@@ -50,7 +50,16 @@ function fixture() {
     gain: 0.5,
     transcript: 'Authored voice',
   };
-  slide.narration = voice;
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: { ...voice, trigger: 'enter' as const },
+    },
+  });
   slide.masks = [
     {
       id: 'private',
@@ -58,11 +67,14 @@ function fixture() {
       color: '#000000',
       opacity: 1,
       rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
-      narration: { ...voice, trigger: 'activation' },
+      narration: { ...voice, trigger: 'activation' as const },
     },
   ];
   const other = structuredClone(slide);
   other.id = 'second';
+  other.actions.forEach((entry) => {
+    entry.object.id = 'second-' + entry.object.id;
+  });
   other.masks = [];
   tour.slides = [slide, other];
   tour.audioResources = [{ assetId: 'unused', name: 'unused', duration: 1 }];
@@ -129,14 +141,35 @@ it('prepares unique media, sanitized shared pixels, object audio, and no capture
   expect(html).not.toContain('private-file');
   expect(html).not.toContain('unused');
   expect(html).toContain('data:audio/wav;base64,');
-  expect(html).toContain('"trigger":"activation"');
+  expect(html).toContain('"trigger":"enter"');
   expect(html).toContain('"trimStart":1');
-  expect(html).toContain('"kind":"highlight"');
+  const payload = JSON.parse(
+    new TextDecoder()
+      .decode(new TextEncoder().encode(html))
+      .split('<script id="tour-data" type="application/json">')[1]!
+      .split('</script>')[0]!
+  );
+  expect(payload.tour.slides[0].masks).toEqual([]);
   expect(html).not.toContain('"kind":"redact"');
   expect(args.project.tour!.slides[0]).toMatchObject({
     masks: [{ kind: 'redact' }],
     image: { width: 640 },
   });
+});
+it('keeps shared-source redactions from omitted empty authoring slides', async () => {
+  const args = fixture();
+  const omitted = args.project.tour!.slides[0]!;
+  if (omitted.kind !== 'image') throw new Error('Expected image fixture');
+  omitted.actions = [];
+  const artifact = await prepareTourHtml(args);
+  expect(io.raster.mock.calls[0]![1]).toMatchObject([{ id: 'private', kind: 'redact' }]);
+  const html = await artifact.blob.text();
+  const payload = JSON.parse(
+    html.split('<script id="tour-data" type="application/json">')[1]!.split('</script>')[0]!
+  );
+  expect(payload.tour.slides.map((slide: { id: string }) => slide.id)).toEqual(['second']);
+  expect(html).toContain(btoa('sanitized'));
+  expect(omitted.masks[0]!.kind).toBe('redact');
 });
 it('rejects missing media, unreviewed targets, invalid options and cancellation', async () => {
   const args = fixture();
@@ -271,7 +304,12 @@ it('reads shared music and narration once, and includes music-only bindings', as
   expect(io.asset.mock.calls.filter(([id]) => id === 'audio')).toHaveLength(1);
   io.asset.mockClear();
   for (const slide of args.project.tour!.slides) {
-    slide.narration = null;
+    if (slide.kind !== 'image') continue;
+    slide.actions = slide.actions.map((entry) =>
+      entry.type === 'hotspot'
+        ? { type: 'hotspot' as const, object: { ...entry.object, narration: null } }
+        : { type: 'annotation' as const, object: { ...entry.object, narration: null } }
+    );
     if (slide.kind === 'image') for (const mask of slide.masks) delete mask.narration;
   }
   const result = await prepareTourHtml(args);

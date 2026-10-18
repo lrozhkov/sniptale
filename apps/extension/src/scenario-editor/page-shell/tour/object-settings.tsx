@@ -1,4 +1,5 @@
-import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
+import { TourHighlightAnimationFields } from './mask-settings';
+import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import {
   tourTextDefaults,
   resolveTourMarkerAppearance,
@@ -10,20 +11,22 @@ import type {
   TourAnnotation,
   TourRect,
   TourDocument,
+  TourHotspotVisual,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
   RotateCcw,
   Crosshair,
   MessageSquare,
   ScanLine,
+  Timer,
+  ScanSearch,
   Palette,
-  MousePointer2,
 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReactNode } from 'react';
 import { GuideInspectorGroup } from '../inspector';
-import { TourActionField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
+import { TourPointFields, TourTextField, TourTextPresentation } from './fields';
 import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
@@ -31,6 +34,8 @@ type SettingsProps<T> = {
   value: T;
   presentation?: 'all' | 'sections';
   narration?: ReactNode;
+  timing?: ReactNode;
+  camera?: ReactNode;
   tour: TourDocument;
   disabled: boolean;
   onChange: (value: T) => boolean;
@@ -41,6 +46,8 @@ export function TourHotspotSettings({
   value,
   presentation = 'all',
   narration,
+  timing,
+  camera,
   tour,
   disabled,
   onChange,
@@ -90,12 +97,7 @@ export function TourHotspotSettings({
       categorized: true,
       content: (
         <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
-          <ToggleField
-            disabled={disabled}
-            label={t('scenario.editor.tourPulse')}
-            value={value.pulse}
-            onChange={() => onChange({ ...value, pulse: !value.pulse })}
-          />
+          <TourHotspotVisualSettings value={value} disabled={disabled} t={t} onChange={onChange} />
           <ToggleField
             disabled={disabled}
             value={!value.markerAppearance}
@@ -128,34 +130,153 @@ export function TourHotspotSettings({
       ),
     },
     {
-      id: 'action',
-      icon: MousePointer2,
-      label: t('scenario.editor.tourAction'),
-      categorized: true,
-      content: (
-        <GuideInspectorGroup
-          id="action"
-          icon={MousePointer2}
-          title={t('scenario.editor.tourAction')}
-        >
-          <TourActionField
-            value={value.action}
-            tour={tour}
-            disabled={disabled}
-            onChange={(action) => onChange({ ...value, action })}
-            t={t}
-          />
-        </GuideInspectorGroup>
-      ),
-    },
-    {
       id: 'targetArea',
       icon: ScanLine,
       label: t('scenario.editor.tourTargetArea'),
       categorized: true,
       content: <TourTargetArea value={value} disabled={disabled} onChange={onChange} t={t} />,
     },
+    ...actionTimingAndCameraSections(timing, camera, t),
   ]);
+}
+
+function TourHotspotVisualSettings({
+  value,
+  disabled,
+  onChange,
+  t,
+}: Omit<SettingsProps<TourHotspot>, 'tour'>) {
+  const visual = value.visual;
+  const switchKind = (kind: TourHotspotVisual['kind']) => {
+    if (kind === visual.kind) return;
+    const rect =
+      visual.kind === 'point'
+        ? (value.targetRect ?? {
+            x: Math.max(0, Math.min(0.8, value.point.x - 0.1)),
+            y: Math.max(0, Math.min(0.8, value.point.y - 0.1)),
+            width: 0.2,
+            height: 0.2,
+          })
+        : visual.rect;
+    const next: TourHotspotVisual =
+      kind === 'point'
+        ? { kind, pulse: true }
+        : {
+            kind,
+            rect,
+            ...(visual.kind === 'point'
+              ? {}
+              : {
+                  ...(visual.strokeWidth === undefined ? {} : { strokeWidth: visual.strokeWidth }),
+                  ...(visual.radius === undefined ? {} : { radius: visual.radius }),
+                }),
+            color: visual.kind === 'point' ? '#f97316' : visual.color,
+            opacity: visual.kind === 'point' ? 0.4 : visual.opacity,
+            animation:
+              visual.kind === 'point'
+                ? {
+                    enter: { kind: 'fade', durationMs: 250 },
+                    exit: { kind: 'fade', durationMs: 250 },
+                  }
+                : visual.animation,
+          };
+    onChange({
+      ...value,
+      point: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+      visual: next,
+    });
+  };
+  return (
+    <>
+      <SelectField
+        label={t('scenario.editor.tourVisual')}
+        value={visual.kind}
+        disabled={disabled}
+        options={[
+          { value: 'point', label: t('scenario.editor.tourVisualPoint') },
+          { value: 'frame', label: t('scenario.editor.tourVisualFrame') },
+          { value: 'highlight', label: t('scenario.editor.tourHighlight') },
+          { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
+        ]}
+        onChange={switchKind}
+      />
+      {visual.kind === 'point' ? (
+        <ToggleField
+          disabled={disabled}
+          label={t('scenario.editor.tourPulse')}
+          value={visual.pulse}
+          onChange={() => onChange({ ...value, visual: { ...visual, pulse: !visual.pulse } })}
+        />
+      ) : (
+        <>
+          <TourRectFields
+            value={visual.rect}
+            t={t}
+            disabled={disabled}
+            onChange={(rect) =>
+              onChange({
+                ...value,
+                point: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+                visual: { ...visual, rect },
+              })
+            }
+          />
+          {visual.kind === 'frame' && (
+            <>
+              <TourInspectorNumericRow
+                label={t('scenario.editor.tourFrameStroke')}
+                value={visual.strokeWidth ?? 3}
+                min={1}
+                max={12}
+                unit="px"
+                disabled={disabled}
+                onChange={(strokeWidth) =>
+                  onChange({ ...value, visual: { ...visual, strokeWidth } })
+                }
+              />
+              <TourInspectorNumericRow
+                label={t('scenario.editor.tourFrameRadius')}
+                value={visual.radius ?? 6}
+                min={0}
+                max={32}
+                unit="px"
+                disabled={disabled}
+                onChange={(radius) => onChange({ ...value, visual: { ...visual, radius } })}
+              />
+            </>
+          )}
+          <TourHighlightAnimationFields
+            value={visual.animation}
+            inherited={false}
+            central
+            disabled={disabled}
+            t={t}
+            onChange={(animation) =>
+              animation ? onChange({ ...value, visual: { ...visual, animation } }) : false
+            }
+          />
+          <ColorField
+            title={t('scenario.editor.color')}
+            label={t('scenario.editor.color')}
+            value={visual.color}
+            disabled={disabled}
+            onChange={(color) => onChange({ ...value, visual: { ...visual, color } })}
+          />
+          <TourInspectorNumericRow
+            label={t('scenario.editor.tourOpacity')}
+            value={visual.opacity * 100}
+            min={0}
+            max={100}
+            unit="%"
+            disabled={disabled}
+            onChange={(opacity) =>
+              onChange({ ...value, visual: { ...visual, opacity: opacity / 100 } })
+            }
+          />
+        </>
+      )}
+    </>
+  );
 }
 
 function TourTargetArea({
@@ -206,6 +327,8 @@ export function TourAnnotationSettings({
   value,
   presentation = 'all',
   narration,
+  timing,
+  camera,
   tour,
   disabled,
   onChange,
@@ -252,6 +375,7 @@ export function TourAnnotationSettings({
         </GuideInspectorGroup>
       ),
     },
+    ...actionTimingAndCameraSections(timing, camera, t),
   ]);
 }
 
@@ -357,4 +481,31 @@ export function TourMarkerFields({
       />
     </div>
   );
+}
+
+function actionTimingAndCameraSections(timing: ReactNode, camera: ReactNode, t: Translate) {
+  return [
+    ...(timing
+      ? [
+          {
+            id: 'timing',
+            icon: Timer,
+            label: t('scenario.editor.tourTiming'),
+            categorized: true,
+            content: timing,
+          },
+        ]
+      : []),
+    ...(camera
+      ? [
+          {
+            id: 'camera',
+            icon: ScanSearch,
+            label: t('scenario.editor.tourCamera'),
+            categorized: true,
+            content: camera,
+          },
+        ]
+      : []),
+  ];
 }

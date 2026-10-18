@@ -46,11 +46,16 @@ export async function prepareTourHtml(args: {
   const tour = structuredClone(parsed.document);
   if (
     tour.slides.some(
-      (slide) => slide.kind === 'image' && (!slide.image || slide.requiresTargetReview)
+      (slide) =>
+        slide.kind === 'image' &&
+        slide.actions.length > 0 &&
+        ((!slide.image && slide.actions.some((entry) => entry.type === 'hotspot')) ||
+          slide.requiresTargetReview)
     )
   )
     throw new Error('Incomplete tour');
   const { redactions, roles } = collectTourMedia(tour);
+  tour.slides = tour.slides.filter((slide) => slide.kind === 'navigation' || slide.actions.length);
   const assets: { id: string; mime: string; blob: Blob }[] = [];
   let inputSize = 0,
     outputSize = 0;
@@ -132,7 +137,11 @@ export async function saveTourHtml(
 function collectTourMedia(tour: TourDocument) {
   const redactions = new Map<string, TourMask[]>();
   const roles = new Map<string, 'image' | 'audio'>();
-  for (const image of getTourImages(tour)) roles.set(image.assetId, 'image');
+  for (const image of getTourImages({
+    ...tour,
+    slides: tour.slides.filter((slide) => slide.kind === 'navigation' || slide.actions.length),
+  }))
+    roles.set(image.assetId, 'image');
   for (const slide of tour.slides) {
     if (slide.kind === 'image' && slide.image) {
       const masks = redactions.get(slide.image.assetId) ?? [];
@@ -155,17 +164,7 @@ function collectTourMedia(tour: TourDocument) {
 
 function markBakedRedactions(tour: TourDocument, id: string) {
   for (const slide of tour.slides) {
-    const image = slide.kind === 'image' ? slide.image : slide.background.image;
-    if (image?.assetId !== id) continue;
-    if (slide.kind === 'image') {
-      for (const mask of slide.masks) {
-        // Preserve mask identity and narration, but the pixels are already irreversible.
-        if (mask.kind === 'redact') {
-          mask.kind = 'highlight';
-          mask.opacity = 0;
-          delete mask.paint;
-        }
-      }
-    }
+    if (slide.kind === 'image' && slide.image?.assetId === id)
+      slide.masks = slide.masks.filter((mask) => mask.kind !== 'redact');
   }
 }

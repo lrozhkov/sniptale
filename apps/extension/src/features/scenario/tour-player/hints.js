@@ -88,10 +88,7 @@ export function createTourHints(
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
     sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
-    pages =
-      navigation || appearance.presentation !== 'callout'
-        ? [copy.text]
-        : measureHintPages(hintText, copy.text);
+    pages = [copy.text];
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
     updateTourHintNavigation(hint, {
@@ -119,6 +116,10 @@ export function createTourHints(
   function changeHint(direction) {
     if (navigation) {
       navigation.move(direction);
+      return;
+    }
+    if (boundary?.canMove(direction)) {
+      boundary.move(direction);
       return;
     }
     if (direction > 0 && textPage + 1 < pages.length) textPage += 1;
@@ -209,7 +210,8 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
   const { stageWidth: hintWidth, stageHeight: hintHeight, imageBox } = geometry;
   const offsetX = ((viewport.clientWidth || hintWidth) - hintWidth) / 2;
   const offsetY = ((viewport.clientHeight || hintHeight) - hintHeight) / 2;
-  const anchor = current.point;
+  const rect = current.visual?.kind !== 'point' ? current.visual?.rect : null;
+  const anchor = rect ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } : current.point;
   const point =
     anchor && imageBox
       ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height }
@@ -230,22 +232,24 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
     let placement = appearance.placement ?? 'auto';
     const x = point.x;
     const y = point.y;
+    const halfWidth = rect && imageBox ? (rect.width * imageBox.width) / 2 : 0;
+    const halfHeight = rect && imageBox ? (rect.height * imageBox.height) / 2 : 0;
     if (placement === 'auto') {
       placement =
-        x + gap + hint.offsetWidth <= hintWidth - 8
+        x + halfWidth + gap + hint.offsetWidth <= hintWidth - 8
           ? 'right'
-          : x - gap - hint.offsetWidth >= 8
+          : x - halfWidth - gap - hint.offsetWidth >= 8
             ? 'left'
-            : y + gap + hint.offsetHeight <= hintHeight - 8
+            : y + halfHeight + gap + hint.offsetHeight <= hintHeight - 8
               ? 'bottom'
               : 'top';
     }
-    left = x + gap;
+    left = x + halfWidth + gap;
     top = y - hint.offsetHeight / 2;
-    if (placement === 'left') left = x - hint.offsetWidth - gap;
+    if (placement === 'left') left = x - halfWidth - hint.offsetWidth - gap;
     if (placement === 'top' || placement === 'bottom') {
       left = x - hint.offsetWidth / 2;
-      top = placement === 'top' ? y - hint.offsetHeight - gap : y + gap;
+      top = placement === 'top' ? y - halfHeight - hint.offsetHeight - gap : y + halfHeight + gap;
     }
   }
   return {

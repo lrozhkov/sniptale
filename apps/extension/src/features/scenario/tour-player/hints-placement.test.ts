@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -63,17 +68,21 @@ function authoringInput() {
     alt: '',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Open',
-      text: 'Text',
-      action: { kind: 'url', url: 'https://example.com/' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Open',
+        text: 'Text',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   return {
@@ -113,15 +122,20 @@ it('places a right callout at the shared anchor gap', async () => {
   const input = authoringInput();
   const slide = input.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image slide');
-  slide.hotspots = [
-    {
-      ...slide.hotspots[0]!,
-      appearance: {
-        presentation: 'callout',
-        alignment: 'start',
-        placement: 'right',
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        ...getTourHotspots(slide)[0]!,
+        appearance: {
+          presentation: 'callout' as const,
+          alignment: 'start' as const,
+          placement: 'right' as const,
+        },
       },
-    },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   player.update(input);
   const anchorX = Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
@@ -140,7 +154,7 @@ it.each([320, 640])(
     const input = authoringInput();
     const slide = input.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image slide');
-    const hotspot = slide.hotspots[0]!;
+    const hotspot = getTourHotspots(slide)[0]!;
     const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
     for (const presentation of ['caption-top', 'caption-bottom'] as const) {
       input.tour.style.textAppearance.presentation = presentation;
@@ -148,7 +162,11 @@ it.each([320, 640])(
       player.update(input);
       expect(hint.dataset['presentation']).toBe('callout');
       expect(Number.parseFloat(hint.style.width)).toBeLessThan(width);
-      hotspot.appearance = { presentation, alignment: 'center', placement: 'right' };
+      hotspot.appearance = {
+        presentation,
+        alignment: 'center' as const,
+        placement: 'right' as const,
+      };
       player.update(input);
       expect(hint.dataset['presentation']).toBe('callout');
       expect(hint.style.textAlign).toBe('center');
@@ -162,13 +180,22 @@ it('keeps a legacy anchored annotation at the slide edge independently of the ac
   const input = authoringInput();
   const slide = input.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image slide');
-  slide.annotations = [
-    {
-      id: 'note',
-      text: 'Independent note',
-      anchor: { x: 0.1, y: 0.2 },
-      appearance: { presentation: 'callout', placement: 'left', alignment: 'end' },
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'annotation' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'note',
+        text: 'Independent note',
+        anchor: { x: 0.1, y: 0.2 },
+        appearance: {
+          presentation: 'callout' as const,
+          placement: 'left' as const,
+          alignment: 'end' as const,
+        },
+      },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   player.update(input);
   const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
@@ -195,8 +222,12 @@ it.each(['left', 'right', 'top', 'bottom'] as const)(
     const input = authoringInput();
     const slide = input.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image slide');
-    slide.hotspots[0]!.appearance = { presentation: 'callout', alignment: 'start', placement };
-    Object.assign(slide.hotspots[0]!.appearance!, { calloutGap: 80 });
+    getTourHotspots(slide)[0]!.appearance = {
+      presentation: 'callout' as const,
+      alignment: 'start' as const,
+      placement,
+    };
+    Object.assign(getTourHotspots(slide)[0]!.appearance!, { calloutGap: 80 });
     player.update(input);
     const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
     const x = Number.parseFloat(marker.style.left);
@@ -225,9 +256,9 @@ it('inherits global gap, applies a local gap, and restores the default without c
   const slide = input.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image slide');
   input.tour.style.hotspotAppearance = {
-    presentation: 'callout',
-    placement: 'right',
-    alignment: 'start',
+    presentation: 'callout' as const,
+    placement: 'right' as const,
+    alignment: 'start' as const,
     calloutGap: 70,
   };
   const markerGap = () =>
@@ -235,30 +266,77 @@ it('inherits global gap, applies a local gap, and restores the default without c
     Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
   player.update(input);
   expect(markerGap()).toBe(70);
-  slide.hotspots[0]!.appearance = { ...input.tour.style.hotspotAppearance, calloutGap: 100 };
+  getTourHotspots(slide)[0]!.appearance = {
+    ...input.tour.style.hotspotAppearance,
+    calloutGap: 100,
+  };
   player.update(input);
   expect(markerGap()).toBe(100);
-  slide.hotspots[0]!.appearance = null;
+  getTourHotspots(slide)[0]!.appearance = null;
   player.update(input);
   expect(markerGap()).toBe(70);
-  slide.annotations = [
-    {
-      id: 'caption',
-      text: 'Caption',
-      anchor: null,
-      appearance: {
-        presentation: 'caption-bottom',
-        placement: 'auto',
-        alignment: 'start',
-        calloutGap: 0,
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'annotation' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'caption',
+        text: 'Caption',
+        anchor: null,
+        appearance: {
+          presentation: 'caption-bottom' as const,
+          placement: 'auto' as const,
+          alignment: 'start' as const,
+          calloutGap: 0,
+        },
       },
-    },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   player.update(input);
   root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   const position = { top: hint.style.top, left: hint.style.left };
-  slide.annotations[0]!.appearance!.calloutGap = 120;
+  getTourAnnotations(slide)[0]!.appearance!.calloutGap = 120;
   player.update(input);
   root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   expect({ top: hint.style.top, left: hint.style.left }).toEqual(position);
 });
+
+it.each(['annotation', 'hotspot'] as const)(
+  'opens the next %s action after dismissing a caption on the same image',
+  async (kind) => {
+    const { player, root } = await mount();
+    const input = authoringInput();
+    const slide = input.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    const point = slide.actions[0]!;
+    slide.actions = [
+      {
+        type: 'annotation',
+        object: { id: 'intro', text: 'Introduction', anchor: null, appearance: null },
+      },
+      kind === 'hotspot'
+        ? point
+        : {
+            type: 'annotation',
+            object: { id: 'next-note', text: 'Next instruction', anchor: null, appearance: null },
+          },
+    ];
+    player.update(input);
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    expect(hint.hidden).toBe(false);
+    expect(root.querySelector('[data-tour-hint-text]')?.textContent).toBe('Introduction');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(hint.hidden).toBe(true);
+    if (kind === 'hotspot') root.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(root.dataset['slideId']).toBe('first');
+    expect(root.dataset['actionId']).toBe(kind === 'hotspot' ? 'point' : 'next-note');
+    expect(hint.hidden).toBe(false);
+    expect(root.querySelector('[data-tour-hint-text]')?.textContent).toBe(
+      kind === 'hotspot' ? 'Text' : 'Next instruction'
+    );
+    window.dispatchEvent(new Event('resize'));
+    expect(hint.hidden).toBe(false);
+  }
+);

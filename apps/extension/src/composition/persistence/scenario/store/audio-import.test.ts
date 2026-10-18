@@ -29,7 +29,19 @@ function input() {
   const project = createGuideProject('Guide', 'guide', 100);
   project.items = [createGuideStep('Keep this', 'step')];
   project.tour = createTourDocument();
-  project.tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
+  project.tour.slides = [
+    {
+      kind: 'navigation',
+      id: 'first',
+      title: '',
+      description: '',
+      background: { color: '#111827', image: null },
+      buttons: [],
+      narration: null,
+      timing: createTourImageSlide().timing,
+    },
+    createTourImageSlide('second'),
+  ];
   return {
     project,
     baseUpdatedAt: 100,
@@ -190,15 +202,29 @@ it('rejects malformed project input before resource acquisition', async () => {
 
 it('attaches a recorded resource to the exact annotation, leaving the slide narration alone', async () => {
   const args = input();
-  const slide = args.project.tour!.slides[0]!;
+  const slide = createTourImageSlide('first');
+  args.project.tour!.slides[0] = slide;
   if (slide.kind !== 'image') throw Error('image');
-  slide.annotations = [{ id: 'hint', text: 'Hint', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'hint', text: 'Hint', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const { project: result } = await importScenarioNarration({ ...args, objectId: 'hint' });
   expect(result.tour!.slides[0]!.narration).toBeNull();
   expect(result.tour).toMatchObject({
     audioResources: [{ duration: 4 }],
     slides: [
-      { annotations: [{ id: 'hint', narration: { duration: 4, trigger: 'activation' } }] },
+      {
+        actions: [
+          {
+            type: 'annotation' as const,
+            object: { id: 'hint', narration: { duration: 4, trigger: 'enter' } },
+          },
+        ],
+      },
       {},
     ],
   });
@@ -222,7 +248,8 @@ it('imports to resources without attaching to a slide', async () => {
 
 it('keeps an object entry trigger when replacing its recorded audio', async () => {
   const args = input();
-  const slide = args.project.tour!.slides[0]!;
+  const slide = createTourImageSlide('first');
+  args.project.tour!.slides[0] = slide;
   if (slide.kind !== 'image') throw Error('image');
   const expected = {
     assetId: 'prior',
@@ -233,8 +260,11 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
     transcript: '',
     trigger: 'enter' as const,
   };
-  slide.annotations = [
-    { id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected }].map(
+      (object) => ({ type: 'annotation' as const, object })
+    ),
   ];
   const { project: result } = await importScenarioNarration({
     ...args,
@@ -242,7 +272,7 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
     expectedNarration: expected,
   });
   expect(result.tour!.slides[0]).toMatchObject({
-    annotations: [{ narration: { trigger: 'enter' } }],
+    actions: [{ type: 'annotation' as const, object: { narration: { trigger: 'enter' } } }],
   });
 });
 

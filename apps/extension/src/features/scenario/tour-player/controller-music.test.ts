@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -219,13 +220,13 @@ it('keeps automatic progression and choice waits independent from music visit ac
   expect(h.root.dataset['slideId']).toBe('second');
   expect(h.music.currentTime).toBe(6);
   expect(h.music.paused).toBe(false);
-  h.tour.slides[1]!.timing = { ...h.tour.slides[1]!.timing, autoplayTarget: 'second' };
+  h.tour.slides[1]!.timing = { ...h.tour.slides[1]!.timing };
   h.player.update(h.input);
   await h.tick();
   h.click('play');
   await h.tick(100);
   expect(h.music.paused).toBe(false);
-  expect(h.root.dataset['slideId']).toBe('second');
+  expect(h.root.dataset['slideId']).toBe('third');
 });
 it('restarts completed tours without an end screen and preserves manual final reading', async () => {
   const h = await mount(false);
@@ -317,6 +318,7 @@ it('uses real local narration state for ducking without stopping the music visit
   await h.tick();
   h.click('play');
   await h.tick();
+  h.player.select('first');
   const local = h.root.querySelector<HTMLButtonElement>('[data-tour-narration-toggle="voice"]')!;
   local.click();
   await h.tick();

@@ -206,13 +206,20 @@ it('keeps global canonical identity, template, Tour navigation and hostile-input
       ? {
           ...row,
           value: {
-            ...createTourImageSlide('slide-a'),
-            timing: {
-              mode: 'inherit',
-              holdSeconds: 4,
-              truncateNarration: false,
-              autoplayTarget: 'missing',
-            },
+            kind: 'navigation',
+            id: 'slide-a',
+            title: '',
+            description: '',
+            background: { color: '#000000', image: null },
+            narration: null,
+            timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false },
+            buttons: [
+              {
+                id: 'broken-link',
+                label: 'Missing slide',
+                action: { kind: 'slide', slideId: 'missing' },
+              },
+            ],
           },
         }
       : row

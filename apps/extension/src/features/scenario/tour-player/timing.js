@@ -1,4 +1,7 @@
-import { resolveTourHighlightAnimation } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  resolveTourHighlightAnimation,
+  getTourHotspots,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourNarrationCues } from '../project/tour-resources';
 import { tourCameraEnabled } from './camera.js';
 /** Reading and narration use authored source data; returned duration is milliseconds. */
@@ -6,9 +9,10 @@ export function tourSlideDuration(tour, slide) {
   const texts =
     slide.kind === 'image'
       ? [
-          slide.title,
-          ...slide.hotspots.flatMap((point) => [point.label, point.text]),
-          ...slide.annotations.map((note) => note.text),
+          ...getTourHotspots(slide).flatMap((point) => [point.label, point.text]),
+          ...slide.actions
+            .filter((entry) => entry.type === 'annotation')
+            .map((entry) => entry.object.text),
         ]
       : [slide.title, slide.description, ...slide.buttons.map((button) => button.label)];
   const characters = texts.join(' ').trim().length;
@@ -28,44 +32,15 @@ export function tourSlideDuration(tour, slide) {
 export function tourAutoplayDestination(tour, index) {
   const slide = tour.slides[index];
   if (!slide) return null;
-  if (slide.timing.autoplayTarget) {
-    const target = tour.slides.findIndex((entry) => entry.id === slide.timing.autoplayTarget);
-    return target < 0 ? null : target;
-  }
-  const actions = (slide.kind === 'image' ? slide.hotspots : slide.buttons)
-    .map((entry) => entry.action)
-    .filter((action) => action.kind !== 'none');
-  if (actions.some((action) => action.kind === 'url')) return null;
-  const destinations = new Set(actions.map((action) => actionDestination(action, tour, index)));
-  if (!destinations.size) return index + 1;
-  return destinations.size === 1 ? [...destinations][0] : null;
-}
-function actionDestination(action, tour, index) {
-  let target = null;
-  if (action.kind === 'next') target = index + 1;
-  else if (action.kind === 'previous') target = index - 1;
-  else if (action.kind === 'restart') target = 0;
-  else if (action.kind === 'end') target = tour.slides.length;
-  else if (action.kind === 'slide')
-    target = tour.slides.findIndex((slide) => slide.id === action.slideId);
-  return target !== null && target >= 0 && target <= tour.slides.length ? target : null;
+  return slide.kind === 'navigation' ? null : index + 1;
 }
 
-/** A branched or looping tour has no truthful global remaining-time estimate. */
+/** Entry durations share one timeline even when contents pauses automatic progression. */
 export function tourLinearTimeline(tour, reducedMotion = false) {
-  if (tour.playback.loop || !tour.slides.length) return null;
+  if (!tour.slides.length) return null;
   const offsets = [];
   let duration = 0;
-  for (const [index, slide] of tour.slides.entries()) {
-    if (tourAutoplayDestination(tour, index) !== index + 1) return null;
-    const objects = slide.kind === 'image' ? slide.hotspots : slide.buttons;
-    if (
-      objects.some(
-        ({ action }) =>
-          action.kind !== 'none' && actionDestination(action, tour, index) !== index + 1
-      )
-    )
-      return null;
+  for (const slide of tour.slides) {
     offsets.push(duration);
     duration +=
       tourEntranceTiming(tour, slide, reducedMotion).total +
@@ -77,10 +52,16 @@ export function tourLinearTimeline(tour, reducedMotion = false) {
 
 /** Destination-only phase budgets keep seeking stable across different incoming routes. */
 export function tourEntranceTiming(tour, slide, reducedMotion = false) {
+  const index = tour.slides.indexOf(slide);
+  const previous = tour.slides[index - 1];
+  const sameSource = slide?.sourceSlideId && slide.sourceSlideId === previous?.sourceSlideId;
   const switchMs =
-    reducedMotion || tour.transition.kind === 'none' ? 0 : tour.transition.durationMs;
+    reducedMotion || sameSource || tour.transition.kind === 'none' ? 0 : tour.transition.durationMs;
   const travelMs =
-    !reducedMotion && slide?.kind === 'image' && slide.hotspots.length === 1
+    !reducedMotion &&
+    slide?.kind === 'image' &&
+    getTourHotspots(slide).length === 1 &&
+    getTourHotspots(slide)[0].visual.kind === 'point'
       ? tour.transition.hotspotTravelMs
       : 0;
   const camera = !reducedMotion && tourCameraEnabled(slide, tour.playback.autoZoom);
@@ -103,8 +84,13 @@ export function tourEntranceTiming(tour, slide, reducedMotion = false) {
 export function tourHighlightTiming(tour, slide, reducedMotion = false) {
   const result = { enterMs: 0, exitMs: 0 };
   if (reducedMotion || slide?.kind !== 'image') return result;
-  for (const mask of slide.masks) {
-    const phases = resolveTourHighlightAnimation(mask, tour.style.maskDefaults);
+  const animations = [
+    ...slide.masks.map((mask) => resolveTourHighlightAnimation(mask, tour.style.maskDefaults)),
+    ...getTourHotspots(slide).flatMap((hotspot) =>
+      hotspot.visual.kind === 'point' ? [] : [hotspot.visual.animation]
+    ),
+  ];
+  for (const phases of animations) {
     if (phases.enter.kind === 'fade')
       result.enterMs = Math.max(result.enterMs, phases.enter.durationMs);
     if (phases.exit.kind === 'fade')

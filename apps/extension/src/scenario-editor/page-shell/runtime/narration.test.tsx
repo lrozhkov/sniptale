@@ -39,7 +39,20 @@ function Probe() {
 function fixture() {
   const project = createGuideProject('Guide', 'guide', 1);
   project.tour = createTourDocument();
-  project.tour.slides = [createTourImageSlide('first')];
+  const slide = createTourImageSlide('first');
+  slide.actions = [
+    {
+      type: 'annotation',
+      object: {
+        id: 'first-action',
+        text: 'Read this',
+        anchor: null,
+        appearance: null,
+        narration: null,
+      },
+    },
+  ];
+  project.tour.slides = [slide];
   return project;
 }
 function command() {
@@ -47,6 +60,7 @@ function command() {
     kind: 'narration' as const,
     input: {
       slideId: 'first',
+      objectId: 'first-action',
       expectedNarration: null,
       blob: new Blob(['voice'], { type: 'audio/webm' }),
       signal: new AbortController().signal,
@@ -65,13 +79,14 @@ beforeEach(async () => {
   io.attach.mockImplementation(async ({ project }) => {
     const next = structuredClone(project);
     next.updatedAt = 2;
-    next.tour.slides[0].narration = {
+    next.tour.slides[0].actions[0].object.narration = {
       assetId: 'audio',
       duration: 2,
       trimStart: 0,
       trimEnd: 2,
       gain: 1,
       transcript: '',
+      trigger: 'enter',
     };
     return { project: next, workspaceRevision: 2 };
   });
@@ -89,17 +104,21 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
+function currentNarration() {
+  const slide = state.project?.tour?.slides[0];
+  return slide?.kind === 'image' ? slide.actions[0]?.object.narration : undefined;
+}
 it('adopts one revisioned narration publication into the existing Undo history', async () => {
   await act(async () => {
     expect(await state.commitChange(command())).toBe(true);
   });
   expect(io.attach).toHaveBeenCalledWith(
-    expect.objectContaining({ baseUpdatedAt: 1, slideId: 'first' })
+    expect.objectContaining({ baseUpdatedAt: 1, slideId: 'first', objectId: 'first-action' })
   );
-  expect(state.project?.tour?.slides[0]?.narration?.assetId).toBe('audio');
+  expect(currentNarration()?.assetId).toBe('audio');
   expect(state.canUndo).toBe(true);
   act(() => state.undo());
-  expect(state.project?.tour?.slides[0]?.narration).toBeNull();
+  expect(currentNarration()).toBeNull();
 });
 it('retains the current narration on failure and admits retry', async () => {
   io.attach.mockRejectedValueOnce(new Error('quota'));
@@ -107,11 +126,11 @@ it('retains the current narration on failure and admits retry', async () => {
     expect(await state.commitChange(command())).toBe(false);
   });
   expect(state.actionError).toBe('import');
-  expect(state.project?.tour?.slides[0]?.narration).toBeNull();
+  expect(currentNarration()).toBeNull();
   await act(async () => {
     expect(await state.commitChange(command())).toBe(true);
   });
-  expect(state.project?.tour?.slides[0]?.narration?.assetId).toBe('audio');
+  expect(currentNarration()?.assetId).toBe('audio');
 });
 it('rejects duplicate pending narration commits and ignores late completion after unmount', async () => {
   let finish!: (project: ReturnType<typeof fixture>) => void;
@@ -143,7 +162,7 @@ it('reports a stale aggregate revision without replacing local content', async (
     expect(await state.commitChange(command())).toBe(false);
   });
   expect(state.status).toBe('conflict');
-  expect(state.project?.tour?.slides[0]?.narration).toBeNull();
+  expect(currentNarration()).toBeNull();
 });
 
 it('loads attached narration into player media URLs and releases it on Undo', async () => {
@@ -182,22 +201,23 @@ function mediaURLs() {
   );
   return { create, revoke };
 }
-it('deduplicates slide and object narration and leaves detached audio unloaded', async () => {
+it('deduplicates two action narrations and music while leaving detached audio unloaded', async () => {
   mediaURLs();
   io.read.mockResolvedValue(new Blob(['voice'], { type: 'audio/webm' }));
   const attach = io.attach.getMockImplementation()!;
   io.attach.mockImplementation(async (args) => {
     const { project: next, workspaceRevision } = await attach(args);
     const slide = next.tour.slides[0];
-    slide.annotations = [
-      {
+    slide.actions.push({
+      type: 'annotation',
+      object: {
         id: 'note',
         text: 'Note',
         anchor: null,
         appearance: null,
-        narration: { ...slide.narration, trigger: 'activation' },
+        narration: { ...slide.actions[0].object.narration, trigger: 'enter' },
       },
-    ];
+    });
     next.tour.audioResources = [{ assetId: 'unused', duration: 2, name: 'Unused' }];
     next.tour.backgroundMusic = {
       assetId: 'audio',

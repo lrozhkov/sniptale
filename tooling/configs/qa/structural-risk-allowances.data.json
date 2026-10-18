@@ -1364,6 +1364,94 @@
       "reviewDate": "2026-10-18",
       "reason": "tool-noise: This read-only test compares permission ceilings for local workflow calls and their callee jobs. Four iteration dimensions retain precise call-site diagnostics. Metric owners are this test module and Vitest assertions. No separate state, effect, recovery, or runtime owner exists. Negative proof reproduces the actual GitHub reusable-workflow permission refusal.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess when this function gains a separate contract, runtime effect, or state authority. Remove when the analyzer can model this cohesive contract matrix."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/controller-preview.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The file proves one createTourPlayer preview contract with reset DOM and media fixtures. Its 34 state signals are separate test-local receivers. No production writer or runtime authority is defined here. The action sequence replaces local paging in the same shared fixture; extracting forwarding-only test setup would spread that fixture. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "9a1af768621d1b4c5663af2b5e2634269b3ee55687cbaaf4b0d0cf0d41943397",
+      "signatureHash": "f6e59affacb7c33dbf3fe6f9bcc037526dd121e78792152af8659bf1c5f1b9c7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/controller.js",
+      "symbol": "createTourPlayer",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: createTourPlayer owns one entry index and one pending navigation transaction. Scene, media readiness and clock remain in their existing owners. Its 177 lines have 21 statements, cyclomatic 4, nesting 1 and no recovery branch. Splitting mount, update and dispose across modules would distribute this same lifecycle receiver. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "b863fb75d04c9af5fc37899af6eead766258adb1ec8250985fff6b909145e95c",
+      "signatureHash": "ef635b48ff6c236366ab68c1df77040cbcfe7a555a236fcd8289323c1f4f7731"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/document.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The file proves one standalone HTML artifact through a shared jsdom/media fixture. Its 28 state signals are isolated test-local values, not concurrent production authorities. Action navigation replaces old hint paging within the same export/render contract; a fixture-only split would add forwarding edges. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "57a5fdcdc15fd1192418e056c43dbd5412fa8059a937ee52e328fa33819d551f",
+      "signatureHash": "15edbcfcfd30b0caf6079b5ea5461b04620e6927ad6b321c93e616eda76b007c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/document.ts",
+      "symbol": "buildTourPlayerShell",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: buildTourPlayerShell validates and projects one bounded standalone artifact, then emits its inert JSON and fixed shell together. The 143-line body has 20 statements and no durable writer or recovery authority. Separating the template only to meet the 140-line limit would obscure the escaping and payload boundary reviewed together. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "85f690c28920a5f3e7d53751522d481c6af6dd1c9c3632d506341030d53419aa",
+      "signatureHash": "bbc8837b2e8cbb534c464182b59ff774a9b622037285624e4046da17aeab2c43"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/navigation.js",
+      "symbol": "createTourNavigation",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: createTourNavigation owns one dialog lifecycle: open, select, dismiss and restore focus. The 144-line body has 3 outer statements, cyclomatic 1 and no durable state or effects. Contents labels now project action entries. A split would distribute dismissal, keyboard and focus ownership for this same dialog. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "699178e809aa54d280a24061cadd0bcbaa57f9d7be9d3ed4f1c913951933f893",
+      "signatureHash": "fc60305331a6fce94a03288d0897260a8a8cb29389f444165ad0a620e41ab480"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/playback.js",
+      "symbol": "createTourPlayback",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: createTourPlayback wires one existing media session and its transport. The 156-line body has 22 outer statements, cyclomatic 1 and no independent recovery authority. Its local values project the current entry; the session remains the single clock owner and audio channels retain media cleanup. A split would distribute this same session lifecycle. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "90baa050cc3bb4a2585650d5153dbb4e3625c3272562861c74ed6d31aac0d655",
+      "signatureHash": "c34b48e68f81e0d2f55b2d2b8a485d28864cb946bb8e5d9e8dd913e411d9fe39"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/stage.tsx",
+      "symbol": "TourStage",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: TourStage is one React adapter for the existing player mount. Its 169-line body has 19 statements, cyclomatic 5 and nesting 1. Refs hold current callbacks and admitted input identities; they do not create a durable writer. Mount, input update and selection restoration share one player instance and cleanup lifetime. Splitting these effects would distribute that receiver. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "df9757d9a53bf6275f5e93a3bc565fcb0e4b907226f6ebfcb4711009fab26dc6",
+      "signatureHash": "45d095e2f809a791d9b419163a75264f58433e378fda63d60bd41dace5f2a899"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "packages/runtime-contracts/src/scenario/tour-parser.test.ts",
+      "symbol": "<file>",
+      "owner": "package:runtime-contracts:scenario",
+      "reason": "tool-noise: The file tests one closed TourDocument boundary using reset document/slide factories and hostile-input mutations. Its 43 state signals are test-local fixtures, not production authorities. Ordered actions replace parallel arrays within the same parser contract; splitting only the 826-line test file would duplicate those fixtures or add forwarding setup. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
+      "reviewDate": "2026-10-18",
+      "astHash": "b223a3f01d613aba46e808f24d38fc673b4fee8e5a24e81efbbc9a497316962b",
+      "signatureHash": "ac66c8d94cfe6559ec7822bbcb8996ab5e102be92322df805080c9379bf5699d"
     }
   ]
 }

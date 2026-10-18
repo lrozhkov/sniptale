@@ -126,12 +126,8 @@ export function TourMaskSettings({
               disabled={disabled}
               value={value.kind}
               options={[
-                { value: 'highlight', label: t('scenario.editor.tourHighlight') },
-                { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
                 { value: 'blur', label: t('scenario.editor.tourBlur') },
-                ...(value.kind === 'redact'
-                  ? [{ value: 'redact' as const, label: t('scenario.editor.tourRedact') }]
-                  : []),
+                { value: 'redact', label: t('scenario.editor.tourRedact') },
               ]}
               onChange={(kind) => onChange({ ...authored, kind })}
             />
@@ -261,7 +257,7 @@ function maskEffectControls(value: TourMask) {
 }
 
 /** Animation inheritance is independent from the mask's paint and opacity inheritance. */
-function TourHighlightAnimationFields({
+export function TourHighlightAnimationFields({
   value,
   inherited,
   central,

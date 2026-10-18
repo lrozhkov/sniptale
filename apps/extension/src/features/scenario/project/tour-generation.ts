@@ -63,25 +63,29 @@ function materialSlide(
       : null;
   const text = boundedText(material.description, sourceId, issues);
   if (point)
-    slide.hotspots.push({
-      id: nextId(),
-      point: { ...point },
-      targetRect,
-      label: material.title,
-      text,
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: true,
+    slide.actions.push({
+      type: 'hotspot',
+      object: {
+        id: nextId(),
+        point: { ...point },
+        targetRect,
+        label: material.title,
+        text,
+        visual: { kind: 'point', pulse: true },
+        appearance: null,
+      },
     });
   else {
     if (source.kind !== 'import') issues.push({ kind: 'place-hotspot', sourceId });
-    if (text)
-      slide.annotations.push({
+    slide.actions.push({
+      type: 'annotation',
+      object: {
         id: nextId(),
         text,
         anchor: null,
         appearance: null,
-      });
+      },
+    });
   }
   return slide;
 }
@@ -188,7 +192,9 @@ export function generateTourFromGuide(
         chapter.buttons.push({
           id: nextId(),
           label: item.title,
-          action: { kind: 'slide', slideId: slide.id },
+          action: slide.actions[0]
+            ? { kind: 'action', actionId: slide.actions[0].object.id }
+            : { kind: 'none' },
         });
     }
   }

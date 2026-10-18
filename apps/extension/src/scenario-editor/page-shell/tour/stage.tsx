@@ -66,15 +66,24 @@ export function TourStage({
     labels,
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
-  const latest = useRef({ input, selection });
-  latest.current = { input, selection };
+  const latest = useRef({ input, selection, tour, images });
+  latest.current = { input, selection, tour, images };
+  const admitted = useRef<{ tour: TourDocument; images: Record<string, string | null> } | null>(
+    null
+  );
+  const lastSelection = useRef<TourSelection | null>(null);
   const hasAuthoringNavigation = Boolean(onNavigateSelection);
   useLayoutEffect(() => {
     if (!root.current) return;
     const player = createTourPlayer(root.current, latest.current.input, {
       preview: view === 'preview',
       ...(view === 'preview' && latest.current.selection?.kind === 'slide'
-        ? { initialSlideId: latest.current.selection.slideId }
+        ? {
+            initialSlideId: latest.current.selection.slideId,
+            ...(latest.current.selection.objectId
+              ? { initialActionId: latest.current.selection.objectId }
+              : {}),
+          }
         : {}),
       authoring:
         view === 'preview'
@@ -117,7 +126,10 @@ export function TourStage({
             },
     });
     controller.current = player;
-    restoreSelection(player, latest.current.selection);
+    admitted.current = { tour: latest.current.tour, images: latest.current.images };
+    lastSelection.current = latest.current.selection;
+    if (view !== 'preview' || latest.current.selection?.kind === 'end')
+      restoreSelection(player, latest.current.selection);
     return () => {
       player.dispose();
       controller.current = null;
@@ -125,15 +137,27 @@ export function TourStage({
   }, [shadow, view, previewKey, hasAuthoringNavigation]);
   useLayoutEffect(() => {
     if (!controller.current) return;
+    if (admitted.current?.tour === tour && admitted.current.images === images) return;
+    admitted.current = { tour, images };
     controller.current.update(latest.current.input);
-    restoreSelection(controller.current, latest.current.selection);
-  }, [tour, images]);
+    if (view !== 'preview') restoreSelection(controller.current, latest.current.selection);
+  }, [tour, images, view]);
   const selectionKind = selection?.kind;
   const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
   const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
   useLayoutEffect(() => {
-    if (controller.current) restoreSelection(controller.current, latest.current.selection);
-  }, [selectionKind, selectedSlide, selectedObject]);
+    const previous = lastSelection.current;
+    const current = latest.current.selection;
+    const same =
+      previous?.kind === current?.kind &&
+      (current?.kind !== 'slide' ||
+        (previous?.kind === 'slide' &&
+          previous.slideId === current.slideId &&
+          previous.objectId === current.objectId));
+    lastSelection.current = current;
+    if (controller.current && (view !== 'preview' || !same))
+      restoreSelection(controller.current, current);
+  }, [selectionKind, selectedSlide, selectedObject, view]);
   return (
     <div
       className="tour-stage-host"

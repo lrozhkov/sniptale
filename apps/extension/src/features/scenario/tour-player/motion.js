@@ -1,3 +1,4 @@
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { resolveTourCamera, resolveTourEditingCamera, tourCameraEnabled } from './camera.js';
 import { tourEntranceTiming } from './timing.js';
 const bounded = (value) => Math.max(0, Math.min(1, value));
@@ -66,6 +67,9 @@ export function createTourMotion(root, signal, changed = () => {}) {
       pixels.classList.add('tour-motion-previous');
       pixels.inert = true;
       pixels.setAttribute('aria-hidden', 'true');
+      pixels
+        .querySelectorAll('.tour-hotspot,[data-tour-object-id]')
+        .forEach((node) => node.remove());
       pixels.querySelectorAll('a').forEach((node) => node.removeAttribute('href'));
       return { pixels, point };
     },
@@ -243,7 +247,7 @@ function applyMotionFrame(state, scene, stage, elapsed) {
     });
   if (state.target && state.marker) {
     state.target.style.visibility = 'hidden';
-    const point = state.image?.hotspots[0]?.point;
+    const point = getTourHotspots(state.image)[0]?.point;
     const destination =
       box && point
         ? { x: box.x + point.x * box.width, y: box.y + point.y * box.height }

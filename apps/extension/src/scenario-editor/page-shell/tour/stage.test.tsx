@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -34,17 +35,19 @@ function fixture() {
     alt: 'Image',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Point',
-      text: 'Explanation',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Point',
+        text: 'Explanation',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   const images: Record<string, string> = {
@@ -113,8 +116,17 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   props.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots = [];
-  slide.annotations = [{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
   act(() => root.render(<TourStage {...props} selection={selection} />));
   const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
@@ -203,11 +215,13 @@ it.each(['blur', 'highlight'] as const)(
     const props = fixture();
     const slide = props.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image');
-    slide.hotspots.push({
-      ...slide.hotspots[0]!,
-      id: 'inactive',
-      point: { x: 0.7, y: 0.5 },
-      action: { kind: 'none' },
+    slide.actions.push({
+      type: 'hotspot' as const,
+      object: {
+        ...getTourHotspots(slide)[0]!,
+        id: 'inactive',
+        point: { x: 0.7, y: 0.5 },
+      },
     });
     slide.masks = [
       {

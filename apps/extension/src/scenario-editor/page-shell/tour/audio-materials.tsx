@@ -103,10 +103,6 @@ export function TourAudioResources({
   const resources = getTourAudioResources(tour);
   const selected = selection?.kind === 'slide' ? selection : null;
   const selectedSlide = tour.slides.find((slide) => slide.id === selected?.slideId);
-  const currentNarration =
-    selectedSlide && selected
-      ? getTourNarrationTarget(selectedSlide, selected.objectId)?.narration
-      : null;
   return (
     <section className="tour-audio-resources" aria-label={t('scenario.editor.tourAudioResources')}>
       <h3>
@@ -166,7 +162,12 @@ export function TourAudioResources({
               </ContentToolbarButton>
               <ContentToolbarButton
                 title={t('scenario.editor.tourAudioAttach')}
-                disabled={disabled || !selected}
+                disabled={
+                  disabled ||
+                  !selected ||
+                  !selectedSlide ||
+                  !getTourNarrationTarget(selectedSlide, selected.objectId)
+                }
                 onClick={() => {
                   if (!selected) return;
                   const voice = materialNarration(resource);
@@ -177,12 +178,7 @@ export function TourAudioResources({
                     narration: selected.objectId
                       ? {
                           ...voice,
-                          trigger:
-                            currentNarration &&
-                            'trigger' in currentNarration &&
-                            currentNarration.trigger === 'enter'
-                              ? 'enter'
-                              : 'activation',
+                          trigger: 'enter',
                         }
                       : voice,
                   });

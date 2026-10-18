@@ -205,7 +205,7 @@ export function useGuidePageState() {
     autosaveEnabled,
     setAutosaveEnabled,
     commitChange,
-    editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),
+    editingLocked: status === 'loading' || (busy.current && !autosaving.current),
     mutationPending: busy.current,
     project,
     status,

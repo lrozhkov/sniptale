@@ -29,7 +29,7 @@ it('generates occurrences in selection order without copying media or changing s
   expect(new Set(result.tour.slides.map((slide) => slide.id)).size).toBe(2);
   expect(result.tour.slides[0]).toMatchObject({
     image: { assetId: 'asset', width: 1000 },
-    annotations: [{ text: 'Caption', appearance: null }],
+    actions: [{ type: 'annotation' as const, object: { text: 'Caption', appearance: null } }],
   });
   expect(first).toEqual(original);
   expect(result.issues).toEqual([]);
@@ -53,7 +53,9 @@ it('uses normalized video clicks and requires placement for edited video or key 
   const material = { image: { ...image, source }, title: 'Click', description: 'Explanation' };
   const result = generateTourFromMaterials([material], ids());
   expect(result.tour.slides[0]).toMatchObject({
-    hotspots: [{ point: { x: 0.25, y: 0.75 }, text: 'Explanation' }],
+    actions: [
+      { type: 'hotspot' as const, object: { point: { x: 0.25, y: 0.75 }, text: 'Explanation' } },
+    ],
   });
   expect(
     generateTourFromMaterials(
@@ -120,14 +122,18 @@ it('preserves capture evidence while mapping only with a proven crop', () => {
   );
   expect(mapped.tour.slides[0]).toMatchObject({
     image: { source: capture.source },
-    hotspots: [
+    actions: [
       {
-        point: { x: 0.5, y: 0.5 },
-        targetRect: {
-          x: 0.4,
-          y: 0.4,
-          width: expect.closeTo(0.2, 10),
-          height: expect.closeTo(0.2, 10),
+        type: 'hotspot' as const,
+        object: {
+          point: { x: 0.5, y: 0.5 },
+          targetRect: {
+            x: 0.4,
+            y: 0.4,
+            width: expect.closeTo(0.2, 10),
+            height: expect.closeTo(0.2, 10),
+          },
+          visual: { kind: 'point' as const, pulse: true },
         },
       },
     ],
@@ -159,7 +165,7 @@ it('converts sections and repeated guide images, and explicitly reports text-onl
   expect(result.tour.slides[0]).toMatchObject({
     kind: 'navigation',
     title: 'Chapter',
-    buttons: [{ action: { kind: 'slide' } }, { action: { kind: 'slide' } }],
+    buttons: [{ action: { kind: 'action' } }, { action: { kind: 'action' } }],
   });
   expect(result.tour.slides[1]).toMatchObject({
     origin: { stepId: 'step', blockId: 'a' },

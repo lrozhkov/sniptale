@@ -1,4 +1,3 @@
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { Mic, Unlink } from 'lucide-react';
 import type {
   TourAudioResource,
@@ -41,8 +40,7 @@ export function TourNarrationSettings({
   const target = getTourNarrationTarget(slide, objectId);
   if (!target) return null;
   const narration = target.narration ?? null;
-  const trigger =
-    narration && 'trigger' in narration && narration.trigger === 'enter' ? 'enter' : 'activation';
+  const trigger = 'enter' as const;
   const update = (value: TourNarration | TourObjectNarration | null, group?: string) => {
     const next = structuredClone(slide);
     const destination = getTourNarrationTarget(next, objectId);
@@ -95,24 +93,7 @@ export function TourNarrationSettings({
       />
       {narration && (
         <>
-          {objectId ? (
-            <div className="tour-text-field">
-              <SelectField
-                label={t('scenario.editor.tourAudioTrigger')}
-                disabled={disabled}
-                value={trigger}
-                options={[
-                  { value: 'activation', label: t('scenario.editor.tourAudioOnActivation') },
-                  { value: 'enter', label: t('scenario.editor.tourAudioOnEnter') },
-                ]}
-                onChange={(value) => {
-                  if (value === 'activation' || value === 'enter') change({ trigger: value });
-                }}
-              />
-            </div>
-          ) : (
-            <p className="guide-inspector-hint">{t('scenario.editor.tourAudioSlideHint')}</p>
-          )}
+          <p className="guide-inspector-hint">{t('scenario.editor.tourAudioSlideHint')}</p>
           <NarrationFields narration={narration} locked={disabled} change={change} t={t} />
         </>
       )}

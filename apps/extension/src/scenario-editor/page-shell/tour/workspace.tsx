@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourAudioResources } from '../../../features/scenario/project/public';
 import { TourNarrationPlacement } from './narration-recording';
 import { TourMusicSettings } from './music-settings';
@@ -328,7 +332,9 @@ function TourSelectedImageActions({
 function selectedTitle(slide: TourSlide | null, id: string | null, t: Translate): string {
   const object =
     slide?.kind === 'image'
-      ? [...slide.hotspots, ...slide.annotations, ...slide.masks].find((entry) => entry.id === id)
+      ? [...getTourHotspots(slide), ...getTourAnnotations(slide), ...slide.masks].find(
+          (entry) => entry.id === id
+        )
       : slide?.buttons.find((entry) => entry.id === id);
   return object
     ? ('label' in object

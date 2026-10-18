@@ -4,13 +4,10 @@ import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
-import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 /** Explanation hints follow the authored mixed-object order; masks stay purely visual. */
 function slideExplanations(slide) {
-  return getTourSlideObjects(slide)
-    .filter((entry) => entry.type !== 'mask')
-    .map((entry) => entry.object);
+  return slide.actions.map((entry) => entry.object);
 }
 
 /** Mount policy decides interaction affordances once; rendering stays policy-free. */
@@ -34,7 +31,7 @@ function createSceneHints(root, input, policy, signal, getHints, boundary) {
     keyboardScope: policy.keyboardScope,
     hideVoice: policy.hideVoice,
     navigation: policy.authoring?.navigation,
-    boundary: policy.authoring ? null : boundary,
+    boundary,
     onClose: () => {},
     labels: input.labels,
     focusTrigger: (activeIndex) => {
@@ -170,7 +167,9 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;
       fullView = false;
-      hintController.reset(current?.id === slide?.id && ended === isEnd);
+      const sameAction =
+        authoring || current?.actions?.[0]?.object.id === slide?.actions?.[0]?.object.id;
+      hintController.reset(current?.id === slide?.id && sameAction && ended === isEnd);
       current = slide;
       ended = isEnd;
       navigationController.reset();
@@ -226,7 +225,7 @@ function renderSceneBody(slide, viewport, context, navigation, selectedObjectId)
   if (slide?.kind === 'image')
     return {
       imageBox: renderTourImage(slide, viewport, context),
-      hints: slide.image ? slideExplanations(slide) : [],
+      hints: slideExplanations(slide),
     };
   if (slide) {
     const rendered = navigation.render(

@@ -106,13 +106,19 @@ it('rejects edits while locked and media identities outside the accepted tour', 
 it('returns to slide settings when the selected object is removed', () => {
   const project = createGuideProject('Project');
   const slide = createTourImageSlide('first');
-  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'note', text: 'Note', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   project.tour = createTourDocument();
   project.tour.slides = [slide];
   render(project);
   act(() => state().select({ kind: 'slide', slideId: slide.id, objectId: 'note' }));
   expect(state().selection).toEqual({ kind: 'slide', slideId: slide.id, objectId: 'note' });
-  render({ ...project, tour: { ...project.tour, slides: [{ ...slide, annotations: [] }] } });
+  render({ ...project, tour: { ...project.tour, slides: [{ ...slide, actions: [] }] } });
   expect(state().selection).toEqual({ kind: 'slide', slideId: slide.id, objectId: null });
   expect(changed).not.toHaveBeenCalled();
 });

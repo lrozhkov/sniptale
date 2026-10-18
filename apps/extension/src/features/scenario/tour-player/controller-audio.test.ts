@@ -1,7 +1,9 @@
+import { getTourAnnotations } from '@sniptale/runtime-contracts/scenario/types/tour';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -117,22 +119,27 @@ async function mount(autoplay = false) {
     gain: 0.5,
     transcript: '',
   };
-  first.annotations = [
-    {
-      id: 'entry',
-      text: 'Entry voice',
-      anchor: null,
-      appearance: null,
-      narration: { ...narration, trigger: 'enter' },
-    },
-    {
-      id: 'activation',
-      text: 'Activation voice',
-      anchor: null,
-      appearance: null,
-      narration: { ...narration, trimStart: 4, trimEnd: 6, trigger: 'activation' },
-    },
-    { id: 'silent', text: 'Silent', anchor: null, appearance: null },
+  first.actions = [
+    ...first.actions.filter(
+      (entry) => entry.type !== 'annotation' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'entry',
+        text: 'Entry voice',
+        anchor: null,
+        appearance: null,
+        narration: { ...narration, trigger: 'enter' as const },
+      },
+      {
+        id: 'activation',
+        text: 'Activation voice',
+        anchor: null,
+        appearance: null,
+        narration: { ...narration, trimStart: 4, trimEnd: 6, trigger: 'activation' as const },
+      },
+      { id: 'silent', text: 'Silent', anchor: null, appearance: null },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   tour.slides = [first, createTourImageSlide('second')];
   const assets = [
@@ -202,7 +209,7 @@ it('composes viewer volume and mute without restarting narration or changing aut
   expect(h.media.currentTime).toBe(2.8);
   expect(h.play).toHaveBeenCalledTimes(plays);
   expect(
-    h.tour.slides[0]!.kind === 'image' && h.tour.slides[0]!.annotations[0]!.narration!.gain
+    h.tour.slides[0]!.kind === 'image' && getTourAnnotations(h.tour.slides[0]!)[0]!.narration!.gain
   ).toBe(0.5);
 });
 
@@ -212,7 +219,7 @@ it('projects a newly selected hint identity without a media event and hides cont
   await h.tick();
   h.button('[data-tour-hint-next]').click();
   const activation = h.button('[data-tour-narration-toggle="activation"]');
-  expect(activation.getAttribute('aria-label')).toBe(labels.narrationReplay);
+  expect(activation.getAttribute('aria-label')).toBe(labels.narrationResume);
   activation.click();
   await h.tick();
   expect(h.media.currentTime).toBe(4);
@@ -272,7 +279,7 @@ it('refreshes actual recreated navigation controls from retained audio state aft
   const h = await mount();
   const first = h.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image fixture');
-  const narration = first.annotations[1]!.narration!;
+  const narration = getTourAnnotations(first)[1]!.narration!;
   h.tour.slides[0] = {
     kind: 'navigation',
     id: 'first',

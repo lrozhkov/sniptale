@@ -39,7 +39,7 @@ export function createTourNavigation({
     return rendered;
   }
 
-  function openContents(slides, index, onSelect, endScreen) {
+  function openContents(slides, index, onSelect, endScreen, plan) {
     const navigation = root.querySelector('[data-tour-navigation]');
     const trigger = root.querySelector('[data-tour-contents]');
     if (navigation.open) {
@@ -51,7 +51,11 @@ export function createTourNavigation({
     let current = null;
     const entries = slides.map((slide, number) => ({
       key: number,
-      label: `${number + 1}. ${slide.title}`,
+      label: plan
+        ? plan.entries[number].ordinal
+          ? `${plan.entries[number].ordinal}. ${slide.title || labels.point}`
+          : slide.title || labels.contents
+        : `${number + 1}. ${slide.title}`,
       title: slide.title,
     }));
     if (endScreen?.enabled)

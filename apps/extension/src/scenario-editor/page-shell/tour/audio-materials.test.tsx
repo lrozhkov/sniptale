@@ -26,16 +26,26 @@ it('separates preview, exact usage navigation, attachment and material deletion'
   root = createRoot(host);
   const tour = createTourDocument();
   const slide = createTourImageSlide('slide');
-  slide.narration = materialNarration(resource);
-  slide.annotations = [
-    {
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: { ...materialNarration(resource), trigger: 'enter' as const },
+    },
+  });
+  slide.actions.push({
+    type: 'annotation',
+    object: {
       id: 'hint',
       text: 'Hint',
       anchor: null,
       appearance: null,
-      narration: { ...slide.narration, trigger: 'enter' },
+      narration: { ...materialNarration(resource), trigger: 'enter' },
     },
-  ];
+  });
   tour.slides = [slide];
   tour.audioResources = [resource];
   const command = vi.fn();
@@ -56,13 +66,17 @@ it('separates preview, exact usage navigation, attachment and material deletion'
   expect(host.querySelector('[data-preview]')).not.toBeNull();
   expect(command).not.toHaveBeenCalled();
   click('Bindings: 2');
-  expect(onSelect).toHaveBeenCalledWith({ kind: 'slide', slideId: 'slide', objectId: null });
+  expect(onSelect).toHaveBeenCalledWith({
+    kind: 'slide',
+    slideId: 'slide',
+    objectId: 'slide-voice',
+  });
   click('Attach to selection');
   expect(command).toHaveBeenCalledWith({
     kind: 'set-narration',
     slideId: 'slide',
     objectId: 'hint',
-    narration: { ...materialNarration(resource), trigger: 'enter' },
+    narration: { ...materialNarration(resource), trigger: 'enter' as const },
   });
   click('Delete material and its bindings');
   expect(command).toHaveBeenLastCalledWith({ kind: 'remove-audio-resource', assetId: 'voice' });

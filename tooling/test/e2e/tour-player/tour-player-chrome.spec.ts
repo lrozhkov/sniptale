@@ -52,32 +52,32 @@ function slide(id: string, title: string) {
     origin: null,
     fit: 'contain' as const,
     camera: { mode: 'inherit' as const, center: { x: 0.5, y: 0.5 }, zoom: 1 },
-    hotspots: [
-      {
-        id: `point-${id}`,
-        point: { x: 0.5, y: 0.5 },
-        targetRect: null,
-        label: 'What happened here',
-        text: 'This step ran the capture and stored the result.',
-        action: { kind: 'next' as const },
-        appearance: null,
-        pulse: true,
-      },
-    ],
-    annotations: [],
     masks: [],
     narration: null,
     timing: {
       mode: 'inherit' as const,
       holdSeconds: 4,
       truncateNarration: false,
-      autoplayTarget: null,
     },
+    actions: [
+      {
+        type: 'hotspot' as const,
+        object: {
+          id: `point-${id}`,
+          point: { x: 0.5, y: 0.5 },
+          targetRect: null,
+          label: 'What happened here',
+          text: 'This step ran the capture and stored the result.',
+          appearance: null,
+          visual: { kind: 'point' as const, pulse: true },
+        },
+      },
+    ],
   };
 }
 
 const tour = {
-  version: 1 as const,
+  version: 2 as const,
   id: 'visual-tour',
   stage: { aspect: '16:9' as const, background: '#111827' },
   style: {
@@ -353,13 +353,15 @@ test('tour caption area and compact chrome respect the player work area', async 
     slides: [
       {
         ...slide('caption', 'Caption'),
-        hotspots: [],
-        annotations: [
+        actions: [
           {
-            id: 'note',
-            text: 'A long explanation with enough detail to span several lines. '.repeat(12),
-            anchor: null,
-            appearance: null,
+            type: 'annotation',
+            object: {
+              id: 'note',
+              text: 'A long explanation with enough detail to span several lines. '.repeat(12),
+              anchor: null,
+              appearance: null,
+            },
           },
         ],
       },
@@ -532,4 +534,198 @@ for (const locale of ['ru', 'en'] as const) {
       expect(faces).toEqual([{ weight: '400 700', status: 'loaded' }]);
     });
   }
+}
+
+function continuousTour(): TourDocument {
+  const sequential: TourDocument = {
+    ...tour,
+    playback: { ...tour.playback, autoZoom: false },
+    slides: [0, 1, 2].map((index) => {
+      const image = slide(`sequence-${index}`, `Author slide ${index + 1}`);
+      return {
+        ...image,
+        actions: [0, 1, 2].map((number) => ({
+          type: 'hotspot' as const,
+          object: {
+            ...image.actions[0]!.object,
+            id: `action-${index * 3 + number + 1}`,
+            label: `Action ${index * 3 + number + 1}`,
+            text: `Instruction ${index * 3 + number + 1}`,
+            visual:
+              number === 0
+                ? { kind: 'point' as const, pulse: true }
+                : {
+                    kind:
+                      index === 0
+                        ? ('highlight' as const)
+                        : index === 1
+                          ? ('frame' as const)
+                          : ('spotlight' as const),
+                    rect: { x: 0.2, y: 0.2, width: 0.25, height: 0.2 },
+                    color: '#f97316',
+                    opacity: 0.4,
+                    animation: {
+                      enter: { kind: 'none' as const, durationMs: 250 },
+                      exit: { kind: 'none' as const, durationMs: 250 },
+                    },
+                  },
+          },
+        })),
+      };
+    }),
+  };
+  sequential.slides.splice(1, 0, {
+    kind: 'navigation',
+    id: 'chapter',
+    title: 'Contents',
+    description: 'Continue with the next action',
+    background: { color: '#111827', image: null },
+    buttons: [],
+    narration: null,
+    timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false },
+  });
+  return sequential;
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`continuous actions and unnumbered contents at ${viewport.size.width}x${viewport.size.height}`, async ({
+    page,
+  }, info) => {
+    const sequential = continuousTour();
+    const output = info.outputPath('sequence.html');
+    await writeFile(output, await buildPlayerHtml(sequential));
+    await page.setViewportSize(viewport.size);
+    await page.goto(pathToFileURL(output).href);
+    for (let action = 1; action <= 9; action += 1) {
+      await expect(page.locator('#tour-player')).toHaveAttribute(
+        'data-action-id',
+        `action-${action}`
+      );
+      await expect(page.locator('[data-tour-counter]')).toHaveText(`${action} / 9`);
+      await expect(page.locator('[data-tour-hint-text]')).toHaveText(`Instruction ${action}`);
+      await expect(page.locator('[data-tour-object-id]')).toHaveCount(1);
+      const active = page.locator('[data-tour-object-id]');
+      await active.hover();
+      await expect(page.locator('#tour-player')).toHaveAttribute(
+        'data-action-id',
+        `action-${action}`
+      );
+      if ([2, 5, 8].includes(action))
+        await page.screenshot({ path: info.outputPath(`active-${action}.png`), fullPage: false });
+      await active.click();
+      if (action === 3) {
+        await expect(page.locator('#tour-player')).toHaveAttribute('data-slide-id', 'chapter');
+        await expect(page.locator('[data-tour-counter]')).toBeHidden();
+        await expect(page.locator('[data-tour-object-id]')).toHaveCount(0);
+        await page.locator('[data-tour-next]').click();
+      }
+    }
+    await expect(page.locator('#tour-player')).toHaveAttribute('data-slide-id', 'end');
+    await page.getByRole('button', { name: 'Restart', exact: true }).click();
+    await expect(page.locator('[data-tour-counter]')).toHaveText('1 / 9');
+    await page.locator('[data-tour-contents]').click();
+    const rows = page.locator('.tour-contents-list button');
+    await expect(rows).toHaveCount(11);
+    await expect(rows.nth(3)).toHaveText('Contents');
+    await expect(rows.nth(4)).toHaveText('4. Action 4');
+    await page.screenshot({ path: info.outputPath('sequence-menu.png'), fullPage: false });
+    await rows.filter({ hasText: '7. Action 7' }).click();
+    await expect(page.locator('[data-tour-counter]')).toHaveText('7 / 9');
+    await page.locator('[data-tour-previous]').click();
+    await expect(page.locator('[data-tour-counter]')).toHaveText('6 / 9');
+    await page.locator('#tour-player').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('[data-tour-counter]')).toHaveText('7 / 9');
+  });
+}
+
+test('autoplay visits every action and waits at contents until Continue', async ({
+  page,
+}, info) => {
+  const sequence = continuousTour();
+  sequence.playback = { ...sequence.playback, autoplay: true, minimumHoldSeconds: 0.1 };
+  for (const slide of sequence.slides)
+    slide.timing = { mode: 'manual', holdSeconds: 0.1, truncateNarration: false };
+  const epoch = new Date('2026-01-01T00:00:00Z');
+  await page.clock.install({ time: epoch });
+  await page.clock.pauseAt(epoch);
+  const output = info.outputPath('autoplay.html');
+  await writeFile(output, await buildPlayerHtml(sequence));
+  await page.goto(pathToFileURL(output).href);
+  const player = page.locator('#tour-player');
+  async function advanceTo(id: string, field = 'data-action-id') {
+    for (let frame = 0; frame < 40 && (await player.getAttribute(field)) !== id; frame += 1)
+      await page.clock.runFor(16);
+    await expect(player).toHaveAttribute(field, id);
+  }
+  await advanceTo('action-1');
+  await advanceTo('action-2');
+  await advanceTo('action-3');
+  await advanceTo('chapter', 'data-slide-id');
+  await page.clock.runFor(2000);
+  await expect(player).toHaveAttribute('data-slide-id', 'chapter');
+  await page.locator('[data-tour-play]').click();
+  for (let action = 4; action <= 9; action += 1) {
+    await advanceTo(`action-${action}`);
+    await expect(page.locator('[data-tour-counter]')).toHaveText(`${action} / 9`);
+  }
+  await advanceTo('end', 'data-slide-id');
+});
+
+test('long action text scrolls without consuming Next', async ({ page }, info) => {
+  const sequence = continuousTour();
+  const first = sequence.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image fixture');
+  first.actions[0]!.object.text = 'Long instruction. '.repeat(100) + 'END OF INSTRUCTION';
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.setContent(await buildPlayerHtml(sequence));
+  const body = page.locator('[data-tour-hint-text]');
+  await expect(body).toBeVisible();
+  expect(await body.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  await body.evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  expect(await body.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await expect(page.locator('#tour-player')).toHaveAttribute('data-action-id', 'action-1');
+  await page.screenshot({ path: info.outputPath('long-action-scroll.png'), fullPage: false });
+  await page.locator('[data-tour-hint-next]').click();
+  await expect(page.locator('#tour-player')).toHaveAttribute('data-action-id', 'action-2');
+});
+
+for (const kind of ['annotation', 'hotspot'] as const) {
+  test(`caption dismissal does not hide the next ${kind} on the same image`, async ({
+    page,
+  }, info) => {
+    const sequence = continuousTour();
+    const first = sequence.slides[0]!;
+    if (first.kind !== 'image') throw new Error('Expected image fixture');
+    first.actions[0] = {
+      type: 'annotation',
+      object: { id: 'action-1', text: 'Introduction', anchor: null, appearance: null },
+    };
+    if (kind === 'annotation')
+      first.actions[1] = {
+        type: 'annotation',
+        object: { id: 'action-2', text: 'Second instruction', anchor: null, appearance: null },
+      };
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.setContent(await buildPlayerHtml(sequence));
+    const hint = page.locator('[data-tour-hint]');
+    await expect(hint).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(hint).toBeHidden();
+    if (kind === 'annotation') await page.keyboard.press('ArrowRight');
+    else await page.locator('[data-tour-next]').click();
+    await expect(page.locator('[data-tour-counter]')).toHaveText('2 / 9');
+    await expect(hint).toBeVisible();
+    await expect(page.locator('[data-tour-hint-text]')).toHaveText(
+      kind === 'annotation' ? 'Second instruction' : 'Instruction 2'
+    );
+    await page.screenshot({ path: info.outputPath(`caption-to-${kind}.png`), fullPage: false });
+    if (kind === 'annotation') await page.keyboard.press('Escape');
+    else await hint.locator('[data-tour-hint-close]').click();
+    await page.locator('[data-tour-previous]').click();
+    await expect(hint).toBeVisible();
+    await expect(page.locator('[data-tour-hint-text]')).toHaveText('Introduction');
+  });
 }

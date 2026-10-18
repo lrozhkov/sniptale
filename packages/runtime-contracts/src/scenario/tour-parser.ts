@@ -50,6 +50,7 @@ export const tourActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('end') }).strict(),
   z.object({ kind: z.literal('restart') }).strict(),
   z.object({ kind: z.literal('slide'), slideId: id }).strict(),
+  z.object({ kind: z.literal('action'), actionId: id }).strict(),
   z.object({ kind: z.literal('url'), url }).strict(),
 ]);
 const markerAppearance = z
@@ -98,7 +99,6 @@ const timing = z
     mode: z.enum(['inherit', 'manual', 'auto']),
     holdSeconds: duration,
     truncateNarration: z.boolean(),
-    autoplayTarget: id.nullable(),
   })
   .strict();
 const image = z
@@ -113,6 +113,17 @@ const image = z
   })
   .strict();
 
+const camera = z
+  .object({
+    mode: z.enum(['inherit', 'off', 'auto', 'manual']),
+    targetZoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom).optional(),
+    delayMs: z.number().finite().min(0).max(5000).optional(),
+    durationMs: z.number().finite().min(100).max(5000).optional(),
+    center: point,
+    zoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom),
+  })
+  .strict();
+
 /** Per-object schemas are also the editor and AI parameter vocabulary. */
 export const tourObjectSchemas = {
   hotspot: z
@@ -123,9 +134,25 @@ export const tourObjectSchemas = {
       targetRect: rect.nullable(),
       label,
       text,
-      action: tourActionSchema,
+      visual: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('point'), pulse: z.boolean() }).strict(),
+        ...(['frame', 'highlight', 'spotlight'] as const).map((kind) =>
+          z
+            .object({
+              kind: z.literal(kind),
+              rect,
+              color,
+              opacity: fraction,
+              animation: highlightAnimation,
+              strokeWidth: z.number().finite().min(1).max(12).optional(),
+              radius: z.number().finite().min(0).max(32).optional(),
+            })
+            .strict()
+        ),
+      ]),
+      timing: timing.optional(),
+      camera: camera.optional(),
       appearance: textAppearance.nullable(),
-      pulse: z.boolean(),
       narration: objectNarration,
     })
     .strict(),
@@ -134,6 +161,8 @@ export const tourObjectSchemas = {
       id,
       text,
       anchor: point.nullable(),
+      timing: timing.optional(),
+      camera: camera.optional(),
       appearance: textAppearance.nullable(),
       narration: objectNarration,
     })
@@ -142,7 +171,7 @@ export const tourObjectSchemas = {
     .object({
       id,
       rect,
-      kind: z.enum(['spotlight', 'highlight', 'blur', 'redact']),
+      kind: z.enum(['blur', 'redact']),
       inheritStyle: z.boolean().optional(),
       highlightAnimation: highlightAnimation.nullable().optional(),
       paint: tourPaintSchema.optional(),
@@ -165,24 +194,19 @@ const imageSlide = z
     origin: z.object({ stepId: id, blockId: id }).strict().nullable(),
     requiresTargetReview: z.boolean().optional(),
     fit: z.enum(['contain', 'cover']),
-    camera: z
-      .object({
-        mode: z.enum(['inherit', 'off', 'auto', 'manual']),
-        targetZoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom).optional(),
-        delayMs: z.number().finite().min(0).max(5000).optional(),
-        durationMs: z.number().finite().min(100).max(5000).optional(),
-        center: point,
-        zoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom),
-      })
-      .strict(),
-    hotspots: z.array(tourObjectSchemas.hotspot).max(TOUR_LIMITS.maxHotspots),
-    annotations: z.array(tourObjectSchemas.annotation).max(TOUR_LIMITS.maxAnnotations),
+    camera,
+    actions: z
+      .array(
+        z.discriminatedUnion('type', [
+          z.object({ type: z.literal('hotspot'), object: tourObjectSchemas.hotspot }).strict(),
+          z
+            .object({ type: z.literal('annotation'), object: tourObjectSchemas.annotation })
+            .strict(),
+        ])
+      )
+      .max(TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations),
     masks: z.array(tourObjectSchemas.mask).max(TOUR_LIMITS.maxMasks),
-    objectOrder: z
-      .array(id)
-      .max(TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks)
-      .optional(),
-    narration: narration.nullable(),
+    narration: z.null(),
     timing,
   })
   .strict();
@@ -215,7 +239,7 @@ const navigationSlide = z
 /** Structural schema; document admission additionally validates identity and navigation references. */
 export const tourDocumentSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     backgroundMusic: z
       .object({
         assetId: id,
@@ -305,7 +329,7 @@ export type TourParseResult =
 export function parseTourDocument(value: unknown): TourParseResult {
   if (!isBoundedScenarioInput(value) || !isPlainRecord(value)) return { status: 'invalid' };
   const version = value['version'];
-  if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0 && version !== 1)
+  if (typeof version === 'number' && Number.isSafeInteger(version) && version > 0 && version !== 2)
     return { status: 'unsupported', version };
   const result = tourDocumentSchema.safeParse(value);
   if (!result.success || !validReferences(result.data)) return { status: 'invalid' };
@@ -326,7 +350,7 @@ function validReferences(document: TourDocument): boolean {
   for (const slide of document.slides) {
     const objects =
       slide.kind === 'image'
-        ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+        ? [...slide.actions.map((entry) => entry.object), ...slide.masks]
         : slide.buttons;
     for (const target of [slide, ...objects]) {
       const voice = target.narration;
@@ -350,32 +374,24 @@ function validReferences(document: TourDocument): boolean {
   const actionExists = (action: TourAction) =>
     action.kind !== 'slide' || slides.has(action.slideId);
   for (const slide of document.slides) {
-    if (
-      !claim(slide.id) ||
-      (slide.timing.autoplayTarget !== null && !slides.has(slide.timing.autoplayTarget))
-    )
-      return false;
+    if (!claim(slide.id)) return false;
     if (slide.kind === 'navigation') {
       if (!slide.buttons.every((button) => claim(button.id) && actionExists(button.action)))
         return false;
     } else {
-      if (!slide.hotspots.every((hotspot) => claim(hotspot.id) && actionExists(hotspot.action)))
-        return false;
-      if (![...slide.annotations, ...slide.masks].every((item) => claim(item.id))) return false;
-      if (slide.objectOrder !== undefined) {
-        const objects = new Set([
-          ...slide.hotspots.map((object) => object.id),
-          ...slide.annotations.map((object) => object.id),
-          ...slide.masks.map((object) => object.id),
-        ]);
-        const listed = new Set(slide.objectOrder);
-        if (
-          listed.size !== slide.objectOrder.length ||
-          listed.size !== objects.size ||
-          slide.objectOrder.some((objectId) => !objects.has(objectId))
+      if (
+        ![...slide.actions.map((entry) => entry.object), ...slide.masks].every((item) =>
+          claim(item.id)
         )
-          return false;
-      }
+      )
+        return false;
+      if (
+        slide.actions.filter((entry) => entry.type === 'hotspot').length >
+          TOUR_LIMITS.maxHotspots ||
+        slide.actions.filter((entry) => entry.type === 'annotation').length >
+          TOUR_LIMITS.maxAnnotations
+      )
+        return false;
     }
   }
   return true;

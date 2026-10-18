@@ -214,7 +214,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   await expect.soft(panel.locator('[data-tour-edit-image]')).toHaveCount(0);
 
   // Object creation uses the heading-level Add menu once objects exist.
-  await panel.getByRole('button', { name: 'Объекты слайда', exact: true }).click();
+  await panel.getByRole('button', { name: 'Действия', exact: true }).click();
   const emptyActions = panel.locator('.tour-object-actions > button');
   if (await emptyActions.count()) {
     await emptyActions.filter({ hasText: 'Точка действия' }).click();
@@ -225,7 +225,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   expect((await add.boundingBox())!.width).toBeLessThanOrEqual(32);
   await expect(add).toHaveText('');
   await add.click();
-  for (const label of ['Точка действия', 'Пояснение к слайду', 'Выделение']) {
+  for (const label of ['Точка действия', 'Текстовое действие', 'Выделение']) {
     await expect
       .soft(
         page.locator('.guide-action-menu').getByRole('button', { name: label, exact: true }),

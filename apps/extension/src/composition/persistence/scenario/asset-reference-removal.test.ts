@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import {
@@ -55,37 +59,51 @@ function fixture() {
     gain: 1,
     transcript: '',
   };
-  slide.narration = removedVoice;
-  slide.hotspots = [
-    {
-      id: 'hotspot',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Keep hotspot',
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
       text: '',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-      narration: { ...removedVoice, trigger: 'activation' },
-    },
-  ];
-  slide.annotations = [
-    {
-      id: 'annotation',
-      text: 'Keep annotation',
       anchor: null,
       appearance: null,
-      narration: { ...removedVoice, trigger: 'enter' },
+      narration: { ...removedVoice, trigger: 'enter' as const },
     },
+  });
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'hotspot',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Keep hotspot',
+        text: '',
+        appearance: null,
+        narration: { ...removedVoice, trigger: 'activation' as const },
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[
+      {
+        id: 'annotation',
+        text: 'Keep annotation',
+        anchor: null,
+        appearance: null,
+        narration: { ...removedVoice, trigger: 'enter' as const },
+      },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   slide.masks = [
     {
       id: 'mask',
-      kind: 'highlight',
+      kind: 'blur',
       rect: { x: 0, y: 0, width: 0.2, height: 0.2 },
       color: '#ffffff',
       opacity: 0.5,
-      narration: { ...removedVoice, trigger: 'enter' },
+      narration: { ...removedVoice, trigger: 'enter' as const },
     },
   ];
   const navigation = {
@@ -157,8 +175,8 @@ it('removes selected image and audio references from current and saved history',
     expect(slide?.narration).toBeNull();
     expect(navigation?.narration).toBeNull();
     if (slide?.kind === 'image') {
-      expect(slide.hotspots[0]?.narration).toBeNull();
-      expect(slide.annotations[0]?.narration).toBeNull();
+      expect(getTourHotspots(slide)[0]?.narration).toBeNull();
+      expect(getTourAnnotations(slide)[0]?.narration).toBeNull();
       expect(slide.masks[0]?.narration).toBeNull();
     }
     if (navigation?.kind === 'navigation') expect(navigation.buttons[0]?.narration).toBeNull();

@@ -579,3 +579,11 @@ html[data-tour-reordering] * {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.tour-object-item[data-drop-before] {
+  border-top: 2px solid var(--accent-color, #f97316);
+}
+.tour-action-number {
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}

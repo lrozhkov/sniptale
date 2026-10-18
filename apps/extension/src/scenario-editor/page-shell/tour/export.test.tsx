@@ -74,7 +74,7 @@ it.each(['ru', 'en'] as const)(
       mute: locale === 'ru' ? 'Выключить звук' : 'Mute',
       unmute: locale === 'ru' ? 'Включить звук' : 'Unmute',
       manual: t('scenario.editor.tourManual'),
-      fullView: locale === 'ru' ? 'Слайд целиком' : 'Full slide',
+      fullView: locale === 'ru' ? 'Изображение целиком' : 'Full image',
       authoredView: locale === 'ru' ? 'Авторский вид' : 'Authored view',
       end: t('scenario.editor.tourEnd'),
     });

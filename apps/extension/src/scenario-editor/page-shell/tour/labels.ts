@@ -28,7 +28,7 @@ export function tourPlayerLabels(t: Translate): TourPlayerLabels {
     restart: t('scenario.editor.tourRestart'),
     finished: t('scenario.editor.tourEnd'),
     empty: t('scenario.editor.tourImageEmpty'),
-    point: t('scenario.editor.tourHotspot'),
+    point: t('scenario.editor.tourActionLabel'),
     details: t('scenario.editor.tourAnnotation'),
     fullView: t('scenario.editor.tourFullView'),
     authoredView: t('scenario.editor.tourAuthoredView'),

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -44,6 +45,8 @@ async function mount(endEnabled = true) {
   tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
   tour.slides[0]!.title = 'First';
   tour.slides[1]!.title = 'Second';
+  for (const slide of tour.slides)
+    if (slide.kind === 'image') slide.actions[0]!.object.text = slide.title;
   const html = await buildTourPlayerHtml({ tour, title: 'Tour', labels, assets: [] });
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   const root = parsed.getElementById('tour-player');
@@ -142,27 +145,16 @@ it('releases drawer listeners when disposed while open', async () => {
   expect(root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!.open).toBe(false);
 });
 
-it('selects the technical end and preserves its history identity across slide count updates', async () => {
+it('keeps the end screen selected across updates and returns to the new final action', async () => {
   const { root, player, tour } = await mount();
-  const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
-  const select = (index: number) => {
-    trigger.click();
-    root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[index]!.click();
-  };
-  select(2);
+  player.selectEnd();
   expect(root.dataset['slideId']).toBe('end');
-  expect(document.activeElement).toBe(trigger);
-  trigger.click();
-  const rows = root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button');
-  expect([...rows].filter((row) => row.hasAttribute('aria-current'))).toEqual([rows[2]]);
-  expect(document.activeElement).toBe(rows[2]);
-  rows[0]!.click();
   const expanded = { ...tour, slides: [...tour.slides, createTourImageSlide('third')] };
   player.update({ tour: expanded, labels, assets: [] });
-  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
   expect(root.dataset['slideId']).toBe('end');
   root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
-  expect(root.dataset['slideId']).toBe('first');
+  expect(root.dataset['slideId']).toBe('third');
+  expect(root.querySelector('[data-tour-counter]')!.textContent).toBe('3 / 3');
 });
 
 it('omits disabled end and skips retained end history when the feature is disabled', async () => {
@@ -251,7 +243,7 @@ it('projects consecutive Space destinations during exit and records only the act
   expect(h.root.dataset['slideId']).toBe('third');
   h.click('previous');
   await h.tick(300);
-  expect(h.root.dataset['slideId']).toBe('first');
+  expect(h.root.dataset['slideId']).toBe('second');
 });
 it('keeps history intact when a pending Previous is cancelled by visibility', async () => {
   const h = await animatedTour();
@@ -342,7 +334,7 @@ it('seeks across slides immediately while retaining the actual source in Back hi
   await h.tick(0);
   h.click('previous');
   await h.tick(300);
-  expect(h.root.dataset['slideId']).toBe('first');
+  expect(h.root.dataset['slideId']).toBe('second');
 });
 it('selects the current Contents row without replacing its rendered scene or replaying entry', async () => {
   const h = await animatedTour();

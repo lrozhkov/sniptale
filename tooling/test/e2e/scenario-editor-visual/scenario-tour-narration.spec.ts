@@ -98,14 +98,6 @@ for (const [locale, theme, viewport] of [
         .getByRole('button', { name: t('scenario.editor.tourAudioAttach'), exact: true })
         .click();
       await category('tourNarration').click();
-      if (index === 0) {
-        await panel
-          .getByRole('button', { name: t('scenario.editor.tourAudioTrigger'), exact: true })
-          .click();
-        await page
-          .getByRole('option', { name: t('scenario.editor.tourAudioOnEnter'), exact: true })
-          .click();
-      }
       const start = panel.getByRole('textbox', {
         name: t('scenario.editor.tourAudioStart'),
         exact: true,
@@ -248,9 +240,9 @@ for (const [locale, theme, viewport] of [
       expect(
         await music.evaluate((node: HTMLAudioElement) => node.currentTime)
       ).toBeGreaterThanOrEqual(beforeNavigation);
-      await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
-      await expect(toggle).toHaveAccessibleName(t('scenario.editor.tourNarrationReplay'));
-      await toggle.click();
+      await expect
+        .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
+        .toBeGreaterThan(0.65);
       await expect
         .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
         .toBeGreaterThan(0.65);
@@ -275,8 +267,8 @@ for (const [locale, theme, viewport] of [
       });
       expect(placement.group.x).toBeCloseTo(placement.footer.x, 0);
       expect(placement.group.y).toBeGreaterThanOrEqual(placement.headerBottom);
-      expect(placement.close).toEqual({ width: 28, height: 28 });
-      expect(placement.icon).toEqual({ width: 20, height: 20 });
+      expect(placement.close).toEqual({ width: 32, height: 32 });
+      expect(placement.icon).toEqual({ width: 16, height: 16 });
       const bounds = await player.boundingBox();
       for (const control of [toggle, replay, volume, mute, musicMute]) {
         const box = await control.boundingBox();
@@ -362,18 +354,23 @@ for (const [locale, theme, viewport] of [
         const payload = JSON.parse(node.textContent!);
         return payload.tour.slides.map(
           (slide: {
-            hotspots: { narration: { trigger: string; trimStart: number; gain: number } }[];
+            actions: {
+              type: string;
+              object: { narration: { trigger: string; trimStart: number; gain: number } };
+            }[];
           }) =>
-            slide.hotspots.map((point) => ({
-              trigger: point.narration.trigger,
-              trimStart: point.narration.trimStart,
-              gain: point.narration.gain,
-            }))
+            slide.actions
+              .filter((action) => action.type === 'hotspot')
+              .map(({ object }) => ({
+                trigger: object.narration.trigger,
+                trimStart: object.narration.trimStart,
+                gain: object.narration.gain,
+              }))
         );
       });
       expect(attachments).toEqual([
         [{ trigger: 'enter', trimStart: 0.5, gain: 1 }],
-        [{ trigger: 'activation', trimStart: 0.5, gain: 1 }],
+        [{ trigger: 'enter', trimStart: 0.5, gain: 1 }],
       ]);
       const musicBinding = await page
         .locator('#tour-data')

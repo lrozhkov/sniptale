@@ -115,7 +115,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .click();
       await panel
         .getByRole('navigation')
-        .getByRole('button', { name: ru ? 'Объекты слайда' : 'Slide objects', exact: true })
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
         .click();
       await panel
         .getByRole('button', { name: ru ? 'Точка действия' : 'Hotspot', exact: true })
@@ -131,7 +131,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       for (const name of [
         ru ? 'Слайд' : 'Slide',
         ru ? 'Камера' : 'Camera',
-        ru ? 'Объекты слайда' : 'Slide objects',
+        ru ? 'Действия' : 'Actions',
         ru ? 'Воспроизведение' : 'Playback',
       ]) {
         const tab = panel.getByRole('navigation').getByRole('button', { name, exact: true });
@@ -150,7 +150,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect(Math.max(...bounds) - Math.min(...bounds)).toBeLessThanOrEqual(1);
       await panel
         .getByRole('navigation')
-        .getByRole('button', { name: ru ? 'Объекты слайда' : 'Slide objects', exact: true })
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
         .click();
       const add = heading.locator('button');
       await expect(add).toHaveCSS('width', '32px');

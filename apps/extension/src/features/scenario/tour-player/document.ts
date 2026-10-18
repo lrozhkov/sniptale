@@ -1,3 +1,4 @@
+import { buildTourPlaybackPlan } from '../project/tour-playback-plan';
 import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
 import designTokens from '@sniptale/ui/styles/design-tokens?raw';
 import golosVariable from '@sniptale/ui/styles/interface-font?inline';
@@ -128,7 +129,9 @@ function selectAssets<T extends { id: string; mime: string }>(
 ) {
   const required = new Map<string, 'image' | 'audio'>();
   if (tour.stage.image) required.set(tour.stage.image.assetId, 'image');
-  for (const slide of tour.slides) {
+  for (const slide of tour.slides.filter(
+    (slide) => slide.kind === 'navigation' || slide.actions.length
+  )) {
     if (slide.kind === 'image' && slide.requiresTargetReview)
       throw new Error('Tour image targets require review before export.');
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
@@ -172,7 +175,35 @@ async function buildTourPlayerShell(args: {
 }): Promise<readonly [string, string]> {
   const parsed = parseTourDocument(args.tour);
   if (parsed.status !== 'ok') throw new Error('Invalid tour.');
-  const tour = parsed.document;
+  const tour = {
+    ...parsed.document,
+    slides: parsed.document.slides.filter(
+      (slide) => slide.kind === 'navigation' || slide.actions.length
+    ),
+  };
+  const plan = buildTourPlaybackPlan(tour);
+  if (!plan.actionCount) throw new Error('Add an action before exporting the tour.');
+  const actionIds = new Set(
+    plan.entries.flatMap((entry) => (entry.actionId ? [entry.actionId] : []))
+  );
+  for (const slide of tour.slides) {
+    if (
+      slide.kind === 'image' &&
+      slide.actions.some((entry) => entry.type === 'hotspot') &&
+      !slide.image
+    )
+      throw new Error('Missing tour image.');
+    if (
+      slide.kind === 'navigation' &&
+      slide.buttons.some(({ action }) =>
+        action.kind === 'action'
+          ? !actionIds.has(action.actionId)
+          : action.kind === 'slide' &&
+            !plan.entries.some((entry) => entry.sourceSlideId === action.slideId)
+      )
+    )
+      throw new Error('Tour navigation target is missing.');
+  }
   const { audioResources: _materials, ...viewerTour } = tour;
   const payload = {
     tour: {

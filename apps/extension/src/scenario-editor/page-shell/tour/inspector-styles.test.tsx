@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -167,7 +171,7 @@ it('exposes global and local text alignment with placement only for callouts', a
     alignment: 'center',
     placement: 'top',
   });
-  await click('Slide explanation');
+  await click('Text action');
   await choose('Placement on slide', 'Bottom captions');
   expect(
     [...host.querySelectorAll('button')].some(
@@ -181,7 +185,7 @@ it('separates document defaults from slide settings and exposes every category',
   scope = 'document';
   draw();
   expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).toBeNull();
-  await click('Slide explanation');
+  await click('Text action');
   await fill('Explanation width', '300');
   expect(project.tour!.style.textAppearance.surface?.width).toBe(300);
   await click('Playback');
@@ -202,7 +206,7 @@ it('renders exactly one heading per section in both presentations and keeps nest
   scope = 'document';
   presentation = 'sections';
   draw();
-  for (const label of ['Appearance', 'Slide explanation', 'Playback', 'Music', 'Transitions']) {
+  for (const label of ['Appearance', 'Text action', 'Playback', 'Music', 'Transitions']) {
     await click(label);
     const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
     expect(heading.textContent).toContain(label);
@@ -250,22 +254,22 @@ it('remembers document disclosure groups independently after leaving document se
     )!;
   await act(async () => disclosure('Appearance').click());
   expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('false');
-  expect(disclosure('Slide explanation').getAttribute('aria-expanded')).toBe('true');
-  await act(async () => disclosure('Slide explanation').click());
+  expect(disclosure('Text action').getAttribute('aria-expanded')).toBe('true');
+  await act(async () => disclosure('Text action').click());
   await act(async () => disclosure('Appearance').click());
   scope = 'selection';
   draw();
   scope = 'document';
   draw();
   expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('true');
-  expect(disclosure('Slide explanation').getAttribute('aria-expanded')).toBe('false');
+  expect(disclosure('Text action').getAttribute('aria-expanded')).toBe('false');
 });
 
 it('detaches and restores text styles independently from central categories', async () => {
   await click('Hotspot');
-  expect(current().hotspots[0]!.appearance).toBeNull();
+  expect(getTourHotspots(current())[0]!.appearance).toBeNull();
   await click('Use tour style');
-  const local = structuredClone(current().hotspots[0]!.appearance);
+  const local = structuredClone(getTourHotspots(current())[0]!.appearance);
   scope = 'document';
   presentation = 'sections';
   draw();
@@ -273,8 +277,8 @@ it('detaches and restores text styles independently from central categories', as
   await fill('Explanation width', '420');
   expect(project.tour!.style.hotspotAppearance?.surface?.width).toBe(420);
   expect(project.tour!.style.textAppearance.surface).toBeUndefined();
-  expect(current().hotspots[0]!.appearance).toEqual(local);
-  await click('Slide explanation');
+  expect(getTourHotspots(current())[0]!.appearance).toEqual(local);
+  await click('Text action');
   await fill('Explanation width', '280');
   expect(project.tour!.style.textAppearance.surface?.width).toBe(280);
   expect(project.tour!.style.hotspotAppearance?.surface?.width).toBe(420);
@@ -282,31 +286,26 @@ it('detaches and restores text styles independently from central categories', as
   presentation = 'all';
   draw();
   await click('Use tour style');
-  expect(current().hotspots[0]!.appearance).toBeNull();
+  expect(getTourHotspots(current())[0]!.appearance).toBeNull();
   expect(host.querySelector<HTMLInputElement>('input[aria-label="Explanation width"]')?.value).toBe(
     '420'
   );
 });
 
-it('keeps effect defaults independent and restores inherited mask appearance', async () => {
-  await click('Highlight');
-  expect(current().masks[0]!.inheritStyle).toBe(true);
+it('keeps permanent blur defaults independent from hotspot visuals', async () => {
+  await click('Image treatment');
+  await choose('Image treatment', 'Blur');
   await click('Use tour style');
-  const local = structuredClone(current().masks[0]);
+  expect(current().masks[0]!.inheritStyle).toBe(true);
   scope = 'document';
   presentation = 'sections';
   draw();
-  await click('Highlight');
+  await click('Image treatment');
   await fill('Blur radius', '32');
   expect(project.tour!.style.maskDefaults?.blur.radius).toBe(32);
-  expect(project.tour!.style.maskDefaults?.highlight.opacity).toBe(0.3);
-  expect(current().masks[0]).toEqual(local);
   scope = 'selection';
   presentation = 'all';
   draw();
-  await choose('Highlight', 'Blur');
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Blur radius"]')?.value).toBe('12');
-  await click('Use tour style');
   expect(host.querySelector<HTMLInputElement>('input[aria-label="Blur radius"]')?.value).toBe('32');
   await fill('Blur radius', '20');
   expect(current().masks[0]!.inheritStyle).toBe(false);
@@ -316,17 +315,19 @@ it('keeps effect defaults independent and restores inherited mask appearance', a
 for (const objectId of [null, 'voice-point']) {
   it(`gives ${objectId ? 'object' : 'slide'} narration its own selectable section`, async () => {
     if (objectId)
-      current().hotspots = [
-        {
-          id: objectId,
-          point: { x: 0.5, y: 0.5 },
-          targetRect: null,
-          label: 'Voice point',
-          text: '',
-          action: { kind: 'none' },
-          appearance: null,
-          pulse: false,
-        },
+      current().actions = [
+        ...current().actions.filter((entry) => entry.type !== 'hotspot'),
+        ...[
+          {
+            id: objectId,
+            point: { x: 0.5, y: 0.5 },
+            targetRect: null,
+            label: 'Voice point',
+            text: '',
+            appearance: null,
+            visual: { kind: 'point' as const, pulse: false },
+          },
+        ].map((object) => ({ type: 'hotspot' as const, object })),
       ];
     selected = { kind: 'slide', slideId: 'image', objectId };
     presentation = 'sections';
@@ -339,7 +340,7 @@ for (const objectId of [null, 'voice-point']) {
   });
 }
 
-for (const kind of ['Slide explanation', 'Highlight', 'Add button'] as const) {
+for (const kind of ['Text action', 'Hotspot', 'Add button'] as const) {
   it(`keeps ${kind} narration isolated and preserves it through presentation switches`, async () => {
     if (kind === 'Add button') {
       selected = { kind: 'slide', slideId: 'nav', objectId: null };
@@ -374,20 +375,17 @@ it('shows only selection guidance when no slide is selected', () => {
   expect(host.querySelector('nav, input, textarea, [data-testid="narration-slot"]')).toBeNull();
 });
 
-it('keeps legacy redaction controls distinct while grouping its narration', async () => {
-  await click('Highlight');
-  current().masks[0]!.kind = 'redact';
+it('keeps redaction permanent and excludes it from action narration', async () => {
+  await click('Image treatment');
   presentation = 'sections';
   draw();
-  expect(host.textContent).toContain('Redact area');
+  expect(current().masks[0]!.kind).toBe('redact');
+  expect(host.querySelector('[aria-label="Narration"]')).toBeNull();
   await click('Appearance');
   expect(host.querySelector('[aria-label="Use tour style"]')).toBeNull();
   expect(host.querySelector('input[aria-label="Opacity"]')).toBeNull();
-  await click('Narration');
-  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
-  expect(current().masks[0]!.kind).toBe('redact');
   await click('Effect type');
-  await choose('Highlight', 'Blur');
+  await choose('Image treatment', 'Blur');
   expect(current().masks[0]!.kind).toBe('blur');
 });
 
@@ -396,7 +394,7 @@ it('hides obsolete hint radius while retaining authored radius through global an
   scope = 'document';
   presentation = 'sections';
   draw();
-  await click('Slide explanation');
+  await click('Text action');
   expect(host.querySelector('input[aria-label="Corner radius"]')).toBeNull();
   await fill('Explanation width', '420');
   await fill('Inner padding', '18');
@@ -409,11 +407,11 @@ it('hides obsolete hint radius while retaining authored radius through global an
   scope = 'selection';
   presentation = 'all';
   draw();
-  await click('Slide explanation');
+  await click('Text action');
   await click('Use tour style');
-  expect(current().annotations[0]!.appearance?.surface?.radius).toBe(20);
+  expect(getTourAnnotations(current())[0]!.appearance?.surface?.radius).toBe(20);
   await fill('Explanation width', '300');
-  expect(current().annotations[0]!.appearance?.surface).toMatchObject({
+  expect(getTourAnnotations(current())[0]!.appearance?.surface).toMatchObject({
     radius: 20,
     width: 300,
     padding: 18,
@@ -431,7 +429,7 @@ it('exposes hotspot coordinates in Text and annotation categories without mutati
   presentation = 'all';
   draw();
   await click('Add');
-  await click('Slide explanation');
+  await click('Text action');
   presentation = 'sections';
   draw();
   const before = structuredClone(project);
@@ -479,14 +477,14 @@ it('inherits callout distance, allows local override, and never offers it for sl
     '45'
   );
   await fill('Callout distance', '120');
-  expect(current().hotspots[0]!.appearance?.calloutGap).toBe(120);
+  expect(getTourHotspots(current())[0]!.appearance?.calloutGap).toBe(120);
   expect(project.tour!.style.hotspotAppearance.calloutGap).toBe(45);
   await click('Use tour style');
-  expect(current().hotspots[0]!.appearance).toBeNull();
+  expect(getTourHotspots(current())[0]!.appearance).toBeNull();
   scope = 'document';
   presentation = 'sections';
   draw();
-  await click('Slide explanation');
+  await click('Text action');
   expect(host.querySelector('[aria-label="Callout distance"]')).toBeNull();
 });
 
@@ -516,14 +514,14 @@ it('commits global and local marker colors while preserving independent snapshot
   await click('Use tour marker style');
   await color('Marker color', '#2563eb');
   await color('Pulse color', '#f97316');
-  expect(current().hotspots[0]!.markerAppearance).toEqual({
+  expect(getTourHotspots(current())[0]!.markerAppearance).toEqual({
     color: '#2563eb',
     pulseColor: '#f97316',
     size: 30,
   });
   await color('Marker color', 'transparent');
   await click('Use interaction accent');
-  expect(current().hotspots[0]!.markerAppearance).toEqual({
+  expect(getTourHotspots(current())[0]!.markerAppearance).toEqual({
     color: null,
     pulseColor: null,
     size: 30,
@@ -533,7 +531,7 @@ it('commits global and local marker colors while preserving independent snapshot
     pulseColor: '#abcdef',
     size: 30,
   });
-  expect(current().hotspots[0]!.appearance).toBeNull();
+  expect(getTourHotspots(current())[0]!.appearance).toBeNull();
 });
 
 it('edits interaction accent without replacing authored marker colors or tour geometry', async () => {
@@ -625,37 +623,20 @@ it('applies stage gradient and solid paint while clearing only the stage image b
   expect(current()).toEqual(before);
 });
 
-it('inherits highlight animation independently and preserves it through appearance edits', async () => {
-  await click('Highlight');
-  const mask = current().masks[0]!;
-  await click('Use tour style');
-  scope = 'document';
-  draw();
-  await choose('Entry', 'Fade');
+it('edits hotspot highlight animation independently from color and opacity', async () => {
+  await click('Hotspot');
+  await choose('Focus style', 'Highlight');
   await fill('Entry duration', '0.6');
-  await choose('Exit', 'Fade');
   await fill('Exit duration', '0.4');
-  const animation = structuredClone(project.tour!.style.maskDefaults!.highlight.animation);
+  const visual = getTourHotspots(current())[0]!.visual;
+  if (visual.kind === 'point') throw new Error('Expected region.');
+  const animation = structuredClone(visual.animation);
   await fill('Opacity', '45');
-  expect(project.tour!.style.maskDefaults!.highlight.animation).toEqual(animation);
-  scope = 'selection';
-  draw();
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Entry duration"]')?.value).toBe(
-    '0.6'
-  );
+  expect(getTourHotspots(current())[0]!.visual).toMatchObject({ animation, opacity: 0.45 });
   await choose('Entry', 'None');
-  expect(current().masks[0]!.inheritStyle).toBe(false);
-  expect(current().masks[0]!.color).toBe(mask.color);
-  expect(current().masks[0]!.highlightAnimation?.enter.kind).toBe('none');
-  expect(project.tour!.style.maskDefaults!.highlight.animation).toEqual(animation);
-  await click('Use tour animation');
-  expect(current().masks[0]!.highlightAnimation).toBeNull();
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Entry duration"]')?.value).toBe(
-    '0.6'
-  );
-  await choose('Highlight', 'Blur');
-  expect(host.querySelector('[aria-label="Entry"]')).toBeNull();
-  await choose('Highlight', 'Highlight');
+  expect(getTourHotspots(current())[0]!.visual).toMatchObject({
+    animation: { enter: { kind: 'none' } },
+  });
   disabled = true;
   draw();
   expect(host.querySelector<HTMLButtonElement>('[aria-label="Entry"]')?.disabled).toBe(true);
@@ -733,12 +714,12 @@ it('preserves playback and transition edits while their optional explanations st
   ).toBe(true);
 });
 
-it('edits slide timing and its automatic destination without expanding the explanation', async () => {
-  await choose('Slide duration', 'Set duration');
+it('edits an action hold without exposing a branch destination', async () => {
+  await click('Hotspot');
+  await choose('Duration', 'Set duration');
   await fill('Hold, s', '6');
-  await choose('Automatic transition', '2. Navigation');
-  expect(current().timing).toMatchObject({ mode: 'manual', holdSeconds: 6, autoplayTarget: 'nav' });
-  await choose('Slide duration', 'From text and narration');
+  expect(getTourHotspots(current())[0]!.timing).toMatchObject({ mode: 'manual', holdSeconds: 6 });
+  expect(host.querySelector('[aria-label="Automatic transition"]')).toBeNull();
+  await choose('Duration', 'From text and narration');
   expect(host.querySelector('[aria-label="Hold, s"]')).toBeNull();
-  expect(current().timing.holdSeconds).toBe(6);
 });

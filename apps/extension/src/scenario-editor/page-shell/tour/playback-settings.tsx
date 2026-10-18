@@ -60,7 +60,7 @@ export function TourPlaybackSettings({
 
 /** A slide may override hold time and choose its default branch without changing click actions. */
 export function TourTimingSettings({
-  tour,
+  hasNarration,
   slide,
   disabled,
   onChange,
@@ -68,6 +68,7 @@ export function TourTimingSettings({
 }: {
   tour: TourDocument;
   slide: TourSlide;
+  hasNarration?: boolean;
   disabled: boolean;
   onChange: (slide: TourSlide) => boolean;
   t: Translate;
@@ -103,7 +104,7 @@ export function TourTimingSettings({
             onPreview={changeHold}
             onChange={changeHold}
           />
-          {slide.narration && (
+          {(hasNarration ?? Boolean(slide.narration)) && (
             <ToggleField
               disabled={disabled}
               value={timing.truncateNarration}
@@ -118,23 +119,6 @@ export function TourTimingSettings({
           )}
         </>
       )}
-      <div className="tour-text-field">
-        <SelectField
-          label={t('scenario.editor.tourAutomaticTransition')}
-          value={timing.autoplayTarget ?? ''}
-          disabled={disabled}
-          options={[
-            { value: '', label: t('scenario.editor.tourFollowActions') },
-            ...tour.slides.map((entry, index) => ({
-              value: entry.id,
-              label: `${index + 1}. ${entry.title}`,
-            })),
-          ]}
-          onChange={(target) =>
-            onChange({ ...slide, timing: { ...timing, autoplayTarget: target || null } })
-          }
-        />
-      </div>
       <InformationDisclosure label={t('common.actions.details')}>
         <p>{t('scenario.editor.tourTimingHint')}</p>
       </InformationDisclosure>

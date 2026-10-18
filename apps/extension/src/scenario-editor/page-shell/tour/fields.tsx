@@ -1,3 +1,4 @@
+import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
@@ -235,7 +236,7 @@ export function TourActionField({
     { value: 'none', label: t('scenario.editor.tourActionNone') },
     { value: 'next', label: t('scenario.editor.tourActionNext') },
     { value: 'previous', label: t('scenario.editor.tourActionPrevious') },
-    { value: 'slide', label: t('scenario.editor.tourActionSlide') },
+    { value: 'action', label: t('scenario.editor.tourActionStep') },
     { value: 'url', label: t('scenario.editor.tourActionUrl') },
     { value: 'restart', label: t('scenario.editor.tourRestart') },
     ...(tour.endScreen.enabled
@@ -256,22 +257,28 @@ export function TourActionField({
           setKind(next);
           setInvalid(false);
           if (next === 'url') return;
-          if (next === 'slide') {
-            const first = tour.slides[0];
-            if (first) onChange({ kind: 'slide', slideId: first.id });
-          } else onChange({ kind: next });
+          if (next === 'action') {
+            const first = buildTourPlaybackPlan(tour).entries.find((entry) => entry.actionId);
+            if (first?.actionId) onChange({ kind: 'action', actionId: first.actionId });
+          } else if (next !== 'slide') onChange({ kind: next });
         }}
       />
-      {kind === 'slide' && (
+      {kind === 'action' && (
         <SelectField
-          label={t('scenario.editor.tourActionSlide')}
+          label={t('scenario.editor.tourActionStep')}
           disabled={disabled}
-          value={value.kind === 'slide' ? value.slideId : (tour.slides[0]?.id ?? '')}
-          options={tour.slides.map((slide, index) => ({
-            value: slide.id,
-            label: `${index + 1}. ${slide.title || t('scenario.editor.tourUntitled')}`,
-          }))}
-          onChange={(slideId) => onChange({ kind: 'slide', slideId })}
+          value={value.kind === 'action' ? value.actionId : ''}
+          options={buildTourPlaybackPlan(tour).entries.flatMap((entry) =>
+            entry.actionId
+              ? [
+                  {
+                    value: entry.actionId,
+                    label: `${entry.ordinal}. ${entry.slide.title || t('scenario.editor.tourHotspot')}`,
+                  },
+                ]
+              : []
+          )}
+          onChange={(actionId) => onChange({ kind: 'action', actionId })}
         />
       )}
       {kind === 'url' && (

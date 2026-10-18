@@ -8,6 +8,8 @@ import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
 import {
   getTourSlideObjects,
+  getTourHotspots,
+  tourHotspotMask,
   resolveTourMask,
   resolveTourHighlightAnimation,
   resolveTourMarkerAppearance,
@@ -38,7 +40,8 @@ export function renderTourImage(
   }
 ) {
   if (!slide.image) {
-    scene.append(element('p', 'tour-empty', labels.empty));
+    if (!slide.actions.length || slide.actions.some((entry) => entry.type === 'hotspot'))
+      scene.append(element('p', 'tour-empty', labels.empty));
     return null;
   }
   const imageBox = authoring
@@ -73,14 +76,9 @@ export function renderTourImage(
   const explanations = getTourSlideObjects(slide).flatMap((entry) =>
     entry.type === 'mask' ? [] : [entry.object.id]
   );
-  slide.hotspots.forEach((hotspot) => {
+  getTourHotspots(slide).forEach((hotspot) => {
     const number = explanations.indexOf(hotspot.id);
-    const button = actionButton(
-      '',
-      hotspot.action.kind === 'url' ? hotspot.action : { kind: 'none' },
-      'tour-hotspot',
-      hotspot.id
-    );
+    const button = actionButton('', { kind: 'none' }, 'tour-hotspot', hotspot.id);
     const point = projectImagePoint(imageBox, hotspot.point);
     button.style.left = `${point.x}px`;
     button.style.top = `${point.y}px`;
@@ -89,22 +87,48 @@ export function renderTourImage(
     button.style.setProperty('--tour-marker-pulse-color', marker.pulseColor ?? style.accent);
     if (hotspot.markerAppearance || style.markerAppearance)
       button.style.setProperty('--tour-marker-size', `${marker.size}px`);
-    button.dataset.pulse = String(hotspot.pulse);
+    button.dataset.pulse = String(hotspot.visual.kind === 'point' && hotspot.visual.pulse);
     button.hidden = point.x < 0 || point.y < 0 || point.x > stageWidth || point.y > stageHeight;
     button.title = hotspot.label;
     button.setAttribute('aria-label', hotspot.label || `${labels.point} ${number + 1}`);
-    button.addEventListener('pointerenter', () => {
-      hintController.select(number);
-    });
-    button.addEventListener('focus', () => {
-      hintController.select(number);
-    });
+    button.addEventListener('focus', () => hintController.select(number));
     button.addEventListener('click', () => {
-      if (authoring) return;
-      if (hintController.activeIndex !== number) {
-        hintController.select(number);
-      } else if (hotspot.action.kind !== 'url') onAction(hotspot.action);
+      if (!authoring) onAction({ kind: 'next' });
     });
+    const region = tourHotspotMask(hotspot);
+    if (region) {
+      const visual = renderTourMask(region, imageBox, slide.image.width, {
+        element,
+        labels,
+        authoring,
+        signal,
+        animation: hotspot.visual.animation,
+      });
+      visual.dataset.tourObjectId = hotspot.id;
+      visual.addEventListener('focus', () => hintController.select(number));
+      if (hotspot.visual.kind === 'frame') {
+        const effect = visual.querySelector('.tour-mask-effect');
+        effect.style.background = 'transparent';
+        effect.style.border = `${hotspot.visual.strokeWidth ?? 3}px solid ${hotspot.visual.color}`;
+        effect.style.borderRadius = `${hotspot.visual.radius ?? 6}px`;
+        effect.classList.add('tour-focus-frame');
+      }
+      if (!authoring) {
+        visual.setAttribute('role', 'button');
+        visual.setAttribute('aria-label', hotspot.label || `${labels.point} ${number + 1}`);
+        visual.tabIndex = 0;
+        visual.style.pointerEvents = 'auto';
+        visual.addEventListener('click', () => onAction({ kind: 'next' }));
+        visual.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            visual.click();
+          }
+        });
+      }
+      plane.append(visual);
+      return;
+    }
     if (authoring)
       bindTourObjectDrag(
         button,

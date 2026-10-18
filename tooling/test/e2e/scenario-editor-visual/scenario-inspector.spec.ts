@@ -178,7 +178,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await tourPanel
         .getByRole('navigation')
         .getByRole('button', {
-          name: locale === 'ru' ? 'Объекты слайда' : 'Slide objects',
+          name: locale === 'ru' ? 'Действия' : 'Actions',
           exact: true,
         })
         .click();
@@ -560,7 +560,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ].join(', ');
       for (const section of [
         ru ? 'Воспроизведение' : 'Playback',
-        ru ? 'Пояснение к слайду' : 'Slide explanation',
+        ru ? 'Текстовое действие' : 'Text action',
       ]) {
         await panel
           .getByRole('navigation')

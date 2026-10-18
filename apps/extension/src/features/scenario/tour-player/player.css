@@ -1031,3 +1031,22 @@ a:focus-visible {
     height: 44px;
   }
 }
+
+.tour-focus-frame {
+  animation: tour-focus-frame 1.6s ease-in-out infinite;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+@keyframes tour-focus-frame {
+  50% {
+    border-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-focus-frame {
+    animation: none;
+  }
+}
+.tour-hint-text {
+  overflow-y: auto;
+}

@@ -144,16 +144,47 @@ function tourGeometryHandlers(
         changeSlide({
           ...slide,
           masks: slide.masks.map((mask) => (mask.id === id ? { ...mask, rect } : mask)),
+          actions: slide.actions.map((entry) =>
+            entry.type === 'hotspot' &&
+            entry.object.id === id &&
+            entry.object.visual.kind !== 'point'
+              ? {
+                  type: 'hotspot',
+                  object: {
+                    ...entry.object,
+                    visual: { ...entry.object.visual, rect },
+                    point: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+                  },
+                }
+              : entry
+          ),
         });
     },
     onMoveObject(id, point) {
       if (slide)
         changeSlide({
           ...slide,
-          hotspots: slide.hotspots.map((entry) => (entry.id === id ? { ...entry, point } : entry)),
-          masks: slide.masks.map((entry) =>
-            entry.id === id ? { ...entry, rect: { ...entry.rect, ...point } } : entry
+          masks: slide.masks.map((mask) =>
+            mask.id === id ? { ...mask, rect: { ...mask.rect, ...point } } : mask
           ),
+          actions: slide.actions.map((entry) => {
+            if (entry.type !== 'hotspot' || entry.object.id !== id) return entry;
+            const visual = entry.object.visual;
+            return {
+              type: 'hotspot',
+              object: {
+                ...entry.object,
+                point:
+                  visual.kind === 'point'
+                    ? point
+                    : { x: point.x + visual.rect.width / 2, y: point.y + visual.rect.height / 2 },
+                visual:
+                  visual.kind === 'point'
+                    ? visual
+                    : { ...visual, rect: { ...visual.rect, ...point } },
+              },
+            };
+          }),
         });
     },
   };

@@ -34,15 +34,17 @@ function fixture() {
     gain: 0.5,
     transcript: '',
   };
-  slide.narration = narration;
-  slide.annotations = [
-    {
-      id: 'note',
-      text: 'Note',
-      anchor: null,
-      appearance: null,
-      narration: { ...narration, trigger: 'activation' },
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[
+      {
+        id: 'note',
+        text: 'Note',
+        anchor: null,
+        appearance: null,
+        narration: { ...narration, trigger: 'activation' as const },
+      },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   player.show(slide, [{ id: 'voice', src: 'data:audio/wav;base64,AA==' }]);
   return { player, media, slide, signal, failed, changed, tick: () => tick() };
@@ -67,7 +69,7 @@ it('synchronizes entry trim/gain to elapsed time, pauses and releases on navigat
 });
 it('activation uses its own attachment and trim, ignores timeline ticks, and stops at trim end', async () => {
   const s = fixture();
-  s.player.activate('note');
+  s.player.replay('note');
   await Promise.resolve();
   expect(s.media.currentTime).toBe(2);
   s.player.sync(1, false);
@@ -94,7 +96,7 @@ it('reports autoplay denial without unhandled rejection and allows a later retry
 
 it('replays entry narration locally and retains position across pause and resume', async () => {
   const s = fixture();
-  s.player.replay(null);
+  s.player.replay('note');
   await Promise.resolve();
   expect(s.media.currentTime).toBe(2);
   expect(s.player.snapshot.status).toBe('playing');
@@ -111,7 +113,7 @@ it('replays entry narration locally and retains position across pause and resume
   expect(s.player.snapshot.status).toBe('ended');
   s.player.resume();
   expect(s.media.paused).toBe(true);
-  s.player.replay(null);
+  s.player.replay('note');
   await Promise.resolve();
   expect(s.media.currentTime).toBe(2);
   s.signal.abort();
@@ -129,7 +131,7 @@ it('changes viewer volume and mute without changing authored gain or restarting'
   s.player.setMuted(false);
   expect(s.media.volume).toBeCloseTo(0.2);
   expect(s.player.snapshot.audible).toBe(true);
-  expect(s.slide.narration?.gain).toBe(0.5);
+  expect(s.slide.actions[0]!.object.narration?.gain).toBe(0.5);
   expect(s.media.play).toHaveBeenCalledOnce();
   s.signal.abort();
 });
@@ -178,12 +180,12 @@ it.each(['resolve', 'reject'] as const)(
     const s = fixture();
     const pending = deferredPlay(s.media);
     s.player.replay('note');
-    s.player.replay(null);
+    s.player.replay('note');
     await settle();
     if (completion === 'resolve') pending.resolve();
     else pending.reject(new DOMException('old', 'NotAllowedError'));
     await settle();
-    expect(s.player.snapshot).toMatchObject({ objectId: null, status: 'playing', audible: true });
+    expect(s.player.snapshot).toMatchObject({ objectId: 'note', status: 'playing', audible: true });
     expect(s.media.paused).toBe(false);
     expect(s.failed).not.toHaveBeenCalled();
     s.signal.abort();
@@ -220,7 +222,7 @@ it('keeps pending resume singular and exposes actual waiting, playback, end and 
 it('keeps gesture denial local and retries explicitly without changing the retained position', async () => {
   const s = fixture();
   vi.mocked(s.media.play).mockRejectedValueOnce(new DOMException('gesture', 'NotAllowedError'));
-  s.player.replay(null);
+  s.player.replay('note');
   await settle();
   expect(s.player.snapshot).toMatchObject({ status: 'blocked', canResume: true, audible: false });
   s.player.sync(1, true);
@@ -252,9 +254,9 @@ function gainGraph() {
 it('composes amplified gain once, keeps the graph and viewer master across cues, then disconnects it', async () => {
   const graph = gainGraph();
   const s = fixture();
-  s.slide.narration!.gain = 2;
+  s.slide.actions[0]!.object.narration!.gain = 2;
   s.player.setVolume(0.4);
-  s.player.replay(null);
+  s.player.replay('note');
   await settle();
   expect(s.media.volume * graph.node.gain.value).toBeCloseTo(0.8);
   s.player.setMuted(true);
@@ -262,12 +264,22 @@ it('composes amplified gain once, keeps the graph and viewer master across cues,
   s.player.setVolume(0.7);
   s.player.setMuted(false);
   expect(s.media.volume * graph.node.gain.value).toBeCloseTo(1.4);
-  s.player.replay('note');
+  s.slide.actions.push({
+    type: 'annotation',
+    object: {
+      id: 'other',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: { ...s.slide.actions[0]!.object.narration!, gain: 0.5 },
+    },
+  });
+  s.player.replay('other');
   await settle();
   expect(s.media.volume * graph.node.gain.value).toBeCloseTo(0.35);
   expect(graph.construct).toHaveBeenCalledOnce();
   expect(graph.context.createMediaElementSource).toHaveBeenCalledOnce();
-  expect(s.slide.narration?.gain).toBe(2);
+  expect(s.slide.actions[0]!.object.narration?.gain).toBe(2);
   s.signal.abort();
   expect(graph.source.disconnect).toHaveBeenCalledOnce();
   expect(graph.node.disconnect).toHaveBeenCalledOnce();
@@ -287,7 +299,7 @@ it('bounds transient volume, preserves it across navigation, and ignores command
   s.player.show(s.slide, [{ id: 'voice', src: 'data:audio/wav;base64,AA==' }]);
   expect(s.player.snapshot.volume).toBe(0.4);
   s.signal.abort();
-  s.player.replay(null);
+  s.player.replay('note');
   s.player.resume();
   s.player.setVolume(1);
   expect(s.media.play).not.toHaveBeenCalled();
@@ -300,13 +312,13 @@ it('never redirects an unknown target and clears old audio when its next attachm
   expect(s.media.play).not.toHaveBeenCalled();
   s.player.replay('note');
   await settle();
-  s.slide.narration!.assetId = 'missing-asset';
-  s.player.replay(null);
+  s.slide.actions[0]!.object.narration!.assetId = 'missing-asset';
+  s.player.replay('note');
   expect(s.media.paused).toBe(true);
   expect(s.media.getAttribute('src')).toBeNull();
   expect(s.player.snapshot).toMatchObject({
     slideId: s.slide.id,
-    objectId: null,
+    objectId: 'note',
     status: 'error',
     canResume: false,
     audible: false,
@@ -317,7 +329,7 @@ it('never redirects an unknown target and clears old audio when its next attachm
 
 it('ignores obsolete pause events and removes listeners on disposal', async () => {
   const s = fixture();
-  s.player.replay(null);
+  s.player.replay('note');
   await settle();
   s.media.dispatchEvent(new Event('pause'));
   expect(s.media.paused).toBe(false);

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 
@@ -171,22 +173,26 @@ it('runs bounded in-tour actions in preview while URL actions stay inert buttons
   expect(root.dataset['slideId']).toBe('first');
 });
 
-it('keeps URL hotspots as buttons in preview and still opens their explanation', async () => {
+it('shows hotspot copy immediately and advances on its first click in preview', async () => {
   instantImages();
   const tick = playbackFrames();
   const tour = previewTour();
   const slide = imageSlide('first');
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Open',
-      text: 'Details',
-      action: { kind: 'url', url: 'https://example.com/' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Open',
+        text: 'Details',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide];
   const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
@@ -197,11 +203,9 @@ it('keeps URL hotspots as buttons in preview and still opens their explanation',
   const hotspot = scene.querySelector<HTMLElement>('.tour-hotspot')!;
   expect(hotspot.tagName).toBe('BUTTON');
   expect(root.querySelector('a[href]')).toBeNull();
-  hotspot.click();
-  expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(false);
   expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Details');
   hotspot.click();
-  expect(root.dataset['slideId']).toBe('first');
+  expect(root.dataset['slideId']).toBe('end');
   expect(root.querySelector('a[href]')).toBeNull();
 });
 
@@ -214,14 +218,26 @@ it('plays available narration in preview, reports a denied gesture and releases 
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   const tour = previewTour();
   const slide = createTourImageSlide('first');
-  slide.narration = {
-    assetId: 'voice',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'voice',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   const tick = playbackFrames();
   const { player, root } = await mount(tour, [{ id: 'voice', mime: 'audio/wav', base64: 'AA==' }]);
@@ -247,17 +263,21 @@ it('scopes preview hint dismissal to the player root and keeps document navigati
   const tick = playbackFrames();
   const tour = previewTour();
   const slide = imageSlide('first');
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Point',
-      text: 'Details',
-      action: { kind: 'none' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Point',
+        text: 'Details',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
@@ -305,14 +325,26 @@ it('reports audio decoding failure separately from images and retries narration'
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   const tour = previewTour();
   const slide = createTourImageSlide('voice-slide');
-  slide.narration = {
-    assetId: 'voice',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'voice',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   const tick = playbackFrames();
   const { root } = await mount(tour, [{ id: 'voice', mime: 'audio/wav', base64: 'AA==' }]);
@@ -347,7 +379,15 @@ it('uses accessible icon narration actions without firing navigation and permits
   const tour = previewTour();
   instantImages();
   const slide = imageSlide('hint');
-  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null, narration }];
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'annotation' && !entry.object.id.endsWith('-action')
+    ),
+    ...[{ id: 'note', text: 'Note', anchor: null, appearance: null, narration }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   tour.slides = [
     slide,
     {
@@ -371,8 +411,6 @@ it('uses accessible icon narration actions without firing navigation and permits
   expect(hint.getAttribute('aria-label')).toBe('play');
   expect(hint.title).toBe('play');
   expect(hint.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
-  hint.click();
-  await settleMedia();
   expect(root.querySelector('[data-tour-status]')!.textContent).toBe('narration failed');
   hint.click();
   await settleMedia();
@@ -479,45 +517,53 @@ it('renders inherited and local marker colors and diameter independently of puls
     markerAppearance: { color: '#2367ab', pulseColor: '#ab3267', size: 48 },
   });
   const slide = imageSlide('markers');
-  slide.hotspots = [
-    {
-      id: 'inherited',
-      point: { x: 0.3, y: 0.4 },
-      targetRect: null,
-      label: 'Inherited',
-      text: 'Details',
-      action: { kind: 'none' },
-      appearance: null,
-      pulse: false,
-    },
-    {
-      id: 'local',
-      point: { x: 0.7, y: 0.6 },
-      targetRect: null,
-      label: 'Local',
-      text: 'Details',
-      action: { kind: 'none' },
-      appearance: null,
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'inherited',
+        point: { x: 0.3, y: 0.4 },
+        targetRect: null,
+        label: 'Inherited',
+        text: 'Details',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+      {
+        id: 'local',
+        point: { x: 0.7, y: 0.6 },
+        targetRect: null,
+        label: 'Local',
+        text: 'Details',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
-  Object.assign(slide.hotspots[1]!, {
+  Object.assign(getTourHotspots(slide)[1]!, {
     markerAppearance: { color: '#123456', pulseColor: null, size: 16 },
   });
   tour.slides = [slide];
+  tour.playback.autoZoom = false;
+  tour.transition.hotspotTravelMs = 0;
   const saved = JSON.stringify(tour);
-  const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+  const { root, player } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
   await settleMedia();
   const markers = [...root.querySelectorAll<HTMLElement>('.tour-hotspot')];
-  expect(markers).toHaveLength(2);
+  expect(markers).toHaveLength(1);
   expect(markers[0]!.style.getPropertyValue('--tour-marker-color')).toBe('#2367ab');
   expect(markers[0]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe('#ab3267');
   expect(markers[0]!.style.getPropertyValue('--tour-marker-size')).toBe('48px');
   expect(markers[0]!.dataset['pulse']).toBe('false');
-  expect(markers[1]!.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
-  expect(markers[1]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe(tour.style.accent);
-  expect(markers[1]!.style.getPropertyValue('--tour-marker-size')).toBe('16px');
-  expect(markers[1]!.dataset['pulse']).toBe('true');
+  player.selectObject('local');
+  await settleMedia();
+  const localMarker = root.querySelector<HTMLElement>('.tour-hotspot')!;
+  expect(localMarker.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
+  expect(localMarker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(tour.style.accent);
+  expect(localMarker.style.getPropertyValue('--tour-marker-size')).toBe('16px');
+  expect(localMarker.dataset['pulse']).toBe('true');
   expect(JSON.stringify(tour)).toBe(saved);
 });
 
@@ -701,17 +747,21 @@ it('keeps temporary full-source projection aligned through playback, resize and 
   slide.image!.height = 200;
   slide.camera = { mode: 'manual', zoom: 3, center: { x: 0.5, y: 0.5 } };
   tour.slides = [slide, imageSlide('second')];
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.25, y: 0.75 },
-      targetRect: null,
-      label: 'Point',
-      text: 'Hint',
-      action: { kind: 'none' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.25, y: 0.75 },
+        targetRect: null,
+        label: 'Point',
+        text: 'Hint',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   slide.masks = [
     {

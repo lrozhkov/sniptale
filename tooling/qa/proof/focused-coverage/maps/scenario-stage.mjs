@@ -1,5 +1,32 @@
 export const SCENARIO_STAGE_OWNER_MAPPINGS = [
   {
+    owner: 'scenario-tour-action-list',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/image-object-list.tsx',
+    exclusive: true,
+    reason:
+      'Real inspector and workspace tests exercise acquisition, global numbering, ordering, selection and removal through the action list.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/workspace.test.tsx',
+    ],
+  },
+  {
+    owner: 'scenario-guide-page-state',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
+    exclusive: true,
+    reason:
+      'Hook fixtures exercise mounted edit admission, image publication, narration, templates and refusal paths that the page suite substitutes.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/use-state.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/image-edits.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/narration.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/templates.test.ts',
+    ],
+  },
+  {
     owner: 'scenario-tour-library',
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/library.tsx',
     exclusive: true,

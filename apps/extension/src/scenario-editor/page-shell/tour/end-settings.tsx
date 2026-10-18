@@ -153,9 +153,7 @@ function TourEndToggle({
 }) {
   const [confirm, setConfirm] = useState(false);
   const linked = tour.slides.some((slide) =>
-    (slide.kind === 'image' ? slide.hotspots : slide.buttons).some(
-      (object) => object.action.kind === 'end'
-    )
+    (slide.kind === 'image' ? [] : slide.buttons).some((object) => object.action.kind === 'end')
   );
   const disable = () =>
     onChange({
@@ -163,14 +161,7 @@ function TourEndToggle({
       endScreen: { ...tour.endScreen, enabled: false },
       slides: tour.slides.map((slide) =>
         slide.kind === 'image'
-          ? {
-              ...slide,
-              hotspots: slide.hotspots.map((object) =>
-                object.action.kind === 'end'
-                  ? { ...object, action: { kind: 'none' as const } }
-                  : object
-              ),
-            }
+          ? slide
           : {
               ...slide,
               buttons: slide.buttons.map((object) =>

@@ -38,16 +38,21 @@ export type TourCommand =
 
 /** Incoming edges are shown before a destructive edit; clearing is an explicit author choice. */
 export function getTourIncomingReferences(tour: TourDocument, targetId: string): string[] {
-  return tour.slides.flatMap((slide) => {
-    if (slide.id === targetId) return [];
-    const objects = slide.kind === 'image' ? slide.hotspots : slide.buttons;
-    return [
-      ...(slide.timing.autoplayTarget === targetId ? [slide.id] : []),
-      ...objects
-        .filter((object) => object.action.kind === 'slide' && object.action.slideId === targetId)
-        .map((object) => object.id),
-    ];
-  });
+  const target = tour.slides.find((slide) => slide.id === targetId);
+  const actionIds = new Set(
+    target?.kind === 'image' ? target.actions.map((entry) => entry.object.id) : []
+  );
+  return tour.slides.flatMap((slide) =>
+    slide.kind === 'navigation' && slide.id !== targetId
+      ? slide.buttons
+          .filter(({ action }) =>
+            action.kind === 'slide'
+              ? action.slideId === targetId
+              : action.kind === 'action' && actionIds.has(action.actionId)
+          )
+          .map((button) => button.id)
+      : []
+  );
 }
 
 function indexOf(slides: TourSlide[], id: string): number {
@@ -66,12 +71,18 @@ function removeSlide(
   const index = indexOf(tour.slides, command.slideId);
   if (command.incoming !== 'clear' && getTourIncomingReferences(tour, command.slideId).length)
     throw new Error('Tour slide has incoming navigation.');
+  const removed = tour.slides[index]!;
+  const removedActions = new Set(
+    removed.kind === 'image' ? removed.actions.map((entry) => entry.object.id) : []
+  );
   tour.slides.splice(index, 1);
   if (command.incoming !== 'clear') return;
   for (const slide of tour.slides) {
-    if (slide.timing.autoplayTarget === command.slideId) slide.timing.autoplayTarget = null;
-    for (const object of slide.kind === 'image' ? slide.hotspots : slide.buttons)
-      if (object.action.kind === 'slide' && object.action.slideId === command.slideId)
+    for (const object of slide.kind === 'image' ? [] : slide.buttons)
+      if (
+        (object.action.kind === 'slide' && object.action.slideId === command.slideId) ||
+        (object.action.kind === 'action' && removedActions.has(object.action.actionId))
+      )
         object.action = { kind: 'none' };
   }
 }
@@ -79,22 +90,16 @@ function removeSlide(
 function duplicateSlide(slide: TourSlide, id: string, nextId: () => string): TourSlide {
   const copy = structuredClone(slide);
   copy.id = id;
-  if (copy.timing.autoplayTarget === slide.id) copy.timing.autoplayTarget = id;
-  const objects = new Map<string, string>();
-  const rename = (object: { id: string }) => {
-    const assigned = nextId();
-    objects.set(object.id, assigned);
-    object.id = assigned;
-  };
-  for (const object of copy.kind === 'image' ? copy.hotspots : copy.buttons) {
-    rename(object);
-    if (object.action.kind === 'slide' && object.action.slideId === slide.id)
-      object.action.slideId = id;
+  if (copy.kind === 'navigation') {
+    for (const button of copy.buttons) {
+      button.id = nextId();
+      if (button.action.kind === 'slide' && button.action.slideId === slide.id)
+        button.action.slideId = id;
+    }
+  } else {
+    for (const entry of copy.actions) entry.object.id = nextId();
+    for (const mask of copy.masks) mask.id = nextId();
   }
-  if (copy.kind !== 'image') return copy;
-  for (const object of [...copy.annotations, ...copy.masks]) rename(object);
-  if (copy.objectOrder)
-    copy.objectOrder = copy.objectOrder.map((objectId) => objects.get(objectId) ?? objectId);
   return copy;
 }
 
@@ -105,12 +110,17 @@ function setNarration(
   const target = getTourNarrationTarget(slide, command.objectId);
   if (!target) throw new Error('Tour narration target is unavailable.');
   if (command.objectId === null) {
+    if (slide.kind !== 'navigation') throw new Error('Select an action for narration.');
     slide.narration = structuredClone(command.narration);
     return;
   }
   const voice = command.narration;
   target.narration = voice
-    ? { ...voice, trigger: 'trigger' in voice ? voice.trigger : 'activation' }
+    ? {
+        ...voice,
+        trigger:
+          slide.kind === 'image' ? 'enter' : 'trigger' in voice ? voice.trigger : 'activation',
+      }
     : null;
 }
 

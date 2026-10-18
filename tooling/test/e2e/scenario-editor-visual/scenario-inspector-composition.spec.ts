@@ -49,7 +49,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await page.getByRole('option', { name: 'Вручную', exact: true }).click();
       await checkOptionalNote(panel);
       await page.screenshot({ path: info.outputPath('camera-settings.png'), fullPage: false });
-      await category('Объекты слайда').click();
+      await category('Действия').click();
       await panel.getByRole('button', { name: 'Точка действия', exact: true }).click();
       const back = panel.getByRole('button', { name: 'К настройкам слайда', exact: true });
       await back.hover();
