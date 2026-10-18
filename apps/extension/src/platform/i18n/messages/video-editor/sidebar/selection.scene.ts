@@ -1,6 +1,30 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  textRewriteSaveDisclosure: {
+    ru: 'Текущий проект сохраняется перед запросом. Звук, видео и эффекты остаются локально.',
+    en: 'The current project is saved before the request. Audio, video and effects stay local.',
+  },
+  textRewriteSourceScope: {
+    ru: 'Правка текста действует на все размещения этого экземпляра исходника. Другие экземпляры независимы.',
+    en: 'Text changes follow every placement of this source instance. Other instances are independent.',
+  },
+  textRewriteProjectScope: {
+    ru: 'Текст размещён во времени проекта и не зависит от монтажа исходных клипов.',
+    en: 'Text belongs to project time and stays independent of source clip edits.',
+  },
+  textRewriteProjectTiming: {
+    ru: 'Изменение интервалов создаёт отдельный текстовый документ во времени проекта. Размещение и скорость исходных клипов сохраняются.',
+    en: 'Changed intervals create a separate text document in project time. Source clips retain their placement and speed.',
+  },
+  textRewritePlacements: {
+    ru: 'Запрос содержит все текущие размещения, включая разрывы и перекрытия. Начало и конец охватывают эти размещения.',
+    en: 'The request lists every current placement, including gaps and overlaps. The start and end enclose these placements.',
+  },
+  textRewriteStale: {
+    ru: 'Проект изменился или выбранный текст не полностью входит в текущий монтаж. Закройте форму и проверьте текст и его размещение.',
+    en: 'The project changed, or the selection includes text outside the current montage. Close this form and check the text and its placement.',
+  },
   recognitionClose: { ru: 'Закрыть результат', en: 'Close result' },
   recognitionFailed: {
     ru: 'Действие не выполнено. Повторите его. Готовый результат остаётся доступен до закрытия.',

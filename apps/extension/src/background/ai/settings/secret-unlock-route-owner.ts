@@ -5,8 +5,6 @@ export function isUnlockRequestOwner(
   record: StoredAISecretUnlockRequest,
   sender: chrome.runtime.MessageSender
 ): boolean {
-  const senderKey =
-    resolveLlmSessionSenderKey('content-ai-pick', sender) ??
-    resolveLlmSessionSenderKey('scenario-editor', sender);
+  const senderKey = resolveLlmSessionSenderKey(record.purpose, sender);
   return record.senderKey === senderKey;
 }

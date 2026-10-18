@@ -1,7 +1,7 @@
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { getDefaultExportSettings } from '../../../features/video/project/timeline/meta';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 
 const { contentSpy } = vi.hoisted(() => ({
@@ -9,6 +9,11 @@ const { contentSpy } = vi.hoisted(() => ({
 }));
 const hookMocks = vi.hoisted(() => ({ collapsed: false, exportOpen: false }));
 const recognition = vi.hoisted(() => ({ recognize: vi.fn() }));
+const rewrite = vi.hoisted(() => ({ start: vi.fn() }));
+const rewriteHook = vi.hoisted(() => vi.fn(() => rewrite));
+vi.mock('../../runtime/session/text-rewrite', () => ({
+  useVideoProjectTextRewrite: rewriteHook,
+}));
 vi.mock('../../runtime/session/recognition', () => ({
   useVideoProjectRecognition: () => recognition,
 }));
@@ -62,6 +67,13 @@ vi.mock('../sidebar/view', () => ({
   getSelectionMeta: () => ({ icon: null, label: 'Scene', title: 'Scene properties' }),
 }));
 
+beforeEach(() => {
+  contentSpy.mockClear();
+  rewriteHook.mockClear();
+  hookMocks.collapsed = false;
+  hookMocks.exportOpen = false;
+});
+
 it('hides the context inspector when the inspector rail state is collapsed', () => {
   hookMocks.collapsed = true;
   const markup = renderToStaticMarkup(
@@ -80,6 +92,7 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
 
   expect(markup).toBe('');
   expect(contentSpy).not.toHaveBeenCalled();
+  expect(rewriteHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] });
 });
 
 it('passes the mounted recognition controller into the actual floating inspector content', () => {
@@ -110,6 +123,7 @@ it('passes the mounted recognition controller into the actual floating inspector
     expect.objectContaining({
       inputRefs: expect.any(Object),
       recognition,
+      textRewrite: rewrite,
       onToggleProjectsOpen: expect.any(Function),
     })
   );
@@ -137,6 +151,10 @@ it('places export in the existing inspector while retaining inert selection cont
     expect(markup).toContain('hidden=""');
     expect(markup).toContain('inert=""');
     expect(markup).not.toContain('role="dialog"');
+    expect(rewriteHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] });
+    expect(contentSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ textRewrite: rewrite })
+    );
   } finally {
     hookMocks.exportOpen = false;
   }

@@ -1,3 +1,4 @@
+import { useVideoProjectTextRewrite } from '../../runtime/session/text-rewrite';
 import { ExportSettingsPanel } from '../../export/dialog';
 import { useVideoProjectRecognition } from '../../runtime/session/recognition';
 import { FileOutput, List, PanelLeft } from 'lucide-react';
@@ -78,6 +79,7 @@ function VideoEditorFloatingInspectorContent({
 }: VideoEditorFloatingInspectorContentProps) {
   const sidebarProps = getWorkspaceSidebarProps(controller);
   const recognition = useVideoProjectRecognition(sidebarProps.project);
+  const textRewrite = useVideoProjectTextRewrite(sidebarProps.project);
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
@@ -155,6 +157,7 @@ function VideoEditorFloatingInspectorContent({
           <WorkspaceSidebarPanelContent
             {...sidebarProps}
             recognition={recognition}
+            textRewrite={textRewrite}
             inputRefs={sidebarState.inputRefs}
             projectsOpen={sidebarState.projectsOpen}
             recordingsOpen={sidebarState.recordingsOpen}

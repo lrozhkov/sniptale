@@ -29,7 +29,7 @@ interface SavedProject {
   project: VideoProject;
   workspaceRevision: number;
 }
-interface ProjectTextRewritePreview {
+export interface ProjectTextRewritePreview {
   basis: VideoProjectTextRewriteBasis;
   localProject: string;
   proposal?: ReviewTextProposal;

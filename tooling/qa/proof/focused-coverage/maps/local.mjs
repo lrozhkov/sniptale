@@ -230,9 +230,24 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile:
       'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts',
     exclusive: true,
-    reason: 'Secret-unlock request persistence has an owner-local lifecycle and replay suite.',
+    allowCrossOwner: true,
+    reason: 'Secret-unlock records require storage lifecycle and protected-provider route proof.',
     testFiles: [
       'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+    ],
+  },
+  {
+    owner: 'ai-secret-unlock-request-parser',
+    productionFile:
+      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.parser.ts',
+    exclusive: true,
+    allowCrossOwner: true,
+    reason:
+      'Secret-unlock admission requires storage lifecycle and protected-provider route proof.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
     ],
   },
   {

@@ -71,7 +71,13 @@ function createSceneGroups(
       id: 'text',
       semantic: 'content' as const,
       label: translate('gallery.videoReview.textTrackDocument'),
-      content: <InspectProjectTextPanel key={props.project.id} project={props.project} />,
+      content: (
+        <InspectProjectTextPanel
+          key={props.project.id}
+          project={props.project}
+          {...(props.textRewrite ? { rewrite: props.textRewrite } : {})}
+        />
+      ),
     },
     {
       id: 'grid',

@@ -1,3 +1,4 @@
+import type { VideoProjectTextRewriteController } from '../../../runtime/session/text-rewrite';
 import type { VideoProjectRecognitionController } from '../../../runtime/session/recognition';
 import type { WindowHeader } from '../../../../features/browser-frame/header';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
@@ -43,6 +44,7 @@ import type { ProjectListItem, RecordingListItem } from '../../../library/contra
 
 export interface WorkspaceSidebarProps {
   recognition?: VideoProjectRecognitionController;
+  textRewrite?: VideoProjectTextRewriteController;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];

@@ -9,6 +9,20 @@ import {
 import { addVideoProjectManualText } from '../../../../../features/video/project/text/authoring';
 import { useVideoEditorStore } from '../../../../state/store';
 import { InspectProjectTextPanel } from './text';
+import {
+  useVideoProjectTextRewrite,
+  type VideoProjectTextRewriteController,
+} from '../../../../runtime/session/text-rewrite';
+
+vi.mock('../../../../../workflows/ai-settings/query', () => ({
+  requestAIModelSelectionBootstrap: vi.fn(async () => ({
+    chromeAiEnabled: false,
+    defaultModelId: null,
+    globalSystemPrompt: '',
+    models: [],
+    providers: [],
+  })),
+}));
 
 vi.mock('../../../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../../../platform/i18n')>()),
@@ -188,4 +202,66 @@ it('mounts retained source text with its native clock and disables jumping when 
   expect(
     host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.speechJump"]')!.disabled
   ).toBe(true);
+});
+
+it('opens exact single, batch and whole-document scopes and restores the initiating command focus', async () => {
+  let project = useVideoEditorStore.getState().project!;
+  for (const [index, id] of ['first', 'second', 'third'].entries()) {
+    const added = addVideoProjectManualText(project, {
+      documentId: 'document',
+      fragmentId: id,
+      start: index * 3,
+      ...(project.textDocuments?.[0] ? { target: project.textDocuments[0] } : {}),
+    });
+    if (!added.ok) throw new Error('Missing text');
+    project = added.project;
+  }
+  useVideoEditorStore.getState().setProject(project);
+  let rewrite: VideoProjectTextRewriteController | undefined;
+  function RewriteHarness() {
+    const project = useVideoEditorStore((state) => state.project)!;
+    const controller = useVideoProjectTextRewrite(project);
+    rewrite = controller;
+    return <InspectProjectTextPanel project={project} rewrite={controller} />;
+  }
+  const trigger = (scope: string) =>
+    host.querySelector<HTMLButtonElement>(`[data-project-text-rewrite="${scope}"]`)!;
+  const close = async () => act(async () => click('gallery.videoReview.textVoiceBack'));
+  await act(async () => root.render(<RewriteHarness />));
+  await act(async () => {
+    trigger('second').focus();
+    trigger('second').click();
+  });
+  expect(rewrite?.target).toEqual({
+    documentId: 'document',
+    ids: ['second'],
+    wholeDocument: false,
+  });
+  expect(host.querySelector('[data-ui="video-editor.text-rewrite.panel"]')).not.toBeNull();
+  expect(host.querySelector('article')).toBeNull();
+  await close();
+  expect(document.activeElement).toBe(trigger('second'));
+  await act(async () => click('gallery.videoReview.speechBatch'));
+  const checks = [...host.querySelectorAll<HTMLInputElement>('article input[type="checkbox"]')];
+  await act(async () => {
+    checks[2]!.click();
+    checks[0]!.click();
+  });
+  await act(async () => trigger('selected').click());
+  expect(rewrite?.target).toEqual({
+    documentId: 'document',
+    ids: ['first', 'third'],
+    wholeDocument: false,
+  });
+  await close();
+  expect(document.activeElement).toBe(trigger('selected'));
+  await act(async () => trigger('all').click());
+  expect(rewrite?.target).toEqual({
+    documentId: 'document',
+    ids: ['first', 'second', 'third'],
+    wholeDocument: true,
+  });
+  await close();
+  expect(document.activeElement).toBe(trigger('all'));
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
 });

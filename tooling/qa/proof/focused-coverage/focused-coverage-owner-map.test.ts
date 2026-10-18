@@ -15,6 +15,21 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['parser', 'store'])(
+  'selects unlock persistence and protected-provider route proof for the %s owner',
+  async (owner) => {
+    const module = await importOwnerMap();
+    expect(
+      module.resolveMappedCoverageOwnerTests(
+        `apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.${owner}.ts`
+      )
+    ).toEqual([
+      'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+    ]);
+  }
+);
+
 it('includes conditional locale initialization without dropping preference IO owner proof', async () => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/composition/persistence/infrastructure/preference-service';

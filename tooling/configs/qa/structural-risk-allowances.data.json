@@ -1147,17 +1147,6 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-review-text.spec.ts",
-      "symbol": "<file>",
-      "owner": "tooling:test:e2e",
-      "astHash": "470044e3f6640826934c110545e072e49da3bf97742aa785bb947de955e93978",
-      "signatureHash": "a73057a41e1d74a090f36abc05512791a9f625e2c2448b326a8d827a69b65644",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One existing review-text fixture/port covers manual/AI text, takes, search, gestures and subtitles. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
-    },
-    {
-      "rule": "structural-file-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-spatial-controls.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",

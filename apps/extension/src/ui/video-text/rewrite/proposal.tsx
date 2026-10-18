@@ -1,117 +1,128 @@
-import { TextareaField } from '../../ui/compact-inspector-controls';
 import { useState } from 'react';
 import { ProductSelect, type ProductSelectOption } from '@sniptale/ui/product-form-controls';
 import { X } from 'lucide-react';
-import { ReviewButton, ReviewDetails, reviewTextButtonClassName } from './controls';
-import { ReviewPreviewNumberRow } from './number-row';
-import type { useReviewTextRewrite } from './use-text-rewrite';
-import { translate } from '../../platform/i18n';
+import type { ReviewTextContext, ReviewTextProposal } from '../../../contracts/ai/review-text';
+import { TextareaField } from '../../compact-inspector-controls';
+import { translate, formatNumber, useAppLocale } from '../../../platform/i18n';
+import { TextRewriteButton, TextRewriteDetails, TextRewriteNumberRow } from './controls';
 
-const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
-type RewriteOperation = ReturnType<typeof useReviewTextRewrite>;
+interface TextRewriteProposalProps {
+  context: ReviewTextContext;
+  proposal: ReviewTextProposal;
+  running: boolean;
+  accepted: boolean;
+  receiptMode?: 'replace' | 'variant' | undefined;
+  disabled?: boolean | undefined;
+  onEdit(updater: (current: ReviewTextProposal) => ReviewTextProposal): void;
+  onApply(mode: 'replace' | 'variant'): void;
+  onDiscard(): void;
+}
 
 /** Disposable result editing and pagination do not own provider requests or durable Apply. */
-export function ReviewTextRewritePreview({
-  operation,
-  disabled,
-}: {
-  operation: RewriteOperation;
-  disabled?: boolean | undefined;
-}) {
+export function TextRewriteProposal(props: TextRewriteProposalProps) {
   const [limit, setLimit] = useState(50);
-  const { preview } = operation;
-  if (!preview?.proposal) return null;
-  const sourceOptions = preview.fragments.map((entry, index) => ({
-    value: entry.id,
-    label: `${index + 1}. ${entry.start}–${entry.end} s · ${entry.text.slice(0, 90)}`,
-  }));
+  const locale = useAppLocale();
+  const { context, proposal } = props;
+  const number = (value: number) => formatNumber(value, { maximumFractionDigits: 2 }, locale);
+  const seconds = translate('videoEditor.timeline.secondsSuffix');
+  const sourceOptions = context.fragments.map((entry, index) => {
+    const ranges = (entry.ranges ?? [entry])
+      .map((range) => `${number(range.start)}–${number(range.end)}`)
+      .join(', ');
+    return {
+      value: entry.id,
+      label: `${number(index + 1)}. ${ranges} ${seconds} · ${entry.text.slice(0, 90)}`,
+    };
+  });
   return (
-    <>
+    <div data-ui="video.text-rewrite.proposal" className="min-w-0 sniptale-parameter-stack">
       <p className="text-xs">
         {translate('gallery.videoReview.textRewritePreview').replace(
           '{count}',
-          String(preview.proposal.fragments.length)
+          String(proposal.fragments.length)
         )}
       </p>
       <p className="text-xs">{translate('gallery.videoReview.textRewriteTakeHint')}</p>
       <fieldset
-        disabled={!!disabled || operation.running || operation.accepted || !!preview.receipt}
+        disabled={!!props.disabled || props.running || props.accepted || !!props.receiptMode}
         className="min-w-0 space-y-2"
       >
-        {preview.proposal.fragments.slice(0, limit).map((fragment, index) => (
+        {proposal.fragments.slice(0, limit).map((fragment, index) => (
           <RewriteProposalPhrase
             key={index}
-            operation={operation}
-            preview={preview}
+            props={props}
             fragment={fragment}
             index={index}
             sourceOptions={sourceOptions}
           />
         ))}
       </fieldset>
-      {preview.proposal.fragments.length > limit && (
-        <ReviewButton
+      {proposal.fragments.length > limit && (
+        <TextRewriteButton
           label={translate('gallery.videoReview.textFragmentMore')}
-          className={buttonClass}
+
           onClick={() => setLimit((value) => value + 50)}
         >
           {translate('gallery.videoReview.textFragmentMore')}
-        </ReviewButton>
+        </TextRewriteButton>
       )}
-      {operation.accepted ? (
+      {props.accepted ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.textRewriteApplied')}
         </p>
       ) : (
         <div className="flex flex-wrap gap-1">
-          <ReviewButton
+          <TextRewriteButton
             label={translate('gallery.videoReview.textRewriteReplace')}
-            className={buttonClass}
-            disabled={!!disabled || operation.running || preview.receiptMode === 'variant'}
-            onClick={() => operation.apply('replace')}
+
+            disabled={!!props.disabled || props.running || props.receiptMode === 'variant'}
+            onClick={() => props.onApply('replace')}
           >
             {translate('gallery.videoReview.textRewriteReplace')}
-          </ReviewButton>
-          <ReviewButton
+          </TextRewriteButton>
+          <TextRewriteButton
             label={translate('gallery.videoReview.textRewriteVariant')}
-            className={buttonClass}
-            disabled={!!disabled || operation.running || preview.receiptMode === 'replace'}
-            onClick={() => operation.apply('variant')}
+
+            disabled={!!props.disabled || props.running || props.receiptMode === 'replace'}
+            onClick={() => props.onApply('variant')}
           >
             {translate('gallery.videoReview.textRewriteVariant')}
-          </ReviewButton>
+          </TextRewriteButton>
         </div>
       )}
-      <ReviewButton
+      <TextRewriteButton
         label={translate('gallery.videoReview.recognitionDiscard')}
-        className={buttonClass}
-        disabled={operation.running}
-        onClick={operation.discard}
+
+        disabled={props.running}
+        onClick={props.onDiscard}
       >
         {translate('gallery.videoReview.recognitionDiscard')}
-      </ReviewButton>
-    </>
+      </TextRewriteButton>
+    </div>
   );
 }
 
 function RewriteProposalPhrase({
-  operation,
-  preview,
+  props,
   fragment,
   index,
   sourceOptions,
 }: {
-  operation: RewriteOperation;
-  preview: NonNullable<RewriteOperation['preview']>;
-  fragment: NonNullable<NonNullable<RewriteOperation['preview']>['proposal']>['fragments'][number];
+  props: TextRewriteProposalProps;
+  fragment: ReviewTextProposal['fragments'][number];
   index: number;
   sourceOptions: ProductSelectOption[];
 }) {
-  const { options } = operation;
+  const { context } = props;
+  const locale = useAppLocale();
+  const number = (value: number) => formatNumber(value, { maximumFractionDigits: 2 }, locale);
   return (
     <div className="min-w-0 space-y-1 rounded border border-[var(--sniptale-color-border)] p-2">
       <span className="text-xs tabular-nums">
-        {index + 1}. {fragment.start !== undefined ? `${fragment.start}–${fragment.end} s` : ''}
+        {number(index + 1)}.{' '}
+        {fragment.start !== undefined && fragment.end !== undefined
+          ? `${number(fragment.start)}–${number(fragment.end)} ${translate('videoEditor.timeline.secondsSuffix')}`
+          : ''}
       </span>
       <TextareaField
         label={translate('gallery.videoReview.textRewriteResult').replace(
@@ -122,7 +133,7 @@ function RewriteProposalPhrase({
         value={fragment.text}
         maxLength={16_000}
         onChange={(text) =>
-          operation.edit((proposal) => ({
+          props.onEdit((proposal) => ({
             ...proposal,
             fragments: proposal.fragments.map((entry, item) =>
               item === index ? { ...entry, text } : entry
@@ -130,13 +141,13 @@ function RewriteProposalPhrase({
           }))
         }
       />
-      {options.changeIntervals && fragment.start !== undefined && fragment.end !== undefined && (
+      {context.changeIntervals && fragment.start !== undefined && fragment.end !== undefined && (
         <>
           <RewriteIntervalFields
             value={{ start: fragment.start, end: fragment.end }}
-            bounds={preview.context.window}
+            bounds={context.window}
             onChange={(change) =>
-              operation.edit((proposal) => ({
+              props.onEdit((proposal) => ({
                 ...proposal,
                 fragments: proposal.fragments.map((entry, item) =>
                   item === index ? { ...entry, ...change } : entry
@@ -146,18 +157,18 @@ function RewriteProposalPhrase({
           />
         </>
       )}
-      <ReviewDetails
+      <TextRewriteDetails
         label={translate('gallery.videoReview.textRewriteBefore')}
         preferenceId={`text-rewrite-before-${index}`}
       >
         <p className="whitespace-pre-wrap text-xs">
           {fragment.fromIds
-            .map((id) => preview.fragments.find((entry) => entry.id === id)?.text)
+            .map((id) => context.fragments.find((entry) => entry.id === id)?.text)
             .join('\n')}
         </p>
-      </ReviewDetails>
-      {preview.context.resegment && (
-        <ReviewDetails
+      </TextRewriteDetails>
+      {context.resegment && (
+        <TextRewriteDetails
           label={translate('gallery.videoReview.textRewriteMapping')}
           preferenceId={`text-rewrite-mapping-${index}`}
         >
@@ -166,7 +177,7 @@ function RewriteProposalPhrase({
             fromIds={fragment.fromIds}
             index={index}
             onChange={(fromIds) =>
-              operation.edit((proposal) => ({
+              props.onEdit((proposal) => ({
                 ...proposal,
                 fragments: proposal.fragments.map((entry, item) =>
                   item === index ? { ...entry, fromIds } : entry
@@ -174,7 +185,7 @@ function RewriteProposalPhrase({
               }))
             }
           />
-        </ReviewDetails>
+        </TextRewriteDetails>
       )}
     </div>
   );
@@ -213,13 +224,13 @@ function RewriteSourceMapping({
               onChange(fromIds.map((entry, item) => (item === position ? value : entry)))
             }
           />
-          <ReviewButton
+          <TextRewriteButton
             label={label('textRewriteSourceRemove')}
             disabled={fromIds.length === 1}
             onClick={() => onChange(fromIds.filter((_, item) => item !== position))}
           >
             <X size={14} />
-          </ReviewButton>
+          </TextRewriteButton>
         </div>
       ))}
       {fromIds.length < sourceOptions.length && (
@@ -265,7 +276,7 @@ function RewriteIntervalFields({
     },
   ];
   return fields.map(({ key, label, ...field }) => (
-    <ReviewPreviewNumberRow
+    <TextRewriteNumberRow
       key={key}
       label={translate(label)}
       unit="s"

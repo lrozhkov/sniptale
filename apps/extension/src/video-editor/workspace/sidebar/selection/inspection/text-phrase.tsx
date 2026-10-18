@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, LocateFixed, Merge, Scissors, Trash2 } from 'lucide-react';
+import { ChevronDown, LocateFixed, Merge, Scissors, Trash2, WandSparkles } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import type { VideoProjectTextDocument } from '../../../../../features/video/project/text/types';
 import { videoProjectTextPlayhead } from '../../../../../features/video/project/text/authoring';
@@ -28,6 +28,10 @@ export function ProjectTextPhrase(props: {
   expanded: boolean;
   focus: boolean;
   onToggle(): void;
+  onRewrite?(): void;
+  batch?: boolean;
+  selected?: boolean;
+  onSelect?(): void;
 }) {
   const { entry, fragment, editor } = props;
   const locale = useAppLocale();
@@ -47,12 +51,26 @@ export function ProjectTextPhrase(props: {
     editor.edit(entry, editReviewTextFragment(entry.document, fragment.id, patch), typing);
   return (
     <article
-      className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-2"
+      className={[
+        'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 border-t',
+        'border-[var(--sniptale-color-border-soft)] pt-2',
+      ].join(' ')}
       data-text-id={fragment.id}
     >
+      {props.batch ? (
+        <label className="flex h-8 shrink-0 items-center justify-center">
+          <input
+            type="checkbox"
+            className="sniptale-parameter-check"
+            aria-label={translate('gallery.videoReview.speechSelectPhrase')}
+            checked={props.selected ?? false}
+            onChange={props.onSelect}
+          />
+        </label>
+      ) : null}
       <button
         type="button"
-        className="flex w-full min-w-0 items-center gap-2 text-left text-xs"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
         aria-expanded={props.expanded}
         onClick={props.onToggle}
       >
@@ -74,8 +92,19 @@ export function ProjectTextPhrase(props: {
           )}
         </span>
       </button>
+      {props.onRewrite ? (
+        <InspectorActionButton
+          iconOnly
+          data-project-text-rewrite={fragment.id}
+          title={translate('gallery.videoReview.textRewriteTitle')}
+          aria-label={translate('gallery.videoReview.textRewriteTitle')}
+          onClick={props.onRewrite}
+        >
+          <WandSparkles size={14} aria-hidden="true" />
+        </InspectorActionButton>
+      ) : null}
       {props.expanded && (
-        <div className="min-w-0 space-y-2">
+        <div className="w-full min-w-0 space-y-2">
           <TextareaField
             label={translate('gallery.videoReview.speechText')}
             value={draft}
