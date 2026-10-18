@@ -373,3 +373,83 @@ it('cancels a project upload while extraction is pending without staging its lat
   expect(staging.write).not.toHaveBeenCalled();
   expect(job.postMessage).toHaveBeenLastCalledWith({ type: 'cancel', requestId: 'r' });
 });
+
+function projectTextStart() {
+  return {
+    type: 'start' as const,
+    operation: 'speech' as const,
+    requestId: 'r',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    phraseId: 'phrase',
+    textRevision: 2,
+    text: 'Saved narration',
+    profile: { voiceId: 'voice', responseFormat: 'mp3' as const },
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-text' as const, documentId: 'script', fragmentId: 'phrase' },
+      basisHash: `sha256:${'a'.repeat(64)}`,
+    },
+  };
+}
+
+it('receives generated project-text audio without extraction or authorized input upload', async () => {
+  staging.write.mockClear();
+  const job = connectedJob();
+  const start = projectTextStart();
+  const prepareInput = vi.fn();
+  const pending = runReviewSpeechJob(start, {
+    signal: new AbortController().signal,
+    prepareInput,
+  });
+  const staged = {
+    id: '11111111-1111-4111-8111-111111111111',
+    mimeType: 'audio/mpeg',
+    size: 120,
+  };
+  job.receive({ type: 'audio', requestId: 'r', staged });
+  await expect(pending).resolves.toEqual({ type: 'audio', requestId: 'r', staged });
+  expect(job.postMessage).toHaveBeenCalledExactlyOnceWith(start);
+  expect(prepareInput).not.toHaveBeenCalled();
+  expect(staging.write).not.toHaveBeenCalled();
+});
+
+it.each(['cancel', 'disconnect', 'unexpected-upload'] as const)(
+  'does not retry or upload project-text audio after %s',
+  async (failure) => {
+    staging.write.mockClear();
+    const job = connectedJob();
+    const start = projectTextStart();
+    const controller = new AbortController();
+    const prepareInput = vi.fn();
+    const pending = runReviewSpeechJob(start, { signal: controller.signal, prepareInput });
+    if (failure === 'cancel') {
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    } else if (failure === 'disconnect') {
+      job.disconnect();
+      await expect(pending).rejects.toThrow('interrupted');
+    } else {
+      job.receive({
+        type: 'authorized',
+        requestId: 'r',
+        scope: start.scope,
+        ticket: '11111111-1111-4111-8111-111111111111',
+      });
+      await expect(pending).rejects.toThrow('invalid-response');
+    }
+    job.receive({
+      type: 'audio',
+      requestId: 'r',
+      staged: { id: '11111111-1111-4111-8111-111111111111', mimeType: 'audio/mpeg', size: 120 },
+    });
+    expect(job.postMessage.mock.calls.filter(([message]) => message.type === 'start')).toEqual([
+      [start],
+    ]);
+    expect(job.postMessage.mock.calls.some(([message]) => message.type === 'execute')).toBe(false);
+    expect(prepareInput).not.toHaveBeenCalled();
+    expect(staging.write).not.toHaveBeenCalled();
+  }
+);

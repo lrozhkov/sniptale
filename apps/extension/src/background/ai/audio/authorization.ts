@@ -5,10 +5,13 @@ import type { VideoWorkspace } from '../../../composition/persistence/review-wor
 import {
   isAudioSourceJobScope,
   isProjectAudioSourceJobScope,
+  isProjectAudioJobScope,
+  isProjectAudioTextJobScope,
   type AudioJobScope,
   type AudioSourceJobScope,
 } from '../../../contracts/ai/audio';
 import { readVideoProjectAudioSource } from '../../../composition/persistence/projects/audio-source';
+import { readVideoProjectTextAudioTarget } from '../../../composition/persistence/projects/text-audio-scope';
 import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
@@ -31,7 +34,7 @@ export function isAudioJobSender(
     sender.url,
     'apps/extension/src/video-editor/index.html'
   );
-  return scope ? (isProjectAudioSourceJobScope(scope) ? project : gallery) : gallery || project;
+  return scope ? (isProjectAudioJobScope(scope) ? project : gallery) : gallery || project;
 }
 
 async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSourceJobScope) {
@@ -49,6 +52,18 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
 
 /** Sender identity alone never authorizes an asset: durable selection is rechecked before POST. */
 export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
+  if (isProjectAudioTextJobScope(request.scope)) {
+    if (request.operation !== 'speech' || !request.approvedProviderId)
+      throw new Error('unauthorized');
+    const { fragment } = await readVideoProjectTextAudioTarget(request.scope);
+    if (
+      request.phraseId !== request.scope.target.fragmentId ||
+      request.textRevision !== fragment.revision ||
+      request.text !== fragment.text
+    )
+      throw new Error('stale');
+    return;
+  }
   if (isProjectAudioSourceJobScope(request.scope)) {
     if (request.operation !== 'transcription' || !request.approvedProviderId)
       throw new Error('unauthorized');

@@ -299,3 +299,32 @@ it('resolves a declared chat endpoint and rejects mismatched request transport b
   await expect(resolveAudioModelConfig(missing)).rejects.toThrow('invalid-request');
   expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
 });
+
+it.each(['matching', 'missing', 'changed'] as const)(
+  'checks the disclosed provider for project text: %s',
+  async (approval) => {
+    const projectText: AudioJobStart = {
+      ...authoredRequest,
+      scope: {
+        projectId: 'project',
+        projectRevision: 3,
+        projectUpdatedAt: 10,
+        target: { kind: 'project-text', documentId: 'script', fragmentId: 'phrase' },
+        basisHash: `sha256:${'a'.repeat(64)}`,
+      },
+    };
+    if (approval === 'missing') delete projectText.approvedProviderId;
+    if (approval === 'changed') projectText.approvedProviderId = 'previous-provider';
+    if (approval === 'matching') {
+      await expect(resolveAudioModelConfig(projectText)).resolves.toMatchObject({
+        url: 'https://audio.example.test/custom/v1/audio/speech',
+        speech: projectText.profile,
+      });
+      expect(activateStoredAIProviderSecretForUse).toHaveBeenCalledExactlyOnceWith(provider);
+    } else {
+      await expect(resolveAudioModelConfig(projectText)).rejects.toThrow('model-unavailable');
+      expect(permission).not.toHaveBeenCalled();
+      expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+    }
+  }
+);

@@ -2,6 +2,7 @@ import {
   isValidAIModelOperationConfiguration,
   type AISpeechModelParameters,
 } from '../settings/model-operation';
+import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 
 export const AUDIO_JOB_PORT_NAME = 'sniptale-gallery-audio-job';
 export const AUDIO_INPUT_MAX_BYTES = 24 * 1024 * 1024;
@@ -56,9 +57,36 @@ export interface ProjectAudioSourceJobScope {
   nativeEnd: number;
 }
 
-export type AudioJobScope = AudioSourceJobScope | AudioTextJobScope | ProjectAudioSourceJobScope;
+/** Authorizes one saved authored phrase and its disclosed placement basis, never source bytes. */
+export interface ProjectAudioTextJobScope {
+  projectId: string;
+  projectRevision: number;
+  projectUpdatedAt: number;
+  target: { kind: 'project-text'; documentId: string; fragmentId: string };
+  basisHash: string;
+}
 
-/** Distinguishes montage admission from Gallery workspace authority. */
+export type AudioJobScope =
+  | AudioSourceJobScope
+  | AudioTextJobScope
+  | ProjectAudioSourceJobScope
+  | ProjectAudioTextJobScope;
+
+/** Distinguishes project authority from Gallery workspace authority for both operations. */
+export function isProjectAudioJobScope(
+  scope: AudioJobScope
+): scope is ProjectAudioSourceJobScope | ProjectAudioTextJobScope {
+  return scope.target.kind === 'project-clip' || scope.target.kind === 'project-text';
+}
+
+/** Project text has no source asset, extraction interval, or upload ticket. */
+export function isProjectAudioTextJobScope(
+  scope: AudioJobScope
+): scope is ProjectAudioTextJobScope {
+  return scope.target.kind === 'project-text';
+}
+
+/** Identifies a montage media interval that can authorize source extraction. */
 export function isProjectAudioSourceJobScope(
   scope: AudioJobScope
 ): scope is ProjectAudioSourceJobScope {
@@ -68,7 +96,11 @@ export function isProjectAudioSourceJobScope(
 export function isAudioSourceJobScope(
   scope: AudioJobScope
 ): scope is AudioSourceJobScope | ProjectAudioSourceJobScope {
-  return scope.target.kind !== 'text';
+  return (
+    scope.target.kind === 'original' ||
+    scope.target.kind === 'voiceover' ||
+    scope.target.kind === 'project-clip'
+  );
 }
 
 export interface AudioStagedHandle {
@@ -255,7 +287,43 @@ function parseProjectAudioJobScope(
   };
 }
 
+function parseProjectAudioTextJobScope(
+  value: Record<string, unknown>,
+  target: Record<string, unknown>
+): ProjectAudioTextJobScope | null {
+  if (
+    Object.keys(value).some(
+      (key) =>
+        !['projectId', 'projectRevision', 'projectUpdatedAt', 'target', 'basisHash'].includes(key)
+    ) ||
+    !identifier(value['projectId']) ||
+    !revision(value['projectRevision']) ||
+    typeof value['projectUpdatedAt'] !== 'number' ||
+    !Number.isFinite(value['projectUpdatedAt']) ||
+    value['projectUpdatedAt'] < 0 ||
+    Object.keys(target).length !== 3 ||
+    !identifier(target['documentId']) ||
+    !identifier(target['fragmentId']) ||
+    typeof value['basisHash'] !== 'string' ||
+    !SHA256_DIGEST_PATTERN.test(value['basisHash'])
+  )
+    return null;
+  return {
+    projectId: value['projectId'],
+    projectRevision: value['projectRevision'],
+    projectUpdatedAt: value['projectUpdatedAt'],
+    target: {
+      kind: 'project-text',
+      documentId: target['documentId'],
+      fragmentId: target['fragmentId'],
+    },
+    basisHash: value['basisHash'],
+  };
+}
+
 export function parseAudioJobScope(value: unknown): AudioJobScope | null {
+  if (record(value) && record(value['target']) && value['target']['kind'] === 'project-text')
+    return parseProjectAudioTextJobScope(value, value['target']);
   if (record(value) && record(value['target']) && value['target']['kind'] === 'project-clip')
     return parseProjectAudioJobScope(value, value['target']);
   if (
@@ -340,7 +408,7 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   const approvedProviderId = value['approvedProviderId'];
   if (
     (approvedProviderId !== undefined && !identifier(approvedProviderId)) ||
-    ((!isAudioSourceJobScope(scope) || isProjectAudioSourceJobScope(scope)) &&
+    ((!isAudioSourceJobScope(scope) || isProjectAudioJobScope(scope)) &&
       !identifier(approvedProviderId))
   )
     return null;
@@ -379,7 +447,8 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   if (!isValidAIModelOperationConfiguration(config) || !config.audio?.speech) return null;
   if (
     !isAudioSourceJobScope(scope) &&
-    (scope.target.fragmentId !== value['phraseId'] || scope.textRevision !== value['textRevision'])
+    (scope.target.fragmentId !== value['phraseId'] ||
+      (!isProjectAudioTextJobScope(scope) && scope.textRevision !== value['textRevision']))
   )
     return null;
   return {
@@ -392,6 +461,17 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   };
 }
 export function sameAudioJobScope(left: AudioJobScope, right: AudioJobScope): boolean {
+  if (isProjectAudioTextJobScope(left) || isProjectAudioTextJobScope(right))
+    return (
+      isProjectAudioTextJobScope(left) &&
+      isProjectAudioTextJobScope(right) &&
+      left.projectId === right.projectId &&
+      left.projectRevision === right.projectRevision &&
+      left.projectUpdatedAt === right.projectUpdatedAt &&
+      left.target.documentId === right.target.documentId &&
+      left.target.fragmentId === right.target.fragmentId &&
+      left.basisHash === right.basisHash
+    );
   if (isProjectAudioSourceJobScope(left) || isProjectAudioSourceJobScope(right))
     return (
       isProjectAudioSourceJobScope(left) &&

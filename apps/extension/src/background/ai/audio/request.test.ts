@@ -554,3 +554,51 @@ it('refuses project transport without the coordinator admission callback', async
   ).rejects.toThrow('unauthorized');
   expect(post).not.toHaveBeenCalled();
 });
+
+it('requires current project-text admission before the single speech POST', async () => {
+  const request: AudioJobStart = {
+    ...speech,
+    approvedProviderId: 'provider',
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-text', documentId: 'script', fragmentId: 'p' },
+      basisHash: `sha256:${'a'.repeat(64)}`,
+    },
+  };
+  const post = vi.fn<typeof fetch>(
+    async () =>
+      new Response(new Uint8Array([1, 2, 3, 4]), {
+        headers: { 'Content-Type': 'audio/mpeg' },
+      })
+  );
+  vi.stubGlobal('fetch', post);
+  const args = {
+    request,
+    config: speechConfig,
+    signal: new AbortController().signal,
+    onReceiving() {},
+  };
+  await expect(requestAudio(args)).rejects.toThrow('unauthorized');
+  expect(post).not.toHaveBeenCalled();
+  const beforeSend = vi.fn<() => Promise<void>>(async () => {
+    throw new Error('stale');
+  });
+  await expect(requestAudio({ ...args, beforeSend })).rejects.toThrow('stale');
+  expect(post).not.toHaveBeenCalled();
+  beforeSend.mockResolvedValueOnce(undefined);
+  await expect(requestAudio({ ...args, beforeSend })).resolves.toMatchObject({ kind: 'audio' });
+  expect(beforeSend).toHaveBeenCalledTimes(2);
+  expect(beforeSend).toHaveBeenCalledBefore(post);
+  expect(post).toHaveBeenCalledOnce();
+  expect(post.mock.calls[0]?.[1]).toMatchObject({
+    method: 'POST',
+    body: JSON.stringify({
+      model: 'speech',
+      input: 'hello',
+      voice: 'voice',
+      response_format: 'mp3',
+    }),
+  });
+});

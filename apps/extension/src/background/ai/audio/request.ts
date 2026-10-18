@@ -2,7 +2,7 @@ import {
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_OUTPUT_MAX_BYTES,
   isAudioSourceJobScope,
-  isProjectAudioSourceJobScope,
+  isProjectAudioJobScope,
   type AudioJobStart,
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
@@ -197,7 +197,7 @@ async function decodeResponse(response: Response, args: AudioRequest) {
 
 /** Only this owner constructs bearer headers; requests are never redirected or retried. */
 export async function requestAudio(args: AudioRequest) {
-  if (isProjectAudioSourceJobScope(args.request.scope) && !args.beforeSend)
+  if (isProjectAudioJobScope(args.request.scope) && !args.beforeSend)
     throw new Error('unauthorized');
   const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
   const body =

@@ -124,7 +124,17 @@ Provider error bodies never enter UI, logs or diagnostics. There is no hidden re
 
 Full video editor transcription uses the same audio job, ticket, staging and transport owners. It requires a separate project clip scope. The top-level editor document must match the scope owner. The saved project revision, snapshot timestamp, clip membership and native source interval must agree. A missing, changed or trashed project refuses admission. Source bytes resolve only through canonical project, Library, recording or scenario readers.
 
-Recheck project authority before POST and temporary input publication. Staging checks project scope under its ticket lock and after upload. A stale project cannot read staged input. Exact scoped cleanup remains available after source deletion. This project scope authorizes transcription only. It requires an explicitly approved provider. It does not authorize speech or the combined montage mix.
+Recheck project authority before POST and temporary input publication. Staging checks project scope under its ticket lock and after upload. A stale project cannot read staged input. Exact scoped cleanup remains available after source deletion. This clip scope authorizes transcription only. It requires an explicitly approved provider. It does not authorize speech or the combined montage mix.
+
+Full video editor speech uses a separate project text scope. The scope names the saved project, text document and fragment. It includes the project revision, timestamp and a SHA256 hash of the selected speech basis.
+
+The hash covers project creation identity, document identity, binding, text, text revisions, intervals, clock and every projected placement. The basis retains each native source slice and its project placement. Caption appearance and descriptive provenance do not change this basis. The exact approved text and revisions must match before POST.
+
+The caller explicitly approves the provider. Background repeats provider and canonical text checks before POST. Background repeats canonical text checks after the response.
+
+The project text scope does not authorize source byte reads. Project text can produce speech without source audio or a current clip placement. Dormant, partially excluded and repeated text keeps its exact captured placement state. Generation does not choose an accepted audio destination.
+
+After asynchronous project integrity checks and basis hashing, admission reads fresh canonical metadata. Restores that keep earlier revisions still invalidate the hash when text, binding or placement changes. Temporary audio checks this scope before and after writes and reads. Exact ticket cleanup remains available after text or project deletion.
 
 Gallery text editing uses the one-shot `review-text` LLM session purpose and typed `sniptale-gallery-review-text` Port. The exact top-level Gallery document, capability purpose, context hash and committed workspace scope must agree. The selector exposes only an opaque SHA256 provider-destination binding. Background compares provider identity, destination and model code before permission or secret activation and again before POST. Provider payload contains the disclosed prompt, texts, language and numeric result-video intervals plus fixed output-contract instructions.
 

@@ -193,3 +193,49 @@ it('binds project and Gallery scopes to their own top-level editor documents', (
   expect(wrongProject.disconnect).toHaveBeenCalledOnce();
   expect(wrongProject.connection.receive).not.toHaveBeenCalled();
 });
+
+it('admits project text only from Montage and refuses malformed speech scope at ingress', () => {
+  const projectSender = {
+    ...sender,
+    url: 'chrome-extension://extension/apps/extension/src/video-editor/index.html',
+  };
+  const message = {
+    type: 'start',
+    operation: 'speech',
+    requestId: 'speech',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    phraseId: 'phrase',
+    textRevision: 0,
+    text: 'Authored narration',
+    profile: { voiceId: 'voice', responseFormat: 'mp3' },
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-text' as const, documentId: 'script', fragmentId: 'phrase' },
+      basisHash: `sha256:${'a'.repeat(64)}`,
+    },
+  };
+  expect(isAudioJobSender(projectSender, message.scope)).toBe(true);
+  expect(isAudioJobSender(sender, message.scope)).toBe(false);
+  const accepted = connectedPort(projectSender);
+  accepted.onMessage.emit(message);
+  expect(accepted.connection.receive).toHaveBeenCalledExactlyOnceWith(message);
+  const gallery = connectedPort();
+  gallery.onMessage.emit(message);
+  expect(gallery.disconnect).toHaveBeenCalledOnce();
+  expect(gallery.connection.receive).not.toHaveBeenCalled();
+  for (const scope of [
+    { ...message.scope, basisHash: 'not-a-digest' },
+    { ...message.scope, assetId: 'unrelated-bytes' },
+    { ...message.scope, target: { ...message.scope.target, documentId: '' } },
+  ]) {
+    const malformed = connectedPort(projectSender);
+    malformed.onMessage.emit({ ...message, scope });
+    expect(malformed.disconnect).toHaveBeenCalledOnce();
+    expect(malformed.connection.receive).not.toHaveBeenCalled();
+  }
+  accepted.stop();
+  gallery.stop();
+});

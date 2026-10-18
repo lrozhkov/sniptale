@@ -18,6 +18,29 @@ export function isTextSourceClip(
   );
 }
 
+/** Retains each source slice and its placement without merging repeated or reordered pieces. */
+export function projectVideoProjectTextSourceSpans(
+  project: VideoProject,
+  entry: VideoProjectTextDocument,
+  fragment: ReviewTextFragment
+) {
+  if (entry.binding.kind !== 'source') return [];
+  const clips = project.clips.flatMap((clip) => {
+    if ((clip.type !== 'VIDEO' && clip.type !== 'AUDIO') || !isTextSourceClip(clip, entry.binding))
+      return [];
+    return [
+      {
+        ...clip,
+        sourceDuration: Math.min(
+          clip.sourceDuration,
+          clip.duration * normalizeClipPlaybackRate(clip.playbackRate ?? 1)
+        ),
+      },
+    ];
+  });
+  return mapSourceRangeToProjectSpans(clips, fragment.start, fragment.end);
+}
+
 /** Projects each placement separately; source order need not equal montage order. */
 export function projectVideoProjectTextFragment(
   project: VideoProject,
@@ -35,20 +58,7 @@ export function projectVideoProjectTextFragment(
         resultEnd: project.duration,
       },
     ]);
-  const clips = project.clips.flatMap((clip) => {
-    if ((clip.type !== 'VIDEO' && clip.type !== 'AUDIO') || !isTextSourceClip(clip, entry.binding))
-      return [];
-    return [
-      {
-        ...clip,
-        sourceDuration: Math.min(
-          clip.sourceDuration,
-          clip.duration * normalizeClipPlaybackRate(clip.playbackRate ?? 1)
-        ),
-      },
-    ];
-  });
-  const spans = mapSourceRangeToProjectSpans(clips, fragment.start, fragment.end);
+  const spans = projectVideoProjectTextSourceSpans(project, entry, fragment);
   let covered = 0;
   let end = fragment.start;
   for (const span of [...spans].sort((a, b) => a.sourceStart - b.sourceStart)) {
