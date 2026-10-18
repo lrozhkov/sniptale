@@ -910,7 +910,11 @@ for (const theme of ['light', 'dark'] as const) {
         .getByRole('button', { name: label('gallery.app.viewModeLargeGrid'), exact: true })
         .click();
       const footers = page.locator(
-        '[data-ui="gallery.large.details"], [data-ui="gallery.project.details"], [data-ui="gallery.large.group-details"]'
+        [
+          '[data-ui="gallery.large.details"]',
+          '[data-ui="gallery.project.details"]',
+          '[data-ui="gallery.large.group-details"]',
+        ].join(', ')
       );
       await expect(footers).toHaveCount(4);
       for (let index = 0; index < 4; index++) {

@@ -1,12 +1,12 @@
 import { LOCALE_CHANGE_EVENT } from '@sniptale/ui/branding';
 import { browserStorage } from '../../../composition/persistence/infrastructure/browser-storage';
 import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
-import { createStorageBackedPreferenceService } from '../../../composition/persistence/infrastructure/preference-service';
-import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type AppLocale } from '@sniptale/platform/i18n/config';
 import {
-  runWithExclusivePersistenceMutationPermit,
-  runWithPersistenceMutationPermit,
-} from '../../../composition/persistence/infrastructure/mutation-barrier';
+  createStorageBackedPreferenceService,
+  initializeBrowserStoredPreference,
+} from '../../../composition/persistence/infrastructure/preference-service';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type AppLocale } from '@sniptale/platform/i18n/config';
+import { runWithPersistenceMutationPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 
 // Keep the persisted storage key stable so existing user locale preferences survive the rename.
 const LOCALE_STORAGE_KEY = 'sniptale-locale-preference';
@@ -149,12 +149,7 @@ export function ensureLocaleHydrated(): Promise<void> {
 }
 
 export async function initializeLocalePreference(): Promise<void> {
-  await runWithExclusivePersistenceMutationPermit(async (permit) => {
-    const values = await browserStorage.local.get([LOCALE_STORAGE_KEY]);
-    if (values[LOCALE_STORAGE_KEY] === undefined) {
-      await browserStorage.local.set({ [LOCALE_STORAGE_KEY]: 'en' }, permit);
-    }
-  });
+  await initializeBrowserStoredPreference(LOCALE_STORAGE_KEY, 'en');
   // Hydration can reconcile the paint hint through a shared persistence permit.
   // Release the exclusive permit before entering that path.
   await ensureLocaleHydrated();

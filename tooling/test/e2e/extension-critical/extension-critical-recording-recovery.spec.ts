@@ -86,7 +86,10 @@ async function launchCrashBrowser(profile: string) {
 }
 
 for (const container of ['mp4', 'webm'] as const) {
-  test(`acknowledged ${container} survives SIGKILL and produces a playable recovery without consuming originals`, async ({}, info) => {
+  const name =
+    `acknowledged ${container} survives SIGKILL and produces a playable recovery ` +
+    'without consuming originals';
+  test(name, async ({}, info) => {
     test.setTimeout(120000);
     const code = await bundleProbe();
     const profile = await mkdtemp(join(tmpdir(), 'sniptale-recovery-proof-'));
@@ -154,9 +157,33 @@ for (const container of ['mp4', 'webm'] as const) {
       );
       expect(after).toEqual(before);
       await running.page.evaluate(
-        async (id) => (window as ProbeWindow).recordingRecoveryProbe.appendIncompleteSuffix(id),
+        async (id) => (window as ProbeWindow).recordingRecoveryProbe.holdIdentity(id),
         id
       );
+      const suffix = running.page
+        .evaluate(
+          async (id) => (window as ProbeWindow).recordingRecoveryProbe.appendIncompleteSuffix(id),
+          id
+        )
+        .then(
+          () => null,
+          (error: unknown) => error
+        );
+      try {
+        await expect
+          .poll(() =>
+            running!.page.evaluate(async (id) => {
+              const { pending = [] } = await navigator.locks.query();
+              return pending.some((lock) => lock.name === `sniptale:recording-recovery:${id}`);
+            }, id)
+          )
+          .toBe(true);
+      } finally {
+        await running.page.evaluate(async () =>
+          (window as ProbeWindow).recordingRecoveryProbe.releaseIdentity()
+        );
+      }
+      expect(await suffix).toBeNull();
       const rawBefore = await running.page.evaluate(
         async (id) => (window as ProbeWindow).recordingRecoveryProbe.rawDigest(id),
         id

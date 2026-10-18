@@ -14,6 +14,8 @@ import type {
   StorageBackedPreferenceService,
 } from './types';
 
+export { initializeBrowserStoredPreference } from './browser-io';
+
 export type {
   CreateStorageBackedPreferenceServiceArgs,
   StorageBackedPreferenceService,

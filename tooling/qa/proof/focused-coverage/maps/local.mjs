@@ -1,5 +1,19 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'preference-initialization-consumer',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/browser-io.ts',
+    allowCrossOwner: true,
+    reason:
+      'Locale initialization proves conditional writes, failure, and ordering with user choices and erasure.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/accessors.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/helpers.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/index.test.ts',
+      'apps/extension/src/platform/i18n/locale/initialization.test.ts',
+    ],
+  },
+  {
     owner: 'video-review-local-session-reset',
     productionFile: 'apps/extension/src/workflows/video-review/local-session.ts',
     reason: 'Local reset candidates use session reset, queue, history and snapshot CAS proof.',

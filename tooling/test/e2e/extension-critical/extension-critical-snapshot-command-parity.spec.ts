@@ -73,7 +73,7 @@ for (const theme of ['light', 'dark'] as const) {
             .filter({ has: page.locator('img') })
             .first();
           const preview = card.getByRole('button', {
-            name: new RegExp(translate('webSnapshotViewer.app.previewAsset', 'ru') + ':'),
+            name: `${translate('webSnapshotViewer.app.previewAsset', 'ru')}:`,
           });
           const link = card.locator('a[download]');
           await page.mouse.move(0, 0);

@@ -100,10 +100,9 @@ for (const viewport of [
         } else {
           await expect(created).not.toContainText(label('gallery.app.draftExpires'));
           const badge = card.locator('[data-ui="gallery.card.expiration"]');
-          await expect(badge).toHaveAttribute(
-            'title',
-            new RegExp(label('gallery.app.draftExpires'))
-          );
+          await expect
+            .poll(() => badge.getAttribute('title'))
+            .toContain(label('gallery.app.draftExpires'));
           const warning = await badge.evaluate((node) => {
             const probe = document.createElement('span');
             probe.style.color = 'var(--sniptale-color-warning)';
@@ -129,7 +128,11 @@ for (const viewport of [
           const icon = (await badge.boundingBox())!;
           expect(bounds.x + bounds.width - icon.x - icon.width).toBeCloseTo(13, 0);
           const caption = card.locator(
-            '[data-ui="gallery.compact.details"], [data-ui="gallery.large.details"], [data-ui="gallery.project.details"]'
+            [
+              '[data-ui="gallery.compact.details"]',
+              '[data-ui="gallery.large.details"]',
+              '[data-ui="gallery.project.details"]',
+            ].join(', ')
           );
           if (mode === 'viewModeLargeGrid') {
             const title = caption.locator('[data-ui="gallery.filename"]').locator('..');

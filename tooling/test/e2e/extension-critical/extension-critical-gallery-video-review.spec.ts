@@ -2869,7 +2869,10 @@ for (const variant of [
       const playback = dialog
         .locator('[data-toolbar-transport]')
         .locator(
-          `button[aria-label=${JSON.stringify(translate('gallery.videoReview.play', variant.locale))}], button[aria-label=${JSON.stringify(translate('gallery.videoReview.pause', variant.locale))}]`
+          [
+            `button[aria-label=${JSON.stringify(translate('gallery.videoReview.play', variant.locale))}]`,
+            `button[aria-label=${JSON.stringify(translate('gallery.videoReview.pause', variant.locale))}]`,
+          ].join(', ')
         );
       await expect(playback).toHaveAttribute(
         'aria-label',

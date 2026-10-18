@@ -15,6 +15,17 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('includes conditional locale initialization without dropping preference IO owner proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence/infrastructure/preference-service';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/browser-io.ts`)).toEqual([
+    `${root}/accessors.test.ts`,
+    `${root}/helpers.test.ts`,
+    `${root}/index.test.ts`,
+    'apps/extension/src/platform/i18n/locale/initialization.test.ts',
+  ]);
+});
+
 it('includes retained Scenario consumers in canonical media deletion proof', async () => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/composition/persistence/media-library';

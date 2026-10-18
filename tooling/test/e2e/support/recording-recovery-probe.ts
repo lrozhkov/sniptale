@@ -238,7 +238,7 @@ export { listRecoverableRecordings };
 /** Preserve a malformed committed suffix to prove repair never consumes original evidence. */
 export async function appendIncompleteSuffix(id: string) {
   const entry = await readRecoveryHeader(id);
-  const release = await acquireRecoveryLock(id, true);
+  const release = await acquireRecoveryLock(id);
   try {
     await commitRecoveryBlock(entry, new Uint8Array([0, 0, 1, 0, 77, 79, 79]).buffer);
   } finally {

@@ -8,7 +8,8 @@ Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns 
 - `apps/extension/src/platform/i18n/messages/**` owns product messages. Each message leaf contains its locale variants.
 - `apps/extension/src/platform/i18n/dictionaries.ts` builds runtime dictionaries.
 - `apps/extension/src/platform/i18n/types.ts` derives translation keys and contracts.
-- `apps/extension/src/platform/i18n/locale/state.ts` owns preference persistence, events, and subscriptions.
+- `apps/extension/src/platform/i18n/locale/state.ts` owns locale preference policy, events, and subscriptions.
+- `apps/extension/src/composition/persistence/infrastructure/preference-service` owns raw browser-storage operations for these preferences.
 - `apps/extension/src/platform/i18n/locale/hook.ts` owns the React locale subscription.
 - `apps/extension/src/platform/i18n/index.ts` is the app runtime API.
 - `apps/extension/src/background/runtime/routing/runtime-wiring/install.ts` owns locale initialization on first installation.
