@@ -24,7 +24,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
       > /etc/apt/apt.conf.d/99sniptale-snapshot \
     && test -s /etc/ssl/certs/ca-certificates.crt \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git jq procps tar unzip \
+    && apt-get install -y --no-install-recommends ca-certificates curl fonts-dejavu-core git jq procps python3 tar unzip \
     && rm -rf /tmp/ca-certificates.deb /tmp/ca-bootstrap \
     && rm -rf /var/lib/apt/lists/*
 

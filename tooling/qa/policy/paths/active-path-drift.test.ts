@@ -95,18 +95,11 @@ function expectSharedOffscreenLifecycleOwnership() {
 
 function expectActiveWorkflowDocPaths() {
   const codeQuality = fs.readFileSync(path.join(repoRoot, 'docs/tooling/code-quality.md'), 'utf8');
-  const repoAuditSkill = fs.readFileSync(
-    path.join(repoRoot, '.agents/skills/repo-audit/SKILL.md'),
-    'utf8'
-  );
 
   expect(codeQuality).toContain('tooling/configs/qa/quality-baseline.json');
   expect(codeQuality).toContain('tooling/qa/composition/control-inventory/discovery.mjs');
   expect(codeQuality).not.toContain('tooling/qa/core/quality-baseline.json');
   expect(codeQuality).not.toContain('tooling/qa/core/validation-manifest.json');
-
-  expect(repoAuditSkill).toContain('derived control inventory');
-  expect(repoAuditSkill).not.toContain('tooling/qa/core/validation-manifest.json');
 }
 
 function expectArchitectureDocPaths() {
@@ -260,7 +253,7 @@ describe('active QA policy path integrity', () => {
 });
 
 describe('active workflow doc path integrity', () => {
-  it('uses current manifest and tracing entrypoint paths in active docs and skills', () => {
+  it('uses current manifest and tracing entrypoint paths in tracked workflow docs', () => {
     expectActiveWorkflowDocPaths();
   });
 

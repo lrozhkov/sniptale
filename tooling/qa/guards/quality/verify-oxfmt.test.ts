@@ -142,6 +142,7 @@ describe('QA Oxfmt wrapper', () => {
 
   it('detects, writes, and clears a native admitted formatting smell', () => {
     const fixture = '.agents/.verify-oxfmt-native-fixture.ts';
+    fs.mkdirSync('.agents', { recursive: true });
     fs.writeFileSync(fixture, 'export const value={answer:42}\n');
     try {
       expect(runFormatterCheck([fixture])).toEqual({

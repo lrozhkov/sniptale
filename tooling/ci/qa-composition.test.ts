@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createReleaseControlOccurrences } from '../qa/composition/catalog/release-occurrences.mjs';
 import {
@@ -21,6 +21,9 @@ import {
   withCwd,
   writeFile,
 } from '../qa/test-support/test-helpers';
+
+beforeEach(() => vi.stubEnv('SNIPTALE_BASE_SHA', undefined));
+afterEach(() => vi.unstubAllEnvs());
 
 const FAST_ADMISSION = {
   artifactKind: 'sniptale-fast-proof-admission',
