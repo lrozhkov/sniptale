@@ -620,11 +620,11 @@ it('omits the page-owned edit action when the host does not implement it', async
   host.remove();
 });
 
-it('uses settings and dimension icons for annotation geometry commands', () => {
+it('uses the current effect icon and dimension icon for annotation geometry commands', () => {
   const markup = renderToStaticMarkup(
     <FrameAnnotationFloatingToolbar effectMode="border" onCommand={() => {}} />
   );
-  expect(markup).toContain('lucide-settings');
+  expect(markup).toContain('lucide-square');
   expect(markup).toContain('lucide-scaling');
   expect(markup).not.toContain('lucide-pencil');
 });

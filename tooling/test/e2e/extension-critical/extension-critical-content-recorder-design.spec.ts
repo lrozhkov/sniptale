@@ -1,3 +1,10 @@
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import {
+  CaptureMode,
+  VideoRecordingStatus,
+  VideoResolutionPreset,
+  type VideoRecordingRuntimeState,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { writeFile } from 'node:fs/promises';
 import {
   expect,
@@ -16,7 +23,9 @@ import { closeExtensionBrowser, launchExtensionBrowser } from '../support/extens
 import { startHostServer } from '../support/host-server';
 import {
   openRealPopup,
+  evaluateInTarget,
   sendRuntimeMessage,
+  sendRuntimeMessageInTarget,
   triggerExtensionAction,
 } from '../support/recording-action';
 
@@ -872,4 +881,165 @@ for (const viewport of primarySizes) {
       }
     });
   }
+}
+
+for (const viewport of primarySizes) {
+  test(`video feedback camera preview during independent capture ${viewport.width}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport, fakeMediaDevices: true });
+    let inspectionSession:
+      | Awaited<ReturnType<typeof launched.browser.newBrowserCDPSession>>
+      | undefined;
+    try {
+      const { context, extensionId } = launched;
+      const admitted = await admit(context, extensionId, host.origin, viewport);
+      const { page, tabId } = admitted;
+      let popup = admitted.popup;
+      await popup.locator('[data-page="video"]').click();
+      const cameraPreference = popup
+        .locator('[data-ui="popup.icon-state-button"]')
+        .and(popup.getByRole('button', { name: 'Camera', exact: true }));
+      await cameraPreference.click();
+      await popup.getByRole('button', { name: 'Configure camera', exact: true }).click();
+      await popup.getByRole('button', { name: 'On page', exact: true }).click();
+      await expect
+        .poll(() =>
+          popup.evaluate(
+            async () =>
+              (await chrome.storage.local.get('sniptale_video_settings'))['sniptale_video_settings']
+                ?.webcamPresentation?.mode
+          )
+        )
+        .toBe('embedded');
+      await popup
+        .locator('[data-ui="popup.inline-curtain.header"]')
+        .getByRole('button', { name: 'Close', exact: true })
+        .click();
+      await cameraPreference.click();
+      await expect(cameraPreference).toHaveAttribute('aria-pressed', 'false');
+      await page.bringToFront();
+      const action = await triggerExtensionAction(context, extensionId, page);
+      await sendRuntimeMessageInTarget(
+        context,
+        action,
+        {
+          type: 'START_RECORDING',
+          captureMode: CaptureMode.SCREEN,
+          tabId,
+          viewportPresetId: null,
+          settings: {
+            ...DEFAULT_VIDEO_SETTINGS,
+            countdownSeconds: 0,
+            microphoneEnabled: false,
+            systemAudioEnabled: false,
+            webcamEnabled: false,
+            qualityProfileId: null,
+            outputProfile: {
+              ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+              resolution: VideoResolutionPreset.P240,
+            },
+          },
+        },
+        false
+      );
+      const readRecording = async () =>
+        (await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' })) as {
+          recordingId: string;
+          state: VideoRecordingRuntimeState;
+        };
+      await expect
+        .poll(async () => (await readRecording()).state.status, { timeout: 30_000 })
+        .toBe(VideoRecordingStatus.RECORDING);
+      const before = await readRecording();
+      await evaluateInTarget(context, action, 'window.close()').catch(() => undefined);
+      await popup.close();
+      await page.bringToFront();
+      await ui(page, 'content.toolbar.mode-selector-button').click();
+      await ui(page, 'content.toolbar.mode-option.video-recording').click();
+      const toggle = ui(page, 'content.toolbar.video-recording.camera.toggle');
+      const camera = ui(page, 'content.video-recording.embedded-camera');
+      const expectFrames = async () => {
+        await expect(camera).toBeVisible();
+        const video = camera.locator('video');
+        await expect
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.videoWidth))
+          .toBeGreaterThan(0);
+        const first = await video.evaluate((element: HTMLVideoElement) => element.currentTime);
+        await expect
+          .poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime))
+          .toBeGreaterThan(first);
+      };
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      await expectFrames();
+      await page.screenshot({ path: info.outputPath('camera-during-screen.png'), fullPage: false });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await expect(camera).toHaveCount(0);
+      await toggle.click();
+      await expectFrames();
+      await toggle.click();
+      await expect(camera).toHaveCount(0);
+      inspectionSession = await launched.browser.newBrowserCDPSession();
+      const targets = await inspectionSession.send('Target.getTargets');
+      const offscreen = targets.targetInfos.find((entry) =>
+        entry.url.includes('/offscreen/offscreen.html')
+      );
+      if (!offscreen) throw new Error('Native camera source document is unavailable');
+      const denyCameraAcquisition = () => {
+        const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        Reflect.set(globalThis, '__sniptaleCameraDenialRestore', () => {
+          navigator.mediaDevices.getUserMedia = original;
+        });
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+          if (constraints?.video)
+            throw new DOMException(
+              'Camera permission denied by the acceptance probe',
+              'NotAllowedError'
+            );
+          return original(constraints);
+        };
+      };
+      // Fake-media UI bypasses browser permission overrides. Inject a camera-only
+      // acquisition refusal; screen capture and native video frames stay unchanged.
+      await evaluateInTarget(
+        context,
+        offscreen.targetId,
+        `(${denyCameraAcquisition.toString()})()`
+      );
+      await toggle.click();
+      await expect(camera.getByRole('alert')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('camera-denied.png'), fullPage: false });
+      await toggle.click();
+      await expect(camera).toHaveCount(0);
+      await evaluateInTarget(
+        context,
+        offscreen.targetId,
+        `Reflect.get(globalThis, '__sniptaleCameraDenialRestore')()`
+      );
+      await toggle.click();
+      await expectFrames();
+      await toggle.click();
+      await expect(camera).toHaveCount(0);
+      popup = await openRealPopup(context, extensionId);
+      const continued = await readRecording();
+      expect(continued.recordingId).toBe(before.recordingId);
+      expect(continued.state.status).toBe(VideoRecordingStatus.RECORDING);
+      expect(continued.state.duration).toBeGreaterThan(before.state.duration);
+      expect(continued.state.liveMedia?.webcamEnabled).toBe(false);
+      await popup.locator('[data-ui="popup.video-active.cancel-button"]').click();
+      await popup.locator('[data-ui="popup.video-active.cancel-delete-button"]').click();
+      await expect(
+        popup.locator('[data-ui="popup.video-setup.start-recording-button"]')
+      ).toBeVisible({ timeout: 30_000 });
+    } finally {
+      await inspectionSession?.detach();
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
 }

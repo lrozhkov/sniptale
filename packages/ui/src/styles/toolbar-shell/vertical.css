@@ -125,8 +125,8 @@
 .sniptale-content-toolbar-adopted[data-display-mode='vertical']
   .sniptale-btn[data-command-press]
   svg {
-  width: 16px;
-  height: 16px;
+  width: clamp(14px, calc(var(--sniptale-toolbar-button-size) - 10px), 16px);
+  height: clamp(14px, calc(var(--sniptale-toolbar-button-size) - 10px), 16px);
 }
 .sniptale-content-toolbar-adopted[data-display-mode='vertical']
   .sniptale-btn.sniptale-full-page-chevron[data-command-press]
@@ -189,10 +189,12 @@
 
 .sniptale-content-toolbar-adopted[data-display-mode='vertical']
   .sniptale-btn[data-menu-indicator='true']::before {
-  border-top: 2px solid transparent;
-  border-bottom: 2px solid transparent;
+  border-top: clamp(1px, calc(var(--sniptale-toolbar-button-size) / 8 - 2px), 2px) solid transparent;
+  border-bottom: clamp(1px, calc(var(--sniptale-toolbar-button-size) / 8 - 2px), 2px) solid
+    transparent;
   border-right: 0;
-  border-left: 3px solid currentColor;
+  border-left: clamp(2px, calc(var(--sniptale-toolbar-button-size) / 8 - 1px), 3px) solid
+    currentColor;
 }
 
 .sniptale-content-toolbar-adopted[data-display-mode='vertical']

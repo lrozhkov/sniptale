@@ -736,6 +736,51 @@ for (const viewport of [
             .toBeGreaterThanOrEqual(2);
         }
         await page.screenshot({ path: info.outputPath(`${menu}-parameters.png`), fullPage: false });
+        const categories = popover.locator('nav button');
+        for (let index = 0; index < (await categories.count()); index += 1) {
+          const category = categories.nth(index);
+          await category.scrollIntoViewIfNeeded();
+          await category.click();
+          await expect(category).toHaveAttribute('aria-pressed', 'true');
+          if (menu === 'future-frame-callout') {
+            const enable = popover.locator(
+              '[data-ui="shared.categorized-inspector.section-heading"] .sniptale-glass-switch:not(.sniptale-glass-switch--on)'
+            );
+            if (await enable.count()) await enable.click();
+          }
+          for (const disclosure of await popover.locator('details:not([open]) > summary').all())
+            await disclosure.click();
+          const escapedControls = await popover
+            .locator('.sniptale-parameter-value > *')
+            .evaluateAll((elements) =>
+              elements.flatMap((element) => {
+                const bounds = element.getBoundingClientRect();
+                const surface = element
+                  .closest('.sniptale-content-appearance-surface')
+                  ?.getBoundingClientRect();
+                if (!surface || bounds.width === 0 || bounds.height === 0) return [];
+                return bounds.right > surface.right - 4 || bounds.left < surface.left + 4
+                  ? [
+                      {
+                        label: element.closest('.sniptale-parameter-row')?.textContent,
+                        left: bounds.left,
+                        right: bounds.right,
+                        surfaceLeft: surface.left,
+                        surfaceRight: surface.right,
+                      },
+                    ]
+                  : [];
+              })
+            );
+          expect(
+            escapedControls,
+            'Visible value constructions remain inside the inspector material'
+          ).toEqual([]);
+          await page.screenshot({
+            path: info.outputPath(`${menu}-category-${index}.png`),
+            fullPage: false,
+          });
+        }
         const saveCategory = popover.locator('nav button').last();
         await saveCategory.scrollIntoViewIfNeeded();
         await saveCategory.click();
@@ -904,3 +949,207 @@ createRoot(document.getElementById('root')).render(<App/>);
     }
     await page.screenshot({ path: info.outputPath('callout-initial-width.png'), fullPage: false });
   });
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`annotation color transaction and compact controls at ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    try {
+      const target = page.locator('#measurement-target');
+      await target.evaluate((element) => {
+        element.style.width = '320px';
+        element.style.height = '100px';
+      });
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.highlighter"]').click();
+      const targetBox = await target.boundingBox();
+      if (!targetBox) throw new Error('Annotation target is unavailable');
+      await page.mouse.click(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2);
+      const frame = page.locator('.sniptale-interactive-frame').first();
+      await expect(frame).toBeVisible();
+      const frameBox = await frame.boundingBox();
+      if (!frameBox) throw new Error('Annotation frame is unavailable');
+      await expect
+        .poll(async () => {
+          await page.mouse.move(frameBox.x, frameBox.y + 30);
+          await page.mouse.move(frameBox.x, frameBox.y + 36);
+          return page.locator('[data-quick-action="callout"]').count();
+        })
+        .toBeGreaterThan(0);
+      await expect(page.locator('[data-quick-action="settings"] .lucide-square')).toBeVisible();
+      const iconGeometry = await page
+        .locator('.sniptale-frame-toolbar-bridge button')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const target = button.getBoundingClientRect();
+            const icon = button.querySelector('svg')?.getBoundingClientRect();
+            if (!icon) throw new Error('Frame action icon is unavailable');
+            return {
+              width: icon.width,
+              height: icon.height,
+              dx: icon.x + icon.width / 2 - target.x - target.width / 2,
+              dy: icon.y + icon.height / 2 - target.y - target.height / 2,
+            };
+          })
+        );
+      for (const icon of iconGeometry) {
+        expect(icon.width).toBe(16);
+        expect(icon.height).toBe(16);
+        expect(Math.abs(icon.dx)).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(icon.dy)).toBeLessThanOrEqual(0.5);
+      }
+      await page.screenshot({
+        path: info.outputPath('frame-circular-actions.png'),
+        fullPage: false,
+      });
+      await page.locator('[data-quick-action="callout"]').click();
+      const callout = page.locator('.sniptale-callout').first();
+      const editable = callout.locator('[contenteditable="true"]');
+      await editable.fill('Color transaction acceptance');
+      await editable.press('Escape');
+      await page.mouse.move(viewport.width - 1, viewport.height - 1);
+      await callout.hover();
+      await expect(page.locator('.sniptale-callout-settings-handle').first()).toHaveCSS(
+        'pointer-events',
+        'auto'
+      );
+      await expect(page.locator('.sniptale-callout-settings-handle').first()).toHaveCSS(
+        'opacity',
+        '1'
+      );
+      await page.locator('.sniptale-callout-settings-handle').first().click();
+      const settings = page.locator('[data-ui="content.callout-settings.popover"]');
+      await expect(settings).toBeVisible();
+      const fork = settings.locator('[data-template-fork-source]').first();
+      if (await fork.count()) {
+        await fork.focus();
+        await fork.press('Enter');
+      }
+      const colorRow = settings
+        .locator('.sniptale-parameter-row')
+        .filter({ has: page.getByRole('button', { name: 'Text color', exact: true }) })
+        .first();
+      const swatch = colorRow.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      const body = callout.locator('[data-sniptale-callout-body-layout]');
+      const originalColor = await body.evaluate((element) => getComputedStyle(element).color);
+      await page.screenshot({
+        path: info.outputPath('comment-color-before-transaction.png'),
+        fullPage: false,
+      });
+      await swatch.click();
+      await expect(picker).toBeVisible();
+      await picker
+        .locator('[data-ui="shared.ui.color-selector.picker-palette"] button')
+        .first()
+        .click();
+      await expect(body).toHaveCSS('color', originalColor);
+      await picker.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(body).toHaveCSS('color', originalColor);
+      await swatch.click();
+      await picker
+        .locator('[data-ui="shared.ui.color-selector.picker-palette"] button')
+        .first()
+        .click();
+      await picker.getByRole('button', { name: 'Apply', exact: true }).click();
+      await expect(body).toHaveCSS('color', 'rgb(248, 250, 252)');
+      await swatch.click();
+      const plane = picker.getByRole('slider', { name: 'Choose color', exact: true }).first();
+      await plane.focus();
+      await plane.press('ArrowRight');
+      await page.keyboard.press('Escape');
+      await expect(picker).toBeHidden();
+      await expect(settings).toBeVisible();
+      const neutralFocus = await swatch.evaluate((element) => {
+        const sample = document.createElement('span');
+        sample.style.color = 'var(--sniptale-color-border-strong)';
+        element.append(sample);
+        const color = getComputedStyle(sample).color;
+        sample.remove();
+        return color;
+      });
+      await expect(swatch).toHaveCSS('outline-color', neutralFocus);
+      await expect(swatch).toHaveCSS('outline-width', '1px');
+      await expect(body).toHaveCSS('color', 'rgb(248, 250, 252)');
+      await expect(colorRow).toHaveAttribute('data-layout', 'inline');
+      const manualSurface = settings.locator(
+        '[data-ui="shared.highlighter-manual-inspector-surface"]'
+      );
+      await expect(manualSurface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(manualSurface).toHaveCSS('border-top-width', '0px');
+      await page.screenshot({
+        path: info.outputPath('annotation-text-controls.png'),
+        fullPage: false,
+      });
+      await swatch.click();
+      await expect(picker).toBeVisible();
+      await picker.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(settings).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(settings).toBeHidden();
+      await body.click();
+      await expect(editable).toBeVisible();
+      await expect(body).toHaveCSS('color', 'rgb(248, 250, 252)');
+      await editable.press('Escape');
+      await page.mouse.move(viewport.width - 1, viewport.height - 1);
+      await callout.hover();
+      await expect(page.locator('.sniptale-callout-settings-handle').first()).toHaveCSS(
+        'pointer-events',
+        'auto'
+      );
+      await expect(page.locator('.sniptale-callout-settings-handle').first()).toHaveCSS(
+        'opacity',
+        '1'
+      );
+      await page.locator('.sniptale-callout-settings-handle').first().click();
+      await expect(settings).toBeVisible();
+      await swatch.click();
+      const pointerPlane = picker
+        .getByRole('slider', { name: 'Choose color', exact: true })
+        .first();
+      const planeBox = await pointerPlane.boundingBox();
+      if (!planeBox) throw new Error('Text color plane is unavailable');
+      const previousSelection = await pointerPlane.getAttribute('aria-valuetext');
+      await page.mouse.click(
+        planeBox.x + planeBox.width * 0.75,
+        planeBox.y + planeBox.height * 0.4
+      );
+      await expect(pointerPlane).not.toHaveAttribute('aria-valuetext', previousSelection ?? '');
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#12ab34');
+      await picker.getByRole('button', { name: 'Apply', exact: true }).click();
+      await expect(body).toHaveCSS('color', 'rgb(18, 171, 52)');
+      await expect(body).toContainText('Color transaction acceptance');
+      await swatch.click();
+      await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toHaveValue(
+        /12ab34/i
+      );
+      const eyedropper = picker.locator('[data-ui="shared.ui.color-selector.eyedropper"]');
+      if (await eyedropper.count()) {
+        await eyedropper.click();
+        await page.keyboard.press('Escape');
+        await expect(settings).toBeVisible();
+      }
+      if (await picker.isVisible())
+        await picker.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(body).toHaveCSS('color', 'rgb(18, 171, 52)');
+      await page.keyboard.press('Escape');
+      await expect(settings).toBeHidden();
+      await body.click();
+      await expect(editable).toBeVisible();
+      await expect(body).toHaveCSS('color', 'rgb(18, 171, 52)');
+      await page.screenshot({
+        path: info.outputPath('editing-comment-committed-color.png'),
+        fullPage: false,
+      });
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}

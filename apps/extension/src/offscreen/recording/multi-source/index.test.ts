@@ -121,23 +121,6 @@ beforeEach(() => {
   FakeMediaRecorder.autoEmitStart = true;
   FakeMediaRecorder.instances = [];
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
-  vi.stubGlobal(
-    'AudioContext',
-    class {
-      state = 'running';
-      createMediaStreamSource = vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() }));
-      createBiquadFilter = vi.fn(() => ({
-        type: 'lowpass',
-        frequency: { value: 0 },
-        Q: { value: 0 },
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-      }));
-      createGain = vi.fn(() => ({ gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }));
-      createMediaStreamDestination = vi.fn(() => ({ stream: createAudioStream() }));
-      close = vi.fn().mockResolvedValue(undefined);
-    }
-  );
   sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
   saveRecordingSafelyMock.mockImplementation(async (_inputs: unknown, completion: unknown) => {
     completionOutboxState.result = completion;

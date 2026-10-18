@@ -211,11 +211,11 @@ describe('InteractiveFrameToolbarTrigger', () => {
   });
 
   it.each([
-    ['border', 'lucide-settings'],
-    ['blur', 'lucide-settings'],
-    ['focus', 'lucide-settings'],
+    ['border', 'lucide-square'],
+    ['blur', 'lucide-droplet'],
+    ['focus', 'lucide-focus'],
   ] as const)(
-    'opens quick frame settings with the settings icon in %s mode',
+    'opens quick frame settings with the current effect icon in %s mode',
     (effectMode, iconClass) => {
       const handlers = createTriggerProps();
       act(() => {
@@ -432,7 +432,7 @@ describe('InteractiveFrameToolbarTrigger capture visibility', () => {
   });
 });
 
-it('uses settings and dimension icons in frame quick actions', () => {
+it('uses the original border icon and dimension icon in frame quick actions', () => {
   act(() =>
     root.render(
       <InteractiveFrameToolbarTrigger
@@ -442,6 +442,6 @@ it('uses settings and dimension icons in frame quick actions', () => {
       />
     )
   );
-  expect(document.querySelector('[data-quick-action="settings"] .lucide-settings')).not.toBeNull();
+  expect(document.querySelector('[data-quick-action="settings"] .lucide-square')).not.toBeNull();
   expect(document.querySelector('[data-quick-action="edit"] .lucide-scaling')).not.toBeNull();
 });

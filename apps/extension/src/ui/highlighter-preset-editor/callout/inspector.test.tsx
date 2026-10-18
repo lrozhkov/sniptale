@@ -161,6 +161,15 @@ async function enterNumber(label: string, value: number) {
 }
 
 async function selectOption(label: string, optionLabel: string) {
+  const group = document.querySelector(`[role="group"][aria-label="${label}"]`);
+  if (group) {
+    const option = [...group.querySelectorAll<HTMLButtonElement>('button')].find(
+      (element) => element.textContent === optionLabel
+    );
+    if (!option) throw new Error(`Choice not found: ${optionLabel}`);
+    await act(async () => option.click());
+    return;
+  }
   await act(async () =>
     document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click()
   );
@@ -463,18 +472,16 @@ it('keeps advanced body, title, and badge typography independently editable', as
   });
 });
 
-it('uses plain aligned numeric and select controls in callout settings', () => {
+it('uses plain aligned numeric controls and exclusive typography choices', () => {
   const numericRow = document.querySelector<HTMLElement>(
     '[data-ui="shared.ui.compact-inspector.numeric-row"]'
   );
-  const select = document.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.compact-select"] > button'
+  const fontChoices = document.querySelector(
+    '[role="group"][aria-label="content.callout.fontFamilyLabel"]'
   );
-
   expect(numericRow?.dataset['appearance']).toBe('plain');
   expect(numericRow?.className).not.toContain('surface-input');
-  expect(select?.className).toContain('border-transparent bg-transparent');
-  expect(select?.title).toBe('');
+  expect(fontChoices?.querySelectorAll('button')).toHaveLength(4);
 });
 
 it('configures a one-sided accent edge in its own inspector section', async () => {

@@ -45,23 +45,6 @@ beforeEach(() => {
   MediaRecorderMock.throwAt = null;
   MediaRecorderMock.isTypeSupported.mockReturnValue(true);
   vi.stubGlobal('MediaRecorder', MediaRecorderMock);
-  vi.stubGlobal(
-    'AudioContext',
-    class {
-      state = 'running';
-      createMediaStreamSource = vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() }));
-      createBiquadFilter = vi.fn(() => ({
-        type: 'lowpass',
-        frequency: { value: 0 },
-        Q: { value: 0 },
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-      }));
-      createGain = vi.fn(() => ({ gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }));
-      createMediaStreamDestination = vi.fn(() => ({ stream: createAudioStream() }));
-      close = vi.fn().mockResolvedValue(undefined);
-    }
-  );
 });
 
 afterEach(() => {
@@ -179,60 +162,40 @@ it('stops the raw microphone stream when encoder construction fails', async () =
   expect(audio.getTracks()[0]?.stop).toHaveBeenCalledOnce();
 });
 
-it.each([1, 2])(
-  'owns and releases the complete microphone-processing graph at gain %s',
-  async (gain) => {
-    const raw = createAudioStream();
-    const processed = createAudioStream();
-    const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
-    const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 0 } };
-    const highPass = {
-      type: 'lowpass',
-      frequency: { value: 0 },
-      Q: { value: 0 },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    };
-    const close = vi.fn().mockResolvedValue(undefined);
-    const resume = vi.fn().mockResolvedValue(undefined);
-    class AudioContextMock {
-      state = 'suspended';
-      resume = resume;
-      createGain = vi.fn(() => gainNode);
-      createBiquadFilter = vi.fn(() => highPass);
-      createMediaStreamDestination = vi.fn(() => ({ stream: processed }));
-      createMediaStreamSource = vi.fn(() => sourceNode);
-      close = close;
-    }
-    vi.stubGlobal('AudioContext', AudioContextMock);
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue(raw) },
-    });
-
-    const recorder = await createMicrophoneRecorder(
-      'rec',
-      { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: gain },
-      createRecordingStagingCoordinatorTestDouble()
-    );
-    stopRecorderStreams([recorder]);
-
-    expect(gainNode.gain.value).toBe(gain);
-    expect(highPass.type).toBe('highpass');
-    expect(highPass.frequency.value).toBe(80);
-    expect(highPass.Q.value).toBe(Math.SQRT1_2);
-    expect(sourceNode.connect).toHaveBeenCalledWith(highPass);
-    expect(highPass.connect).toHaveBeenCalledWith(gainNode);
-    expect(highPass.disconnect).toHaveBeenCalledOnce();
-    expect(gainNode.connect).toHaveBeenCalledOnce();
-    expect(sourceNode.disconnect).toHaveBeenCalledOnce();
-    expect(gainNode.disconnect).toHaveBeenCalledOnce();
-    expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
-    expect(processed.getTracks()[0]?.stop).toHaveBeenCalledOnce();
-    expect(close).toHaveBeenCalledOnce();
-    expect(resume).toHaveBeenCalledOnce();
+it('owns and releases the complete gain-processing graph', async () => {
+  const raw = createAudioStream();
+  const processed = createAudioStream();
+  const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
+  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 0 } };
+  const close = vi.fn().mockResolvedValue(undefined);
+  class AudioContextMock {
+    createGain = vi.fn(() => gainNode);
+    createMediaStreamDestination = vi.fn(() => ({ stream: processed }));
+    createMediaStreamSource = vi.fn(() => sourceNode);
+    close = close;
   }
-);
+  vi.stubGlobal('AudioContext', AudioContextMock);
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue(raw) },
+  });
+
+  const recorder = await createMicrophoneRecorder(
+    'rec',
+    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
+    createRecordingStagingCoordinatorTestDouble()
+  );
+  stopRecorderStreams([recorder]);
+
+  expect(gainNode.gain.value).toBe(2);
+  expect(sourceNode.connect).toHaveBeenCalledWith(gainNode);
+  expect(gainNode.connect).toHaveBeenCalledOnce();
+  expect(sourceNode.disconnect).toHaveBeenCalledOnce();
+  expect(gainNode.disconnect).toHaveBeenCalledOnce();
+  expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
+  expect(processed.getTracks()[0]?.stop).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
+});
 
 it('rolls back a partially created gain-processing graph', async () => {
   const raw = createAudioStream();
@@ -242,13 +205,6 @@ it('rolls back a partially created gain-processing graph', async () => {
     createGain = vi.fn(() => {
       throw new Error('gain unavailable');
     });
-    createBiquadFilter = vi.fn(() => ({
-      type: 'lowpass',
-      frequency: { value: 0 },
-      Q: { value: 0 },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    }));
     createMediaStreamSource = vi.fn(() => sourceNode);
     close = close;
   }

@@ -2,6 +2,7 @@ import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import {
   VIDEO_AUTO_FADE_DELAYS,
+  VideoRecordingStatus,
   type VideoAutoFadeDelay,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -13,6 +14,8 @@ export function createVideoRecordingSurfaceSnapshot(
   settings: VideoRecordingSettings
 ): VideoRecordingSurfaceSnapshot {
   const state = getVideoRecordingRuntimeState();
+  const ownsRecording = lease.recordingId !== null;
+  const liveMedia = ownsRecording ? state.liveMedia : null;
   return {
     autoFadeDelay: VIDEO_AUTO_FADE_DELAYS.includes(settings.autoFadeDelay as VideoAutoFadeDelay)
       ? (settings.autoFadeDelay as VideoAutoFadeDelay)
@@ -22,19 +25,19 @@ export function createVideoRecordingSurfaceSnapshot(
     cursorDimmingEnabled: settings.recordingSurface?.cursorDimmingEnabled ?? false,
     cursorClickAnimationEnabled: settings.recordingSurface?.cursorClickAnimationEnabled ?? false,
     documentGeneration: lease.documentGeneration,
-    duration: state.duration,
+    duration: ownsRecording ? state.duration : 0,
     entry: lease.entry,
-    errorCode: state.error,
+    errorCode: ownsRecording ? state.error : null,
     lifecycle: lease.lifecycle,
-    microphoneEnabled: state.liveMedia?.microphoneEnabled ?? settings.microphoneEnabled,
-    microphoneDeviceId: state.liveMedia?.microphoneDeviceId ?? settings.microphoneDeviceId,
+    microphoneEnabled: liveMedia?.microphoneEnabled ?? settings.microphoneEnabled,
+    microphoneDeviceId: liveMedia?.microphoneDeviceId ?? settings.microphoneDeviceId,
     peerGeneration: lease.peerGeneration,
     recordingId: lease.recordingId,
-    status: state.status,
+    status: ownsRecording ? state.status : VideoRecordingStatus.IDLE,
     surfaceSessionId: lease.surfaceSessionId,
     toolbarRequested: lease.toolbarRequested,
-    webcamEnabled: state.liveMedia?.webcamEnabled ?? settings.webcamEnabled === true,
-    webcamDeviceId: state.liveMedia?.webcamDeviceId ?? settings.webcamDeviceId ?? null,
+    webcamEnabled: liveMedia?.webcamEnabled ?? settings.webcamEnabled === true,
+    webcamDeviceId: liveMedia?.webcamDeviceId ?? settings.webcamDeviceId ?? null,
     webcamPresentation: settings.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
   };
 }

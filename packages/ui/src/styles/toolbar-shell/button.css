@@ -62,12 +62,14 @@
 .sniptale-btn[data-menu-indicator='true']::before {
   content: '';
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: 2px;
+  bottom: 2px;
   width: 0;
   height: 0;
-  border-inline: 2px solid transparent;
-  border-top: 3px solid currentColor;
+  border-inline: clamp(1px, calc(var(--sniptale-toolbar-button-size) / 8 - 2px), 2px) solid
+    transparent;
+  border-top: clamp(2px, calc(var(--sniptale-toolbar-button-size) / 8 - 1px), 3px) solid
+    currentColor;
   opacity: 0.42;
   pointer-events: none;
 }
@@ -249,8 +251,8 @@
   padding: 0;
 }
 .sniptale-content-toolbar-adopted .sniptale-btn[data-command-press] svg {
-  width: 16px;
-  height: 16px;
+  width: clamp(14px, calc(var(--sniptale-toolbar-button-size) - 10px), 16px);
+  height: clamp(14px, calc(var(--sniptale-toolbar-button-size) - 10px), 16px);
 }
 .sniptale-content-toolbar-adopted .sniptale-btn.sniptale-full-page-chevron[data-command-press] svg {
   width: 12px;

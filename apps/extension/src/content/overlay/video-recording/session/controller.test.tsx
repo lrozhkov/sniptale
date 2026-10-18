@@ -481,7 +481,12 @@ it('projects runtime sync fallbacks and command snapshots after binding', async 
   );
   expect(controller.state.surfaceSessionId).toBeNull();
 
-  act(() => mocks.surfaceListener?.(snapshot, 'token-1'));
+  act(() =>
+    mocks.surfaceListener?.(
+      { ...snapshot, recordingId: 'recording-1', status: VideoRecordingStatus.RECORDING },
+      'token-1'
+    )
+  );
   act(() =>
     mocks.runtimeListener?.({
       captureMode: null,
@@ -547,3 +552,39 @@ it('hides the video surface controls without releasing an active recording', asy
   });
   expect(onModeRequested).toHaveBeenLastCalledWith(false);
 });
+
+it.each([
+  VideoRecordingStatus.PREPARING,
+  VideoRecordingStatus.COUNTDOWN,
+  VideoRecordingStatus.RECORDING,
+  VideoRecordingStatus.PAUSED,
+  VideoRecordingStatus.STOPPING,
+  VideoRecordingStatus.IDLE,
+])(
+  'preserves idle camera preview when an unrelated %s recording publishes live media',
+  (status) => {
+    act(() => mocks.surfaceListener?.(snapshot, 'token-1'));
+    act(() =>
+      mocks.runtimeListener?.({
+        status,
+        duration: 43,
+        error: 'unrelated failure',
+        liveMedia: {
+          microphoneEnabled: false,
+          microphoneDeviceId: 'recording-mic',
+          webcamEnabled: false,
+          webcamDeviceId: 'recording-camera',
+        },
+      })
+    );
+    expect(controller.state).toMatchObject({
+      phase: 'idle',
+      recordingId: null,
+      error: null,
+      cameraEnabled: true,
+      webcamDeviceId: 'cam-1',
+      microphoneEnabled: true,
+      microphoneDeviceId: 'mic-1',
+    });
+  }
+);

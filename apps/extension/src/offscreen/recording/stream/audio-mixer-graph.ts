@@ -1,19 +1,9 @@
-/** Removes microphone DC and subbass impulses before gain without filtering system audio. */
-export function createMicrophoneHighPass(audioContext: BaseAudioContext): BiquadFilterNode {
-  const filter = audioContext.createBiquadFilter();
-  filter.type = 'highpass';
-  filter.frequency.value = 80;
-  filter.Q.value = Math.SQRT1_2;
-  return filter;
-}
-
 export class AudioMixerGraph {
   private audioContext: AudioContext | null = null;
   private destination: MediaStreamAudioDestinationNode | null = null;
   private tabSource: MediaStreamAudioSourceNode | null = null;
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micGain: GainNode | null = null;
-  private micHighPass: BiquadFilterNode | null = null;
   private silenceSource: ConstantSourceNode | null = null;
 
   private getInitializedAudioContext(): AudioContext {
@@ -63,16 +53,14 @@ export class AudioMixerGraph {
     this.disconnectMicrophoneStream();
     const audioContext = this.getInitializedAudioContext();
     this.micSource = audioContext.createMediaStreamSource(micStream);
-    this.micHighPass = createMicrophoneHighPass(audioContext);
-    this.micSource.connect(this.micHighPass);
     if (gain === 1) {
-      this.micHighPass.connect(this.getInitializedDestination());
+      this.micSource.connect(this.getInitializedDestination());
       return;
     }
 
     this.micGain = audioContext.createGain();
     this.micGain.gain.value = gain;
-    this.micHighPass.connect(this.micGain);
+    this.micSource.connect(this.micGain);
     this.micGain.connect(this.getInitializedDestination());
   }
 
@@ -86,10 +74,6 @@ export class AudioMixerGraph {
   }
 
   disconnectMicrophoneStream(): void {
-    if (this.micHighPass) {
-      this.micHighPass.disconnect();
-      this.micHighPass = null;
-    }
     if (this.micGain) {
       this.micGain.disconnect();
       this.micGain = null;

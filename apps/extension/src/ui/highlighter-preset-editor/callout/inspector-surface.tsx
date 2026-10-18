@@ -36,6 +36,7 @@ function ShadowColorField(props: ManualContentProps) {
     .surface.shadowColor;
   return (
     <ColorField
+      onOpenChange={props.onNestedLayerChange}
       control={
         <ProductGlassBoldButton
           aria-label={`${label} — ${sourceLabel}`}

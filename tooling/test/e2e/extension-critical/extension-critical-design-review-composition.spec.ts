@@ -98,19 +98,45 @@ for (const theme of ['light', 'dark'] as const) {
         const close = popover.getByRole('button', { name: /^(Close|Закрыть)$/u });
         const panelBounds = (await popover.boundingBox())!;
         const closeBounds = (await close.boundingBox())!;
-        expect(closeBounds.x).toBeGreaterThanOrEqual(panelBounds.x);
-        expect(closeBounds.y).toBeGreaterThanOrEqual(panelBounds.y);
-        expect(closeBounds.x + closeBounds.width).toBeLessThanOrEqual(
-          panelBounds.x + panelBounds.width
-        );
-        expect(closeBounds.y + closeBounds.height).toBeLessThanOrEqual(
-          panelBounds.y + panelBounds.height
-        );
+        const commentLayer = popover.locator('[data-ui="content.design-review.comment-layer"]');
+        await expect.soft(commentLayer).toHaveCSS('padding-top', '16px', { timeout: 500 });
+        expect.soft(closeBounds.width, 'Close retains a compact target').toBe(24);
+        expect.soft(closeBounds.height).toBe(24);
+        expect
+          .soft(Math.abs(closeBounds.x + closeBounds.width / 2 - panelBounds.x - panelBounds.width))
+          .toBeLessThanOrEqual(2);
+        expect
+          .soft(Math.abs(closeBounds.y + closeBounds.height / 2 - panelBounds.y))
+          .toBeLessThanOrEqual(2);
+        const backing = await close.evaluate((node) => {
+          const surface = node.parentElement?.matches(
+            '[data-ui="content.design-review.close-backing"]'
+          )
+            ? node.parentElement
+            : node;
+          const css = getComputedStyle(surface);
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = css.backgroundColor;
+          context.fillRect(0, 0, 1, 1);
+          return { radius: css.borderRadius, alpha: context.getImageData(0, 0, 1, 1).data[3] };
+        });
+        expect.soft(backing.radius, 'Close has a circular backing over page imagery').toBe('50%');
+        expect.soft(backing.alpha).toBe(255);
+        expect.soft(closeBounds.x).toBeGreaterThanOrEqual(0);
+        expect.soft(closeBounds.y).toBeGreaterThanOrEqual(0);
+        expect.soft(closeBounds.x + closeBounds.width).toBeLessThanOrEqual(viewport.size.width);
+        expect.soft(closeBounds.y + closeBounds.height).toBeLessThanOrEqual(viewport.size.height);
         await page.screenshot({
           path: info.outputPath('comment-popover.png'),
           fullPage: false,
           animations: 'disabled',
         });
+        await close.click();
+        await expect(popover).toHaveCount(0);
+        await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+        await expect(popover).toBeVisible();
         await popover
           .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
           .click();

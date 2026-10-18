@@ -1,6 +1,6 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
-import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls';
+import { SegmentedRow, ToggleField } from '../../../ui/compact-inspector-controls';
 import { Droplet, Focus, Square } from 'lucide-react';
 
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
@@ -134,7 +134,8 @@ export function FrameBlurControls(props: {
         value={props.settings.amount}
       />
       {inspector ? (
-        <SelectField
+        <SegmentedRow
+          ariaLabel={translate('content.overlayControls.blurTypeLabel')}
           label={translate('content.overlayControls.blurTypeLabel')}
           onChange={props.handleBlurTypeChange}
           options={buildBlurTypeOptions().map((option) => ({
