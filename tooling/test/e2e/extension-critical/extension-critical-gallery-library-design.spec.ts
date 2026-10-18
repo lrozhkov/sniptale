@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { test, expect } from '../support/extension-fixture';
@@ -514,8 +514,82 @@ for (const width of [1535, 1536, 1537, 1100]) {
       expect(scroll!.left).toBeGreaterThan(0);
     }
     await expect(page.locator('[data-ui="gallery.header.storage"] > button')).toBeInViewport();
+    const headerFit = await page.locator('header').evaluate((header) => {
+      const selection = header.querySelector('[data-ui="gallery.selection.toolbar"]')!;
+      const controls = header.querySelector('[data-ui="gallery.header.controls"]')!;
+      const commands = [...selection.querySelectorAll('button')]
+        .map((node) => node.getBoundingClientRect())
+        .filter((r) => r.width && r.height);
+      const persistent = [...controls.querySelectorAll('button,input')]
+        .map((node) => node.getBoundingClientRect())
+        .filter((r) => r.width && r.height);
+      return {
+        commandWidth:
+          Math.max(...commands.map((r) => r.right)) - Math.min(...commands.map((r) => r.left)),
+        controlsWidth: controls.getBoundingClientRect().width,
+        collisions: commands.flatMap((a) =>
+          persistent
+            .filter(
+              (b) =>
+                Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 &&
+                Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1
+            )
+            .map((b) => ({ command: a.toJSON(), control: b.toJSON() }))
+        ),
+      };
+    });
+    expect(headerFit.collisions, JSON.stringify(headerFit)).toEqual([]);
     await screenshot(page, info, `header-${width}`);
   });
+}
+
+async function checkPaletteCopyContrast(palette: Locator) {
+  const copyContrast = await palette.evaluate((root) => {
+    const parser = document.createElement('canvas').getContext('2d')!;
+    const parse = (value: string) => {
+      parser.clearRect(0, 0, 1, 1);
+      parser.fillStyle = value;
+      parser.fillRect(0, 0, 1, 1);
+      return [...parser.getImageData(0, 0, 1, 1).data];
+    };
+    const luminance = (color: number[]) =>
+      color
+        .slice(0, 3)
+        .map((channel) => channel / 255)
+        .map((channel) =>
+          channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+        )
+        .reduce((sum, channel, i) => sum + channel * [0.2126, 0.7152, 0.0722][i]!, 0);
+    return [...root.querySelectorAll<HTMLElement>('*')].flatMap((node) => {
+      const text = [...node.childNodes]
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent)
+        .join('')
+        .trim();
+      if (!text || !node.getBoundingClientRect().height || node.closest(':disabled, .sr-only'))
+        return [];
+      const ancestors: Element[] = [];
+      for (let current: Element | null = node; current; current = current.parentElement)
+        ancestors.unshift(current);
+      let background = [255, 255, 255];
+      for (const ancestor of ancestors) {
+        const color = parse(getComputedStyle(ancestor).backgroundColor);
+        background = color
+          .slice(0, 3)
+          .map(
+            (channel, i) => (channel * color[3]!) / 255 + background[i]! * (1 - color[3]! / 255)
+          );
+      }
+      const foreground = parse(getComputedStyle(node).color);
+      const light = luminance(foreground),
+        dark = luminance(background);
+      return [{ text, ratio: (Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05) }];
+    });
+  });
+  expect(
+    copyContrast.filter(({ ratio }) => ratio < 4.5),
+    'Readable palette copy in panel and selected rows'
+  ).toEqual([]);
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -539,11 +613,16 @@ for (const theme of ['light', 'dark'] as const) {
     await page.mouse.down();
     await expect(close).toHaveAttribute('data-pressing', 'true');
     await expect(close.locator(':scope > .sniptale-command-content')).toHaveCSS('opacity', '0.72');
+    await checkPaletteCopyContrast(palette);
     await screenshot(page, info, `palette-pressure-${theme}`);
     await page.mouse.move(0, 0);
     await page.mouse.up();
     await expect(close).not.toHaveAttribute('data-pressing', 'true');
     await expect(palette).toBeVisible();
+    await query.fill('synthetic-no-matching-command-8491');
+    await expect(palette.getByRole('option')).toHaveCount(0);
+    await checkPaletteCopyContrast(palette);
+    await screenshot(page, info, `palette-empty-${theme}`);
     await close.click();
     await expect(palette).toBeHidden();
   });
@@ -786,7 +865,7 @@ for (const theme of ['light', 'dark'] as const) {
       const project = withVideoProjectUsage(
         createVideoProjectEntry({
           id: 'large-footer-project',
-          name: 'Проект с длинным пользовательским названием для проверки выравнивания и сокращения',
+          name: 'Проект с длинным пользовательским названием для проверки футера и сокращения',
           baseRecordingId: 'beta-v1-recording',
         })
       );
@@ -797,19 +876,35 @@ for (const theme of ['light', 'dark'] as const) {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
           });
-          const tx = db.transaction('video_projects', 'readwrite');
+          const tx = db.transaction(['video_projects', 'recordings', 'media_library'], 'readwrite');
           const done = new Promise<void>((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onabort = () => reject(tx.error);
           });
           tx.objectStore('video_projects').put(project);
+          for (const [store, ids] of [
+            ['recordings', ['beta-v1-recording', 'webcam-clock']],
+            ['media_library', ['recording:beta-v1-recording', 'recording:webcam-clock']],
+          ] as const) {
+            for (const id of ids) {
+              const request = tx.objectStore(store).get(id);
+              request.onsuccess = () => {
+                if (!request.result) throw new Error(`Missing footer fixture: ${store}/${id}`);
+                tx.objectStore(store).put({
+                  ...request.result,
+                  filename: `Проверка-футера-${id}.webm`,
+                  originalFilename: `Проверка-футера-${id}.webm`,
+                });
+              };
+            }
+          }
           await done;
           db.close();
         },
         { databaseName: betaV1Fixture.databaseName, project }
       );
-      await searchLibrary(page, '');
       await page.reload();
+      await searchLibrary(page, 'футера');
       const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
       await page
         .getByRole('button', { name: label('gallery.app.viewModeLargeGrid'), exact: true })

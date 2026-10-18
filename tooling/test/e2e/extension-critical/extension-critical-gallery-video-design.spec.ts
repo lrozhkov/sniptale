@@ -260,12 +260,10 @@ async function checkTrackIndicators(page: Page, label: Label, info: TestInfo) {
     await expect(unavailable).toHaveCSS('opacity', '0.55');
     await checkTrackIndicator(page, unavailable, 28, '--sniptale-color-text-muted');
   }
-  const lock = page.locator('[data-review-header-track="source"] button[aria-pressed]');
-  await lock.click();
-  await expect(lock).toHaveAttribute('aria-pressed', 'true');
-  await checkTrackIndicator(page, lock, 24, '--sniptale-color-accent');
-  await lock.click();
-  await expect(lock).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('[data-review-header-track="source"]')).toBeVisible();
+  await expect(
+    page.locator('.review-track-status .lucide-lock, .review-track-status .lucide-unlock')
+  ).toHaveCount(0);
   const filter = page
     .locator('[data-review-header-track="actions"]')
     .getByRole('button', { name: label('gallery.videoReview.historyAnimatedOnly'), exact: true });

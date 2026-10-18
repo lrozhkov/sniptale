@@ -442,16 +442,11 @@ function GalleryHeaderControls(
     GalleryHeaderStorageProps & {
       onSearchCommit: (value: string) => void;
       searchNavigation?: GallerySearchNavigation;
-      stackWhenNarrow: boolean;
     }
 ) {
   return (
     <div
-      className={cx(
-        'ml-auto flex min-w-max shrink-0 flex-nowrap items-center justify-end gap-2',
-        props.stackWhenNarrow &&
-          'max-2xl:row-start-1 max-2xl:ml-0 max-2xl:justify-self-start max-2xl:justify-start'
-      )}
+      className="ml-auto flex min-w-max shrink-0 flex-nowrap items-center justify-end gap-2"
       data-ui="gallery.header.controls"
     >
       <GalleryHeaderSearchField
@@ -542,7 +537,7 @@ export function GalleryHeader(
         'relative z-30 flex h-12 min-h-12 shrink-0 items-center gap-4',
         'rounded-[4px] border py-1.5',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] ',
-        hasWorkspaceActions && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
+        hasWorkspaceActions && 'h-auto'
       )}
     >
       <div
@@ -568,8 +563,7 @@ export function GalleryHeader(
       <div
         className={cx(
           'flex min-w-0 flex-1 flex-nowrap items-center gap-2 pr-3',
-          hasWorkspaceActions &&
-            'max-2xl:grid max-2xl:h-full max-2xl:grid-cols-1 max-2xl:grid-rows-[2rem_2rem] max-2xl:gap-y-2'
+          hasWorkspaceActions && 'flex-wrap-reverse gap-y-2'
         )}
         data-ui="gallery.header.workspace"
       >
@@ -577,7 +571,7 @@ export function GalleryHeader(
           <div
             className={cx(
               'min-w-0 flex-1',
-              hasWorkspaceActions && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
+              hasWorkspaceActions && 'min-w-max shrink-0 basis-auto overflow-visible'
             )}
           >
             {hasSelection ? (
@@ -587,7 +581,7 @@ export function GalleryHeader(
             ) : null}
           </div>
         ) : null}
-        <GalleryHeaderControls {...props} stackWhenNarrow={hasWorkspaceActions} />
+        <GalleryHeaderControls {...props} />
       </div>
     </header>
   );

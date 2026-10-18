@@ -235,12 +235,12 @@ it('keeps browsing controls on the right and adds selection actions on the left'
   expect(container?.textContent).toContain('gallery.app.selectedPrefix 1');
   expect(container?.querySelector('[data-ui="test.sort"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="gallery.header.workspace"]')).not.toBeNull();
-  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  expect(container?.querySelector('header')?.className).toContain('h-auto');
   expect(container?.querySelector('[data-ui="gallery.header.workspace"]')?.className).toContain(
-    'max-2xl:grid-rows-[2rem_2rem]'
+    'flex-wrap-reverse'
   );
   expect(container?.querySelector('[data-ui="gallery.header.controls"]')?.className).toContain(
-    'max-2xl:row-start-1'
+    'shrink-0'
   );
 });
 
@@ -359,7 +359,7 @@ it('replaces Found with selection actions and restores it after deselection', ()
   renderHeader({ resultActions });
   const results = container?.querySelector('[data-ui="gallery.results.toolbar"]');
   expect(results?.textContent).toContain('gallery.app.facetResults: 7');
-  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  expect(container?.querySelector('header')?.className).toContain('h-auto');
   clickButton(results?.querySelector('button'));
   expect(resultActions.onSelectAll).toHaveBeenCalledOnce();
   const selectedItems = [createMediaItem({ id: 'selected' })];
