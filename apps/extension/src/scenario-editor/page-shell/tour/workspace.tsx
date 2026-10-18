@@ -1,4 +1,9 @@
-import { getTourAudioResources } from '../../../features/scenario/project/public';
+import {
+  getTourAudioResources,
+  getScenarioNarrationText,
+  listScenarioNarrationTexts,
+  type ScenarioNarrationText,
+} from '../../../features/scenario/project/public';
 import { TourNarrationPlacement } from './narration-recording';
 import { TourMusicSettings } from './music-settings';
 import { TourNarrationSettings } from './narration-settings';
@@ -18,6 +23,7 @@ import type { Translate } from '../../../platform/i18n';
 import { TourCanvas } from './canvas';
 import type { TourWorkspaceProps, SelectedTourProps } from './workspace-contracts';
 import './tour.css';
+import { TourNarrationAI } from './narration-ai';
 
 /** Tour editing uses the page's existing buffer, resource drawer and panel frame. */
 export function TourWorkspace(props: TourWorkspaceProps) {
@@ -25,6 +31,25 @@ export function TourWorkspace(props: TourWorkspaceProps) {
   const state = useTourSelection(project, disabled, onChange, props.initialSlideId);
   const view = useTourViewMode(state.selection, state.slide);
   const [generating, setGenerating] = useState(false);
+  const [aiTargets, setAITargets] = useState<ScenarioNarrationText[] | null>(null);
+  const aiOrigin = useRef<HTMLElement | null>(null);
+  const openAI = (targets: ScenarioNarrationText[]) => {
+    aiOrigin.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAITargets(targets);
+    panels.openRight('selection');
+  };
+  const closeAI = () => {
+    setAITargets(null);
+    requestAnimationFrame(() => {
+      if (aiOrigin.current?.isConnected) aiOrigin.current.focus();
+      else
+        document
+          .getElementById('guide-inspector-panel')
+          ?.querySelector<HTMLButtonElement>('[data-ai-single]')
+          ?.focus();
+    });
+  };
   const [recording, setRecording] = useState(false);
   const recordingOrigin = useRef<boolean | null>(null);
   const [recordingHost, setRecordingHost] = useState<HTMLDivElement | null>(null);
@@ -35,11 +60,13 @@ export function TourWorkspace(props: TourWorkspaceProps) {
       ? { slideId: state.slide.id, disabled: disabled || !props.images[selectedImage.assetId] }
       : null;
   const selectSlide = (slideId: string) => {
+    setAITargets(null);
     state.select({ kind: 'slide', slideId, objectId: null });
     panels.selectRightScope('selection');
   };
   const selectObject = (objectId: string | null) => {
     if (!state.slide) return;
+    setAITargets(null);
     state.select({ kind: 'slide', slideId: state.slide.id, objectId });
     panels.openRight('selection');
   };
@@ -94,6 +121,17 @@ export function TourWorkspace(props: TourWorkspaceProps) {
                   disabled={disabled}
                   t={t}
                 />
+                {props.narrationAI && (
+                  <ContentToolbarButton
+                    className="guide-labeled-action"
+                    title={t('scenario.editor.tourNarrationAIBatch')}
+                    data-ai-batch
+                    disabled={importDisabled || !listScenarioNarrationTexts(project).length}
+                    onClick={() => openAI(listScenarioNarrationTexts(project))}
+                  >
+                    <span>{t('scenario.editor.tourNarrationAIBatch')}</span>
+                  </ContentToolbarButton>
+                )}
                 {editImage && (
                   <ContentToolbarButton
                     className="guide-labeled-action"
@@ -133,7 +171,14 @@ export function TourWorkspace(props: TourWorkspaceProps) {
             right={
               <>
                 <div style={{ display: recording ? 'none' : 'contents' }} inert={recording}>
-                  <TourSettingsPanel {...props} state={state} onSelectObject={selectObject} />
+                  <TourSettingsPanel
+                    {...props}
+                    state={state}
+                    onSelectObject={selectObject}
+                    aiTargets={aiTargets}
+                    onOpenAI={openAI}
+                    onCloseAI={closeAI}
+                  />
                 </div>
                 <FloatingChromePanel
                   id="tour-recording-inspector"
@@ -179,9 +224,18 @@ function TourSettingsPanel({
   onImport,
   state,
   onSelectObject: selectObject,
-}: SelectedTourProps) {
-  const inspectorTitle =
-    panels.rightScope === 'document'
+  narrationAI,
+  aiTargets,
+  onOpenAI,
+  onCloseAI,
+}: SelectedTourProps & {
+  aiTargets: ScenarioNarrationText[] | null;
+  onOpenAI(targets: ScenarioNarrationText[]): void;
+  onCloseAI(): void;
+}) {
+  const inspectorTitle = aiTargets
+    ? t('scenario.editor.tourNarrationAI')
+    : panels.rightScope === 'document'
       ? t('scenario.editor.tourSettings')
       : state.selection?.kind === 'end'
         ? t('scenario.editor.tourEnd')
@@ -191,9 +245,10 @@ function TourSettingsPanel({
             t
           );
   const nested =
-    panels.rightScope === 'selection' &&
-    state.selection?.kind === 'slide' &&
-    Boolean(state.selection.objectId);
+    Boolean(aiTargets) ||
+    (panels.rightScope === 'selection' &&
+      state.selection?.kind === 'slide' &&
+      Boolean(state.selection.objectId));
   const grouped = panels.rightScope === 'document' || state.selection?.kind === 'slide';
   return (
     <FloatingChromePanel
@@ -209,7 +264,7 @@ function TourSettingsPanel({
             className="tour-inspector-back"
             size="compact"
             title={t('scenario.editor.tourBackToSlide')}
-            onClick={() => selectObject(null)}
+            onClick={aiTargets ? onCloseAI : () => selectObject(null)}
           >
             <ArrowLeft size={16} aria-hidden="true" />
           </ContentToolbarButton>
@@ -228,75 +283,114 @@ function TourSettingsPanel({
           tone="close"
           size="compact"
           title={t('scenario.editor.close')}
-          onClick={panels.toggleRight}
+          onClick={() => {
+            if (aiTargets) onCloseAI();
+            panels.toggleRight();
+          }}
         >
           <X size={16} />
         </ContentToolbarButton>
       </div>
       <div className="guide-panel-scroll">
-        {project.tour && (
-          <TourInspector
-            images={images}
-            importDisabled={importDisabled}
-            onUploadStage={(file, signal, originMediaId) =>
-              onImport({
-                sources: originMediaId
-                  ? [{ kind: 'library', mediaId: originMediaId }]
-                  : [{ kind: 'file', file }],
-                placement: { kind: 'tour-stage-background' },
-                signal,
-              })
-            }
-            presentation={panels.presentation}
-            tour={project.tour}
-            slide={state.slide}
-            selection={state.selection}
-            scope={panels.rightScope}
-            disabled={disabled}
+        {aiTargets && narrationAI && (
+          <TourNarrationAI
+            key={project.id}
+            targets={aiTargets}
+            access={narrationAI}
+            disabled={importDisabled}
             t={t}
-            onChangeTour={state.changeTour}
-            onChangeSlide={state.changeSlide}
-            music={
-              onImportNarration && (
-                <TourMusicSettings
-                  key={project.id}
-                  tour={project.tour}
-                  disabled={disabled}
-                  importDisabled={importDisabled}
-                  onChange={state.changeTour}
-                  onImport={onImportNarration}
-                  t={t}
-                />
-              )
-            }
-            narration={
-              panels.rightOpen &&
-              panels.rightScope === 'selection' &&
-              state.selection?.kind === 'slide' &&
-              state.slide &&
-              (state.slide.kind === 'navigation' ||
-                state.slide.actions.some(
-                  (entry) =>
-                    state.selection?.kind === 'slide' &&
-                    entry.object.id === state.selection.objectId
-                )) &&
-              onImportNarration && (
-                <TourNarrationSettings
-                  key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
-                  slide={state.slide}
-                  objectId={state.selection.objectId}
-                  resources={project.tour ? getTourAudioResources(project.tour) : []}
-                  disabled={disabled}
-                  importDisabled={importDisabled}
-                  onImport={onImportNarration}
-                  onChange={state.changeSlide}
-                  t={t}
-                />
-              )
-            }
-            onSelectObject={selectObject}
           />
         )}
+        <div hidden={Boolean(aiTargets)} inert={Boolean(aiTargets)}>
+          {project.tour && (
+            <TourInspector
+              images={images}
+              importDisabled={importDisabled}
+              onUploadStage={(file, signal, originMediaId) =>
+                onImport({
+                  sources: originMediaId
+                    ? [{ kind: 'library', mediaId: originMediaId }]
+                    : [{ kind: 'file', file }],
+                  placement: { kind: 'tour-stage-background' },
+                  signal,
+                })
+              }
+              presentation={panels.presentation}
+              tour={project.tour}
+              slide={state.slide}
+              selection={state.selection}
+              scope={panels.rightScope}
+              disabled={disabled}
+              t={t}
+              onChangeTour={state.changeTour}
+              onChangeSlide={state.changeSlide}
+              music={
+                onImportNarration &&
+                (aiTargets ? (
+                  <span />
+                ) : (
+                  <TourMusicSettings
+                    key={project.id}
+                    tour={project.tour}
+                    disabled={disabled}
+                    importDisabled={importDisabled}
+                    onChange={state.changeTour}
+                    onImport={onImportNarration}
+                    t={t}
+                  />
+                ))
+              }
+              narration={
+                panels.rightOpen &&
+                panels.rightScope === 'selection' &&
+                state.selection?.kind === 'slide' &&
+                state.slide &&
+                (state.slide.kind === 'navigation' ||
+                  state.slide.actions.some(
+                    (entry) =>
+                      state.selection?.kind === 'slide' &&
+                      entry.object.id === state.selection.objectId
+                  )) &&
+                onImportNarration &&
+                (aiTargets ? (
+                  <span />
+                ) : (
+                  <TourNarrationSettings
+                    key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
+                    slide={state.slide}
+                    objectId={state.selection.objectId}
+                    resources={project.tour ? getTourAudioResources(project.tour) : []}
+                    disabled={disabled}
+                    importDisabled={importDisabled}
+                    onImport={onImportNarration}
+                    onGenerate={
+                      narrationAI &&
+                      state.selection.objectId &&
+                      getScenarioNarrationText(project, {
+                        slideId: state.slide.id,
+                        objectId: state.selection.objectId,
+                      })
+                        ? () => {
+                            const target =
+                              state.selection?.kind === 'slide' && state.selection.objectId
+                                ? getScenarioNarrationText(project, {
+                                    slideId: state.slide!.id,
+                                    objectId: state.selection.objectId,
+                                  })
+                                : null;
+                            if (target) onOpenAI([target]);
+                          }
+                        : undefined
+                    }
+                    onChange={state.changeSlide}
+                    t={t}
+                  />
+                ))
+              }
+              onSelectObject={selectObject}
+            />
+          )}
+        </div>
       </div>
     </FloatingChromePanel>
   );

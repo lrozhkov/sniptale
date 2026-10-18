@@ -1,5 +1,11 @@
 import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
-import { getTourImages, getTourNarrationTargets } from '../../../features/scenario/project/public';
+import {
+  getTourImages,
+  getTourNarrationTargets,
+  getScenarioNarrationText,
+  type ScenarioNarrationText,
+} from '../../../features/scenario/project/public';
+import type { ScenarioNarrationPreview } from '../../../workflows/scenario-narration/generation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -104,6 +110,8 @@ export function useGuidePageState() {
     }
   );
   const { clearSelection, ...selection } = useGuideSelection(project);
+  const current = useRef({ project, status });
+  current.current = { project, status };
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
   const loadContext = useRef({ project, status });
@@ -152,6 +160,7 @@ export function useGuidePageState() {
   const mutate = createGuideMutationRunner({ busy, generation, setStatus, setActionError });
   const acceptProject = (committed: ScenarioProjectSnapshot, reversible = false) => {
     saved.current = committed;
+    current.current = { ...current.current, project: committed.project, status: 'saved' };
     commit(committed.project, reversible);
     setStatus('saved');
   };
@@ -190,7 +199,10 @@ export function useGuidePageState() {
       setStatus(next);
       if (next === 'saved') setActionError((current) => (current === 'reload' ? null : current));
     },
-    onPublish: publish,
+    onPublish: (committed, source, historyAction) => {
+      if (current.current.project === source) current.current.project = committed;
+      publish(committed, source, historyAction);
+    },
   });
   const rejectAction = (action: Exclude<GuideActionError, 'structure'>) => {
     setStatus(status);
@@ -198,6 +210,7 @@ export function useGuidePageState() {
   };
   const commitChange = createGuideCommitDispatcher({
     project,
+    current,
     saved,
     generation,
     status,
@@ -207,7 +220,79 @@ export function useGuidePageState() {
     rejectAction,
   });
 
+  const narrationAdapter = useRef({ save: autosave.save, commitChange });
+  narrationAdapter.current = { save: autosave.save, commitChange };
+  const prepareNarration = useCallback(
+    async (targets: readonly ScenarioNarrationText[], signal: AbortSignal) => {
+      signal.throwIfAborted();
+      const turn = generation.current;
+      const source = current.current;
+      const captured = structuredClone(targets);
+      const matches = (candidate: GuideProject | null) =>
+        !!candidate &&
+        captured.length > 0 &&
+        captured.every((target) => {
+          const value = getScenarioNarrationText(candidate, target);
+          return value?.text === target.text && narrationMatches(value.narration, target.narration);
+        });
+      if (!source.project || !matches(source.project)) throw new Error('stale');
+      if (!(await narrationAdapter.current.save())) throw new Error('save-failed');
+      signal.throwIfAborted();
+      const snapshot = saved.current;
+      if (
+        turn !== generation.current ||
+        !snapshot ||
+        source.project.id !== current.current.project?.id ||
+        !matches(current.current.project) ||
+        !matches(snapshot.project)
+      )
+        throw new Error('stale');
+      return snapshot;
+    },
+    []
+  );
+  const applyNarration = useCallback(
+    async (preview: ScenarioNarrationPreview, signal: AbortSignal): Promise<boolean> => {
+      const turn = generation.current;
+      try {
+        signal.throwIfAborted();
+        if (
+          current.current.project !== saved.current?.project &&
+          !(await narrationAdapter.current.save())
+        )
+          return false;
+        signal.throwIfAborted();
+        const project = current.current.project;
+        const target = project ? getScenarioNarrationText(project, preview.scope.target) : null;
+        if (
+          turn !== generation.current ||
+          project?.id !== preview.scope.workspaceId ||
+          !target ||
+          target.text !== preview.text ||
+          !narrationMatches(target.narration, preview.expectedNarration)
+        )
+          return false;
+        return await narrationAdapter.current.commitChange({
+          kind: 'narration',
+          input: {
+            slideId: preview.scope.target.slideId,
+            objectId: preview.scope.target.objectId,
+            expectedNarration: preview.expectedNarration,
+            expectedSource: { text: preview.text, sourceTextHash: preview.scope.sourceTextHash },
+            blob: preview.blob,
+            signal,
+          },
+        });
+      } catch {
+        return false;
+      }
+    },
+    []
+  );
+
   return {
+    prepareNarration,
+    applyNarration,
     autosaveEnabled,
     setAutosaveEnabled,
     commitChange,
@@ -449,6 +534,7 @@ function createGuideMutationRunner({
 /** Adapts committed workflow outcomes to the page's existing revision/history admission. */
 function createGuideCommitDispatcher({
   project,
+  current,
   saved,
   generation,
   status,
@@ -459,6 +545,7 @@ function createGuideCommitDispatcher({
 }: {
   project: GuideProject | null;
   saved: { current: ScenarioProjectSnapshot | null };
+  current: { current: { project: GuideProject | null; status: GuidePageStatus } };
   generation: { current: number };
   status: GuidePageStatus;
   mutate: ReturnType<typeof createGuideMutationRunner>;
@@ -471,12 +558,13 @@ function createGuideCommitDispatcher({
   function commitChange(command: GuideCommitCommand): Promise<boolean>;
   async function commitChange(command: GuideCommitCommand | TourImageEditCommand) {
     const base = saved.current;
+    const activeProject = command.kind === 'narration' ? current.current.project : project;
     if (
       turn !== generation.current ||
-      !project ||
+      !activeProject ||
       !base ||
-      project.id !== base.project.id ||
-      status === 'conflict'
+      activeProject.id !== base.project.id ||
+      (command.kind === 'narration' ? current.current.status : status) === 'conflict'
     )
       return false;
     let targetReview = false;
@@ -487,11 +575,11 @@ function createGuideCommitDispatcher({
         command.kind === 'tour-edit'
           ? applyTourImageEdit({
               ...command.input,
-              project,
+              project: activeProject,
               baseUpdatedAt: base.project.updatedAt,
               expectedRevision: base.workspaceRevision,
             })
-          : runGuideCommitCommand(command, project, base),
+          : runGuideCommitCommand(command, activeProject, base),
       (result) => {
         if ('status' in result) {
           if (result.status === 'requires-target-review') {
@@ -501,8 +589,10 @@ function createGuideCommitDispatcher({
         } else acceptProject(result, true);
       },
       (error) => {
-        if (isRevisionConflict(error)) setStatus('conflict');
-        else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
+        if (isRevisionConflict(error)) {
+          if (command.kind === 'narration') current.current.status = 'conflict';
+          setStatus('conflict');
+        } else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
         else
           rejectAction(
             command.kind === 'tour-edit'
@@ -532,4 +622,11 @@ async function readGuideHistoryProjection(id: string) {
         : null,
     previousProjects: previous.map((version) => version.project).reverse(),
   };
+}
+
+function narrationMatches(
+  left: ScenarioNarrationText['narration'],
+  right: ScenarioNarrationText['narration']
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

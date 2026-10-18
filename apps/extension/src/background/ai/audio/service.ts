@@ -13,7 +13,11 @@ import {
   readAudioStaging,
   discardAudioStaging,
 } from '../../../composition/persistence/assets/audio-staging';
-import { authorizeAudioJob } from './authorization';
+import {
+  authorizeAudioJob,
+  isAudioJobAllowedForConsumer,
+  type AudioJobConsumer,
+} from './authorization';
 import { resolveAudioModelConfig, type AudioModelConfig } from './model-config';
 import { requestAudio } from './request';
 import { validateAudioUpload } from './response';
@@ -217,7 +221,7 @@ class AudioJobCoordinator {
     void job.flight.catch(() => undefined);
   }
 
-  connect(send: Send) {
+  connect(send: Send, consumer: AudioJobConsumer = 'gallery') {
     let job: Job | undefined;
     let closed = false;
     const emit: Send = (message) => {
@@ -240,7 +244,11 @@ class AudioJobCoordinator {
           this.acceptExecution(job, message, emit);
           return;
         }
-        if (job || this.erasureReservations > 0) {
+        if (
+          !isAudioJobAllowedForConsumer(message, consumer) ||
+          job ||
+          this.erasureReservations > 0
+        ) {
           emit({ type: 'failure', requestId: message.requestId, code: 'unauthorized' });
           return;
         }

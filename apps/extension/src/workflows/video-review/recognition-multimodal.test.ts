@@ -7,7 +7,7 @@ const remote = vi.hoisted(() => ({
   extract: vi.fn(async () => new Blob(['pcm'])),
   plan: vi.fn(),
 }));
-vi.mock('./speech-client', () => ({ runReviewSpeechJob: remote.job }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: remote.job }));
 vi.mock('./speech-audio', () => ({
   extractReviewSpeechWav: remote.extract,
   planReviewSpeechChunks: remote.plan,

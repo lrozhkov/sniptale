@@ -167,6 +167,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/audio-jobs`
 - `apps/extension/src/workflows/background-images`
 - `apps/extension/src/workflows/browser-frame`
 - `apps/extension/src/workflows/editor`
@@ -177,6 +178,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/page-preparation`
 - `apps/extension/src/workflows/project-covers`
 - `apps/extension/src/workflows/scenario-capture-edit`
+- `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`

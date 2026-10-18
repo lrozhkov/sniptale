@@ -1,5 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { authorizeAudioJob } from './authorization';
+import { assertScenarioSpeechScope } from '../../../composition/persistence/scenario/speech-scope';
+import { createAudioJobService } from './service';
+import type { AudioJobServerMessage } from '../../../contracts/ai/audio';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
@@ -9,6 +12,9 @@ import {
   addReviewTextFragment,
   createReviewTextDocument,
 } from '../../../features/video/review/text-document';
+vi.mock('../../../composition/persistence/scenario/speech-scope', () => ({
+  assertScenarioSpeechScope: vi.fn(),
+}));
 vi.mock('../../../composition/persistence/review-workspaces/store', () => ({
   readVideoWorkspace: vi.fn(),
 }));
@@ -182,3 +188,76 @@ it('rejects missing transcript and native gaps rather than uploading another sli
   clip.sourceAnchor = [{ start: 1, end: 2, offset: 1, duration: 1 }];
   await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
 });
+
+const scenarioSpeech = {
+  type: 'start',
+  requestId: 'scenario',
+  modelId: 'model',
+  operation: 'speech',
+  approvedProviderId: 'provider',
+  scope: {
+    workspaceId: 'scenario',
+    workspaceRevision: 1,
+    target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+    sourceTextHash: 'a'.repeat(64),
+  },
+  text: 'Saved action',
+  profile: { voiceId: 'voice', responseFormat: 'mp3' },
+} satisfies AudioJobStart;
+
+it('admits exact saved Scenario action text without video authority', async () => {
+  vi.mocked(assertScenarioSpeechScope).mockResolvedValue('Saved action');
+  await expect(authorizeAudioJob(scenarioSpeech)).resolves.toBeUndefined();
+  expect(assertScenarioSpeechScope).toHaveBeenCalledExactlyOnceWith(scenarioSpeech.scope);
+  expect(readVideoWorkspace).not.toHaveBeenCalled();
+  expect(getProjectAsset).not.toHaveBeenCalled();
+  await expect(authorizeAudioJob({ ...scenarioSpeech, text: 'Forged text' })).rejects.toThrow(
+    'stale'
+  );
+  vi.mocked(assertScenarioSpeechScope).mockRejectedValueOnce(new Error('stale'));
+  await expect(authorizeAudioJob(scenarioSpeech)).rejects.toThrow('stale');
+});
+
+it.each(['admission', 'before-post', 'after-response'] as const)(
+  'rejects Scenario source changes at %s without publishing stale output',
+  async (boundary) => {
+    let savedText = 'Saved action';
+    vi.mocked(assertScenarioSpeechScope).mockImplementation(async () => savedText);
+    const write = vi.fn();
+    const post = vi.fn(async () => {
+      if (boundary === 'after-response') savedText = 'Changed action';
+      return { kind: 'audio' as const, blob: new Blob(['audio'], { type: 'audio/mpeg' }) };
+    });
+    const resolveModel = vi.fn(async () => {
+      if (boundary === 'before-post') savedText = 'Changed action';
+      return {
+        url: 'https://example.test/audio/speech',
+        apiKey: 'fixture',
+        modelCode: 'model',
+        speech: scenarioSpeech.profile,
+      };
+    });
+    if (boundary === 'admission') savedText = 'Changed action';
+    const service = createAudioJobService({
+      authorize: authorizeAudioJob,
+      resolveModel,
+      request: post,
+      write,
+    });
+    const messages: AudioJobServerMessage[] = [];
+    const connection = service.connect((message) => messages.push(message), 'scenario');
+    connection.receive(scenarioSpeech);
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual({
+        type: 'failure',
+        requestId: scenarioSpeech.requestId,
+        code: 'stale',
+      })
+    );
+    expect(write).not.toHaveBeenCalled();
+    expect(messages.some((message) => message.type === 'audio')).toBe(false);
+    expect(post).toHaveBeenCalledTimes(boundary === 'after-response' ? 1 : 0);
+    if (boundary === 'admission') expect(resolveModel).not.toHaveBeenCalled();
+    await connection.disconnect();
+  }
+);

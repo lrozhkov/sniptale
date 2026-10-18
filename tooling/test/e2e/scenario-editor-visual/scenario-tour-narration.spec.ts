@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { expect, type Locator } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
@@ -35,6 +35,68 @@ function narrationWav(seconds = 5) {
       44 + index * 2
     );
   return wav;
+}
+
+async function exerciseNarrationTrim(
+  page: Page,
+  panel: Locator,
+  t: ReturnType<typeof createTranslator>,
+  info: TestInfo,
+  locale: string
+) {
+  const start = panel.getByRole('spinbutton', {
+    name: t('scenario.editor.tourAudioStart'),
+    exact: true,
+  });
+  const preview = panel.locator('[data-tour-narration-preview]');
+  const startHandle = preview.getByRole('slider', {
+    name: t('scenario.editor.tourAudioStart'),
+    exact: true,
+  });
+  const endHandle = preview.getByRole('slider', {
+    name: t('scenario.editor.tourAudioEnd'),
+    exact: true,
+  });
+  await startHandle.focus();
+  await startHandle.press('ArrowRight');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '0.51');
+  await start.fill('0.5');
+  await start.press('Enter');
+  const scale = preview.locator('.tour-narration-scale');
+  await scale.scrollIntoViewIfNeeded();
+  const bounds = await scale.boundingBox();
+  const handle = await endHandle.boundingBox();
+  await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width * 0.6, bounds!.y + bounds!.height / 2);
+  await page.mouse.up();
+  await expect(endHandle).toHaveAttribute('aria-valuenow', '3');
+  const end = preview.getByRole('spinbutton', {
+    name: t('scenario.editor.tourAudioEnd'),
+    exact: true,
+  });
+  await end.fill('1');
+  await end.press('Enter');
+  const audio = preview.locator('audio');
+  await preview.getByRole('button', { name: t('scenario.editor.tourPlay'), exact: true }).click();
+  await expect
+    .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
+    .toBeGreaterThanOrEqual(0.99);
+  await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
+  expect(await audio.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeLessThanOrEqual(
+    1.03
+  );
+  await endHandle.press('End');
+  await expect(endHandle).toHaveAttribute('aria-valuenow', '5');
+  await startHandle.press('End');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '4.99');
+  await start.fill('0.5');
+  await start.press('Enter');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '0.5');
+  await page.screenshot({
+    path: info.outputPath(`integrated-trim-${locale}.png`),
+    fullPage: false,
+  });
 }
 
 for (const [locale, theme, viewport] of [
@@ -88,7 +150,7 @@ for (const [locale, theme, viewport] of [
       await panel
         .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
         .click();
-      await expect(page.locator('.tour-stage-host .tour-hotspot')).toHaveCount(1);
+      await expect(page.locator('.tour-canvas .tour-stage-host .tour-hotspot')).toHaveCount(1);
       await library
         .locator('.guide-left-navigation')
         .getByRole('button', { name: t('scenario.editor.guideResources'), exact: true })
@@ -98,14 +160,17 @@ for (const [locale, theme, viewport] of [
         .getByRole('button', { name: t('scenario.editor.tourAudioAttach'), exact: true })
         .click();
       await category('tourNarration').click();
-      const start = panel.getByRole('textbox', {
+      const start = panel.getByRole('spinbutton', {
         name: t('scenario.editor.tourAudioStart'),
         exact: true,
       });
       await start.fill('0.5');
       await start.press('Enter');
+      if (index === 0) await exerciseNarrationTrim(page, panel, t, info, locale);
       ids.push(
-        (await page.locator('.tour-stage-host #tour-player').getAttribute('data-slide-id'))!
+        (await page
+          .locator('.tour-canvas .tour-stage-host #tour-player')
+          .getAttribute('data-slide-id'))!
       );
     }
     await expect(
@@ -303,13 +368,14 @@ for (const [locale, theme, viewport] of [
         contentType: 'image/png',
       });
     };
-    const player = page.locator('.tour-stage-host #tour-player');
+    const player = page.locator('.tour-canvas .tour-stage-host #tour-player');
     await check(player, 'normal');
     await player.evaluate((root) => root.requestFullscreen());
     await check(player, 'fullscreen');
     await page.evaluate(() => document.exitFullscreen());
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
+      let complete = false;
       Object.defineProperty(window, 'showSaveFilePicker', {
         configurable: true,
         value: async () => ({
@@ -318,12 +384,25 @@ for (const [locale, theme, viewport] of [
               write(chunk) {
                 chunks.push(chunk);
               },
+              close() {
+                complete = true;
+              },
             }),
         }),
       });
+      Object.defineProperty(window, 'savedNarrationTourComplete', {
+        configurable: true,
+        get: () => complete,
+      });
       Object.defineProperty(window, 'savedNarrationTour', {
         configurable: true,
-        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+        get: () => {
+          const decoder = new TextDecoder();
+          return (
+            chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('') +
+            decoder.decode()
+          );
+        },
       });
     });
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
@@ -333,8 +412,11 @@ for (const [locale, theme, viewport] of [
       .click();
     await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
     await expect
-      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedNarrationTour'))))
-      .toContain('<!doctype html>');
+      .poll(() => page.evaluate(() => Reflect.get(window, 'savedNarrationTourComplete')))
+      .toBe(true);
+    expect(await page.evaluate(() => String(Reflect.get(window, 'savedNarrationTour')))).toContain(
+      '</html>'
+    );
     const output = info.outputPath('narration-tour.html');
     await writeFile(
       output,

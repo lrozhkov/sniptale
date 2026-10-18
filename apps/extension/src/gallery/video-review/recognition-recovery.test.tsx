@@ -14,7 +14,7 @@ import { ReviewOriginalSpeechPanel } from './speech-panel';
 import { translate } from '../../platform/i18n';
 
 const remote = vi.hoisted(() => ({ job: vi.fn() }));
-vi.mock('../../workflows/video-review/speech-client', () => ({ runReviewSpeechJob: remote.job }));
+vi.mock('../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: remote.job }));
 vi.mock('../../workflows/video-review/speech-audio', () => ({
   planReviewSpeechChunks: async (
     _source: unknown,

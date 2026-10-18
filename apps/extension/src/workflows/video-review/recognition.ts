@@ -16,7 +16,7 @@ import {
   planReviewSpeechChunks,
   reviewSpeechWavIsSilent,
 } from './speech-audio';
-import { runReviewSpeechJob } from './speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import {
   getReviewSpeechClip,
   getReviewSpeechTarget,

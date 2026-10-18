@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ScenarioNarrationAccess } from './use-narration-ai';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   importScenarioImages,
@@ -9,6 +10,7 @@ import type { useTourSelection } from './selection';
 import type { Translate } from '../../../platform/i18n';
 
 export type TourWorkspaceProps = {
+  narrationAI?: ScenarioNarrationAccess;
   onImportNarration?: (
     input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>
   ) => Promise<boolean>;

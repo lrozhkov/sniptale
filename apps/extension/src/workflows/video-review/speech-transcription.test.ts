@@ -166,7 +166,7 @@ const workflow = vi.hoisted(() => ({
     ]
   ),
 }));
-vi.mock('./speech-client', () => ({ runReviewSpeechJob: workflow.job }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: workflow.job }));
 vi.mock('./speech-audio', async (original) => ({
   ...(await original<typeof import('./speech-audio')>()),
   extractReviewSpeechWav: workflow.extract,

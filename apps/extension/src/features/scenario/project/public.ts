@@ -51,3 +51,9 @@ export {
 export { mapTourCapturePoint, mapTourCaptureRect, type TourCaptureMapping } from './tour-geometry';
 
 export { remapTourImageGeometry, type TourImageTransform } from './tour-edit-geometry';
+
+export {
+  getScenarioNarrationText,
+  listScenarioNarrationTexts,
+  type ScenarioNarrationText,
+} from './narration-text';

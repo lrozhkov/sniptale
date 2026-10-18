@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   discard: vi.fn(),
   decode: vi.fn(),
 }));
-vi.mock('../../workflows/video-review/speech-client', () => ({ runReviewSpeechJob: mocks.job }));
+vi.mock('../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: mocks.job }));
 vi.mock('../../workflows/video-review/speech-audio', () => ({
   decodeReviewSpeechDuration: mocks.decode,
 }));

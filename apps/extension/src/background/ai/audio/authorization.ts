@@ -2,7 +2,12 @@ import { sameReviewSourceIdentity } from '../../../features/video/review/source-
 import { readLibrarySceneSource } from '../../../composition/persistence/projects/library-scene-source';
 import { readAssetFile } from '../../../composition/persistence/assets/opfs-store';
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
-import { isAudioSourceJobScope, type AudioSourceJobScope } from '../../../contracts/ai/audio';
+import {
+  isAudioSourceJobScope,
+  isScenarioSpeechScope,
+  type AudioSourceJobScope,
+} from '../../../contracts/ai/audio';
+import { assertScenarioSpeechScope } from '../../../composition/persistence/scenario/speech-scope';
 import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
@@ -15,13 +20,32 @@ import type { AudioJobStart } from '../../../contracts/ai/audio';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { isOwnedExtensionPagePath } from '../../../platform/navigation/extension-pages/sender-url';
 
+export type AudioJobConsumer = 'gallery' | 'scenario';
+
+/** Resolves an owned top-level document; its consumer is bound for the Port lifetime. */
+export function getAudioJobSenderConsumer(
+  sender: chrome.runtime.MessageSender | undefined
+): AudioJobConsumer | null {
+  if (!sender?.documentId || sender.id !== chrome.runtime.id || sender.frameId !== 0) return null;
+  if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html'))
+    return 'gallery';
+  if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/scenario-editor/index.html'))
+    return 'scenario';
+  return null;
+}
+
 export function isAudioJobSender(sender: chrome.runtime.MessageSender | undefined): boolean {
-  return (
-    !!sender?.documentId &&
-    sender.id === chrome.runtime.id &&
-    sender.frameId === 0 &&
-    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html')
-  );
+  return getAudioJobSenderConsumer(sender) !== null;
+}
+
+/** Sender identity permits only the operation family owned by that document. */
+export function isAudioJobAllowedForConsumer(
+  request: AudioJobStart,
+  consumer: AudioJobConsumer
+): boolean {
+  return consumer === 'scenario'
+    ? request.operation === 'speech' && isScenarioSpeechScope(request.scope)
+    : !isScenarioSpeechScope(request.scope);
 }
 
 async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSourceJobScope) {
@@ -39,6 +63,12 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
 
 /** Sender identity alone never authorizes an asset: durable selection is rechecked before POST. */
 export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
+  if (isScenarioSpeechScope(request.scope)) {
+    if (request.operation !== 'speech') throw new Error('unauthorized');
+    const savedText = await assertScenarioSpeechScope(request.scope);
+    if (savedText !== request.text) throw new Error('stale');
+    return;
+  }
   const snapshot = await readVideoWorkspace(request.scope.workspaceId);
   const workspace = snapshot?.workspace;
   if (!workspace || workspace.revision !== request.scope.workspaceRevision)
@@ -59,6 +89,7 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
       scope.timeDomain === 'source' ? workspace.source.duration : (segments.at(-1)?.resultEnd ?? 0);
     if (
       request.operation !== 'speech' ||
+      !('phraseId' in request) ||
       !matchesReviewTextScope(fragment, scope) ||
       request.phraseId !== scope.target.fragmentId ||
       request.textRevision !== scope.textRevision ||
@@ -103,6 +134,7 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
   )
     throw new Error('unauthorized');
   if (request.operation === 'speech') {
+    if (!('phraseId' in request)) throw new Error('stale');
     const transcript =
       target.kind === 'original'
         ? document.advancedContent.audio.originalSpeech?.transcript

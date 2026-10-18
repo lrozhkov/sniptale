@@ -1,4 +1,20 @@
 export const scenarioTourMessages = {
+  tourNarrationAI: { ru: 'AI-озвучка', en: 'AI narration' },
+  tourNarrationAIBatch: { ru: 'Озвучить действия', en: 'Narrate actions' },
+  tourNarrationAISave: {
+    ru: 'Перед генерацией и применением текущий проект будет сохранён. Автосохранение не включается.',
+    en: 'The current project is saved before generation and Apply. Autosave stays at its current setting.',
+  },
+  tourNarrationAITargets: { ru: 'Действия для озвучки', en: 'Actions to narrate' },
+  tourNarrationAIConsent: {
+    ru: 'Разрешаю отправить выбранные тексты этому провайдеру и возможное списание средств.',
+    en: 'I approve sending the selected texts to this provider and any possible charge.',
+  },
+  tourNarrationAIProgress: { ru: 'Готово {done} из {total}', en: 'Completed {done} of {total}' },
+  tourNarrationAIPreview: { ru: 'Прослушать озвучку', en: 'Preview narration' },
+  tourNarrationAIApplied: { ru: 'Применено', en: 'Applied' },
+  tourNarrationAIApply: { ru: 'Применить', en: 'Apply' },
+  tourNarrationAIApplyAll: { ru: 'Применить готовые', en: 'Apply all ready' },
   tourMarkerPulseDetails: { ru: 'Пульсация', en: 'Pulse details' },
   tourTextAppearance: { ru: 'Стиль пояснения', en: 'Explanation style' },
   tourAdvancedAppearance: { ru: 'Дополнительное оформление', en: 'Advanced appearance' },

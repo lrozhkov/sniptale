@@ -1485,6 +1485,94 @@
       "reviewDate": "2026-10-19",
       "astHash": "670032991551fe4a8df5c0b538aed693489cf536afea4255d7cea37350f75b7f",
       "signatureHash": "beb03052b28fceb8f03ef5525c7328a0061a96cd58a36b73845d35ce5da0a6cd"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/scenario/store/audio-import.ts",
+      "symbol": "importScenarioNarration",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One narration import owns input admission, audio preparation, aggregate handoff and compensation. Its 159 lines retain the existing score5 delta0. Local recording, upload, AI source binding and music converge on the same aggregate CAS and asset handoff. There is no second writer or recovery domain. Controlled preparation, competing-writer and retry tests plus real browser Apply prove this boundary. Extracting guards only to reduce branch counts would distribute the same transaction.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "756aef1b1809e62420ec5fc13cb048f7eba8404774bf57624a430bdbcac235d5",
+      "signatureHash": "787185504712f49d475406e03bc84fe7c5dca38b3cd7fec631944872171676c3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts",
+      "symbol": "useGuidePageState",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: One mounted page coordinates its existing history, autosave and mutation admission. The current and loadContext refs alias the same project/status receiver. narrationAdapter retains current save and commit callbacks, not another document authority. The new callbacks use that existing receiver for source save and serial Apply. Controlled no-render batch, save refusal and disposal tests prove ordering. The 227-line function has cyclomatic7 and cognitive6. A forwarding adapter with these same refs would distribute one mutation owner.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "17a53e424220aeb7e6e3c7ed1bbab5cb36ce6c813fd1d6ee9a01bd5665234055",
+      "signatureHash": "b154fc198334b22f879635c665ab02574d0a4aed9829e50317af1b0a00a9f7bf"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/narration-preview.tsx",
+      "symbol": "NarrationTrimScale",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This 211-line component owns one trim gesture and the same keyboard commit boundary. accepted is a narration snapshot and callbacks stores current callbacks, not two durable authorities. The single local draft drives both handles and exact values. Cancellation restores that same accepted snapshot. Unit and real browser tests prove pointer release, crossing clamps, keyboard precision, history and playback limits. The score1 pressure is length. Splitting handlers and JSX would distribute this one gesture receiver.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "6f75e2681f1569a7b2c207a5d280b0ebbd704a786ff8a42b93bba3adff685ec8",
+      "signatureHash": "6266016c2cf92ed13231ca1062c732095aed843a401067be4aeb388c37befbaf"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx",
+      "symbol": "TourWorkspace",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This 186-line workspace composes the existing stage, panels, recording placement and selected AI form. Score3 delta0 remains unchanged. It adds only disposable form targets and focus return. Provider work, audio publication and playback remain in their named owners. Real browser single, batch, cancellation and focus return pass at both primary sizes. A forwarding JSX shell would retain the same composition dependencies without separating authority.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "693e421ede419c91aea902d61dc04d0b5190fb0c70369d1a63c654ee2f22a884",
+      "signatureHash": "be46c587336c7ca8016c61f8beba1b1ad2fd4a02ab60bab2558ed267667ec61f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx",
+      "symbol": "TourSettingsPanel",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This 182-line panel owns one inspector placement and visibility lifetime. Score5 delta0 remains unchanged. Conditional JSX projects the existing selection and document controls. The retained hidden inspector preserves category state while narration and music controls dispose during AI editing. A failed-first real-component test and passing browser focus checks prove this lifetime. It owns no provider request, durable writer or recovery. Extracting a forwarding selected-settings facade would distribute this same visibility boundary.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "74854ac22fa5e087413fcb52b1b4db2e30bb8fdd322d8196a67aa7c996f841f4",
+      "signatureHash": "62be791c8b7e49381fe048a7ad908dd9e870e92b37db93186d40bd7794ca85ed"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
+      "symbol": "TourNarrationAI",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This 198-line form owns one catalog, profile, provider approval and target selection lifetime. Voice parameters and result presentation already have cohesive local components. Generation and explicit publication remain in the existing attempt hook and page adapters. Its 19 branches project catalog, disclosure, busy and error states, with no durable writer or independent recovery. Form tests and real browser proof cover provider reset, cancellation, retry, explicit Apply and focus. Further forwarding components would distribute this same form lifetime.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "ad10d2ed4eaf2c833ca69daa579f6e3ca18bc30dfb52b11a410db2aa26e21c8d",
+      "signatureHash": "fc2ff29cd7dd2af6b1c33aef69f08045dd9326a84c0b638dfa741c6352cf3124"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.ts",
+      "symbol": "useScenarioNarrationAI",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This 156-line hook owns one mounted attempt and disposable preview receiver. Its owner ref and React state are imperative and rendered views of that same attempt. Generation and Apply serialize through one active controller. Profile reset removes only unaccepted previews. Accepted durable state remains with the page mutation owner. Controlled disposal, cancellation acknowledgement, partial success and retry tests prove this lifetime. The score1 pressure is length. Splitting these transitions would distribute their shared cancellation and cleanup state.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "f2b86151db71d3abf528ec83fb4ef0e57813e893e1723ca75e3fbeea51b7499a",
+      "signatureHash": "af9ffe5c891cb863fa2637479f1437e3560d7cf57dafc517286a716131ef455b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/scenario-editor-visual/scenario-tour-narration.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: This existing 369-line browser workflow uses one authored audio fixture across live, fullscreen and exact offline HTML. Its score1 delta0 remains unchanged after extracting the independently changing trim proof helper. Recording, music, navigation, save and stream-aware HTML checks converge on the same user workflow and output. Both primary-size cases pass with inspected screenshots. Dividing this sequence into separate fixture owners would duplicate resource setup or hide cross-surface continuity.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
+      "reviewDate": "2026-10-19",
+      "astHash": "0749cce9e80dfab93f768140ba04fbe962c968f064c58f311893b9e087843a52",
+      "signatureHash": "d6c2a8b2ac5c95227be59f77dc645c7c886f8200fd2ef7fca0c9ab5b3879dcad"
     }
   ]
 }

@@ -527,3 +527,38 @@ it('does not return WAV when cancellation arrives while PCM is being read', asyn
     requestAudio({ request: pcmRequest, config: pcmConfig, signal: abort.signal, onReceiving() {} })
   ).rejects.toThrow();
 });
+
+it('sends Scenario text and profile without source scope metadata or video phrase fields', async () => {
+  const fetchMock = vi.fn<typeof fetch>(
+    async () =>
+      new Response(new Uint8Array([73, 68, 51, 0]), { headers: { 'Content-Type': 'audio/mpeg' } })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const scenario: AudioJobStart = {
+    type: 'start',
+    requestId: 'scenario',
+    operation: 'speech',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    text: 'Exact saved action',
+    profile: speech.profile,
+    scope: {
+      workspaceId: 'scenario',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+  };
+  await run(scenario);
+  expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+    model: 'speech',
+    input: 'Exact saved action',
+    voice: 'voice',
+    response_format: 'mp3',
+  });
+  expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+    redirect: 'error',
+    credentials: 'omit',
+    referrerPolicy: 'no-referrer',
+  });
+});

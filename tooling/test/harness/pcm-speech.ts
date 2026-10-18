@@ -1,17 +1,46 @@
+import type { AudioJobConsumer } from '../../../apps/extension/src/background/ai/audio/authorization';
 import { createAudioJobService } from '../../../apps/extension/src/background/ai/audio/service';
 import {
   AUDIO_JOB_PORT_NAME,
   parseAudioJobClientMessage,
   type AudioJobServerMessage,
+  type AudioJobStart,
 } from '../../../apps/extension/src/contracts/ai/audio';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
+type ResponseMode = 'success' | 'invalid';
+type RequestMode = ResponseMode | 'hold';
+
+function fixtureResponse(mode: ResponseMode): Response {
+  if (mode === 'invalid')
+    return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+  const pcm = new Uint8Array(36_000);
+  const view = new DataView(pcm.buffer);
+  for (let index = 0; index < pcm.length / 2; index++)
+    view.setInt16(
+      index * 2,
+      Math.round(2000 * Math.sin((2 * Math.PI * 220 * index) / 24_000)),
+      true
+    );
+  return new Response(pcm, { headers: { 'Content-Type': 'audio/pcm; rate=24000; channels=1' } });
+}
+
 /** Test-only transport: actual authorization, request parsing, coordinator and OPFS staging remain active. */
-export function installPcmSpeechFixture() {
+export function installPcmSpeechFixture(consumer: AudioJobConsumer = 'gallery') {
   const url = 'https://pcm.fixture.invalid/v1/audio/speech';
+  const pending = new Map<number, (mode: ResponseMode) => void>();
   const fixture = {
-    mode: 'success' as 'success' | 'invalid' | 'hold',
+    mode: 'success' as RequestMode,
+    modes: [] as RequestMode[],
+    starts: [] as AudioJobStart[],
     requests: [] as Array<{ format: string; text: string }>,
+    details: [] as Array<{ mode: RequestMode; aborted: boolean }>,
+    release(index: number, mode: ResponseMode = 'success'): boolean {
+      const resolve = pending.get(index);
+      if (!resolve) return false;
+      resolve(mode);
+      return true;
+    },
   };
   Object.assign(window, { pcmSpeechFixture: fixture });
   const originalFetch = window.fetch.bind(window);
@@ -28,24 +57,33 @@ export function installPcmSpeechFixture() {
       typeof body['input'] !== 'string'
     )
       throw new Error('Invalid fixture body');
-    fixture.requests.push({ format: body['response_format'], text: body['input'] });
-    if (fixture.mode === 'hold')
-      return new Promise<Response>((_resolve, reject) => {
-        const aborted = () => reject(new DOMException('Cancelled fixture', 'AbortError'));
-        if (init.signal?.aborted) aborted();
-        else init.signal?.addEventListener('abort', aborted, { once: true });
+    const mode = fixture.modes.shift() ?? fixture.mode;
+    const index = fixture.requests.length;
+    const request = {
+      format: body['response_format'],
+      text: body['input'],
+    };
+    const detail = { mode, aborted: false };
+    fixture.requests.push(request);
+    fixture.details.push(detail);
+    if (mode !== 'hold') return fixtureResponse(mode);
+    return new Promise<Response>((resolve, reject) => {
+      const cleanup = () => {
+        pending.delete(index);
+        init.signal?.removeEventListener('abort', aborted);
+      };
+      const aborted = () => {
+        detail.aborted = true;
+        cleanup();
+        reject(new DOMException('Cancelled fixture', 'AbortError'));
+      };
+      pending.set(index, (responseMode) => {
+        cleanup();
+        resolve(fixtureResponse(responseMode));
       });
-    if (fixture.mode === 'invalid')
-      return new Response('{}', { headers: { 'Content-Type': 'application/json' } });
-    const pcm = new Uint8Array(36_000);
-    const view = new DataView(pcm.buffer);
-    for (let index = 0; index < pcm.length / 2; index++)
-      view.setInt16(
-        index * 2,
-        Math.round(2000 * Math.sin((2 * Math.PI * 220 * index) / 24_000)),
-        true
-      );
-    return new Response(pcm, { headers: { 'Content-Type': 'audio/pcm; rate=24000; channels=1' } });
+      if (init.signal?.aborted) aborted();
+      else init.signal?.addEventListener('abort', aborted, { once: true });
+    });
   };
   const service = createAudioJobService({
     resolveModel: async (request) => {
@@ -66,7 +104,7 @@ export function installPcmSpeechFixture() {
       const disconnected = new Set<() => void>();
       const connection = service.connect((message) => {
         for (const listener of listeners) listener(message);
-      });
+      }, consumer);
       return {
         name: options.name,
         onMessage: {
@@ -85,6 +123,7 @@ export function installPcmSpeechFixture() {
         postMessage(message: unknown) {
           const parsed = parseAudioJobClientMessage(message);
           if (!parsed) throw new Error('Invalid fixture Port frame');
+          if (parsed.type === 'start') fixture.starts.push(parsed);
           connection.receive(parsed);
         },
         disconnect() {

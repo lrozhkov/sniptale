@@ -10,7 +10,20 @@ vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
 });
-vi.mock('./narration-preview', () => ({ TourNarrationPreview: () => <div data-preview /> }));
+vi.mock('../../../composition/persistence/scenario/store/public', async (original) => ({
+  ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
+  getScenarioAssetBlob: vi.fn(async () => new Blob(['voice'])),
+}));
+vi.mock('./narration-playback', () => ({
+  createNarrationPlayback: (
+    _audio: unknown,
+    _narration: unknown,
+    changed: (value: unknown) => void
+  ) => {
+    changed({ time: 0, playing: false, ready: true, failed: false });
+    return { update: vi.fn(), toggle: vi.fn(), seek: vi.fn() };
+  },
+}));
 vi.mock('./fields', () => ({ TourTextField: () => null }));
 let root: Root;
 let host: HTMLDivElement;
@@ -39,6 +52,7 @@ const slide = {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: vi.fn() });
   host = document.createElement('div');
   recordingHost = document.createElement('div');
   document.body.append(host, recordingHost);
@@ -104,7 +118,7 @@ it('keeps the current narration on failure and permits selecting the same file a
   await render();
   await act(async () => choose());
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
-  expect(host.querySelector('[data-preview]')).not.toBeNull();
+  expect(host.querySelector('[data-tour-narration-preview]')).not.toBeNull();
   await act(async () => choose());
   expect(onImport).toHaveBeenCalledTimes(2);
   expect(host.querySelector('[role="alert"]')).toBeNull();
@@ -123,7 +137,7 @@ it('removes the narration through slide history and disables acquisition during 
   expect(onChange).toHaveBeenCalledWith({ ...slide, narration: null }, undefined);
 });
 
-it('commits trim and amplification through the existing slide edit callback', async () => {
+it('groups integrated trim edits in existing narration history', async () => {
   await render();
   for (const [label, value, key, expected] of [
     ['Start, s', '1', 'trimStart', 1],

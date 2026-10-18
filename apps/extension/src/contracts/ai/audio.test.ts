@@ -273,3 +273,51 @@ it('admits source and returned timings longer than five minutes within the uploa
     })
   ).not.toBeNull();
 });
+
+it('admits exact Scenario speech scopes without video fields and compares every binding', () => {
+  const scope = {
+    workspaceId: 'scenario',
+    workspaceRevision: 3,
+    target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+    sourceTextHash: 'a'.repeat(64),
+  };
+  const start = {
+    type: 'start',
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    operation: 'speech',
+    scope,
+    text: '  Exact text  ',
+    profile: { voiceId: 'alloy', responseFormat: 'mp3' },
+  };
+  expect(parseAudioJobScope(scope)).toEqual(scope);
+  expect(parseAudioJobClientMessage(start)).toEqual(start);
+  for (const patch of [
+    { approvedProviderId: undefined },
+    { operation: 'transcription' },
+    { phraseId: 'fake' },
+    { textRevision: 0 },
+    { recognition: {} },
+    { extra: true },
+  ])
+    expect(parseAudioJobClientMessage({ ...start, ...patch })).toBeNull();
+  for (const patch of [
+    { sourceTextHash: 'x' },
+    { workspaceRevision: -1 },
+    { assetId: 'fake' },
+    { timingRevision: 0 },
+    { target: { ...scope.target, extra: true } },
+  ])
+    expect(parseAudioJobScope({ ...scope, ...patch })).toBeNull();
+  const parsed = parseAudioJobScope(scope)!;
+  expect(sameAudioJobScope(parsed, parsed)).toBe(true);
+  for (const patch of [
+    { workspaceId: 'other' },
+    { workspaceRevision: 4 },
+    { sourceTextHash: 'b'.repeat(64) },
+    { target: { ...scope.target, slideId: 'other' } },
+    { target: { ...scope.target, objectId: 'other' } },
+  ])
+    expect(sameAudioJobScope(parsed, parseAudioJobScope({ ...scope, ...patch })!)).toBe(false);
+});
