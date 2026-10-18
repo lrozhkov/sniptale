@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {
   createVideoProject,
   createVideoProjectEntry,
@@ -66,6 +66,10 @@ beforeEach(() => {
   projectsDbMocks.initDBMock.mockResolvedValue(createDb());
   projectsDbMocks.txGetAllMock.mockResolvedValue([]);
   projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
+});
+
+beforeAll(async () => {
+  await import('./index');
 });
 
 async function importProjectsDbModule() {
@@ -194,4 +198,202 @@ it('preserves persisted project-owned assets when saving an older project snapsh
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
   ]);
+});
+
+it('refuses restored metadata with an unchanged identity, revision and timestamp before writes', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const base = createVideoProject({ updatedAt: 10 });
+  const restored = createVideoProjectEntry(
+    { ...base, name: 'Restored script' },
+    { workspaceRevision: 4 }
+  );
+  projectsDbMocks.txGetMock.mockResolvedValue(restored);
+  await expect(
+    saveVideoProject(
+      { ...base, name: 'Pending voice take' },
+      {
+        expectedWorkspaceRevision: 4,
+        expectedProject: base,
+      }
+    )
+  ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+});
+
+it('preserves the actual replace restore when it commits during pending Save preparation', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const { putVideoProjectBackupRestore } = await import('./backup-restore');
+  const { createVideoProjectRestoreTransaction } = await import('./index.test-support');
+  const base = createVideoProject({ updatedAt: 10 });
+  let head = createVideoProjectEntry(base, { workspaceRevision: 4 });
+  let release!: () => void;
+  let entered!: () => void;
+  const pendingRecovery = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  projectsDbMocks.recoverProjectMediaPublicationsMock.mockImplementationOnce(async () => {
+    entered();
+    await pendingRecovery;
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (key: IDBValidKey) =>
+    key === base.id ? head : undefined
+  );
+  projectsDbMocks.txPutMock.mockImplementation(async (value: unknown) => {
+    const { parseVideoProjectEntry } = await import('./read-guards');
+    const parsed = parseVideoProjectEntry(value);
+    if (parsed) head = parsed;
+  });
+  const pending = saveVideoProject(
+    { ...base, name: 'Pending voice take' },
+    {
+      expectedWorkspaceRevision: 4,
+      expectedProject: base,
+    }
+  );
+  await started;
+  const empty = () => ({
+    get: async (_key: IDBValidKey): Promise<unknown> => undefined,
+    getAll: async (): Promise<unknown[]> => [],
+    put: async (_value: unknown): Promise<unknown> => undefined,
+    delete: async (_key: IDBValidKey): Promise<unknown> => undefined,
+  });
+  const stores = {
+    assets: empty(),
+    exports: { ...empty(), index: () => ({ getAll: async () => [] }) },
+    media: empty(),
+    videoWorkspaces: empty(),
+    videoDrafts: empty(),
+    operations: empty(),
+    owners: { ...empty(), index: () => ({ count: async () => 0 }) },
+    presentations: empty(),
+    refs: empty(),
+    thumbnails: empty(),
+    scenarioAssets: empty(),
+    projects: {
+      ...empty(),
+      get: async () => head,
+      getAll: async () => [head],
+      put: async (value: typeof head) => {
+        head = value;
+      },
+    },
+  } satisfies import('./backup-restore').VideoProjectBackupRestoreStores;
+  const restored = createVideoProjectEntry(
+    { ...base, name: 'Restored script' },
+    { workspaceRevision: 4 }
+  );
+  await putVideoProjectBackupRestore({
+    root: { assets: [], entry: restored, exports: [] },
+    stores,
+    tx: createVideoProjectRestoreTransaction(stores),
+    strategy: 'replace',
+    operation: {
+      assetIds: [],
+      createdAt: 1,
+      kind: 'physical-delete',
+      operationId: 'restore-cleanup',
+      status: 'pending',
+      updatedAt: 1,
+    },
+  });
+  expect(head.project.name).toBe('Restored script');
+  expect(head.workspaceRevision).toBe(4);
+  expect(head.project.updatedAt).toBe(10);
+  release();
+  await expect(pending).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+  expect(head.project.name).toBe('Restored script');
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+});
+
+it('accepts the exact canonical predecessor and advances its revision', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const base = createVideoProject({ updatedAt: 10 });
+  projectsDbMocks.txGetMock.mockResolvedValue(
+    createVideoProjectEntry(base, { workspaceRevision: 4 })
+  );
+  await expect(
+    saveVideoProject(
+      { ...base, name: 'Accepted take' },
+      {
+        expectedWorkspaceRevision: 4,
+        expectedProject: structuredClone(base),
+      }
+    )
+  ).resolves.toMatchObject({ project: { name: 'Accepted take' }, workspaceRevision: 5 });
+});
+
+it.each(['missing', 'recreated', 'trashed'] as const)(
+  'refuses the %s predecessor before publishing a delayed edit',
+  async (state) => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const base = createVideoProject({ updatedAt: 10 });
+    const current = createVideoProjectEntry(
+      { ...base, ...(state === 'recreated' ? { createdAt: base.createdAt - 1 } : {}) },
+      {
+        workspaceRevision: 4,
+        ...(state === 'trashed'
+          ? { lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 2 } }
+          : {}),
+      }
+    );
+    projectsDbMocks.txGetMock.mockResolvedValue(state === 'missing' ? undefined : current);
+    await expect(
+      saveVideoProject(
+        { ...base, name: 'Delayed take' },
+        {
+          expectedWorkspaceRevision: 4,
+          expectedProject: base,
+        }
+      )
+    ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+    expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+    expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses a pending save after deletion and recreation of the same identity and revision', async () => {
+  const { saveVideoProject } = await importProjectsDbModule();
+  const base = createVideoProject({ updatedAt: 10 });
+  let head: ReturnType<typeof createVideoProjectEntry> | undefined = createVideoProjectEntry(base, {
+    workspaceRevision: 4,
+  });
+  let release!: () => void;
+  let entered!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  projectsDbMocks.recoverProjectMediaPublicationsMock.mockImplementationOnce(async () => {
+    entered();
+    await hold;
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (key: IDBValidKey) =>
+    key === base.id ? head : undefined
+  );
+  const pending = saveVideoProject(
+    { ...base, name: 'Delayed take' },
+    { expectedWorkspaceRevision: 4, expectedProject: base }
+  );
+  await started;
+  head = undefined;
+  expect(await projectsDbMocks.txGetMock(base.id)).toBeUndefined();
+  head = createVideoProjectEntry(
+    { ...base, createdAt: base.createdAt - 1, name: 'Recreated project' },
+    { workspaceRevision: 4 }
+  );
+  release();
+  await expect(pending).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+  expect(head.project.name).toBe('Recreated project');
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
 });

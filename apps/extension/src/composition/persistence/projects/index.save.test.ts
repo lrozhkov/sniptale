@@ -391,6 +391,7 @@ it('commits a video workspace with explicit placement and returns its durable re
   await expect(
     commitVideoProjectWorkspaceMutation(project, {
       expectedWorkspaceRevision: null,
+      expectedProject: null,
     })
   ).resolves.toEqual({
     project: expect.objectContaining({ id: project.id, name: 'Workspace commit' }),
@@ -410,7 +411,10 @@ it('saves a new video workspace directly in the library despite the capture defa
   projectsDbMocks.txGetMock.mockResolvedValue(undefined);
 
   await expect(
-    commitVideoProjectWorkspaceMutation(project, { expectedWorkspaceRevision: null })
+    commitVideoProjectWorkspaceMutation(project, {
+      expectedWorkspaceRevision: null,
+      expectedProject: null,
+    })
   ).resolves.toEqual({
     project: expect.objectContaining({ id: project.id }),
     workspaceRevision: 1,
@@ -470,7 +474,10 @@ it('retains a temporary project in the library with its next revisioned workspac
     workspaceRevision: 7,
     lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 500 },
   });
-  await commitVideoProjectWorkspaceMutation(project, { expectedWorkspaceRevision: 7 });
+  await commitVideoProjectWorkspaceMutation(project, {
+    expectedWorkspaceRevision: 7,
+    expectedProject: project,
+  });
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({
       lifecycle: { storageClass: 'library', savedAt: 1000, updatedAt: 1000 },
@@ -596,6 +603,7 @@ it('commits and re-admits authored text without replacing its shared gallery doc
   projectsDbMocks.txGetMock.mockResolvedValue(undefined);
   const saved = await commitVideoProjectWorkspaceMutation(project, {
     expectedWorkspaceRevision: null,
+    expectedProject: null,
   });
   expect(saved.workspaceRevision).toBe(1);
   const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(saved.project)));

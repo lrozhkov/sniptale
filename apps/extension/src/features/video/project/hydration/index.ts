@@ -46,6 +46,11 @@ function getLegacyClipNames(legacyClipNames?: ReadonlyMap<string, string>) {
       ]);
 }
 
+/** Captures translated legacy labels for a later projection in the same opened editor session. */
+export function captureVideoProjectHydrationOptions(): VideoProjectHydrationOptions {
+  return { legacyTrackNames: getLegacyTrackNames(), legacyClipNames: getLegacyClipNames() };
+}
+
 function normalizeProjectSource(project: VideoProject): VideoProject['source'] {
   const recordingId = project.baseRecordingId ?? null;
   if (project.source?.kind === VideoProjectSourceKind.SCENARIO) {

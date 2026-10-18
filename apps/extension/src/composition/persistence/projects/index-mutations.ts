@@ -29,10 +29,12 @@ export async function commitVideoProjectWorkspaceMutation(
   project: VideoProject,
   options: {
     expectedWorkspaceRevision: number | null;
+    expectedProject: VideoProject | null;
   }
 ): Promise<VideoProjectWorkspaceCommit> {
   const entry = await saveVideoProject(project, {
     expectedWorkspaceRevision: options.expectedWorkspaceRevision,
+    expectedProject: structuredClone(options.expectedProject),
     storageClass: 'library',
   });
   return { project: entry.project, workspaceRevision: entry.workspaceRevision ?? 0 };

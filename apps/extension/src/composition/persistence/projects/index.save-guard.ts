@@ -5,6 +5,8 @@ import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 export interface SaveVideoProjectOptions {
   baseUpdatedAt?: number | null;
   expectedWorkspaceRevision?: number | null;
+  /** Exact canonical predecessor closes restore/recreation races that can retain an old revision. */
+  expectedProject?: VideoProject | null;
   storageClass?: LibraryStorageClass;
 }
 
@@ -20,6 +22,15 @@ function hasBaseRevisionConflict(args: {
   options: SaveVideoProjectOptions;
   project: VideoProject;
 }): boolean {
+  if (
+    args.options.expectedProject !== undefined &&
+    (args.existing?.lifecycle?.trashedAt !== undefined ||
+      (args.existing
+        ? args.options.expectedProject === null ||
+          JSON.stringify(args.existing.project) !== JSON.stringify(args.options.expectedProject)
+        : args.options.expectedProject !== null))
+  )
+    return true;
   if (args.options.expectedWorkspaceRevision !== undefined) {
     return args.existing
       ? args.options.expectedWorkspaceRevision !== (args.existing.workspaceRevision ?? 0)
