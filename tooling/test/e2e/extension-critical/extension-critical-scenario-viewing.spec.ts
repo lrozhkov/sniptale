@@ -210,7 +210,7 @@ async function storedProject(page: Page, rename?: string) {
 test('built Library opens full guide and tour HTML with isolation and committed refresh semantics', async ({
   context,
   extensionId,
-}) => {
+}, info) => {
   const openExtensionPage = async (path: string) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}${path}`);
@@ -282,7 +282,7 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await expect(content.getByRole('heading', { name: 'Library HTML proof' })).toBeVisible();
   await guide.getByRole('button', { name: /Refresh view|Обновить просмотр/ }).click();
   await expect(content.getByRole('heading', { name: 'Saved update' })).toBeVisible();
-  await guide.screenshot({ path: '.tmp/scenario-guide-view.png' });
+  await guide.screenshot({ path: info.outputPath('scenario-guide-view.png'), fullPage: false });
   await guide.evaluate(async () => {
     await chrome.storage.local.set({
       'sniptale-locale-preference': 'ru',
@@ -296,7 +296,10 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await refresh.press('Enter');
   await expect(content.locator('html')).toHaveAttribute('data-theme', 'dark');
   await guide.emulateMedia({ reducedMotion: 'reduce' });
-  await guide.screenshot({ path: '.tmp/scenario-guide-view-dark-ru.png' });
+  await guide.screenshot({
+    path: info.outputPath('scenario-guide-view-dark-ru.png'),
+    fullPage: false,
+  });
 
   const openingTour = context.waitForEvent('page');
   await library.getByRole('link', { name: /Play tour|Запустить тур/ }).click();
@@ -315,12 +318,16 @@ test('built Library opens full guide and tour HTML with isolation and committed 
     )
     .toBe(true);
   await player.getByRole('button', { name: /^(Pause|Пауза)$/ }).click();
+  await player.locator('[data-tour-seek]').focus();
+  await player.locator('[data-tour-seek]').press('Home');
+  await expect(player.locator('[data-tour-title]')).toHaveText('First slide');
+
   await player
     .getByRole('button', { name: /Next|Далее/ })
     .last()
     .click();
   await expect(player.locator('[data-tour-title]')).toHaveText('Second slide');
-  await tour.screenshot({ path: '.tmp/scenario-tour-view.png' });
+  await tour.screenshot({ path: info.outputPath('scenario-tour-view.png'), fullPage: false });
   await player.locator('[data-tour-next]').click();
   const destination = player.getByRole('link', { name: 'External destination' });
   await expect(destination).toHaveAttribute('rel', 'noopener noreferrer');

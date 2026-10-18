@@ -127,6 +127,13 @@ async function openNativeScenario(
 }
 
 async function recordRoles(page: Page, info: TestInfo, name: string) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+  });
+
   const roles = await page
     .locator(
       '.guide-page, .guide-page-header, .guide-project-name input, ' +
