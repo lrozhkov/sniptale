@@ -21,6 +21,7 @@ import type {
 } from '../../../features/video/project/types';
 import { useExportDialogCapabilities } from './capability-state';
 import { ExportDialogFields } from './fields';
+import { ProjectSubtitles } from './subtitles';
 import { useExportDialogFocus } from './focus';
 
 interface ExportDialogProps {
@@ -190,6 +191,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             settings={settings}
           />
           <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
+          {estimateContext ? <ProjectSubtitles project={estimateContext.project} /> : null}
         </ProductModalBody>
         <ExportDialogFooter
           settings={settings}

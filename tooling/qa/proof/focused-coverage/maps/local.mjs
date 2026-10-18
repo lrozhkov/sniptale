@@ -711,6 +711,18 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'shared-video-project-validation',
+    productionFile: 'apps/extension/src/features/video/project/validation/clips.ts',
+    reason:
+      'Media identity admission shares clip validation with project parser and camera contracts.',
+    testFiles: [
+      'apps/extension/src/features/video/project/validation/clips.test.ts',
+      'apps/extension/src/features/video/project/validation/project.test.ts',
+      'apps/extension/src/features/video/project/camera/appearance.test.ts',
+      'apps/extension/src/features/video/project/camera/animation.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-video-project-validation',
     productionFile: 'apps/extension/src/features/video/project/validation/root.ts',
     reason: 'Video project boundary validation is covered by parser and transitive boundary tests.',
     testFiles: [

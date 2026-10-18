@@ -226,6 +226,8 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  /** Stable text/speech placement identity; split retains it and duplicate replaces it. */
+  sourceInstanceId?: string;
   type: typeof VideoProjectClipType.AUDIO;
   assetId: string;
   playbackRate?: number;

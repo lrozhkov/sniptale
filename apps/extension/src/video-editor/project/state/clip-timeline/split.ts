@@ -1,3 +1,5 @@
+import { duplicateVideoProjectTextDocuments } from '../../../../features/video/project/text/duplication';
+import { isTextSourceClip } from '../../../../features/video/project/text/projection';
 import { cursorFocusOverrideId } from '../../../../features/video/project/cursor-focus-path/authoring';
 import { createClipGroupId } from '../../../../features/video/project/factories/creation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
@@ -69,7 +71,13 @@ export function splitProjectClipsAtTimeWithResult(
     if (item.startTime + item.duration <= splitTime) return [item];
     if (item.startTime >= splitTime) return [{ ...item, groupId: secondGroupId }];
 
-    const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+    const source =
+      isSourceTimedClip(item) &&
+      !item.sourceInstanceId &&
+      project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding))
+        ? { ...item, sourceInstanceId: item.id }
+        : item;
+    const splitClips = splitProjectClip(source, offsets.get(item.id) ?? 0, secondGroupId);
     if (splitClips[1]) trailingClipIdsBySourceId.set(item.id, splitClips[1].id);
     if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
     return splitClips;
@@ -180,7 +188,7 @@ export function duplicateProjectClipsWithResult(
         name: `${item.name} ${translate('shared.projectActions.copySuffix')}`,
       } as VideoProjectClip;
 
-      duplicateCursorSourceInstance(item, duplicate, project, sourceInstances);
+      duplicateSourceInstance(item, duplicate, project, sourceInstances);
       duplicateClipIds.set(item.id, duplicate.id);
       duplicateIds.push(duplicate.id);
       if (item.id === clipId) duplicateClipId = duplicate.id;
@@ -251,6 +259,11 @@ export function duplicateProjectClipsWithResult(
         return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
       }),
     ];
+  if (project.textDocuments) {
+    const documents = duplicateVideoProjectTextDocuments(project.textDocuments, sourceInstances);
+    if (!documents) return null;
+    nextProject.textDocuments = documents;
+  }
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
   const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
   return selectedDuplicate
@@ -356,16 +369,18 @@ function duplicateCapturedFocusKeyId(
   return null;
 }
 
-function duplicateCursorSourceInstance(
+function duplicateSourceInstance(
   item: VideoProjectClip,
   duplicate: VideoProjectClip,
   project: VideoProject,
   sourceInstances: Map<string, string>
 ): void {
   if (
-    item.type === 'VIDEO' &&
-    duplicate.type === 'VIDEO' &&
+    isSourceTimedClip(item) &&
+    isSourceTimedClip(duplicate) &&
+    item.type === duplicate.type &&
     (item.sourceInstanceId ||
+      project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
       project.cursorFocusPath?.segments.some(
         (segment) =>
           segment.binding.kind === 'recording-source' &&

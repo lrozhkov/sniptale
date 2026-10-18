@@ -249,3 +249,20 @@ it('clips out-of-result tails and omits empty authored text with honest approxim
     text: expect.stringContaining('00:00:09.000 --> 00:00:10.000'),
   });
 });
+
+it('omits only unrepresentable positive ranges when montage clipping explicitly permits it', () => {
+  const input = [
+    fragment({ start: 1.0001, end: 1.0002 }),
+    fragment({ id: 'valid', start: 2, end: 3 }),
+  ];
+  const result = output(input, { omitSubMillisecondRanges: true });
+  expect(result).toMatchObject({ ok: true, count: 1, excluded: 1 });
+  if (!result.ok) throw new Error(result.reason);
+  expect(result.text).toContain('00:00:02.000 --> 00:00:03.000');
+  expect(output([input[0]!])).toEqual({ ok: false, reason: 'timing' });
+  for (const mainOffset of [NaN, Infinity, Number.MAX_SAFE_INTEGER])
+    expect(output(input, { omitSubMillisecondRanges: true, mainOffset })).toEqual({
+      ok: false,
+      reason: 'timing',
+    });
+});
