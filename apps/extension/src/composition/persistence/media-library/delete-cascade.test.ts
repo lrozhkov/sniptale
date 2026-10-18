@@ -555,3 +555,32 @@ it.each([
   await deleteMediaAssetWithProjectCascade(mediaId, []);
   expect(rows.get('media_library')?.has(mediaId)).toBe(false);
 });
+
+it('purges a secondary source from a text-capable project and retains independent authored text', async () => {
+  const project = createVideoProjectEntryWithMediaClip({ version: 5 });
+  const asset = project.project.assets[0]!;
+  project.project.textDocuments = [
+    {
+      id: 'source-text',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'source-placement' },
+      document: { version: 1, fragments: [] },
+    },
+    {
+      id: 'independent-text',
+      binding: { kind: 'project' },
+      document: { version: 1, fragments: [] },
+    },
+  ];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(project.id, project);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: project.id, kind: 'video', name: project.project.name, primary: false },
+  ]);
+  const saved = rows.get('video_projects')!.get(project.id) as typeof project;
+  expect(saved.project.textDocuments?.map(({ id }) => id)).toEqual(['independent-text']);
+  expect(saved.project.assets).toEqual([]);
+  expect(saved.project.clips).toEqual([]);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledTimes(1);
+});

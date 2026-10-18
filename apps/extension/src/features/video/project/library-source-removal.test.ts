@@ -281,3 +281,27 @@ it.each<VideoProjectAssetSource>([
   expect(project).toEqual(original);
   expect(isExportReadyVideoProject(result)).toBe(true);
 });
+
+it('removes text bound to explicitly deleted sources while retaining independent and unrelated text', () => {
+  const source = { kind: 'library-asset' as const, mediaId: 'removed-source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = 5;
+  project.textDocuments = [
+    {
+      id: 'removed',
+      binding: { kind: 'source', assetId: removed.id, sourceInstanceId: 'removed' },
+      document: { version: 1, fragments: [] },
+    },
+    {
+      id: 'kept',
+      binding: { kind: 'source', assetId: kept.id, sourceInstanceId: 'kept' },
+      document: { version: 1, fragments: [] },
+    },
+    { id: 'project', binding: { kind: 'project' }, document: { version: 1, fragments: [] } },
+  ];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.textDocuments?.map(({ id }) => id)).toEqual(['kept', 'project']);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+});

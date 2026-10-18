@@ -143,3 +143,13 @@ it('rejects duplicate source groups and returns independent snapshots on admissi
   expect(groups[0]!.signals[0]!.data['activity']).toBe('input');
   expect(groups[0]!.settings[0]!.volume).toBe(0.5);
 });
+
+it('keeps the text-capable project schema when editing captured feedback', () => {
+  const { project } = fixture();
+  project.version = 5;
+  project.textDocuments = [];
+  const group = project.actionFeedback![0]!;
+  const changed = patchVideoProjectActionFeedback(project, group, { settings: [] });
+  expect(changed.version).toBe(5);
+  expect(changed.textDocuments).toEqual([]);
+});

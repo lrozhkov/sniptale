@@ -1,0 +1,14 @@
+import type { ReviewCaptionSettings, ReviewTextDocument } from '../../review/text-types';
+
+/** Placement owns the clock; text provenance never authorizes access to source bytes. */
+export type VideoProjectTextBinding =
+  | { kind: 'project' }
+  | { kind: 'source'; assetId: string; sourceInstanceId: string };
+
+/** Retained text survives trims and cuts even when its source has no visible placement. */
+export interface VideoProjectTextDocument {
+  id: string;
+  binding: VideoProjectTextBinding;
+  document: ReviewTextDocument;
+  captions?: ReviewCaptionSettings;
+}

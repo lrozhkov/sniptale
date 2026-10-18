@@ -357,7 +357,7 @@ function MaterialRow(props: {
         )}
       </div>
       <MaterialName {...props} />
-      {props.uses.some((use) => use.kind !== 'analysis') && (
+      {props.uses.some((use) => use.kind === 'clip' || use.kind === 'scene') && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
             menuAnchorRef={rowRef}
@@ -372,10 +372,10 @@ function MaterialRow(props: {
             placeholder={translate('videoEditor.sidebar.materialsShowUses')}
             onChange={(value) => {
               const use = props.uses[Number(value)];
-              if (use && use.kind !== 'analysis') props.onShowUse(use);
+              if (use && (use.kind === 'clip' || use.kind === 'scene')) props.onShowUse(use);
             }}
             options={props.uses.flatMap((use, index) => {
-              if (use.kind === 'analysis') return [];
+              if (use.kind !== 'clip' && use.kind !== 'scene') return [];
               if (use.kind === 'scene')
                 return [
                   {

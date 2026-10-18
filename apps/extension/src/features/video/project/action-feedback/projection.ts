@@ -30,6 +30,6 @@ export function patchVideoProjectActionFeedback(
   );
   const parsed = parseVideoProjectActionFeedback(values);
   return parsed
-    ? { ...project, version: project.version === 4 ? 4 : 3, actionFeedback: parsed }
+    ? { ...project, version: project.version >= 4 ? project.version : 3, actionFeedback: parsed }
     : project;
 }

@@ -467,3 +467,37 @@ it('clears a rename draft without committing and Escape retains the source name'
   ).toBe(asset.name);
   expect(onRename).not.toHaveBeenCalled();
 });
+
+it('shows dormant text sources as in use without offering an unavailable clip jump', () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  project.version = 5;
+  project.textDocuments = [
+    {
+      id: 'retained',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'hidden' },
+      document: { version: 1, fragments: [] },
+    },
+  ];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        onRename={vi.fn()}
+        onShowUse={vi.fn()}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        project={project}
+        selectedAssetId={null}
+        onSelect={onSelect}
+        onImport={onImport}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(container.querySelector('[data-ui="video-editor.materials.show-use"]')).toBeNull();
+  const cleanup = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.materials.remove-unused"]'
+  )!;
+  expect(cleanup.disabled).toBe(true);
+  act(() => cleanup.click());
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});

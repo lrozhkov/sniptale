@@ -562,3 +562,48 @@ it('refuses a newly inserted source deleted before the placement could be saved'
   await expect(saveVideoProject({ ...existing, assets: [linked] })).rejects.toThrow();
   expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
 });
+
+it('commits and re-admits authored text without replacing its shared gallery document', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const { parseHydratableVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const project = createVideoProject({
+    version: 5,
+    textDocuments: [
+      {
+        id: 'narration',
+        binding: { kind: 'project' },
+        document: {
+          version: 1,
+          fragments: [
+            {
+              id: 'phrase',
+              text: 'Принятый текст',
+              originalText: '',
+              revision: 2,
+              timingRevision: 0,
+              start: 0,
+              end: 2,
+              alignment: 'manual',
+              timeDomain: 'result',
+              showInVideo: true,
+            },
+          ],
+        },
+      },
+    ],
+  });
+  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+  const saved = await commitVideoProjectWorkspaceMutation(project, {
+    expectedWorkspaceRevision: null,
+  });
+  expect(saved.workspaceRevision).toBe(1);
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(saved.project)));
+  expect(reopened?.textDocuments).toEqual(project.textDocuments);
+  expect(reopened?.version).toBe(5);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ textDocuments: project.textDocuments, version: 5 }),
+    })
+  );
+});

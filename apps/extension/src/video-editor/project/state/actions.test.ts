@@ -431,3 +431,43 @@ it('restores removed source authoring through editor Undo and Redo', async () =>
   expect(store.getState().project?.assets).toEqual([]);
   expect(store.getState().project?.cursorFocusPath).toEqual(deleted.cursorFocusPath);
 });
+
+it('retains dormant source text when removing unused materials through the project command', async () => {
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const project = createEmptyVideoProject('Dormant text');
+  const retained = createVideoAsset('text-source');
+  const unused = createVideoAsset('unused');
+  project.version = 5;
+  project.assets = [retained, unused];
+  project.textDocuments = [
+    {
+      id: 'speech',
+      binding: { kind: 'source', assetId: retained.id, sourceInstanceId: 'hidden' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            text: 'Retained under a cut',
+            originalText: '',
+            revision: 0,
+            timingRevision: 0,
+            start: 1,
+            end: 2,
+            alignment: 'manual',
+            timeDomain: 'source',
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const store = createVideoEditorTestStore();
+  store.getState().setProject(project);
+  store.getState().removeUnusedAssets();
+  const cleaned = store.getState().project!;
+  expect(cleaned.assets).toEqual([retained]);
+  expect(cleaned.textDocuments).toEqual(project.textDocuments);
+  expect(isExportReadyVideoProject(cleaned)).toBe(true);
+});

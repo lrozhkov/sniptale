@@ -1,3 +1,7 @@
+import {
+  parseVideoProjectTextDocuments,
+  hasValidVideoProjectTextReferences,
+} from '../text/validation';
 import { parseVideoProjectActionFeedback } from '../action-feedback/validation';
 import { parseCursorFocusPath } from '../cursor-focus-path/validation';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
@@ -77,20 +81,25 @@ function isTransition(value: unknown): boolean {
 function isHydratableProjectShape(value: unknown): value is VideoProject {
   return (
     isRecord(value) &&
-    (value['version'] === 4 ||
+    (value['version'] === 5 ||
+      value['version'] === 4 ||
       value['version'] === 3 ||
       (value['version'] === 2 &&
         value['cursorFocusPath'] === undefined &&
         value['actionFeedback'] === undefined)) &&
     (value['cameraFollowDefaults'] === undefined ||
       parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
-    (value['version'] === 4 ||
+    (value['version'] === 5 ||
+      value['version'] === 4 ||
       (value['cameraFollowDefaults'] === undefined &&
         (!Array.isArray(value['motionRegions']) ||
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
     isString(value['id']) &&
+    (value['textDocuments'] === undefined ||
+      (value['version'] === 5 &&
+        parseVideoProjectTextDocuments(value['textDocuments']) !== null)) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -218,7 +227,11 @@ function hasValidInteractionAnchorReference(
 }
 
 function hasValidReferences(project: VideoProject): boolean {
-  return hasValidVideoProjectBaseReferences(project) && hasValidEffectProjectReferences(project);
+  return (
+    hasValidVideoProjectBaseReferences(project) &&
+    hasValidEffectProjectReferences(project) &&
+    hasValidVideoProjectTextReferences(project)
+  );
 }
 
 function hasValidSceneBackgroundReferences(

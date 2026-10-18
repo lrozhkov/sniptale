@@ -560,3 +560,38 @@ it('keeps typing-only telemetry with its inserted source instance through undo a
   if (undoneInsertion?.status !== 'applied') throw new Error('Expected insertion undo');
   expect(undoneInsertion.project.actionFeedback ?? []).toHaveLength(0);
 });
+
+it('keeps text-capable schema while adding recording telemetry to a material placement', () => {
+  const { store, asset } = setup();
+  asset.source = { kind: 'recording', recordingId: 'source' };
+  const project = store.getState().project!;
+  store.setState({ project: { ...project, version: 5, textDocuments: [] } });
+  const result = store.getState().appendMaterial(
+    asset.id,
+    { start: 0, end: 2 },
+    {
+      recordingId: 'source',
+      createdAt: 1,
+      updatedAt: 1,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      signals: [],
+      actionEvents: [
+        {
+          id: 'click',
+          kind: 'CLICK',
+          time: 1,
+          duration: 0.1,
+          preset: 'NONE',
+          label: '',
+          point: null,
+          data: {},
+        },
+      ],
+    }
+  );
+  expect(result.status).toBe('placed');
+  expect(store.getState().project?.version).toBe(5);
+  expect(store.getState().project?.textDocuments).toEqual([]);
+});

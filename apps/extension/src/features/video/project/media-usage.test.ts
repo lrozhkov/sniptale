@@ -84,3 +84,42 @@ it('retains distinct clip targets for repeated use and a separate scene referenc
   ]);
   expect(getProjectAssetUseCounts(project).get(asset.id)).toBe(3);
 });
+
+it('counts dormant source-bound documents without treating provenance as an asset lease', async () => {
+  const { getProjectAssetUses } = await import('./media-usage');
+  const project = createEmptyVideoProject();
+  project.version = 5;
+  project.textDocuments = [
+    {
+      id: 'retained',
+      binding: { kind: 'source', assetId: 'source', sourceInstanceId: 'hidden' },
+      document: { version: 1, fragments: [] },
+    },
+    {
+      id: 'project-time',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            text: 'Unlinked text',
+            originalText: '',
+            revision: 0,
+            timingRevision: 0,
+            start: 0,
+            end: 1,
+            alignment: 'manual',
+            timeDomain: 'result',
+            showInVideo: false,
+            origin: { kind: 'voiceover', clipId: 'descriptive-only', start: 1, end: 2 },
+          },
+        ],
+      },
+    },
+  ];
+  expect(getProjectAssetUses(project)).toEqual([
+    { assetId: 'source', kind: 'text', documentId: 'retained' },
+  ]);
+  expect([...getProjectAssetUseCounts(project)]).toEqual([['source', 1]]);
+});

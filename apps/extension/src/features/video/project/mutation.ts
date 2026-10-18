@@ -7,9 +7,37 @@ export function getVideoProjectMutationTimestamp(): number {
   return Date.now();
 }
 
-/**
- * Applies a project patch while keeping `updatedAt` owned by a single helper seam.
- */
+function getMutationSchemaVersion(
+  project: VideoProject,
+  patch: Omit<Partial<VideoProject>, 'updatedAt'>
+): VideoProject['version'] {
+  if (
+    project.version === 5 ||
+    project.textDocuments !== undefined ||
+    patch.textDocuments !== undefined
+  )
+    return 5;
+  if (
+    project.version === 4 ||
+    project.cameraFollowDefaults !== undefined ||
+    patch.cameraFollowDefaults !== undefined ||
+    (patch.motionRegions ?? project.motionRegions)?.some(
+      (region) => region.cameraFollow !== undefined
+    )
+  )
+    return 4;
+  if (
+    project.version === 3 ||
+    project.cursorFocusPath !== undefined ||
+    project.actionFeedback !== undefined ||
+    patch.cursorFocusPath !== undefined ||
+    patch.actionFeedback !== undefined
+  )
+    return 3;
+  return 2;
+}
+
+/** Applies a project patch while retaining the schema and the sole mutation timestamp owner. */
 export function applyVideoProjectMutationPatch(
   project: VideoProject,
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
@@ -17,21 +45,7 @@ export function applyVideoProjectMutationPatch(
   return {
     ...project,
     ...patch,
-    version:
-      project.version === 4 ||
-      project.cameraFollowDefaults !== undefined ||
-      patch.cameraFollowDefaults !== undefined ||
-      (patch.motionRegions ?? project.motionRegions)?.some(
-        (region) => region.cameraFollow !== undefined
-      )
-        ? 4
-        : project.version === 3 ||
-            project.cursorFocusPath !== undefined ||
-            project.actionFeedback !== undefined ||
-            patch.cursorFocusPath !== undefined ||
-            patch.actionFeedback !== undefined
-          ? 3
-          : 2,
+    version: getMutationSchemaVersion(project, patch),
     updatedAt: getVideoProjectMutationTimestamp(),
   };
 }

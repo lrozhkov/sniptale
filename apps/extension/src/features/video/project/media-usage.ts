@@ -6,9 +6,10 @@ export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'clip'; clipId: string }
   | { kind: 'scene' }
   | { kind: 'analysis'; objectTrackId: string }
+  | { kind: 'text'; documentId: string }
 );
 
-/** Includes hidden and locked clips, scene media and analysis dependencies. */
+/** Includes hidden clips, scene media, analysis and dormant source-text dependencies. */
 export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   const uses: ProjectAssetUse[] = [];
   for (const clip of project.clips) {
@@ -27,6 +28,10 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
         kind: 'analysis',
         objectTrackId: track.id,
       });
+  }
+  for (const entry of project.textDocuments ?? []) {
+    if (entry.binding.kind === 'source')
+      uses.push({ assetId: entry.binding.assetId, kind: 'text', documentId: entry.id });
   }
   return uses;
 }
