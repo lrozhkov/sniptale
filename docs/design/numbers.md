@@ -4,13 +4,13 @@
 
 ## Choose the editor
 
-Use a numeric field for exact values with units, bounds, and meaningful precision. Use ranges for useful bounded continuous comparison. Do not use a slider for arbitrary named modes. An ordinary slider is visible. A contextual slider supplements an inspector value on hover or range focus. A repeat stepper belongs to the numeric owner. It is not an ordinary command button.
+Numeric fields provide exact values, units, bounds, and meaningful precision. Ranges support bounded continuous comparison, never arbitrary named modes. Ordinary sliders stay visible. Contextual sliders supplement inspector values on hover/range focus. Repeat steppers belong to numeric owners, not ordinary command buttons.
 
 Preserve the product mapping, units, precision, snapping, valid boundaries, and accepted off-step values.
 
 ## Row geometry and hierarchy
 
-Parameter names remain secondary. Values and units remain primary with tabular digits where useful. Hover paint belongs to the editable value, not the name or whole row. Align visible numeric and color value edges. Keep alignment stable when steppers appear or editing starts. Ordinary forms retain the shared 32px control. The explicit compact inspector uses a 40px row for every equivalent parameter. Its first band contains a 32px control. Its lower 8px strip contains contextual tools. Keep the slider target and thumb clear of label text and the next row. Use a 3px painted track. Wrapped names can increase this allocation. Hover does not change row height or add margins to the group's 4px gap. The lower slider target remains separate from the direct label/value editing targets and cannot overlap the next parameter.
+Names remain secondary. Values/units remain primary, with tabular digits where useful. Only editable values receive hover paint. Numeric/color value edges stay aligned while steppers appear and editing starts. Ordinary forms retain the shared 32px control. Equivalent compact parameters use 40px rows: a 32px control band and an 8px contextual strip. Slider targets/thumbs stay clear of labels and neighboring rows. Use a 3px track. Wrapped names can increase allocation. Hover never changes height or adds margins beyond the 4px group gap. Slider targets stay separate from label/value targets.
 
 The editable value provides equivalent pointer and keyboard control for the supplementary strip. Do not apply that target exception to a standalone slider. At narrow widths, wrap a label or stack its value before text becomes unreadable. Prevent local clipping.
 
@@ -40,7 +40,7 @@ NumericField accepts separate scrubMin/scrubMax and typed min/max bounds. A vali
 
 Use editable=false for a range-only setting. Its value remains read-only while the range supports pointer and keyboard input.
 
-Keep units visible outside the editable text during focus and draft changes. The editor can expand toward the leading edge while its trailing unit edge stays fixed. Give short values a comfortable minimum of 5ch during editing. Keep leading inner space when longer drafts expand the editor. Do not compress the editor to its current digits or reserve an oversized fixed width. Use the same light neutral 1px boundary and input surface as inline text and HEX editors. On initial focus in an editable numeric field, select the complete value. Support pointer and keyboard activation of the input. A later click inside the focused field can place the caret.
+Units stay visible outside editable text during focus/draft changes. Editors expand toward the leading edge, retaining the trailing unit edge. Editing starts at 5ch minimum, retaining leading inner space for longer drafts. Avoid digit-tight or oversized fixed widths. Use the same light neutral 1px boundary and input surface as inline text and HEX editors. On initial focus in an editable numeric field, select the complete value. Support pointer and keyboard activation of the input. A later click inside the focused field can place the caret.
 
 Place the 20px stepper at the trailing edge with absolute positioning. Reveal it contextually. Do not reserve an empty trailing gutter at rest. It can extend up to 8px into a verified surrounding gutter. Keep it inside the viewport and clear of adjacent controls. Keep arrows near their value. Pointer focus retains a neutral surface. Keyboard focus uses a visible neutral strong 1px frame. Stepper hover brightens the icon without painting a filled box over the adjacent editor.
 

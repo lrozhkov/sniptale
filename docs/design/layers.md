@@ -5,11 +5,11 @@
 [Surface-specific patterns](surfaces.md) limit generic rules for popup, timeline, canvas, and embedded UI.
 ## Choose the layer
 
-Use a menu for commands, a listbox for property values, an anchored editor for a small draft, and a dialog for a protected task. Do not interrupt a task with a modal when an inline or anchored editor suffices. Keep one shared layer stack. Opening a related child preserves its parent. An unrelated transient layer replaces the current one. Decorative icons do not create separate activation targets.
+Use menus for commands, listboxes for values, anchored editors for small drafts, and dialogs for protected tasks. Prefer sufficient inline/anchored editors over modals. One shared stack preserves parents for related children and replaces unrelated transient layers. Decorative icons have no separate targets.
 
 ## Anchoring, dismissal, and focus
 
-Measure the actual layer. Clamp it to the visible viewport and its actual scroll owner. Avoid covering its anchor or edited object when another valid placement exists. Rebind geometry observation when a layer replaces another without closing. Reposition after scroll, resize, and anchor geometry changes. Use explicit inspector section bounds for column-width property menus.
+Measure layers and clamp them to the viewport and actual scroll owner. Prefer valid placements clear of anchors/edited objects. Rebind geometry observation for replacements without closing. Reposition after scroll, resize, or anchor changes. Column-width property menus use explicit inspector section bounds.
 
 If an anchor disappears or leaves its scroll area, close through the cancellation path and place focus logically. A modal belongs to the browser top layer. Check clipping inside its scroll owner and dialog, then stop at the modal boundary. Do not clip a modal child against the underlying page's ancestors. Escape closes the deepest unprotected layer first. Outside pointer activation closes the applicable chain without stealing destination focus.
 
@@ -39,7 +39,7 @@ Device-selection curtains belong to the extension popup. They are not a generic 
 
 [WAI dialog](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/), [menu](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/).
 
-Textual color values select their complete contents on initial focus through pointer or Tab. This supports direct replacement with a pasted color. A second click within the focused field can place the caret. Keep ordinary editing, IME, paste, validation, acceptance, and cancellation intact. Declare this color-value variant explicitly. Do not select all text on focus for every ordinary text field.
+Textual colors select all contents on initial pointer/Tab focus for paste replacement. Subsequent clicks can place the caret. Preserve ordinary editing, IME, paste, validation, acceptance, and cancellation. Declare this variant explicitly without extending it to ordinary text fields.
 
 Use native browser `title` for optional hints throughout the application. Do not create custom tooltip layers. Keep required information in visible content and preserve complete accessible names.
 

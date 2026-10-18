@@ -12,7 +12,7 @@
 | Related object that can open | Navigation row with object name and navigation icon | Open the declared destination |
 | Operation on the current object | Command | Follow [Buttons](buttons.md) |
 
-A static property is not a disabled input. Do not draw an input surface, caret, dropdown arrow, or hover frame around it. Do not dim a valid informational value as if it were unavailable. Use a definition list for a property set. Keep names secondary and values primary at the shared 13px/18px regular weight. Structural section headings use their separate heading role. A present value does not increase weight. A property label does not become bold because the value is important or present.
+Static properties have no disabled-input styling, input surface, caret, dropdown arrow, or hover frame. Valid information stays readable without unavailable dimming. Property sets use definition lists. Names stay secondary, values primary, both 13px/18px regular. Structural headings retain their separate role. Value presence/importance never increases label or value weight.
 
 ## Geometry and text
 
@@ -20,7 +20,7 @@ Use 28px minimum read-only rows with 4px separation. Interactive parameter rows 
 
 Long descriptions wrap. Identifiers can break at safe character boundaries when necessary. Use tabular numerals for comparable numbers. Format dates, units, and numbers through locale owners. Do not use monospace for ordinary names, dates, or sizes.
 
-Static values wrap by default, so full content stays available without a tooltip or extra Tab stop. Use the [text-fitting policy](localization.md) when a bounded row requires shortening. Retain padding before a trailing action. Text must not extend under its hit target. Do not replace a missing value with zero. Use a localized absence label such as Not available.
+Static values wrap without tooltips or extra Tab stops. Bounded rows follow [text fitting](localization.md). Retain padding before trailing actions without text beneath their targets. Missing values use localized absence labels, such as Not available, never zero.
 
 Keep a duration row for time-based media when its value is not yet available. Display an absence marker instead of zero.
 
@@ -42,7 +42,7 @@ Keep its target at least 24px. Keep focus on the command after copying. Report s
 
 ## Related objects
 
-A related-project row navigates. It does not select the project or change the current property. Use a real link when a URL exists. Preserve modified-click, new-tab, keyboard, and browser link behavior. Use the existing command owner when product navigation requires an extension API instead of a URL. Use one consistent navigation icon for a related-object list. Do not add a checkbox or dropdown chevron.
+Related-project rows navigate without selecting projects or changing properties. URLs use real links, preserving modified-click, new-tab, keyboard, and browser behavior. Extension-API navigation retains the existing command owner. Related-object lists use one consistent navigation icon, without checkboxes or dropdown chevrons.
 
 A neutral row can brighten its text on hover. Keep adjacent rows visually separate with 4px spacing. User-authored object names in compact navigation buttons occupy one line. Truncate excess text at the trailing edge with an ellipsis. Keep the full stored and accessible name. Use the native browser title to expose the complete name on hover. Plain informational names can wrap. Loading, failure, empty results, and unavailable references have distinct readable states. An unavailable reference displays its name and reason as plain content. Do not display a working-looking navigation target.
 

@@ -148,9 +148,11 @@ it.each([false, true])(
         />
       )
     );
-    const microphone = host.querySelector<HTMLButtonElement>(
-      '[aria-label="videoEditor.app.recordAudioDevice"]'
-    )!;
+    const microphone = host.querySelector<HTMLButtonElement>('button[aria-labelledby$="-label"]')!;
+    expect(microphone).not.toBeNull();
+    expect(document.getElementById(microphone.getAttribute('aria-labelledby')!)?.textContent).toBe(
+      'videoEditor.app.recordAudioDevice'
+    );
     const consumed = new KeyboardEvent('keydown', {
       key: 'Escape',
       bubbles: true,

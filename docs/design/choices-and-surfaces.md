@@ -53,4 +53,4 @@ Segment motion must not delay acceptance. Initial layout and resize do not anima
 
 Compact inspector segments use 32px height and 6px horizontal padding per option. General controls retain their existing height.
 
-Configured provider/model pickers refresh their catalog when opened. Keep the open menu, search and current choice while the read completes. A failed read retains the last known catalog and exposes retry. Refresh does not select a different provider or model. Keep a removed choice unresolved until the user replaces it. Initial configured defaults remain with their existing owner.
+Configured provider/model pickers refresh catalogs when opened. Keep the menu open and preserve search and choice during reads. Failed reads retain the last catalog and expose retry. Refresh never selects a different provider or model. Keep removed choices unresolved until replacement. Existing owners retain initial configured defaults.
