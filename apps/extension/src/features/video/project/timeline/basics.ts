@@ -47,11 +47,12 @@ export function getClipEndTime(clip: VideoProjectClip): number {
 }
 
 export function calculateProjectDuration(project: VideoProject): number {
-  if (project.clips.length === 0) {
-    return 0;
+  let duration = project.clips.reduce((maxEnd, clip) => Math.max(maxEnd, getClipEndTime(clip)), 0);
+  for (const entry of project.textDocuments ?? []) {
+    if (entry.binding.kind !== 'project') continue;
+    for (const fragment of entry.document.fragments) duration = Math.max(duration, fragment.end);
   }
-
-  return project.clips.reduce((maxEnd, clip) => Math.max(maxEnd, getClipEndTime(clip)), 0);
+  return duration;
 }
 
 export function syncProjectDuration(project: VideoProject): VideoProject {

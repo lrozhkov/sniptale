@@ -46,9 +46,11 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-project-duration-reconciliation',
     productionFile: 'apps/extension/src/features/video/project/timeline/basics.ts',
     reason:
-      'Project duration synchronization reconciles EffectV1 host placement before applying duration.',
+      'Direct timeline suites prove predicates, transitions, duration and EffectV1 reconciliation.',
     testFiles: [
       'apps/extension/src/features/video/project/timeline/basics.test.ts',
+      'apps/extension/src/features/video/project/timeline/basics.predicates.test.ts',
+      'apps/extension/src/features/video/project/timeline/basics.transitions.test.ts',
       'apps/extension/src/features/video/project/effect-instance/reconcile.test.ts',
     ],
   },

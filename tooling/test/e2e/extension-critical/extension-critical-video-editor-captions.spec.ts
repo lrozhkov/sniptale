@@ -1,3 +1,4 @@
+import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import { expect, test } from '@playwright/test';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createReviewCaptionSettings } from '../../../../apps/extension/src/features/video/review/text-document';
@@ -11,6 +12,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const project = createEmptyVideoProject('Caption preview', 1280, 720);
     project.version = 5;
     project.duration = 8;
+    const clip = { ...createTextClip(project.tracks[0]!.id, 1280, 720, 0), duration: 1, text: '' };
+    project.clips = [clip];
     project.textDocuments = ['First caption / Первый', 'Second caption / Второй'].map(
       (text, index) => ({
         id: `document-${index}`,
@@ -83,6 +86,13 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         ];
       });
       expect(positions[0]).not.toBe(positions[1]);
+      const timelineClip = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+      await timelineClip.click();
+      await canvas.evaluate((element) => element.removeAttribute('data-caption-draws'));
+      await page.keyboard.press('Delete');
+      await expect(timelineClip).toHaveCount(0);
+      await expect(page.locator('[data-playback-counter="true"]')).toContainText('0:08.000');
+      await expect(canvas).toHaveAttribute('data-caption-draws', /First caption/);
       await expect(page.locator('[data-ui="video.preview.effect-runtime-error"]')).toHaveCount(0);
       await page.screenshot({ path: info.outputPath('project-captions.png'), fullPage: false });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

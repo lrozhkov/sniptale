@@ -268,3 +268,41 @@ function verifyDurationSync(): void {
   expect(syncedOverlapProject.transitions).toHaveLength(1);
   expect(calculateProjectDuration(createProject([]))).toBe(0);
 }
+
+it('retains project-time text duration independently from caption visibility and source documents', () => {
+  const project = createProject([]);
+  const fragment = {
+    id: 'text',
+    text: 'Independent',
+    originalText: '',
+    start: 2,
+    end: 12,
+    timeDomain: 'result' as const,
+    alignment: 'manual' as const,
+    revision: 0,
+    timingRevision: 0,
+    showInVideo: false,
+  };
+  project.textDocuments = [
+    {
+      id: 'manual',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: false,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: { version: 1, fragments: [fragment] },
+    },
+  ];
+  expect(calculateProjectDuration(project)).toBe(12);
+  expect(syncProjectDuration(project).duration).toBe(12);
+  expect(project.textDocuments[0]!.document.fragments[0]).toEqual(fragment);
+  project.textDocuments.push({
+    id: 'source',
+    binding: { kind: 'source', assetId: 'asset', sourceInstanceId: 'instance' },
+    document: { version: 1, fragments: [{ ...fragment, timeDomain: 'source', end: 200 }] },
+  });
+  expect(calculateProjectDuration(project)).toBe(12);
+  project.textDocuments = project.textDocuments.filter((entry) => entry.binding.kind === 'source');
+  expect(syncProjectDuration(project).duration).toBe(0);
+});

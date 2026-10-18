@@ -1,3 +1,4 @@
+import { syncProjectDuration } from '../../../../features/video/project/timeline/basics';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -346,4 +347,37 @@ it('keeps each linked video and audio name when cutting the group', () => {
   const project = splitProjectClipsAtTime(original, 'video-1', 3);
   expect(project.clips).toHaveLength(4);
   for (const clip of project.clips) expect(clip.name).toBe(originalNames.get(clip.type));
+});
+
+it('preserves independent text after trimming the last media placement', () => {
+  const project = createTimelineProject();
+  project.clips = [project.clips[0]!];
+  project.duration = 12;
+  project.textDocuments = [
+    {
+      id: 'manual',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'After the video',
+            originalText: '',
+            start: 6,
+            end: 12,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const trimmed = syncProjectDuration(trimProjectClipEnd(project, 'clip-1', 3));
+  expect(trimmed.clips[0]!.duration).toBe(2);
+  expect(trimmed.duration).toBe(12);
+  expect(trimmed.textDocuments).toEqual(project.textDocuments);
 });
