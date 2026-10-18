@@ -25,7 +25,7 @@ import {
   type VideoProjectExportSettings,
 } from '../../../features/video/project/types';
 import { mergeVideoProjectExportSettings } from '../../../features/video/project/export/capabilities';
-import { ExportDialog } from './index';
+import { ExportSettingsPanel } from './index';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -43,7 +43,7 @@ function createSettings(): VideoProjectExportSettings {
   };
 }
 
-function renderDialog(props?: Partial<React.ComponentProps<typeof ExportDialog>>) {
+function renderDialog(props?: Partial<React.ComponentProps<typeof ExportSettingsPanel>>) {
   const onClose = vi.fn();
   const onChange = vi.fn();
   const onExport = vi.fn();
@@ -56,7 +56,7 @@ function renderDialog(props?: Partial<React.ComponentProps<typeof ExportDialog>>
 
   act(() => {
     root?.render(
-      <ExportDialog
+      <ExportSettingsPanel
         settings={createSettings()}
         sourceDimensions={{ height: 1080, width: 1920 }}
         onClose={onClose}
@@ -96,16 +96,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders inside the shared modal shell and wires close, export, select, and toggle actions', async () => {
+it('renders inline inspector controls and wires close, export, select, and toggle actions', async () => {
   const { onChange, onClose, onExport } = renderDialog();
 
-  expect(container?.querySelector('[role="dialog"]')).not.toBeNull();
-  expect(container?.textContent).toContain('videoEditor.exportDialog.title');
+  expect(container?.querySelector('[role="dialog"]')).toBeNull();
+  expect(container?.querySelector('[role="region"]')).not.toBeNull();
+  expect(container?.querySelector('[role="region"]')?.getAttribute('aria-label')).toBe(
+    'videoEditor.exportDialog.title'
+  );
   expect(container?.textContent).not.toContain('videoEditor.exportDialog.exportSubtitleFiles');
   expect(container?.textContent).not.toContain('videoEditor.exportDialog.burnInSubtitles');
 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
-  const closeButton = container?.querySelector<HTMLButtonElement>('.sniptale-modal-close');
+  const closeButton = buttons.find(
+    (button) => button.textContent === 'videoEditor.exportDialog.cancel'
+  );
   const formatTrigger = container?.querySelector<HTMLButtonElement>(
     '[aria-label="videoEditor.exportDialog.formatLabel"]'
   );
@@ -238,36 +243,34 @@ it('restores the default MP4 codec when switching back from WebM during the same
   });
 });
 
-it('names the dialog, keeps Tab inside it and restores its opener on unmount', () => {
+it('names and focuses the inspector without trapping Tab, and restores its opener on close', () => {
   const opener = document.createElement('button');
   document.body.append(opener);
   opener.focus();
-  renderDialog();
-  const dialog = container!.querySelector<HTMLElement>('[role="dialog"]')!;
-  const titleId = dialog.getAttribute('aria-labelledby');
-  expect(titleId).toBeTruthy();
-  expect(document.getElementById(titleId!)?.textContent).toContain(
-    'videoEditor.exportDialog.title'
-  );
-  const buttons = dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
-  const first = buttons[0]!;
-  const last = buttons[buttons.length - 1]!;
-  expect(document.activeElement).toBe(first);
-  act(() =>
-    first.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
-    )
-  );
-  expect(document.activeElement).toBe(last);
-  act(() =>
-    last.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    )
-  );
-  expect(document.activeElement).toBe(first);
+  const { onClose } = renderDialog();
+  const panel = container!.querySelector<HTMLElement>('[role="region"]')!;
+  expect(panel.getAttribute('aria-label')).toBe('videoEditor.exportDialog.title');
+  expect(document.activeElement).toBe(panel);
+  const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+  act(() => panel.dispatchEvent(tab));
+  expect(tab.defaultPrevented).toBe(false);
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  act(() => panel.dispatchEvent(escape));
+  expect(escape.defaultPrevented).toBe(true);
+  expect(onClose).toHaveBeenCalledOnce();
   act(() => root!.render(null));
   expect(document.activeElement).toBe(opener);
   opener.remove();
+});
+
+it('does not restore focus over a destination chosen outside the inspector', () => {
+  renderDialog();
+  const destination = document.createElement('button');
+  document.body.append(destination);
+  destination.focus();
+  act(() => root!.render(null));
+  expect(document.activeElement).toBe(destination);
+  destination.remove();
 });
 
 it('leaves a portaled select for the adjacent form control on Tab in either direction', () => {

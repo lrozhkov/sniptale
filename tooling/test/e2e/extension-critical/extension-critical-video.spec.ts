@@ -10,6 +10,7 @@ import {
   createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import {
   createAudioClipFromAsset,
   createVideoClipFromAsset,
@@ -45,11 +46,24 @@ type StartedVideoExport = {
 const E2E_VIDEO_EDITOR_DOCUMENT_ID = 'e2e-video-editor-document';
 
 async function openVideoEditorHarness(page: Page, hostOrigin: string) {
+  const project = createEmptyVideoProject('Export lifecycle');
+  project.duration = 2;
+  project.clips.push(createTextClip(project.tracks[0]!.id, project.width, project.height, 0));
   await applyHarnessBootstrap(page, {
+    videoProjects: [project],
+    storage: { 'sniptale-locale-preference': 'ru' },
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
     runtimeResponses: {
       [VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES]: {
         success: true,
+        capabilities: {
+          formats: [
+            { format: 'MP4', available: true },
+            { format: 'WEBM', available: true },
+          ],
+          mp4Codecs: [{ codec: 'AVC', available: true }],
+          defaultMp4VideoCodec: 'AVC',
+        },
         capabilityToken: 'e2e-export-start-capability',
         cancelCapabilityToken: 'e2e-export-cancel-capability',
         ownerDocumentId: E2E_VIDEO_EDITOR_DOCUMENT_ID,
@@ -62,7 +76,8 @@ async function openVideoEditorHarness(page: Page, hostOrigin: string) {
       [VideoMessageType.CANCEL_PROJECT_EXPORT]: { success: true },
     },
   });
-  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}`, {
+  await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'ru'));
+  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`, {
     waitUntil: 'domcontentloaded',
   });
 }
@@ -307,6 +322,7 @@ async function expectVideoEditorStackSpacingCompatibility(page: Page): Promise<v
 }
 
 async function startVideoExport(page: Page): Promise<StartedVideoExport> {
+  await page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]').click();
   const exportButton = page.getByRole('button', {
     name: VIDEO_EDITOR_EXPORT_BUTTON_LABEL,
     exact: true,
@@ -401,8 +417,8 @@ async function expectVideoExportProgress(page: Page, jobId: string, progress: nu
 async function captureVideoExportDialogScreenshot(page: Page, testInfo: TestInfo): Promise<void> {
   await mkdir(testInfo.outputDir, { recursive: true });
   await page.screenshot({
-    path: testInfo.outputPath('video-editor-export-dialog.png'),
-    fullPage: true,
+    path: testInfo.outputPath('video-editor-export-inspector.png'),
+    fullPage: false,
   });
 }
 
@@ -412,6 +428,7 @@ test('video editor export reacts to runtime progress and completion events', asy
 }, testInfo) => {
   await openVideoEditorHarness(page, hostOrigin);
   await expectVideoEditorStackSpacingCompatibility(page);
+  await page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]').click();
   await page.getByRole('button', { name: VIDEO_EDITOR_EXPORT_BUTTON_LABEL, exact: true }).click();
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_EXPORT_SUBMIT_LABEL, exact: true })
@@ -440,8 +457,8 @@ test('video editor export reacts to runtime progress and completion events', asy
     jobId,
     projectId,
     exportId: 'export-harness',
-    filename: 'demo.webm',
-    format: VideoExportFormat.WEBM,
+    filename: 'demo.mp4',
+    format: VideoExportFormat.MP4,
     targetDocumentId: E2E_VIDEO_EDITOR_DOCUMENT_ID,
     targetSenderUrl: await page.evaluate(
       () => `${window.location.origin}${window.location.pathname}`
@@ -451,6 +468,7 @@ test('video editor export reacts to runtime progress and completion events', asy
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_PROGRESS_CANCEL_LABEL, exact: true })
   ).toBeHidden();
+  await page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]').click();
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_EXPORT_BUTTON_LABEL, exact: true })
   ).toBeVisible();

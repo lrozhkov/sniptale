@@ -80,6 +80,7 @@ for (const variant of [
       expect(await readFile(path, 'utf8')).toContain(
         '00:00:02,000 --> 00:00:04,000\nПривет / Hello'
       );
+      await expect(panel.getByRole('status')).toBeInViewport();
       await expect(panel.getByRole('status')).toHaveText(
         label('gallery.videoReview.subtitlesDownloadStarted')
       );
@@ -98,7 +99,7 @@ for (const variant of [
         exact: true,
       });
       await expect(submit).toBeInViewport();
-      const dialog = page.getByRole('dialog');
+      const dialog = page.locator('[data-ui="video-editor.export.inspector"]');
       expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
         true
       );

@@ -1,6 +1,5 @@
 import React, { useId, useRef } from 'react';
 import { useExportDialogFocus } from '../../export/dialog/focus';
-import { ExportDialog } from '../../export/dialog';
 import { ExportProgressOverlay } from '../../export/progress-overlay';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import {
@@ -34,20 +33,6 @@ export function VideoEditorWorkspaceOverlays({
         onConfirm={controller.onConfirmDialogConfirm}
         onCancel={controller.onConfirmDialogCancel}
       />
-      {controller.exportDialog.isOpen &&
-      controller.exportDialog.settings &&
-      controller.exportDialog.sourceDimensions ? (
-        <ExportDialog
-          estimateContext={controller.exportDialog.estimateContext}
-          selectedClipAvailable={controller.exportDialog.selectedClipId != null}
-          selectedRangeAvailable={controller.exportDialog.selectedRangeAvailable ?? false}
-          settings={controller.exportDialog.settings}
-          sourceDimensions={controller.exportDialog.sourceDimensions}
-          onClose={controller.exportDialog.onClose}
-          onChange={controller.exportDialog.onChange}
-          onExport={controller.exportDialog.onExport}
-        />
-      ) : null}
       {controller.exportProgress.isRunning && controller.exportProgress.status ? (
         <ExportProgressOverlay
           cancellationFailed={Boolean(controller.exportFailure.error)}

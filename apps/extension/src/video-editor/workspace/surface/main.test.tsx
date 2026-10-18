@@ -17,6 +17,8 @@ const timelineSpy = vi.fn();
 const hookMocks = vi.hoisted(() => ({
   controller: null as unknown,
   sourceActive: false,
+  exportOpen: false,
+  closeExport: vi.fn(),
   setSourceActive: vi.fn(),
 }));
 
@@ -41,6 +43,11 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
 
 vi.mock('../../runtime/controller/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorExportPort: (selector: (port: unknown) => unknown) =>
+    selector({
+      exportState: { dialogOpen: hookMocks.exportOpen },
+      closeExportDialog: hookMocks.closeExport,
+    }),
   useVideoEditorEffectEditingPort: (selector: (port: unknown) => unknown) =>
     selector({ applyEffectDocument: vi.fn() }),
 }));
@@ -565,6 +572,32 @@ it('does not pause a new recording session when an old playback start resolves',
     await rejected;
     expect(pausePlayback).toHaveBeenCalledTimes(pauses);
   } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it('opens export from collapsed state and closes it when the inspector collapses', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const controller = createWorkspaceController();
+  hookMocks.controller = controller;
+  hookMocks.exportOpen = false;
+  hookMocks.closeExport.mockClear();
+  const root = createRoot(document.createElement('div'));
+  const render = () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
+  try {
+    await act(async () => render());
+    hookMocks.exportOpen = true;
+    await act(async () => render());
+    expect(controller.header.onToggleSidebar).toHaveBeenCalledOnce();
+    controller.header.leftSidebarCollapsed = false;
+    await act(async () => render());
+    controller.header.leftSidebarCollapsed = true;
+    await act(async () => render());
+    expect(hookMocks.closeExport).toHaveBeenCalledOnce();
+    expect(controller.header.onToggleSidebar).toHaveBeenCalledOnce();
+  } finally {
+    hookMocks.exportOpen = false;
+    hookMocks.closeExport.mockClear();
     await act(async () => root.unmount());
   }
 });

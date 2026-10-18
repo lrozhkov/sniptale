@@ -277,7 +277,7 @@ it('keeps stable children and unrelated contexts isolated across provider update
 
   mocks.exportPort.exportState = { ...mocks.exportPort.exportState, dialogOpen: true };
   act(renderProvider);
-  expect(blockingRender).toHaveBeenCalledTimes(2);
+  expect(blockingRender).toHaveBeenCalledTimes(1);
 });
 
 it('admits montage shortcuts only when the montage viewer is active and no overlay blocks input', () => {
@@ -290,7 +290,11 @@ it('admits montage shortcuts only when the montage viewer is active and no overl
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState.dialogOpen = true;
   act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+  mocks.exportPort.exportState.isRunning = true;
+  act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.exportPort.exportState.isRunning = false;
   mocks.exportPort.exportState.dialogOpen = false;
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
@@ -324,8 +328,8 @@ it('binds export only to the ready montage workspace outside blocking layers and
   act(() => render());
   mocks.exportPort.exportState.dialogOpen = true;
   act(() => render());
-  expect(exportKey().defaultPrevented).toBe(false);
-  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(1);
+  expect(exportKey().defaultPrevented).toBe(true);
+  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(2);
 });
 
 it('keeps inspector time on the live playback port across seeks', () => {

@@ -78,15 +78,6 @@ export function ProjectSubtitles({ project }: { project: VideoProject }) {
           />
         ) : null}
         <SubtitleExportFeedback result={result} format={format} />
-        <ProductActionButton
-          tone="secondary"
-          disabled={!result.ok || result.count === 0}
-          onClick={() => {
-            if (result.ok) download.download(result.text, format);
-          }}
-        >
-          {translate('gallery.videoReview.subtitlesDownload')}
-        </ProductActionButton>
         {download.status !== 'idle' ? (
           <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
             {translate(
@@ -96,6 +87,15 @@ export function ProjectSubtitles({ project }: { project: VideoProject }) {
             )}
           </p>
         ) : null}
+        <ProductActionButton
+          tone="secondary"
+          disabled={!result.ok || result.count === 0}
+          onClick={() => {
+            if (result.ok) download.download(result.text, format);
+          }}
+        >
+          {translate('gallery.videoReview.subtitlesDownload')}
+        </ProductActionButton>
       </div>
     </details>
   );

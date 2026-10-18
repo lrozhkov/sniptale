@@ -1,3 +1,5 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { getDefaultExportSettings } from '../../../features/video/project/timeline/meta';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { VideoEditorFloatingInspectorStack } from './inspector-stack';
@@ -5,11 +7,18 @@ import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 const { contentSpy } = vi.hoisted(() => ({
   contentSpy: vi.fn(),
 }));
-const hookMocks = vi.hoisted(() => ({ collapsed: false }));
+const hookMocks = vi.hoisted(() => ({ collapsed: false, exportOpen: false }));
 
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
   useVideoEditorSidebarController: () => ({}),
+  useVideoEditorOverlaysController: () => ({
+    exportDialog: {
+      isOpen: hookMocks.exportOpen,
+      settings: getDefaultExportSettings(createEmptyVideoProject()),
+      sourceDimensions: { width: 1920, height: 1080 },
+    },
+  }),
   useWorkspaceLayoutContext: () => ({ leftSidebarCollapsed: hookMocks.collapsed }),
 }));
 
@@ -38,6 +47,10 @@ vi.mock('../sidebar/panel-content', () => ({
     contentSpy(props);
     return <div data-ui="mock-context-inspector-content" />;
   },
+}));
+
+vi.mock('../../export/dialog', () => ({
+  ExportSettingsPanel: () => <div data-ui="mock-export-settings" />,
 }));
 
 vi.mock('../sidebar/view', () => ({
@@ -95,4 +108,31 @@ it('renders a context inspector surface without introducing a layers panel', () 
       onToggleProjectsOpen: expect.any(Function),
     })
   );
+});
+
+it('places export in the existing inspector while retaining inert selection content', () => {
+  hookMocks.collapsed = false;
+  hookMocks.exportOpen = true;
+  try {
+    const markup = renderToStaticMarkup(
+      <VideoEditorFloatingInspectorStack
+        onClose={vi.fn()}
+        resize={{
+          width: 344,
+          min: 280,
+          max: 520,
+          onDoubleClick: vi.fn(),
+          onPointerDown: vi.fn(),
+          onKeyDown: vi.fn(),
+        }}
+      />
+    );
+    expect(markup).toContain('mock-export-settings');
+    expect(markup).toContain('mock-context-inspector-content');
+    expect(markup).toContain('hidden=""');
+    expect(markup).toContain('inert=""');
+    expect(markup).not.toContain('role="dialog"');
+  } finally {
+    hookMocks.exportOpen = false;
+  }
 });

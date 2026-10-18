@@ -72,7 +72,6 @@ function useVideoEditorRuntimeComposition(
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
     workspace.libraryPanelOpen ||
-    exportPort.exportState.dialogOpen ||
     exportPort.exportState.error !== null ||
     exportPort.exportState.isRunning;
 
