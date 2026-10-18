@@ -1,3 +1,4 @@
+import { InspectProjectRecognition } from './recognition';
 import { CameraAppearanceControls } from '../inputs/camera-appearance';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import type React from 'react';
@@ -200,6 +201,20 @@ function createStandardClipGroups(
           onUpdateClipFades={props.onUpdateClipFades}
         />
       ),
+    },
+    {
+      id: 'recognition',
+      semantic: 'processing' as const,
+      label: translate('gallery.videoReview.recognitionTitle'),
+      visible: !!props.recognition && (clip.type === 'VIDEO' || clip.type === 'AUDIO'),
+      content: props.recognition ? (
+        <InspectProjectRecognition
+          key={`${props.project.id}:${clip.id}`}
+          project={props.project}
+          clipId={clip.id}
+          controller={props.recognition}
+        />
+      ) : null,
     },
     ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;

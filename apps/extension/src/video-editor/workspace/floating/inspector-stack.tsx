@@ -1,4 +1,5 @@
 import { ExportSettingsPanel } from '../../export/dialog';
+import { useVideoProjectRecognition } from '../../runtime/session/recognition';
 import { FileOutput, List, PanelLeft } from 'lucide-react';
 import { WorkspacePanelButton, WorkspacePanelHeader } from './panel-header';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
@@ -76,6 +77,7 @@ function VideoEditorFloatingInspectorContent({
   resize,
 }: VideoEditorFloatingInspectorContentProps) {
   const sidebarProps = getWorkspaceSidebarProps(controller);
+  const recognition = useVideoProjectRecognition(sidebarProps.project);
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
@@ -152,6 +154,7 @@ function VideoEditorFloatingInspectorContent({
         >
           <WorkspaceSidebarPanelContent
             {...sidebarProps}
+            recognition={recognition}
             inputRefs={sidebarState.inputRefs}
             projectsOpen={sidebarState.projectsOpen}
             recordingsOpen={sidebarState.recordingsOpen}

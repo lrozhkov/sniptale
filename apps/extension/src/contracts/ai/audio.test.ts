@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  AUDIO_INPUT_MAX_SECONDS,
   parseAudioJobClientMessage,
   parseAudioJobServerMessage,
   parseAudioJobScope,
@@ -344,4 +345,26 @@ it('admits disclosed project transcription without admitting project speech or m
     scope: projectScope,
   };
   expect(parseAudioJobServerMessage(authorized)).toEqual(authorized);
+});
+
+it('admits maximum native chunks at late offsets without admitting one extra PCM sample', () => {
+  const nativeStart = 10000;
+  const nativeEnd = nativeStart + AUDIO_INPUT_MAX_SECONDS;
+  const scopes = [
+    { ...scope, nativeStart, nativeEnd },
+    {
+      projectId: 'project',
+      projectRevision: 1,
+      projectUpdatedAt: 1,
+      target: { kind: 'project-clip', clipId: 'clip' },
+      assetId: 'asset',
+      nativeStart,
+      nativeEnd,
+    },
+  ];
+  expect(nativeEnd - nativeStart).toBeGreaterThan(AUDIO_INPUT_MAX_SECONDS);
+  for (const candidate of scopes) {
+    expect(parseAudioJobScope(candidate)).toEqual(candidate);
+    expect(parseAudioJobScope({ ...candidate, nativeEnd: nativeEnd + 1 / 16000 })).toBeNull();
+  }
 });

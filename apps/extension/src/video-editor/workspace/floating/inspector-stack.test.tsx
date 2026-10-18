@@ -8,6 +8,10 @@ const { contentSpy } = vi.hoisted(() => ({
   contentSpy: vi.fn(),
 }));
 const hookMocks = vi.hoisted(() => ({ collapsed: false, exportOpen: false }));
+const recognition = vi.hoisted(() => ({ recognize: vi.fn() }));
+vi.mock('../../runtime/session/recognition', () => ({
+  useVideoProjectRecognition: () => recognition,
+}));
 
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
@@ -78,7 +82,7 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
   expect(contentSpy).not.toHaveBeenCalled();
 });
 
-it('renders a context inspector surface without introducing a layers panel', () => {
+it('passes the mounted recognition controller into the actual floating inspector content', () => {
   hookMocks.collapsed = false;
   const markup = renderToStaticMarkup(
     <VideoEditorFloatingInspectorStack
@@ -105,6 +109,7 @@ it('renders a context inspector surface without introducing a layers panel', () 
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({
       inputRefs: expect.any(Object),
+      recognition,
       onToggleProjectsOpen: expect.any(Function),
     })
   );

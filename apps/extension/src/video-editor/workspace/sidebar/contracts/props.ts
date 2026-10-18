@@ -1,3 +1,4 @@
+import type { VideoProjectRecognitionController } from '../../../runtime/session/recognition';
 import type { WindowHeader } from '../../../../features/browser-frame/header';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -41,6 +42,7 @@ import type {
 import type { ProjectListItem, RecordingListItem } from '../../../library/contracts/items';
 
 export interface WorkspaceSidebarProps {
+  recognition?: VideoProjectRecognitionController;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];

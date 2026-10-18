@@ -1,6 +1,6 @@
 import { createRecognitionFixture as fixture } from './recognition.test-support';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AudioTranscriptResult } from '../../contracts/ai/audio';
+import { AUDIO_INPUT_MAX_SECONDS, type AudioTranscriptResult } from '../../contracts/ai/audio';
 import {
   addReviewTextFragment,
   createReviewTextDocument,
@@ -743,4 +743,18 @@ it('retains a long text-only response in admissible coarse fragments without inv
         phrase.end === 700
     )
   ).toBe(true);
+});
+
+it('admits a maximum audio-chat native selection at a late offset and refuses an extra sample', async () => {
+  const { session } = fixture(11000);
+  const selection = { start: 10000, end: 10000 + AUDIO_INPUT_MAX_SECONDS };
+  const recognition = { mode: 'transcribe' as const, granularity: 'sentence' as const, prompt: '' };
+  const job = await prepare(session, { selection, recognition });
+  expect(job.chunks).toEqual([expect.objectContaining(selection)]);
+  await expect(
+    prepare(session, {
+      selection: { ...selection, end: selection.end + 1 / 16000 },
+      recognition,
+    })
+  ).rejects.toThrow('too-large');
 });

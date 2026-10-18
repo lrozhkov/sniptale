@@ -72,6 +72,7 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
 function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
     project: props.project,
     selection: props.selection,
     canAddCameraPosition: props.canAddCameraPosition ?? false,
@@ -167,6 +168,7 @@ function createSelectionPanelStateProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'recognition'
   | 'gridSettings'
   | 'placementMode'
   | 'project'
@@ -188,6 +190,7 @@ function createSelectionPanelStateProps(
   return {
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     selection: props.selection ?? createSceneSelection(),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
     project: props.project,
     recentColors: props.recentColors ?? [],
     canAddCameraPosition: props.canAddCameraPosition ?? false,

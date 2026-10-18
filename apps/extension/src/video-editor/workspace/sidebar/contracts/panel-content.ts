@@ -2,6 +2,7 @@ import type { VideoEditorFileInputRefs } from '../../../chrome/file-inputs';
 import type { WorkspaceSidebarProps } from './props';
 
 type WorkspaceSidebarPanelContentPropKeys =
+  | 'recognition'
   | 'activeProjectId'
   | 'gridSettings'
   | 'inspectorMode'

@@ -23,7 +23,11 @@ export function resolveVideoProjectAudioTarget(
   if (!clip || (clip.type !== 'VIDEO' && clip.type !== 'AUDIO') || clip.assetId !== scope.assetId)
     return null;
   const asset = project.assets.find((entry) => entry.id === scope.assetId);
-  if (!asset || (asset.type !== 'VIDEO' && asset.type !== 'AUDIO') || !asset.metadata.hasAudio)
+  if (
+    !asset ||
+    (asset.type !== 'VIDEO' && asset.type !== 'AUDIO' && asset.type !== 'RECORDING') ||
+    !asset.metadata.hasAudio
+  )
     return null;
   const end = Math.min(
     clip.sourceStart + clip.sourceDuration,

@@ -1,6 +1,27 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  recognitionClose: { ru: 'Закрыть результат', en: 'Close result' },
+  recognitionFailed: {
+    ru: 'Действие не выполнено. Повторите его. Готовый результат остаётся доступен до закрытия.',
+    en: 'The action failed. Try again. A completed result remains available until you close it.',
+  },
+  recognitionSaveRetry: {
+    ru: 'Изменения текста применены локально. Повторите применение, чтобы подтвердить сохранение. Закрытие результата не отменяет изменения. Их можно отменить через Undo.',
+    en: 'Text changes are applied locally. Apply again to confirm saving. Closing this result keeps the changes. Undo can reverse these changes.',
+  },
+  recognitionNativeScope: {
+    ru: 'Аудио выбранного клипа. Время указано в исходнике, до изменения скорости и размещения на таймлайне.',
+    en: 'Audio from the selected clip. Times refer to the source, before playback speed and timeline placement.',
+  },
+  recognitionInvalidRange: {
+    ru: 'Выберите интервал внутри сохранённого фрагмента с аудио.',
+    en: 'Choose an interval within the retained clip that contains audio.',
+  },
+  recognitionSaved: {
+    ru: 'Текст сохранён. Он доступен в разделе текста сцены.',
+    en: 'Text saved. It is available in the scene text section.',
+  },
   canvasFormatLabel: { ru: 'Пропорции', en: 'Aspect ratio' },
   canvasResolutionLabel: { ru: 'Разрешение', en: 'Resolution' },
   canvasFormatWide: { ru: 'Горизонтальный', en: 'Landscape' },

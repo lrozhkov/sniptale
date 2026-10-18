@@ -9,6 +9,7 @@ import {
 type WorkspaceSidebarSelectionBodyProps = Partial<
   Pick<
     WorkspaceSidebarProps,
+    | 'recognition'
     | 'onImportImage'
     | 'gridSettings'
     | 'typingProject'
@@ -141,6 +142,7 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
       ? { onApplyTypingCompression: props.onApplyTypingCompression }
       : {}),
     ...(props.onImportImage ? { onImportImage: props.onImportImage } : {}),
+    ...(props.recognition ? { recognition: props.recognition } : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,

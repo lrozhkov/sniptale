@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
 import { createVideoClipFromAsset } from '../factories/clip';
+import { createRecordingProjectAsset } from '../factories/recording';
 import { createVideoProjectAudioScope, resolveVideoProjectAudioTarget } from './audio-scope';
 
 function fixture() {
@@ -78,4 +79,28 @@ it('admits AUDIO clips and enforces the source metadata duration', () => {
   project.assets = [{ ...asset, type: 'AUDIO', metadata: { ...asset.metadata, duration: 5 } }];
   expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 5)).not.toBeNull();
   expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 6)).toBeNull();
+});
+it('admits retained recording assets used by supported video and audio clips', () => {
+  for (const type of ['VIDEO', 'AUDIO'] as const) {
+    const { project, clip } = fixture();
+    const asset = createRecordingProjectAsset({
+      recordingId: 'recording',
+      filename: 'Recording',
+      width: 640,
+      height: 360,
+      duration: 20,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: true,
+    });
+    project.assets = [asset];
+    project.clips = [{ ...clip, type, assetId: asset.id }];
+    const scope = createVideoProjectAudioScope(project, 2, clip.id, 2, 10);
+    expect(scope).not.toBeNull();
+    if (!scope) throw new Error('Recording scope refused');
+    expect(resolveVideoProjectAudioTarget(project, scope)?.asset).toEqual(asset);
+    asset.metadata.hasAudio = false;
+    expect(resolveVideoProjectAudioTarget(project, scope)).toBeNull();
+    expect(createVideoProjectAudioScope(project, 2, clip.id, 1, 3)).toBeNull();
+  }
 });

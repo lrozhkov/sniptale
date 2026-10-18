@@ -7,6 +7,14 @@ export const AUDIO_JOB_PORT_NAME = 'sniptale-gallery-audio-job';
 export const AUDIO_INPUT_MAX_BYTES = 24 * 1024 * 1024;
 /** Maximum mono PCM16 duration at the extraction rate, including its 44-byte WAV header. */
 export const AUDIO_INPUT_MAX_SECONDS = Math.floor((AUDIO_INPUT_MAX_BYTES - 44) / 2) / 16_000;
+/**
+ * Admit native subtraction error with a 1e-7-second tolerance (0.0016 samples at 16 kHz).
+ * This stays below half a PCM sample, so rounded extraction cannot exceed the byte budget.
+ */
+export function validAudioInputDuration(duration: number): boolean {
+  return Number.isFinite(duration) && duration > 0 && duration <= AUDIO_INPUT_MAX_SECONDS + 1e-7;
+}
+
 export const AUDIO_OUTPUT_MAX_BYTES = 32 * 1024 * 1024;
 export const AUDIO_STAGING_TTL_MS = 10 * 60 * 1000;
 export const AUDIO_JOB_TIMEOUT_MS = 120_000;
@@ -233,7 +241,7 @@ function parseProjectAudioJobScope(
     typeof value['nativeEnd'] !== 'number' ||
     !Number.isFinite(value['nativeEnd']) ||
     value['nativeEnd'] <= value['nativeStart'] ||
-    value['nativeEnd'] - value['nativeStart'] > AUDIO_INPUT_MAX_SECONDS
+    !validAudioInputDuration(value['nativeEnd'] - value['nativeStart'])
   )
     return null;
   return {
@@ -298,7 +306,7 @@ export function parseAudioJobScope(value: unknown): AudioJobScope | null {
     typeof value['nativeEnd'] !== 'number' ||
     !Number.isFinite(value['nativeEnd']) ||
     value['nativeEnd'] <= value['nativeStart'] ||
-    value['nativeEnd'] - value['nativeStart'] > AUDIO_INPUT_MAX_SECONDS
+    !validAudioInputDuration(value['nativeEnd'] - value['nativeStart'])
   )
     return null;
   const target = parseReviewSpeechTarget(value['target']);

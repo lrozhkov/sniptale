@@ -1,5 +1,5 @@
 import {
-  AUDIO_INPUT_MAX_SECONDS,
+  validAudioInputDuration,
   type AudioRecognitionOptions,
   type ReviewSpeechTarget,
 } from '../../contracts/ai/audio';
@@ -159,7 +159,7 @@ export async function prepareReviewRecognition(
   const ranges = recognitionRanges(session, target, options.selection);
   if (!ranges.length) throw new Error('invalid-request');
   if (options.recognition && ranges.length !== 1) throw new Error('invalid-request');
-  if (options.recognition && ranges[0]!.end - ranges[0]!.start > AUDIO_INPUT_MAX_SECONDS)
+  if (options.recognition && !validAudioInputDuration(ranges[0]!.end - ranges[0]!.start))
     throw new Error('too-large');
   const geometry = recognitionGeometry(session, target);
   const documentBasis = textBasis(session);
