@@ -82,6 +82,7 @@ jobs:
       actions: read
       contents: read
       packages: write
+      security-events: write
     uses: ./.github/workflows/_canonical-proof.yml
     with:
       gate: selectel-smoke

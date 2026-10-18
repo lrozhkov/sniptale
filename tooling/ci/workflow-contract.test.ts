@@ -330,6 +330,28 @@ describe('release workflow topology', () => {
 });
 
 describe('workflow supply-chain and privilege contracts', () => {
+  it('permits every declared permission of each local reusable workflow', () => {
+    const rank = { none: 0, read: 1, write: 2 };
+    for (const callerPath of WORKFLOW_PATHS) {
+      const caller = readWorkflow(callerPath);
+      for (const [callerName, call] of Object.entries(caller.jobs)) {
+        if (!call.uses?.startsWith('./.github/workflows/')) continue;
+        const callee = readWorkflow(call.uses.slice(2));
+        const ceiling = call.permissions ?? caller.permissions ?? {};
+        for (const [calleeName, job] of Object.entries(callee.jobs)) {
+          for (const [scope, required] of Object.entries(
+            job.permissions ?? callee.permissions ?? {}
+          )) {
+            expect(
+              rank[ceiling[scope] ?? 'none'],
+              `${callerPath}:${callerName} must permit ${calleeName} ${scope}:${required}`
+            ).toBeGreaterThanOrEqual(rank[required]);
+          }
+        }
+      }
+    }
+  });
+
   it('pins every external Action to a full immutable commit SHA', () => {
     for (const path of WORKFLOW_PATHS) {
       for (const uses of actionUses(readWorkflow(path))) {
@@ -391,6 +413,7 @@ describe('workflow supply-chain and privilege contracts', () => {
       actions: 'read',
       contents: 'read',
       packages: 'write',
+      'security-events': 'write',
     });
     expectExactPermissions(readWorkflow(RELEASE).jobs.admission, {
       actions: 'read',
