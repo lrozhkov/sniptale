@@ -28,6 +28,7 @@ import {
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
 } from './primitives';
 import { hasAnnotationFields } from './annotations';
+import { parseVideoProjectVoiceTextSnapshot } from '../text/voice-take';
 
 function isTransform(value: unknown): boolean {
   return (
@@ -152,6 +153,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (!isRecord(value) || !hasBaseClipFields(value)) {
     return false;
   }
+
+  if (
+    value['textSnapshot'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.AUDIO ||
+      !parseVideoProjectVoiceTextSnapshot(value['textSnapshot']))
+  )
+    return false;
 
   if (
     value['type'] === VideoProjectClipType.VIDEO ||

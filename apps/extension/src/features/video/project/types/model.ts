@@ -1,4 +1,5 @@
 import type { CameraAppearance } from '../camera/appearance';
+import type { VideoProjectVoiceTextSnapshot } from '../text/voice-take';
 import type { VideoMediaFitMode } from './media';
 import type {
   VideoProjectActionEvent,
@@ -226,6 +227,8 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  /** Accepted speech keeps its original text even after that text or source is removed. */
+  textSnapshot?: VideoProjectVoiceTextSnapshot;
   /** Stable text/speech placement identity; split retains it and duplicate replaces it. */
   sourceInstanceId?: string;
   type: typeof VideoProjectClipType.AUDIO;

@@ -9,7 +9,8 @@ function identity(value: unknown): value is string {
   );
 }
 
-function parseBinding(value: unknown): VideoProjectTextBinding | null {
+/** Parses descriptive placement identity without requiring a current source reference. */
+export function parseVideoProjectTextBinding(value: unknown): VideoProjectTextBinding | null {
   if (!isRecord(value)) return null;
   if (value['kind'] === 'project' && Object.keys(value).length === 1) return { kind: 'project' };
   if (
@@ -43,7 +44,7 @@ function withinTextBudget(value: unknown[]): boolean {
 
 function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
   if (!isRecord(value) || !identity(value['id'])) return null;
-  const binding = parseBinding(value['binding']);
+  const binding = parseVideoProjectTextBinding(value['binding']);
   const document = parseReviewTextDocument(value['document']);
   const captions =
     value['captions'] === undefined ? undefined : parseReviewCaptionSettings(value['captions']);
