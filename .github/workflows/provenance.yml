@@ -6,6 +6,12 @@ on:
     - cron: '23 4 * * 1'
   workflow_dispatch:
     inputs:
+      runner_backend:
+        description: Runner provider for the locked QA container
+        required: false
+        default: selectel
+        type: choice
+        options: [selectel, github]
       force_rebuild:
         description: Build separate forced candidate images
         required: false
@@ -44,6 +50,7 @@ jobs:
     secrets: inherit
     with:
       gate: release-provenance
+      runner_backend: ${{ inputs.runner_backend || 'selectel' }}
       release_diagnostic: ${{ inputs.diagnostic || false }}
       force_rebuild: ${{ inputs.force_rebuild || false }}
       force_rebuild_reason: ${{ inputs.force_rebuild_reason || '' }}

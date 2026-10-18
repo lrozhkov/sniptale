@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 const mocks = vi.hoisted(() => ({
@@ -55,12 +55,20 @@ const operation = {
   updatedAt: 1,
 };
 
+const hostLocks = navigator.locks;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Node native locks span worker threads; explicit lock cases install their own manager.
+  vi.stubGlobal('navigator', {});
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 function installMutationHarness(current: unknown = operation) {
@@ -78,6 +86,21 @@ function installMutationHarness(current: unknown = operation) {
 }
 
 describe('durable asset operations', () => {
+  it('keeps fixture deletion independent from host lock admission failures', async () => {
+    const request = vi
+      .spyOn(hostLocks, 'request')
+      .mockRejectedValue(new Error('unrelated host lock admission failed'));
+    try {
+      const { db } = installMutationHarness();
+      const intent = buildPhysicalDeleteOperation(['obsolete']);
+      await completePhysicalDeleteOperation(intent);
+      expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith('obsolete');
+      expect(db.delete).toHaveBeenCalledWith('asset_operations', intent.operationId);
+      expect(request).not.toHaveBeenCalled();
+    } finally {
+      request.mockRestore();
+    }
+  });
   it.each(['owner', 'ready'] as const)(
     'retains bytes adopted after their physical delete was journaled: %s',
     async (claim) => {

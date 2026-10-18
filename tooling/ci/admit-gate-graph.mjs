@@ -34,17 +34,20 @@ export function admitGateGraph({
     provisionResult === 'skipped' &&
     canonicalResult === 'skipped' &&
     cleanupResult === 'skipped';
-  const vm =
-    executionPath === 'vm' &&
+  const lifecycleResult = executionPath === 'github' ? 'skipped' : 'success';
+  const executed =
+    ['vm', 'github'].includes(executionPath) &&
     reuse === false &&
     ['success', 'skipped'].includes(classifierResult) &&
     admissionResult === 'success' &&
     imageResult === 'success' &&
-    provisionResult === 'success' &&
+    provisionResult === lifecycleResult &&
     canonicalResult === 'success' &&
-    cleanupResult === 'success';
-  if (!derived && !vm) {
-    throw new Error('Gate jobs do not form an explicitly admitted derived or VM graph.');
+    cleanupResult === lifecycleResult;
+  if (!derived && !executed) {
+    throw new Error(
+      'Gate jobs do not form an explicitly admitted derived, VM, or GitHub-hosted graph.'
+    );
   }
   return {
     schemaVersion: 1,

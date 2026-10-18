@@ -18,6 +18,10 @@ Release provenance admits an exact Fast proof before release execution. [Wrapper
 
 Repository-audit, topology, and mutation evidence run after proof sealing in a separate non-blocking job. These artifacts neither satisfy nor block the canonical gate.
 
+Release checks accepts `runner_backend=selectel` or `runner_backend=github`. Existing callers and schedules default to Selectel. Unknown selectors fail before resource acquisition. Both modes execute the same pinned QA image and require full canonical checks plus trusted admission.
+
+GitHub mode uses a standard Ubuntu runner with the bounded profile in the canonical workflow. It skips Selectel provisioning and cleanup and does not enter the controller environment. Selectel mode still requires successful provisioning and exact-attempt cleanup. The final gate admits only the complete graph for the selected mode. Candidate credential isolation, proof identity, release signatures, and publication admission remain mandatory.
+
 Selectel connectivity checks controller admission without provisioning. Infrastructure smoke provisions one disposable runner and must prove cleanup. Selectel maintenance performs recovery and scheduled cleanup without entering the QA graph.
 
 Publish release accepts an admitted provenance finalizer result. It does not provision Selectel or rerun QA.
