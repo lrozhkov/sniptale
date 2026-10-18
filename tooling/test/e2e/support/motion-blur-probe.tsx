@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,

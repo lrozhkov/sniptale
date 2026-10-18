@@ -70,7 +70,8 @@
     "./scenario/types/guide": "./src/scenario/types/guide.ts",
     "./scenario/guide-parser": "./src/scenario/guide-parser.ts",
     "./scenario/types/tour": "./src/scenario/types/tour.ts",
-    "./scenario/tour-parser": "./src/scenario/tour-parser.ts"
+    "./scenario/tour-parser": "./src/scenario/tour-parser.ts",
+    "./window-header": "./src/window-header.ts"
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.1",

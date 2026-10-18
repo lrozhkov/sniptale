@@ -278,7 +278,8 @@ export interface QuickEditOriginalAudio {
 }
 
 /** Source coordinates remain independent of the decorated window. */
-export type QuickEditWindowHeader = import('../../../browser-frame/header').WindowHeader;
+export type QuickEditWindowHeader =
+  import('@sniptale/runtime-contracts/window-header').WindowHeader;
 
 /** An explicit base canvas size; absence means native source dimensions. */
 export interface QuickEditCanvasSize {

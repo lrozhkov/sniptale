@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_WINDOW_HEADER } from '../../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { isVideoProjectClip } from '../../../../features/video/project/validation/clips';
 import { parseHydratableVideoProject } from '../../../../features/video/project/validation';
 import { normalizeClip } from '../../../../features/video/project/hydration/clip';

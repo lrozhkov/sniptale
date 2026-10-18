@@ -1053,3 +1053,14 @@ a:focus-visible {
 .tour-hint-text {
   overflow-y: auto;
 }
+
+.tour-image-viewport {
+  position: absolute;
+  inset: 0;
+}
+.tour-window-header {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  border-radius: 4px 4px 0 0;
+}

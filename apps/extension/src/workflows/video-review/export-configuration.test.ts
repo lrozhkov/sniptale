@@ -1,5 +1,5 @@
 import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewMediaIndex } from './media-index';

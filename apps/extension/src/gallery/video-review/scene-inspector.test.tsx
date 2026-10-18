@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

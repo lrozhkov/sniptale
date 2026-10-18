@@ -585,3 +585,12 @@ html[data-tour-reordering] * {
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
+
+.tour-image-framing-preview {
+  height: 180px;
+  min-width: 0;
+  overflow: hidden;
+}
+.tour-image-framing-preview .tour-stage-host {
+  height: 100%;
+}

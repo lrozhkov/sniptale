@@ -1,6 +1,6 @@
 import { SegmentedRow, TextField } from '../../ui/compact-inspector-controls';
 import { useEffect, useState, type ReactNode } from 'react';
-import { type WindowHeader } from '../../features/browser-frame/header';
+import { type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { useWindowHeaderEditing, type WindowHeaderSettingsProps } from './editing';
 import { WindowHeaderIconControls } from './icon-controls';

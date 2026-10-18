@@ -10,7 +10,7 @@ import {
   quickEditContentPointToCanvas,
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
-import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { DEFAULT_QUICK_EDIT_PERSPECTIVE, DEFAULT_QUICK_EDIT_DEPTH } from './spatial';
 import {
   quickEditPlaneProjection,

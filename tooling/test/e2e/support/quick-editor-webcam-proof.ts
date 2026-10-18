@@ -1,5 +1,5 @@
 import { readNativeReviewWorkspace, replaceNativeReviewWorkspace } from './native-review-workspace';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import type { Page } from '@playwright/test';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {

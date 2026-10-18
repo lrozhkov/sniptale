@@ -1337,11 +1337,11 @@
       "file": "tooling/test/e2e/scenario-editor-visual/scenario-tour-frame.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "astHash": "5496c366000844ed2675bf40a369eb94d4e6a3d048acce7b4afb188bc1b43286",
-      "signatureHash": "aaff3cea4281d82fa1054f3f146ff42ece821b31a87d8b3cac7e31d14d4af6dd",
-      "reviewDate": "2026-10-18",
-      "reason": "tool-noise: One authored tour/frame result across live/fullscreen/offline consumers. Independently inspected by pr_structural_wrapper_diagnosis. This correction leaves the existing fixture sequence and cleanup unchanged; no product authority moves. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
+      "reason": "tool-noise: This file retains one authored-frame fixture across live and exported views. Changes scope selectors to the main stage and use the shared background picker. The completed-stream flag strengthens exact artifact capture. It adds no independent fixture or runtime lifetime. Splitting at a line threshold would duplicate this setup. Main and independent diagnosis inspected the exact body. Fresh complete-candidate architecture review must inspect this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, geometry receiver, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-10-19",
+      "astHash": "95811eaf6657621d729d8f9ebb5bfdde6bbd2a6230ca06d2a14a229d9db5c07e",
+      "signatureHash": "aaff3cea4281d82fa1054f3f146ff42ece821b31a87d8b3cac7e31d14d4af6dd"
     },
     {
       "rule": "structural-file-risk",
@@ -1392,21 +1392,21 @@
       "file": "apps/extension/src/features/scenario/tour-player/document.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The file proves one standalone HTML artifact through a shared jsdom/media fixture. Its 28 state signals are isolated test-local values, not concurrent production authorities. Action navigation replaces old hint paging within the same export/render contract; a fixture-only split would add forwarding edges. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
-      "reviewDate": "2026-10-18",
-      "astHash": "57a5fdcdc15fd1192418e056c43dbd5412fa8059a937ee52e328fa33819d551f",
-      "signatureHash": "15edbcfcfd30b0caf6079b5ea5461b04620e6927ad6b321c93e616eda76b007c"
+      "reason": "tool-noise: The file tests one standalone HTML artifact through common jsdom and media fixtures. Its 29 state signals are isolated test values. Header artwork and source placement extend the same artifact contract. A fixture-only split would duplicate setup without a new owner. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "53730d6e2723423b0001b924244c36d82a75fa677e749949633e0384fb237da5",
+      "signatureHash": "351b76d2d581265d63fb6852dc9f44e1b0b2b3ccfb19ab5216637c6175191bf8"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/features/scenario/tour-player/document.ts",
       "symbol": "buildTourPlayerShell",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: buildTourPlayerShell validates and projects one bounded standalone artifact, then emits its inert JSON and fixed shell together. The 143-line body has 20 statements and no durable writer or recovery authority. Separating the template only to meet the 140-line limit would obscure the escaping and payload boundary reviewed together. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
-      "reviewDate": "2026-10-18",
-      "astHash": "85f690c28920a5f3e7d53751522d481c6af6dd1c9c3632d506341030d53419aa",
+      "reason": "tool-noise: The function validates and projects one standalone artifact, including safe JSON, CSP and fixed HTML. The new headers field uses the same escaping boundary. Its 20 statements add no state, writer or recovery authority. Separating the template would obscure that boundary. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "724803f25d67fd663d81929a333ef67d2a253680bcc00b118bb59aa7527c7e3d",
       "signatureHash": "bbc8837b2e8cbb534c464182b59ff774a9b622037285624e4046da17aeab2c43"
     },
     {
@@ -1436,22 +1436,55 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/stage.tsx",
       "symbol": "TourStage",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: TourStage remains one React adapter for one existing player instance. This exact 197-line body has 21 statements, cyclomatic 5, nesting 1, and one DOM effect family. The added camera projection is disposable and pure; preview origin and author scroll are restored within the same mount/update/dispose lifetime. Callback and input refs feed that single player receiver, with no durable writer or new runtime authority. Main inspected the complete body, selected-action frame and preview/return proof. Splitting the lifecycle only to meet the line limit would distribute its cleanup receiver. Fresh complete-candidate architecture review must validate this reassessed exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
-      "reviewDate": "2026-10-18",
-      "astHash": "679bc77e33b801c55018ea2ae7e1fba88efeb22f4711da679a07215f699d7655",
-      "signatureHash": "1af3786ae6186caeaedb0ea44f43e7796773325004d28c12b88f08076b0ac809"
+      "reason": "tool-noise: The component adapts one player through one mount, update and disposal lifetime. Image framing adds a pure projection and a callback. Refs feed the same player receiver. It adds no writer or independent resource authority. Splitting this lifecycle would distribute its cleanup. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "48f2fa70dea3cdfa02f7218fb289d9184f8496152ce3996077284f72ee6bc902",
+      "signatureHash": "5c814e7f52a1cebeaf485b6d4c28d282852cf9618a15bbd0c2220e9fdce6ad9c"
     },
     {
       "rule": "structural-file-risk",
       "file": "packages/runtime-contracts/src/scenario/tour-parser.test.ts",
       "symbol": "<file>",
       "owner": "package:runtime-contracts:scenario",
-      "reason": "tool-noise: The file tests one closed TourDocument boundary using reset document/slide factories and hostile-input mutations. Its 43 state signals are test-local fixtures, not production authorities. Ordered actions replace parallel arrays within the same parser contract; splitting only the 826-line test file would duplicate those fixtures or add forwarding setup. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
-      "reviewDate": "2026-10-18",
-      "astHash": "b223a3f01d613aba46e808f24d38fc673b4fee8e5a24e81efbbc9a497316962b",
-      "signatureHash": "ac66c8d94cfe6559ec7822bbcb8996ab5e102be92322df805080c9379bf5699d"
+      "reason": "tool-noise: The file tests one closed TourDocument admission contract with common reset factories. Header and imagePlacement checks extend that contract. Its 48 state signals are isolated test fixtures. Splitting by line count would duplicate those factories without a separate boundary. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "f7f44d7247fdd78e919e1be8e97dff93e69f561d579ec81c1527a4c13e53e27e",
+      "signatureHash": "862ce1066e90f19fcc0d96b833e3e9225bb00d4c882a8c3dfc5b9f423b09198a"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: The file is one ordered registry of database migrations. The new metadata-only migration preserves existing stores and rows. It adds no writer, state receiver or recovery authority. Splitting the registry at 800 lines would divide its chronological admission contract. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "a545f538210f02625c123ae3a19b956175a8574548f12a55939ccef7e04c5708",
+      "signatureHash": "e475b1fb64e96c97e8e5f06c50cd59834a250f161221c716acf6b3c21840b0ee"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/scene.js",
+      "symbol": "createTourScene",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The function owns one scene lifecycle and drawable geometry. Headers update with the accepted tour. Render, motion and full view consume the same geometry. No independent writer, clock or resource lifetime exists. Splitting the closure would distribute its shared cleanup receiver. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-19",
+      "astHash": "11211803b300d6559feda6a3ba08850cd062b34fe10fe77572e9c9ae3f972b13",
+      "signatureHash": "e7bb3ff3d78bbbc91afd10a008639c40c73c8f81b14a0ba9560f3a1224d75edf"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/image-scene.js",
+      "symbol": "renderTourImage",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: After separate window-shell rendering, this function projects bitmap, privacy masks and targets through one imageBox. Its 27 statements have one state receiver and score3 delta0. Placement uses the same surface. Another split for two lines would distribute that receiver. Existing gesture, camera and mask owners remain unchanged. Main and independent diagnosis inspected the exact body. Fresh complete-candidate architecture review must inspect this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, geometry receiver, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-10-19",
+      "astHash": "670032991551fe4a8df5c0b538aed693489cf536afea4255d7cea37350f75b7f",
+      "signatureHash": "beb03052b28fceb8f03ef5525c7328a0061a96cd58a36b73845d35ce5da0a6cd"
     }
   ]
 }

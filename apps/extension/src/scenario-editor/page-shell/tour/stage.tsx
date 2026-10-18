@@ -1,3 +1,4 @@
+import { prepareTourWindowHeaders } from '../../../features/scenario/tour-player/document';
 import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -21,12 +22,14 @@ export function TourStage({
   onMoveObject,
   onResizeObject,
   onFrameCamera,
+  onFrameImage,
   view = 'edit',
   previewKey = 0,
   previewOrigin = 'selection',
   t,
 }: {
-  view?: 'edit' | 'frame' | 'preview';
+  view?: 'edit' | 'frame' | 'preview' | 'image';
+  onFrameImage?: (placement: { center: { x: number; y: number }; zoom: number }) => void;
   previewKey?: number;
   previewOrigin?: 'selection' | 'beginning';
   onFrameCamera?: (camera: { center: { x: number; y: number }; zoom: number }) => void;
@@ -48,6 +51,7 @@ export function TourStage({
     onMoveObject,
     onResizeObject,
     onFrameCamera,
+    onFrameImage,
     disabled,
     onNavigateSelection,
   });
@@ -56,6 +60,7 @@ export function TourStage({
     onMoveObject,
     onResizeObject,
     onFrameCamera,
+    onFrameImage,
     disabled,
     onNavigateSelection,
   };
@@ -64,6 +69,15 @@ export function TourStage({
   const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
   const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
   const framedTour = useMemo(() => {
+    if (view === 'image')
+      return {
+        ...tour,
+        slides: tour.slides.map((slide) =>
+          slide.kind === 'image'
+            ? { ...slide, camera: { ...slide.camera, mode: 'off' as const } }
+            : slide
+        ),
+      };
     if (view !== 'frame' || !selectedSlide || !selectedObject) return tour;
     return {
       ...tour,
@@ -81,6 +95,7 @@ export function TourStage({
         ? { ...tour, playback: { ...tour.playback, autoplay: true, loop: false } }
         : framedTour,
     labels,
+    headers: prepareTourWindowHeaders(framedTour),
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
   const latest = useRef({ input, selection, tour, images });
@@ -111,6 +126,8 @@ export function TourStage({
           ? undefined
           : {
               cameraFrame: view === 'frame',
+              imageFrame: view === 'image',
+              onFrameImage: (placement) => callbacks.current.onFrameImage?.(placement),
               onFrameCamera: (camera) => callbacks.current.onFrameCamera?.(camera),
               canEdit: () => !callbacks.current.disabled,
               onSelectObject: (id) => callbacks.current.onSelectObject(id),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WINDOW_HEADER, parseWindowHeader, windowHeaderGeometry } from './header';
+import { DEFAULT_WINDOW_HEADER, parseWindowHeader, windowHeaderGeometry } from './window-header';
 
 describe('window header project contract', () => {
   it('admits each appearance and rejects remote favicon references', () => {

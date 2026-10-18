@@ -10,7 +10,7 @@ import {
   mapCursorFocusControlPoint,
 } from './cursor';
 import { createVideoProjectFromRecording } from '../../../project/factories/creation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 it.each([VideoCursorCaptureMode.SEPARATE, VideoCursorCaptureMode.EMBEDDED_FALLBACK])(
   'switches cursor visibility at its key time in %s mode',

@@ -1,3 +1,4 @@
+import { resolveTourImageFrame } from './image-frame.js';
 import { renderTourCameraFrame } from './camera-frame.js';
 import {
   resolveTourCamera,
@@ -5,7 +6,7 @@ import {
   resolveTourFullViewCamera,
 } from './camera.js';
 import { renderTourMask } from './image-mask.js';
-import { bindTourObjectDrag } from './authoring.js';
+import { bindTourImagePlacement, bindTourObjectDrag } from './authoring.js';
 import {
   getTourSlideObjects,
   getTourHotspots,
@@ -19,10 +20,42 @@ function projectImagePoint(box, point) {
   return { x: box.x + point.x * box.width, y: box.y + point.y * box.height };
 }
 
+/** Window decoration and clipping share one passive DOM shell around the source plane. */
+function renderTourImageWindow(slide, viewport, { scene, element, headers }) {
+  const { stageWidth, stageHeight } = viewport;
+  const frame = resolveTourImageFrame(slide, viewport);
+  const clip = element('div', 'tour-image-viewport');
+  if (frame.header) {
+    const insets = [
+      frame.content.y,
+      stageWidth - frame.content.x - frame.content.width,
+      stageHeight - frame.content.y - frame.content.height,
+      frame.content.x,
+    ]
+      .map((value) => `${value}px`)
+      .join(' ');
+    clip.style.clipPath = `inset(${insets})`;
+    const header = element('img', 'tour-window-header');
+    header.alt = '';
+    header.src = headers[`${slide.image.width}x${slide.image.height}`] ?? '';
+    Object.assign(header.style, {
+      left: `${frame.header.x}px`,
+      top: `${frame.header.y}px`,
+      width: `${frame.header.width}px`,
+      height: `${frame.header.height}px`,
+    });
+    scene.append(header);
+  }
+  const plane = element('div', 'tour-image-plane');
+  clip.append(plane);
+  scene.append(clip);
+  return { frame, plane, clip };
+}
+
 /** Renders bitmap, masks and targets through one source-to-stage geometry without owning navigation. */
 export function renderTourImage(
   slide,
-  { stageWidth, stageHeight },
+  viewport,
   {
     scene,
     element,
@@ -37,6 +70,7 @@ export function renderTourImage(
     maskDefaults,
     style,
     fullView = false,
+    headers = {},
   }
 ) {
   if (!slide.image) {
@@ -45,13 +79,16 @@ export function renderTourImage(
     return null;
   }
   const imageBox = authoring
-    ? resolveTourEditingCamera(slide, { stageWidth, stageHeight })
+    ? resolveTourEditingCamera(slide, viewport)
     : fullView
-      ? resolveTourFullViewCamera(slide, { stageWidth, stageHeight })
-      : resolveTourCamera(slide, { stageWidth, stageHeight }, autoZoom);
+      ? resolveTourFullViewCamera(slide, viewport)
+      : resolveTourCamera(slide, viewport, autoZoom);
   if (!imageBox) return null;
-  const plane = element('div', 'tour-image-plane');
-  scene.append(plane);
+  const { frame, plane, clip } = renderTourImageWindow(slide, viewport, {
+    scene,
+    element,
+    headers,
+  });
   const image = element('img', 'tour-image');
   const source = media.get(slide.image.assetId);
   if (source) image.src = source;
@@ -73,6 +110,10 @@ export function renderTourImage(
         animation: resolveTourHighlightAnimation(mask, maskDefaults),
       })
     );
+  if (authoring?.imageFrame) {
+    bindTourImagePlacement(clip, plane, slide, imageBox, authoring, signal);
+    return imageBox;
+  }
   const explanations = getTourSlideObjects(slide).flatMap((entry) =>
     entry.type === 'mask' ? [] : [entry.object.id]
   );
@@ -88,7 +129,11 @@ export function renderTourImage(
     if (hotspot.markerAppearance || style.markerAppearance)
       button.style.setProperty('--tour-marker-size', `${marker.size}px`);
     button.dataset.pulse = String(hotspot.visual.kind === 'point' && hotspot.visual.pulse);
-    button.hidden = point.x < 0 || point.y < 0 || point.x > stageWidth || point.y > stageHeight;
+    button.hidden =
+      point.x < frame.content.x ||
+      point.y < frame.content.y ||
+      point.x > frame.content.x + frame.content.width ||
+      point.y > frame.content.y + frame.content.height;
     button.title = hotspot.label;
     button.setAttribute('aria-label', hotspot.label || `${labels.point} ${number + 1}`);
     button.addEventListener('focus', () => hintController.select(number));
@@ -140,7 +185,7 @@ export function renderTourImage(
     scene.append(button);
   });
   if (authoring?.cameraFrame && slide.camera.mode === 'manual') {
-    const frame = renderTourCameraFrame(slide, { stageWidth, stageHeight }, imageBox, {
+    const frame = renderTourCameraFrame(slide, viewport, imageBox, {
       element,
       labels,
       authoring,

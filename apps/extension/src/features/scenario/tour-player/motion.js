@@ -162,6 +162,7 @@ function pointOf(node) {
   return { x: parseFloat(node.style.left), y: parseFloat(node.style.top) };
 }
 function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
+  viewport = { ...viewport, windowHeader: tour.stage.windowHeader };
   const phases = tourEntranceTiming(tour, slide, reducedMotion);
   const image = slide?.kind === 'image' && slide.image ? slide : null;
   const final = image ? resolveTourCamera(image, viewport, tour.playback.autoZoom) : null;

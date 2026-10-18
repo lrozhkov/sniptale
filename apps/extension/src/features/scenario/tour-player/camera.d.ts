@@ -1,3 +1,4 @@
+import type { TourImageViewport } from './image-frame';
 import type { TourImageSlide, TourPoint } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 interface TourImageProjection {
@@ -11,16 +12,16 @@ interface TourImageProjection {
 
 export function resolveTourCamera(
   slide: TourImageSlide,
-  viewport: { stageWidth: number; stageHeight: number },
+  viewport: TourImageViewport,
   autoZoom: boolean
 ): TourImageProjection | null;
 
 export function resolveTourEditingCamera(
   slide: TourImageSlide,
-  viewport: { stageWidth: number; stageHeight: number }
+  viewport: TourImageViewport
 ): TourImageProjection | null;
 export function resolveTourFullViewCamera(
   slide: TourImageSlide,
-  viewport: { stageWidth: number; stageHeight: number }
+  viewport: TourImageViewport
 ): TourImageProjection | null;
 export function tourCameraEnabled(slide: TourImageSlide | null, autoZoom: boolean): boolean;

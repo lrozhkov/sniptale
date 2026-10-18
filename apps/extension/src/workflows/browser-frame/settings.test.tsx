@@ -5,7 +5,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
 import { WindowHeaderSettings } from './settings';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
-import { DEFAULT_WINDOW_HEADER, type WindowHeader } from '../../features/browser-frame/header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  type WindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 const acquire = vi.hoisted(() => vi.fn());
 const importIcon = vi.hoisted(() => vi.fn());
 vi.mock('./local-icon', () => ({

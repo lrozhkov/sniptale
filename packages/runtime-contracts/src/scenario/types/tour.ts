@@ -1,3 +1,4 @@
+import type { WindowHeader } from '../../window-header';
 import type { Paint } from '@sniptale/foundation/paint';
 import type { GuideImageSource } from './image-source';
 
@@ -262,7 +263,15 @@ export interface TourImage {
   source: GuideImageSource;
 }
 
+/** Authored bitmap placement is independent from timed camera motion. */
+export interface TourImagePlacement {
+  center: TourPoint;
+  zoom: number;
+}
+
 export interface TourImageSlide {
+  /** Source placement is independent from timed action cameras. */
+  imagePlacement?: TourImagePlacement | undefined;
   kind: 'image';
   id: string;
   title: string;
@@ -380,6 +389,7 @@ export interface TourDocument {
   version: 2;
   id: string;
   stage: {
+    windowHeader?: WindowHeader | undefined;
     aspect: '16:9' | '4:3' | '9:16';
     background: string;
     paint?: Paint | undefined;

@@ -1,4 +1,4 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { isRecord } from './validation/primitives';
 
 /** Project-owned decoration; favicon bytes are retained, never a remote image reference. */
 export interface WindowHeader {
@@ -9,8 +9,8 @@ export interface WindowHeader {
   url: string;
   faviconEnabled: boolean;
   /** Missing source in older projects means website acquisition. */
-  faviconSource?: 'site' | 'file';
-  faviconDataUrl?: string;
+  faviconSource?: 'site' | 'file' | undefined;
+  faviconDataUrl?: string | undefined;
 }
 
 export const DEFAULT_WINDOW_HEADER: WindowHeader = {

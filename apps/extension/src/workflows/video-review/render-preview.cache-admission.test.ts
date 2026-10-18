@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';

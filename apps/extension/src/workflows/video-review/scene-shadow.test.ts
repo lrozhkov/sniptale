@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { expect, it, vi } from 'vitest';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 

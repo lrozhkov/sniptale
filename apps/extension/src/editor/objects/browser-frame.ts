@@ -1,4 +1,4 @@
-import { windowHeaderGeometry } from '../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../features/editor/document/constants';
 import { FabricImage, type FabricObject } from 'fabric';
 import type { BrowserFrameState } from '../../features/editor/document/types';

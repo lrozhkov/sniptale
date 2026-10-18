@@ -17,7 +17,7 @@ import {
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { MediaFrameControls } from './media-frame';
-import { DEFAULT_WINDOW_HEADER } from '../../../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { acquireWindowHeaderFavicon } from '../../../../../workflows/browser-frame/favicon';
 
 vi.mock('../../../../../workflows/browser-frame/favicon', () => ({

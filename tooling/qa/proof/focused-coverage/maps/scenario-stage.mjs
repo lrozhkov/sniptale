@@ -1,5 +1,32 @@
 export const SCENARIO_STAGE_OWNER_MAPPINGS = [
   {
+    owner: 'scenario-tour-image-framing',
+    productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/image-framing.tsx',
+    exclusive: true,
+    reason:
+      'Real framing controls prove pointer cancellation, privacy masks and the shared live scene.',
+    testFiles: [
+      'apps/extension/src/scenario-editor/page-shell/tour/image-framing.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/workspace.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/use-state.test.tsx',
+    ],
+  },
+  {
+    owner: 'scenario-tour-window-document',
+    productionFile: 'apps/extension/src/features/scenario/tour-player/document.ts',
+    reason:
+      'The document embeds the shared JavaScript projection used by camera, motion and authoring.',
+    testFiles: [
+      'apps/extension/src/features/scenario/tour-player/image-frame.test.ts',
+      'apps/extension/src/features/scenario/tour-player/camera.test.ts',
+      'apps/extension/src/features/scenario/tour-player/motion.test.ts',
+      'apps/extension/src/features/scenario/tour-player/document.test.ts',
+      'apps/extension/src/scenario-editor/page-shell/tour/stage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/tour/image-framing.test.tsx',
+    ],
+  },
+
+  {
     owner: 'scenario-tour-action-list',
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/image-object-list.tsx',
     exclusive: true,

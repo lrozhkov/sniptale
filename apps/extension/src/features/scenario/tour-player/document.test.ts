@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
 import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
@@ -879,6 +880,34 @@ it('exports marker overrides without rewriting source points', async () => {
       getTourHotspots(exported.tour.slides[0]).map((point: { point: unknown }) => point.point)
     ).toEqual(getTourHotspots(slide).map((point) => point.point));
     expect(JSON.stringify(args.tour)).toBe(saved);
+  } finally {
+    dom.close();
+  }
+});
+
+it('exports a passive shared window header while preserving authored source placement', async () => {
+  const args = fixture();
+  args.tour.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'application',
+    title: 'Image window',
+  };
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.3, y: 0.5 }, zoom: 2 };
+  const saved = structuredClone(args.tour);
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const header = dom.window.document.querySelector<HTMLImageElement>('.tour-window-header')!;
+    expect(header.src).toMatch(/^data:image\/svg\+xml/);
+    expect(decodeURIComponent(header.src)).toContain('Image window');
+    expect(
+      dom.window.document.querySelector<HTMLElement>('.tour-image-viewport')!.style.clipPath
+    ).toContain('inset(');
+    const payload = JSON.parse(dom.window.document.querySelector('#tour-data')!.textContent!);
+    expect(payload.tour.stage.windowHeader).toEqual(args.tour.stage.windowHeader);
+    expect(payload.tour.slides[0].imagePlacement).toEqual(slide.imagePlacement);
+    expect(args.tour).toEqual(saved);
   } finally {
     dom.close();
   }

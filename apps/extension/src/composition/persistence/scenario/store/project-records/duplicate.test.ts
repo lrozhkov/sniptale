@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -403,6 +404,12 @@ it('copies tour images once across representations and independently copies narr
   source.tour.slides = [slide];
   source.tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'source-audio', duration: 3 });
   source.tour.stage.image = structuredClone(slide.image);
+  source.tour.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'application',
+    title: 'Window',
+  };
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2 };
   const image = await io.asset('source-image');
   io.asset.mockImplementation(async (id) =>
     id === 'source-audio' || id === 'detached-audio'
@@ -426,6 +433,8 @@ it('copies tour images once across representations and independently copies narr
   if (copied?.kind !== 'image') throw new Error('Expected tour image');
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
   expect(result.tour?.stage.image).toEqual(copied.image);
+  expect(result.tour?.stage.windowHeader).toEqual(source.tour.stage.windowHeader);
+  expect(copied.imagePlacement).toEqual(slide.imagePlacement);
   expect(result.tour?.stage.image?.editDocumentId).not.toBe('source-document');
   expect(source.tour.stage.image?.assetId).toBe('source-image');
   expect(copied.actions[0]!.object.narration?.assetId).not.toBe('source-audio');

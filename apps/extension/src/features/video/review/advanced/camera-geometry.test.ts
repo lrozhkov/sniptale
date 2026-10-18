@@ -10,7 +10,7 @@ import {
   evaluateQuickEditCameraAtTime,
 } from './scene';
 import { projectQuickEditPoint, quickEditPlaneProjection } from './spatial-geometry';
-import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from './zoom';
 import {
   createCameraFollowSettings,

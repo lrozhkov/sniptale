@@ -5,7 +5,10 @@ import { drawCompositionVisualLayer } from './visual';
 import { createVisualTestContext } from './visual.test-support';
 import { windowHeaderImageKey } from './window-header';
 import { expect, it, vi } from 'vitest';
-import { DEFAULT_WINDOW_HEADER, windowHeaderGeometry } from '../../../browser-frame/header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  windowHeaderGeometry,
+} from '@sniptale/runtime-contracts/window-header';
 import {
   drawFittedMediaLayer,
   getFittedMediaContentFrame,

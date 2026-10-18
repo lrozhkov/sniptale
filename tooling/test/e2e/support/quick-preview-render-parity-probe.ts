@@ -32,7 +32,7 @@ import { createQuickEditBorder } from '../../../../apps/extension/src/features/v
 import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
 import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/key-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
 import type { RenderResources } from '../../../../apps/extension/src/features/video/composition/canvas/render-resources';
 

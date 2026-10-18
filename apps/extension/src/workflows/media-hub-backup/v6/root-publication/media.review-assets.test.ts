@@ -22,7 +22,7 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 }));
 
 import { mediaLibraryRootPublisher } from './media';
-import { DEFAULT_WINDOW_HEADER } from '../../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,

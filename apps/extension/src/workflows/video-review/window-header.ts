@@ -2,7 +2,7 @@ import type { RenderResources } from '../../features/video/composition/canvas/re
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
-import { windowHeaderGeometry } from '../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 

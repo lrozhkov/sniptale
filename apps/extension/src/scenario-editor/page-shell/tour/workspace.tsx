@@ -7,10 +7,9 @@ import { useRef, useState } from 'react';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { X, Settings2, SquarePen, Image, ArrowLeft } from 'lucide-react';
+import { X, Settings2, SquarePen, ArrowLeft } from 'lucide-react';
 import { GuideInspectorPresentationToggle, ScenarioWorkspaceFrame } from '../workspace';
-import { GuideResourceDrawer, useGuideResourceRequest } from '../resource-drawer';
-import { ScenarioInspectorActionButton } from '../inspector-actions';
+import { GuideResourceDrawer, GuideResourceTrigger } from '../resource-drawer';
 import { TourViewControls, useTourViewMode } from './view-controls';
 import { TourInspector } from './inspector';
 import { TourImageDropZone } from './image-drop';
@@ -108,6 +107,17 @@ export function TourWorkspace(props: TourWorkspaceProps) {
                     <span>{t('scenario.editor.guideEditImage')}</span>
                   </ContentToolbarButton>
                 )}
+                {state.slide && (
+                  <GuideResourceTrigger
+                    t={t}
+                    disabled={importDisabled}
+                    title={t('scenario.editor.guideReplaceImage')}
+                    target={{
+                      kind: state.slide.kind === 'image' ? 'tour-image' : 'tour-background',
+                      slideId: state.slide.id,
+                    }}
+                  />
+                )}
               </div>
             )}
             t={t}
@@ -160,7 +170,6 @@ export function TourWorkspace(props: TourWorkspaceProps) {
 
 function TourSettingsPanel({
   images,
-  onEditImage,
   project,
   panels,
   disabled,
@@ -171,8 +180,6 @@ function TourSettingsPanel({
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
-  const slide = state.slide;
-  const image = slide?.kind === 'image' ? slide.image : slide?.background.image;
   const inspectorTitle =
     panels.rightScope === 'document'
       ? t('scenario.editor.tourSettings')
@@ -229,26 +236,16 @@ function TourSettingsPanel({
       <div className="guide-panel-scroll">
         {project.tour && (
           <TourInspector
+            images={images}
             importDisabled={importDisabled}
-            onUploadStage={(file, signal) =>
+            onUploadStage={(file, signal, originMediaId) =>
               onImport({
-                sources: [{ kind: 'file', file }],
+                sources: originMediaId
+                  ? [{ kind: 'library', mediaId: originMediaId }]
+                  : [{ kind: 'file', file }],
                 placement: { kind: 'tour-stage-background' },
                 signal,
               })
-            }
-            imageActions={
-              slide &&
-              image && (
-                <TourSelectedImageActions
-                  slide={slide}
-                  images={images}
-                  onEditImage={onEditImage}
-                  disabled={disabled}
-                  importDisabled={importDisabled}
-                  t={t}
-                />
-              )
             }
             presentation={panels.presentation}
             tour={project.tour}
@@ -302,53 +299,6 @@ function TourSettingsPanel({
         )}
       </div>
     </FloatingChromePanel>
-  );
-}
-
-/** Selected image commands keep target and resource availability separate from panel presentation. */
-function TourSelectedImageActions({
-  slide,
-  images,
-  onEditImage,
-  disabled,
-  importDisabled,
-  t,
-}: {
-  slide: TourSlide;
-  images: SelectedTourProps['images'];
-  onEditImage: SelectedTourProps['onEditImage'];
-  disabled: boolean;
-  importDisabled: boolean;
-  t: Translate;
-}) {
-  const requestResource = useGuideResourceRequest();
-  const image = slide.kind === 'image' ? slide.image : slide.background.image;
-  return (
-    <>
-      {onEditImage && (
-        <ScenarioInspectorActionButton
-          data-inspector-edit-image={slide.id}
-          disabled={disabled || !image || !images[image.assetId]}
-          onClick={() => onEditImage(slide.id)}
-        >
-          <SquarePen size={16} aria-hidden="true" />
-          {t('scenario.editor.guideEditImage')}
-        </ScenarioInspectorActionButton>
-      )}
-      <ScenarioInspectorActionButton
-        disabled={importDisabled || !requestResource}
-        aria-controls="guide-resource-drawer"
-        onClick={() =>
-          requestResource?.({
-            kind: slide.kind === 'image' ? 'tour-image' : 'tour-background',
-            slideId: slide.id,
-          })
-        }
-      >
-        <Image size={16} aria-hidden="true" />
-        {t('scenario.editor.guideReplaceImage')}
-      </ScenarioInspectorActionButton>
-    </>
   );
 }
 

@@ -1,6 +1,6 @@
 import { reviewTrackEnabled } from './track-controls';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import { windowHeaderGeometry } from '../../../browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import {
   deriveReviewCursorFocusPath,
   resolveReviewCursorFocusPath,

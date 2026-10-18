@@ -1,3 +1,4 @@
+import { TourImageFraming } from './image-framing';
 import { TourImageObjects, TourAddObjectMenu, commitTourImageObject } from './image-object-list';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { TourDocumentSettings } from './document-settings';
@@ -36,8 +37,9 @@ import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
 type InspectorProps = {
+  images?: Record<string, string | null>;
   imageActions?: ReactNode;
-  onUploadStage?: (file: File, signal: AbortSignal) => Promise<boolean>;
+  onUploadStage?: (file: File, signal: AbortSignal, originMediaId?: string) => Promise<boolean>;
   importDisabled?: boolean;
   presentation?: 'all' | 'sections';
   narration?: ReactNode;
@@ -251,6 +253,7 @@ function TourInspectorContent(props: InspectorProps) {
       />
     ) : (
       <TourImageSettings
+        images={props.images ?? {}}
         narration={props.narration}
         presentation={props.presentation ?? 'all'}
         key={JSON.stringify([slide.id, objectId])}
@@ -321,6 +324,7 @@ function TourInspectorContent(props: InspectorProps) {
 }
 
 type ImageSettingsProps = {
+  images: Record<string, string | null>;
   narration?: ReactNode;
   presentation: 'all' | 'sections';
   section: string;
@@ -360,6 +364,14 @@ function TourImageSettings(props: ImageSettingsProps) {
               onChange={(fit) => onChange({ ...slide, fit })}
             />
           </div>
+          <TourImageFraming
+            tour={tour}
+            slide={slide}
+            images={props.images}
+            disabled={disabled}
+            onChange={onChange}
+            t={t}
+          />
           {slide.image && (
             <TourTextField
               label={t('scenario.editor.tourAlt')}

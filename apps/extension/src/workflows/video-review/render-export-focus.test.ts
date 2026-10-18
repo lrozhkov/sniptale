@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import { createQuickEditBorder } from '../../features/video/review/advanced/border';

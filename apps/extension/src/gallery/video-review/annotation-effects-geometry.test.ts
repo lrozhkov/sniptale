@@ -4,7 +4,7 @@ import {
   resolveEffectV1ControlDefault,
   validateEffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import {
   DEFAULT_QUICK_EDIT_PERSPECTIVE,

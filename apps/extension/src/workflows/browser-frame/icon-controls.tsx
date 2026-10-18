@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { FolderOpen, Globe, LoaderCircle } from 'lucide-react';
-import type { WindowHeader } from '../../features/browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { translate } from '../../platform/i18n';
 import { WINDOW_HEADER_ICON_ACCEPT } from './local-icon';
 

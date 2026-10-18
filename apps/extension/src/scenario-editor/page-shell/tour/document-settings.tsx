@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
-import { GuideImageUpload } from '../image-upload';
+import { BackgroundImagePicker } from '../../../composition/background-resources/picker';
+import type { AcquiredBackground } from '../../../composition/background-resources/acquisition';
+import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
 import {
@@ -29,7 +32,9 @@ export function TourDocumentSettings({
   tour: TourDocument;
   disabled: boolean;
   onChange: (tour: TourDocument) => boolean;
-  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  onUploadStage?:
+    | ((file: File, signal: AbortSignal, originMediaId?: string) => Promise<boolean>)
+    | undefined;
   importDisabled?: boolean | undefined;
   t: Translate;
 }) {
@@ -67,6 +72,15 @@ export function TourDocumentSettings({
             onUploadStage={onUploadStage}
             onChange={(stage) => onChange({ ...tour, stage })}
             t={t}
+          />
+          <WindowHeaderSettings
+            header={tour.stage.windowHeader}
+            disabled={disabled}
+            onChange={(windowHeader) => {
+              const { windowHeader: _previousHeader, ...stage } = tour.stage;
+              if (!onChange({ ...tour, stage: windowHeader ? { ...stage, windowHeader } : stage }))
+                throw new Error('Window header edit refused');
+            }}
           />
           {(
             [
@@ -138,10 +152,14 @@ function TourStageBackgroundSettings({
   stage: TourDocument['stage'];
   disabled: boolean;
   importDisabled: boolean;
-  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  onUploadStage?:
+    | ((file: File, signal: AbortSignal, originMediaId?: string) => Promise<boolean>)
+    | undefined;
   onChange: (stage: TourDocument['stage']) => boolean;
   t: Translate;
 }) {
+  const [pickerKey, setPickerKey] = useState(0);
+  const [applying, setApplying] = useState(false);
   return (
     <>
       <CompactPaintSelector
@@ -161,13 +179,29 @@ function TourStageBackgroundSettings({
         }
       />
       {onUploadStage && (
-        <GuideImageUpload
-          compact
-          placement={{ kind: 'tour-stage-background' }}
-          disabled={importDisabled}
-          onUpload={onUploadStage}
-          t={t}
+        <BackgroundImagePicker
+          key={pickerKey}
+          pending={importDisabled}
+          onSelect={async ({ file, originMediaId }: AcquiredBackground, signal) => {
+            setApplying(true);
+            try {
+              if (!(await onUploadStage(file, signal, originMediaId)))
+                throw new Error('Stage background import refused');
+            } finally {
+              if (!signal.aborted) setApplying(false);
+            }
+          }}
         />
+      )}
+      {applying && (
+        <ScenarioInspectorActionButton
+          onClick={() => {
+            setApplying(false);
+            setPickerKey((value) => value + 1);
+          }}
+        >
+          {t('scenario.editor.guideImportCancel')}
+        </ScenarioInspectorActionButton>
       )}
       {stage.image && (
         <>

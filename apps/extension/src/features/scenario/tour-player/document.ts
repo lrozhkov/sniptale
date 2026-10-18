@@ -1,3 +1,4 @@
+import { composeWindowHeaderSvg } from '../../browser-frame/appearance';
 import { buildTourPlaybackPlan } from '../project/tour-playback-plan';
 import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
 import designTokens from '@sniptale/ui/styles/design-tokens?raw';
@@ -10,6 +11,23 @@ import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
+
+/** Passive artwork is disposable and never enters the authored project contract. */
+export function prepareTourWindowHeaders(tour: TourDocument): Record<string, string> {
+  const header = tour.stage.windowHeader;
+  const result: Record<string, string> = {};
+  if (!header) return result;
+  const [aspectWidth, aspectHeight] = tour.stage.aspect.split(':').map(Number);
+  const window = { width: (aspectWidth! / aspectHeight!) * 900, height: 900 };
+  const artwork = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(header, window))}`;
+  for (const slide of tour.slides) {
+    if (slide.kind !== 'image' || !slide.image) continue;
+    const source = slide.image;
+    const key = `${source.width}x${source.height}`;
+    if (!result[key]) result[key] = artwork;
+  }
+  return result;
+}
 
 export interface TourPlayerLabels {
   musicMute?: string;
@@ -206,6 +224,7 @@ async function buildTourPlayerShell(args: {
   }
   const { audioResources: _materials, ...viewerTour } = tour;
   const payload = {
+    headers: prepareTourWindowHeaders(tour),
     tour: {
       ...viewerTour,
       stage: {

@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
 import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act } from 'react';
@@ -344,4 +345,73 @@ it('moves the camera with arrows at fixed zoom and preserves focus after commit'
     frame().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
   );
   expect(onFrameCamera).toHaveBeenCalledTimes(1);
+});
+
+it('hides a source target under the header and restores it only inside visible content', () => {
+  const props = fixture();
+  props.tour.stage.windowHeader = DEFAULT_WINDOW_HEADER;
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.5, y: 0.5 }, zoom: 3 };
+  act(() => root.render(<TourStage {...props} />));
+  const image = shadow().querySelector<HTMLElement>('.tour-image')!;
+  const header = shadow().querySelector<HTMLElement>('.tour-window-header')!;
+  const desiredY = parseFloat(header.style.top) + parseFloat(header.style.height) / 2;
+  const point = getTourHotspots(slide)[0]!;
+  point.point = {
+    x: 0.5,
+    y: (desiredY - parseFloat(image.style.top)) / parseFloat(image.style.height),
+  };
+  const underHeader = { ...props.tour, slides: [{ ...slide }, props.tour.slides[1]!] };
+  act(() => root.render(<TourStage {...props} tour={underHeader} />));
+  const hidden = shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  expect(parseFloat(hidden.style.top)).toBeGreaterThanOrEqual(parseFloat(header.style.top));
+  expect(parseFloat(hidden.style.top)).toBeLessThan(
+    parseFloat(header.style.top) + parseFloat(header.style.height)
+  );
+  expect(hidden.hidden).toBe(true);
+  const visible = {
+    ...slide,
+    actions: slide.actions.map((entry) =>
+      entry.type === 'hotspot'
+        ? { ...entry, object: { ...entry.object, point: { x: 0.5, y: 0.5 } } }
+        : entry
+    ),
+  };
+  act(() => root.render(<TourStage {...props} tour={{ ...props.tour, slides: [visible] }} />));
+  const button = shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  expect(button.hidden).toBe(false);
+  act(() => button.click());
+  expect(props.onSelectObject).toHaveBeenCalledWith('point');
+});
+
+it('projects window chrome and source targets into the stage content box inside its borders', () => {
+  const props = fixture();
+  props.tour.stage.windowHeader = DEFAULT_WINDOW_HEADER;
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.matches('.tour-stage') ? Math.max(0, parseFloat(this.style.width) - 2) : 0;
+  });
+  const height = vi
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockImplementation(function (this: HTMLElement) {
+      return this.matches('.tour-stage') ? Math.max(0, parseFloat(this.style.height) - 2) : 0;
+    });
+  try {
+    act(() => root.render(<TourStage {...props} />));
+    const stage = shadow().querySelector<HTMLElement>('[data-tour-stage]')!;
+    const header = shadow().querySelector<HTMLElement>('.tour-window-header')!;
+    const image = shadow().querySelector<HTMLElement>('.tour-image')!;
+    const point = shadow().querySelector<HTMLElement>('.tour-hotspot')!;
+    expect(parseFloat(header.style.width)).toBe(parseFloat(stage.style.width) - 2);
+    expect(parseFloat(image.style.top)).toBeCloseTo(parseFloat(header.style.height));
+    expect(parseFloat(point.style.left)).toBeCloseTo(stage.clientWidth / 2);
+    expect(parseFloat(point.style.top)).toBeCloseTo(
+      (stage.clientHeight + parseFloat(header.style.height)) / 2
+    );
+  } finally {
+    width.mockRestore();
+    height.mockRestore();
+  }
 });

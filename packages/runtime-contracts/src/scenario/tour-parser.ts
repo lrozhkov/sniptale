@@ -1,3 +1,4 @@
+import { parseWindowHeader } from '../window-header';
 import { tourPaintSchema } from './tour-paint-schema';
 import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
@@ -194,6 +195,10 @@ const imageSlide = z
     origin: z.object({ stepId: id, blockId: id }).strict().nullable(),
     requiresTargetReview: z.boolean().optional(),
     fit: z.enum(['contain', 'cover']),
+    imagePlacement: z
+      .object({ center: point, zoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom) })
+      .strict()
+      .optional(),
     camera,
     actions: z
       .array(
@@ -258,6 +263,20 @@ export const tourDocumentSchema = z
     id,
     stage: z
       .object({
+        windowHeader: z
+          .object({
+            kind: z.enum(['browser', 'application']),
+            style: z.enum(['windows', 'macos', 'linux']),
+            theme: z.enum(['light', 'dark']),
+            title: z.string().max(512),
+            url: z.string().max(2048),
+            faviconEnabled: z.boolean(),
+            faviconSource: z.enum(['site', 'file']).optional(),
+            faviconDataUrl: z.string().max(90_000).optional(),
+          })
+          .strict()
+          .refine((value) => parseWindowHeader(value) !== null)
+          .optional(),
         aspect: z.enum(['16:9', '4:3', '9:16']),
         background: color,
         paint: tourPaintSchema.optional(),

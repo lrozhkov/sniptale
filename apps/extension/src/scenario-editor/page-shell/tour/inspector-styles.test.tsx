@@ -20,6 +20,13 @@ import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/to
 import { TourMusicSettings } from './music-settings';
 import { TourInspector } from './inspector';
 import type { TourSelection } from './selection';
+vi.mock('../../../composition/background-resources/catalog', () => ({
+  useBackgroundCatalog: () => ({ status: 'ready', presets: [] }),
+}));
+vi.mock('../../../workflows/background-images/intake', () => ({
+  BACKGROUND_IMAGE_ACCEPT: 'image/png',
+  prepareBackgroundImage: async (file: File) => file,
+}));
 const uploadStage = vi.fn<(file: File, signal: AbortSignal) => Promise<boolean>>();
 let importDisabled = false;
 let root: Root;
@@ -600,15 +607,23 @@ it('uses the shared stage uploader with cancellation and separate import admissi
   );
   Object.defineProperty(input, 'files', { value: [file], configurable: true });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(uploadStage).toHaveBeenCalledWith(file, expect.any(AbortSignal));
-  expect(input.disabled).toBe(true);
+  expect(uploadStage).toHaveBeenCalledWith(file, expect.any(AbortSignal), undefined);
+  expect(
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent?.trim() === translate('settings.editor.backgrounds.upload')
+    )?.disabled
+  ).toBe(true);
   await click('Cancel preparation');
   expect(uploadStage.mock.calls[0]?.[1].aborted).toBe(true);
   await act(async () => finish?.(false));
   expect(host.querySelector('[role="alert"]')).toBeNull();
   importDisabled = true;
   draw();
-  expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.disabled).toBe(true);
+  expect(
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent?.trim() === translate('settings.editor.backgrounds.upload')
+    )?.disabled
+  ).toBe(true);
   expect(host.querySelector<HTMLButtonElement>('[aria-label="Stage background"]')?.disabled).toBe(
     false
   );

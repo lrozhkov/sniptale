@@ -63,7 +63,7 @@ for (const theme of ['light', 'dark'] as const) {
       { tourFixture: '1' }
     );
     await page.getByRole('button', { name: 'Interactive tour', exact: true }).click();
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expectFittedFrame(host);
     const surface = await page
       .locator('.guide-center-panel')
@@ -178,7 +178,7 @@ for (const [locale, theme] of [
       { tourFixture: '1' }
     );
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expect(host.locator('.tour-toolbar')).toBeHidden();
     await page.locator('.tour-slide-select').nth(1).click();
     await expect(host.locator('#tour-player')).toHaveAttribute('data-slide-id', 'tour-after');
@@ -426,7 +426,7 @@ for (const [locale, theme] of [
     const field = panel.getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true });
     const short = locale === 'ru' ? 'Короткое пояснение' : 'Short explanation';
     await field.fill(short);
-    const host = page.locator('.tour-stage-host');
+    const host = page.locator('.tour-canvas .tour-stage-host');
     await expect(host.locator('[data-tour-hint-text]')).toHaveText(short);
     await expect(host.locator('[data-tour-hint-toggle]')).toBeHidden();
     const copy = (
@@ -572,7 +572,7 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(player.locator('[data-tour-next]')).toBeDisabled();
       await expect(hint).toBeHidden();
     };
-    await checkSequence(page.locator('.tour-stage-host'));
+    await checkSequence(page.locator('.tour-canvas .tour-stage-host'));
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
       .locator('.guide-export-stage')
@@ -935,13 +935,12 @@ for (const [locale, theme, viewport] of [
       .click();
     await expect(
       panel.getByRole('button', {
-        name: t('scenario.editor.guideUploadImage'),
+        name: t('settings.editor.backgrounds.upload'),
         exact: true,
       })
     ).toBeVisible();
-    await panel.getByRole('button', { name: t('scenario.editor.tourAspect'), exact: true }).click();
-    await page.getByRole('option', { name: '4:3', exact: true }).click();
-    const player = page.locator('.tour-stage-host');
+    await panel.getByRole('button', { name: '4:3', exact: true }).click();
+    const player = page.locator('.tour-canvas .tour-stage-host');
     const stage = player.locator('[data-tour-stage]');
     await expect(player.locator('.tour-hotspot')).toHaveCount(1);
     await expect(player.locator('.tour-image')).toBeVisible();
@@ -991,8 +990,15 @@ for (const [locale, theme, viewport] of [
     await expect(stage).toHaveCSS('background-image', /url\(/);
     await expect(stage).toHaveCSS('background-size', 'cover, auto');
     const chooseFit = async (fit: 'tourContain' | 'tourCover') => {
-      await panel.getByRole('button', { name: t('scenario.editor.tourFit'), exact: true }).click();
-      await page.getByRole('option', { name: t(`scenario.editor.${fit}`), exact: true }).click();
+      const option = t(`scenario.editor.${fit}`);
+      const segment = panel.getByRole('button', { name: option, exact: true });
+      if (await segment.isVisible()) await segment.click();
+      else {
+        await panel
+          .getByRole('button', { name: t('scenario.editor.tourFit'), exact: true })
+          .click();
+        await page.getByRole('option', { name: option, exact: true }).click();
+      }
     };
     await chooseFit('tourContain');
     await expect(stage).toHaveCSS('background-size', 'contain, auto');
@@ -1021,24 +1027,10 @@ for (const [locale, theme, viewport] of [
     expect(await inspectStageContent(player)).toEqual(original);
     await appearance();
     await panel
-      .getByRole('button', { name: t('scenario.editor.guideOpenImageLibrary'), exact: true })
+      .getByRole('button', { name: t('settings.editor.backgrounds.library'), exact: true })
       .click();
-    const drawer = page.locator('#guide-resource-drawer');
-    const select = drawer.getByRole('button', {
-      name: `${t('gallery.app.selectItem')}: Library screenshot.png`,
-      exact: true,
-    });
-    await expect(select).toBeVisible();
-    await select.click();
-    await expect(drawer.locator('.guide-import-count')).toHaveText(
-      t('scenario.editor.guideImportSelectedCount').replace('{count}', '1')
-    );
-    const importSelected = drawer.getByRole('button', {
-      name: t('scenario.editor.guideImportSelected'),
-      exact: true,
-    });
-    await expect(importSelected).toBeInViewport({ ratio: 1 });
-    await importSelected.click();
+    const drawer = page.locator('[data-ui="background.library.drawer"]');
+    await drawer.getByRole('button', { name: /Library screenshot\.png/ }).click();
     await expect(drawer).toHaveCount(0);
     await expect(stage).toHaveCSS('background-image', /url\(/);
     expect(await inspectStageContent(player)).toEqual(original);
@@ -1058,6 +1050,7 @@ for (const [locale, theme, viewport] of [
     });
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
+      let complete = false;
       Object.defineProperty(window, 'showSaveFilePicker', {
         configurable: true,
         value: async () => ({
@@ -1066,12 +1059,25 @@ for (const [locale, theme, viewport] of [
               write: (chunk) => {
                 chunks.push(chunk);
               },
+              close: () => {
+                complete = true;
+              },
             }),
         }),
       });
+      Object.defineProperty(window, 'savedStageTourComplete', {
+        configurable: true,
+        get: () => complete,
+      });
       Object.defineProperty(window, 'savedStageTour', {
         configurable: true,
-        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+        get: () => {
+          const decoder = new TextDecoder();
+          return (
+            chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('') +
+            decoder.decode()
+          );
+        },
       });
     });
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
@@ -1081,8 +1087,8 @@ for (const [locale, theme, viewport] of [
       .click();
     await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
     await expect
-      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedStageTour'))))
-      .toContain('<!doctype html>');
+      .poll(() => page.evaluate(() => Reflect.get(window, 'savedStageTourComplete')))
+      .toBe(true);
     const html = await page.evaluate(() => String(Reflect.get(window, 'savedStageTour')));
     const output = info.outputPath('stage-background-tour.html');
     await writeFile(output, html);

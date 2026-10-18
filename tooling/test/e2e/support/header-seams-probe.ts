@@ -4,12 +4,12 @@ import {
   attachBrowserHeaderToImage,
 } from '../../../../apps/extension/src/editor/objects/image-frame';
 import { renderExactBrowserFrameToDataUrl } from '../../../../apps/extension/src/editor/browser-frame/factory/exact/renderer';
-import { windowHeaderGeometry } from '../../../../apps/extension/src/features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_IMAGE_SETTINGS,
 } from '../../../../apps/extension/src/features/editor/document/constants';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import {
   reviewWindowHeaderUrl,
   loadReviewWindowHeader,

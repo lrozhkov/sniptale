@@ -50,6 +50,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
   const policy = scenePolicy(root, options);
   const { authoring } = policy;
   let { tour } = input;
+  let headers = input.headers ?? {};
   const { assets, labels } = input;
   const media = new Map(assets.map((asset) => [asset.id, asset.src]));
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
@@ -73,7 +74,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
   const refreshFullView = () =>
     updateFullView({
       slide: ended ? null : current,
-      viewport: { stageWidth, stageHeight },
+      viewport: { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
       autoZoom: tour.playback.autoZoom,
       fullView,
       state: stage.dataset.motion,
@@ -95,7 +96,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
     if (signal.aborted) return;
     hints = renderSceneContent(
       ended ? endSlide(tour, labels) : current,
-      { stageWidth, stageHeight },
+      { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
       {
         scene,
         element,
@@ -110,6 +111,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
         maskDefaults: tour.style.maskDefaults,
         style: tour.style,
         fullView,
+        headers,
       },
       navigationController,
       selectedObjectId
@@ -126,16 +128,17 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
     });
     if (!next) return;
     lastFontSize = next.fontSize;
-    stageWidth = next.width;
-    stageHeight = next.height;
+    stageWidth = stage.clientWidth || next.width;
+    stageHeight = stage.clientHeight || next.height;
     render();
-    motion?.reflow({ stageWidth, stageHeight });
+    motion?.reflow({ stageWidth, stageHeight, windowHeader: tour.stage.windowHeader });
   }
   applySceneStyle(root, stage, tour, media);
   return {
     update(next) {
       fullView = false;
       tour = next.tour;
+      headers = next.headers ?? {};
       media.clear();
       for (const asset of next.assets) media.set(asset.id, asset.src);
       hintController.setDefaultAppearance(tour.style);
@@ -180,7 +183,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
         previous,
         ended ? null : slide,
         tour,
-        { stageWidth, stageHeight },
+        { stageWidth, stageHeight, windowHeader: tour.stage.windowHeader },
         reducedMotion()
       );
     },
@@ -198,8 +201,8 @@ function selectObjectHint(slide, id, hints) {
 function resizeTourViewport(root, viewport, stage, aspect, previous) {
   const next = measureScene(root, viewport, aspect);
   if (
-    next.width === previous.width &&
-    next.height === previous.height &&
+    next.width === parseFloat(stage.style.width) &&
+    next.height === parseFloat(stage.style.height) &&
     next.fontSize === previous.fontSize &&
     stage.style.width
   )
@@ -225,7 +228,7 @@ function renderSceneBody(slide, viewport, context, navigation, selectedObjectId)
   if (slide?.kind === 'image')
     return {
       imageBox: renderTourImage(slide, viewport, context),
-      hints: slideExplanations(slide),
+      hints: context.authoring?.imageFrame ? [] : slideExplanations(slide),
     };
   if (slide) {
     const rendered = navigation.render(
@@ -327,20 +330,22 @@ function applySceneStyle(root, stage, tour, media) {
   root.style.setProperty('--tour-accent', tour.style.accent);
   root.style.setProperty('--tour-text', tour.style.text);
   root.style.setProperty('--tour-surface', tour.style.surface);
-  stage.style.background = tour.stage.paint
-    ? serializePaintToCss(tour.stage.paint)
-    : tour.stage.background;
+  const paint = tour.stage.paint;
+  const underlay = paint?.kind === 'gradient' ? serializePaintToCss(paint) : null;
   const source = tour.stage.image && media.get(tour.stage.image.assetId);
-  if (source) {
-    const underlay = stage.style.backgroundImage;
-    stage.style.backgroundImage = `url("${source}")${underlay && underlay !== 'none' ? `, ${underlay}` : ''}`;
-    stage.style.backgroundPosition = 'center';
-    stage.style.backgroundRepeat = 'no-repeat';
-    stage.style.backgroundSize =
-      underlay && underlay !== 'none'
-        ? `${tour.stage.imageFit ?? 'cover'}, auto`
-        : (tour.stage.imageFit ?? 'cover');
-  }
+  // Explicit layers avoid reading shorthand resets through browser-specific CSSOM serialization.
+  stage.style.backgroundColor = paint?.kind === 'solid' ? paint.color : tour.stage.background;
+  stage.style.backgroundImage = source
+    ? `url("${source}")${underlay ? `, ${underlay}` : ''}`
+    : (underlay ?? 'none');
+  stage.style.backgroundPosition = 'center';
+  stage.style.backgroundRepeat = 'no-repeat';
+  stage.style.backgroundSize =
+    source && underlay
+      ? `${tour.stage.imageFit ?? 'cover'}, auto`
+      : source
+        ? (tour.stage.imageFit ?? 'cover')
+        : 'auto';
 }
 
 /** Viewport geometry and font metrics jointly determine scene and explanation layout. */

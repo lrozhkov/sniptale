@@ -2,7 +2,7 @@
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

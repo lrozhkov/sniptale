@@ -1,5 +1,9 @@
 import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
-import { isWindowHeaderFavicon, windowHeaderGeometry, type WindowHeader } from './header';
+import {
+  isWindowHeaderFavicon,
+  windowHeaderGeometry,
+  type WindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 
 const headerFontCss =
   `@font-face{font-family:"Sniptale Interface";font-style:normal;` +

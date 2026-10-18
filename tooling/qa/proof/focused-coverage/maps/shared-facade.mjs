@@ -1,5 +1,18 @@
 export const SHARED_FACADE_OWNER_MAPPINGS = [
   {
+    owner: 'window-header-contract',
+    productionFile: 'packages/runtime-contracts/src/window-header.ts',
+    reason:
+      'The shared contract admits existing header data for every editor without application imports.',
+    testFiles: [
+      'packages/runtime-contracts/src/window-header.test.ts',
+      'packages/runtime-contracts/src/scenario/tour-parser.test.ts',
+      'apps/extension/src/features/browser-frame/appearance.test.ts',
+      'apps/extension/src/workflows/browser-frame/settings.test.tsx',
+      'apps/extension/src/workflows/media-hub-backup/v6/metadata-transport.test.ts',
+    ],
+  },
+  {
     owner: 'sf-editor-floating-workspace',
     productionPrefix: 'apps/extension/src/editor/workspace/floating/',
     exclusive: true,

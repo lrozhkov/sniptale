@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../window-header';
 import {
   getTourHotspots,
   getTourAnnotations,
@@ -822,4 +823,37 @@ it('strictly admits complete bounded global and local highlight phase pairs', ()
       }).status
     ).toBe(animation === null ? 'ok' : 'invalid');
   }
+});
+
+it('retains global window headers and independent image placement without changing source coordinates', () => {
+  const value = document();
+  value.stage.windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'application', title: 'Window' };
+  const slide = value.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2.5 };
+  const before = structuredClone(value);
+  const parsed = parseTourDocument(value);
+  expect(parsed).toEqual({ status: 'ok', document: before });
+  expect(value).toEqual(before);
+  if (parsed.status !== 'ok') throw new Error('Expected parsed tour');
+  parsed.document.stage.windowHeader!.title = 'Other';
+  expect(value.stage.windowHeader.title).toBe('Window');
+});
+it('rejects remote header icons and nonfinite or out-of-range source placement', () => {
+  const value = document();
+  value.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    faviconEnabled: true,
+    faviconDataUrl: 'https://site.test/icon.png',
+  };
+  expect(parseTourDocument(value).status).toBe('invalid');
+  delete value.stage.windowHeader;
+  const slide = value.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  for (const zoom of [NaN, Infinity, 0, 8.1]) {
+    slide.imagePlacement = { center: { x: 0.5, y: 0.5 }, zoom };
+    expect(parseTourDocument(value).status).toBe('invalid');
+  }
+  slide.imagePlacement = { center: { x: 1.1, y: 0.5 }, zoom: 1 };
+  expect(parseTourDocument(value).status).toBe('invalid');
 });

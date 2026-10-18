@@ -1,3 +1,8 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import {
+  createTourDocument,
+  createTourImageSlide,
+} from '../../../features/scenario/project/public';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -6,10 +11,17 @@ import { createGuideProject } from '../../../features/scenario/project/public';
 import type { useGuideAutosave } from './autosave';
 import { useGuidePageState } from './use-state';
 
-const io = vi.hoisted(() => ({ load: vi.fn(), autosave: vi.fn(), list: vi.fn(), enter: vi.fn() }));
+const io = vi.hoisted(() => ({
+  load: vi.fn(),
+  autosave: vi.fn(),
+  list: vi.fn(),
+  enter: vi.fn(),
+  importImages: vi.fn(),
+}));
 vi.mock('../../../composition/persistence/scenario/store/public', async (original) => ({
   ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
   listScenarioProjectSummaries: io.list,
+  importScenarioImages: io.importImages,
 }));
 vi.mock('./autosave', () => ({ useGuideAutosave: io.autosave }));
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
@@ -183,4 +195,132 @@ it('ignores delayed unsupported metadata after another project opens', async () 
   await act(async () => finishMetadata!([{ id: 'guide', availability: 'unsupported' }]));
   expect(state.project?.id).toBe('next');
   expect(state.status).toBe('saved');
+});
+
+function backgroundCommand() {
+  return {
+    kind: 'import' as const,
+    input: {
+      sources: [
+        {
+          kind: 'file' as const,
+          file: new File(['image'], 'background.png', { type: 'image/png' }),
+        },
+      ],
+      placement: { kind: 'tour-stage-background' as const },
+      signal: new AbortController().signal,
+    },
+  };
+}
+function savedTour(revision = 1) {
+  const project = createGuideProject('Tour', 'guide', revision);
+  project.tour = createTourDocument();
+  project.tour.slides = [createTourImageSlide('image')];
+  return { currentRevision: revision, versions: [{ project, revision, savedAt: revision }] };
+}
+it('keeps global header and source placement reversible through Undo, Redo and saved reopen', async () => {
+  io.load.mockResolvedValue(savedTour());
+  await mount();
+  const original = state.project!;
+  const tour = structuredClone(original.tour!);
+  tour.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'application',
+    title: 'Image window',
+  };
+  const slide = tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2 };
+  const edited = { ...original, tour };
+  act(() => state.update(edited));
+  expect(state.project?.tour).toEqual(tour);
+  act(() => state.undo());
+  expect(state.project?.tour).toEqual(original.tour);
+  act(() => state.redo());
+  expect(state.project?.tour).toEqual(tour);
+  io.load.mockResolvedValue({
+    currentRevision: 2,
+    versions: [{ project: structuredClone(edited), revision: 2, savedAt: 2 }],
+  });
+  await act(async () => state.reload());
+  expect(state.project?.tour).toEqual(tour);
+});
+it('refuses a stale framing edit after another accepted revision', async () => {
+  io.load.mockResolvedValue(savedTour());
+  await mount();
+  const stale = state.commitChange;
+  io.load.mockResolvedValue(savedTour(2));
+  await act(async () => state.reload());
+  await act(async () => expect(await stale(backgroundCommand())).toBe(false));
+  expect(io.importImages).not.toHaveBeenCalled();
+  expect(state.project?.updatedAt).toBe(2);
+});
+it('rejects a delayed background result after project deletion or restore', async () => {
+  io.load.mockResolvedValue(savedTour());
+  await mount();
+  let finish:
+    | ((value: {
+        project: ReturnType<typeof createGuideProject>;
+        workspaceRevision: number;
+      }) => void)
+    | undefined;
+  io.importImages.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  let pending: Promise<boolean>;
+  act(() => {
+    pending = state.commitChange(backgroundCommand());
+  });
+  expect(io.importImages).toHaveBeenCalledWith(
+    expect.objectContaining({
+      expectedRevision: 1,
+      project: expect.objectContaining({ id: 'guide' }),
+    })
+  );
+  const restored = savedTour(3);
+  restored.versions[0]!.project.name = 'Restored';
+  io.load.mockResolvedValue(restored);
+  await act(async () => state.reload());
+  await act(async () => {
+    finish!({
+      project: { ...restored.versions[0]!.project, name: 'Late old result' },
+      workspaceRevision: 2,
+    });
+    expect(await pending).toBe(false);
+  });
+  expect(state.project?.name).toBe('Restored');
+  expect(state.canUndo).toBe(false);
+});
+it('refuses an old background import after the project identity is recreated', async () => {
+  io.load.mockResolvedValue(savedTour());
+  await mount();
+  const previousGeneration = state.commitChange;
+  const recreated = savedTour(1);
+  recreated.versions[0]!.project.name = 'Recreated';
+  io.load.mockResolvedValue(recreated);
+  await act(async () => state.reload());
+  await act(async () => expect(await previousGeneration(backgroundCommand())).toBe(false));
+  expect(io.importImages).not.toHaveBeenCalled();
+  expect(state.project?.name).toBe('Recreated');
+});
+it('retries a refused stage background without duplicate page publication', async () => {
+  io.load.mockResolvedValue(savedTour());
+  await mount();
+  io.importImages.mockRejectedValueOnce(new Error('Publication refused'));
+  await act(async () => expect(await state.commitChange(backgroundCommand())).toBe(false));
+  expect(state.canUndo).toBe(false);
+  expect(state.project?.tour?.stage.image).toBeUndefined();
+  io.importImages.mockImplementationOnce(async ({ project }) => ({
+    project: { ...project, name: 'Accepted' },
+    workspaceRevision: 2,
+  }));
+  await act(async () => expect(await state.commitChange(backgroundCommand())).toBe(true));
+  expect(io.importImages).toHaveBeenCalledTimes(2);
+  expect(state.project?.name).toBe('Accepted');
+  act(() => state.undo());
+  expect(state.project?.name).toBe('Tour');
+  expect(state.canUndo).toBe(false);
 });
