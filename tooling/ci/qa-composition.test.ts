@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 import { expect, it, vi } from 'vitest';
 
@@ -42,7 +43,12 @@ function createCandidateGitRunner(stdout: string, comparisonRevision = 'b'.repea
     skipped: false,
     status: 0,
     stderr: '',
-    stdout: args[0] === 'merge-base' ? `${comparisonRevision}\n` : stdout,
+    stdout:
+      args[0] === 'rev-parse'
+        ? 'false\n'
+        : args[0] === 'merge-base'
+          ? `${comparisonRevision}\n`
+          : stdout,
   });
 }
 
@@ -189,6 +195,7 @@ it('uses one merge-base authority for candidate paths and deleted lineage', () =
     deletedFiles: ['apps/extension/src/content/removed.ts'],
   });
   expect(calls).toEqual([
+    ['rev-parse', '--is-shallow-repository'],
     ['merge-base', 'a'.repeat(40), 'HEAD'],
     [
       'diff',
@@ -233,6 +240,71 @@ it('keeps an advanced base tip out of the candidate comparison tree', async () =
     comparisonRevision: commonAncestor,
     deletedFiles: ['src/removed.ts'],
   });
+});
+
+it('compares exact base and candidate trees in the shallow PR launcher checkout', async () => {
+  const source = createTempRoot('ci-shallow-source-');
+  initGitRepo(source);
+  writeFile(source, 'src/current.ts', 'export const current = 1;\n');
+  writeFile(source, 'src/removed.ts', 'export const removed = 1;\n');
+  writeFile(source, 'src/original.ts', 'export const renamed = true;\n');
+  runFixtureGit(source, 'add', '.');
+  runFixtureGit(source, 'commit', '-m', 'base');
+  const ancestor = gitOutput(source, 'rev-parse', 'HEAD');
+  writeFile(source, 'src/current.ts', 'export const current = 2;\n');
+  fs.rmSync(`${source}/src/removed.ts`);
+  fs.renameSync(`${source}/src/original.ts`, `${source}/src/renamed.ts`);
+  writeFile(source, 'tooling/control.mjs', 'export const control = true;\n');
+  runFixtureGit(source, 'add', '-A');
+  runFixtureGit(source, 'commit', '-m', 'candidate');
+  const candidate = gitOutput(source, 'rev-parse', 'HEAD');
+  runFixtureGit(source, 'checkout', '--detach', ancestor);
+  writeFile(source, 'src/base-only.ts', 'export const baseOnly = true;\n');
+  runFixtureGit(source, 'add', '.');
+  runFixtureGit(source, 'commit', '-m', 'advanced base');
+  const base = gitOutput(source, 'rev-parse', 'HEAD');
+  const checkout = createTempRoot('ci-shallow-candidate-');
+  initGitRepo(checkout);
+  runFixtureGit(
+    checkout,
+    'fetch',
+    '--depth=1',
+    pathToFileURL(source).href,
+    `${candidate}:refs/sniptale/candidate`,
+    `${base}:refs/sniptale/base`
+  );
+  runFixtureGit(checkout, 'checkout', '--detach', candidate);
+  expect(gitOutput(checkout, 'rev-parse', '--is-shallow-repository')).toBe('true');
+  await withCwd(checkout, () => {
+    const environment = { SNIPTALE_BASE_SHA: base };
+    expect(resolveCiCandidateDiff({ environment })).toEqual({
+      available: true,
+      comparisonRevision: base,
+      candidateFiles: [
+        'src/base-only.ts',
+        'src/current.ts',
+        'src/original.ts',
+        'src/removed.ts',
+        'src/renamed.ts',
+        'tooling/control.mjs',
+      ],
+      deletedFiles: ['src/base-only.ts', 'src/removed.ts'],
+      requiresFullHarness: true,
+    });
+    expect(resolveCiHarnessTestPlan({}, { environment }).full).toBe(true);
+    expect(() =>
+      resolveCiCandidateDiff({ environment: { SNIPTALE_BASE_SHA: 'f'.repeat(40) } })
+    ).toThrow();
+  });
+});
+
+it('rejects malformed shallow metadata without treating it as complete history', () => {
+  expect(() =>
+    resolveCiCandidateDiff({
+      environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+      gitRunner: () => ({ skipped: false, status: 0, stderr: '', stdout: 'unknown\n' }),
+    })
+  ).toThrow('Malformed Git shallow repository status.');
 });
 
 it('allows an explicit periodic proof to force the full harness', () => {

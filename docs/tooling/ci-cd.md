@@ -53,6 +53,8 @@ Candidate code receives no GitHub token, Selectel credential, OIDC authority, or
 
 A control-digest change is reported as `candidate-controls`. It does not cause the previous implementation to run. Changed QA becomes trusted after merge to `main`.
 
+Shallow PR checkouts can lack merge-base ancestry. Compare their exact base and candidate trees. Full-history checkouts retain merge-base comparison. Neither mode reduces repository-wide Fast proof or harness selection. Missing or unreadable trees fail proof.
+
 Docs-only proof reuse requires an exact successful base proof, equal semantic and control digests, and changed paths classified by machine policy as non-gate inputs. Unknown paths require candidate execution.
 
 ## Proof identity and reuse
@@ -83,4 +85,4 @@ For a release, complete Release checks on the source commit before creating its 
 
 Publication is restricted to `main`. It requires a GitHub-verifiable annotated version tag, the matching finalizer result, checked release assets, and attestations for every published subject. Diagnostic mode remains read-only and cannot enter the publisher environment.
 
-The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts evidence and never merges. Use it only for an external-capacity failure or incident. 
+The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts evidence and never merges. Use it only for an external-capacity failure or incident.
