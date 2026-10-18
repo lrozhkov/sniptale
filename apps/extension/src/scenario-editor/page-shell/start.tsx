@@ -20,6 +20,7 @@ import {
   type EditorStartSourceItem,
   useEditorStartItems,
 } from '../../ui/editor-start';
+import { UnsupportedScenarioTourError } from './runtime/open-existing';
 import type { useGuidePageState } from './runtime/use-state';
 
 const covers = createProjectCoverService({
@@ -75,8 +76,12 @@ export function ScenarioEditorStart(props: {
     try {
       const result = await action();
       if (result === false) setError(failure);
-    } catch {
-      setError(failure);
+    } catch (error) {
+      setError(
+        error instanceof UnsupportedScenarioTourError
+          ? props.t('scenario.editor.tourUnsupportedOpen')
+          : failure
+      );
       void refresh();
     } finally {
       pendingRef.current = false;
@@ -86,9 +91,11 @@ export function ScenarioEditorStart(props: {
   const loadError =
     props.state.status === 'missing'
       ? props.t('scenario.editor.guideMissing')
-      : props.state.status === 'unavailable'
-        ? props.t('scenario.editor.guideUnavailable')
-        : null;
+      : props.state.status === 'unsupported'
+        ? props.t('scenario.editor.tourUnsupportedOpen')
+        : props.state.status === 'unavailable'
+          ? props.t('scenario.editor.guideUnavailable')
+          : null;
   return (
     <EditorStart
       title={props.t('scenario.editor.documentTitle')}

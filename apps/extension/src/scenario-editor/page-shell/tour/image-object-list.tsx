@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Crosshair, MessageSquare, Plus, ScanLine, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Crosshair, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   getTourHotspots,
   getTourAnnotations,
-  getTourSlideObjects,
   TOUR_LIMITS,
-  type TourSlideObject,
   type TourDocument,
   type TourImageSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -47,7 +45,7 @@ export function TourImageObjects({
     actions.splice(index < 0 ? actions.length : index, 0, entry);
     onChange({ ...slide, actions });
   };
-  const add = (kind: 'hotspot' | 'annotation' | 'mask') =>
+  const add = (kind: 'hotspot' | 'annotation') =>
     commitTourImageObject(slide, kind, t, onChange, onSelect);
   return (
     <GuideInspectorGroup
@@ -55,7 +53,7 @@ export function TourImageObjects({
       icon={Crosshair}
       title={t('scenario.editor.tourObjects')}
       action={
-        slide.actions.length + slide.masks.length ? (
+        slide.actions.length ? (
           <TourAddObjectMenu slide={slide} disabled={disabled} onAdd={add} t={t} />
         ) : undefined
       }
@@ -63,7 +61,7 @@ export function TourImageObjects({
       {!slide.actions.length && (
         <p className="guide-inspector-hint">{t('scenario.editor.tourNoActions')}</p>
       )}
-      {!slide.actions.length && !slide.masks.length && (
+      {!slide.actions.length && (
         <TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />
       )}
       <ol
@@ -77,7 +75,7 @@ export function TourImageObjects({
           setBefore(null);
         }}
       >
-        {getTourSlideObjects(slide).map((entry) => {
+        {slide.actions.map((entry) => {
           const { label, Icon } = tourSlideObjectLabel(entry, t);
           const actionIndex = slide.actions.findIndex((item) => item.object.id === entry.object.id);
           return (
@@ -88,7 +86,7 @@ export function TourImageObjects({
               data-drop-before={before === entry.object.id || undefined}
               onDragOver={(event) => {
                 event.preventDefault();
-                if (entry.type !== 'mask') setBefore(entry.object.id);
+                setBefore(entry.object.id);
               }}
             >
               <button
@@ -96,7 +94,7 @@ export function TourImageObjects({
                 data-inspector-object={entry.object.id}
                 onClick={() => onSelect(entry.object.id)}
                 title={label}
-                draggable={!disabled && entry.type !== 'mask'}
+                draggable={!disabled}
                 onDragStart={(event) => {
                   setDragged(entry.object.id);
                   event.dataTransfer.effectAllowed = 'move';
@@ -109,35 +107,31 @@ export function TourImageObjects({
               >
                 <Icon size={15} aria-hidden="true" />
                 <span>
-                  {entry.type !== 'mask' && (
-                    <span className="tour-action-number">{numbers.get(entry.object.id)}. </span>
-                  )}
+                  <span className="tour-action-number">{numbers.get(entry.object.id)}. </span>
                   {label}
                 </span>
               </button>
               <div className="tour-object-item-actions">
-                {entry.type !== 'mask' && (
-                  <>
-                    <ContentToolbarButton
-                      title={t('scenario.editor.tourMoveObjectUp')}
-                      disabled={disabled || actionIndex === 0}
-                      onClick={() =>
-                        move(entry.object.id, slide.actions[actionIndex - 1]?.object.id ?? null)
-                      }
-                    >
-                      <ArrowUp size={14} />
-                    </ContentToolbarButton>
-                    <ContentToolbarButton
-                      title={t('scenario.editor.tourMoveObjectDown')}
-                      disabled={disabled || actionIndex === slide.actions.length - 1}
-                      onClick={() =>
-                        move(entry.object.id, slide.actions[actionIndex + 2]?.object.id ?? null)
-                      }
-                    >
-                      <ArrowDown size={14} />
-                    </ContentToolbarButton>
-                  </>
-                )}
+                <>
+                  <ContentToolbarButton
+                    title={t('scenario.editor.tourMoveObjectUp')}
+                    disabled={disabled || actionIndex === 0}
+                    onClick={() =>
+                      move(entry.object.id, slide.actions[actionIndex - 1]?.object.id ?? null)
+                    }
+                  >
+                    <ArrowUp size={14} />
+                  </ContentToolbarButton>
+                  <ContentToolbarButton
+                    title={t('scenario.editor.tourMoveObjectDown')}
+                    disabled={disabled || actionIndex === slide.actions.length - 1}
+                    onClick={() =>
+                      move(entry.object.id, slide.actions[actionIndex + 2]?.object.id ?? null)
+                    }
+                  >
+                    <ArrowDown size={14} />
+                  </ContentToolbarButton>
+                </>
                 <ContentToolbarButton
                   className="tour-object-delete"
                   tone="danger"
@@ -147,7 +141,6 @@ export function TourImageObjects({
                     onChange({
                       ...slide,
                       actions: slide.actions.filter((item) => item.object.id !== entry.object.id),
-                      masks: slide.masks.filter((item) => item.id !== entry.object.id),
                     })
                   }
                 >
@@ -162,7 +155,7 @@ export function TourImageObjects({
   );
 }
 
-function tourSlideObjectLabel(entry: TourSlideObject, t: Translate) {
+function tourSlideObjectLabel(entry: TourImageSlide['actions'][number], t: Translate) {
   switch (entry.type) {
     case 'hotspot':
       return { label: entry.object.label || t('scenario.editor.tourHotspot'), Icon: Crosshair };
@@ -171,15 +164,13 @@ function tourSlideObjectLabel(entry: TourSlideObject, t: Translate) {
         label: entry.object.text || t('scenario.editor.tourAnnotation'),
         Icon: MessageSquare,
       };
-    case 'mask':
-      return { label: t('scenario.editor.tourMask'), Icon: ScanLine };
   }
 }
 
 /** Adds one object then selects it; the single path shared by the Add menu and empty-state actions. */
 export function commitTourImageObject(
   slide: TourImageSlide,
-  kind: 'hotspot' | 'annotation' | 'mask',
+  kind: 'hotspot' | 'annotation',
   t: Translate,
   onChange: (slide: TourImageSlide, group?: string | null) => boolean,
   onSelect: (id: string) => void
@@ -191,45 +182,30 @@ export function commitTourImageObject(
 /** Adds one object with a fresh id through a single slide update. */
 function addTourImageObject(
   slide: TourImageSlide,
-  kind: 'hotspot' | 'annotation' | 'mask',
+  kind: 'hotspot' | 'annotation',
   t: Translate
 ): { slide: TourImageSlide; id: string } {
   const id = crypto.randomUUID();
-  const next: TourImageSlide =
-    kind === 'mask'
-      ? {
-          ...slide,
-          masks: [
-            ...slide.masks,
-            {
+  const next: TourImageSlide = {
+    ...slide,
+    actions: [
+      ...slide.actions,
+      kind === 'hotspot'
+        ? {
+            type: 'hotspot',
+            object: {
               id,
-              kind: 'redact',
-              rect: { x: 0.25, y: 0.25, width: 0.3, height: 0.2 },
-              color: '#111827',
-              opacity: 1,
+              point: { x: 0.5, y: 0.5 },
+              targetRect: null,
+              label: t('scenario.editor.tourHotspot'),
+              text: '',
+              appearance: null,
+              visual: { kind: 'point', pulse: true },
             },
-          ],
-        }
-      : {
-          ...slide,
-          actions: [
-            ...slide.actions,
-            kind === 'hotspot'
-              ? {
-                  type: 'hotspot',
-                  object: {
-                    id,
-                    point: { x: 0.5, y: 0.5 },
-                    targetRect: null,
-                    label: t('scenario.editor.tourHotspot'),
-                    text: '',
-                    appearance: null,
-                    visual: { kind: 'point', pulse: true },
-                  },
-                }
-              : { type: 'annotation', object: { id, text: '', anchor: null, appearance: null } },
-          ],
-        };
+          }
+        : { type: 'annotation', object: { id, text: '', anchor: null, appearance: null } },
+    ],
+  };
   return { slide: next, id };
 }
 
@@ -248,12 +224,6 @@ function tourAddObjectOptions(slide: TourImageSlide, t: Translate) {
       icon: <MessageSquare size={15} aria-hidden="true" />,
       disabled: getTourAnnotations(slide).length >= TOUR_LIMITS.maxAnnotations,
     },
-    {
-      value: 'mask' as const,
-      label: t('scenario.editor.tourMask'),
-      icon: <ScanLine size={15} aria-hidden="true" />,
-      disabled: slide.masks.length >= TOUR_LIMITS.maxMasks,
-    },
   ];
 }
 
@@ -266,7 +236,7 @@ export function TourAddObjectMenu({
 }: {
   slide: TourImageSlide;
   disabled: boolean;
-  onAdd: (kind: 'hotspot' | 'annotation' | 'mask') => void;
+  onAdd: (kind: 'hotspot' | 'annotation') => void;
   t: Translate;
 }) {
   return (
@@ -295,7 +265,7 @@ function TourImageObjectActions({
 }: {
   slide: TourImageSlide;
   disabled: boolean;
-  onAdd: (kind: 'hotspot' | 'annotation' | 'mask') => void;
+  onAdd: (kind: 'hotspot' | 'annotation') => void;
   t: Translate;
 }) {
   return (

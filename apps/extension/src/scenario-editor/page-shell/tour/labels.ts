@@ -23,7 +23,7 @@ export function tourPlayerLabels(t: Translate): TourPlayerLabels {
     collapse: t('scenario.editor.tourCollapseCaption'),
     previous: t('scenario.editor.tourHintPrevious'),
     next: t('scenario.editor.tourHintNext'),
-    contents: t('scenario.editor.tourSlides'),
+    contents: t('scenario.editor.tourContentsTitle'),
     close: t('scenario.editor.close'),
     restart: t('scenario.editor.tourRestart'),
     finished: t('scenario.editor.tourEnd'),

@@ -1436,11 +1436,11 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/stage.tsx",
       "symbol": "TourStage",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: TourStage is one React adapter for the existing player mount. Its 169-line body has 19 statements, cyclomatic 5 and nesting 1. Refs hold current callbacks and admitted input identities; they do not create a durable writer. Mount, input update and selection restoration share one player instance and cleanup lifetime. Splitting these effects would distribute that receiver. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: TourStage remains one React adapter for one existing player instance. This exact 197-line body has 21 statements, cyclomatic 5, nesting 1, and one DOM effect family. The added camera projection is disposable and pure; preview origin and author scroll are restored within the same mount/update/dispose lifetime. Callback and input refs feed that single player receiver, with no durable writer or new runtime authority. Main inspected the complete body, selected-action frame and preview/return proof. Splitting the lifecycle only to meet the line limit would distribute its cleanup receiver. Fresh complete-candidate architecture review must validate this reassessed exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
       "reviewDate": "2026-10-18",
-      "astHash": "df9757d9a53bf6275f5e93a3bc565fcb0e4b907226f6ebfcb4711009fab26dc6",
-      "signatureHash": "45d095e2f809a791d9b419163a75264f58433e378fda63d60bd41dace5f2a899"
+      "astHash": "679bc77e33b801c55018ea2ae7e1fba88efeb22f4711da679a07215f699d7655",
+      "signatureHash": "1af3786ae6186caeaedb0ea44f43e7796773325004d28c12b88f08076b0ac809"
     },
     {
       "rule": "structural-file-risk",

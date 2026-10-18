@@ -862,12 +862,23 @@ for (const [locale, theme] of [
           expect(geometry.heights.every((height) => height >= 32)).toBe(true);
           expect(geometry.gaps.every((gap) => gap >= 8)).toBe(true);
           await page.screenshot({
-            path: `.tmp/backlog6-w16-visual/slide-object-actions-${locale}-${theme}.png`,
+            path: info.outputPath(`slide-object-actions-${locale}-${theme}.png`),
+            fullPage: false,
           });
         }
       }
-      await category(t('scenario.editor.tourNarration')).click();
-      await expect(panel.locator('.tour-audio-acquisition')).toBeVisible();
+      const restoredCategory =
+        label === 'image-slide'
+          ? t('scenario.editor.tourObjects')
+          : t('scenario.editor.tourNarration');
+      await category(restoredCategory).click();
+      if (label === 'image-slide') {
+        await expect(category(t('scenario.editor.tourNarration'))).toHaveCount(0);
+        await expect(panel.locator('.tour-audio-acquisition')).toHaveCount(0);
+      } else {
+        await expect(panel.locator('.tour-audio-acquisition')).toBeVisible();
+      }
+      await expect(panel).not.toContainText(t('scenario.editor.tourMask'));
       await panel
         .getByRole('button', { name: t('scenario.editor.inspectorShowAll'), exact: true })
         .click();
@@ -875,41 +886,40 @@ for (const [locale, theme] of [
       await panel
         .getByRole('button', { name: t('scenario.editor.inspectorShowSections'), exact: true })
         .click();
-      await expect(category(t('scenario.editor.tourNarration'))).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
+      await expect(category(restoredCategory)).toHaveAttribute('aria-pressed', 'true');
       await info.attach(`${label}-${locale}-${theme}`, {
         body: await page.screenshot({
-          path: `.tmp/backlog6-w16-visual/${label}-${locale}-${theme}.png`,
+          path: info.outputPath(`${label}-${locale}-${theme}.png`),
+          fullPage: false,
         }),
         contentType: 'image/png',
       });
     };
-    await visit(5, 'image-slide');
-    await panel
-      .locator('.tour-audio-acquisition input[type="file"]')
-      .setInputFiles('tooling/test/e2e/fixtures/review-voice-speech.wav');
-    await expect(panel).toContainText('review-voice-speech.wav');
+    await visit(4, 'image-slide');
     for (const [key, count] of [
-      ['tourHotspot', 5],
-      ['tourAnnotation', 3],
-      ['tourMask', 3],
+      ['tourHotspot', 6],
+      ['tourAnnotation', 5],
     ] as const) {
       await category(t('scenario.editor.tourObjects')).click();
-      if (key === 'tourHotspot') {
-        await panel.getByRole('button', { name: t(`scenario.editor.${key}`), exact: true }).click();
+      const directAdd = panel
+        .locator('.tour-object-actions')
+        .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true });
+      if (await directAdd.count()) {
+        await directAdd.click();
       } else {
         await panel.locator('.tour-object-add button').click();
-        await page
-          .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
-          .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true })
-          .click();
+        const menu = page.locator('.guide-action-menu');
+        await expect(menu.getByRole('button')).toHaveCount(2);
+        await expect(menu).not.toContainText(t('scenario.editor.tourMask'));
+        await menu.getByRole('button', { name: t(`scenario.editor.${key}`), exact: true }).click();
       }
       await checkTourObjectActions(panel, t);
       if (key === 'tourHotspot') {
         await info.attach(`object-delete-${locale}-${theme}`, {
-          body: await panel.screenshot(),
+          body: await page.screenshot({
+            path: info.outputPath(`object-delete-${locale}-${theme}.png`),
+            fullPage: false,
+          }),
           contentType: 'image/png',
         });
       }
@@ -926,6 +936,8 @@ for (const [locale, theme] of [
         .getByRole('button', { name: t('scenario.editor.inspectorShowSections'), exact: true })
         .click();
       await visit(count, key);
+      await expect(category(t('scenario.editor.tourTiming'))).toBeVisible();
+      await expect(category(t('scenario.editor.tourCamera'))).toBeVisible();
       if (key === 'tourAnnotation') {
         await category(t('scenario.editor.appearance')).click();
         for (const placement of ['tourCaptionTop', 'tourCaptionBottom'] as const) {
@@ -969,31 +981,7 @@ for (const [locale, theme] of [
           .setInputFiles('tooling/test/e2e/fixtures/review-voice-speech.wav');
         await expect(panel).toContainText('review-voice-speech.wav');
       }
-      if (key === 'tourMask') {
-        await category(t('scenario.editor.tourEffectType')).click();
-        for (const effect of ['tourSpotlight', 'tourBlur', 'tourHighlight'] as const) {
-          await panel
-            .getByRole('button', { name: t('scenario.editor.tourMask'), exact: true })
-            .click();
-          await page
-            .getByRole('option', { name: t(`scenario.editor.${effect}`), exact: true })
-            .click();
-          await category(t('scenario.editor.appearance')).click();
-          await expect(
-            panel.getByRole('switch', {
-              name: t('scenario.editor.tourUseCentralStyle'),
-              exact: true,
-            })
-          ).toBeVisible();
-          if (effect === 'tourHighlight') await checkTourObjectActions(panel, t);
-          if (effect === 'tourBlur') {
-            await expect(
-              panel.getByRole('textbox', { name: t('scenario.editor.tourBlurRadius'), exact: true })
-            ).toBeVisible();
-          }
-          await category(t('scenario.editor.tourEffectType')).click();
-        }
-      }
+
       await panel
         .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
         .click();
@@ -1009,7 +997,10 @@ for (const [locale, theme] of [
       .click();
     await checkTourObjectActions(panel, t);
     await info.attach(`navigation-delete-${locale}-${theme}`, {
-      body: await panel.screenshot(),
+      body: await page.screenshot({
+        path: info.outputPath(`navigation-delete-${locale}-${theme}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     await panel
@@ -1032,8 +1023,9 @@ for (const [locale, theme] of [
       .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
       .click();
     const defaults = panel.getByRole('navigation').getByRole('button');
-    await expect(defaults).toHaveCount(7);
-    for (let index = 0; index < 7; index++) {
+    await expect(defaults).toHaveCount(6);
+    await expect(panel).not.toContainText(t('scenario.editor.tourMask'));
+    for (let index = 0; index < 6; index++) {
       await defaults.nth(index).click();
       await expect(defaults.nth(index)).toHaveAttribute('aria-pressed', 'true');
       await expect
@@ -1043,15 +1035,16 @@ for (const [locale, theme] of [
         .toHaveCount(0);
       expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
       await page.screenshot({
-        path: `.tmp/backlog6-w16-visual/tour-default-${index}-${locale}-${theme}.png`,
+        path: info.outputPath(`tour-default-${index}-${locale}-${theme}.png`),
+        fullPage: false,
       });
     }
     await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
     await page.reload();
     await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
     await page.locator('.tour-slide-select').first().click();
-    await category(t('scenario.editor.tourNarration')).click();
-    await expect(panel.locator('.tour-audio-binding')).toContainText('review-voice-speech.wav');
+    await expect(category(t('scenario.editor.tourNarration'))).toHaveCount(0);
+    await expect(panel.locator('.tour-audio-binding')).toHaveCount(0);
     await category(t('scenario.editor.tourObjects')).click();
     await panel.locator('[data-inspector-object]').first().click();
     await category(t('scenario.editor.tourNarration')).click();
@@ -1158,19 +1151,19 @@ async function checkTourObjectActions(panel: Locator, t: ReturnType<typeof creat
   await back.page().keyboard.press('Tab');
   await back.page().keyboard.press('Shift+Tab');
   await expect(back).toBeFocused();
-  const focus = await back.evaluate((node) => {
-    const style = getComputedStyle(node);
-    return {
-      visible: node.matches(':focus-visible'),
-      width: parseFloat(style.borderTopWidth),
-      style: style.borderTopStyle,
-      color: style.borderTopColor,
-    };
-  });
-  expect(focus.visible).toBe(true);
-  expect(focus.width).toBeGreaterThanOrEqual(1);
-  expect(focus.style).not.toBe('none');
-  expect(focus.color).not.toBe('rgba(0, 0, 0, 0)');
+  await expect
+    .poll(() =>
+      back.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return (
+          node.matches(':focus-visible') &&
+          parseFloat(style.outlineWidth) >= 2 &&
+          style.outlineStyle === 'solid' &&
+          style.outlineColor !== 'rgba(0, 0, 0, 0)'
+        );
+      })
+    )
+    .toBe(true);
   expect
     .soft(
       await back.evaluate((node) => {

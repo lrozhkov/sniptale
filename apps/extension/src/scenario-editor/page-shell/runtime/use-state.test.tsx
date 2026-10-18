@@ -6,10 +6,14 @@ import { createGuideProject } from '../../../features/scenario/project/public';
 import type { useGuideAutosave } from './autosave';
 import { useGuidePageState } from './use-state';
 
-const io = vi.hoisted(() => ({ load: vi.fn(), autosave: vi.fn() }));
+const io = vi.hoisted(() => ({ load: vi.fn(), autosave: vi.fn(), list: vi.fn(), enter: vi.fn() }));
+vi.mock('../../../composition/persistence/scenario/store/public', async (original) => ({
+  ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
+  listScenarioProjectSummaries: io.list,
+}));
 vi.mock('./autosave', () => ({ useGuideAutosave: io.autosave }));
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
-const enterSession = async () => true;
+const enterSession = (id: string | null) => io.enter(id);
 vi.mock('../../../composition/persistence/scenario/history', () => ({
   getScenarioSavedVersions: io.load,
 }));
@@ -37,6 +41,8 @@ function Probe() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  io.enter.mockResolvedValue(true);
+  io.list.mockResolvedValue([{ id: 'guide', availability: 'available' }]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   const project = createGuideProject('Original', 'guide', 1);
@@ -113,4 +119,68 @@ it('keeps text enabled, focused and editable while the autosave writer is active
   expect(state.project?.name).toBe('During autosave');
   expect(field.value).toBe('During autosave');
   expect(document.activeElement).toBe(field);
+});
+
+it('reports an unsupported stored tour without opening or replacing its source', async () => {
+  io.load.mockResolvedValue(null);
+  io.list.mockResolvedValue([{ id: 'guide', availability: 'unsupported' }]);
+  await mount();
+  expect(state.project).toBeNull();
+  expect(state.status).toBe('unsupported');
+  expect(autosave.project).toBeNull();
+});
+
+it('retains a dirty editor buffer when reload finds an unsupported stored tour', async () => {
+  const field = await mount();
+  act(() => input(field, 'Retain this draft'));
+  const retained = state.project;
+  io.load.mockResolvedValue(null);
+  io.list.mockResolvedValue([{ id: 'guide', availability: 'unsupported' }]);
+  await act(async () => state.reload());
+  expect(state.project).toBe(retained);
+  expect(state.project?.name).toBe('Retain this draft');
+  expect(state.status).toBe('dirty');
+  expect(state.actionError).toBe('reload');
+});
+
+it('explains unsupported storage when resource pruning refuses to open it', async () => {
+  io.enter.mockRejectedValue(new Error('Unavailable guide cannot be pruned.'));
+  io.list.mockResolvedValue([{ id: 'guide', availability: 'unsupported' }]);
+  await mount();
+  expect(state.project).toBeNull();
+  expect(state.status).toBe('unsupported');
+  expect(io.load).not.toHaveBeenCalled();
+});
+
+it('keeps a missing direct link distinct from an unsupported tour', async () => {
+  io.load.mockResolvedValue(null);
+  io.list.mockResolvedValue([]);
+  await mount();
+  expect(state.status).toBe('missing');
+});
+
+it('ignores delayed unsupported metadata after another project opens', async () => {
+  let finishMetadata: ((value: { id: string; availability: string }[]) => void) | undefined;
+  io.enter.mockRejectedValueOnce(new Error('Unavailable guide cannot be pruned.'));
+  io.list.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishMetadata = resolve;
+      })
+  );
+  await act(async () => root.render(<Probe />));
+  expect(state.status).toBe('loading');
+  const project = createGuideProject('Next project', 'next', 2);
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project, revision: 1, savedAt: 2 }],
+  });
+  io.list.mockResolvedValue([{ id: 'next', availability: 'available' }]);
+  await act(async () => state.openExisting('next'));
+  expect(state.project?.id).toBe('next');
+  expect(state.status).toBe('saved');
+  if (!finishMetadata) throw new Error('Missing delayed compatibility metadata.');
+  await act(async () => finishMetadata!([{ id: 'guide', availability: 'unsupported' }]));
+  expect(state.project?.id).toBe('next');
+  expect(state.status).toBe('saved');
 });

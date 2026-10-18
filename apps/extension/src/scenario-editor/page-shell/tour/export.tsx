@@ -10,6 +10,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import type { Translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { useTourHtmlExport } from './export-state';
+import type { TourHtmlBlocker } from '../runtime/tour-html';
 import type { TourHtmlImageOptions } from '../runtime/tour-html-images';
 import './export.css';
 
@@ -97,7 +98,6 @@ export function TourHtmlExport({
           </GuideInspectorGroup>
           <div className="tour-export-notes">
             <p>{t('scenario.editor.tourHtmlMediaHint')}</p>
-            <p>{t('scenario.editor.tourHtmlMaskHint')}</p>
             <p>{t('scenario.editor.tourHtmlLimitHint')}</p>
           </div>
         </>
@@ -112,13 +112,15 @@ export function TourHtmlExport({
               job.status === 'failed' || job.status === 'history-failed' ? 'error' : undefined
             }
           >
-            {job.status === 'saving'
-              ? t('scenario.editor.guideHtmlPreparing')
-              : job.status === 'failed'
-                ? t('scenario.editor.tourHtmlFailed')
-                : job.status === 'saved'
-                  ? t('scenario.editor.guideHtmlSaved')
-                  : t('scenario.editor.guideHtmlHistoryFailed')}
+            {job.status === 'saving' ? (
+              t('scenario.editor.guideHtmlPreparing')
+            ) : job.status === 'failed' ? (
+              <TourExportFailure blocker={job.blocker} t={t} />
+            ) : job.status === 'saved' ? (
+              t('scenario.editor.guideHtmlSaved')
+            ) : (
+              t('scenario.editor.guideHtmlHistoryFailed')
+            )}
           </p>
         )
       }
@@ -209,6 +211,51 @@ function TourImageSettings({
           </div>
         </>
       )}
+    </>
+  );
+}
+
+/** Localized fixed reasons and authored labels explain recovery without exposing exception text. */
+function TourExportFailure({ blocker, t }: { blocker: TourHtmlBlocker | null; t: Translate }) {
+  if (!blocker) return t('scenario.editor.tourHtmlFailed');
+  const messages = {
+    invalid: 'scenario.editor.tourHtmlBlockerInvalid',
+    unsupported: 'scenario.editor.tourHtmlBlockerUnsupported',
+    noActions: 'scenario.editor.tourHtmlBlockerNoActions',
+    invalidOptions: 'scenario.editor.tourHtmlBlockerInvalidOptions',
+    missingImage: 'scenario.editor.tourHtmlBlockerMissingImage',
+    targetReview: 'scenario.editor.tourHtmlBlockerTargetReview',
+    missingTarget: 'scenario.editor.tourHtmlBlockerMissingTarget',
+    missingImageMedia: 'scenario.editor.tourHtmlBlockerMissingImageMedia',
+    missingAudioMedia: 'scenario.editor.tourHtmlBlockerMissingAudioMedia',
+    conflictingMedia: 'scenario.editor.tourHtmlBlockerConflictingMedia',
+    rasterFailed: 'scenario.editor.tourHtmlBlockerRasterFailed',
+    mediaBudget: 'scenario.editor.tourHtmlBlockerMediaBudget',
+  } as const;
+  const context = [
+    blocker.slideNumber
+      ? t('scenario.editor.tourHtmlBlockerSlide')
+          .replace('{number}', String(blocker.slideNumber))
+          .replace('{title}', blocker.slideTitle?.trim() || '—')
+      : '',
+    blocker.actionNumber
+      ? t('scenario.editor.tourHtmlBlockerAction').replace('{number}', String(blocker.actionNumber))
+      : '',
+    blocker.buttonLabel
+      ? t('scenario.editor.tourHtmlBlockerButton').replace('{label}', blocker.buttonLabel)
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <>
+      {context && (
+        <>
+          <strong>{context}</strong>
+          <br />
+        </>
+      )}
+      {t(messages[blocker.code])}
     </>
   );
 }

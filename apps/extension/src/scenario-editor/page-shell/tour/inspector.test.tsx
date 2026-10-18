@@ -186,23 +186,23 @@ it('edits hotspot visuals and copy through canonical history without click comma
   await click('Delete');
   expect(current().actions).toHaveLength(0);
 });
-it('edits text actions and permanent image treatments separately', async () => {
+it('offers text and hotspot actions without a second image editor', async () => {
+  expect(host.textContent).not.toContain('Image treatment');
   await click('Text action');
   await fill('Text', 'A note');
   await choose('Placement on slide', 'Bottom captions');
   expect(getTourAnnotations(current())[0]?.appearance?.presentation).toBe('caption-bottom');
   await click('Back to slide settings');
-  await choose('Add', 'Image treatment');
-  expect(current().masks[0]?.kind).toBe('redact');
-  await choose('Image treatment', 'Blur');
-  await fill('Blur radius', '24');
-  expect(current().masks[0]?.blurRadius).toBe(24);
-  expect(current().actions).toHaveLength(1);
-  await click('Delete');
-  expect(current().masks).toHaveLength(0);
-  await click('A note');
-  await click('Delete');
-  expect(current().actions).toHaveLength(0);
+  await click('Add');
+  expect(document.querySelector('.guide-action-menu')?.textContent).not.toContain(
+    'Image treatment'
+  );
+  await act(async () =>
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  );
+  scope = 'document';
+  draw();
+  expect(host.textContent).not.toContain('Image treatment');
 });
 it('shows global action numbers and reorders actions without moving image treatments', async () => {
   const slide = current();
@@ -234,10 +234,10 @@ it('shows global action numbers and reorders actions without moving image treatm
   const rows = () => [...host.querySelectorAll('.tour-object-item')];
   const labels = () =>
     rows().map((row) => row.querySelector('.tour-object-row')!.textContent?.trim());
-  expect(labels()).toEqual(['1. Note', '2. Point', 'Image treatment']);
+  expect(labels()).toEqual(['1. Note', '2. Point']);
   await act(async () => rows()[1]!.querySelector<HTMLButtonElement>('[title="Move up"]')!.click());
   expect(current().actions.map((entry) => entry.object.id)).toEqual(['point', 'note']);
-  expect(labels()).toEqual(['1. Point', '2. Note', 'Image treatment']);
+  expect(labels()).toEqual(['1. Point', '2. Note']);
   await act(async () =>
     rows()[0]!.querySelector<HTMLButtonElement>('[title="Move down"]')!.click()
   );
@@ -246,7 +246,7 @@ it('shows global action numbers and reorders actions without moving image treatm
 });
 
 it('derives the object list without a stored order and swaps the actions for one Add menu', async () => {
-  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(2);
   expect(host.querySelector('[aria-label="Add"]')).toBeNull();
   await click('Text action');
   await click('Back to slide settings');
@@ -261,7 +261,7 @@ it('derives the object list without a stored order and swaps the actions for one
   expect(add.textContent).toBe('');
   await act(async () => add.click());
   const option = [...document.querySelectorAll<HTMLElement>('.guide-action-menu button')].find(
-    (node) => node.textContent?.trim() === 'Image treatment'
+    (node) => node.textContent?.trim() === 'Text action'
   )!;
   await act(async () =>
     option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -288,7 +288,7 @@ it('restores empty-state direct actions after the last object is deleted', async
   await click('Delete');
   expect(getTourAnnotations(current())).toHaveLength(0);
   expect(current().actions).toEqual([]);
-  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(2);
   expect(host.querySelector('[aria-label="Add"]')).toBeNull();
 });
 
@@ -307,7 +307,7 @@ it('deletes directly from the object row and removes its ordering entry', async 
   await act(async () => remove.click());
   expect(getTourAnnotations(current())).toHaveLength(0);
   expect(current().actions.map((entry) => entry.object.id)).toEqual([]);
-  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(2);
 });
 
 it('moves the Add control into the objects heading seam in both presentations', async () => {
@@ -334,7 +334,7 @@ it('moves the Add control into the objects heading seam in both presentations', 
   await click('Text action');
   await click('Delete');
   expect(heading().querySelector('[aria-label="Add"]')).toBeNull();
-  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(2);
 });
 
 it('edits navigation and end screen in independent scopes', async () => {
@@ -612,7 +612,7 @@ it('shows one section heading in sections mode and moves object actions into it'
     '[data-ui="shared.categorized-inspector.section-heading"]'
   )!;
   expect(objectsHeading.textContent).toContain('Actions');
-  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(2);
   await click('Hotspot');
   expect(
     host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')

@@ -998,6 +998,9 @@ a:focus-visible {
   height: 32px;
   padding: 7px;
 }
+.tour-toolbar .tour-icon-button[hidden] {
+  display: none;
+}
 .tour-toolbar .tour-button svg,
 .tour-hint-controls button svg {
   flex: none;

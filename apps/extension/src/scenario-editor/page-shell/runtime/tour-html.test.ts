@@ -33,6 +33,7 @@ function fixture() {
   const project = createGuideProject('Export');
   const tour = createTourDocument();
   const slide = createTourImageSlide('first');
+  slide.title = 'first';
   slide.image = {
     assetId: 'image',
     width: 640,
@@ -174,7 +175,9 @@ it('keeps shared-source redactions from omitted empty authoring slides', async (
 it('rejects missing media, unreviewed targets, invalid options and cancellation', async () => {
   const args = fixture();
   io.asset.mockResolvedValue(null);
-  await expect(prepareTourHtml(args)).rejects.toThrow('Missing');
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingImageMedia', slideNumber: 1 },
+  });
   const controller = new AbortController();
   controller.abort();
   await expect(prepareTourHtml({ ...args, signal: controller.signal })).rejects.toThrow();
@@ -183,7 +186,9 @@ it('rejects missing media, unreviewed targets, invalid options and cancellation'
   ).rejects.toThrow();
   const slide = args.project.tour!.slides[0]!;
   if (slide.kind === 'image') slide.requiresTargetReview = true;
-  await expect(prepareTourHtml(args)).rejects.toThrow('Incomplete');
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'targetReview', slideNumber: 1 },
+  });
 });
 it('streams precisely the prepared file; aborts write failure and records only after close', async () => {
   const artifact = await prepareTourHtml(fixture());
@@ -288,7 +293,9 @@ it('prepares a stage-only image through the shared raster authority and fails mi
       ? undefined
       : new Blob([id], { type: id === 'audio' ? 'audio/wav' : 'image/png' })
   );
-  await expect(prepareTourHtml(args)).rejects.toThrow('Missing tour media');
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingImageMedia' },
+  });
 });
 
 it('reads shared music and narration once, and includes music-only bindings', async () => {
@@ -329,7 +336,9 @@ it('rejects missing music and aborts after a pending music read without publicat
   };
   const read = io.asset.getMockImplementation()!;
   io.asset.mockImplementation((id) => (id === 'music' ? undefined : read(id)));
-  await expect(prepareTourHtml(args)).rejects.toThrow('Missing tour media');
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingAudioMedia' },
+  });
   const controller = new AbortController();
   io.asset.mockImplementation(async (id) => {
     if (id === 'music') controller.abort();
@@ -338,4 +347,131 @@ it('rejects missing music and aborts after a pending music read without publicat
   await expect(prepareTourHtml({ ...args, signal: controller.signal })).rejects.toThrow();
   expect(io.sink).not.toHaveBeenCalled();
   expect(io.record).not.toHaveBeenCalled();
+});
+
+it('explains empty, unsupported and invalid documents before acquiring media', async () => {
+  const args = fixture();
+  args.project.tour!.slides = [];
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({ blocker: { code: 'noActions' } });
+  Object.assign(args.project.tour!, { version: 1 });
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({ blocker: { code: 'unsupported' } });
+  Object.assign(args.project.tour!, { version: 2, slides: 'invalid' });
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({ blocker: { code: 'invalid' } });
+  expect(io.asset).not.toHaveBeenCalled();
+});
+
+it('identifies missing hotspot images without rejecting text-only stages', async () => {
+  const args = fixture();
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image fixture');
+  slide.image = null;
+  slide.masks = [];
+  slide.actions.push({
+    type: 'hotspot',
+    object: {
+      id: 'point-action',
+      label: 'Click here',
+      text: 'Continue',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      appearance: null,
+      visual: { kind: 'point', pulse: true },
+    },
+  });
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingImage', slideTitle: 'first', slideNumber: 1, actionNumber: 2 },
+  });
+  slide.actions.pop();
+  expect((await prepareTourHtml(args)).blob.size).toBeGreaterThan(0);
+});
+
+it('reports narration at its global action and allows reattachment without mutating the project', async () => {
+  const args = fixture();
+  const read = io.asset.getMockImplementation()!;
+  io.asset.mockImplementation(async (id) => (id === 'audio' ? undefined : read(id)));
+  const original = JSON.stringify(args.project);
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingAudioMedia', slideTitle: 'first', actionNumber: 1 },
+  });
+  expect(JSON.stringify(args.project)).toBe(original);
+  io.asset.mockImplementation(read);
+  expect((await prepareTourHtml(args)).mediaCount).toBe(2);
+});
+
+it('identifies unsafe raster preparation and preserves privacy masks for retry', async () => {
+  const args = fixture();
+  const original = JSON.stringify(args.project);
+  io.raster.mockRejectedValueOnce(new Error('secret browser path'));
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'rasterFailed', slideTitle: 'first', slideNumber: 1 },
+  });
+  expect(JSON.stringify(args.project)).toBe(original);
+  expect(io.sink).not.toHaveBeenCalled();
+  expect((await prepareTourHtml(args)).blob.size).toBeGreaterThan(0);
+  expect(io.raster.mock.calls.at(-1)![1]).toHaveLength(1);
+});
+
+it('reports media-budget refusal before reading the remaining attachments', async () => {
+  const args = fixture();
+  const source = new Blob(['image'], { type: 'image/png' });
+  Object.defineProperty(source, 'size', { value: 128 * 1024 * 1024 + 1 });
+  io.asset.mockResolvedValue(source);
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'mediaBudget', slideNumber: 1 },
+  });
+  expect(io.asset).toHaveBeenCalledTimes(1);
+  expect(io.raster).not.toHaveBeenCalled();
+});
+
+it.each(['action', 'slide'] as const)(
+  'identifies broken %s destinations by contents button label',
+  async (kind) => {
+    const args = fixture();
+    const empty = createTourImageSlide('empty');
+    args.project.tour!.slides.push(empty, {
+      kind: 'navigation',
+      id: 'contents',
+      title: 'Choose a topic',
+      description: '',
+      background: { color: '#ffffff', image: null },
+      narration: null,
+      timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false },
+      buttons: [
+        {
+          id: 'broken-link',
+          label: 'Finish checkout',
+          action:
+            kind === 'action'
+              ? { kind: 'action', actionId: 'deleted-action' }
+              : { kind: 'slide', slideId: 'empty' },
+        },
+      ],
+    });
+    await expect(prepareTourHtml(args)).rejects.toMatchObject({
+      blocker: {
+        code: 'missingTarget',
+        slideTitle: 'Choose a topic',
+        slideNumber: 4,
+        buttonLabel: 'Finish checkout',
+      },
+    });
+    expect(io.asset).not.toHaveBeenCalled();
+    const contents = args.project.tour!.slides[3]!;
+    if (contents.kind === 'navigation')
+      contents.buttons[0]!.action = { kind: 'action', actionId: 'first-voice' };
+    expect((await prepareTourHtml(args)).blob.size).toBeGreaterThan(0);
+  }
+);
+
+it('refuses a missing image with saved privacy masks instead of silently dropping protection', async () => {
+  const args = fixture();
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image fixture');
+  slide.image = null;
+  const original = JSON.stringify(args.project);
+  await expect(prepareTourHtml(args)).rejects.toMatchObject({
+    blocker: { code: 'missingImage', slideNumber: 1 },
+  });
+  expect(JSON.stringify(args.project)).toBe(original);
+  expect(io.raster).not.toHaveBeenCalled();
 });

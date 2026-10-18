@@ -272,7 +272,7 @@ it('does not preview or commit object drags while the host locks editing', async
   expect(moved).not.toHaveBeenCalled();
 });
 
-it('selects an authored mask with native click activation without moving it', async () => {
+it('keeps saved privacy masks visible without authoring interaction', async () => {
   const selected = vi.fn();
   const moved = vi.fn();
   const { player, root } = await mount({
@@ -285,14 +285,16 @@ it('selects an authored mask with native click activation without moving it', as
     {
       id: 'mask',
       rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
-      kind: 'highlight',
+      kind: 'redact',
       color: '#F97316',
       opacity: 0.3,
     },
   ];
   player.update(input);
   root.querySelector<HTMLButtonElement>('.tour-mask')!.click();
-  expect(selected).toHaveBeenCalledWith('mask');
+  expect(selected).not.toHaveBeenCalled();
+  expect(root.querySelector('.tour-mask-effect')).not.toBeNull();
+  expect(root.querySelector('.tour-mask .tour-resize-handle')).toBeNull();
   expect(moved).not.toHaveBeenCalled();
 });
 
@@ -580,7 +582,9 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   expect(play.textContent).toBe('Play');
   root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   await tick(1000);
-  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
+  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+  expect(scene.inert).toBe(false);
+  expect(root.dataset['slideId']).toBe('first');
   play.click();
   await tick(50);
   expect(scene.inert).toBe(false);

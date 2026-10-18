@@ -1,7 +1,3 @@
-import {
-  getTourHotspots,
-  getTourAnnotations,
-} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourAudioResources } from '../../../features/scenario/project/public';
 import { TourNarrationPlacement } from './narration-recording';
 import { TourMusicSettings } from './music-settings';
@@ -91,6 +87,11 @@ export function TourWorkspace(props: TourWorkspaceProps) {
                 <TourViewControls
                   mode={view}
                   previewDisabled={!state.slide}
+                  beginningDisabled={
+                    !project.tour?.slides.some(
+                      (slide) => slide.kind === 'navigation' || slide.actions.length > 0
+                    )
+                  }
                   disabled={disabled}
                   t={t}
                 />
@@ -139,6 +140,7 @@ export function TourWorkspace(props: TourWorkspaceProps) {
               state={state}
               view={view.view}
               previewKey={view.replay}
+              previewOrigin={view.previewOrigin}
               onSelectObject={selectObject}
               generating={generating}
               onGenerationChange={setGenerating}
@@ -260,6 +262,12 @@ function TourSettingsPanel({
               panels.rightScope === 'selection' &&
               state.selection?.kind === 'slide' &&
               state.slide &&
+              (state.slide.kind === 'navigation' ||
+                state.slide.actions.some(
+                  (entry) =>
+                    state.selection?.kind === 'slide' &&
+                    entry.object.id === state.selection.objectId
+                )) &&
               onImportNarration && (
                 <TourNarrationSettings
                   key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
@@ -332,15 +340,9 @@ function TourSelectedImageActions({
 function selectedTitle(slide: TourSlide | null, id: string | null, t: Translate): string {
   const object =
     slide?.kind === 'image'
-      ? [...getTourHotspots(slide), ...getTourAnnotations(slide), ...slide.masks].find(
-          (entry) => entry.id === id
-        )
+      ? slide.actions.find((entry) => entry.object.id === id)?.object
       : slide?.buttons.find((entry) => entry.id === id);
   return object
-    ? ('label' in object
-        ? object.label
-        : 'text' in object
-          ? object.text
-          : t('scenario.editor.tourMask')) || t('scenario.editor.tourAnnotation')
+    ? ('label' in object ? object.label : object.text) || t('scenario.editor.tourAnnotation')
     : slide?.title || t('scenario.editor.tourSlide');
 }

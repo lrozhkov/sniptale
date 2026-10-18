@@ -1,5 +1,5 @@
 import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
@@ -23,10 +23,12 @@ export function TourStage({
   onFrameCamera,
   view = 'edit',
   previewKey = 0,
+  previewOrigin = 'selection',
   t,
 }: {
   view?: 'edit' | 'frame' | 'preview';
   previewKey?: number;
+  previewOrigin?: 'selection' | 'beginning';
   onFrameCamera?: (camera: { center: { x: number; y: number }; zoom: number }) => void;
   tour: TourDocument;
   images: Record<string, string | null>;
@@ -58,26 +60,45 @@ export function TourStage({
     onNavigateSelection,
   };
   const labels = useRef(tourPlayerLabels(t)).current;
+  const selectionKind = selection?.kind;
+  const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
+  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
+  const framedTour = useMemo(() => {
+    if (view !== 'frame' || !selectedSlide || !selectedObject) return tour;
+    return {
+      ...tour,
+      slides: tour.slides.map((slide) => {
+        if (slide.id !== selectedSlide || slide.kind !== 'image') return slide;
+        const camera = slide.actions.find((entry) => entry.object.id === selectedObject)?.object
+          .camera;
+        return camera ? { ...slide, camera } : slide;
+      }),
+    };
+  }, [tour, view, selectedSlide, selectedObject]);
   const input = {
     tour:
       view === 'preview'
         ? { ...tour, playback: { ...tour.playback, autoplay: true, loop: false } }
-        : tour,
+        : framedTour,
     labels,
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
   const latest = useRef({ input, selection, tour, images });
-  latest.current = { input, selection, tour, images };
+  latest.current = { input, selection, tour: framedTour, images };
   const admitted = useRef<{ tour: TourDocument; images: Record<string, string | null> } | null>(
     null
   );
+  const authoringScroll = useRef(0);
   const lastSelection = useRef<TourSelection | null>(null);
   const hasAuthoringNavigation = Boolean(onNavigateSelection);
   useLayoutEffect(() => {
-    if (!root.current) return;
-    const player = createTourPlayer(root.current, latest.current.input, {
+    const stageRoot = root.current;
+    if (!stageRoot) return;
+    const player = createTourPlayer(stageRoot, latest.current.input, {
       preview: view === 'preview',
-      ...(view === 'preview' && latest.current.selection?.kind === 'slide'
+      ...(view === 'preview' &&
+      previewOrigin === 'selection' &&
+      latest.current.selection?.kind === 'slide'
         ? {
             initialSlideId: latest.current.selection.slideId,
             ...(latest.current.selection.objectId
@@ -128,23 +149,30 @@ export function TourStage({
     controller.current = player;
     admitted.current = { tour: latest.current.tour, images: latest.current.images };
     lastSelection.current = latest.current.selection;
-    if (view !== 'preview' || latest.current.selection?.kind === 'end')
+    if (
+      view !== 'preview' ||
+      (previewOrigin === 'selection' && latest.current.selection?.kind === 'end')
+    )
       restoreSelection(player, latest.current.selection);
+    if (view !== 'preview') {
+      const body = stageRoot.querySelector<HTMLElement>('[data-tour-hint-text]');
+      if (body) body.scrollTop = authoringScroll.current;
+    }
     return () => {
+      if (view !== 'preview')
+        authoringScroll.current =
+          stageRoot.querySelector<HTMLElement>('[data-tour-hint-text]')?.scrollTop ?? 0;
       player.dispose();
       controller.current = null;
     };
-  }, [shadow, view, previewKey, hasAuthoringNavigation]);
+  }, [shadow, view, previewKey, previewOrigin, hasAuthoringNavigation]);
   useLayoutEffect(() => {
     if (!controller.current) return;
-    if (admitted.current?.tour === tour && admitted.current.images === images) return;
-    admitted.current = { tour, images };
+    if (admitted.current?.tour === framedTour && admitted.current.images === images) return;
+    admitted.current = { tour: framedTour, images };
     controller.current.update(latest.current.input);
     if (view !== 'preview') restoreSelection(controller.current, latest.current.selection);
-  }, [tour, images, view]);
-  const selectionKind = selection?.kind;
-  const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
-  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
+  }, [tour, framedTour, images, view]);
   useLayoutEffect(() => {
     const previous = lastSelection.current;
     const current = latest.current.selection;

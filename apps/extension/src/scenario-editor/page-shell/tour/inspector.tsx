@@ -1,11 +1,6 @@
 import { TourImageObjects, TourAddObjectMenu, commitTourImageObject } from './image-object-list';
-import {
-  getTourHotspots,
-  getTourAnnotations,
-} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { TourDocumentSettings } from './document-settings';
-import { TourMaskSettings, TourMaskDefaultSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
@@ -19,7 +14,6 @@ import type {
 import {
   Crosshair,
   MessageSquare,
-  ScanLine,
   Palette,
   Image,
   Trash2,
@@ -86,8 +80,7 @@ function TourSlideCategories({
       />
     ) : null;
   const objectControl =
-    slide.kind === 'image' &&
-    getTourHotspots(slide).length + getTourAnnotations(slide).length + slide.masks.length > 0 ? (
+    slide.kind === 'image' && slide.actions.length > 0 ? (
       <TourAddObjectMenu
         slide={slide}
         disabled={disabled}
@@ -169,12 +162,6 @@ function TourDocumentCategories({
       label: t('scenario.editor.tourHotspot'),
       categorized: true,
       content: <TourDocumentSettings {...documentSettings} section="hotspots" />,
-    },
-    {
-      id: 'masks',
-      icon: ScanLine,
-      label: t('scenario.editor.tourMask'),
-      content: <TourMaskDefaultSettings {...documentSettings} />,
     },
     {
       id: 'explanations',
@@ -437,7 +424,6 @@ function TourImageObjectSettings({
   t,
 }: ImageSettingsProps) {
   const entry = slide.actions.find((entry) => entry.object.id === objectId);
-  const mask = slide.masks.find((entry) => entry.id === objectId);
   const timing = entry ? (
     <TourTimingSettings
       tour={tour}
@@ -484,7 +470,6 @@ function TourImageObjectSettings({
       onChange({
         ...slide,
         actions: slide.actions.filter((entry) => entry.object.id !== objectId),
-        masks: slide.masks.filter((entry) => entry.id !== objectId),
       })
     )
       onSelect(null);
@@ -531,22 +516,7 @@ function TourImageObjectSettings({
           }
         />
       )}
-      {mask && (
-        <TourMaskSettings
-          presentation={presentation}
-          defaults={tour.style.maskDefaults}
-          value={mask}
-          disabled={disabled}
-          t={t}
-          onChange={(value) =>
-            onChange({
-              ...slide,
-              masks: slide.masks.map((item) => (item.id === value.id ? value : item)),
-            })
-          }
-        />
-      )}
-      {(entry || mask) && (
+      {entry && (
         <div className="tour-object-destructive-actions">
           <ScenarioInspectorActionButton tone="danger" disabled={disabled} onClick={remove}>
             <Trash2 size={15} />

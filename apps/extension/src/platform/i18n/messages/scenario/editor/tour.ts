@@ -6,6 +6,57 @@ export const scenarioTourMessages = {
     ru: 'Нажмите «Воспроизвести», чтобы включить звук.',
     en: 'Press Play to enable audio.',
   },
+  tourHtmlBlockerInvalid: {
+    ru: 'Данные тура повреждены. Вернитесь в редактор и исправьте или создайте содержимое заново.',
+    en: 'The tour data is invalid. Return to the editor and repair or recreate the affected content.',
+  },
+  tourHtmlBlockerUnsupported: {
+    ru: 'Этот формат тура не поддерживается. Создайте новый тур в этой версии редактора.',
+    en: 'This tour format is not supported. Create a new tour in this version of the editor.',
+  },
+  tourHtmlBlockerNoActions: {
+    ru: 'Добавьте хотя бы одно действие перед экспортом.',
+    en: 'Add at least one action before exporting.',
+  },
+  tourHtmlBlockerInvalidOptions: {
+    ru: 'Выберите допустимые разрешение и качество изображения и повторите подготовку.',
+    en: 'Choose a supported image resolution and quality, then prepare again.',
+  },
+  tourHtmlBlockerMissingImage: {
+    ru: 'Добавьте или восстановите изображение этого слайда перед экспортом.',
+    en: 'Attach or restore the image for this slide before exporting.',
+  },
+  tourHtmlBlockerTargetReview: {
+    ru: 'Проверьте положение действий после замены изображения и подтвердите его в редакторе.',
+    en: 'Review the action positions after replacing the image, then confirm them in the editor.',
+  },
+  tourHtmlBlockerMissingTarget: {
+    ru: 'Выберите существующее действие или слайд для этой кнопки оглавления либо удалите кнопку.',
+    en: 'Choose an existing action or slide for this contents button, or delete the button.',
+  },
+  tourHtmlBlockerMissingImageMedia: {
+    ru: 'Файл изображения недоступен. Замените изображение в редакторе и повторите подготовку.',
+    en: 'The image file is unavailable. Replace it in the editor and prepare again.',
+  },
+  tourHtmlBlockerMissingAudioMedia: {
+    ru: 'Аудиофайл недоступен. Прикрепите заново или удалите озвучку либо фоновую музыку.',
+    en: 'The audio file is unavailable. Reattach or remove the narration or background music.',
+  },
+  tourHtmlBlockerConflictingMedia: {
+    ru: 'Типы вложения не совпадают. Замените его в редакторе.',
+    en: 'This media attachment has conflicting types. Replace it in the editor.',
+  },
+  tourHtmlBlockerRasterFailed: {
+    ru: 'Не удалось безопасно подготовить изображение. Замените его или уменьшите размер и повторите.',
+    en: 'The image could not be prepared safely. Replace it or reduce its dimensions and retry.',
+  },
+  tourHtmlBlockerMediaBudget: {
+    ru: 'Медиа тура превышают ограничение 128 МиБ. Уменьшите изображения или удалите лишнюю прикреплённую озвучку.',
+    en: 'The tour exceeds the 128 MiB media limit. Reduce image dimensions or remove unused attached audio.',
+  },
+  tourHtmlBlockerSlide: { ru: 'Слайд {number}: {title}', en: 'Slide {number}: {title}' },
+  tourHtmlBlockerAction: { ru: 'Действие {number}', en: 'Action {number}' },
+  tourHtmlBlockerButton: { ru: 'Кнопка оглавления: {label}', en: 'Contents button: {label}' },
   tourHtmlPreview: { ru: 'Предпросмотр HTML', en: 'HTML preview' },
   tourHtmlTitle: { ru: 'Экспорт интерактивного тура', en: 'Export interactive tour' },
   tourHtmlPrepare: { ru: 'Подготовить и посмотреть', en: 'Prepare and preview' },
@@ -22,10 +73,6 @@ export const scenarioTourMessages = {
   tourHtmlMediaHint: {
     ru: 'Один HTML со всеми изображениями и озвучкой. Сохраняется именно файл из предпросмотра. Для запуска звука браузер может попросить нажать «Воспроизвести».',
     en: 'One HTML file with all images and narration. Save writes exactly the previewed file. Audio may require pressing Play in your browser.',
-  },
-  tourHtmlMaskHint: {
-    ru: 'Непрозрачное скрытие запекается во все использования общего изображения. Размытие и подсветка — визуальные эффекты, они не удаляют исходные пиксели.',
-    en: 'Opaque redactions are baked into every use of a shared image. Blur and highlights are visual effects; they do not remove source pixels.',
   },
   tourHtmlLimitHint: {
     ru: 'До 128 МБ используемых медиа. Неиспользуемые материалы и метаданные захвата не включаются.',
@@ -187,7 +234,12 @@ export const scenarioTourMessages = {
     en: 'X and Y set the center as image percentages. The view stays within the image edges.',
   },
   tourSlideControls: { ru: 'Управление слайдом', en: 'Slide controls' },
-  tourPreviewSlide: { ru: 'Просмотр', en: 'Preview' },
+  tourPreviewSlide: { ru: 'Просмотреть отсюда', en: 'Preview from here' },
+  tourUnsupportedOpen: {
+    ru: 'Формат этого тура не поддерживается. Сохранённые данные не изменены. Создайте новый тур в текущей версии редактора.',
+    en: 'This tour format is not supported. Saved data has not been changed. Create a new tour in this version of the editor.',
+  },
+  tourPreviewStart: { ru: 'Просмотреть сначала', en: 'Preview from beginning' },
   tourReturnToEditing: { ru: 'К редактированию', en: 'Return to editing' },
   tourReplayPreview: { ru: 'Повторить', en: 'Replay' },
   tourRemoveBackground: { ru: 'Убрать фоновое изображение', en: 'Remove background image' },
@@ -235,6 +287,7 @@ export const scenarioTourMessages = {
   referenceMode: { ru: 'Руководство', en: 'Guide' },
   tourMode: { ru: 'Интерактивный тур', en: 'Interactive tour' },
   tourSlides: { ru: 'Слайды', en: 'Slides' },
+  tourContentsTitle: { ru: 'Оглавление', en: 'Contents' },
   tourSlideActions: { ru: 'Действия со слайдом', en: 'Slide actions' },
   tourMoveSlide: { ru: 'Переместить слайд', en: 'Move slide' },
   tourDuplicate: { ru: 'Дублировать слайд', en: 'Duplicate slide' },

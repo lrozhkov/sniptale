@@ -11,6 +11,7 @@ import type { SelectedTourProps } from './workspace-contracts';
 type TourCanvasProps = SelectedTourProps & {
   view: TourView;
   previewKey: number;
+  previewOrigin: 'selection' | 'beginning';
   generating: boolean;
   onGenerationChange: (value: boolean) => void;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
@@ -72,6 +73,7 @@ function TourSelectedCanvas({
   onSelectObject: selectObject,
   view,
   previewKey,
+  previewOrigin,
 }: Pick<
   TourCanvasProps,
   | 'project'
@@ -85,6 +87,7 @@ function TourSelectedCanvas({
   | 'onSelectObject'
   | 'view'
   | 'previewKey'
+  | 'previewOrigin'
 >) {
   if (!project.tour || !state.selection) return null;
   return (
@@ -99,6 +102,7 @@ function TourSelectedCanvas({
           t={t}
           view={view}
           previewKey={previewKey}
+          previewOrigin={previewOrigin}
           onSelectObject={selectObject}
           onNavigateSelection={(selection) => {
             state.select(selection);
@@ -106,7 +110,8 @@ function TourSelectedCanvas({
           }}
           {...tourGeometryHandlers(
             state.slide?.kind === 'image' ? state.slide : null,
-            state.changeSlide
+            state.changeSlide,
+            state.selection?.kind === 'slide' ? state.selection.objectId : null
           )}
         />
       </div>
@@ -133,11 +138,33 @@ function TourSelectedCanvas({
 /** Geometry inputs transform the selected image slide and commit through its existing history owner. */
 function tourGeometryHandlers(
   slide: Extract<TourSlide, { kind: 'image' }> | null,
-  changeSlide: SelectedTourProps['state']['changeSlide']
+  changeSlide: SelectedTourProps['state']['changeSlide'],
+  objectId: string | null
 ): Pick<ComponentProps<typeof TourStage>, 'onFrameCamera' | 'onResizeObject' | 'onMoveObject'> {
   return {
     onFrameCamera(camera) {
-      if (slide) changeSlide({ ...slide, camera: { ...slide.camera, ...camera, mode: 'manual' } });
+      if (slide) {
+        const selected = slide.actions.find((entry) => entry.object.id === objectId);
+        const nextCamera = {
+          ...(selected?.object.camera ?? slide.camera),
+          ...camera,
+          mode: 'manual' as const,
+        };
+        changeSlide(
+          selected
+            ? {
+                ...slide,
+                actions: slide.actions.map((entry) =>
+                  entry.object.id !== objectId
+                    ? entry
+                    : entry.type === 'hotspot'
+                      ? { type: 'hotspot', object: { ...entry.object, camera: nextCamera } }
+                      : { type: 'annotation', object: { ...entry.object, camera: nextCamera } }
+                ),
+              }
+            : { ...slide, camera: nextCamera }
+        );
+      }
     },
     onResizeObject(id, rect) {
       if (slide)

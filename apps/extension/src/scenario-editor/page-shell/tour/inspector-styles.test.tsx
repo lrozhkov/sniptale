@@ -218,7 +218,7 @@ it('renders exactly one heading per section in both presentations and keeps nest
   presentation = 'all';
   draw();
   const groups = [...host.querySelectorAll('.guide-inspector-group')];
-  expect(groups).toHaveLength(9);
+  expect(groups).toHaveLength(6);
   for (const group of groups)
     expect(group.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(1);
   scope = 'selection';
@@ -292,24 +292,13 @@ it('detaches and restores text styles independently from central categories', as
   );
 });
 
-it('keeps permanent blur defaults independent from hotspot visuals', async () => {
-  await click('Image treatment');
-  await choose('Image treatment', 'Blur');
-  await click('Use tour style');
-  expect(current().masks[0]!.inheritStyle).toBe(true);
+it('keeps image processing out of document settings and action settings', async () => {
+  expect(host.textContent).not.toContain('Image treatment');
   scope = 'document';
   presentation = 'sections';
   draw();
-  await click('Image treatment');
-  await fill('Blur radius', '32');
-  expect(project.tour!.style.maskDefaults?.blur.radius).toBe(32);
-  scope = 'selection';
-  presentation = 'all';
-  draw();
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Blur radius"]')?.value).toBe('32');
-  await fill('Blur radius', '20');
-  expect(current().masks[0]!.inheritStyle).toBe(false);
-  expect(project.tour!.style.maskDefaults?.blur.radius).toBe(32);
+  expect(host.textContent).not.toContain('Image treatment');
+  expect(host.querySelector('[aria-label="Blur radius"]')).toBeNull();
 });
 
 for (const objectId of [null, 'voice-point']) {
@@ -375,18 +364,26 @@ it('shows only selection guidance when no slide is selected', () => {
   expect(host.querySelector('nav, input, textarea, [data-testid="narration-slot"]')).toBeNull();
 });
 
-it('keeps redaction permanent and excludes it from action narration', async () => {
-  await click('Image treatment');
+it('preserves saved privacy data without exposing processing controls', () => {
+  current().masks = [
+    {
+      id: 'private',
+      kind: 'redact',
+      rect: { x: 0, y: 0, width: 0.2, height: 0.2 },
+      color: '#111827',
+      opacity: 1,
+    },
+  ];
+  const before = structuredClone(current().masks);
   presentation = 'sections';
   draw();
-  expect(current().masks[0]!.kind).toBe('redact');
-  expect(host.querySelector('[aria-label="Narration"]')).toBeNull();
-  await click('Appearance');
-  expect(host.querySelector('[aria-label="Use tour style"]')).toBeNull();
-  expect(host.querySelector('input[aria-label="Opacity"]')).toBeNull();
-  await click('Effect type');
-  await choose('Image treatment', 'Blur');
-  expect(current().masks[0]!.kind).toBe('blur');
+  expect(host.textContent).not.toContain('Image treatment');
+  expect(host.querySelector('[data-inspector-object="private"]')).toBeNull();
+  expect(current().masks).toEqual(before);
+  selected = { kind: 'slide', slideId: 'image', objectId: 'private' };
+  draw();
+  expect(host.querySelector('input, textarea, [aria-label="Delete"]')).toBeNull();
+  expect(current().masks).toEqual(before);
 });
 
 it('hides obsolete hint radius while retaining authored radius through global and inherited local edits', async () => {

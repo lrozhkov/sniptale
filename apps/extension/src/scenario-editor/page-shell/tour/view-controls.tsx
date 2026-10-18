@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { MousePointer2, Play, RotateCcw, ScanSearch } from 'lucide-react';
+import { MousePointer2, Play, RotateCcw, ScanSearch, SkipBack } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { Translate } from '../../../platform/i18n';
@@ -10,8 +10,10 @@ export type TourView = 'edit' | 'frame' | 'preview';
 type TourViewMode = {
   view: TourView;
   replay: number;
+  previewOrigin: 'selection' | 'beginning';
   cameraAvailable: boolean;
   preview(): void;
+  previewBeginning(): void;
   replayPreview(): void;
   edit(): void;
   toggleFrame(): void;
@@ -28,21 +30,34 @@ export function useTourViewMode(
     key: string | null;
     view: TourView;
     replay: number;
-  }>({ key: selectionKey, view: 'edit', replay: 0 });
+    previewOrigin: 'selection' | 'beginning';
+  }>({ key: selectionKey, view: 'edit', replay: 0, previewOrigin: 'selection' });
   const current =
     requested.key === selectionKey
       ? requested
-      : { key: selectionKey, view: 'edit' as const, replay: 0 };
+      : {
+          key: selectionKey,
+          view: 'edit' as const,
+          replay: 0,
+          previewOrigin: 'selection' as const,
+        };
+  const selectedAction =
+    slide?.kind === 'image' && selection?.kind === 'slide'
+      ? slide.actions.find((entry) => entry.object.id === selection.objectId)
+      : undefined;
+  const camera = selectedAction?.object.camera ?? (slide?.kind === 'image' ? slide.camera : null);
   const cameraAvailable =
-    slide?.kind === 'image' && Boolean(slide.image) && slide.camera.mode === 'manual';
+    slide?.kind === 'image' && Boolean(slide.image) && camera?.mode === 'manual';
   const view: TourView = current.view === 'frame' && !cameraAvailable ? 'edit' : current.view;
-  const set = (next: TourView, replay = current.replay) =>
-    setRequested({ key: selectionKey, view: next, replay });
+  const set = (next: TourView, replay = current.replay, previewOrigin = current.previewOrigin) =>
+    setRequested({ key: selectionKey, view: next, replay, previewOrigin });
   return {
     view,
     replay: current.replay,
+    previewOrigin: current.previewOrigin,
     cameraAvailable,
-    preview: () => set('preview'),
+    preview: () => set('preview', current.replay, 'selection'),
+    previewBeginning: () => set('preview', current.replay, 'beginning'),
     replayPreview: () => set('preview', current.replay + 1),
     edit: () => set('edit'),
     toggleFrame: () => set(view === 'frame' ? 'edit' : 'frame'),
@@ -53,11 +68,13 @@ export function useTourViewMode(
 export function TourViewControls({
   mode,
   previewDisabled = false,
+  beginningDisabled = previewDisabled,
   disabled = false,
   t,
 }: {
   mode: TourViewMode;
   previewDisabled?: boolean;
+  beginningDisabled?: boolean;
   disabled?: boolean;
   t: Translate;
 }) {
@@ -109,6 +126,16 @@ export function TourViewControls({
       >
         <Play size={16} aria-hidden="true" />
         <span>{t('scenario.editor.tourPreviewSlide')}</span>
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        className="guide-labeled-action"
+        data-header-collapse="5"
+        title={t('scenario.editor.tourPreviewStart')}
+        disabled={beginningDisabled}
+        onClick={activate(mode.previewBeginning)}
+      >
+        <SkipBack size={16} aria-hidden="true" />
+        <span>{t('scenario.editor.tourPreviewStart')}</span>
       </ContentToolbarButton>
       {mode.cameraAvailable && (
         <ContentToolbarButton

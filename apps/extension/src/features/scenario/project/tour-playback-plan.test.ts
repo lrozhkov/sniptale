@@ -72,7 +72,7 @@ it('keeps stable targets after slide and action reorder', () => {
   });
 });
 
-it('skips empty image containers and preserves consecutive contents stops', () => {
+it('skips empty image containers and represents completely empty tours', () => {
   const tour = example();
   const first = tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image slide.');
@@ -109,4 +109,41 @@ it('projects only one action and its overrides while retaining permanent image e
   });
   expect(entry.slide.kind === 'image' && entry.slide.actions).toEqual([action]);
   expect(slide.actions).toHaveLength(3);
+});
+
+it('keeps beginning, consecutive and ending contents as distinct unnumbered entries', () => {
+  const tour = example();
+  const timing = createTourImageSlide().timing;
+  const contents = (id: string) => ({
+    kind: 'navigation' as const,
+    id,
+    title: id,
+    description: '',
+    background: { color: '#ffffff', image: null },
+    buttons: [],
+    narration: null,
+    timing,
+  });
+  tour.slides = [
+    contents('begin'),
+    tour.slides[0]!,
+    contents('middle-one'),
+    contents('middle-two'),
+    tour.slides[1]!,
+    contents('end'),
+  ];
+  const plan = buildTourPlaybackPlan(tour);
+  expect(plan.entries.map((entry) => [entry.key, entry.ordinal])).toEqual([
+    ['begin', null],
+    ['action-0-0', 1],
+    ['action-0-1', 2],
+    ['action-0-2', 3],
+    ['middle-one', null],
+    ['middle-two', null],
+    ['action-1-0', 4],
+    ['action-1-1', 5],
+    ['action-1-2', 6],
+    ['end', null],
+  ]);
+  expect(plan.actionCount).toBe(6);
 });

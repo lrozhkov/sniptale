@@ -21,7 +21,12 @@ import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driv
 import { useGuideHistory } from './history';
 import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
-import { openExistingScenarioProject } from './open-existing';
+import {
+  openExistingScenarioProject,
+  enterScenarioProjectSession,
+  UnsupportedScenarioTourError,
+  assertScenarioTourSupported,
+} from './open-existing';
 
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
 import { applyTourImageEdit } from '../../../workflows/scenario-capture-edit/tour-edits';
@@ -32,6 +37,7 @@ type GuidePageStatus =
   | 'ready'
   | 'missing'
   | 'unavailable'
+  | 'unsupported'
   | 'saving'
   | 'saved'
   | 'failed'
@@ -105,9 +111,9 @@ export function useGuidePageState() {
   const load = useCallback(async () => {
     const turn = ++generation.current;
     const retained = loadContext.current;
-    const rejectLoad = () => {
+    const rejectLoad = (reason: 'unavailable' | 'unsupported' = 'unavailable') => {
       if (turn !== generation.current) return;
-      setStatus(retained.project ? retained.status : 'unavailable');
+      setStatus(retained.project ? retained.status : reason);
       if (retained.project) setActionError('reload');
     };
     if (!requestedId.current) {
@@ -116,7 +122,7 @@ export function useGuidePageState() {
     }
     setStatus('loading');
     try {
-      if (!(await enterResourceSession(requestedId.current))) {
+      if (!(await enterScenarioProjectSession(requestedId.current, enterResourceSession))) {
         rejectLoad();
         return;
       }
@@ -133,8 +139,8 @@ export function useGuidePageState() {
       saved.current = savedSnapshot;
       reset(loaded, previousProjects);
       setStatus(loaded ? 'ready' : 'missing');
-    } catch {
-      rejectLoad();
+    } catch (error) {
+      rejectLoad(error instanceof UnsupportedScenarioTourError ? 'unsupported' : 'unavailable');
     }
   }, [reset, enterResourceSession]);
   useEffect(() => {
@@ -516,6 +522,7 @@ function createGuideCommitDispatcher({
 /** Reads the canonical saved versions without changing the page's generation or load policy. */
 async function readGuideHistoryProjection(id: string) {
   const history = await getScenarioSavedVersions(id);
+  if (!history) await assertScenarioTourSupported(id);
   const [current, ...previous] = history?.versions ?? [];
   return {
     loaded: current?.project ?? null,

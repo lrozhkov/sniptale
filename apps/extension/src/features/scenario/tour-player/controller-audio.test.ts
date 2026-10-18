@@ -219,6 +219,11 @@ it('projects a newly selected hint identity without a media event and hides cont
   await h.tick();
   h.button('[data-tour-hint-next]').click();
   const activation = h.button('[data-tour-narration-toggle="activation"]');
+  expect(activation.getAttribute('aria-label')).toBe(labels.narrationPause);
+  expect(h.media.paused).toBe(false);
+  expect(h.media.currentTime).toBe(4);
+  activation.click();
+  expect(h.media.paused).toBe(true);
   expect(activation.getAttribute('aria-label')).toBe(labels.narrationResume);
   activation.click();
   await h.tick();
@@ -226,6 +231,7 @@ it('projects a newly selected hint identity without a media event and hides cont
   expect(activation.getAttribute('aria-label')).toBe(labels.narrationPause);
   h.button('[data-tour-hint-next]').click();
   expect(h.root.querySelector<HTMLElement>('[data-tour-narration-controls]')!.hidden).toBe(true);
+  expect(h.media.paused).toBe(true);
   expect(h.root.dataset['slideId']).toBe('first');
 });
 it('resyncs global Play once and stops local audio on full view and navigation', async () => {

@@ -68,7 +68,7 @@ export function renderTourImage(
       renderTourMask(resolveTourMask(mask, maskDefaults), imageBox, slide.image.width, {
         element,
         labels,
-        authoring,
+        authoring: undefined,
         signal,
         animation: resolveTourHighlightAnimation(mask, maskDefaults),
       })

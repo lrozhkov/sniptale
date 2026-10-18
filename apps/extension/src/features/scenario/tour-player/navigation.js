@@ -53,7 +53,7 @@ export function createTourNavigation({
       key: number,
       label: plan
         ? plan.entries[number].ordinal
-          ? `${plan.entries[number].ordinal}. ${slide.title || labels.point}`
+          ? `${plan.entries[number].ordinal}. ${slide.title || `${labels.point} ${plan.entries[number].ordinal}`}`
           : slide.title || labels.contents
         : `${number + 1}. ${slide.title}`,
       title: slide.title,

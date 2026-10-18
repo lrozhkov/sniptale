@@ -346,3 +346,64 @@ it('selects the current Contents row without replacing its rendered scene or rep
   expect(h.root.querySelector('[data-tour-scene]')!.firstChild).toBe(frame);
   expect(h.root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.disabled).toBe(true);
 });
+
+it('numbers localized fallback labels for untitled actions', async () => {
+  const { root, player, tour } = await mount(false);
+  for (const slide of tour.slides) {
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    slide.title = '';
+    slide.actions[0]!.object.text = '';
+  }
+  player.update({ tour, labels, assets: [] });
+  root.querySelector<HTMLButtonElement>('[data-tour-contents]')!.click();
+  expect(
+    [...root.querySelectorAll('.tour-contents-list button')].map((button) => button.textContent)
+  ).toEqual(['1. Point 1', '2. Point 2']);
+});
+
+it('walks beginning, consecutive and ending contents without consuming action numbers', async () => {
+  const { root, player, tour } = await mount();
+  const timing = tour.slides[0]!.timing;
+  const contents = (id: string) => ({
+    kind: 'navigation' as const,
+    id,
+    title: id,
+    description: '',
+    background: { color: '#ffffff', image: null },
+    buttons: [],
+    narration: null,
+    timing,
+  });
+  tour.slides = [
+    contents('begin'),
+    tour.slides[0]!,
+    contents('middle-one'),
+    contents('middle-two'),
+    tour.slides[1]!,
+    contents('last-contents'),
+  ];
+  player.update({ tour, labels, assets: [] });
+  player.select('begin');
+  const next = root.querySelector<HTMLButtonElement>('[data-tour-next]')!;
+  const previous = root.querySelector<HTMLButtonElement>('[data-tour-previous]')!;
+  const counter = root.querySelector<HTMLElement>('[data-tour-counter]')!;
+  for (const [id, count] of [
+    ['begin', ''],
+    ['first', '1 / 2'],
+    ['middle-one', ''],
+    ['middle-two', ''],
+    ['second', '2 / 2'],
+    ['last-contents', ''],
+  ]) {
+    expect(root.dataset['slideId']).toBe(id);
+    expect(counter.textContent).toBe(count);
+    next.click();
+  }
+  expect(root.dataset['slideId']).toBe('end');
+  previous.click();
+  expect(root.dataset['slideId']).toBe('last-contents');
+  expect(counter.hidden).toBe(true);
+  previous.click();
+  expect(root.dataset['slideId']).toBe('second');
+  expect(counter.textContent).toBe('2 / 2');
+});
