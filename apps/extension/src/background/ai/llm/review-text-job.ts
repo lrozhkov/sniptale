@@ -164,6 +164,8 @@ async function run(
   signal.throwIfAborted();
   const config = await deps.resolveModel(request.modelId, approved);
   signal.throwIfAborted();
+  await deps.assertScope(request, signal);
+  signal.throwIfAborted();
   send({ type: 'progress', requestId: request.requestId, phase: 'requesting' });
   try {
     const content = await deps.request({

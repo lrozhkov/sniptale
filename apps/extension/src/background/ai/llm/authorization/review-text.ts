@@ -1,4 +1,11 @@
-import type { ReviewTextStart } from '../../../../contracts/ai/review-text';
+import {
+  isProjectReviewTextScope,
+  type ReviewTextStart,
+} from '../../../../contracts/ai/review-text';
+import { isOwnedExtensionPagePath } from '../../../../platform/navigation/extension-pages/sender-url';
+import { isCurrentVideoProjectSnapshot } from '../../../../composition/persistence/projects/revision';
+import { getVideoProject } from '../../../../composition/persistence/projects';
+import { captureVideoProjectTextRewriteContext } from '../../../../features/video/project/text/rewrite-context';
 import { createReviewTextEgressAuthority } from '../../../../features/ai/egress-authority';
 import { consumeLlmSessionToken, resolveLlmSessionSenderKey } from '../session-tokens';
 import { readVideoWorkspace } from '../../../../composition/persistence/review-workspaces/store';
@@ -33,14 +40,48 @@ export async function authorizeReviewText(
     })
   )
     throw new Error('unauthorized');
+  if (
+    isProjectReviewTextScope(request.scope) !==
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/video-editor/index.html')
+  )
+    throw new Error('unauthorized');
   await assertReviewTextJobScope(request, signal);
 }
 
-/** Repeated before POST: a trusted Gallery sender does not authorize a vanished or changed workspace. */
+/** Repeated before POST: page ownership does not authorize vanished or changed source text. */
 export async function assertReviewTextJobScope(
   request: ReviewTextStart,
   signal: AbortSignal
 ): Promise<void> {
+  if (isProjectReviewTextScope(request.scope)) {
+    const scope = request.scope;
+    const saved = await getVideoProject(scope.projectId);
+    signal.throwIfAborted();
+    if (
+      saved.status !== 'ready' ||
+      saved.lifecycle?.trashedAt !== undefined ||
+      saved.workspaceRevision !== scope.projectRevision ||
+      saved.project.id !== scope.projectId ||
+      saved.project.updatedAt !== scope.projectUpdatedAt
+    )
+      throw new Error('stale');
+    let expected;
+    try {
+      expected = captureVideoProjectTextRewriteContext(
+        saved.project,
+        scope.documentId,
+        request.context.fragments.map((fragment) => fragment.id),
+        request.context
+      );
+    } catch {
+      throw new Error('stale');
+    }
+    if (JSON.stringify(expected) !== JSON.stringify(request.context)) throw new Error('stale');
+    const current = await isCurrentVideoProjectSnapshot(saved.project, saved.workspaceRevision);
+    signal.throwIfAborted();
+    if (!current) throw new Error('stale');
+    return;
+  }
   const saved = await readVideoWorkspace(request.scope.workspaceId);
   signal.throwIfAborted();
   const workspace = saved?.workspace;
@@ -72,7 +113,9 @@ export async function assertReviewTextJobScope(
       projected.excludedFromResult ||
       projected.partiallyExcluded ||
       projected.ranges[0]?.start !== disclosed.start ||
-      projected.ranges.at(-1)?.end !== disclosed.end
+      projected.ranges.at(-1)?.end !== disclosed.end ||
+      (disclosed.ranges !== undefined &&
+        JSON.stringify(disclosed.ranges) !== JSON.stringify(projected.ranges))
     )
       throw new Error('stale');
   }

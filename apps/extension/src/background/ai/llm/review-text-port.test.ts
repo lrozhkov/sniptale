@@ -69,3 +69,23 @@ it('strictly parses commands and disconnects malformed traffic, removing listene
   stop();
   expect(browser.unsubscribe).toHaveBeenCalledOnce();
 });
+it.each(['gallery', 'video-editor'])(
+  'admits the owned top-level %s page through the actual Port gate',
+  (page) => {
+    const service = createReviewTextJobService();
+    const connection = { receive: vi.fn(), disconnect: vi.fn(async () => undefined) };
+    const connect = vi.spyOn(service, 'connect').mockReturnValue(connection);
+    registerReviewTextPorts(service);
+    const identity = {
+      ...sender,
+      url: `chrome-extension://extension/apps/extension/src/${page}/index.html`,
+    };
+    const port = createRuntimePortFixture({ name: REVIEW_TEXT_PORT_NAME, sender: identity });
+    browser.listener?.(port.port);
+    expect(connect).toHaveBeenCalledOnce();
+    expect(port.disconnect).not.toHaveBeenCalled();
+    const command = { type: 'keepalive', requestId: '1cbf949a-76e3-41e2-a37a-78179423eb29' };
+    port.onMessage.emit(command);
+    expect(connection.receive).toHaveBeenCalledExactlyOnceWith(command);
+  }
+);
