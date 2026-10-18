@@ -64,10 +64,13 @@ function createCleanupDisposers() {
 function createCleanupJob() {
   const disposers = createCleanupDisposers();
   const cleanupNode = document.createElement('div');
+  const captionRenderer = { prepare: vi.fn(), clear: vi.fn() };
 
   return {
     ...disposers,
+    captionRenderer,
     job: {
+      captionRenderer,
       mediaRecorder: null,
       clipMediaElements: new Map([
         [
@@ -110,6 +113,8 @@ function createCleanupJob() {
 }
 
 function expectCleanupJobState(cleanup: ReturnType<typeof createCleanupJob>) {
+  expect(cleanup.captionRenderer.clear).toHaveBeenCalledOnce();
+  expect(cleanup.job.captionRenderer).toBeUndefined();
   expect(cleanup.disconnectSource).toHaveBeenCalledOnce();
   expect(cleanup.disconnectGain).toHaveBeenCalledOnce();
   expect(cleanup.stopAudioTrack).toHaveBeenCalledOnce();

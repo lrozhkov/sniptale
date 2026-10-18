@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
   drawProjectFrameMock,
@@ -238,5 +238,98 @@ it('rejects cancelled composite frames before touching playback', async () => {
   ).rejects.toThrow('PROJECT_EXPORT_CANCELLED');
   expect(syncClipPlaybackMock).not.toHaveBeenCalled();
   expect(drawProjectFrameMock).not.toHaveBeenCalled();
+  expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
+});
+
+afterEach(() => {
+  Reflect.deleteProperty(document, 'fonts');
+});
+
+it('burns authored captions after normal composite frames and reuses the prepared layout', async () => {
+  const project = createProject(1);
+  project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Burned in',
+            originalText: '',
+            start: 0,
+            end: 1,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const load = vi.fn(async () => [{ status: 'loaded' }]);
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { load } });
+  const context = createRenderContext();
+  const fillText = vi.spyOn(context, 'fillText');
+  const args = {
+    context,
+    currentTime: 0.25,
+    frameIndex: 0,
+    job: createJob(),
+    loadedImages: createLoadedImages(),
+    lastProgressSent: 0,
+    project,
+    settings: createSettings(),
+    totalFrames: 4,
+  };
+  await renderCompositeFrame(args);
+  await renderCompositeFrame({ ...args, currentTime: 0.5, frameIndex: 1 });
+  expect(load).toHaveBeenCalledOnce();
+  expect(fillText).toHaveBeenCalledWith('Burned in', expect.any(Number), expect.any(Number));
+  expect(drawProjectFrameMock.mock.invocationCallOrder[0]).toBeLessThan(
+    fillText.mock.invocationCallOrder[0]!
+  );
+  fillText.mockRestore();
+  load.mockResolvedValue([]);
+  await expect(renderCompositeFrame({ ...args, job: createJob() })).rejects.toThrow(
+    'Caption font is unavailable'
+  );
+  expect(drawProjectFrameMock).toHaveBeenCalledTimes(2);
+  expect(sendCompositeRenderProgressMock).toHaveBeenCalledTimes(2);
+});
+it('rejects unsafe caption layout before drawing or progress', async () => {
+  const assertExportable = vi.fn(() => {
+    throw new Error('unsafe captions');
+  });
+  const draw = vi.fn();
+  await expect(
+    renderCompositeFrame({
+      context: createRenderContext(),
+      currentTime: 0.25,
+      frameIndex: 0,
+      job: {
+        ...createJob(),
+        captionRenderer: {
+          prepare: vi.fn().mockResolvedValue({ assertExportable, draw }),
+          clear: vi.fn(),
+        },
+      },
+      loadedImages: {},
+      lastProgressSent: 0,
+      project: createProject(1),
+      settings: createSettings(),
+      totalFrames: 4,
+    })
+  ).rejects.toThrow('unsafe captions');
+  expect(assertExportable).toHaveBeenCalledWith({ start: 0, end: 1, duration: 1 });
+  expect(drawProjectFrameMock).not.toHaveBeenCalled();
+  expect(draw).not.toHaveBeenCalled();
   expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
 });

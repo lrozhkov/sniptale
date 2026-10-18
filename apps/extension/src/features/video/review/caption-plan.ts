@@ -149,6 +149,7 @@ type CaptionPlanInput = {
   segments: readonly ReviewTimeSegment[];
   output: { width: number; height: number };
   measure(text: string, pixels: number): number;
+  project?(fragment: ReviewTextFragment): ReturnType<typeof projectReviewTextFragment>;
   reservations?: readonly ReviewCaptionReservation[] | undefined;
 };
 type CaptionConflictSink = (
@@ -168,7 +169,8 @@ function collectCaptionCues(
   const settings = args.settings!;
   for (const fragment of args.document!.fragments) {
     if (!fragment.showInVideo || !fragment.text.trim()) continue;
-    const projected = projectReviewTextFragment(fragment, args.segments).ranges;
+    const project = args.project ?? ((value) => projectReviewTextFragment(value, args.segments));
+    const projected = project(fragment).ranges;
     if (!projected.length) continue;
     if (cues.length >= MAX_CUES) {
       for (const range of projected) conflict(fragment.id, 'budget', range);
@@ -185,10 +187,7 @@ function collectCaptionCues(
       const lines = wrap(block.text);
       const width = Math.max(...lines.map((line) => args.measure(line, pixels))) + padding * 2;
       const lineHeight = pixels * 1.25;
-      for (const [slice, range] of projectReviewTextFragment(
-        { ...fragment, ...block },
-        args.segments
-      ).ranges.entries()) {
+      for (const [slice, range] of project({ ...fragment, ...block }).ranges.entries()) {
         if (cues.length >= MAX_CUES) {
           for (const remainder of projected) conflict(fragment.id, 'budget', remainder);
           break blocks;

@@ -67,6 +67,8 @@ export async function sendProgress(
 }
 
 export function cleanupJob(job: ProjectExportRuntimeState): void {
+  job.captionRenderer?.clear();
+  delete job.captionRenderer;
   for (const audioNode of job.clipAudioNodes.values()) {
     audioNode.source.disconnect();
     audioNode.gain.disconnect();

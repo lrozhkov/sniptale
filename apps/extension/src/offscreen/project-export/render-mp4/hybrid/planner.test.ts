@@ -295,3 +295,43 @@ it('requires full composition for adaptive MP4 even with a clean source', () => 
     true
   );
 });
+
+it('composites authored captions independently of the legacy subtitle toggle', () => {
+  const project = createProject();
+  project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Authored',
+            originalText: '',
+            start: 1,
+            end: 2,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const spans = planMp4VideoRenderSpans(project, createSettings({ burnInSubtitles: false }));
+  expect(spans.some((span) => span.kind !== 'clean-source')).toBe(true);
+  expect(spans.some((span) => span.kind === 'clean-source' && span.start < 2 && span.end > 1)).toBe(
+    false
+  );
+  project.textDocuments[0]!.captions!.enabled = false;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+});

@@ -10,6 +10,8 @@ import {
 } from '../../effect-runtime';
 import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
 import { sendCompositeRenderProgress } from '../progress/index';
+import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
+import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 
 type RenderCompositeFrameArgs = {
   context: CanvasRenderingContext2D;
@@ -44,6 +46,9 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
   }
 
   syncClipPlayback(job, project, currentTime);
+  job.captionRenderer ??= createVideoProjectCaptionRenderer();
+  const captions = await job.captionRenderer.prepare(project, settings, signal);
+  captions.assertExportable(resolveProjectExportRange(project, settings));
   const effectRuntimeFrames = await renderCompositeEffectFrames(args);
   try {
     if (job.cancelled || signal?.aborted) {
@@ -62,6 +67,7 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
       job.clipMediaElements,
       frameOptions
     );
+    captions.draw(context, currentTime);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

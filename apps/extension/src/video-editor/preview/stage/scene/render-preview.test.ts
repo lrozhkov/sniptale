@@ -110,3 +110,55 @@ it('discards async results if seeking starts and finishes during their calculati
   await renderPreviewScene(job);
   expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
 });
+
+it('draws prepared captions after the scene in final viewport coordinates regardless of camera zoom', async () => {
+  const { job } = setup();
+  const context = job.canvas.getContext('2d')!;
+  const fillText = vi.spyOn(context, 'fillText');
+  const translate = vi.spyOn(context, 'translate');
+  const scale = vi.spyOn(context, 'scale');
+  vi.mocked(drawPreviewVisualPasses).mockReturnValueOnce({
+    context,
+    viewport: { offsetX: 12, offsetY: 18, scale: 0.5, width: 960, height: 540 },
+  } as ReturnType<typeof drawPreviewVisualPasses>);
+  const draw = vi.fn((target: CanvasRenderingContext2D, time: number) => {
+    target.fillText(`Caption ${time}`, 100, 200);
+  });
+  const captionRenderer = {
+    prepare: vi.fn().mockResolvedValue({ plan: { cues: [{}] }, draw }),
+    clear: vi.fn(),
+  };
+  await renderPreviewScene({ ...job, captionRenderer });
+  expect(captionRenderer.prepare).toHaveBeenCalledWith(job.project, job.project, undefined);
+  expect(translate).toHaveBeenCalledWith(12, 18);
+  expect(scale).toHaveBeenCalledWith(0.5, 0.5);
+  expect(fillText).toHaveBeenCalledWith('Caption 1', 100, 200);
+  expect(vi.mocked(drawPreviewVisualPasses).mock.invocationCallOrder[0]).toBeLessThan(
+    draw.mock.invocationCallOrder[0]!
+  );
+});
+it('keeps the presented scene when caption preparation fails or completes after cancellation', async () => {
+  const { job } = setup();
+  const captionRenderer = {
+    prepare: vi.fn().mockRejectedValue(new Error('font unavailable')),
+    clear: vi.fn(),
+  };
+  await expect(renderPreviewScene({ ...job, captionRenderer })).rejects.toThrow('font unavailable');
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  let ready!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const draw = vi.fn();
+  captionRenderer.prepare.mockImplementation(async () => {
+    await gate;
+    return { plan: { cues: [{}] }, draw };
+  });
+  const controller = new AbortController();
+  const pending = renderPreviewScene({ ...job, captionRenderer, signal: controller.signal });
+  controller.abort();
+  ready();
+  await pending;
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  expect(draw).not.toHaveBeenCalled();
+});

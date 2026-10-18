@@ -18,6 +18,10 @@ import type { PreviewSceneViewport, PreviewStageVideoRefs } from '../types';
 import { resolvePreviewEffectRuntimeRasterScale } from './canvas';
 import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
 import type { VideoEditorPreviewMode } from '../../../contracts/preview-runtime';
+import {
+  createVideoProjectCaptionRenderer,
+  type VideoProjectCaptionRenderer,
+} from '../../../../workflows/video-review/project-captions';
 
 type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
@@ -77,6 +81,7 @@ function drawPreviewSceneOverlays(params: {
 export async function renderPreviewScene(params: {
   cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
+  captionRenderer?: VideoProjectCaptionRenderer;
   currentTime: number;
   imageBank: Record<string, HTMLImageElement>;
   effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
@@ -111,7 +116,13 @@ export async function renderPreviewScene(params: {
   };
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
+  let captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   try {
+    captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
+      params.project,
+      params.project,
+      params.signal
+    );
     effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
       params,
       renderPasses,
@@ -135,6 +146,7 @@ export async function renderPreviewScene(params: {
     if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
     const drawn = drawResolvedPreviewScene({
       clipMediaElements,
+      captions,
       effectRuntimeFrames,
       params,
       renderPasses,
@@ -163,6 +175,7 @@ function arePreviewSceneVideosReady(
 }
 
 function drawResolvedPreviewScene(args: {
+  captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   clipMediaElements: Map<string, HTMLMediaElement>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
@@ -190,6 +203,16 @@ function drawResolvedPreviewScene(args: {
     frame: args.renderPasses.overlayFrame,
     viewport: overlayPrepared.viewport,
   });
+  const { context, viewport } = overlayPrepared;
+  if (!args.captions.plan.cues.length) return true;
+  context.save();
+  try {
+    context.translate(viewport.offsetX, viewport.offsetY);
+    context.scale(viewport.scale, viewport.scale);
+    args.captions.draw(context, args.params.currentTime);
+  } finally {
+    context.restore();
+  }
   return true;
 }
 

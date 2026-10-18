@@ -3,6 +3,7 @@ import { createSha256Digest } from '@sniptale/platform/security/digest';
 
 import { resolveVideoProjectActionPresentations } from '../../../features/video/project/action-presentation';
 import type { VideoProject } from '../../../features/video/project/types';
+import { isTextSourceClip } from '../../../features/video/project/text/projection';
 
 interface VideoPreviewSegmentRange {
   endFrame: number;
@@ -190,6 +191,27 @@ function projectVideoPreviewSegmentRenderState(
 
   return {
     ...fullState,
+    // Whole-phrase ranges can stay fixed while source slips change projected word blocks and slots.
+    captionSourcePlacements: project.clips.flatMap((clip) => {
+      if (
+        (clip.type !== 'VIDEO' && clip.type !== 'AUDIO') ||
+        !project.textDocuments?.some(
+          (entry) => entry.captions?.enabled && isTextSourceClip(clip, entry.binding)
+        )
+      )
+        return [];
+      return [
+        {
+          assetId: clip.assetId,
+          sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+          startTime: clip.startTime,
+          duration: clip.duration,
+          sourceStart: clip.sourceStart,
+          sourceDuration: clip.sourceDuration,
+          playbackRate: clip.playbackRate ?? 1,
+        },
+      ];
+    }),
     actionEvents: actions.events,
     actionRenderStates: actions.renderStates,
     assets: (fullState['assets'] as Array<{ id: string }>).filter((asset) =>

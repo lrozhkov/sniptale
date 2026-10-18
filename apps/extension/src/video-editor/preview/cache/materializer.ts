@@ -8,6 +8,7 @@ import {
 import type { VideoProject } from '../../../features/video/project/types';
 import { createVideoEditorEffectRuntime } from '../../runtime/effect-runtime';
 import { renderPreviewScene } from '../stage/scene/render-preview';
+import { createVideoProjectCaptionRenderer } from '../../../workflows/video-review/project-captions';
 import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
 
 const FRAME_SOURCE_TIMEOUT_MS = 2_000;
@@ -24,6 +25,7 @@ export interface VideoPreviewFrameMaterializer {
 }
 
 interface VideoPreviewMaterializerState {
+  captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
   videoRefs: Record<string, HTMLVideoElement | null>;
@@ -194,6 +196,7 @@ function createMaterializerMediaState(
   stage: HTMLDivElement
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
+    captionRenderer: createVideoProjectCaptionRenderer(),
     effectRuntime: null,
     imageBank: {},
     videoRefs: {},
@@ -236,6 +239,7 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
     video?.remove();
   });
   state.effectRuntime?.dispose();
+  state.captionRenderer.clear();
   state.effectRuntime = null;
   stage.remove();
 }
@@ -253,6 +257,7 @@ async function renderMaterializedFrame(
   await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
   await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
   await renderPreviewScene({
+    captionRenderer: state.captionRenderer,
     ...(cameraOverride ? { cameraOverride } : {}),
     canvas,
     currentTime: time,

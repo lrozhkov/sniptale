@@ -11,6 +11,8 @@ import {
 } from '../../effect-runtime';
 import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
 import type { ExportSceneBackgroundCache } from '../../renderer/background';
+import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
+import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { pauseRenderLoopMediaElements } from '../../render-loop/shared/media';
 import {
   getFrameDrivenRenderCurrentTime,
@@ -192,6 +194,10 @@ async function drawDecodedCompositeFrame(
   frames: Awaited<ReturnType<typeof prepareWebmProviderFrames>>
 ): Promise<void> {
   const clipMediaElements = new Map(frames.map((frame) => [frame.clipId, frame.source]));
+  const { job, project, settings, signal } = args.request;
+  job.captionRenderer ??= createVideoProjectCaptionRenderer();
+  const captions = await job.captionRenderer.prepare(project, settings, signal);
+  captions.assertExportable(resolveProjectExportRange(project, settings));
   const ownerDocument = getDecodedCompositeOwnerDocument(args);
   const effectRuntimeFrames = await args.effectRuntime.renderProjectFrames({
     clipMediaElements,
@@ -216,6 +222,7 @@ async function drawDecodedCompositeFrame(
         ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
       }
     );
+    captions.draw(args.request.context, args.projectTime);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

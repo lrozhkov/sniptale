@@ -119,6 +119,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(document, 'fonts');
 });
 
 it('renders decoded WebM samples into canvas frames and forwards them to the encoder', async () => {
@@ -241,4 +242,60 @@ it('marks irreversible output only after the encoder accepts a frame', async () 
   expect(args.videoEncoder.encode.mock.invocationCallOrder[0]).toBeLessThan(
     submitted.mock.invocationCallOrder[0]!
   );
+});
+
+it('burns authored captions into accelerated frames before encoding and refuses font failure', async () => {
+  const args = createArgs();
+  args.project.duration = 1;
+  args.project.textDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      captions: {
+        enabled: true,
+        style: { position: 'bottom', fontSize: 0.04, color: '#ffffff', background: '#000000' },
+      },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text',
+            text: 'Accelerated caption',
+            originalText: '',
+            start: 0,
+            end: 1,
+            timeDomain: 'result',
+            alignment: 'manual',
+            revision: 0,
+            timingRevision: 0,
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  const load = vi.fn(async () => [{ status: 'loaded' }]);
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { load } });
+  samplesAtTimestampsMock.mockImplementation(() => createSamples([createSample(), createSample()]));
+  const fillText = vi.spyOn(args.context, 'fillText');
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(true);
+  expect(load).toHaveBeenCalledOnce();
+  expect(fillText).toHaveBeenCalledWith(
+    'Accelerated caption',
+    expect.any(Number),
+    expect.any(Number)
+  );
+  expect(drawProjectFrameMock.mock.invocationCallOrder[0]).toBeLessThan(
+    fillText.mock.invocationCallOrder[0]!
+  );
+  expect(fillText.mock.invocationCallOrder[0]).toBeLessThan(
+    args.videoEncoder.encode.mock.invocationCallOrder[0]!
+  );
+  fillText.mockRestore();
+  load.mockResolvedValue([]);
+  delete args.job.captionRenderer;
+  await expect(renderAcceleratedCompositeWebmSpan(args)).rejects.toThrow(
+    'Caption font is unavailable'
+  );
+  expect(args.videoEncoder.encode).toHaveBeenCalledTimes(2);
 });

@@ -15,6 +15,7 @@ import {
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
 import type { Mp4CompositeRenderReason, Mp4VideoRenderSpan } from './types';
 import { getSingleVisibleVideoClip } from './visible-clips';
+import { hasVideoProjectCaptions } from '../../../../features/video/project/text/captions';
 
 const CLEAN_SAMPLE_EPSILON_SECONDS = 1 / 240;
 const DIMENSION_EPSILON = 0.5;
@@ -150,7 +151,7 @@ export function createCleanSourceSpan(
   end: number,
   timelineIndex: VideoCompositionTimelineIndex
 ): Mp4VideoRenderSpan {
-  if (settings.burnInSubtitles === true) {
+  if (settings.burnInSubtitles === true || hasVideoProjectCaptions(project, { start, end })) {
     return createCompositeSpan(start, end, 'subtitles');
   }
 

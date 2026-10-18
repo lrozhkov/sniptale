@@ -10,6 +10,7 @@ import {
 import type {
   ReviewCaptionSettings,
   ReviewTextDocument,
+  ReviewTextFragment,
 } from '../../features/video/review/text-types';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
@@ -24,6 +25,7 @@ export async function prepareReviewCaptions(args: {
   output: { width: number; height: number };
   signal: AbortSignal;
   resources?: RenderResources;
+  project?(fragment: ReviewTextFragment): ReturnType<typeof projectReviewTextFragment>;
   reservations?(context: CanvasRenderingContext2D): readonly ReviewCaptionReservation[];
 }) {
   args.signal.throwIfAborted();
@@ -35,7 +37,8 @@ export async function prepareReviewCaptions(args: {
           (fragment) =>
             fragment.showInVideo &&
             fragment.text.trim() &&
-            projectReviewTextFragment(fragment, args.segments).ranges.length
+            (args.project?.(fragment) ?? projectReviewTextFragment(fragment, args.segments)).ranges
+              .length
         )
         .map((fragment) => fragment.text)
         .join('')
@@ -67,6 +70,7 @@ export async function prepareReviewCaptions(args: {
       settings: args.settings,
       segments: args.segments,
       output: args.output,
+      ...(args.project ? { project: args.project } : {}),
       measure(text, pixels) {
         if (!context) throw new Error('Caption measurement is unavailable.');
         context.font = font(pixels);

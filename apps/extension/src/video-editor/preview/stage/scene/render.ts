@@ -11,6 +11,7 @@ import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
+import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
 
 export function usePreviewStageCanvasRender(
   params: PreviewStageCanvasSceneParams & {
@@ -152,7 +153,10 @@ function usePreviewRenderSchedulerRef(
   const feedbackRef = useRef({ onFailure, onRecovery });
   feedbackRef.current = { onFailure, onRecovery };
   const schedulerRef = useRef<ReturnType<typeof createPreviewSceneRenderScheduler> | null>(null);
+  const captionsRef = useRef<ReturnType<typeof createVideoProjectCaptionRenderer> | null>(null);
   if (!schedulerRef.current) {
+    const captionRenderer = createVideoProjectCaptionRenderer();
+    captionsRef.current = captionRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
       onError: (error) => feedbackRef.current.onFailure('visual', error),
       onSuccess: (job) => {
@@ -160,11 +164,13 @@ function usePreviewRenderSchedulerRef(
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },
       render: (job) => {
-        if (!exactFrameCache) return renderPreviewScene(job);
+        const render = (input: Parameters<typeof renderPreviewScene>[0]) =>
+          renderPreviewScene({ ...input, captionRenderer });
+        if (!exactFrameCache) return render(job);
         return renderPreviewSceneWithExactCache({
           cache: exactFrameCache,
           job,
-          render: renderPreviewScene,
+          render,
         });
       },
     });
@@ -173,6 +179,7 @@ function usePreviewRenderSchedulerRef(
     const scheduler = schedulerRef.current;
     return () => {
       scheduler?.dispose();
+      captionsRef.current?.clear();
     };
   }, []);
   return schedulerRef as MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>>;
