@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { expect, type Page } from '@playwright/test';
@@ -28,6 +29,13 @@ function pcmAudio(seconds: number) {
 }
 
 async function choose(page: Page, label: string, option: string) {
+  const segment = page
+    .locator('#guide-inspector-panel')
+    .getByRole('button', { name: option, exact: true });
+  if (await segment.isVisible()) {
+    await segment.click();
+    return;
+  }
   const control = page
     .locator('#guide-inspector-panel')
     .getByRole('button', { name: label, exact: true });
@@ -36,8 +44,17 @@ async function choose(page: Page, label: string, option: string) {
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 
+async function expectChoice(page: Page, label: string, option: string) {
+  const panel = page.locator('#guide-inspector-panel');
+  const segment = panel.getByRole('button', { name: option, exact: true });
+  if (await segment.isVisible()) await expect(segment).toHaveAttribute('aria-pressed', 'true');
+  else await expect(panel.getByRole('button', { name: label, exact: true })).toContainText(option);
+}
+
 async function editTourImage(page: Page, t: ReturnType<typeof createTranslator>) {
-  const originalImage = await page.locator('.tour-stage-host .tour-image').getAttribute('src');
+  const originalImage = await page
+    .locator('.tour-canvas .tour-stage-host .tour-image')
+    .getAttribute('src');
   await page
     .locator('.tour-header-controls')
     .getByRole('button', { name: t('scenario.editor.guideEditImage'), exact: true })
@@ -63,7 +80,7 @@ async function editTourImage(page: Page, t: ReturnType<typeof createTranslator>)
     .locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]')
     .click();
   await expect(page.locator('.guide-image-editor')).toHaveCount(0);
-  await expect(page.locator('.tour-stage-host .tour-image')).not.toHaveAttribute(
+  await expect(page.locator('.tour-canvas .tour-stage-host .tour-image')).not.toHaveAttribute(
     'src',
     originalImage!
   );
@@ -95,12 +112,12 @@ async function authorTourActions(page: Page, t: ReturnType<typeof createTranslat
           .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
           .click();
       const label = `Action ${slide * 3 + action + 1}`;
-      await panel
-        .getByRole('textbox', { name: t('scenario.editor.tourObjectLabel'), exact: true })
-        .fill(label);
-      await expect(page.locator('.tour-stage-host [data-tour-hint-action-title]')).toHaveText(
-        label
-      );
+      await expect(
+        panel.getByRole('textbox', { name: t('scenario.editor.tourObjectLabel'), exact: true })
+      ).toHaveCount(0);
+      await expect(
+        page.locator('.tour-canvas .tour-stage-host [data-tour-hint-action-title]')
+      ).toHaveCount(0);
       const text = panel.getByRole('textbox', {
         name: t('scenario.editor.textLabel'),
         exact: true,
@@ -150,16 +167,16 @@ async function authorTourActions(page: Page, t: ReturnType<typeof createTranslat
         ? visualKeys
         : [visualKeys[(slide * 3 + action) % 4]!]) {
         const objectId = await page
-          .locator('.tour-stage-host [data-tour-object-id]')
+          .locator('.tour-canvas .tour-stage-host [data-tour-object-id]')
           .last()
           .getAttribute('data-tour-object-id');
         await choose(page, t('scenario.editor.tourVisual'), t(`scenario.editor.${key}`));
         await expect(
-          page.locator(`.tour-stage-host [data-tour-object-id="${objectId}"]`)
+          page.locator(`.tour-canvas .tour-stage-host [data-tour-object-id="${objectId}"]`)
         ).toHaveCount(1);
-        await expect(page.locator('.tour-stage-host [data-tour-hint-text]')).toHaveText(
-          `Instruction ${label}`
-        );
+        await expect(
+          page.locator('.tour-canvas .tour-stage-host [data-tour-hint-text]')
+        ).toHaveText(`Instruction ${label}`);
         if (slide === 0 && action === 0) {
           await panel
             .getByRole('navigation')
@@ -204,24 +221,24 @@ async function reorderTourActionsAndSlides(page: Page, t: ReturnType<typeof crea
     .getByRole('navigation')
     .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true });
   if (await category.isVisible()) await category.click();
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 1/);
-  await expect(panel.locator('.tour-object-row').nth(1)).toHaveText(/2\.\s*Action 2/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 1/);
+  await expect(panel.locator('.tour-object-row').nth(1)).toHaveText(/2\.\s*Instruction Action 2/);
   await panel.locator('.tour-object-item').nth(1).hover();
   await panel
     .locator('.tour-object-item')
     .nth(1)
     .getByRole('button', { name: t('scenario.editor.tourMoveObjectUp'), exact: true })
     .click();
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 2/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 2/);
   await page.getByRole('button', { name: t('scenario.editor.guideUndo'), exact: true }).click();
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 1/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 1/);
   await page.getByRole('button', { name: t('scenario.editor.guideRedo'), exact: true }).click();
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 2/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 2/);
   await page.getByRole('button', { name: t('scenario.editor.guideUndo'), exact: true }).click();
   await panel.locator('.tour-object-row').nth(2).dragTo(panel.locator('.tour-object-row').nth(0));
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 3/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 3/);
   await page.getByRole('button', { name: t('scenario.editor.guideUndo'), exact: true }).click();
-  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Action 1/);
+  await expect(panel.locator('.tour-object-row').nth(0)).toHaveText(/1\.\s*Instruction Action 1/);
   const thirdHandle = library
     .locator('.tour-slide-row')
     .nth(2)
@@ -230,12 +247,12 @@ async function reorderTourActionsAndSlides(page: Page, t: ReturnType<typeof crea
   await thirdHandle.press('Home');
   await slides.first().click();
   if (await category.isVisible()) await category.click();
-  await expect(panel.locator('.tour-object-row').first()).toHaveText(/1\.\s*Action 7/);
+  await expect(panel.locator('.tour-object-row').first()).toHaveText(/1\.\s*Instruction Action 7/);
   await page.getByRole('button', { name: t('scenario.editor.guideUndo'), exact: true }).click();
   await page.getByRole('button', { name: t('scenario.editor.guideRedo'), exact: true }).click();
   await slides.first().click();
   if (await category.isVisible()) await category.click();
-  await expect(panel.locator('.tour-object-row').first()).toHaveText(/1\.\s*Action 7/);
+  await expect(panel.locator('.tour-object-row').first()).toHaveText(/1\.\s*Instruction Action 7/);
   await page.getByRole('button', { name: t('scenario.editor.guideUndo'), exact: true }).click();
   await slides.first().click();
   await library
@@ -287,7 +304,7 @@ async function frameSelectedTourAction(page: Page, t: ReturnType<typeof createTr
     .locator('.tour-header-controls')
     .getByRole('button', { name: t('scenario.editor.tourCameraFrame'), exact: true });
   await frameControl.click();
-  const frame = page.locator('.tour-stage-host .tour-camera-frame');
+  const frame = page.locator('.tour-canvas .tour-stage-host .tour-camera-frame');
   await expect(frame).toBeVisible();
   const frameBefore = await frame.getAttribute('style');
   await frame.focus();
@@ -303,24 +320,22 @@ async function frameSelectedTourAction(page: Page, t: ReturnType<typeof createTr
     .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
     .click();
   await cameraCategory.click();
-  await expect(
-    panel.getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
-  ).toContainText(t('scenario.editor.tourInherited'));
+  await expectChoice(page, t('scenario.editor.tourCameraMode'), t('scenario.editor.tourInherited'));
   if (await category.isVisible()) await category.click();
-  await panel.locator('.tour-object-row[title="Action 3"]').click();
+  await panel.locator('.tour-object-row[title="Instruction Action 3"]').click();
   await cameraCategory.click();
-  await expect(
-    panel.getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
-  ).toContainText(t('scenario.editor.tourInherited'));
+  await expectChoice(page, t('scenario.editor.tourCameraMode'), t('scenario.editor.tourInherited'));
   await panel
     .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
     .click();
   if (await category.isVisible()) await category.click();
-  await panel.locator('.tour-object-row[title="Action 2"]').click();
+  await panel.locator('.tour-object-row[title="Instruction Action 2"]').click();
   await cameraCategory.click();
-  await expect(
-    panel.getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
-  ).toContainText(t('scenario.editor.tourCameraManual'));
+  await expectChoice(
+    page,
+    t('scenario.editor.tourCameraMode'),
+    t('scenario.editor.tourCameraManual')
+  );
   await expect(zoom).toHaveValue('200');
 }
 
@@ -336,6 +351,25 @@ for (const [locale, theme, size] of [
     const t = createTranslator(locale);
     const issues = createPageIssueCollector(page);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.context().addInitScript(() => {
+      window.addEventListener('message', (event: MessageEvent<unknown>) => {
+        const value = event.data;
+        if (!value || typeof value !== 'object' || Reflect.get(value, 'kind') !== 'tour-preview')
+          return;
+        const blob: unknown = Reflect.get(value, 'blob');
+        if (!(blob instanceof Blob)) return;
+        void blob
+          .arrayBuffer()
+          .then((bytes) => crypto.subtle.digest('SHA-256', bytes))
+          .then((digest) => {
+            Reflect.set(
+              window,
+              'previewedTourDigest',
+              [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+            );
+          });
+      });
+    });
     await openVisualHarness(
       page,
       `chrome-extension://${extensionId}`,
@@ -392,7 +426,7 @@ for (const [locale, theme, size] of [
     await slides.nth(0).click();
     if (await category.isVisible()) await category.click();
     await expect(panel.locator('.tour-object-row')).toHaveCount(3);
-    await panel.locator('.tour-object-row[title="Action 2"]').click();
+    await panel.locator('.tour-object-row[title="Instruction Action 2"]').click();
     await expect(
       panel.getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
     ).toHaveValue('Instruction Action 2');
@@ -412,14 +446,16 @@ for (const [locale, theme, size] of [
       .locator('.tour-header-controls')
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
       .click();
-    const player = page.locator('.tour-stage-host #tour-player');
+    const player = page.locator('.tour-canvas .tour-stage-host #tour-player');
     await expect(player.locator('[data-tour-counter]')).toHaveText('2 / 9');
     await expect(player.locator('audio[data-tour-music]')).toHaveAttribute('src', /^(blob:|data:)/);
 
-    await expect(player.locator('[data-tour-hint-action-title]')).toHaveText('Action 2');
+    await expect(
+      player.locator('[data-tour-hint-action-title], [data-tour-hint-title]')
+    ).toHaveCount(0);
     await expect(player.locator('[data-tour-hint-text]')).toHaveText('Instruction Action 2');
     await expect(player.locator('[data-tour-object-id]')).toHaveCount(1);
-    await player.locator('[data-tour-manual]').click();
+    await expect(player.locator('[data-tour-manual]')).toHaveCount(0);
     await player.locator('[data-tour-next]').click();
     await expect(player.locator('[data-tour-counter]')).toHaveText('3 / 9');
     await player.locator('[data-tour-next]').click();
@@ -431,7 +467,9 @@ for (const [locale, theme, size] of [
     await expect(player.locator('.tour-contents-title')).toHaveText(
       t('scenario.editor.tourContentsTitle')
     );
-    await expect(player.locator('.tour-contents-list button').nth(4)).toHaveText('4. Action 4');
+    await expect(player.locator('.tour-contents-list button').nth(4)).toHaveText(
+      '4. Instruction Action 4'
+    );
     await page.screenshot({ path: info.outputPath('action-preview-menu.png'), fullPage: false });
     await page.keyboard.press('Escape');
     await page
@@ -478,17 +516,18 @@ for (const [locale, theme, size] of [
       .frameLocator('.tour-export-frame iframe')
       .frameLocator('iframe')
       .locator('#tour-player');
-    await exported.locator('[data-tour-manual]').click();
+    await expect(exported.locator('[data-tour-manual]')).toHaveCount(0);
     await expect(exported.locator('[data-tour-counter]')).toHaveText('1 / 9');
-    await expect(exported.locator('[data-tour-narration-replay]:visible')).toHaveCount(1);
+    await expect(exported.locator('[data-tour-hint] [data-tour-narration-replay]')).toHaveCount(0);
+    await expect(exported.locator('[data-tour-play]')).toBeVisible();
     await expect(exported.locator('audio[data-tour-music]')).toHaveAttribute(
       'src',
       /^(blob:|data:)/
     );
     for (let action = 1; action <= 9; action += 1) {
       await expect(exported.locator('[data-tour-counter]')).toHaveText(`${action} / 9`);
-      await expect(exported.locator('[data-tour-hint-action-title]')).toHaveText(
-        `Action ${action}`
+      await expect(exported.locator('[data-tour-hint-text]')).toHaveText(
+        `Instruction Action ${action}`
       );
       await expect(exported.locator('[data-tour-object-id]')).toHaveCount(1);
       await exported.locator('[data-tour-next]').click();
@@ -537,6 +576,18 @@ for (const [locale, theme, size] of [
     await expect
       .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedSequenceTour'))))
       .toContain('<!doctype html>');
+    const previewSandbox = page.frameLocator('.tour-export-frame iframe');
+    await expect
+      .poll(() =>
+        previewSandbox.locator('html').evaluate(() => Reflect.get(window, 'previewedTourDigest'))
+      )
+      .toMatch(/^[0-9a-f]{64}$/);
+    const savedHtml = await page.evaluate(() => String(Reflect.get(window, 'savedSequenceTour')));
+    expect(
+      await previewSandbox
+        .locator('html')
+        .evaluate(() => Reflect.get(window, 'previewedTourDigest'))
+    ).toBe(createHash('sha256').update(savedHtml).digest('hex'));
     const output = info.outputPath('authored-sequence.html');
     await writeFile(
       output,
@@ -548,11 +599,11 @@ for (const [locale, theme, size] of [
     try {
       await offline.goto(pathToFileURL(output).href);
       const offlinePlayer = offline.locator('#tour-player');
-      await offlinePlayer.locator('[data-tour-manual]').click();
+      await expect(offlinePlayer.locator('[data-tour-manual]')).toHaveCount(0);
       for (let action = 1; action <= 9; action += 1) {
         await expect(offlinePlayer.locator('[data-tour-counter]')).toHaveText(`${action} / 9`);
-        await expect(offlinePlayer.locator('[data-tour-hint-action-title]')).toHaveText(
-          `Action ${action}`
+        await expect(offlinePlayer.locator('[data-tour-hint-text]')).toHaveText(
+          `Instruction Action ${action}`
         );
         await expect(offlinePlayer.locator('[data-tour-object-id]')).toHaveCount(1);
         await offlinePlayer.locator('[data-tour-next]').click();
@@ -570,6 +621,103 @@ for (const [locale, theme, size] of [
       await offline.close();
     }
 
+    issues.assertClean();
+  });
+  test(`adapts duration and placement to the inspector width ${locale}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const t = createTranslator(locale);
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(
+      page,
+      `chrome-extension://${extensionId}`,
+      theme,
+      locale,
+      { width: 1920, height: 900 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    await page.locator('.tour-slide-select').first().click();
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.inspectorShowAll'), exact: true })
+      .click();
+    await page.evaluate(() => document.fonts.ready);
+    const duration = panel.getByRole('group', {
+      name: t('scenario.editor.tourDurationMode'),
+      exact: true,
+    });
+    await expect(duration).toBeVisible();
+    await duration
+      .getByRole('button', { name: t('scenario.editor.tourDurationManual'), exact: true })
+      .click();
+    const hold = panel.getByRole('textbox', {
+      name: t('scenario.editor.tourHoldSeconds'),
+      exact: true,
+    });
+    await hold.fill('120.3');
+    await hold.press('Tab');
+    await panel
+      .getByRole('switch', { name: t('scenario.editor.tourUseCentralStyle'), exact: true })
+      .click();
+    const placement = panel.getByRole('group', {
+      name: t('scenario.editor.tourTextPlacement'),
+      exact: true,
+    });
+    await expect(placement).toBeVisible();
+    await expect(placement.getByRole('button')).toHaveCount(5);
+    await placement
+      .getByRole('button', { name: t('scenario.editor.tourPlacementLeft'), exact: true })
+      .click();
+    await page.screenshot({ path: info.outputPath('finite-choices-wide.png'), fullPage: false });
+    const divider = page.locator('.guide-panel-divider-right');
+    await divider.focus();
+    for (let step = 0; step < 10; step += 1) await page.keyboard.press('ArrowRight');
+    await expect(divider).toHaveAttribute('aria-valuenow', '260');
+    await expect(duration).toHaveCount(0);
+    await expect(placement).toHaveCount(0);
+    await expectChoice(
+      page,
+      t('scenario.editor.tourDurationMode'),
+      t('scenario.editor.tourDurationManual')
+    );
+    await expectChoice(
+      page,
+      t('scenario.editor.tourTextPlacement'),
+      t('scenario.editor.tourPlacementLeft')
+    );
+    await choose(
+      page,
+      t('scenario.editor.tourTextPlacement'),
+      t('scenario.editor.tourPlacementRight')
+    );
+    await expect(hold).toHaveValue('120.3');
+    await page.screenshot({ path: info.outputPath('finite-choices-narrow.png'), fullPage: false });
+    await divider.focus();
+    await page.keyboard.press('Home');
+    await expect(divider).toHaveAttribute('aria-valuenow', '420');
+    await expect(duration).toBeVisible();
+    await expect(placement).toBeVisible();
+    await expect(
+      duration.getByRole('button', { name: t('scenario.editor.tourDurationManual'), exact: true })
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      placement.getByRole('button', { name: t('scenario.editor.tourPlacementRight'), exact: true })
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(hold).toHaveValue('120.3');
+    await page.screenshot({
+      path: info.outputPath('finite-choices-restored.png'),
+      fullPage: false,
+    });
     issues.assertClean();
   });
 }

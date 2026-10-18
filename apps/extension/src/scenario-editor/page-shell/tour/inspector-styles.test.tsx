@@ -784,3 +784,81 @@ it('keeps exact hold values beyond the useful slider scale when the range only r
   expect(project.tour!.playback.minimumHoldSeconds).toBe(120.3);
   expect(field.value).toBe('120.3');
 });
+
+it('offers all four camera modes as shared segments while retaining manual camera values', async () => {
+  const group = () => host.querySelector<HTMLElement>('[role="group"][aria-label="Camera mode"]')!;
+  expect(group()).not.toBeNull();
+  expect([...group().querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    'Use tour default',
+    'Full view',
+    'Focus hotspot',
+    'Manual',
+  ]);
+  await choose('Camera mode', 'Manual');
+  await fill('Zoom', '170');
+  await choose('Camera mode', 'Full view');
+  expect(current().camera).toMatchObject({ mode: 'off', zoom: 1.7 });
+  expect(
+    [...group().querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Full view')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  disabled = true;
+  draw();
+  expect(
+    [...group().querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+  ).toBe(true);
+});
+
+it('offers complete duration choices through shared segments and preserves a custom hold', async () => {
+  await click('Hotspot');
+  const group = () => host.querySelector<HTMLElement>('[role="group"][aria-label="Duration"]')!;
+  expect(group()).not.toBeNull();
+  expect([...group().querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    'Use tour default',
+    'From text and narration',
+    'Set duration',
+  ]);
+  await choose('Duration', 'Set duration');
+  await fill('Hold', '6.5');
+  await choose('Duration', 'From text and narration');
+  expect(getTourHotspots(current())[0]!.timing).toMatchObject({ mode: 'auto', holdSeconds: 6.5 });
+  await choose('Duration', 'Set duration');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Hold"]')!.value).toBe('6.5');
+  disabled = true;
+  draw();
+  expect(
+    [...group().querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+  ).toBe(true);
+});
+
+it('offers all five callout placements with complete labels while retaining other appearance values', async () => {
+  scope = 'document';
+  draw();
+  const group = () =>
+    host.querySelector<HTMLElement>('[role="group"][aria-label="Callout placement"]')!;
+  expect(group()).not.toBeNull();
+  expect([...group().querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    'Automatic',
+    'Above',
+    'Below',
+    'Left',
+    'Right',
+  ]);
+  await choose('Text alignment', 'Center');
+  await choose('Callout placement', 'Right');
+  expect(project.tour!.style.hotspotAppearance).toMatchObject({
+    alignment: 'center',
+    placement: 'right',
+  });
+  await choose('Callout placement', 'Automatic');
+  expect(project.tour!.style.hotspotAppearance).toMatchObject({
+    alignment: 'center',
+    placement: 'auto',
+  });
+  disabled = true;
+  draw();
+  expect(
+    [...group().querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+  ).toBe(true);
+});

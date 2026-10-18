@@ -1,6 +1,6 @@
 import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { TourChoiceField } from './fields';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Play, Timer } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
@@ -81,7 +81,7 @@ export function TourTimingSettings({
   return (
     <GuideInspectorGroup id="timing" icon={Timer} title={t('scenario.editor.tourTiming')}>
       <div className="tour-text-field">
-        <SelectField
+        <TourChoiceField
           label={t('scenario.editor.tourDurationMode')}
           value={timing.mode}
           disabled={disabled}

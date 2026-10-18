@@ -77,7 +77,9 @@ it('mounts the shared scene and updates selection without replacing its viewport
   expect(shadow().querySelector('.tour-image')).not.toBeNull();
   expect(shadow().querySelector('.tour-hotspot')!.textContent).toBe('');
   expect(shadow().querySelector('[data-tour-hint-point-count]')).not.toBeNull();
-  expect(shadow().querySelector('[data-tour-hint-previous]')!.textContent).toBeTruthy();
+  expect(shadow().querySelector('[data-tour-hint-previous]')!.getAttribute('aria-label')).toBe(
+    'Back'
+  );
   act(() => shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!.click());
   expect(props.onSelectObject).toHaveBeenCalledWith('point');
   act(() =>
@@ -414,4 +416,27 @@ it('projects window chrome and source targets into the stage content box inside 
     width.mockRestore();
     height.mockRestore();
   }
+});
+
+it('uses text-only explanation copy with accessible icon controls in the shared scaffold', () => {
+  const props = fixture();
+  act(() =>
+    root.render(
+      <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }} />
+    )
+  );
+  expect(shadow().querySelector('[data-tour-hint-action-title]')).toBeNull();
+  expect(shadow().querySelector('[data-tour-hint-title]')).toBeNull();
+  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('Explanation');
+  for (const [selector, label] of [
+    ['previous', 'Back'],
+    ['next', 'Next'],
+    ['close', 'Close'],
+  ]) {
+    const button = shadow().querySelector(`[data-tour-hint-${selector}]`)!;
+    expect(button.getAttribute('aria-label')).toBe(label);
+    expect(button.querySelector('svg')).not.toBeNull();
+    expect(button.textContent?.trim()).toBe('');
+  }
+  expect(shadow().querySelector('[data-tour-hints]')?.getAttribute('aria-pressed')).toBe('true');
 });

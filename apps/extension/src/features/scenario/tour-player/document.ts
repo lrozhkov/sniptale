@@ -59,6 +59,8 @@ export interface TourPlayerLabels {
   authoredView?: string;
   end?: string;
   manual?: string;
+  showHints?: string;
+  hideHints?: string;
   play: string;
   pause: string;
   seek: string;
@@ -271,18 +273,32 @@ async function buildTourPlayerShell(args: {
 </section>
 <aside class="tour-hint" data-tour-hint hidden>
 <div class="tour-hint-header">
-<strong class="tour-hint-action-title" data-tour-hint-action-title hidden></strong>
-<button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true">
-<span data-tour-hint-title></span></button>
-<button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">×</button>
+<button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true"
+ aria-label="${escape(labels.collapse)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m6 15 6-6 6 6"/>
+</svg>
+</button>
+<button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m6 6 12 12M6 18 18 6"/>
+</svg>
+</button>
 </div>
 <div class="tour-hint-text" data-tour-hint-text></div>
 <div class="tour-hint-controls">
 <button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">
-${escape(labels.previous)}</button>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m15 18-6-6 6-6"/>
+</svg>
+</button>
 <span data-tour-hint-point-count hidden></span>
 <span data-tour-hint-count hidden></span>
-<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
+<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m9 18 6-6-6-6"/>
+</svg>
+</button>
 </div>
 </aside>
 <dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
@@ -312,6 +328,12 @@ ${escape(labels.previous)}</button>
 </svg>
 </button>
 </div>
+<button id="hints" class="tour-button tour-icon-button" data-tour-hints aria-pressed="true"
+ aria-label="${escape(labels.showHints || labels.details)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-5a8.5 8.5 0 1 1 16-3.5Z"/>
+</svg>
+</button>
 <button class="tour-button tour-contents-trigger" data-tour-contents
  aria-haspopup="dialog" aria-expanded="false"
  aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">

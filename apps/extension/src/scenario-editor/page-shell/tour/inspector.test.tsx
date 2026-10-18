@@ -177,7 +177,8 @@ it('edits hotspot visuals and copy through canonical history without click comma
   await fill('Image description', 'Accessible image');
   await choose('Image fit', 'Fill');
   await click('Hotspot');
-  await fill('Action label', 'Open settings');
+  expect(host.querySelector('[aria-label="Action label"]')).toBeNull();
+  const savedLabel = getTourHotspots(current())[0]!.label;
   await fill('Text', 'Click here');
   await fill('X', '30');
   await fill('Y', '40');
@@ -186,7 +187,7 @@ it('edits hotspot visuals and copy through canonical history without click comma
   await choose('Focus style', 'Highlight');
   expect(getTourHotspots(current())[0]).toMatchObject({
     id,
-    label: 'Open settings',
+    label: savedLabel,
     text: 'Click here',
     visual: { kind: 'highlight' },
   });
@@ -197,8 +198,8 @@ it('edits hotspot visuals and copy through canonical history without click comma
   expect(getTourHotspots(current())[0]!.point.y).toBeCloseTo(0.4);
   expect(current().image!.source).toEqual(source);
   await click('Back to slide settings');
-  expect(document.activeElement?.textContent).toContain('Open settings');
-  await click('Open settings');
+  expect(document.activeElement?.textContent).toContain('Click here');
+  await click('Click here');
   await click('Delete');
   expect(current().actions).toHaveLength(0);
 });
@@ -783,4 +784,33 @@ it('edits marker defaults and independent local size without changing pulse or s
   expect(getTourHotspots(current())[0]!.visual).toEqual(pulse);
   await click('Use tour marker style');
   expect(getTourHotspots(current())[0]!.markerAppearance).toBeNull();
+});
+
+it('offers complete focus-style choices and keeps region data', async () => {
+  await click('Hotspot');
+  const group = () => host.querySelector<HTMLElement>('[role="group"][aria-label="Focus style"]')!;
+  expect(group()).not.toBeNull();
+  expect([...group().querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    'Pulsating point',
+    'Animated frame',
+    'Highlight',
+    'Spotlight',
+  ]);
+  await choose('Focus style', 'Spotlight');
+  const region = getTourHotspots(current())[0]!.visual;
+  expect(region.kind).toBe('spotlight');
+  await choose('Focus style', 'Highlight');
+  const highlight = getTourHotspots(current())[0]!.visual;
+  if (highlight.kind === 'point' || region.kind === 'point') throw new Error('Expected region');
+  expect(highlight.rect).toEqual(region.rect);
+  expect(
+    [...group().querySelectorAll('button')]
+      .find((button) => button.textContent?.trim() === 'Highlight')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  disabled = true;
+  draw();
+  expect(
+    [...group().querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
+  ).toBe(true);
 });

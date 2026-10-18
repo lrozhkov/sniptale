@@ -1,3 +1,4 @@
+import { getTourActionTitle } from '../project/tour-playback-plan';
 import { resolveTourImageFrame } from './image-frame.js';
 import { renderTourCameraFrame } from './camera-frame.js';
 import {
@@ -134,9 +135,12 @@ export function renderTourImage(
       point.y < frame.content.y ||
       point.x > frame.content.x + frame.content.width ||
       point.y > frame.content.y + frame.content.height;
-    button.title = hotspot.label;
-    button.setAttribute('aria-label', hotspot.label || `${labels.point} ${number + 1}`);
-    button.addEventListener('focus', () => hintController.select(number));
+    const title = getTourActionTitle(hotspot, `${labels.point} ${number + 1}`);
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    if (authoring)
+      button.addEventListener('focus', () => hintController.select(number), { signal });
+    else hintController.bindTarget(button, number);
     button.addEventListener('click', () => {
       if (!authoring) onAction({ kind: 'next' });
     });
@@ -150,7 +154,9 @@ export function renderTourImage(
         animation: hotspot.visual.animation,
       });
       visual.dataset.tourObjectId = hotspot.id;
-      visual.addEventListener('focus', () => hintController.select(number));
+      if (authoring)
+        visual.addEventListener('focus', () => hintController.select(number), { signal });
+      else hintController.bindTarget(visual, number);
       if (hotspot.visual.kind === 'frame') {
         const effect = visual.querySelector('.tour-mask-effect');
         effect.style.background = 'transparent';
@@ -160,7 +166,7 @@ export function renderTourImage(
       }
       if (!authoring) {
         visual.setAttribute('role', 'button');
-        visual.setAttribute('aria-label', hotspot.label || `${labels.point} ${number + 1}`);
+        visual.setAttribute('aria-label', title);
         visual.tabIndex = 0;
         visual.style.pointerEvents = 'auto';
         visual.addEventListener('click', () => onAction({ kind: 'next' }));

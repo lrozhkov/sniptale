@@ -108,7 +108,7 @@ export function createTourPlayer(root, input, options = {}) {
     back,
     index: projectedIndex,
     slides: () => tour.slides,
-    space: (next) => (playback?.mode === 'manual' ? next() : playback?.pause()),
+    space: () => playback?.toggle(),
     openContents: (select) => {
       playback?.interact();
       view.openContents(
@@ -355,7 +355,7 @@ function mountTourNavigationInput(root, options, signal, actions) {
   query('contents').addEventListener('click', () => actions.openContents(manualGo), { signal });
   bindTourKeyboard(root, query('navigation'), options, signal, {
     ArrowRight: next,
-    ' ': () => actions.space(next),
+    ' ': actions.space,
     ArrowLeft: actions.back,
     Home: () => manualGo(0),
     End: () => manualGo(actions.slides().length - 1),

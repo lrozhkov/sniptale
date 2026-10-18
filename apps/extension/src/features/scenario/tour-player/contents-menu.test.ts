@@ -229,16 +229,12 @@ async function animatedTour() {
       h.root.querySelector<HTMLButtonElement>(`[data-tour-${name}]`)!.click(),
   };
 }
-it('projects consecutive Space destinations during exit and records only the actual departing slide', async () => {
+it('projects consecutive Next destinations during exit and records only the actual departing slide', async () => {
   const h = await animatedTour();
-  const space = () =>
-    h.root.dispatchEvent(
-      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
-    );
-  space();
+  h.click('next');
   expect(h.root.dataset['slideId']).toBe('first');
   await h.tick(100);
-  space();
+  h.click('next');
   await h.tick(300);
   expect(h.root.dataset['slideId']).toBe('third');
   h.click('previous');

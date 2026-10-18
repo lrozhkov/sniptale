@@ -1370,10 +1370,10 @@
       "file": "apps/extension/src/features/scenario/tour-player/controller-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The file proves one createTourPlayer preview contract with reset DOM and media fixtures. Its 34 state signals are separate test-local receivers. No production writer or runtime authority is defined here. The action sequence replaces local paging in the same shared fixture; extracting forwarding-only test setup would spread that fixture. Main inspected this exact body and proof. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, runtime, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation or test fixture.",
-      "reviewDate": "2026-10-18",
-      "astHash": "9a1af768621d1b4c5663af2b5e2634269b3ee55687cbaaf4b0d0cf0d41943397",
+      "reason": "tool-noise: One preview-controller fixture mounts disposable players and controls image, frame and media inputs. Teardown disposes registered roots and restores globals and spies. Point and region tests extend this same contract. File-level state metrics combine independent test-local receivers. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "ca8518607e3530b8cd9ea9787e2c100b6516ba7ed34194a9f733c6d6e629c99b",
       "signatureHash": "f6e59affacb7c33dbf3fe6f9bcc037526dd121e78792152af8659bf1c5f1b9c7"
     },
     {
@@ -1392,10 +1392,10 @@
       "file": "apps/extension/src/features/scenario/tour-player/document.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The file tests one standalone HTML artifact through common jsdom and media fixtures. Its 29 state signals are isolated test values. Header artwork and source placement extend the same artifact contract. A fixture-only split would duplicate setup without a new owner. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Fresh fixture values build one standalone HTML artifact. Executed artifacts use fresh iframe receivers with explicit close. Serialization, CSP, geometry and hint assertions inspect that same artifact boundary. Aggregate test state does not establish shared production authority. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
       "reviewDate": "2026-10-19",
-      "astHash": "53730d6e2723423b0001b924244c36d82a75fa677e749949633e0384fb237da5",
+      "astHash": "46f3fb2f08a86a5a7e1bd42d0fb4e27aced157bfcd911cdf1b1991402b9ef559",
       "signatureHash": "351b76d2d581265d63fb6852dc9f44e1b0b2b3ccfb19ab5216637c6175191bf8"
     },
     {
@@ -1403,10 +1403,10 @@
       "file": "apps/extension/src/features/scenario/tour-player/document.ts",
       "symbol": "buildTourPlayerShell",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The function validates and projects one standalone artifact, including safe JSON, CSP and fixed HTML. The new headers field uses the same escaping boundary. Its 20 statements add no state, writer or recovery authority. Separating the template would obscure that boundary. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
+      "reason": "tool-noise: The function validates and projects one standalone artifact, including safe JSON, CSP and fixed HTML. Fixed SVG controls use the existing escaping boundary. Its 20 statements add no state, writer or recovery authority. The line increase wraps HTML attributes for readability. Separating the template would obscure that boundary. Main inspected this body. Fresh complete-candidate architecture review must validate this classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-10-19",
-      "astHash": "724803f25d67fd663d81929a333ef67d2a253680bcc00b118bb59aa7527c7e3d",
+      "astHash": "0545f14d1f5433323a06ea5327b9241666a2630d1c3f1654a9cff425d59d9de9",
       "signatureHash": "bbc8837b2e8cbb534c464182b59ff774a9b622037285624e4046da17aeab2c43"
     },
     {
@@ -1469,10 +1469,10 @@
       "file": "apps/extension/src/features/scenario/tour-player/scene.js",
       "symbol": "createTourScene",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The function owns one scene lifecycle and drawable geometry. Headers update with the accepted tour. Render, motion and full view consume the same geometry. No independent writer, clock or resource lifetime exists. Splitting the closure would distribute its shared cleanup receiver. Main inspected the body. Independent diagnosis confirms this classification. Fresh complete-candidate architecture review must inspect it.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery authority or runtime contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Current scene, geometry, full view, selection, hints and motion share one scene lifecycle. Existing helpers isolate policy, content rendering and viewport projection. Reflow uses that same receiver when dimensions stay equal. No independent clock, writer or resource lifetime enters this function. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
       "reviewDate": "2026-10-19",
-      "astHash": "11211803b300d6559feda6a3ba08850cd062b34fe10fe77572e9c9ae3f972b13",
+      "astHash": "2e02ebe206a05aef0d6d703a9c2672310ff8e2ad4b5103c23167d8c16390d9cf",
       "signatureHash": "e7bb3ff3d78bbbc91afd10a008639c40c73c8f81b14a0ba9560f3a1224d75edf"
     },
     {
@@ -1480,10 +1480,10 @@
       "file": "apps/extension/src/features/scenario/tour-player/image-scene.js",
       "symbol": "renderTourImage",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: After separate window-shell rendering, this function projects bitmap, privacy masks and targets through one imageBox. Its 27 statements have one state receiver and score3 delta0. Placement uses the same surface. Another split for two lines would distribute that receiver. Existing gesture, camera and mask owners remain unchanged. Main and independent diagnosis inspected the exact body. Fresh complete-candidate architecture review must inspect this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, geometry receiver, resource lifetime or recovery authority. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: Bitmap, masks and targets use one imageBox and content frame. Existing camera, shell, mask and gesture owners remain separate. Text-first titles and reveal bindings add no clock, writer or geometry authority. Another context-passing split would distribute this projection. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
       "reviewDate": "2026-10-19",
-      "astHash": "670032991551fe4a8df5c0b538aed693489cf536afea4255d7cea37350f75b7f",
+      "astHash": "71dc687ad4253119f673e5f1e67be6dd3f44aae2195bbd3b0de11e75466cd3f5",
       "signatureHash": "beb03052b28fceb8f03ef5525c7328a0061a96cd58a36b73845d35ce5da0a6cd"
     },
     {
@@ -1573,6 +1573,72 @@
       "reviewDate": "2026-10-19",
       "astHash": "0749cce9e80dfab93f768140ba04fbe962c968f064c58f311893b9e087843a52",
       "signatureHash": "d6c2a8b2ac5c95227be59f77dc645c7c886f8200fd2ef7fca0c9ab5b3879dcad"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/controller.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One mounted controller fixture proves selection, playback, media admission and disposal. Teardown disposes roots and restores globals and spies. Space and geometry assertions extend the same consumer contract. A file-cap split would distribute its mount and cleanup fixture. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "6b30382b1ebfd009dad2c9fcf281c527d19479f649d5f17b1633d9b31a65259c",
+      "signatureHash": "804c443280e532f69a102b458a000aa5073b6635936dddf9ca03d7cda3d2ef85"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/scenario/tour-player/hints.js",
+      "symbol": "createTourHints",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One mounted hint receiver owns visibility flags, target and hint focus, dismissal suppression and reflow. Abort and reset clear its timer. Listeners use the supplied signal. Caption and geometry helpers retain their owners. Short-height sizing uses the same text scroll receiver and toolbar geometry. Its 33 outer statements include nested callbacks. Splitting those flags would distribute one visibility invariant. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "fb406ee79a41488cb266c9fc3e61362c66098471142362301b7595e941355f6d",
+      "signatureHash": "d1f413df908c24fa4221e9d7e50f2d5f3cbece8bfde0d6ac289f8c96edb0add2"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: Fresh project, selection, React root and admission flags feed one style inspector fixture. Accepted mutations use applyTourCommands. Teardown unmounts the root and clears toast hosts. Camera, duration and placement segments extend this same contract. Values and disabled controls use the existing command route. Test dependencies do not establish independent mutable authorities. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "05a68493a2d04fe9574a2b220e8671b55c566351923f99b83c24c719ea1d4460",
+      "signatureHash": "1c89184a1ca603cfe93341d4186021ad16124afdc6e2454b3a2a73ce17a356b7"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: Fresh project and UI state feed one inspector root. Accepted mutations use the existing command owner. Focus-style assertions prove the same control route and retained region geometry. The candidate adds no independent fixture resource or effect lifetime. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "dcf688820b0c3ad480dd14467fe4395657cb78971c00e53b5d2354b96d57b9c1",
+      "signatureHash": "b24508f6d86389b7e9f04b6ddaccc2137592d82311694ffde1fc104427bb08c6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/tour/workspace.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: Probe owns one React project receiver and panel instance. Workspace changes converge on setProject. Tests create roots and reset callback mocks. Teardown unmounts and removes the host. Text-first header assertions extend this integration fixture. Batch and single AI forms use the same mounted root for context and focus recovery. They issue no generation or persistence call. This classification does not assert that every existing spy resets. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "1f24ed10f34036a22e465b6498c1c401c533f9e5a482c82fcd70aab31030b1b8",
+      "signatureHash": "e8d2292bd758d541207b979f8980ea514634509f038977ff45c27df0824f4eff"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/scenario-editor-visual/scenario-tour-sequence.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One authored-sequence continuity proof follows the same project through reorder, reload, selected preview, export preview, saved-byte digest and offline playback. Existing helpers isolate image editing, authoring and framing. One save collector retains the artifact. Finally restores offline state and closes the offline page. Independent tests would lose artifact identity continuity. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "67f500fc8b5eabfad0dd958810e7be1544aad9075a26d5eb6e179f765a7a9812",
+      "signatureHash": "a0ff341f91b7204849e157495edd0bf35277a97d4821551fb7f85c30ec6d58d3"
     }
   ]
 }

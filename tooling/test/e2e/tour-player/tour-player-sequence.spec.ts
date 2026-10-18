@@ -97,9 +97,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const rows = page.locator('.tour-contents-list button');
     await expect(rows).toHaveCount(11);
     await expect(rows.nth(3)).toHaveText('Contents');
-    await expect(rows.nth(4)).toHaveText('4. Action 4');
+    await expect(rows.nth(4)).toHaveText('4. Instruction 4');
     await page.screenshot({ path: info.outputPath('sequence-menu.png'), fullPage: false });
-    await rows.filter({ hasText: '7. Action 7' }).click();
+    await rows.filter({ hasText: '7. Instruction 7' }).click();
     await expect(page.locator('[data-tour-counter]')).toHaveText('7 / 9');
     await page.locator('[data-tour-previous]').click();
     await expect(page.locator('[data-tour-counter]')).toHaveText('6 / 9');
@@ -163,7 +163,7 @@ test('long action text scrolls without consuming Next', async ({ page }, info) =
 });
 
 for (const kind of ['annotation', 'hotspot'] as const) {
-  test(`caption dismissal does not hide the next ${kind} on the same image`, async ({
+  test(`caption dismissal stays explicit before showing the next ${kind} on the same image`, async ({
     page,
   }, info) => {
     const sequence = continuousTour();
@@ -187,6 +187,8 @@ for (const kind of ['annotation', 'hotspot'] as const) {
     if (kind === 'annotation') await page.keyboard.press('ArrowRight');
     else await page.locator('[data-tour-next]').click();
     await expect(page.locator('[data-tour-counter]')).toHaveText('2 / 9');
+    await expect(hint).toBeHidden();
+    await page.locator('[data-tour-hints]').click();
     await expect(hint).toBeVisible();
     await expect(page.locator('[data-tour-hint-text]')).toHaveText(
       kind === 'annotation' ? 'Second instruction' : 'Instruction 2'
@@ -195,6 +197,8 @@ for (const kind of ['annotation', 'hotspot'] as const) {
     if (kind === 'annotation') await page.keyboard.press('Escape');
     else await hint.locator('[data-tour-hint-close]').click();
     await page.locator('[data-tour-previous]').click();
+    await expect(hint).toBeHidden();
+    await page.locator('[data-tour-hints]').click();
     await expect(hint).toBeVisible();
     await expect(page.locator('[data-tour-hint-text]')).toHaveText('Introduction');
   });
@@ -271,6 +275,7 @@ test('largest admitted menu fixture scrolls to its last action and restores focu
                     ...image.actions[0]!.object,
                     id: `maximum-action-${ordinal}`,
                     label: `Action ${ordinal}`,
+                    text: `Action ${ordinal}`,
                   },
                 };
               }
@@ -355,4 +360,99 @@ test('start consecutive and final contents stay unnumbered in offline playback',
   await expect(page.locator('[data-tour-counter]')).toHaveText('Finished');
   await page.getByRole('button', { name: 'Restart', exact: true }).click();
   await expect(page.locator('#tour-player')).toHaveAttribute('data-slide-id', 'start');
+});
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`hint hover and focus preserve the paused sequence ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    const output = info.outputPath('hint-interactions.html');
+    await writeFile(output, await buildPlayerHtml(continuousTour()));
+    await page.setViewportSize(viewport.size);
+    await page.goto(pathToFileURL(output).href);
+    const player = page.locator('#tour-player');
+    const hint = player.locator('[data-tour-hint]');
+    const visibility = player.locator('[data-tour-hints]');
+    const identity = () =>
+      player.evaluate((root) => ({
+        slide: root.getAttribute('data-slide-id'),
+        action: root.getAttribute('data-action-id'),
+        counter: root.querySelector('[data-tour-counter]')?.textContent,
+        seek: root.querySelector<HTMLInputElement>('[data-tour-seek]')?.value,
+      }));
+    for (const [index, kind] of ['point', 'region'].entries()) {
+      if (index) await player.locator('[data-tour-next]').click();
+      await expect(player).toHaveAttribute('data-tour-playing', 'false');
+      await expect(visibility).toHaveAttribute('aria-pressed', 'true');
+      const before = await identity();
+      await visibility.click();
+      await expect(visibility).toHaveAttribute('aria-pressed', 'false');
+      await expect(hint).toBeHidden();
+      const target = player.locator('[data-tour-object-id]');
+      await target.hover();
+      await expect(hint).toBeVisible();
+      expect(await identity()).toEqual(before);
+      await hint.hover();
+      await expect(hint).toBeVisible();
+      expect(await identity()).toEqual(before);
+      await expect(
+        hint.locator(
+          '[data-tour-hint-title], [data-tour-hint-action-title], [data-tour-narration-toggle], [data-tour-narration-replay]'
+        )
+      ).toHaveCount(0);
+      for (const [selector, name] of [
+        ['hint-previous', 'Back'],
+        ['hint-next', 'Next'],
+        ['hint-close', 'Close'],
+      ] as const) {
+        const control = hint.locator(`[data-tour-${selector}]`);
+        await expect(control).toHaveAccessibleName(name);
+        await expect(control.locator('svg')).toHaveCount(1);
+        expect((await control.textContent())?.trim()).toBe('');
+      }
+      await hint.locator('[data-tour-hint-close]').click();
+      await expect(hint).toBeHidden();
+      await expect(target).toBeFocused();
+      expect(await identity()).toEqual(before);
+      await player.focus();
+      await page.mouse.move(0, 0);
+      await target.focus();
+      await expect(hint).toBeVisible();
+      expect(await identity()).toEqual(before);
+      await hint.locator('[data-tour-hint-close]').focus();
+      await page.keyboard.press('Enter');
+      await expect(hint).toBeHidden();
+      await expect(target).toBeFocused();
+      await expect(visibility).toHaveAttribute('aria-pressed', 'false');
+      await visibility.click();
+      await expect(hint).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+      await page.screenshot({ path: info.outputPath(`hint-${kind}.png`), fullPage: false });
+    }
+  });
+}
+
+test('annotation without a marker remains available through the hint toggle', async ({ page }) => {
+  const sequence = continuousTour();
+  const first = sequence.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image fixture');
+  first.actions[0] = {
+    type: 'annotation',
+    object: {
+      id: 'action-1',
+      text: 'Text without a spatial marker',
+      anchor: null,
+      appearance: null,
+    },
+  };
+  await page.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
+  await page.setContent(await buildPlayerHtml(sequence));
+  await expect(page.locator('[data-tour-object-id]')).toHaveCount(0);
+  const hint = page.locator('[data-tour-hint]');
+  await hint.locator('[data-tour-hint-close]').click();
+  await expect(hint).toBeHidden();
+  await page.locator('[data-tour-hints]').click();
+  await expect(hint).toBeVisible();
+  await expect(page.locator('#tour-player')).toHaveAttribute('data-action-id', 'action-1');
 });

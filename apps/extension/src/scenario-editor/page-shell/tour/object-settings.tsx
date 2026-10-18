@@ -1,7 +1,7 @@
 import { InspectorDisclosureView } from '../../../ui/compact-inspector-controls/disclosure';
 import { useInspectorDisclosure } from '../../../composition/inspector-disclosures/state';
 import { TourHighlightAnimationFields } from './mask-settings';
-import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls/controls';
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import {
   tourTextDefaults,
   resolveTourMarkerAppearance,
@@ -29,7 +29,7 @@ import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReactNode } from 'react';
 import { GuideInspectorGroup } from '../inspector';
-import { TourPointFields, TourTextField, TourTextPresentation } from './fields';
+import { TourChoiceField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
 import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
@@ -71,13 +71,6 @@ export function TourHotspotSettings({
             icon={Crosshair}
             title={t('scenario.editor.tourHotspot')}
           >
-            <TourTextField
-              label={t('scenario.editor.tourObjectLabel')}
-              singleLine
-              value={value.label}
-              disabled={disabled}
-              onChange={(label) => onChange({ ...value, label })}
-            />
             <TourTextField
               label={t('scenario.editor.textLabel')}
               value={value.text}
@@ -213,7 +206,7 @@ function TourHotspotVisualSettings({
   };
   return (
     <>
-      <SelectField
+      <TourChoiceField
         label={t('scenario.editor.tourVisual')}
         value={visual.kind}
         disabled={disabled}

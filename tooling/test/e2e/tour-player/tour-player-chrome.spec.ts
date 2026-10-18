@@ -5,30 +5,35 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { buildPlayerHtml, labels, slide, tour } from './tour-player-artifact.fixture';
 
 async function geometry(page: Page) {
-  const viewport = await page.locator('.tour-viewport').boundingBox();
+  const viewport = await page.locator('#tour-player').boundingBox();
   const toolbar = await page.locator('.tour-toolbar').boundingBox();
   if (!viewport || !toolbar) throw new Error('Missing player geometry');
   return { viewport, toolbar };
 }
 
-async function expectChromeBelowFrame(page: Page) {
+async function expectFloatingChrome(page: Page) {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const frame = document.querySelector('.tour-viewport')?.getBoundingClientRect();
+        const frame = document.querySelector('#tour-player')?.getBoundingClientRect();
         const toolbar = document.querySelector('.tour-toolbar')?.getBoundingClientRect();
         return (
           !!frame &&
           !!toolbar &&
-          toolbar.y >= frame.bottom - 0.5 &&
-          toolbar.bottom <= innerHeight + 0.5
+          toolbar.y >= frame.y - 0.5 &&
+          toolbar.bottom <= frame.bottom + 0.5 &&
+          toolbar.x >= frame.x - 0.5 &&
+          toolbar.right <= frame.right + 0.5
         );
       })
     )
     .toBe(true);
   const { viewport, toolbar } = await geometry(page);
   const pageHeight = page.viewportSize()!.height;
-  expect(toolbar.y).toBeGreaterThanOrEqual(viewport.y + viewport.height - 0.5);
+  expect(toolbar.y).toBeGreaterThanOrEqual(viewport.y - 0.5);
+  expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(viewport.y + viewport.height + 0.5);
+  expect(toolbar.width).toBeLessThan(viewport.width);
+  await expect(page.locator('[data-tour-manual]')).toHaveCount(0);
   expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(pageHeight + 0.5);
   expect(await page.locator('header').count()).toBe(0);
   const controls = await Promise.all(
@@ -39,6 +44,7 @@ async function expectChromeBelowFrame(page: Page) {
       '[data-tour-previous]',
       '[data-tour-counter]',
       '[data-tour-next]',
+      '[data-tour-hints]',
       '[data-tour-contents]',
     ].map(async (selector) => ({ selector, box: await page.locator(selector).boundingBox() }))
   );
@@ -67,6 +73,30 @@ async function expectChromeBelowFrame(page: Page) {
       );
     }
   }
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const toolbar = document.querySelector('.tour-toolbar')!.getBoundingClientRect();
+        return [
+          ...document.querySelectorAll<HTMLElement>(
+            '[data-tour-hint-text], [data-tour-object-id], [data-tour-hint-close], [data-tour-hint-previous], [data-tour-hint-next]'
+          ),
+        ]
+          .filter((node) => {
+            const box = node.getBoundingClientRect();
+            return (
+              box.width > 0 &&
+              box.height > 0 &&
+              box.right > toolbar.left + 0.5 &&
+              box.left < toolbar.right - 0.5 &&
+              box.bottom > toolbar.top + 0.5 &&
+              box.top < toolbar.bottom - 0.5
+            );
+          })
+          .map((node) => node.getAttribute('aria-label') || node.tagName);
+      })
+    )
+    .toEqual([]);
   // Wrapped controls must still read left-to-right, top-to-bottom in DOM order.
   for (let index = 1; index < controls.length; index += 1) {
     const previous = controls[index - 1]!.box!;
@@ -88,11 +118,11 @@ async function expectChromeBelowFrame(page: Page) {
 
 test.describe('standalone tour player chrome', () => {
   for (const [name, size] of [
-    ['desktop', { width: 1280, height: 800 }],
+    ['desktop', { width: 1280, height: 560 }],
     ['minimum', { width: 480, height: 640 }],
     ['narrow', { width: 320, height: 568 }],
   ] as const) {
-    test(`frame and bottom toolbar never overlap at ${name} size`, async ({ page }, info) => {
+    test(`floating chrome fits the viewport at ${name} size`, async ({ page }, info) => {
       await page.setViewportSize(size);
       await page.setContent(await buildPlayerHtml());
       await expect(page.locator('[data-tour-play]')).toBeVisible();
@@ -100,7 +130,7 @@ test.describe('standalone tour player chrome', () => {
       await expect(page.locator('[data-tour-previous]')).toHaveCount(1);
       await expect(page.locator('[data-tour-next]')).toHaveCount(1);
       await expect(page.locator('[data-tour-contents]')).toHaveCount(1);
-      await expectChromeBelowFrame(page);
+      await expectFloatingChrome(page);
       await page.locator('[data-tour-contents]').click();
       const dialog = await page.locator('[data-tour-navigation]').boundingBox();
       const player = await page.locator('.tour-viewport').boundingBox();
@@ -148,13 +178,18 @@ test.describe('standalone tour player chrome', () => {
     await expect(page.locator('[data-tour-contents]')).toBeFocused();
   });
 
-  test('explanation disclosure never repeats body copy in its heading', async ({ page }, info) => {
+  test('explanation keeps authored copy without a plaque heading', async ({ page }, info) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.setContent(await buildPlayerHtml());
     const hint = page.locator('[data-tour-hint]');
     await expect(hint).toBeVisible();
-    const toggle = hint.locator('[data-tour-hint-toggle]');
-    await expect(toggle).toContainText('What happened here');
+    await expect(hint.locator('[data-tour-hint-title], [data-tour-hint-action-title]')).toHaveCount(
+      0
+    );
+    await expect(hint.locator('[data-tour-hint-close]')).toBeVisible();
+    await expect(
+      hint.locator('[data-tour-narration-toggle], [data-tour-narration-replay]')
+    ).toHaveCount(0);
     await expect(hint.locator('[data-tour-hint-text]')).toHaveText(
       'This step ran the capture and stored the result.'
     );
@@ -192,7 +227,10 @@ test('tour caption area and compact chrome respect the player work area', async 
   await check(hint).toHaveCSS('border-top-left-radius', '0px');
   await check(hint).toHaveCSS('border-top-right-radius', '0px');
   await check(hint).toHaveAttribute('data-collapsed', 'true');
-  await expect(hint.locator('[data-tour-hint-title]')).toBeVisible();
+  await expect(hint.locator('[data-tour-hint-title], [data-tour-hint-action-title]')).toHaveCount(
+    0
+  );
+  await expect(hint.locator('[data-tour-hint-close]')).toBeVisible();
   const body = hint.locator('[data-tour-hint-text]');
   await expect(body).toHaveCSS('transition-duration', '0.18s');
   await body.click();
@@ -288,7 +326,8 @@ for (const locale of ['ru', 'en'] as const) {
               finished: 'Тур завершён',
               play: 'Воспроизвести',
               pause: 'Приостановить',
-              manual: 'Ручное управление',
+              showHints: 'Показать подсказки',
+              hideHints: 'Скрыть подсказки',
             }
           : labels;
       const externalFonts: string[] = [];
@@ -316,7 +355,7 @@ for (const locale of ['ru', 'en'] as const) {
         .toHaveCSS('font-weight', '400', { timeout: 100 });
       for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.setViewportSize(size);
-        await expectChromeBelowFrame(page);
+        await expectFloatingChrome(page);
         await captureChrome(page, info, `player-${name}`);
         const trigger = page.locator('[data-tour-contents]');
         await trigger.click();
@@ -338,7 +377,7 @@ for (const locale of ['ru', 'en'] as const) {
       }
       for (const width of [1024, 479, 480, 481, 320]) {
         await page.setViewportSize({ width, height: 560 });
-        await expectChromeBelowFrame(page);
+        await expectFloatingChrome(page);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           width
         );
@@ -354,3 +393,126 @@ for (const locale of ['ru', 'en'] as const) {
     });
   }
 }
+
+test('floating controls preserve stage geometry, native focus and Space playback', async ({
+  page,
+}, info) => {
+  const documentTour: TourDocument = structuredClone(tour);
+  documentTour.playback.minimumHoldSeconds = 60;
+  for (const slide of documentTour.slides)
+    slide.timing = { mode: 'manual', holdSeconds: 60, truncateNarration: false };
+  await page.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setContent(await buildPlayerHtml(documentTour));
+  const player = page.locator('#tour-player');
+  const stage = player.locator('[data-tour-stage]');
+  const play = player.locator('[data-tour-play]');
+  await expect(play).toBeEnabled();
+  const original = await stage.boundingBox();
+  await page.clock.install();
+  await player.focus();
+  await page.keyboard.press('Space');
+  await expect(player).toHaveAttribute('data-tour-playing', 'true');
+  await expect(player).toHaveAttribute('data-action-id', 'point-first');
+  await page.keyboard.press('Space');
+  await expect(player).toHaveAttribute('data-tour-playing', 'false');
+  await expect(player).toHaveAttribute('data-action-id', 'point-first');
+  await page.keyboard.press('Space');
+  await expect(player).toHaveAttribute('data-tour-playing', 'true');
+  await page.mouse.move(0, 0);
+  await player.focus();
+  await page.clock.runFor(2100);
+  await expect(player).toHaveAttribute('data-tour-chrome-hidden', 'true');
+  expect(await stage.boundingBox()).toEqual(original);
+  await page.mouse.move(20, 20);
+  await play.focus();
+  await page.clock.runFor(2100);
+  await expect(play).toBeFocused();
+  await expect(player).toHaveAttribute('data-tour-chrome-hidden', 'false');
+  expect(await stage.boundingBox()).toEqual(original);
+  await page.keyboard.press('Space');
+  await expect(player).toHaveAttribute('data-tour-playing', 'false');
+  await expect(player).toHaveAttribute('data-action-id', 'point-first');
+  const seek = player.locator('[data-tour-seek]');
+  await seek.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(seek).toBeFocused();
+  await expect(player).toHaveAttribute('data-action-id', 'point-first');
+  await player.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(player).toHaveAttribute('data-action-id', 'point-second');
+  await expect(player).toHaveAttribute('data-tour-playing', 'false');
+  await page.clock.runFor(250);
+  await expect(player).toHaveAttribute('data-action-id', 'point-second');
+  expect(await stage.boundingBox()).toEqual(original);
+  await page.clock.resume();
+  await captureChrome(page, info, 'floating-native-focus');
+});
+
+test('image failure and explicit retry preserve the floating stage budget', async ({
+  page,
+}, info) => {
+  const documentTour: TourDocument = structuredClone(tour);
+  const second = documentTour.slides[1]!;
+  if (second.kind !== 'image' || !second.image) throw new Error('Expected image fixture');
+  second.image.assetId = 'broken-image';
+  await page.setViewportSize(PRIMARY_BROWSER_VIEWPORTS[0].size);
+  await page.setContent(
+    await buildPlayerHtml(documentTour, labels, [
+      { id: 'broken-image', mime: 'image/png', base64: 'AA==' },
+    ])
+  );
+  const player = page.locator('#tour-player');
+  await expect(player.locator('[data-tour-stage]')).toBeVisible();
+  const before = await player.locator('[data-tour-stage]').boundingBox();
+  await player.locator('[data-tour-next]').click();
+  await expect(player.locator('[data-tour-status]')).toContainText(labels.mediaError);
+  await expect(player.locator('[data-tour-play]')).toHaveAccessibleName(labels.retry);
+  expect(await player.locator('[data-tour-stage]').boundingBox()).toEqual(before);
+  await expectFloatingChrome(page);
+  await player.locator('[data-tour-play]').click();
+  await expect(player.locator('[data-tour-status]')).toContainText(labels.mediaError);
+  expect(await player.locator('[data-tour-stage]').boundingBox()).toEqual(before);
+  await captureChrome(page, info, 'floating-image-error');
+});
+
+test('portrait floating chrome fits narrow and short viewports', async ({ page }, info) => {
+  const documentTour: TourDocument = structuredClone(tour);
+  documentTour.stage.aspect = '9:16';
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.setContent(await buildPlayerHtml(documentTour));
+  for (const size of [
+    { width: 360, height: 640 },
+    { width: 479, height: 560 },
+    { width: 480, height: 560 },
+    { width: 481, height: 560 },
+    { width: 320, height: 280 },
+  ]) {
+    await page.setViewportSize(size);
+    await expectFloatingChrome(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      size.width
+    );
+    await expect(page.locator('[data-tour-hint-close]')).toBeInViewport();
+    await captureChrome(page, info, `portrait-${size.width}-${size.height}`);
+    if (size.height === 280) {
+      const body = page.locator('[data-tour-hint-text]');
+      await expect
+        .poll(() => body.evaluate((node) => node.scrollHeight > node.clientHeight))
+        .toBe(true);
+      await body.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+      });
+      expect(await body.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+      await page.locator('[data-tour-hint-next]').click();
+      await expect(page.locator('[data-tour-counter]')).toHaveText('2 / 2');
+      await page.locator('[data-tour-hint-close]').click();
+      await expect(page.locator('[data-tour-hint]')).toBeHidden();
+      await expect(page.locator('[data-tour-counter]')).toHaveText('2 / 2');
+      await page.locator('[data-tour-hints]').click();
+      await expect(page.locator('[data-tour-hint]')).toBeVisible();
+      await expectFloatingChrome(page);
+      await captureChrome(page, info, 'portrait-short-navigation');
+    }
+  }
+});

@@ -34,10 +34,7 @@ export function buildTourPlaybackPlan(tour: TourDocument) {
           ...slide,
           sourceSlideId: slide.id,
           id: slide.id,
-          title:
-            entry.type === 'hotspot'
-              ? objectLabel(entry.object.label, entry.object.text)
-              : objectLabel('', entry.object.text),
+          title: getTourActionTitle(entry.object),
           actions: [entry],
           camera: object.camera ?? slide.camera,
           timing: object.timing ?? slide.timing,
@@ -48,13 +45,14 @@ export function buildTourPlaybackPlan(tour: TourDocument) {
   return { entries, actionCount };
 }
 
-function objectLabel(label: string, text: string) {
+/** Projects disposable action copy without changing the saved label or authored text. */
+export function getTourActionTitle(object: { text: string; label?: string }, fallback = '') {
   return (
-    label.trim() ||
-    text
+    object.text
       .split('\n')
       .find((line) => line.trim())
       ?.trim() ||
-    ''
+    object.label?.trim() ||
+    fallback
   );
 }

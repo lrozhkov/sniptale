@@ -266,6 +266,26 @@ for (const [locale, theme, viewport] of [
   ['ru', 'light', { width: 1280, height: 560 }],
   ['en', 'dark', { width: 1920, height: 900 }],
 ] as const) {
+  test(`returns batch narration to the document inspector context ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const t = await setup(page, hostOrigin, locale, theme, viewport);
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
+    await expect(inspector(page)).toHaveAttribute('aria-label', t('scenario.editor.tourSettings'));
+    const selected = inspector(page).getByRole('navigation').getByRole('button', { pressed: true });
+    const category = await selected.getAttribute('aria-label');
+    await openBatch(page);
+    await closeForm(page, locale, 'batch');
+    await expect(inspector(page)).toHaveAttribute('aria-label', t('scenario.editor.tourSettings'));
+    await expect(
+      inspector(page).getByRole('navigation').getByRole('button', { pressed: true })
+    ).toHaveAttribute('aria-label', category!);
+  });
+
   test(`generates selected action speech only after disclosure and applies it after preview ${locale}`, async ({
     page,
     hostOrigin,
@@ -330,7 +350,10 @@ for (const [locale, theme, viewport] of [
       .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
       .click();
     const player = page.locator('.tour-canvas .tour-stage-host #tour-player');
-    await player.locator('[data-tour-narration-replay]:visible').click();
+    await expect(
+      player.locator('[data-tour-narration-replay], [data-tour-narration-toggle]')
+    ).toHaveCount(0);
+    await expect(player).toHaveAttribute('data-tour-playing', 'true');
     await expect
       .poll(() =>
         player
@@ -338,6 +361,8 @@ for (const [locale, theme, viewport] of [
           .evaluate((node: HTMLAudioElement) => node.currentTime)
       )
       .toBeGreaterThan(0);
+    await player.locator('[data-tour-play]').click();
+    await expect(player).toHaveAttribute('data-tour-playing', 'false');
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
       let complete = false;

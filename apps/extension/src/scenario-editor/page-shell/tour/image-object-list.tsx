@@ -9,6 +9,7 @@ import {
   type TourImageSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
+import { getTourActionTitle } from '../../../features/scenario/project/public';
 import type { Translate } from '../../../platform/i18n';
 import { GuideInspectorGroup } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
@@ -158,10 +159,13 @@ export function TourImageObjects({
 function tourSlideObjectLabel(entry: TourImageSlide['actions'][number], t: Translate) {
   switch (entry.type) {
     case 'hotspot':
-      return { label: entry.object.label || t('scenario.editor.tourHotspot'), Icon: Crosshair };
+      return {
+        label: getTourActionTitle(entry.object, t('scenario.editor.tourHotspot')),
+        Icon: Crosshair,
+      };
     case 'annotation':
       return {
-        label: entry.object.text || t('scenario.editor.tourAnnotation'),
+        label: getTourActionTitle(entry.object, t('scenario.editor.tourAnnotation')),
         Icon: MessageSquare,
       };
   }

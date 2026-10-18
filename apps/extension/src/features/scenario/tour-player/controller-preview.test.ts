@@ -406,13 +406,9 @@ it('uses accessible icon narration actions without firing navigation and permits
     { id: 'image', mime: 'image/png', base64: 'AA==' },
   ]);
   await settleMedia();
-  const hint = root.querySelector<HTMLButtonElement>('[data-tour-narration="note"]')!;
-  expect(hint.textContent).toBe('');
-  expect(hint.getAttribute('aria-label')).toBe('play');
-  expect(hint.title).toBe('play');
-  expect(hint.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+  expect(root.querySelector('[data-tour-hint] [data-tour-narration]')).toBeNull();
   expect(root.querySelector('[data-tour-status]')!.textContent).toBe('narration failed');
-  hint.click();
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
   await settleMedia();
   expect(play).toHaveBeenCalledTimes(2);
   expect(root.querySelector('[data-tour-status]')!.textContent).toBe('');
@@ -613,7 +609,7 @@ it('updates stage paint and image layers without changing scene geometry', async
   expect([stage.style.width, stage.style.height]).toEqual(dimensions);
 });
 
-it('keeps manual entrances separate from playback and routes Space by persistent mode', async () => {
+it('toggles playback with Space and ignores repeat without changing action identity', async () => {
   instantImages();
   const tick = playbackFrames();
   const tour = previewTour();
@@ -621,33 +617,26 @@ it('keeps manual entrances separate from playback and routes Space by persistent
   tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
   const { root } = await mount(tour);
   await settleMedia();
-  const press = (repeat = false) => {
-    const event = new KeyboardEvent('keydown', {
-      key: ' ',
-      bubbles: true,
-      cancelable: true,
-      repeat,
-    });
-    root.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
-  };
-  expect(root.dataset['tourMode']).toBe('manual');
+  const press = (repeat = false) =>
+    root.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: ' ',
+        bubbles: true,
+        cancelable: true,
+        repeat,
+      })
+    );
+  const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
   press();
-  expect(root.dataset['slideId']).toBe('second');
+  expect(play.getAttribute('aria-pressed')).toBe('true');
   press(true);
-  expect(root.dataset['slideId']).toBe('second');
-  await tick(100000);
-  expect(root.dataset['slideId']).toBe('second');
-  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
-  expect(root.dataset['tourMode']).toBe('playback');
-  press();
+  expect(play.getAttribute('aria-pressed')).toBe('true');
   press();
   await tick(100000);
-  expect(root.dataset['slideId']).toBe('second');
-  expect(root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('false');
-  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
+  expect(play.getAttribute('aria-pressed')).toBe('false');
+  expect(root.dataset['slideId']).toBe('first');
   press();
-  expect(root.dataset['slideId']).toBe('end');
+  expect(play.getAttribute('aria-pressed')).toBe('true');
 });
 
 it('admits Space only for the active player and leaves native controls and modified keys alone', async () => {
@@ -678,11 +667,11 @@ it('admits Space only for the active player and leaves native controls and modif
   first.root.dispatchEvent(
     new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
   );
-  expect(first.root.dataset['slideId']).toBe('second');
-  expect(second.root.dataset['slideId']).not.toBe('second');
+  expect(first.root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('true');
+  expect(second.root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('false');
 });
 
-it('retains authored playback mode when hidden and manual choice cancels pending media progression', async () => {
+it('retains authored playback mode when hidden and navigation cancels pending media progression', async () => {
   const tick = playbackFrames();
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
   const hidden = await mount(previewTour());
@@ -701,13 +690,12 @@ it('retains authored playback mode when hidden and manual choice cancels pending
   const tour = previewTour();
   tour.slides = [imageSlide('first'), imageSlide('second')];
   const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
-  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   root.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
   ready.forEach((resolve) => resolve());
   await tick(100000);
   await tick(100000);
   expect(root.dataset['slideId']).toBe('second');
-  expect(root.dataset['tourMode']).toBe('manual');
+  expect(root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('preserves consumed keys, contents dialog and ARIA control focus', async () => {
@@ -814,3 +802,77 @@ it('keeps temporary full-source projection aligned through playback, resize and 
   expect(button.getAttribute('aria-pressed')).toBe('false');
   expect(JSON.stringify(tour)).toBe(before);
 });
+
+it.each(['point', 'region'] as const)(
+  'reveals only the current %s hint without navigation and suppresses Close focus restoration',
+  async (kind) => {
+    instantImages();
+    playbackFrames();
+    const tour = previewTour();
+    tour.playback.autoplay = false;
+    const slide = imageSlide('first');
+    slide.actions = [
+      {
+        type: 'hotspot',
+        object: {
+          id: 'current',
+          point: { x: 0.5, y: 0.5 },
+          targetRect: null,
+          label: 'Current',
+          text: 'Author text',
+          appearance: null,
+          visual:
+            kind === 'point'
+              ? { kind: 'point', pulse: false }
+              : {
+                  kind: 'highlight',
+                  rect: { x: 0.2, y: 0.2, width: 0.4, height: 0.4 },
+                  color: '#ffff00',
+                  opacity: 0.4,
+                  animation: {
+                    enter: { kind: 'none', durationMs: 0 },
+                    exit: { kind: 'none', durationMs: 0 },
+                  },
+                },
+        },
+      },
+    ];
+    tour.slides = [slide, createTourImageSlide('second')];
+    const original = JSON.stringify(tour);
+    const { root, player } = await mount(tour, [
+      { id: 'image', mime: 'image/png', base64: 'AA==' },
+    ]);
+    await settleMedia();
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    const toggle = root.querySelector<HTMLButtonElement>('[data-tour-hints]')!;
+    const target = root.querySelector<HTMLElement>(
+      kind === 'point' ? '.tour-hotspot' : '.tour-mask'
+    )!;
+    expect(target.getAttribute('aria-label')).toBe('Author text');
+    const identity = [root.dataset['slideId'], root.dataset['actionId']];
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    toggle.click();
+    expect(hint.hidden).toBe(true);
+    target.dispatchEvent(new MouseEvent('pointerenter'));
+    expect(hint.hidden).toBe(false);
+    target.dispatchEvent(new MouseEvent('pointerleave', { relatedTarget: hint }));
+    hint.dispatchEvent(new MouseEvent('pointerenter'));
+    expect(hint.hidden).toBe(false);
+    root.querySelector<HTMLButtonElement>('[data-tour-hint-close]')!.click();
+    expect(hint.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    target.dispatchEvent(new MouseEvent('pointerenter'));
+    expect(hint.hidden).toBe(true);
+    target.dispatchEvent(new MouseEvent('pointerleave'));
+    target.blur();
+    target.focus();
+    expect(hint.hidden).toBe(false);
+    expect([root.dataset['slideId'], root.dataset['actionId']]).toEqual(identity);
+    expect(JSON.stringify(tour)).toBe(original);
+    expect(hint.querySelector('[data-tour-narration]')).toBeNull();
+    expect(hint.querySelector('[data-tour-hint-action-title]')).toBeNull();
+    player.dispose();
+    toggle.click();
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  }
+);

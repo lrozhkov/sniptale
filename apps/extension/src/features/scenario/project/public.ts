@@ -57,3 +57,5 @@ export {
   listScenarioNarrationTexts,
   type ScenarioNarrationText,
 } from './narration-text';
+
+export { getTourActionTitle } from './tour-playback-plan';

@@ -142,7 +142,10 @@ it('treats authored text as text through both JSON and visible title boundaries'
   args.title = attack;
   args.tour.slides[0]!.title = attack;
   const first = args.tour.slides[0]!;
-  if (first.kind === 'image') getTourHotspots(first)[0]!.label = attack;
+  if (first.kind === 'image') {
+    getTourHotspots(first)[0]!.label = attack;
+    getTourHotspots(first)[0]!.text = attack;
+  }
   args.labels.next = attack;
   const dom = open(await buildTourPlayerHtml(args));
   expect(dom.window.document.title).toBe(attack);
@@ -177,13 +180,16 @@ it('projects the camera and legacy marker appearance through one source-image bo
   const dom = open(await buildTourPlayerHtml(args));
   const marker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
   const image = dom.window.document.querySelector<HTMLElement>('.tour-image')!;
-  expect(marker.style.left).toBe('310px');
-  expect(marker.style.top).toBe('174.375px');
+  const stage = dom.window.document.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const width = Number.parseFloat(stage.style.width);
+  const height = Number.parseFloat(stage.style.height);
+  expect(Number.parseFloat(marker.style.left)).toBeCloseTo(width / 2);
+  expect(Number.parseFloat(marker.style.top)).toBeCloseTo(height / 2);
   expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
   expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
   expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
   expect(marker.dataset['pulse']).toBe('true');
-  expect(image.style.width).toBe('1240px');
+  expect(Number.parseFloat(image.style.width)).toBeCloseTo(width * 2);
   dom.close();
 });
 it.each(['slides', 'stage'] as const)(
@@ -367,19 +373,23 @@ it('requires object narration bytes and omits unused audio material metadata fro
   expect(html).toContain('"trigger":"activation"');
 });
 
-it('uses a numberless hotspot and readable explanation controls without a compound counter', async () => {
+it('uses a numberless hotspot and accessible icon explanation controls without a compound counter', async () => {
   const dom = open(await buildTourPlayerHtml(fixture()));
   const doc = dom.window.document;
   expect(doc.querySelector('.tour-hotspot')?.textContent).toBe('');
-  expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('Back');
-  expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('Next');
+  expect(doc.querySelector('[data-tour-hint-previous]')?.getAttribute('aria-label')).toBe('Back');
+  expect(doc.querySelector('[data-tour-hint-previous] svg')).not.toBeNull();
+  expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('');
+  expect(doc.querySelector('[data-tour-hint-next]')?.getAttribute('aria-label')).toBe('Next');
+  expect(doc.querySelector('[data-tour-hint-next] svg')).not.toBeNull();
+  expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('');
   expect(doc.querySelector('[data-tour-hint-count]')?.textContent).not.toContain('·');
   expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 2');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   dom.close();
 });
 
-it('shows each action name in the callout header and omits an empty description', async () => {
+it('shows authored callout text without an action heading and omits an empty description', async () => {
   const args = fixture();
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
@@ -395,12 +405,12 @@ it('shows each action name in the callout header and omits an empty description'
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
   expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 3');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(false);
   expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Explanation');
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 3');
-  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Finish setup');
+  expect(doc.querySelector('[data-tour-hint-action-title]')).toBeNull();
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(true);
   dom.close();
 });
@@ -468,7 +478,8 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     resize.initEvent('resize', false, false);
     dom.window.dispatchEvent(resize);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle.textContent).toContain('Details');
+    expect(toggle.textContent?.trim()).toBe('');
+    expect(toggle.querySelector('svg')).not.toBeNull();
     expect(body.textContent).toBe('A'.repeat(170));
     expect(body.hidden).toBe(false);
     expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 3');
@@ -477,7 +488,7 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     expect(body.textContent).toBe('A'.repeat(170));
     expect(Number.parseFloat(body.style.maxHeight)).toBeGreaterThan(20);
     toggle.click();
-    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
+    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation');
     expect(body.hidden).toBe(false);
     expect(body.style.maxHeight).toBe('20px');
     next.click();
@@ -543,7 +554,9 @@ it('exports visual blur through the shared renderer without authoring handles', 
   ];
   const dom = open(await buildTourPlayerHtml(args));
   const effect = dom.window.document.querySelector<HTMLElement>('.tour-mask-effect')!;
-  expect(effect.style.backdropFilter).toBe('blur(23.25px)');
+  const stage = dom.window.document.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const scale = Number.parseFloat(stage.style.width) / first.image!.width;
+  expect(Number.parseFloat(effect.style.backdropFilter.slice(5))).toBeCloseTo(24 * scale);
   expect(effect.style.opacity).toBe('');
   expect(dom.window.document.querySelector('.tour-resize-handle')).toBeNull();
   dom.close();
@@ -566,6 +579,7 @@ it('lays out one content frame above one bottom toolbar that owns every control'
     '[data-tour-seek]',
     '[data-tour-previous]',
     '[data-tour-next]',
+    '[data-tour-hints]',
     '[data-tour-contents]',
   ];
   const nodes = ordered.map((selector) => document.querySelector(selector)!);
@@ -579,6 +593,10 @@ it('lays out one content frame above one bottom toolbar that owns every control'
   expect(document.querySelectorAll('[data-tour-status]')).toHaveLength(1);
   expect(toolbar.contains(document.querySelector('[data-tour-title]'))).toBe(true);
   expect(toolbar.contains(document.querySelector('[data-tour-status]'))).toBe(true);
+  expect(document.querySelector('#mode')).toBeNull();
+  expect(document.querySelector('[data-tour-hint-title]')).toBeNull();
+  expect(document.querySelector('[data-tour-hint] [data-tour-narration]')).toBeNull();
+  expect(document.querySelector('[data-tour-hints]')?.getAttribute('aria-pressed')).toBe('true');
   dom.close();
 });
 
@@ -603,7 +621,7 @@ it('keeps short slide explanations readable without a disclosure', async () => {
   const doc = dom.window.document;
   const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
   const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
-  expect(toggle.textContent?.trim()).toBe('Details');
+  expect(toggle.textContent?.trim()).toBe('');
   expect(body.textContent).toBe(text);
   expect(toggle.hidden).toBe(true);
   expect(body.hidden).toBe(false);
@@ -640,7 +658,7 @@ it('separates action callouts and slide captions despite a shared caption defaul
   );
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Slide note body');
-  expect(toggle.textContent?.trim()).toBe('Details');
+  expect(toggle.textContent?.trim()).toBe('');
   expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.dataset['presentation']).toBe(
     'caption-bottom'
   );
@@ -746,8 +764,15 @@ it('renders independent inherited and local element styles in the standalone art
   expect(hint.dataset['presentation']).toBe('caption-top');
   expect(hint.style.borderRadius).toBe('0 0 8px 8px');
   const effects = doc.querySelectorAll<HTMLElement>('.tour-mask-effect');
-  expect(effects[0]!.style.backdropFilter).toBe('blur(29.0625px)');
-  expect(effects[1]!.style.backdropFilter).toBe('blur(6.78125px)');
+  const stageWidth = Number.parseFloat(
+    doc.querySelector<HTMLElement>('[data-tour-stage]')!.style.width
+  );
+  expect(Number.parseFloat(effects[0]!.style.backdropFilter.slice(5))).toBeCloseTo(
+    (30 * stageWidth) / 640
+  );
+  expect(Number.parseFloat(effects[1]!.style.backdropFilter.slice(5))).toBeCloseTo(
+    (7 * stageWidth) / 640
+  );
   dom.close();
 });
 

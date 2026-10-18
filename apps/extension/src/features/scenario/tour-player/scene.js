@@ -19,7 +19,6 @@ function scenePolicy(root, options) {
     // Editor preview never creates an executable link; denied actions stay plain buttons.
     linkedUrls: !authoring && !preview,
     keyboardScope: authoring || preview ? root : null,
-    hideVoice: Boolean(authoring),
   };
 }
 
@@ -29,7 +28,6 @@ function createSceneHints(root, input, policy, signal, getHints, boundary) {
   return createTourHints(root, input.tour.style, {
     signal,
     keyboardScope: policy.keyboardScope,
-    hideVoice: policy.hideVoice,
     navigation: policy.authoring?.navigation,
     boundary,
     onClose: () => {},
@@ -126,7 +124,10 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       height: stageHeight,
       fontSize: lastFontSize,
     });
-    if (!next) return;
+    if (!next) {
+      hintController.reflow();
+      return;
+    }
     lastFontSize = next.fontSize;
     stageWidth = stage.clientWidth || next.width;
     stageHeight = stage.clientHeight || next.height;
@@ -354,14 +355,13 @@ function measureScene(root, viewport, aspect) {
   const spacing = globalThis.getComputedStyle(viewport);
   const horizontal = (parseFloat(spacing.marginLeft) || 0) + (parseFloat(spacing.marginRight) || 0);
   const vertical = (parseFloat(spacing.marginTop) || 0) + (parseFloat(spacing.marginBottom) || 0);
-  const toolbarHeight = root.querySelector('.tour-toolbar')?.offsetHeight || 0;
   const availableWidth = Math.max(
     1,
     (root.clientWidth || viewport.clientWidth || 640) - horizontal
   );
   const availableHeight = Math.max(
     1,
-    (root.clientHeight || viewport.clientHeight || 360) - toolbarHeight - vertical
+    (root.clientHeight || viewport.clientHeight || 360) - vertical
   );
   const stageWidth = Math.min(availableWidth, (availableHeight * width) / height);
   return {

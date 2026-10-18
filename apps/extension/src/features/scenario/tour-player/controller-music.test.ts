@@ -158,25 +158,25 @@ async function mount(endEnabled = true) {
     root.querySelector<HTMLButtonElement>(`[data-tour-${name}]`)!.click();
   return { ...clock, root, player, tour, input, music: music!, click };
 }
-it('admits a manual visit only through viewer navigation and preserves one music offset across slides', async () => {
+it('keeps manual navigation paused and preserves the music offset until global Play', async () => {
   const h = await mount();
-  expect(h.music.paused).toBe(true);
   h.player.select('second');
   await h.tick();
-  expect(h.music.paused).toBe(true);
   h.click('previous');
   await h.tick();
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
+  h.click('play');
+  await h.tick();
   h.music.currentTime = 7;
   const plays = h.play.mock.calls.length;
   h.click('next');
   await h.tick();
+  expect(h.music.paused).toBe(true);
   expect(h.music.currentTime).toBe(7);
   expect(h.play).toHaveBeenCalledTimes(plays);
-  expect(h.root.dataset['tourMode']).toBe('manual');
   h.click('contents');
   await h.tick();
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
 });
 it('keeps explicitly paused music paused through navigation and resumes by global Play', async () => {
   const h = await mount();
@@ -194,7 +194,7 @@ it('keeps explicitly paused music paused through navigation and resumes by globa
   expect(h.music.paused).toBe(false);
   expect(h.music.currentTime).toBe(5);
 });
-it('finishes at the technical end and starts a fresh visit on a human Back command', async () => {
+it('finishes at the technical end and waits for global Play after Back', async () => {
   const h = await mount();
   h.click('next');
   await h.tick();
@@ -208,8 +208,11 @@ it('finishes at the technical end and starts a fresh visit on a human Back comma
   expect(h.music.currentTime).toBe(0);
   h.click('previous');
   await h.tick();
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
   expect(h.root.dataset['slideId']).toBe('third');
+  h.click('play');
+  await h.tick();
+  expect(h.music.paused).toBe(false);
 });
 it('keeps automatic progression and choice waits independent from music visit activity', async () => {
   const h = await mount();
@@ -236,7 +239,7 @@ it('restarts completed tours without an end screen and preserves manual final re
   await h.tick();
   h.music.currentTime = 8;
   await h.tick(10000);
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
   h.click('play');
   await h.tick(100);
   expect(h.music.paused).toBe(true);
@@ -269,6 +272,9 @@ it('pauses on hidden state without visibility auto-resume and never unlocks repl
   expect(h.music.paused).toBe(true);
   h.click('previous');
   await h.tick();
+  expect(h.music.paused).toBe(true);
+  h.click('play');
+  await h.tick();
   expect(h.music.paused).toBe(false);
 });
 it('finishes an active visit when a document update removes its final slide', async () => {
@@ -283,51 +289,31 @@ it('finishes an active visit when a document update removes its final slide', as
   expect(h.music.currentTime).toBe(0);
   expect(h.root.dataset['slideId']).toBe('');
 });
-it('uses real local narration state for ducking without stopping the music visit', async () => {
+it('uses actual global narration for ducking and global Pause stops both channels', async () => {
   const h = await mount();
   const first = h.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image');
-  const narration = {
+  first.actions[0]!.object.narration = {
     assetId: 'voice',
     duration: 4,
     trimStart: 0,
     trimEnd: 4,
     gain: 0.5,
     transcript: '',
-    trigger: 'activation' as const,
+    trigger: 'enter',
   };
   h.input.assets.push({ id: 'voice', src: 'data:audio/wav;base64,AQ==' });
-  h.tour.slides[0] = {
-    kind: 'navigation',
-    id: 'first',
-    title: 'Choice',
-    description: '',
-    background: { color: '#000000', image: null },
-    narration: null,
-    timing: first.timing,
-    buttons: [
-      {
-        id: 'voice',
-        label: 'Stay',
-        action: { kind: 'none' },
-        narration,
-      },
-    ],
-  };
   h.player.update(h.input);
   await h.tick();
   h.click('play');
   await h.tick();
-  h.player.select('first');
-  const local = h.root.querySelector<HTMLButtonElement>('[data-tour-narration-toggle="voice"]')!;
-  local.click();
-  await h.tick();
   expect(h.music.paused).toBe(false);
   expect(h.ramps.at(-1)).toBe(0.25);
-  local.click();
+  h.click('play');
   await h.tick();
   expect(h.ramps.at(-1)).toBe(1);
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
+  expect(h.root.querySelector<HTMLAudioElement>('audio:not([data-tour-music])')!.paused).toBe(true);
   const volume = h.root.querySelector<HTMLInputElement>('[data-tour-volume]')!;
   volume.value = '0.5';
   volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -340,7 +326,7 @@ it('uses real local narration state for ducking without stopping the music visit
   h.click('mute');
   expect(h.music.volume).toBeCloseTo(0.2);
 });
-it('preserves active music through full view and manual mode but suspends on external departure', async () => {
+it('pauses both channels on full view and suspends on external departure', async () => {
   const h = await mount();
   const first = h.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image');
@@ -362,10 +348,12 @@ it('preserves active music through full view and manual mode but suspends on ext
   await h.tick();
   h.music.currentTime = 3;
   h.click('full-view');
-  h.click('manual');
+  await h.tick();
+  expect(h.music.paused).toBe(true);
+  expect(h.music.currentTime).toBe(3);
+  h.click('play');
   await h.tick();
   expect(h.music.paused).toBe(false);
-  expect(h.music.currentTime).toBe(3);
   const link = document.createElement('a');
   link.href = '#external';
   h.root.append(link);
@@ -376,7 +364,7 @@ it('preserves active music through full view and manual mode but suspends on ext
   await h.tick();
   expect(h.music.paused).toBe(true);
 });
-it('admits an authored no-op point and only explicit Restart replays an exhausted non-loop track', async () => {
+it('keeps no-op and Restart paused and global Play replays an exhausted visit', async () => {
   const h = await mount();
   const first = h.tour.slides[0]!;
   h.tour.backgroundMusic!.loop = false;
@@ -397,6 +385,9 @@ it('admits an authored no-op point and only explicit Restart replays an exhauste
   await h.tick();
   h.root.querySelector<HTMLButtonElement>('[data-tour-object-id="stay"]')!.click();
   await h.tick();
+  expect(h.music.paused).toBe(true);
+  h.click('play');
+  await h.tick();
   expect(h.music.paused).toBe(false);
   Object.defineProperty(h.music, 'ended', { configurable: true, get: () => true });
   h.music.currentTime = 30;
@@ -406,29 +397,45 @@ it('admits an authored no-op point and only explicit Restart replays an exhauste
   h.click('previous');
   await h.tick();
   expect(h.music.paused).toBe(true);
+  h.click('previous');
+  await h.tick();
   h.root.querySelector<HTMLButtonElement>('[data-tour-object-id="restart"]')!.click();
   await h.tick();
-  expect(h.music.paused).toBe(false);
+  expect(h.music.paused).toBe(true);
   expect(h.music.currentTime).toBe(0);
+  h.click('play');
+  await h.tick();
+  expect(h.music.paused).toBe(false);
 });
-it('keeps optional music failure independent of navigation and retries only accepted viewer actions', async () => {
+it('retries optional music failure only through accepted playing-session commands', async () => {
   const h = await mount();
   h.play.mockRejectedValueOnce(new DOMException('gesture', 'NotAllowedError'));
   h.click('play');
   await h.tick();
-  expect(h.music.paused).toBe(true);
   const attempts = h.play.mock.calls.length;
   await h.tick(100);
   expect(h.root.dataset['slideId']).toBe('second');
   expect(h.play).toHaveBeenCalledTimes(attempts);
   h.click('next');
   await h.tick();
-  expect(h.music.paused).toBe(false);
-  expect(h.play).toHaveBeenCalledTimes(attempts + 1);
-  h.music.dispatchEvent(new Event('error'));
-  h.root.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  expect(h.music.paused).toBe(true);
   h.click('music-retry');
   await h.tick();
+  expect(h.play).toHaveBeenCalledTimes(attempts);
+  h.click('play');
+  await h.tick();
+  expect(h.music.paused).toBe(false);
   expect(h.play).toHaveBeenCalledTimes(attempts + 1);
+});
+it('pauses the music visit with the session on stopped navigation', async () => {
+  const h = await mount();
+  h.click('play');
+  await h.tick();
+  expect(h.music.paused).toBe(false);
+  h.music.currentTime = 3;
+  h.click('next');
+  await h.tick();
   expect(h.music.paused).toBe(true);
+  expect(h.root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('false');
+  expect(h.music.currentTime).toBe(3);
 });

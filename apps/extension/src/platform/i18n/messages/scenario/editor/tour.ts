@@ -192,6 +192,8 @@ export const scenarioTourMessages = {
   tourAnimationFade: { ru: 'Плавно', en: 'Fade' },
   tourFullView: { ru: 'Изображение целиком', en: 'Full image' },
   tourAuthoredView: { ru: 'Авторский вид', en: 'Authored view' },
+  tourShowHints: { ru: 'Показывать подсказки', en: 'Show hints' },
+  tourHideHints: { ru: 'Скрыть подсказки', en: 'Hide hints' },
   tourManual: { ru: 'Ручная навигация', en: 'Manual navigation' },
   tourPlay: { ru: 'Воспроизвести', en: 'Play' },
   tourPause: { ru: 'Пауза', en: 'Pause' },

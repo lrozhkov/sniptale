@@ -580,7 +580,6 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   await tick(50);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   expect(play.textContent).toBe('Play');
-  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   await tick(1000);
   expect(root.querySelector('.tour-motion-previous')).toBeNull();
   expect(scene.inert).toBe(false);
@@ -789,4 +788,42 @@ it('keeps every navigation link reachable across unequal text page heights', asy
     next.click();
   }
   expect(visited.size).toBe(13);
+});
+
+it('toggles Space in both directions without navigating and exposes no Manual control', async () => {
+  const tick = playbackFrames();
+  const { root, player } = await mount();
+  player.update({ tour: shortTour(), labels, assets: [] });
+  await tick(0);
+  const press = () =>
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.pause);
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.play);
+  const before = root.dataset['actionId'];
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.pause);
+  expect(root.dataset['actionId']).toBe(before);
+  expect(root.querySelector('[data-tour-manual]')).toBeNull();
+  root.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+  expect(root.dataset['slideId']).toBe('second');
+  expect(play.getAttribute('aria-label')).toBe(labels.play);
+});
+
+it('fits the scene without reserving toolbar or feedback height', async () => {
+  const { root } = await mount();
+  Object.defineProperty(root, 'clientWidth', { value: 1280, configurable: true });
+  Object.defineProperty(root, 'clientHeight', { value: 560, configurable: true });
+  const toolbar = root.querySelector<HTMLElement>('.tour-toolbar')!;
+  Object.defineProperty(toolbar, 'offsetHeight', { value: 100, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+  const stage = root.querySelector<HTMLElement>('[data-tour-stage]')!;
+  expect(parseFloat(stage.style.height)).toBe(560);
+  const geometry = [stage.style.width, stage.style.height];
+  Object.defineProperty(toolbar, 'offsetHeight', { value: 200, configurable: true });
+  root.querySelector<HTMLElement>('[data-tour-status]')!.textContent = 'Loading';
+  window.dispatchEvent(new Event('resize'));
+  expect([stage.style.width, stage.style.height]).toEqual(geometry);
 });

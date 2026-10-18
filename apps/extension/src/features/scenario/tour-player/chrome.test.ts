@@ -93,3 +93,21 @@ it('auto-hides overlay chrome during playback and restores it on activity and pa
   expect(root.dataset['tourChromeHidden']).toBe('false');
   await tick(0);
 });
+
+it.each([false, true])(
+  'keeps focused toolbar controls visible with shadow root %s',
+  async (shadow) => {
+    vi.useFakeTimers();
+    const { root } = await mount();
+    if (shadow) {
+      const host = document.createElement('div');
+      document.body.append(host);
+      host.attachShadow({ mode: 'open' }).append(root);
+    }
+    await Promise.resolve();
+    root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+    root.querySelector<HTMLButtonElement>('[data-tour-next]')!.focus();
+    vi.advanceTimersByTime(2500);
+    expect(root.dataset['tourChromeHidden']).toBe('false');
+  }
+);

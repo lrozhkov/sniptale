@@ -28,6 +28,8 @@ export const labels = {
   loading: 'Loading',
   mediaError: 'Image failed',
   choose: 'Choose a destination',
+  showHints: 'Show hints',
+  hideHints: 'Hide hints',
 };
 
 const png =
@@ -97,7 +99,8 @@ export const tour = {
 /** Bundles the real document module the same way the vite plugin does, then builds the artifact. */
 export async function buildPlayerHtml(
   documentTour: TourDocument = tour,
-  playerLabels: TourPlayerLabels = labels
+  playerLabels: TourPlayerLabels = labels,
+  extraAssets: { id: string; mime: string; base64: string }[] = []
 ): Promise<string> {
   const script = (
     await build({
@@ -179,6 +182,6 @@ export async function buildPlayerHtml(
     tour: documentTour,
     title: 'Demo tour',
     labels: playerLabels,
-    assets: [{ id: 'image', mime: 'image/png', base64: png }],
+    assets: [{ id: 'image', mime: 'image/png', base64: png }, ...extraAssets],
   });
 }

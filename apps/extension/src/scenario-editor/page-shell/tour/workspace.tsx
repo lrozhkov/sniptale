@@ -1,5 +1,6 @@
 import {
   getTourAudioResources,
+  getTourActionTitle,
   getScenarioNarrationText,
   listScenarioNarrationTexts,
   type ScenarioNarrationText,
@@ -37,7 +38,7 @@ export function TourWorkspace(props: TourWorkspaceProps) {
     aiOrigin.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setAITargets(targets);
-    panels.openRight('selection');
+    panels.openRight(panels.rightScope);
   };
   const closeAI = () => {
     setAITargets(null);
@@ -402,6 +403,11 @@ function selectedTitle(slide: TourSlide | null, id: string | null, t: Translate)
       ? slide.actions.find((entry) => entry.object.id === id)?.object
       : slide?.buttons.find((entry) => entry.id === id);
   return object
-    ? ('label' in object ? object.label : object.text) || t('scenario.editor.tourAnnotation')
+    ? 'text' in object
+      ? getTourActionTitle(
+          object,
+          t('point' in object ? 'scenario.editor.tourHotspot' : 'scenario.editor.tourAnnotation')
+        )
+      : object.label
     : slide?.title || t('scenario.editor.tourSlide');
 }

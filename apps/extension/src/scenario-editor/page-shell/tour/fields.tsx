@@ -40,7 +40,7 @@ export function TourChoiceField<T extends string>({
       label={label}
       ariaLabel={label}
       value={value}
-      columns={options.length === 2 ? 2 : 3}
+      columns={options.length === 2 ? 2 : options.length === 4 ? 4 : options.length === 5 ? 5 : 3}
       options={options.map((option) => ({ ...option, disabled }))}
       onChange={onChange}
     />
@@ -194,7 +194,7 @@ export function TourTextPresentation({
                   />
                 </div>
               )}
-              <SelectField
+              <TourChoiceField
                 label={t('scenario.editor.tourTextPlacement')}
                 value={value.placement}
                 disabled={disabled}

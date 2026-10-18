@@ -10,7 +10,10 @@ export function createTourChrome(root, signal) {
   let playing = false;
   let state = 'ready';
   const navigationOpen = () => root.querySelector('[data-tour-navigation]')?.open === true;
-  const interactive = () => playing && state === 'ready' && !navigationOpen() && !document.hidden;
+  const focused = () =>
+    root.querySelector('.tour-toolbar')?.contains(root.getRootNode().activeElement);
+  const interactive = () =>
+    playing && state === 'ready' && !navigationOpen() && !document.hidden && !focused();
   const cancel = () => {
     globalThis.clearTimeout(timer);
     timer = 0;
@@ -18,7 +21,7 @@ export function createTourChrome(root, signal) {
   const schedule = () => {
     timer = globalThis.setTimeout(() => {
       timer = 0;
-      root.dataset.tourChromeHidden = 'true';
+      if (interactive()) root.dataset.tourChromeHidden = 'true';
     }, HIDE_DELAY_MS);
   };
   const evaluate = () => {
@@ -37,6 +40,14 @@ export function createTourChrome(root, signal) {
   };
   for (const type of ['pointermove', 'pointerdown', 'touchstart', 'focusin'])
     root.addEventListener(type, activity, { signal, passive: true });
+  root.addEventListener(
+    'focusout',
+    () =>
+      queueMicrotask(() => {
+        if (!signal.aborted) activity();
+      }),
+    { signal }
+  );
   document.addEventListener('keydown', activity, { signal });
   document.addEventListener('visibilitychange', evaluate, { signal });
   signal.addEventListener('abort', cancel, { once: true });

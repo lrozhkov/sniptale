@@ -303,7 +303,7 @@ it('inherits global gap, applies a local gap, and restores the default without c
 });
 
 it.each(['annotation', 'hotspot'] as const)(
-  'opens the next %s action after dismissing a caption on the same image',
+  'retains hidden hints on the next %s action until the explicit toggle',
   async (kind) => {
     const { player, root } = await mount();
     const input = authoringInput();
@@ -332,6 +332,8 @@ it.each(['annotation', 'hotspot'] as const)(
     else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(root.dataset['slideId']).toBe('first');
     expect(root.dataset['actionId']).toBe(kind === 'hotspot' ? 'point' : 'next-note');
+    expect(hint.hidden).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-tour-hints]')!.click();
     expect(hint.hidden).toBe(false);
     expect(root.querySelector('[data-tour-hint-text]')?.textContent).toBe(
       kind === 'hotspot' ? 'Text' : 'Next instruction'
@@ -340,3 +342,72 @@ it.each(['annotation', 'hotspot'] as const)(
     expect(hint.hidden).toBe(false);
   }
 );
+
+it('keeps a bottom caption clear of floating toolbar controls without changing stage geometry', async () => {
+  const { player, root } = await mount();
+  const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  const toolbar = root.querySelector<HTMLElement>('.tour-toolbar')!;
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 360));
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 300, 440, 48));
+  Object.defineProperties(viewport, { clientWidth: { value: 640 }, clientHeight: { value: 360 } });
+  Object.defineProperties(hint, { offsetWidth: { value: 640 }, offsetHeight: { value: 80 } });
+  const input = authoringInput();
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  slide.actions = [
+    {
+      type: 'annotation',
+      object: {
+        id: 'caption',
+        text: 'Caption above controls',
+        anchor: null,
+        appearance: null,
+      },
+    },
+  ];
+  player.update(input);
+  expect(hint.hidden).toBe(false);
+  expect(360 - Number.parseFloat(hint.style.bottom)).toBe(292);
+  const dimensions = root.querySelector<HTMLElement>('[data-tour-stage]')!.style.cssText;
+  const toggle = root.querySelector<HTMLButtonElement>('[data-tour-hints]')!;
+  toggle.click();
+  expect(hint.hidden).toBe(true);
+  window.dispatchEvent(new Event('resize'));
+  expect(hint.hidden).toBe(true);
+  toggle.click();
+  expect(hint.hidden).toBe(false);
+  expect(360 - Number.parseFloat(hint.style.bottom)).toBe(292);
+  expect(root.querySelector<HTMLElement>('[data-tour-stage]')!.style.cssText).toBe(dimensions);
+});
+
+it('budgets short portrait callout text above the toolbar while retaining navigation space', async () => {
+  const { root, player } = await mount();
+  const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  const text = root.querySelector<HTMLElement>('[data-tour-hint-text]')!;
+  const toolbar = root.querySelector<HTMLElement>('.tour-toolbar')!;
+  Object.defineProperties(root, { clientWidth: { value: 320 }, clientHeight: { value: 280 } });
+  Object.defineProperties(viewport, { clientWidth: { value: 146 }, clientHeight: { value: 260 } });
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(new DOMRect(87, 10, 146, 260));
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(12, 188, 296, 80));
+  Object.defineProperties(hint, {
+    offsetWidth: { value: 128 },
+    offsetHeight: { get: () => Math.min(220, parseFloat(hint.style.maxHeight) || 220) },
+  });
+  Object.defineProperty(hint.querySelector('.tour-hint-header')!, 'offsetHeight', { value: 32 });
+  Object.defineProperty(hint.querySelector('.tour-hint-controls')!, 'offsetHeight', { value: 32 });
+  const input = authoringInput();
+  input.tour.stage.aspect = '9:16';
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  slide.actions[0]!.object.text = 'Long explanation '.repeat(40);
+  player.update(input);
+  expect(parseFloat(hint.style.top) + hint.offsetHeight).toBeLessThanOrEqual(170);
+  expect(parseFloat(text.style.maxHeight)).toBeGreaterThan(0);
+  expect(parseFloat(text.style.maxHeight)).toBeLessThan(80);
+  const stage = root.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const size = [stage.style.width, stage.style.height];
+  window.dispatchEvent(new Event('resize'));
+  expect([stage.style.width, stage.style.height]).toEqual(size);
+});

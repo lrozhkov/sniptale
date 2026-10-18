@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from './factories';
-import { buildTourPlaybackPlan } from './tour-playback-plan';
+import { buildTourPlaybackPlan, getTourActionTitle } from './tour-playback-plan';
 
 function example() {
   const tour = createTourDocument('tour');
@@ -146,4 +146,34 @@ it('keeps beginning, consecutive and ending contents as distinct unnumbered entr
     ['end', null],
   ]);
   expect(plan.actionCount).toBe(6);
+});
+
+it('projects the first nonempty authored text line before the saved hotspot label', () => {
+  const tour = example();
+  const slide = tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide.');
+  slide.actions = [
+    {
+      type: 'hotspot',
+      object: {
+        id: 'text-first',
+        text: ' \n Authored title \nSecond line',
+        label: 'Saved label',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        appearance: null,
+        visual: { kind: 'point', pulse: false },
+      },
+    },
+  ];
+  expect(buildTourPlaybackPlan(tour).entries[0]?.slide.title).toBe('Authored title');
+  expect(slide.actions[0]!.object).toMatchObject({ label: 'Saved label' });
+});
+
+it('uses saved labels and localized generic copy only when authored text is empty', () => {
+  expect(getTourActionTitle({ text: ' \n ', label: ' Saved label ' }, 'Hotspot')).toBe(
+    'Saved label'
+  );
+  expect(getTourActionTitle({ text: ' \n ', label: ' ' }, 'Hotspot')).toBe('Hotspot');
+  expect(getTourActionTitle({ text: '' }, 'Annotation')).toBe('Annotation');
 });

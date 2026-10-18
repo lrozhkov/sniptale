@@ -251,28 +251,28 @@ function TourStageScaffold({
         </section>
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
-            <strong className="tour-hint-action-title" data-tour-hint-action-title hidden />
             <button
               className="tour-button tour-caption-title"
               data-tour-hint-toggle
               hidden
               aria-expanded="true"
+              aria-label={labels.collapse}
             >
-              <span data-tour-hint-title />
+              <TourControlIcon path="m6 15 6-6 6 6" />
             </button>
             <button className="tour-button" data-tour-hint-close aria-label={labels.close}>
-              ×
+              <TourControlIcon path="m6 6 12 12M6 18 18 6" />
             </button>
           </div>
           <div className="tour-hint-text" data-tour-hint-text />
           <div className="tour-hint-controls">
             <button className="tour-button" data-tour-hint-previous aria-label={labels.previous}>
-              {labels.previous}
+              <TourControlIcon path="m15 18-6-6 6-6" />
             </button>
             <span data-tour-hint-point-count hidden />
             <span data-tour-hint-count hidden />
             <button className="tour-button" data-tour-hint-next aria-label={labels.next}>
-              {labels.next}
+              <TourControlIcon path="m9 18 6-6-6-6" />
             </button>
           </div>
         </aside>
@@ -286,14 +286,31 @@ function TourStageScaffold({
         <div className="tour-controls">
           <div className="tour-playback" data-tour-playback />
           <div className="tour-nav">
-            <button className="tour-button" data-tour-previous>
-              {labels.previous}
+            <button
+              className="tour-button tour-icon-button"
+              data-tour-previous
+              aria-label={labels.previous}
+            >
+              <TourControlIcon path="m15 18-6-6 6-6" />
             </button>
             <span data-tour-counter />
-            <button className="tour-button" data-tour-next>
-              {labels.next}
+            <button
+              className="tour-button tour-icon-button"
+              data-tour-next
+              aria-label={labels.next}
+            >
+              <TourControlIcon path="m9 18 6-6-6-6" />
             </button>
           </div>
+          <button
+            id="hints"
+            className="tour-button tour-icon-button"
+            data-tour-hints
+            aria-pressed="true"
+            aria-label={labels.showHints || labels.details}
+          >
+            <TourControlIcon path="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-5a8.5 8.5 0 1 1 16-3.5Z" />
+          </button>
           <button
             className="tour-button"
             data-tour-contents
@@ -305,5 +322,21 @@ function TourStageScaffold({
         </div>
       </footer>
     </div>
+  );
+}
+
+function TourControlIcon({ path }: { path: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
   );
 }
