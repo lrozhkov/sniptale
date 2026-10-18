@@ -1,6 +1,6 @@
 # Modified Mediabunny corresponding source
 
-This archive accompanies Mediabunny 1.61.3, licensed MPL-2.0. Preserve LICENSE and the original source headers. Sniptale adds an optional validated 48 kHz processed-audio window for AAC fragmented MP4 and Opus WebM; Opus pre-skip is derived from decoder configuration. The changed TypeScript files are listed in patch-manifest.json and included in full in patch-payload.json.gz. source.patch is the reviewable source delta.
+This archive accompanies Mediabunny 1.61.3, licensed MPL-2.0. Preserve LICENSE and the original source headers. Sniptale distributes the corresponding modifications in [sniptale-dependency-source-0.5.1.zip](https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip). The payload and reconstruction files below are inside that separate source archive. Sniptale adds an optional validated 48 kHz processed-audio window for AAC fragmented MP4 and Opus WebM; Opus pre-skip is derived from decoder configuration. The changed TypeScript files are listed in patch-manifest.json and included in full in patch-payload.json.gz. source.patch is the reviewable source delta.
 
 Unmodified upstream source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
 

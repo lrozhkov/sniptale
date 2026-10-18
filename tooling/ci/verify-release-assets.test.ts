@@ -21,9 +21,11 @@ function fixture() {
     'sniptale_0.4.0.zip': 'extension',
     'sniptale_0.4.0-qa-evidence.zip': 'evidence',
     'sbom.cdx.json': 'sbom',
+    'sniptale-dependency-source-0.4.0.zip': 'source',
   };
   const provenance = `${JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 3,
+    dependencySource: { file: 'sniptale-dependency-source-0.4.0.zip', sha256: digest('source') },
     artifactKind: 'sniptale-release-provenance',
     commit,
     releaseProofSha256: digest('{"proof":true}\n'),
@@ -43,16 +45,23 @@ function fixture() {
       .join('\n')}\n`
   );
   const verifyProof = vi.fn(() => ({ manifest: {}, zipFile: 'build/sniptale_0.4.0.zip' }));
-  return { assetRoot, commit, root, verifyProof };
+  const verifySourceArchive = vi.fn(async () => ({
+    file: 'sniptale-dependency-source-0.4.0.zip',
+    sha256: digest('source'),
+  }));
+  return { assetRoot, commit, root, verifyProof, verifySourceArchive };
 }
 
-it('accepts only the exact proof-bound release asset and checksum inventory', () => {
+it('accepts only the exact proof-bound release asset and checksum inventory', async () => {
   const value = fixture();
-  expect(verifyPreparedReleaseAssets({ releaseRoot: value.root, ...value })).toMatchObject({
+  await expect(
+    verifyPreparedReleaseAssets({ releaseRoot: value.root, ...value })
+  ).resolves.toMatchObject({
     subjectNames: [
       'SHA256SUMS',
       'provenance.json',
       'sbom.cdx.json',
+      'sniptale-dependency-source-0.4.0.zip',
       'sniptale_0.4.0-qa-evidence.zip',
       'sniptale_0.4.0.zip',
     ],
@@ -62,22 +71,33 @@ it('accepts only the exact proof-bound release asset and checksum inventory', ()
   });
 });
 
-it('rejects extra, tampered, and proof-detached assets', () => {
+it('rejects extra, tampered, and proof-detached assets', async () => {
   const extra = fixture();
   writeFile(extra.assetRoot, 'extra.txt', 'unexpected');
-  expect(() => verifyPreparedReleaseAssets({ releaseRoot: extra.root, ...extra })).toThrow(
+  await expect(verifyPreparedReleaseAssets({ releaseRoot: extra.root, ...extra })).rejects.toThrow(
     'inventory'
   );
 
   const tampered = fixture();
   writeFile(tampered.assetRoot, 'sbom.cdx.json', 'changed');
-  expect(() => verifyPreparedReleaseAssets({ releaseRoot: tampered.root, ...tampered })).toThrow(
-    'digest mismatch'
-  );
+  await expect(
+    verifyPreparedReleaseAssets({ releaseRoot: tampered.root, ...tampered })
+  ).rejects.toThrow('digest mismatch');
 
   const detached = fixture();
   writeFile(detached.root, 'proof-manifest.json', '{"changed":true}\n');
-  expect(() => verifyPreparedReleaseAssets({ releaseRoot: detached.root, ...detached })).toThrow(
+  await expect(
+    verifyPreparedReleaseAssets({ releaseRoot: detached.root, ...detached })
+  ).rejects.toThrow('does not bind');
+});
+
+it('rejects a source archive detached from the checked source inputs', async () => {
+  const value = fixture();
+  value.verifySourceArchive.mockResolvedValueOnce({
+    file: 'sniptale-dependency-source-0.4.0.zip',
+    sha256: digest('other-source'),
+  });
+  await expect(verifyPreparedReleaseAssets({ releaseRoot: value.root, ...value })).rejects.toThrow(
     'does not bind'
   );
 });

@@ -37,6 +37,10 @@ async function fixture() {
     ],
   });
   roots.push(repoRoot);
+  await fs.writeFile(
+    path.join(repoRoot, 'package.json'),
+    JSON.stringify({ name: 'sniptale', version: '0.4.0' })
+  );
   for (const row of manifest.changes) {
     const target = path.join(repoRoot, 'node_modules/mediabunny', row.path);
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -89,7 +93,7 @@ it.each(['installed', 'archive', 'policy'] as const)(
   }
 );
 
-it('requires every generated modified-source file at the release packaging boundary', async () => {
+it('keeps source payload out of the installer and checks its separate distribution inputs', async () => {
   const { repoRoot } = await fixture();
   await seedTestOssReleasePolicy(repoRoot);
   const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
@@ -108,23 +112,17 @@ it('requires every generated modified-source file at the release packaging bound
   expect(await validateDependencyLegalClosure(repoRoot)).toEqual([]);
   const files = await collectReleaseLegalSourceFiles(repoRoot);
   expect(() => assertReleaseLegalPayload(files, repoRoot)).not.toThrow();
-  const sourcePath = files.find((file) =>
-    file.relativePath.endsWith('modified/patch-payload.json.gz')
-  )!.relativePath;
-  expect(() =>
-    assertReleaseLegalPayload(
-      files.filter((file) => file.relativePath !== sourcePath),
-      repoRoot
-    )
-  ).toThrow('missing legal file');
-  expect(() =>
-    assertReleaseLegalPayload(
-      files.map((file) =>
-        file.relativePath === sourcePath ? { ...file, contents: Buffer.from('changed') } : file
-      ),
-      repoRoot
-    )
-  ).toThrow('digest drift');
+  expect(files.some((file) => file.relativePath.endsWith('patch-payload.json.gz'))).toBe(false);
+  expect(files.some((file) => file.relativePath.startsWith('packages/'))).toBe(false);
+  const sourceFiles = await collectReleaseLegalSourceFiles(repoRoot, { includeSource: true });
+  const payload = sourceFiles.find((file) => file.relativePath.endsWith('patch-payload.json.gz'))!;
+  expect(() => assertReleaseLegalPayload([...files, payload], repoRoot)).toThrow(
+    'Source-only file'
+  );
+  await fs.appendFile(payload.absolutePath, 'changed');
+  await expect(collectReleaseLegalSourceFiles(repoRoot, { includeSource: true })).rejects.toThrow(
+    'digest drift'
+  );
 });
 
 it('reads the checked source object when its path is replaced after the file check', async () => {

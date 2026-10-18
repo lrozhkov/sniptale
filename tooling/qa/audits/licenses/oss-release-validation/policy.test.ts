@@ -4,6 +4,7 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 import {
   REQUIRED_RELEASE_LEGAL_PATHS,
+  releaseLegalArchivePath,
   sha256,
 } from '../../../../release/policy/oss-release-policy.mjs';
 import { validateLegalFiles } from './policy.mjs';
@@ -22,7 +23,12 @@ it('includes exactly the declared modified-source closure in both canonical lega
       },
     ],
   });
-  const files = [...REQUIRED_RELEASE_LEGAL_PATHS, manifestPath, license, source].map((file) => {
+  const files = [
+    ...REQUIRED_RELEASE_LEGAL_PATHS.map(releaseLegalArchivePath),
+    manifestPath,
+    license,
+    source,
+  ].map((file) => {
     const bytes = file === manifestPath ? manifest : file === source ? 'source' : 'fixture';
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     writeFileSync(path.join(root, file), bytes);

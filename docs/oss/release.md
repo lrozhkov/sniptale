@@ -13,9 +13,13 @@ The [generated project facts](../engineering/project-facts.md) own current GitHu
 
 ## Legal material
 
-Run `npm run release:legal` when the production dependency closure, reviewed license selection, pinned upstream source, bundled-asset mapping, or authored notice changes. Do not edit generated legal output.
+Run `npm run release:legal` when the production dependency closure, reviewed license selection, pinned upstream source, bundled-asset mapping, authored notice, or product version changes. Do not edit generated legal output.
 
 For a pinned upstream refresh, acquire a version-tagged or commit-addressed resource. Check its package identity. Check its bytes. Update the checked-in source and its policy fields. Then regenerate the legal output. Ordinary validation must not fetch legal text.
+
+Font licenses use `LICENSES/fonts/` in the installer. Their original source paths remain in the repository.
+
+The installer contains the modified dependency license and a notice with its release source-archive URL. Preparation creates `sniptale-dependency-source-<version>.zip` from the checked source files. Publish this archive beside the installer. Checksums, provenance, and attestations bind both archives. The source archive contains the license, notice, reconstruction manifest, patch, and compressed replacement source. Missing or changed source files block preparation.
 
 See [OSS provenance](provenance.md) for the evidence policy.
 
@@ -43,7 +47,9 @@ Publish GitHub's source archive for the same tag beside the extension archive.
 
 ## Inspection and correction
 
-Load `dist/` for local browser smoke. Inspect the archive under `build/`. Check that it contains every policy-owned legal file.
+Load `dist/` for local browser smoke. Inspect the archive under `build/`. Check that it contains every policy-owned installer legal file. Check source-only files in the separate dependency source archive.
+
+Extract a new installer ZIP into an empty directory. Do not extract it over an older unpacked extension. Older hashed assets otherwise remain and increase the installed directory size.
 
 Before publication, revert the complete candidate to roll it back. After publication, preserve history. Use a forward corrective commit after publication.
 

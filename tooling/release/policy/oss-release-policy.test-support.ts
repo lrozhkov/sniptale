@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { sha256 } from './oss-release-policy.mjs';
+import { releaseLegalArchivePath, sha256 } from './oss-release-policy.mjs';
 
 const LEGAL_CONTENTS = new Map([
   [
@@ -18,10 +18,10 @@ const LEGAL_CONTENTS = new Map([
 ]);
 
 export const TEST_LEGAL_FILES = [...LEGAL_CONTENTS].map(([archivePath, contents]) => ({
-  archivePath,
+  archivePath: releaseLegalArchivePath(archivePath),
   contents,
   sha256: sha256(Buffer.from(contents)),
-  source: archivePath,
+  source: releaseLegalArchivePath(archivePath),
 }));
 
 export function createTestLegalArtifactFiles() {
@@ -33,6 +33,12 @@ export function createTestLegalArtifactFiles() {
 
 export async function seedTestOssReleasePolicy(root: string) {
   await fs.mkdir(path.join(root, 'tooling/configs/qa'), { recursive: true });
+  for (const [source, contents] of LEGAL_CONTENTS) {
+    if (releaseLegalArchivePath(source) === source) continue;
+    const destination = path.join(root, source);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, contents);
+  }
   for (const entry of TEST_LEGAL_FILES) {
     const destination = path.join(root, entry.source);
     await fs.mkdir(path.dirname(destination), { recursive: true });

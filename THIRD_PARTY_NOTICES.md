@@ -8,7 +8,7 @@ This file is generated from the installed production dependency closure, package
 - Font version: `2.000`
 - License: `OFL-1.1`
 - Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos UI".
-- License text: [`packages/ui/src/styles/golos-ui/LICENSE.txt`](packages/ui/src/styles/golos-ui/LICENSE.txt)
+- License text: [`LICENSES/fonts/golos-ui.txt`](LICENSES/fonts/golos-ui.txt)
 
 | Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Font version: `2.005`
 - License: `OFL-1.1`
 - Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos Text".
-- License text: [`packages/ui/src/styles/golos-text/LICENSE.txt`](packages/ui/src/styles/golos-text/LICENSE.txt)
+- License text: [`LICENSES/fonts/golos-text.txt`](LICENSES/fonts/golos-text.txt)
 
 | Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
@@ -275,12 +275,13 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04`
 - Repository/source: https://github.com/Vanilagy/mediabunny.git
 - MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
-- Supplied modifications (combine with upstream source above):
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz) (SHA-256: 7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json) (SHA-256: f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch](LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch) (SHA-256: 9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE](LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE) (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10)
+- Modified source archive: [sniptale-dependency-source-0.5.1.zip](https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip)
+- Files inside that source archive (combine with upstream source above):
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz` (SHA-256: 7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json` (SHA-256: f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch` (SHA-256: 9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE` (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
+  - `LICENSES/dependencies/mediabunny-1.61.3-modified/README.md` (SHA-256: c3a87c3784618c36512562995abacccdf5bdc09511e7ff5f87548d72f317341a)
 - Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==
 
 ### `pako` 1.0.11

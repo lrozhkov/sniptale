@@ -7,6 +7,7 @@ import {
   readProofInput,
   sha256ProofInput as sha256Bytes,
 } from '../qa/proof/contracts/proof-input.mjs';
+import { createDependencySourceArchive } from '../release/package/dependency-source-archive.mjs';
 import { verifyReleaseProof } from './verify-main-proof.mjs';
 import { collectProofEvidenceSources } from './release-evidence.mjs';
 
@@ -83,12 +84,16 @@ const evidenceSha256 = await writeEvidenceArchive(output, evidenceName, evidence
   releaseProofSha256: proofSha256,
 });
 
+const sourceArchive = await createDependencySourceArchive();
+fs.writeFileSync(path.join(output, sourceArchive.file), sourceArchive.contents, { flag: 'wx' });
+
 const provenance = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   artifactKind: 'sniptale-release-provenance',
   commit: releaseCommit,
   releaseProofSha256: proofSha256,
   qaEvidence: { file: evidenceName, sha256: evidenceSha256 },
+  dependencySource: { file: sourceArchive.file, sha256: sourceArchive.sha256 },
 };
 fs.writeFileSync(path.join(output, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`, {
   flag: 'wx',
@@ -99,7 +104,7 @@ const releaseAssets = fs
   .filter((entry) => entry.isFile())
   .map((entry) => entry.name)
   .sort();
-if (releaseAssets.length !== 4) throw new Error('Release asset staging inventory drifted.');
+if (releaseAssets.length !== 5) throw new Error('Release asset staging inventory drifted.');
 const sums = releaseAssets.map(
   (name) => `${sha256Bytes(fs.readFileSync(path.join(output, name)))}  ${name}`
 );

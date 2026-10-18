@@ -151,6 +151,7 @@ jobs:
             build/release-proof/release-assets/provenance.json
             build/release-proof/release-assets/sbom.cdx.json
             build/release-proof/release-assets/sniptale_*.zip
+            build/release-proof/release-assets/sniptale-dependency-source-*.zip
       - name: Attest build image
         id: qa-attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2

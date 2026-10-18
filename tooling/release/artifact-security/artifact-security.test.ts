@@ -8,6 +8,7 @@ import { afterEach, expect, it } from 'vitest';
 
 import {
   EXPECTED_SANDBOX_CSP,
+  getForbiddenReleaseArtifactPathReason,
   verifyReleaseArchivePath,
   verifyReleaseArtifactFiles,
 } from './artifact-security.mjs';
@@ -504,4 +505,14 @@ it('rejects removal or weakening of the effect sandbox head policy', async () =>
       'strict head CSP'
     );
   }
+});
+
+it.each([
+  'packages/ui/src/styles/fonts/LICENSE.golos-ui.txt',
+  'tooling/test/fixture.json',
+  'tasks/notes.md',
+  'docs/source.md',
+  'node_modules/dependency/index.js',
+])('rejects repository-only directories in the installer: %s', (name) => {
+  expect(getForbiddenReleaseArtifactPathReason(name)).toBe('repository-only directory');
 });

@@ -90,42 +90,6 @@ export const ACTION_SOUND_CATALOG = {
     size: 4454,
     sha256: 'f83ceef7f528ad9cf9df397defcfcfa94c8c33844f2bd3a1f0e8ed86f548230b',
   },
-  'mouse-classic-down-v2': {
-    path: 'action-sounds/v2/mouse-classic-down.wav',
-    version: 2,
-    durationFrames: 3087,
-    sampleRate: 44100,
-    mimeType: 'audio/wav',
-    size: 6218,
-    sha256: '3d8363318fb248ef4513147f42ba5e0a1c4c2ab171db7b625f07976eb136e966',
-  },
-  'mouse-classic-up-v2': {
-    path: 'action-sounds/v2/mouse-classic-up.wav',
-    version: 2,
-    durationFrames: 2205,
-    sampleRate: 44100,
-    mimeType: 'audio/wav',
-    size: 4454,
-    sha256: '3699ac31be259372db03953e2963586c9eeaba1e54a1220ee9ed9822338e4df2',
-  },
-  'mouse-soft-down-v2': {
-    path: 'action-sounds/v2/mouse-soft-down.wav',
-    version: 2,
-    durationFrames: 3087,
-    sampleRate: 44100,
-    mimeType: 'audio/wav',
-    size: 6218,
-    sha256: '75c44c1200bfedd8e84a3193e2467302203f980f46b2d557d7e920c50bf5aa0e',
-  },
-  'mouse-soft-up-v2': {
-    path: 'action-sounds/v2/mouse-soft-up.wav',
-    version: 2,
-    durationFrames: 2205,
-    sampleRate: 44100,
-    mimeType: 'audio/wav',
-    size: 4454,
-    sha256: 'bd23ae9182bcd98a94dc9bd1ed8934ce4e9fecd83209e57ad0789803448ab949',
-  },
 } as const;
 
 export type ActionSoundSampleId = keyof typeof ACTION_SOUND_CATALOG;

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
+import { verifyDependencySourceArchive } from '../release/package/dependency-source-archive.mjs';
 import { verifyReleaseProof } from './verify-main-proof.mjs';
 
 function sha256(file) {
@@ -26,16 +27,24 @@ function parseChecksums(file) {
   return entries;
 }
 
-export function verifyPreparedReleaseAssets({
+export async function verifyPreparedReleaseAssets({
   releaseRoot,
   commit,
   verifyProof = verifyReleaseProof,
+  verifySourceArchive = verifyDependencySourceArchive,
 }) {
   const verified = verifyProof(releaseRoot, commit, { allowPreparedReleaseAssets: true });
   const assetRoot = path.join(releaseRoot, 'release-assets');
+  const dependencySource = await verifySourceArchive(assetRoot);
   const zipName = path.basename(verified.zipFile);
   const evidenceName = `${path.basename(zipName, '.zip')}-qa-evidence.zip`;
-  const subjectNames = [zipName, evidenceName, 'provenance.json', 'sbom.cdx.json'].sort();
+  const subjectNames = [
+    zipName,
+    evidenceName,
+    dependencySource.file,
+    'provenance.json',
+    'sbom.cdx.json',
+  ].sort();
   const expectedNames = [...subjectNames, 'SHA256SUMS'].sort();
   const actualNames = fs.readdirSync(assetRoot).sort();
   if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) {
@@ -54,10 +63,13 @@ export function verifyPreparedReleaseAssets({
   const proofSha256 = sha256(path.join(releaseRoot, 'proof-manifest.json'));
   const provenance = JSON.parse(fs.readFileSync(path.join(assetRoot, 'provenance.json'), 'utf8'));
   if (
-    provenance.schemaVersion !== 2 ||
+    provenance.schemaVersion !== 3 ||
     provenance.artifactKind !== 'sniptale-release-provenance' ||
     provenance.commit !== commit ||
     provenance.releaseProofSha256 !== proofSha256 ||
+    provenance.dependencySource?.file !== dependencySource.file ||
+    provenance.dependencySource?.sha256 !== dependencySource.sha256 ||
+    checksums.get(dependencySource.file) !== dependencySource.sha256 ||
     provenance.qaEvidence?.file !== evidenceName ||
     provenance.qaEvidence?.sha256 !== checksums.get(evidenceName)
   ) {
@@ -71,5 +83,7 @@ if (isExecutedAsScript(import.meta.url)) {
   if (!releaseRoot || !/^[a-f0-9]{40}$/u.test(commit ?? '')) {
     throw new Error('Usage: verify-release-assets.mjs <release-proof-root> <commit>');
   }
-  process.stdout.write(`${JSON.stringify(verifyPreparedReleaseAssets({ releaseRoot, commit }))}\n`);
+  process.stdout.write(
+    `${JSON.stringify(await verifyPreparedReleaseAssets({ releaseRoot, commit }))}\n`
+  );
 }

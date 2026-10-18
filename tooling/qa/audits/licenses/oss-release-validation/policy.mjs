@@ -5,6 +5,7 @@ import {
   CANONICAL_LICENSE_DIGESTS,
   DOCUMENT_FONT_LICENSE_PATH,
   REQUIRED_RELEASE_LEGAL_PATHS,
+  releaseLegalArchivePath,
   sha256,
 } from '../../../../release/policy/oss-release-policy.mjs';
 import { isNonEmptyString, validatePolicyEntries } from './policy-schema.mjs';
@@ -89,9 +90,9 @@ export function validateLegalFiles(root, policy) {
     errors.push('dependency legal manifest has an invalid schema');
   }
   const expectedLegalPaths = new Set([
-    ...REQUIRED_RELEASE_LEGAL_PATHS,
+    ...REQUIRED_RELEASE_LEGAL_PATHS.map(releaseLegalArchivePath),
     ...(policy.bundledAssets.some((asset) => asset.id === 'golos-text')
-      ? [DOCUMENT_FONT_LICENSE_PATH]
+      ? [releaseLegalArchivePath(DOCUMENT_FONT_LICENSE_PATH)]
       : []),
     policy.dependencyLegal.manifestPath,
     ...dependencyArchivePaths,
