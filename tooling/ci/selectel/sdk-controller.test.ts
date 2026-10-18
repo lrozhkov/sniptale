@@ -266,6 +266,24 @@ it('reconciles an ambiguous Nova create without a second POST and preserves clea
   expect(source).not.toContain('connect_retries=');
 });
 
+it.each([
+  'missing-volume-fallback',
+  'ambiguous-volume-fallback',
+  'volume-cleanup-refusal',
+  'resource-admission-refusal',
+])('preserves provision admission and cleanup ordering for %s', (scenario) => {
+  const result = spawnSync(
+    'python3',
+    ['tooling/ci/selectel/sdk-controller-cleanup.test.py', scenario],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, SNIPTALE_REPOSITORY_ROOT: process.cwd() },
+      encoding: 'utf8',
+    }
+  );
+  expect(result.status, result.stderr).toBe(0);
+});
+
 const validProfiles = {
   profiles: [
     {
