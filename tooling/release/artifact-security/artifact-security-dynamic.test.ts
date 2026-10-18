@@ -23,7 +23,7 @@ const baseManifest = {
   web_accessible_resources: [
     {
       matches: ['http://*/*', 'https://*/*'],
-      resources: ['fonts/manrope-latin-wght-normal.woff2'],
+      resources: ['assets/golos-ui-vf.woff2'],
     },
   ],
   sandbox: {
@@ -42,7 +42,7 @@ const basePolicy = {
     {
       name: [
         'web_accessible_resources:',
-        '{"resources":["fonts/manrope-latin-wght-normal.woff2"],',
+        '{"resources":["assets/golos-ui-vf.woff2"],',
         '"matches":["http://*/*","https://*/*"],"extensionIds":[],"useDynamicUrl":false}',
       ].join(''),
     },
@@ -288,7 +288,9 @@ it('allows only vetted jitless Zod dynamic-code probes', async () => {
 
 const closedZodCompiler = [
   'class X{compile(){let t=Function,n=this?.content??[""];',
-  'return new t(...Object.keys(this.closed),`return function (${this.args.join(", ")}) {\n${n.join(`\n`)}\n};`)(...Object.values(this.closed))}}',
+  'return new t(...Object.keys(this.closed),`return function ' +
+    '(${this.args.join(", ")}) ' +
+    '{\n${n.join(`\n`)}\n};`)(...Object.values(this.closed))}}',
 ].join('');
 
 it('admits the bundled jitless Zod compiler with closed bindings', async () => {

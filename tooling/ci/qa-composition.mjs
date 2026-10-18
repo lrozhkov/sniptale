@@ -240,9 +240,19 @@ export function resolveCiCandidateDiff({ environment = process.env, gitRunner = 
   if (!/^[0-9a-f]{40}$/u.test(baseSha ?? '')) {
     return unavailableCandidateDiff();
   }
-  const mergeBaseResult = gitRunner(['merge-base', baseSha, 'HEAD']);
-  const comparisonRevision = mergeBaseResult.stdout.trim();
-  if (mergeBaseResult.skipped || !/^[0-9a-f]{40}$/u.test(comparisonRevision)) {
+  const shallowResult = gitRunner(['rev-parse', '--is-shallow-repository']);
+  if (shallowResult.skipped) return unavailableCandidateDiff();
+  const shallow = shallowResult.stdout.trim();
+  if (shallow !== 'true' && shallow !== 'false') {
+    throw new Error('Malformed Git shallow repository status.');
+  }
+  // The PR launcher fetches exact tips without their merge-base ancestry.
+  const comparisonResult =
+    shallow === 'true'
+      ? { skipped: false, stdout: baseSha }
+      : gitRunner(['merge-base', baseSha, 'HEAD']);
+  const comparisonRevision = comparisonResult.stdout.trim();
+  if (comparisonResult.skipped || !/^[0-9a-f]{40}$/u.test(comparisonRevision)) {
     return unavailableCandidateDiff();
   }
   const result = gitRunner([

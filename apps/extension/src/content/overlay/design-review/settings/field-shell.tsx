@@ -1,18 +1,12 @@
 import { RotateCcw } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { InspectorParameterRow } from '../../../../ui/compact-inspector-controls/layout';
 import type { ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 
-export const PAGE_STYLE_CONTROL_CLASS_NAME = '!h-8 !rounded-[7px] !px-2 !text-xs';
+export const PAGE_STYLE_CONTROL_CLASS_NAME =
+  '!h-8 !rounded-[4px] !px-2 !text-[13px] !leading-[18px] !font-normal';
 export const PAGE_STYLE_SELECT_CLASS_NAME = PAGE_STYLE_CONTROL_CLASS_NAME;
-
-function fieldLabelClassName(modified: boolean): string {
-  return [
-    'flex min-w-0 items-center justify-between gap-2 text-[11px] font-semibold',
-    modified
-      ? 'text-[var(--sniptale-color-accent)]'
-      : 'text-[var(--sniptale-color-text-secondary)]',
-  ].join(' ');
-}
 
 export function Field(props: {
   children: ReactNode;
@@ -21,69 +15,56 @@ export function Field(props: {
   label: string;
   modified?: boolean | undefined;
   onReset?: (() => void) | undefined;
+  stacked?: boolean | undefined;
 }) {
-  const modified = props.modified ?? false;
   return (
     <div
       data-ui="content.design-review.field"
       data-field-label={props.label}
-      className={[
-        'group/field relative grid w-full min-w-0 max-w-full',
-        'grid-cols-[7rem_minmax(0,1fr)] items-center gap-2',
-        props.className ?? '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+      className={['group/section-row', props.className].filter(Boolean).join(' ')}
     >
-      <span className={fieldLabelClassName(modified)}>
-        <span className="truncate" title={props.label}>
-          {props.label}
-        </span>
-        <span className="flex min-h-5 shrink-0 items-center justify-end gap-1">
-          {modified && props.onReset ? (
-            <button
-              type="button"
-              aria-label={`${props.label}: ${translate('content.designReview.resetProperty')}`}
-              className={[
-                'inline-flex h-5 w-5 items-center justify-center rounded-[6px]',
-                'text-[var(--sniptale-color-text-secondary)] opacity-0 transition-opacity',
-                'hover:text-[var(--sniptale-color-accent)] group-hover/field:opacity-100 focus:opacity-100',
-              ].join(' ')}
-              onClick={(event) => {
-                event.preventDefault();
-                props.onReset?.();
-              }}
-            >
-              <RotateCcw size={12} />
-            </button>
+      <InspectorParameterRow
+        label={props.label}
+        valueMinimum={160}
+        {...(props.stacked === undefined ? {} : { stacked: props.stacked })}
+      >
+        <div className="flex min-w-0 items-center gap-1">
+          <div className="min-w-0 flex-1">{props.children}</div>
+          {props.modified && props.onReset ? (
+            <FieldResetButton
+              disabled={false}
+              label={props.label}
+              modified
+              onReset={props.onReset}
+            />
           ) : null}
-        </span>
-      </span>
-      <div className="min-w-0">{props.children}</div>
+        </div>
+      </InspectorParameterRow>
     </div>
   );
 }
 
-export function FieldResetButton(props: {
+function FieldResetButton(props: {
   disabled: boolean;
   label: string;
   modified: boolean;
   onReset: () => void;
 }) {
   if (!props.modified) {
-    return <span className="h-5 w-5 shrink-0" aria-hidden="true" />;
+    return <span className="h-8 w-8 shrink-0" aria-hidden="true" />;
   }
 
   return (
-    <button
+    <ContentToolbarButton
+      tone="utility"
       type="button"
       disabled={props.disabled}
       aria-label={`${props.label}: ${translate('content.designReview.resetProperty')}`}
       title={translate('content.designReview.resetProperty')}
       className={[
-        'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px]',
+        'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
         'text-[var(--sniptale-color-text-secondary)] opacity-0 transition-opacity',
-        'hover:text-[var(--sniptale-color-accent)] group-hover/section-row:opacity-100 focus:opacity-100',
+        'hover:text-[var(--sniptale-color-text-primary)] group-hover/section-row:opacity-100 focus:opacity-100',
         'disabled:opacity-30',
       ].join(' ')}
       onClick={(event) => {
@@ -92,6 +73,6 @@ export function FieldResetButton(props: {
       }}
     >
       <RotateCcw size={12} />
-    </button>
+    </ContentToolbarButton>
   );
 }

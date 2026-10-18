@@ -710,3 +710,32 @@ it('projects additional-only measurements for inaccessible iframe selection and 
   inaccessibleIframeMocks.onSelect?.(iframe);
   expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
 });
+
+it.each(['mode', 'annotations-export'])(
+  'defers Escape while the toolbar %s menu owns the interaction',
+  (menu) => {
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(root);
+    const toolbar = document.createElement('div');
+    toolbar.dataset['ui'] = 'content.toolbar.root';
+    toolbar.dataset['menuOpen'] = 'true';
+    const trigger = document.createElement('button');
+    trigger.dataset['menuOpen'] = 'true';
+    trigger.setAttribute('aria-haspopup', 'menu');
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.dataset['ui'] = `content.toolbar.${menu}-button`;
+    toolbar.append(trigger);
+    root.append(toolbar);
+    document.body.append(host);
+    const onDisableRequested = vi.fn();
+    startPicker({ onDisableRequested });
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    expect(onDisableRequested).not.toHaveBeenCalled();
+    trigger.dataset['menuOpen'] = 'false';
+    toolbar.removeAttribute('data-menu-open');
+    trigger.setAttribute('aria-expanded', 'false');
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+    expect(onDisableRequested).toHaveBeenCalledOnce();
+  }
+);

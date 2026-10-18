@@ -68,24 +68,35 @@ for (const variant of [
       await expect(sceneTab).toHaveCSS('min-height', '36px');
       const laneControls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
       await expect(laneControls).toBeInViewport();
-      await expect(laneControls.getByRole('button')).toHaveCount(4);
-      expect(
-        await button('gallery.videoReview.zoomTrack').evaluate(
-          (node) => !!node.closest('[data-ui="gallery.videoReview.trackHeader"]')
-        )
-      ).toBe(true);
+      await expect(laneControls.getByRole('button')).toHaveCount(3);
+      await button('gallery.videoReview.trackSettings').click();
+      const focusSwitch = dialog.locator('[data-review-header-track="zoom"]').getByRole('switch');
+      await expect(focusSwitch).toHaveAttribute('aria-checked', 'true');
+      for (const track of ['voiceover', 'music']) {
+        await expect(
+          dialog.locator(`[data-review-header-track="${track}"]`).getByRole('switch')
+        ).toHaveAttribute('aria-checked', 'true');
+      }
+      await button('gallery.videoReview.trackSettings').click();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.workspaceTools"] button')
       ).toHaveCount(0);
       await expect(button('gallery.videoReview.advancedEditing')).toBeInViewport();
-      await expect(button('gallery.videoReview.advancedEditing').locator('span')).toBeHidden();
+      await expect(
+        button('gallery.videoReview.advancedEditing').locator('[data-review-toolbar-label]')
+      ).toBeHidden();
       await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(3);
-      await expect(button('gallery.videoReview.zoomTrack')).toHaveAttribute('aria-pressed', 'true');
-      await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute(
-        'aria-pressed',
-        'true'
-      );
       await addReviewFocus(page);
+      const undo = button('gallery.videoReview.undo');
+      await undo.hover();
+      await expect(undo).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(undo).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await undo.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      await expect(undo).toBeFocused();
+      await expect(undo).toHaveCSS('outline-width', '2px');
+
       const zoomRegion = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();
@@ -96,15 +107,25 @@ for (const variant of [
       ).toHaveCount(0);
       await button('gallery.videoReview.scene').click();
       await page.mouse.move(0, 0);
-      await expect(button('gallery.videoReview.backgroundNone')).not.toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)'
-      );
-      await button('gallery.videoReview.backgroundNone').hover();
-      await expect(button('gallery.videoReview.backgroundNone')).not.toHaveCSS(
-        'border-color',
-        'rgba(0, 0, 0, 0)'
-      );
+      const backgroundKinds = dialog.locator('.review-background-kinds');
+      const backgroundNone = backgroundKinds.getByRole('button', {
+        name: label('gallery.videoReview.backgroundNone'),
+        exact: true,
+      });
+      const backgroundMode = (await backgroundNone.count())
+        ? backgroundNone
+        : backgroundKinds.getByRole('button', {
+            name: label('gallery.videoReview.background'),
+            exact: true,
+          });
+      await backgroundMode.hover();
+      const backgroundHoverSurface =
+        (await backgroundMode.getAttribute('aria-haspopup')) === 'listbox'
+          ? backgroundMode.locator(
+              'xpath=ancestor::*[contains(@class,"sniptale-parameter-row")][1]'
+            )
+          : backgroundMode;
+      await expect(backgroundHoverSurface).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const image = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
         canvas.width = 16;
@@ -114,7 +135,18 @@ for (const variant of [
         context.fillRect(0, 0, 16, 16);
         return canvas.toDataURL('image/png').split(',')[1]!;
       });
-      await dialog.locator('input[accept="image/png,image/jpeg,image/webp"]').setInputFiles({
+      const imageMode = backgroundKinds.getByRole('button', {
+        name: label('gallery.videoReview.backgroundImage'),
+        exact: true,
+      });
+      if (await imageMode.count()) await imageMode.click();
+      else {
+        await backgroundMode.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.backgroundImage'), exact: true })
+          .click();
+      }
+      await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
         name: 'background.png',
         mimeType: 'image/png',
         buffer: Buffer.from(image, 'base64'),
@@ -149,15 +181,17 @@ for (const variant of [
       ).toBeLessThan(2);
       expect(closeBox!.x).toBeGreaterThan(titleBox!.x + titleBox!.width);
       const format = button('videoEditor.sidebar.canvasFormatLabel');
-      const formatRow = format.locator('xpath=../..');
+      const formatRow = format.locator(
+        'xpath=ancestor::*[contains(@class,"sniptale-parameter-row")][1]'
+      );
       expect((await formatRow.boundingBox())!.height).toBeLessThan(40);
       const padding = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.backgroundPadding'),
         exact: true,
       });
-      await expect(padding).toHaveCSS('font-size', '12px');
-      await expect(format).toHaveCSS('font-size', '12px');
-      await expect(formatRow.locator(':scope > span')).toHaveCSS('font-size', '12px');
+      await expect(padding).toHaveCSS('font-size', '13px');
+      await expect(format).toHaveCSS('font-size', '13px');
+      await expect(formatRow.locator('.sniptale-parameter-name')).toHaveCSS('font-size', '13px');
       await exerciseWorkspaceAudio(page, dialog, label, (name) => testInfo.outputPath(name));
       const playhead = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
       expect((await playhead.boundingBox())!.height).toBeGreaterThan(150);
@@ -173,15 +207,31 @@ for (const variant of [
       await button('gallery.videoReview.comments').click();
       const addNote = button('gallery.videoReview.addComment').and(dialog.locator('aside button'));
       const noteBounds = (await addNote.boundingBox())!;
-      const listBounds = (await dialog.locator('aside ol').boundingBox())!;
+      const listBounds = (await dialog.locator('.review-inspector-list').boundingBox())!;
       expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
       await expect(addNote).toHaveCSS('justify-content', 'center');
       await addNote.click();
+      const noteText = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.commentText'),
+        exact: true,
+      });
+      await expect(noteText).toBeFocused();
+      await noteText.fill('Discarded draft');
       await dialog
-        .getByRole('textbox', { name: label('gallery.videoReview.commentText'), exact: true })
-        .fill('Explicit note');
+        .getByRole('button', {
+          name: label('shared.ui.clearField').replace(
+            '{field}',
+            label('gallery.videoReview.commentText')
+          ),
+          exact: true,
+        })
+        .click();
+      await expect(noteText).toHaveValue('');
+      await expect(noteText).toBeFocused();
+      await expect(button('gallery.videoReview.save')).toBeDisabled();
+      await noteText.fill('Explicit note');
       await button('gallery.videoReview.save').click();
-      await expect(dialog.locator('ol')).toContainText('Explicit note');
+      await expect(dialog.locator('.review-inspector-list')).toContainText('Explicit note');
       await page.screenshot({ path: testInfo.outputPath('advanced.png') });
       await page.setViewportSize({ width: 1280, height: 720 });
       await expect(button('common.actions.close')).toBeInViewport();
@@ -190,9 +240,9 @@ for (const variant of [
       expect(stage!.height).toBeGreaterThan(140);
       const navigation = dialog.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
       expect((await navigation.boundingBox())!.height).toBeGreaterThanOrEqual(36);
-      await expect(dialog.locator('ol').getByText('Explicit note', { exact: true })).toBeInViewport(
-        { ratio: 1 }
-      );
+      await expect(
+        dialog.locator('.review-inspector-list').getByText('Explicit note', { exact: true })
+      ).toBeInViewport({ ratio: 1 });
       await page.screenshot({ path: testInfo.outputPath('minimum.png') });
       await button('gallery.videoReview.advancedEditing').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(0);
@@ -205,6 +255,8 @@ for (const variant of [
       await expect(button('common.actions.close')).toBeEnabled();
       await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toHaveCount(0);
+      await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
+      await page.getByRole('button', { name: label('common.actions.close'), exact: true }).click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -238,10 +290,17 @@ async function exerciseWorkspaceAudio(
     .locator('[data-ui="gallery.videoReview.canvasSettings"]')
     .scrollIntoViewIfNeeded();
   await page.screenshot({ path: outputPath('scene-inspector.png') });
-  await button('gallery.videoReview.audioTrack').click();
+  const trackSettings = button('gallery.videoReview.trackSettings');
+  await trackSettings.click();
+  for (const track of ['voiceover', 'music'])
+    await dialog.locator(`[data-review-header-track="${track}"]`).getByRole('switch').click();
+  await trackSettings.click();
   await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(1);
   await expect(dialog.locator('[data-audio-lane="music"]')).toHaveCount(0);
-  await button('gallery.videoReview.audioTrack').click();
+  await trackSettings.click();
+  for (const track of ['voiceover', 'music'])
+    await dialog.locator(`[data-review-header-track="${track}"]`).getByRole('switch').click();
+  await trackSettings.click();
   await expect(dialog.locator('[data-audio-lane="music"]')).toBeVisible();
 
   const headers = dialog.locator('[data-ui="gallery.videoReview.trackHeader"]');
@@ -317,9 +376,23 @@ async function exerciseWorkspaceAudio(
     node.scrollLeft = 0;
   });
   await button('gallery.videoReview.fit').click();
+  await button('gallery.videoReview.audioImport').first().click();
+  const library = page.getByRole('dialog', {
+    name: label('gallery.videoReview.musicLibrary'),
+    exact: true,
+  });
+  await library
+    .getByRole('button', { name: label('gallery.videoReview.musicFilter'), exact: true })
+    .click();
+  await expect(page.getByRole('listbox')).toHaveCSS('font-family', /Sniptale Interface/);
+  await expect(page.getByRole('listbox')).toHaveCSS('border-radius', '4px');
+  await page.screenshot({ path: outputPath('audio-library-menu.png'), fullPage: false });
+  await page.keyboard.press('Escape');
   const [voiceFile] = await Promise.all([
     page.waitForEvent('filechooser'),
-    button('gallery.videoReview.audioImport').first().click(),
+    library
+      .getByRole('button', { name: label('gallery.videoReview.musicUpload'), exact: true })
+      .click(),
   ]);
   await voiceFile.setFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: wav });
   const voice = dialog.locator('[data-audio-lane="voiceover"] [role="button"]');
@@ -339,6 +412,7 @@ async function exerciseWorkspaceAudio(
     .poll(async () => (await voice.boundingBox())!.width)
     .toBeGreaterThan(voiceBefore.width * 1.9);
   await button('gallery.videoReview.pointerTool').click();
+  await voice.scrollIntoViewIfNeeded();
   const voiceBox = (await voice.boundingBox())!;
   await expect
     .poll(async () => (await voice.locator('path').getAttribute('d'))?.length ?? 0)

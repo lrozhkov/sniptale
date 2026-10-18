@@ -70,6 +70,7 @@ describe('recording finalizer', () => {
       const staging = createStaging();
       const primary = createArtifact(`finalizer-batch-primary-${recordingDestination}`);
       const webcam = createArtifact(`finalizer-batch-webcam-${recordingDestination}`);
+      primary.recoverySource = { id: primary.artifactId, incarnation: 'writer', epoch: 'storage' };
       loadSettingsMock.mockResolvedValueOnce({
         localStoragePolicy: { defaultDestination: 'temporary', recordingDestination },
       });
@@ -103,6 +104,7 @@ describe('recording finalizer', () => {
         [
           {
             preparedAsset: primary.asset,
+            recoverySource: primary.recoverySource,
             filename: primary.filename,
             id: primary.artifactId,
             recordingGroup: expect.objectContaining({

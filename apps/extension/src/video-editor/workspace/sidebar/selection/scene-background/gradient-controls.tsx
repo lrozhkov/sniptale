@@ -19,7 +19,7 @@ export function GradientAnimationControls(props: GradientControlProps) {
   const animation = props.background.animation ?? DEFAULT_GRADIENT_ANIMATION;
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <SelectInput
         label={translate('videoEditor.sidebar.sceneBackgroundAnimationModeLabel')}
         value={animation.mode}

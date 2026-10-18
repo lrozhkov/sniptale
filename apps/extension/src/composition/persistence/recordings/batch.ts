@@ -1,3 +1,4 @@
+import { parseRecordingRecoverySource, type RecordingRecoverySource } from './recovery/publication';
 import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
@@ -26,6 +27,7 @@ import { initDB, STORE_NAME } from '../infrastructure/indexed-db/core';
 import { parseRecordingEntry } from './index.guards';
 
 export interface SaveRecordingBatchInput {
+  recoverySource?: RecordingRecoverySource;
   blob?: Blob;
   createdAt?: number;
   filename: string;
@@ -69,6 +71,8 @@ function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
     if (input.recordingMetadata !== undefined && !parseRecordingMetadata(input.recordingMetadata)) {
       throw new Error('Recording acquisition metadata is invalid.');
     }
+    if (input.recoverySource !== undefined && !parseRecordingRecoverySource(input.recoverySource))
+      throw new Error('Invalid recording recovery source.');
     ids.add(input.id);
   }
 }
@@ -154,7 +158,7 @@ async function saveRecordingEntries(
       const previous = parseRecordingEntry(raw);
       if (raw !== undefined && (!previous || previous.id !== input.id))
         throw new Error('Invalid existing recording source.');
-      expectedAssetIds[input.id] = previous?.assetId ?? null;
+      expectedAssetIds[input.id] = input.recoverySource ? null : (previous?.assetId ?? null);
     }
   } catch (error) {
     await Promise.all(
@@ -168,7 +172,15 @@ async function saveRecordingEntries(
   const entries = createEntries(preparedInputs);
   let journalCreated = false;
   try {
-    const payload: RecordingPublicationPayload = { completion, entries, expectedAssetIds };
+    const recoverySources: Record<string, RecordingRecoverySource> = {};
+    for (const input of inputs)
+      if (input.recoverySource) recoverySources[input.id] = input.recoverySource;
+    const payload: RecordingPublicationPayload = {
+      completion,
+      entries,
+      expectedAssetIds,
+      ...(Object.keys(recoverySources).length ? { recoverySources } : {}),
+    };
     const journal = await createAssetPublicationJournal({
       assetRefs: preparedInputs.map(({ prepared }) => prepared.ref),
       domain: RECORDING_ASSET_PUBLICATION_DOMAIN,

@@ -8,6 +8,8 @@ import { GuideWorkspace } from './workspace';
 import { useGuidePanels } from './panel-layout';
 import { GuideBlockInspector } from './block-inspector';
 import { GuideStyleFields } from './style-controls';
+import { GuideInspectorNumber } from './inspector';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 let host: HTMLDivElement;
 let root: Root;
 const t = createTranslator('en');
@@ -238,4 +240,36 @@ it('remembers disclosure choices by element type after another selection', async
   expect(toggle().getAttribute('aria-expanded')).toBe('true');
   await click('Select step');
   expect(toggle().getAttribute('aria-expanded')).toBe('false');
+});
+
+it('retains commit-only integer editing through the field and leaves its name passive', () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <InspectorLayout>
+        <GuideInspectorNumber
+          label="Start at"
+          value={2}
+          min={1}
+          max={100}
+          disabled={false}
+          onChange={change}
+        />
+      </InspectorLayout>
+    )
+  );
+  const name = host.querySelector<HTMLElement>('.sniptale-parameter-name')!;
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  act(() => name.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
+  expect(document.activeElement).toBe(input);
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '7');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(change).not.toHaveBeenCalled();
+  act(() => input.blur());
+  expect(change).toHaveBeenCalledExactlyOnceWith(7);
+  expect(host.querySelector('input[type="range"]')).toBeNull();
 });

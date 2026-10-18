@@ -3,7 +3,8 @@ import { Cable, RefreshCw } from 'lucide-react';
 import type { NativeAppRuntimeStatus } from '../../../../../contracts/native-app/runtime';
 import type { NativePlatform } from '../../../../../contracts/native-app';
 import { translate } from '../../../../../platform/i18n';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { StatusRow } from '../../../../../ui/compact-inspector-controls';
 import {
   settingsMetaLabelClassName,
   settingsNeutralBadgeClassName,
@@ -42,29 +43,32 @@ function formatHardwareAcceleration(
 
 function NativeStatusActions(props: { onAction: (operation: NativeRuntimeOperation) => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <button
+    <div className="flex flex-wrap gap-1">
+      <ProductActionButton
         type="button"
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
+        compact
+        tone="secondary"
         onClick={() => props.onAction('reconnect')}
       >
         <RefreshCw className="h-4 w-4" />
         {translate('settings.nativeApp.reconnect')}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
         type="button"
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
+        compact
+        tone="secondary"
         onClick={() => props.onAction('sync-settings')}
       >
         {translate('settings.nativeApp.syncSettings')}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
         type="button"
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
+        compact
+        tone="secondary"
         onClick={() => props.onAction('take-controller')}
       >
         {translate('settings.nativeApp.takeController')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -80,7 +84,10 @@ function NativeStatusWarnings({ status }: { status: NativeAppRuntimeStatus | nul
     <div className="space-y-2">
       <p className={settingsMetaLabelClassName}>{translate('settings.nativeApp.warnings')}</p>
       {warningMessages.map((warning) => (
-        <p key={warning} className="text-sm text-[var(--sniptale-color-warning)]">
+        <p
+          key={warning}
+          className="text-[13px] leading-[18px] text-[var(--sniptale-color-warning)]"
+        >
           {warning}
         </p>
       ))}
@@ -98,7 +105,7 @@ function NativeOperationError({ status }: { status: NativeAppRuntimeStatus | nul
       ? 'settings.nativeApp.operationErrorScreenshot'
       : 'settings.nativeApp.operationErrorGeneric';
   return (
-    <div className="space-y-1 text-sm text-[var(--sniptale-color-danger)]">
+    <div className="space-y-1 text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]">
       <p className={settingsMetaLabelClassName}>
         {translate('settings.nativeApp.operationErrorTitle')}
       </p>
@@ -113,32 +120,27 @@ function NativeStatusDetails({ status }: { status: NativeAppRuntimeStatus | null
   }
   const limits = status.capabilities?.limits;
   return (
-    <div className="grid gap-3 text-sm text-[var(--sniptale-color-text-secondary)] md:grid-cols-3">
-      <p>
-        <span className={settingsMetaLabelClassName}>
-          {translate('settings.nativeApp.autostartStatus')}
-        </span>
-        <br />
-        {status.install.autostart.enabled
-          ? translate('settings.nativeApp.enabled')
-          : translate('settings.nativeApp.disabled')}
-      </p>
-      <p>
-        <span className={settingsMetaLabelClassName}>
-          {translate('settings.nativeApp.effectiveEncoder')}
-        </span>
-        <br />
-        {status.effectiveSettings
-          ? formatHardwareAcceleration(status.effectiveSettings.video.codec.hardwareAcceleration)
-          : '-'}
-      </p>
-      <p>
-        <span className={settingsMetaLabelClassName}>
-          {translate('settings.nativeApp.capabilityLimits')}
-        </span>
-        <br />
-        {limits ? `${limits.maxWidth}x${limits.maxHeight} · ${limits.maxFps} FPS` : '-'}
-      </p>
+    <div className="sniptale-parameter-stack w-full max-w-[720px]">
+      <StatusRow
+        label={translate('settings.nativeApp.autostartStatus')}
+        value={
+          status.install.autostart.enabled
+            ? translate('settings.nativeApp.enabled')
+            : translate('settings.nativeApp.disabled')
+        }
+      />
+      <StatusRow
+        label={translate('settings.nativeApp.effectiveEncoder')}
+        value={
+          status.effectiveSettings
+            ? formatHardwareAcceleration(status.effectiveSettings.video.codec.hardwareAcceleration)
+            : '-'
+        }
+      />
+      <StatusRow
+        label={translate('settings.nativeApp.capabilityLimits')}
+        value={limits ? `${limits.maxWidth}x${limits.maxHeight} · ${limits.maxFps} FPS` : '-'}
+      />
     </div>
   );
 }
@@ -149,30 +151,30 @@ export function NativeStatusPanel(props: {
 }) {
   const { status } = props;
   return (
-    <div className={[settingsPanelClassName, 'space-y-5'].join(' ')}>
+    <div className={[settingsPanelClassName, 'space-y-3'].join(' ')}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2">
-            <Cable className="h-5 w-5 text-[var(--sniptale-color-accent)]" />
-            <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary-strong)]">
+            <Cable className="h-4 w-4 text-[var(--sniptale-color-text-secondary)]" />
+            <h2 className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary-strong)]">
               {translate('settings.nativeApp.statusTitle')}
             </h2>
             <span className={getStatusBadgeClassName(status)}>
               {translate(getNativeConnectionStateLabel(status?.connectionState))}
             </span>
           </div>
-          <p className="max-w-3xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
+          <p className="max-w-3xl text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             {status?.install
               ? `${formatNativePlatform(status.install.platform)} · ${status.install.appVersion}`
               : translate('settings.nativeApp.statusMissing')}
           </p>
           {status?.connectionState === 'controlled-by-other-profile' ? (
-            <p className="text-sm font-medium text-[var(--sniptale-color-warning)]">
+            <p className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-warning)]">
               {translate('settings.nativeApp.controlledByOtherProfile')}
             </p>
           ) : null}
           {status?.error?.message ? (
-            <p className="text-sm text-[var(--sniptale-color-danger)]">
+            <p className="text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]">
               {normalizeNativeAppError(status.error.message, 'settings.nativeApp.actionError')}
             </p>
           ) : null}

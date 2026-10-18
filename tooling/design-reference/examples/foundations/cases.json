@@ -1,0 +1,59 @@
+{
+  "group": "foundations",
+  "version": "package-5",
+  "rules": "foundations.md",
+  "component": "ThemeRoles / DensityScale / RadiusRelation / MaterialSurface",
+  "excludes": ["binary control variants", "numeric editing", "dropdown behavior"],
+  "cases": [
+    {
+      "id": "foundations.text-hierarchy",
+      "title": "Иерархия названия и значения",
+      "states": ["light", "dark", "long-label"],
+      "proof": "Parameter label uses secondary text, value uses primary text, both meet text contrast."
+    },
+    {
+      "id": "foundations.density",
+      "title": "Соотношение высот поля, списка и кнопки",
+      "states": ["compact", "standard", "spacious"],
+      "proof": "Actual shared text fields, select triggers, and command buttons align at 32px, 40px, and 48px within an explicit density."
+    },
+    {
+      "id": "foundations.radius",
+      "title": "Связанные скругления",
+      "states": ["field-menu", "nested-highlight"],
+      "proof": "Matching outer radii and concentric inner radius after inset."
+    },
+    {
+      "id": "foundations.material",
+      "title": "Материал поверхности",
+      "states": ["patterned-background", "solid-fallback"],
+      "proof": "Surface blurs backdrop while text remains opaque; fallback retains contrast."
+    },
+    {
+      "id": "foundations.focus",
+      "title": "Фокус и наведение",
+      "states": ["idle", "hover", "keyboard"],
+      "proof": "Hover alone does not replace visible keyboard focus."
+    },
+    {
+      "id": "foundations.text-fitting",
+      "title": "Длинный текст и полный доступ",
+      "states": [
+        "wrap",
+        "end-ellipsis",
+        "middle-ellipsis",
+        "hover-full-text",
+        "keyboard-full-text"
+      ],
+      "proof": "Overflow policy follows text role and preserves full names and padding."
+    },
+    {
+      "id": "foundations.responsive-actions",
+      "title": "Поэтапное сжатие панели",
+      "states": ["full", "compact-spacing", "icon-only", "stacked"],
+      "proof": "Actual fit controls spacing, approved caption reduction, then wrapping. Accessible command names remain stable."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

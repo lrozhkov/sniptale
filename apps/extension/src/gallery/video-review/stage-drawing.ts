@@ -93,6 +93,7 @@ export function useReviewDrawingPlane(args: {
           moving.current = region;
       }
       if (start.current) {
+        event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
         args.pause();
       }

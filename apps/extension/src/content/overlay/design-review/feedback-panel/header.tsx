@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { X } from 'lucide-react';
 import type { PointerEventHandler } from 'react';
 import { FeedbackCollectionIcon } from '../icons';
@@ -20,17 +21,20 @@ export function FeedbackPanelHeader(props: {
       onPointerCancel={props.onPointerUp}
     >
       <FeedbackCollectionIcon size={19} />
-      <strong className="text-sm">{translate('content.designReview.panelTitle')}</strong>
+      <strong className="text-[14px] leading-5 font-semibold">
+        {translate('content.designReview.panelTitle')}
+      </strong>
       <span className="text-xs text-[var(--sniptale-color-text-dim)]">{props.count}</span>
-      <button
+      <ContentToolbarButton
+        tone="close"
         type="button"
-        className="sniptale-dismiss-button ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[8px]"
+        className="sniptale-dismiss-button ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[4px]"
         aria-label={translate('content.designReview.panelClose')}
         title={translate('content.designReview.panelClose')}
         onClick={props.onClose}
       >
         <X size={17} />
-      </button>
+      </ContentToolbarButton>
     </header>
   );
 }

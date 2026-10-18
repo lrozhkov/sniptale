@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type React from 'react';
 import { ImageUp, Trash2 } from 'lucide-react';
 
@@ -17,23 +18,27 @@ export function EditorInspectorFrameBackgroundImageActions(
 
   return (
     <div className="grid grid-cols-1 gap-2">
-      <button
+      <ProductActionButton
+        compact
+        tone="secondary"
         type="button"
         className={`${secondaryPanelButtonClassName} gap-2`}
         onClick={onPickBackgroundImage}
       >
         <ImageUp size={16} strokeWidth={2} />
         {hasImage ? translate('editor.scene.replaceImage') : translate('editor.scene.uploadImage')}
-      </button>
+      </ProductActionButton>
       {hasImage ? (
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={`${secondaryPanelButtonClassName} gap-2`}
           onClick={onClearBackgroundImage}
         >
           <Trash2 size={16} strokeWidth={2} />
           {translate('editor.scene.clearImage')}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );

@@ -48,8 +48,8 @@ it('resolves drawing defaults from full, short, and empty palettes', () => {
 });
 
 it('resolves every selectable drawing font and the default family', () => {
-  expect(resolveDrawingTextFontFamily()).toContain('system-ui');
-  expect(resolveDrawingTextFontFamily('sans')).toContain('system-ui');
+  expect(resolveDrawingTextFontFamily()).toMatch(/^"Sniptale Text",/);
+  expect(resolveDrawingTextFontFamily('sans')).toBe(resolveDrawingTextFontFamily());
   expect(resolveDrawingTextFontFamily('serif')).toContain('Georgia');
   expect(resolveDrawingTextFontFamily('mono')).toContain('ui-monospace');
   expect(resolveDrawingTextFontFamily('handwritten')).toContain('Sniptale Handwritten');

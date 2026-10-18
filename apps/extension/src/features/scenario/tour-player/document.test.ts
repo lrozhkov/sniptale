@@ -145,13 +145,13 @@ it('projects the camera and legacy marker appearance through one source-image bo
   const dom = open(await buildTourPlayerHtml(args));
   const marker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
   const image = dom.window.document.querySelector<HTMLElement>('.tour-image')!;
-  expect(marker.style.left).toBe('320px');
-  expect(marker.style.top).toBe('180px');
+  expect(marker.style.left).toBe('310px');
+  expect(marker.style.top).toBe('174.375px');
   expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
   expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
   expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
   expect(marker.dataset['pulse']).toBe('true');
-  expect(image.style.width).toBe('1280px');
+  expect(image.style.width).toBe('1240px');
   dom.close();
 });
 it.each(['slides', 'stage'] as const)(
@@ -461,11 +461,11 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     const resize = dom.window.document.createEvent('Event');
     resize.initEvent('resize', false, false);
     dom.window.dispatchEvent(resize);
-    expect(hint.style.width).toBe('608px');
-    expect(hint.style.left).toBe('0px');
+    expect(hint.style.width).toBe('588px');
+    expect(hint.style.left).toBe('10px');
     expect(
       Number.parseFloat(presentation === 'caption-top' ? hint.style.top : hint.style.bottom)
-    ).toBe(139);
+    ).toBe(144.625);
     dom.close();
   }
 );
@@ -487,7 +487,7 @@ it('exports visual blur through the shared renderer without authoring handles', 
   ];
   const dom = open(await buildTourPlayerHtml(args));
   const effect = dom.window.document.querySelector<HTMLElement>('.tour-mask-effect')!;
-  expect(effect.style.backdropFilter).toBe('blur(24px)');
+  expect(effect.style.backdropFilter).toBe('blur(23.25px)');
   expect(effect.style.opacity).toBe('');
   expect(dom.window.document.querySelector('.tour-resize-handle')).toBeNull();
   dom.close();
@@ -669,8 +669,8 @@ it('renders independent inherited and local element styles in the standalone art
   expect(hint.dataset['presentation']).toBe('caption-top');
   expect(hint.style.borderRadius).toBe('0 0 8px 8px');
   const effects = doc.querySelectorAll<HTMLElement>('.tour-mask-effect');
-  expect(effects[0]!.style.backdropFilter).toBe('blur(30px)');
-  expect(effects[1]!.style.backdropFilter).toBe('blur(7px)');
+  expect(effects[0]!.style.backdropFilter).toBe('blur(29.0625px)');
+  expect(effects[1]!.style.backdropFilter).toBe('blur(6.78125px)');
   dom.close();
 });
 

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { InlineCurtainSelect } from './select';
+import { PopupSelect } from '../select';
 
 function TestOptionIcon({ className }: { className?: string }) {
   return <svg className={className} data-testid="option-icon" />;
@@ -64,7 +65,7 @@ function renderSelectWithSecondaryAction() {
   });
 }
 
-function renderSelectWithCustomOptionsPanel(onFormatChange = vi.fn()) {
+function renderSelectWithCustomOptionsPanel(onFormatChange = vi.fn(), optionsPanel?: ReactNode) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -77,7 +78,7 @@ function renderSelectWithCustomOptionsPanel(onFormatChange = vi.fn()) {
         label="Quality"
         onChange={vi.fn()}
         options={[]}
-        optionsPanel={<button onClick={() => onFormatChange('webp')}>WebP</button>}
+        optionsPanel={optionsPanel ?? <button onClick={() => onFormatChange('webp')}>WebP</button>}
         selectedLabel="JPEG · 90%"
         value="jpeg"
       />
@@ -227,3 +228,57 @@ it('closes on Escape and restores focus to the trigger', async () => {
   expect(container?.querySelector('[role="listbox"]')).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
+
+it.each(['close button', 'Escape'])(
+  'returns focus to the secondary opener after %s',
+  async (method) => {
+    renderSelectWithSecondaryAction();
+    const opener = container?.querySelector<HTMLButtonElement>('[aria-label="Open settings"]');
+    act(() => {
+      opener?.focus();
+      opener?.click();
+    });
+    await act(async () => Promise.resolve());
+    expect(container?.textContent).toContain('Camera settings panel');
+    act(() => {
+      if (method === 'Escape')
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      else container?.querySelector<HTMLButtonElement>('[aria-label="Закрыть"]')?.click();
+    });
+    expect(container?.textContent).not.toContain('Camera settings panel');
+    expect(document.activeElement).toBe(opener);
+  }
+);
+
+it.each([false, true])(
+  'dismisses a nested listbox before the curtain (empty: %s)',
+  async (empty) => {
+    renderSelectWithCustomOptionsPanel(
+      vi.fn(),
+      <PopupSelect
+        aria-label="Nested value"
+        options={empty ? [] : [{ label: 'First', value: 'first' }]}
+        value="first"
+        onChange={vi.fn()}
+      />
+    );
+    await act(async () =>
+      container?.querySelector<HTMLButtonElement>('[aria-label="Quality"]')?.click()
+    );
+    const nested = container?.querySelector<HTMLButtonElement>('[aria-label="Nested value"]');
+    await act(async () => nested?.click());
+    await act(async () => Promise.resolve());
+    expect(document.body.querySelector('[role="listbox"]')).not.toBeNull();
+    const target = document.body.querySelector('[role="option"]') ?? nested;
+    await act(async () =>
+      target?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(nested);
+    await act(async () =>
+      nested?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).toBeNull();
+  }
+);

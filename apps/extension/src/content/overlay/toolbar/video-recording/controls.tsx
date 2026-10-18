@@ -102,7 +102,7 @@ function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProp
               ? 'content.toolbar.video-recording.resume'
               : 'content.toolbar.video-recording.pause'
           }
-          active={paused}
+          data-content-command="true"
           title={translate(
             paused ? 'content.toolbar.videoRecordingResume' : 'content.toolbar.videoRecordingPause'
           )}

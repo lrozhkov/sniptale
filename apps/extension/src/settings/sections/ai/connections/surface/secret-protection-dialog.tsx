@@ -77,6 +77,7 @@ function SecretProtectionPassphraseField(props: {
     <ProductField label={props.label}>
       <ProductInput
         autoComplete="off"
+        placeholder={props.label}
         autoFocus={props.autoFocus}
         onChange={(event) => props.onChange(event.currentTarget.value)}
         type="password"

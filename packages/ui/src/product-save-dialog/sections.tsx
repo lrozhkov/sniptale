@@ -1,7 +1,30 @@
 import { Check, FolderInput, FolderOpen, X } from 'lucide-react';
-import type { MouseEvent, ReactNode } from 'react';
-import { ProductField, ProductInput } from '../product-form-controls';
+import {
+  useContext,
+  useRef,
+  type ButtonHTMLAttributes,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
+import { ProductInput } from '../product-form-controls';
 import type { ProductSaveDialogPresetItem } from './types';
+
+function SaveDialogCommand({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  const adopted = useContext(CommandPressScope);
+  const press = useCommandPress({ ...props, enabled: adopted });
+  return (
+    <button
+      {...props}
+      {...press.props}
+      type="button"
+      data-command-press={adopted ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+    >
+      {adopted ? <span className="sniptale-command-content">{children}</span> : children}
+    </button>
+  );
+}
 
 export function ProductSaveDialogHeader({
   title,
@@ -27,14 +50,14 @@ export function ProductSaveDialogHeader({
           <p className="sniptale-save-dialog-subtitle">{subtitle}</p>
         </div>
       </div>
-      <button
+      <SaveDialogCommand
         type="button"
         onClick={onClose}
         className="sniptale-modal-close"
         aria-label={closeLabel}
       >
         <X size={16} />
-      </button>
+      </SaveDialogCommand>
     </div>
   );
 }
@@ -44,27 +67,49 @@ export function ProductSaveDialogFilenameSection({
   filename,
   disabled,
   filenamePlaceholder,
+  filenameClearLabel,
   onFilenameChange,
 }: {
   filenameLabel: ReactNode;
   filename: string;
   disabled?: boolean;
   filenamePlaceholder?: string;
+  filenameClearLabel?: string;
   onFilenameChange: (value: string) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <section className="sniptale-save-dialog-section">
-      <ProductField label={filenameLabel}>
-        <ProductInput
-          id="save-dialog-filename"
-          type="text"
-          disabled={disabled}
-          value={filename}
-          onChange={(event) => onFilenameChange(event.target.value)}
-          className="sniptale-save-dialog-input"
-          placeholder={filenamePlaceholder}
-        />
-      </ProductField>
+      <div className="sniptale-save-dialog-filename-group">
+        <label className="sniptale-label-sm" htmlFor="save-dialog-filename">
+          {filenameLabel}
+        </label>
+        <div className="sniptale-save-dialog-field">
+          <ProductInput
+            ref={inputRef}
+            id="save-dialog-filename"
+            type="text"
+            disabled={disabled}
+            value={filename}
+            onChange={(event) => onFilenameChange(event.target.value)}
+            className="sniptale-save-dialog-input"
+            placeholder={filenamePlaceholder}
+          />
+          {filenameClearLabel && filename && !disabled ? (
+            <SaveDialogCommand
+              className="sniptale-save-dialog-clear"
+              aria-label={filenameClearLabel}
+              title={filenameClearLabel}
+              onClick={() => {
+                onFilenameChange('');
+                inputRef.current?.focus();
+              }}
+            >
+              <X size={16} />
+            </SaveDialogCommand>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
@@ -96,7 +141,7 @@ export function ProductSaveDialogPresetSection({
       ) : (
         <div className="sniptale-save-dialog-list">
           {presetItems.map((preset) => (
-            <button
+            <SaveDialogCommand
               key={preset.id}
               type="button"
               disabled={disabled}
@@ -111,7 +156,7 @@ export function ProductSaveDialogPresetSection({
                 <span className="sniptale-save-dialog-item-path">{preset.path}</span>
               </span>
               <Check size={16} className="sniptale-save-dialog-item-check" />
-            </button>
+            </SaveDialogCommand>
           ))}
         </div>
       )}
@@ -131,7 +176,7 @@ export function ProductSaveDialogSystemFolderButton({
   onChooseSystemFolder: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <button
+    <SaveDialogCommand
       type="button"
       disabled={disabled}
       onClick={onChooseSystemFolder}
@@ -142,6 +187,6 @@ export function ProductSaveDialogSystemFolderButton({
         <span className="sniptale-save-dialog-system-label">{systemFolderLabel}</span>
         <span className="sniptale-save-dialog-system-hint">{systemFolderHint}</span>
       </span>
-    </button>
+    </SaveDialogCommand>
   );
 }

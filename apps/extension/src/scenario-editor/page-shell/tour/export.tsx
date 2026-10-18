@@ -1,9 +1,9 @@
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { TourExportPreview } from './export-preview';
 import { useState } from 'react';
 import { Download, Image, MonitorSmartphone, Play, RotateCcw, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideExportWorkspace } from '../export-workspace';
 import { GuideInspectorGroup } from '../inspector';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -73,8 +73,8 @@ export function TourHtmlExport({
             icon={MonitorSmartphone}
             title={t('scenario.editor.tourHtmlPreview')}
           >
-            <CompactSelect
-              aria-label={t('scenario.editor.tourHtmlPreview')}
+            <SelectField
+              label={t('scenario.editor.tourHtmlPreview')}
               value={viewport}
               options={[
                 { value: 'desktop', label: t('scenario.editor.tourHtmlDesktop') },
@@ -171,8 +171,8 @@ function TourImageSettings({
 }) {
   return (
     <>
-      <CompactSelect
-        aria-label={t('scenario.editor.htmlImages')}
+      <SelectField
+        label={t('scenario.editor.htmlImages')}
         value={options.optimize ? 'optimized' : 'original'}
         disabled={busy}
         options={[
@@ -183,10 +183,9 @@ function TourImageSettings({
       />
       {options.optimize && (
         <>
-          <label className="tour-export-field">
-            <span>{t('scenario.editor.tourHtmlResolution')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourHtmlResolution')}
+          <div className="tour-export-field">
+            <SelectField
+              label={t('scenario.editor.tourHtmlResolution')}
               value={String(options.maxEdge)}
               disabled={busy}
               options={[1280, 1920, 2560, 3840].map((value) => ({
@@ -195,11 +194,10 @@ function TourImageSettings({
               }))}
               onChange={(maxEdge) => onChange({ ...options, maxEdge: Number(maxEdge) })}
             />
-          </label>
-          <label className="tour-export-field">
-            <span>{t('scenario.editor.tourHtmlQuality')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourHtmlQuality')}
+          </div>
+          <div className="tour-export-field">
+            <SelectField
+              label={t('scenario.editor.tourHtmlQuality')}
               value={String(options.quality)}
               disabled={busy}
               options={[0.75, 0.85, 0.95].map((value) => ({
@@ -208,7 +206,7 @@ function TourImageSettings({
               }))}
               onChange={(quality) => onChange({ ...options, quality: Number(quality) })}
             />
-          </label>
+          </div>
         </>
       )}
     </>

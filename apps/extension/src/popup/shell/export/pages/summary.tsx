@@ -8,7 +8,7 @@ export function ExportPagesSummary(props: {
 }) {
   if (props.selectedTabs.length === 0) {
     return (
-      <div className={['py-1 text-[11px]', 'text-[var(--sniptale-color-text-dim)]'].join(' ')}>
+      <div className={['py-1 text-[11px]', 'text-[var(--sniptale-color-text-muted)]'].join(' ')}>
         {translate('popup.export.noSelectedTabs')}
       </div>
     );
@@ -38,7 +38,7 @@ export function ExportPagesSummary(props: {
 export function ExportUrlsSummary(props: { onRemove: (url: string) => void; urls: string[] }) {
   if (props.urls.length === 0) {
     return (
-      <div className="py-1 text-[11px] text-[var(--sniptale-color-text-dim)]">
+      <div className="py-1 text-[11px] text-[var(--sniptale-color-text-muted)]">
         {translate('popup.export.noSelectedUrls')}
       </div>
     );

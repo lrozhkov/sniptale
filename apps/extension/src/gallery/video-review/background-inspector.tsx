@@ -1,4 +1,3 @@
-import './background-inspector.css';
 import { ColorField, SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
@@ -41,7 +40,7 @@ export function ReviewBackgroundInspector(props: {
 
   return (
     <div data-ui="gallery.videoReview.backgroundInspector" className="review-inspector-columns">
-      <div className="min-w-0 space-y-2">
+      <div className="sniptale-parameter-stack">
         <ReviewZoomObject background={background} onChange={onChange} />
         <div className="review-background-kinds">
           <SegmentedRow
@@ -153,7 +152,7 @@ function ReviewBackgroundLayoutControls({
     />
   );
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack">
       {background.type !== 'solid' ? (
         <ReviewPreviewNumberRow
           enterBehavior="blur"

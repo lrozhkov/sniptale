@@ -122,45 +122,45 @@ describe('content entrypoint styles', () => {
     );
   });
 
-  it('resolves dev and build font urls through extension runtime URLs', () => {
-    const styles = resolveContentEntrypointStyleUrls(
-      [
-        [
-          "src: url('/node_modules/@fontsource-variable/manrope/files/",
-          "manrope-latin-wght-normal.woff2') format('woff2-variations');",
-        ].join(''),
-        [
-          "src: url('@fontsource-variable/manrope/files/",
-          "manrope-latin-ext-wght-normal.woff2') format('woff2-variations');",
-        ].join(''),
-        'src: url(./manrope-cyrillic-wght-normal.woff2) format("woff2-variations");',
-        [
-          "src: url('@fontsource/marck-script/files/",
-          "marck-script-cyrillic-400-normal.woff2') format('woff2');",
-        ].join(''),
-      ].join('\n')
-    );
+  it.each([
+    [
+      '.x { content: "a:b;{1rem}"; width: calc(1rem + var(--x, 2rem)); }',
+      '.x { content: "a:b;{1rem}"; width: calc(16px + var(--x, 32px)); }',
+    ],
+    ['.x[data-label=":;{1rem}"] { margin: 1rem; }', '.x[data-label=":;{1rem}"] { margin: 16px; }'],
+    [
+      String.raw`.x { escaped\:name: 1rem; --literal: a\;b; }`,
+      String.raw`.x { escaped\:name: 16px; --literal: a\;b; }`,
+    ],
+    [
+      '/* :;{ 2rem */ .x { width: 1rem; /* :;{ 3rem */ }',
+      '/* :;{ 2rem */ .x { width: 16px; /* :;{ 3rem */ }',
+    ],
+    [
+      String.raw`.x { content: "a\";1rem"; width: 2rem; }`,
+      String.raw`.x { content: "a\";1rem"; width: 32px; }`,
+    ],
+    [
+      '@media (min-width: 10rem) { .x { width: 1rem; } }',
+      '@media (min-width: 160px) { .x { width: 16px; } }',
+    ],
+    ['.x { content: "1rem; width: 2rem; }', '.x { content: "1rem; width: 2rem; }'],
+    ['.x { width: 1rem; /* 2rem', '.x { width: 16px; /* 2rem'],
+    [
+      '.x { width: calc(1rem + 2rem; padding: 3rem; }',
+      '.x { width: calc(16px + 32px; padding: 48px; }',
+    ],
+  ])('preserves CSS lexical boundaries while normalizing %s', (input, expected) => {
+    expect(normalizeContentEntrypointRemUnits(input)).toBe(expected);
+  });
 
-    expect(styles).toContain(
-      [
-        'url("chrome-extension://sniptale/node_modules/@fontsource-variable/manrope/files/',
-        'manrope-latin-wght-normal.woff2")',
-      ].join('')
-    );
-    expect(styles).toContain(
-      'url("chrome-extension://sniptale/fonts/manrope-latin-ext-wght-normal.woff2")'
-    );
-    expect(styles).toContain(
-      'url("chrome-extension://sniptale/fonts/manrope-cyrillic-wght-normal.woff2")'
+  it('resolves callout font URLs through extension runtime URLs', () => {
+    const styles = resolveContentEntrypointStyleUrls(
+      "src: url('@fontsource/marck-script/files/marck-script-cyrillic-400-normal.woff2') format('woff2');"
     );
     expect(styles).toContain(
       'url("chrome-extension://sniptale/fonts/marck-script-cyrillic-400-normal.woff2")'
     );
-    expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith(
-      'node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2'
-    );
-    expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith('fonts/manrope-cyrillic-wght-normal.woff2');
-    expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith('fonts/manrope-latin-ext-wght-normal.woff2');
     expect(runtimeInfoGetUrlMock).toHaveBeenCalledWith(
       'fonts/marck-script-cyrillic-400-normal.woff2'
     );
@@ -183,4 +183,43 @@ it('registers locally scoped property focus styles in the content bundle', () =>
   expect(styles).toContain(
     "[data-ui='content.design-review.settings'][data-focus-modality='keyboard']"
   );
+});
+
+it.each(['ui', 'text'])('maps bundled Golos %s VF from supported source forms', (role) => {
+  const file = `golos-${role}-vf.woff2`;
+  for (const prefix of [`/packages/ui/src/styles/golos-${role}/`, `./golos-${role}/`, './']) {
+    expect(resolveContentEntrypointStyleUrls(`src: url("${prefix}${file}")`)).toBe(
+      `src: url("chrome-extension://sniptale/assets/${file}")`
+    );
+  }
+  expect(readFileSync(STYLES_SOURCE_PATH, 'utf8')).toContain(
+    'compact-inspector-controls/inspector-surface.css?inline'
+  );
+});
+
+it('leaves unrelated font sources outside the exact bundled Golos UI inventory unchanged', () => {
+  for (const source of [
+    './golos-ui/golos-ui-semibold.woff2',
+    './golos-ui/golos-text-regular.woff2',
+    'https://example.test/golos-ui-vf.woff2',
+    '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2',
+  ]) {
+    const declaration = `src: url("${source}")`;
+    expect(resolveContentEntrypointStyleUrls(declaration)).toBe(declaration);
+  }
+  expect(runtimeInfoGetUrlMock).not.toHaveBeenCalled();
+});
+
+it('keeps an unresolved Interface declaration when runtime URL resolution is unavailable', () => {
+  runtimeInfoGetUrlMock.mockImplementationOnce(() => {
+    throw new Error('runtime unavailable');
+  });
+  const source = 'url("./golos-ui/golos-ui-vf.woff2")';
+  expect(resolveContentEntrypointStyleUrls(source)).toBe(source);
+});
+
+it('does not resolve removed Manrope resources', () => {
+  const source = 'url("./manrope-latin-wght-normal.woff2")';
+  expect(resolveContentEntrypointStyleUrls(source)).toBe(source);
+  expect(runtimeInfoGetUrlMock).not.toHaveBeenCalled();
 });

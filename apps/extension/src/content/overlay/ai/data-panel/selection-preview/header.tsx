@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { ExpandChevronIcon } from '../preview/icons';
@@ -35,11 +37,13 @@ export function DataSelectionPreviewHeader({
   toggleExpandAll,
   toggleSelectAll,
 }: DataSpoilerHeaderProps) {
+  const searchInput = useRef<HTMLInputElement>(null);
   const stopHeaderToggle = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <div className="sniptale-spoiler-header">
       <button
         aria-expanded={isDataSpoilerOpen}
+        title={translate('aiModal.dataForProcessingLabel')}
         className="sniptale-ai-spoiler-toggle"
         onClick={handleToggleSpoiler}
         type="button"
@@ -48,7 +52,10 @@ export function DataSelectionPreviewHeader({
         <span className="sniptale-ai-spoiler-label">
           {translate('aiModal.dataForProcessingLabel')}
         </span>
-        <span className={`sniptale-ai-spoiler-summary ${getSummaryToneClass()}`}>
+        <span
+          title={spoilerSummary}
+          className={`sniptale-ai-spoiler-summary ${getSummaryToneClass()}`}
+        >
           {spoilerSummary}
         </span>
       </button>
@@ -62,7 +69,9 @@ export function DataSelectionPreviewHeader({
           <label className="sniptale-ai-data-search">
             <Search aria-hidden="true" size={13} />
             <input
+              ref={searchInput}
               aria-label={translate('aiModal.searchDataLabel')}
+              title={translate('aiModal.searchDataLabel')}
               disabled={isLoading}
               onChange={(event) => setFilterQuery(event.target.value)}
               placeholder={translate('aiModal.searchDataPlaceholder')}
@@ -70,15 +79,22 @@ export function DataSelectionPreviewHeader({
               value={filterQuery}
             />
             {filterQuery ? (
-              <button
+              <ProductActionButton
+                tone="secondary"
+                data-command-chrome="true"
                 aria-label={translate('aiModal.clearSearchLabel')}
-                className="sniptale-dismiss-button sniptale-ai-data-search-clear"
+                className="sniptale-ai-data-search-clear"
+                title={translate('aiModal.clearSearchLabel')}
+                onPointerDown={(event) => event.preventDefault()}
                 disabled={isLoading}
-                onClick={() => setFilterQuery('')}
+                onClick={() => {
+                  setFilterQuery('');
+                  searchInput.current?.focus();
+                }}
                 type="button"
               >
                 <X aria-hidden="true" size={13} />
-              </button>
+              </ProductActionButton>
             ) : null}
           </label>
           <button

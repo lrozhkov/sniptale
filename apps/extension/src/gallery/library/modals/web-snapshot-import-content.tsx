@@ -1,9 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { Globe2, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
 import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import type { PendingWebSnapshotImportState } from '../import-types';
@@ -11,9 +8,9 @@ import { GalleryModalFrame } from './frame';
 
 function SummaryRow(props: { label: string; value: string | number }) {
   return (
-    <div className="flex min-h-10 items-center justify-between gap-4 py-2 text-sm">
+    <div className="flex min-h-8 items-center justify-between gap-4 py-2 text-[13px] leading-[18px] font-medium">
       <span className="text-[var(--sniptale-color-text-secondary)]">{props.label}</span>
-      <span className="min-w-0 truncate text-right font-medium" title={String(props.value)}>
+      <span className="min-w-0 break-words text-right font-medium" title={String(props.value)}>
         {props.value}
       </span>
     </div>
@@ -49,7 +46,7 @@ export function WebSnapshotImportModalContent(props: {
       onClose={props.onClose}
     >
       <div
-        className="mt-4 divide-y divide-[var(--sniptale-color-border-soft)] rounded-[8px]
+        className="mt-4 divide-y divide-[var(--sniptale-color-border-soft)] rounded-[4px]
         border border-[var(--sniptale-color-border-soft)] px-3"
       >
         <SummaryRow
@@ -77,16 +74,16 @@ export function WebSnapshotImportModalContent(props: {
       </div>
 
       <div
-        className="mt-3 flex items-start gap-2 rounded-[8px]
-        bg-[var(--sniptale-color-surface-canvas)] px-3 py-2.5 text-xs leading-5
+        className="mt-3 flex items-start gap-2 rounded-[4px]
+        bg-[var(--sniptale-color-surface-canvas)] px-3 py-2.5 text-sm leading-5 font-normal
         text-[var(--sniptale-color-text-secondary)]"
       >
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sniptale-color-accent-emphasis)]" />
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sniptale-color-text-secondary)]" />
         <span>{translate('gallery.importModal.webSnapshotSafety')}</span>
       </div>
 
       {inspection.warnings.length > 0 ? (
-        <div className="mt-3 text-xs text-[var(--sniptale-color-text-secondary)]">
+        <div className="mt-3 select-text text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
           <div className="font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('gallery.importModal.webSnapshotWarnings')} · {inspection.warnings.length}
           </div>
@@ -98,20 +95,21 @@ export function WebSnapshotImportModalContent(props: {
         </div>
       ) : null}
 
-      <div className="mt-5 flex justify-end gap-2">
-        <button
+      <div className="mt-4 flex justify-end gap-2">
+        <ProductActionButton
+          compact
           type="button"
           disabled={isImporting}
           onClick={props.onClose}
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
+          tone="secondary"
         >
           {translate('common.actions.cancel')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          compact
           type="button"
           disabled={isImporting}
           onClick={() => void confirm()}
-          className={getControlPrimaryButtonClassName({ density: 'compact' })}
         >
           {isImporting ? (
             <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -123,7 +121,7 @@ export function WebSnapshotImportModalContent(props: {
               ? 'gallery.importModal.webSnapshotImporting'
               : 'gallery.importModal.webSnapshotImport'
           )}
-        </button>
+        </ProductActionButton>
       </div>
     </GalleryModalFrame>
   );

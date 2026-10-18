@@ -299,6 +299,20 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+it('routes native ended to transport without admitting a note-completion command', async () => {
+  const beforeAction = vi.fn((action: () => void) => action());
+  state.beforeAction = beforeAction;
+  state.composer.annotation = {
+    id: 'later-note',
+    text: '',
+    anchor: { kind: 'point', time: source.duration },
+  };
+  await render();
+  stage().onEnded?.();
+  expect(state.onEnded).toHaveBeenCalledOnce();
+  expect(beforeAction).not.toHaveBeenCalled();
+});
+
 it('maps transport seeks and playback events while preserving non-point selections', async () => {
   await render();
   frame().onSeek(2);

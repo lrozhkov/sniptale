@@ -35,6 +35,7 @@ function LayerEffectIconButton(props: {
 }) {
   return (
     <EditorIconButton
+      variant="utility"
       title={props.title}
       data-ui={props.dataUi}
       className={LAYER_ACTION_BUTTON_CLASS_NAME}
@@ -102,6 +103,7 @@ function LayerVisibilityButton(props: {
 }) {
   return (
     <EditorIconButton
+      variant="utility"
       title={
         props.layer.visible
           ? translate('editor.toolbar.hideLayer')
@@ -115,7 +117,7 @@ function LayerVisibilityButton(props: {
       {props.layer.visible ? (
         <Eye size={13} strokeWidth={2} />
       ) : (
-        <EyeOff size={13} strokeWidth={2} />
+        <EyeOff size={13} strokeWidth={2} className="text-[var(--sniptale-color-accent)]" />
       )}
     </EditorIconButton>
   );
@@ -124,6 +126,7 @@ function LayerVisibilityButton(props: {
 function LayerLockButton(props: { disabled: boolean; locked: boolean; onToggle: () => void }) {
   return (
     <EditorIconButton
+      variant="utility"
       title={
         props.locked
           ? translate('editor.toolbar.unlockLayer')
@@ -134,7 +137,11 @@ function LayerLockButton(props: { disabled: boolean; locked: boolean; onToggle: 
       disabled={props.disabled}
       className={LAYER_ACTION_BUTTON_CLASS_NAME}
     >
-      {props.locked ? <Lock size={13} strokeWidth={2} /> : <Unlock size={13} strokeWidth={2} />}
+      {props.locked ? (
+        <Lock size={13} strokeWidth={2} className="text-[var(--sniptale-color-accent)]" />
+      ) : (
+        <Unlock size={13} strokeWidth={2} />
+      )}
     </EditorIconButton>
   );
 }

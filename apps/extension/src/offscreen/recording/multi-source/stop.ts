@@ -28,8 +28,10 @@ function retireMultiSourceSession(session: MultiSourceSession): void {
   releaseVideoRecordingMediaActivityLease();
 }
 
-async function abortSession(session: MultiSourceSession): Promise<void> {
-  await session.staging.abort();
+async function abortSession(session: MultiSourceSession, discard = false): Promise<void> {
+  await (discard
+    ? (session.staging.discard?.() ?? session.staging.abort())
+    : session.staging.abort());
 }
 
 export function failMultiSourceSession(session: MultiSourceSession, error: Error): boolean {
@@ -58,7 +60,7 @@ async function stopAndFinalizeSession(params: {
     );
     retireMultiSourceSession(session);
     if (discard) {
-      await abortSession(session);
+      await abortSession(session, discard);
       await notifyMultiSourceStopped(session.recordingId);
       return;
     }
@@ -66,7 +68,7 @@ async function stopAndFinalizeSession(params: {
   } catch (error) {
     retireMultiSourceSession(session);
     try {
-      await abortSession(session);
+      await abortSession(session, discard);
     } catch (abortError) {
       throw new AggregateError(
         [error, abortError],
@@ -89,7 +91,7 @@ export function stopMultiSourceSession(params: {
   const previousPhase = session.lifecycle.beginStop();
   if (previousPhase === null) return Promise.resolve();
   if (previousPhase === 'starting') {
-    session.stopPromise = cancelStartingSession(session);
+    session.stopPromise = cancelStartingSession(session, params.discard);
     return session.stopPromise;
   }
 
@@ -97,10 +99,10 @@ export function stopMultiSourceSession(params: {
   return session.stopPromise;
 }
 
-async function cancelStartingSession(session: MultiSourceSession): Promise<void> {
+async function cancelStartingSession(session: MultiSourceSession, discard: boolean): Promise<void> {
   const aborts = getSessionRecorders(session).map(async (source) => source.artifactSession.abort());
   retireMultiSourceSession(session);
-  const results = await Promise.allSettled([...aborts, abortSession(session)]);
+  const results = await Promise.allSettled([...aborts, abortSession(session, discard)]);
   const errors = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : []
   );

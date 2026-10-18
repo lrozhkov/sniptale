@@ -17,44 +17,46 @@ function requireSha256(value, label) {
   return digest;
 }
 
-function validateManrope(manrope) {
-  if (!manrope || typeof manrope !== 'object') throw new Error('Manrope metadata is required.');
-  const artifacts = Array.isArray(manrope.artifacts) ? manrope.artifacts : [];
-  if (artifacts.length === 0) throw new Error('Manrope artifact hashes are required.');
+function validateInterfaceFont(interfaceFont) {
+  if (!interfaceFont || typeof interfaceFont !== 'object')
+    throw new Error('Interface font metadata is required.');
+  const artifacts = Array.isArray(interfaceFont.artifacts) ? interfaceFont.artifacts : [];
+  if (artifacts.length === 0) throw new Error('Interface font artifact hashes are required.');
   return {
     artifacts: artifacts
       .map((artifact) => ({
-        path: requireText(artifact.path, 'Manrope artifact path'),
-        sha256: requireSha256(artifact.sha256, 'Manrope artifact SHA-256'),
-        sourcePath: requireText(artifact.sourcePath, 'Manrope artifact source path'),
+        path: requireText(artifact.path, 'Interface font artifact path'),
+        sha256: requireSha256(artifact.sha256, 'Interface font artifact SHA-256'),
+        sourcePath: requireText(artifact.sourcePath, 'Interface font artifact source path'),
       }))
       .sort((left, right) => compareText(left.path, right.path)),
-    copyright: requireText(manrope.copyright, 'Manrope copyright'),
-    license: requireText(manrope.license, 'Manrope license'),
-    licensePath: requireText(manrope.licensePath, 'Manrope license path'),
-    sourcePackage: requireText(manrope.sourcePackage, 'Manrope source package'),
-    version: requireText(manrope.version, 'Manrope version'),
+    copyright: requireText(interfaceFont.copyright, 'Interface font copyright'),
+    license: requireText(interfaceFont.license, 'Interface font license'),
+    licensePath: requireText(interfaceFont.licensePath, 'Interface font license path'),
+    sourcePackage: requireText(interfaceFont.sourcePackage, 'Interface font source package'),
+    version: requireText(interfaceFont.version, 'Interface font version'),
   };
 }
 
-function formatManropeSection(manrope) {
-  const artifactRows = manrope.artifacts
+function formatInterfaceFontSection(interfaceFont, family = 'Golos UI') {
+  const artifactRows = interfaceFont.artifacts
     .map(
       (artifact) => `| \`${artifact.path}\` | \`${artifact.sourcePath}\` | \`${artifact.sha256}\` |`
     )
     .join('\n');
-  return `## Manrope bundled font
+  return `## ${family} bundled font
 
-- Source package: \`${manrope.sourcePackage}\` ${manrope.version}
-- License: \`${manrope.license}\`
-- Copyright: ${manrope.copyright}
-- License text: [\`${manrope.licensePath}\`](${manrope.licensePath})
+- Source package: \`${interfaceFont.sourcePackage}\`
+- Font version: \`${interfaceFont.version}\`
+- License: \`${interfaceFont.license}\`
+- Copyright: ${interfaceFont.copyright}
+- License text: [\`${interfaceFont.licensePath}\`](${interfaceFont.licensePath})
 
-| Bundled file | Installed source | SHA-256 |
+| Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
 ${artifactRows}
 
-The font files remain under ${manrope.license}. The rest of Sniptale is not relicensed by the font license.`;
+The font files remain under ${interfaceFont.license}. The rest of Sniptale is not relicensed by the font license.`;
 }
 
 function formatDependencySection(entry) {
@@ -95,8 +97,11 @@ function formatDependencySection(entry) {
 }
 
 /** Formats the deterministic notices document for the complete production dependency closure. */
-export function formatThirdPartyNotices({ entries, manrope }) {
-  const normalizedManrope = validateManrope(manrope);
+export function formatThirdPartyNotices({ entries, interfaceFont, documentFont }) {
+  const normalizedInterfaceFont = validateInterfaceFont(interfaceFont);
+  const documentSection = documentFont
+    ? `\n\n${formatInterfaceFontSection(validateInterfaceFont(documentFont), 'Golos Text')}`
+    : '';
   const dependencySections = [...entries]
     .sort(
       (left, right) =>
@@ -109,7 +114,7 @@ export function formatThirdPartyNotices({ entries, manrope }) {
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-${formatManropeSection(normalizedManrope)}
+${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}
 
 ## Production dependency licenses
 
@@ -219,7 +224,8 @@ async function assertCanonicalLicenseFiles(outputRoot, entries) {
 export async function writeDependencyLegalClosure({
   closure,
   manifestPath = 'THIRD_PARTY_DEPENDENCIES.json',
-  manrope,
+  interfaceFont,
+  documentFont,
   noticesPath = 'THIRD_PARTY_NOTICES.md',
   outputRoot,
 }) {
@@ -240,6 +246,6 @@ export async function writeDependencyLegalClosure({
   );
   await fs.writeFile(
     resolveOutputPath(outputRoot, noticesPath),
-    formatThirdPartyNotices({ entries: normalized.entries, manrope })
+    formatThirdPartyNotices({ entries: normalized.entries, interfaceFont, documentFont })
   );
 }

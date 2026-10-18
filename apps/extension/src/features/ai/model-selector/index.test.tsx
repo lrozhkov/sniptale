@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type React from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -114,6 +115,7 @@ afterEach(async () => {
   await act(async () => {
     root?.unmount();
   });
+  vi.restoreAllMocks();
   container?.remove();
   container = null;
   root = null;
@@ -121,6 +123,9 @@ afterEach(async () => {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
 });
 
 it('renders an empty state when no models are available', async () => {
@@ -322,4 +327,94 @@ it('closes only the open selector on Escape and restores its trigger focus', asy
     )
   );
   expect(parentKey).toHaveBeenCalledTimes(1);
+});
+
+it.each([true, false])('preserves model search and selection with compact=%s', async (compact) => {
+  const onSelect = vi.fn();
+  await renderUi(
+    <CommandPressScope value={compact}>
+      <AIModelSelector
+        models={MODELS}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+      />
+    </CommandPressScope>
+  );
+  const trigger = getButtons()[0]!;
+  expect(trigger.hasAttribute('data-command-press')).toBe(compact);
+  await act(async () => trigger.click());
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  await act(async () => setInputValue(input, 'missing'));
+  expect(container!.textContent).not.toContain('Llama 3.2');
+  const clearName = translate('shared.ui.clearField').replace(
+    '{field}',
+    translate('aiModal.modelSearchPlaceholder')
+  );
+  const clear = getButtons().find((button) => button.getAttribute('aria-label') === clearName);
+  expect(Boolean(clear)).toBe(true);
+  if (clear) {
+    await act(async () => clear.click());
+    expect(document.activeElement).toBe(input);
+    expect(input.value).toBe('');
+    expect(container!.textContent).toContain('Llama 3.2');
+    expect(onSelect).not.toHaveBeenCalled();
+    const model = getButtons().find((button) => button.textContent?.includes('Llama 3.2'))!;
+    await act(async () => model.click());
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
+  }
+});
+
+it.each([true, false])('selects a focused model by keyboard with compact=%s', async (compact) => {
+  const onSelect = vi.fn();
+  await renderUi(
+    <CommandPressScope value={compact}>
+      <AIModelSelector
+        models={MODELS}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+      />
+    </CommandPressScope>
+  );
+  await act(async () => getButtons()[0]!.click());
+  const model = getButtons().find((button) => button.textContent?.includes('Llama 3.2'))!;
+  model.focus();
+  await act(async () => model.click());
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('model-2');
+  expect(document.activeElement).toBe(getButtons()[0]);
+});
+
+it('notifies only opening and retains the open search and selection when refreshed models arrive', async () => {
+  const onOpen = vi.fn();
+  const onSelect = vi.fn();
+  const render = (models: AIModel[], disabled = false) =>
+    renderUi(
+      <AIModelSelector
+        models={models}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={onSelect}
+        onOpen={onOpen}
+        disabled={disabled}
+      />
+    );
+  await render(MODELS);
+  const trigger = getButtons()[0]!;
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
+  const search = container!.querySelector('input')!;
+  await act(async () => setInputValue(search, 'GPT'));
+  await render([...MODELS, { ...MODELS[0]!, id: 'new', displayName: 'GPT refreshed' }]);
+  expect(container!.querySelector('input')).toBe(search);
+  expect(search.value).toBe('GPT');
+  expect(document.activeElement).toBe(search);
+  expect(container?.textContent).toContain('GPT refreshed');
+  expect(trigger.textContent).toContain('OpenAI / GPT 4.1');
+  expect(onSelect).not.toHaveBeenCalled();
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
+  await render(MODELS, true);
+  await act(async () => trigger.click());
+  expect(onOpen).toHaveBeenCalledOnce();
 });

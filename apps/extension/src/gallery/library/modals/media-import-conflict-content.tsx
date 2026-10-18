@@ -1,9 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
 import { Library } from 'lucide-react';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
@@ -43,8 +40,8 @@ export function MediaImportConflictModalContent(props: {
       maxWidthClassName="max-w-lg"
       onClose={props.onClose}
     >
-      <div className="mt-4 rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-3">
-        <div className="flex min-h-10 items-center justify-between gap-4 py-2 text-sm">
+      <div className="mt-4 rounded-[4px] border border-[var(--sniptale-color-border-soft)] px-3">
+        <div className="flex min-h-8 items-center justify-between gap-4 py-2 text-[13px] leading-[18px] font-medium">
           <span className="text-[var(--sniptale-color-text-secondary)]">
             {translate('gallery.importModal.mediaFilesSelected')}
           </span>
@@ -58,10 +55,10 @@ export function MediaImportConflictModalContent(props: {
             {props.conflicts.map((conflict, index) => (
               <li
                 key={`${conflict.filename}-${conflict.size}-${index}`}
-                className="flex items-center justify-between gap-3 text-xs
+                className="flex items-center justify-between gap-3 text-[13px] leading-[18px]
                   text-[var(--sniptale-color-text-secondary)]"
               >
-                <span className="min-w-0 truncate" title={conflict.filename}>
+                <span className="min-w-0 break-words" title={conflict.filename}>
                   {conflict.filename}
                 </span>
                 <span className="shrink-0 tabular-nums text-[var(--sniptale-color-text-muted)]">
@@ -74,7 +71,7 @@ export function MediaImportConflictModalContent(props: {
       </div>
 
       <div className="mt-4">
-        <span className="mb-1.5 block text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+        <span className="mb-1 block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.importModal.conflictActionLabel')}
         </span>
         <ProductSelect<MediaFileImportConflictStrategy>
@@ -86,27 +83,19 @@ export function MediaImportConflictModalContent(props: {
           options={STRATEGIES.map((value) => ({ value, label: getStrategyTitle(value) }))}
           onChange={setStrategy}
         />
-        <p className="mt-1.5 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+        <p className="mt-1.5 text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
           {getStrategyDescription(strategy)}
         </p>
       </div>
 
-      <div className="mt-5 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={props.onClose}
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
-        >
+      <div className="mt-4 flex justify-end gap-2">
+        <ProductActionButton compact type="button" onClick={props.onClose} tone="secondary">
           {translate('common.actions.cancel')}
-        </button>
-        <button
-          type="button"
-          onClick={() => props.onImport(strategy)}
-          className={getControlPrimaryButtonClassName({ density: 'compact' })}
-        >
+        </ProductActionButton>
+        <ProductActionButton compact type="button" onClick={() => props.onImport(strategy)}>
           <Library className="h-4 w-4" aria-hidden="true" />
           {translate('gallery.importModal.mediaConflictContinue')}
-        </button>
+        </ProductActionButton>
       </div>
     </GalleryModalFrame>
   );

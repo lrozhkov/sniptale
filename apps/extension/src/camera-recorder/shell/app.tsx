@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import type { RuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
@@ -26,7 +27,7 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const runControl = useCallback(
-    async (message: RuntimeControlMessage) => {
+    async (message: RuntimeControlMessage, onAccepted?: () => void) => {
       try {
         setError(null);
         const response = await messaging.sendRuntimeMessage(message);
@@ -35,6 +36,7 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
           return;
         }
         await refreshState();
+        onAccepted?.();
       } catch (controlError) {
         setError(
           createUserFacingErrorMessage({
@@ -50,21 +52,26 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
 
   if (postRecordResult) {
     return (
-      <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
+      <CommandPressScope value={true}>
+        <CameraPostRecordPanel result={postRecordResult} onAcknowledge={acknowledgePostRecord} />
+      </CommandPressScope>
     );
   }
 
   return (
-    <CameraRecorderLiveScreen
-      capability={capability}
-      cancelConfirmOpen={cancelConfirmOpen}
-      error={error}
-      onCancel={() => setCancelConfirmOpen(true)}
-      onControl={runControl}
-      recordingId={routeState.recordingId ?? ''}
-      registrationError={registrationError}
-      state={state}
-    />
+    <CommandPressScope value={true}>
+      <CameraRecorderLiveScreen
+        capability={capability}
+        cancelConfirmOpen={cancelConfirmOpen}
+        error={error}
+        onCancel={() => setCancelConfirmOpen(true)}
+        onContinue={() => setCancelConfirmOpen(false)}
+        onControl={runControl}
+        recordingId={routeState.recordingId ?? ''}
+        registrationError={registrationError}
+        state={state}
+      />
+    </CommandPressScope>
   );
 }
 
@@ -73,7 +80,8 @@ function CameraRecorderLiveScreen(props: {
   cancelConfirmOpen: boolean;
   error: string | null;
   onCancel: () => void;
-  onControl: (message: RuntimeControlMessage) => Promise<void>;
+  onContinue: () => void;
+  onControl: (message: RuntimeControlMessage, onAccepted?: () => void) => Promise<void>;
   recordingId: string;
   registrationError: string | null;
   state: ReturnType<typeof useRecordingState>['state'];
@@ -82,9 +90,11 @@ function CameraRecorderLiveScreen(props: {
 
   return (
     <main
+      data-ui="camera-recorder.live"
       className={[
+        'sniptale-compact-workspace overflow-y-auto',
         'flex h-screen flex-col bg-[var(--sniptale-color-surface-canvas)]',
-        'p-5 text-[var(--sniptale-color-text-primary)]',
+        'p-3 text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
       <CameraLivePanel
@@ -100,7 +110,10 @@ function CameraRecorderLiveScreen(props: {
         cancelConfirmOpen={props.cancelConfirmOpen}
         isPaused={props.state.status === VideoRecordingStatus.PAUSED}
         onCancel={props.onCancel}
-        onContinue={() => handleContinue(props.capability, props.onControl, props.recordingId)}
+        onContinue={() => {
+          props.onContinue();
+          handleContinue(props.capability, props.onControl, props.recordingId);
+        }}
         onDelete={() => handleDelete(props.capability, props.onControl, props.recordingId)}
         onPauseResume={() =>
           handlePauseResume(props.capability, props.onControl, props.state.status)
@@ -125,15 +138,18 @@ function handleContinue(
 
 function handleDelete(
   capability: { controlToken: string; recordingId: string } | null,
-  runControl: (message: RuntimeControlMessage) => Promise<void>,
+  runControl: (message: RuntimeControlMessage, onAccepted?: () => void) => Promise<void>,
   fallbackRecordingId: string
 ): void {
-  void runControl({
-    type: VideoMessageType.STOP_RECORDING,
-    controlToken: capability?.controlToken ?? '',
-    discard: true,
-    recordingId: capability?.recordingId ?? fallbackRecordingId,
-  }).then(() => window.close());
+  void runControl(
+    {
+      type: VideoMessageType.STOP_RECORDING,
+      controlToken: capability?.controlToken ?? '',
+      discard: true,
+      recordingId: capability?.recordingId ?? fallbackRecordingId,
+    },
+    () => window.close()
+  );
 }
 
 function handlePauseResume(

@@ -10,7 +10,7 @@ import {
 import type { VideoEditorTypingSpanTarget } from '../../../../contracts/commands/timeline';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { SelectInput } from '../shared/controls';
-import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
+import { DetailList, DetailItem, PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 
 type Props = Pick<
   WorkspaceSidebarSelectionPanelProps,
@@ -43,30 +43,24 @@ function TypingPreviewSummary({ plan }: { plan: Extract<Preview['plan'], { statu
   ] as const;
   return (
     <div className="space-y-2 text-xs" aria-live="polite">
-      <dl className="space-y-2">
+      <DetailList>
         {details.slice(0, 2).map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-3">
-            <dt className="text-[var(--sniptale-color-text-secondary)]">
-              {translate(`videoEditor.sidebar.${label}`)}
-            </dt>
-            <dd className="m-0 shrink-0 tabular-nums text-[var(--sniptale-color-text-primary)]">
-              {value}
-            </dd>
-          </div>
+          <DetailItem key={label} label={translate(`videoEditor.sidebar.${label}`)} value={value} />
         ))}
-      </dl>
+      </DetailList>
       <InspectorDetails
         preferenceId="history-span:videoEditor.sidebar.inspectorMoreDetails"
         label={translate('videoEditor.sidebar.inspectorMoreDetails')}
       >
-        <dl className="space-y-2">
+        <DetailList>
           {details.slice(2).map(([label, value]) => (
-            <div key={label} className="flex justify-between gap-3">
-              <dt>{translate(`videoEditor.sidebar.${label}`)}</dt>
-              <dd className="m-0 tabular-nums">{value}</dd>
-            </div>
+            <DetailItem
+              key={label}
+              label={translate(`videoEditor.sidebar.${label}`)}
+              value={value}
+            />
           ))}
-        </dl>
+        </DetailList>
       </InspectorDetails>
     </div>
   );

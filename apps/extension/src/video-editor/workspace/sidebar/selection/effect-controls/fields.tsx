@@ -41,7 +41,7 @@ export function ActionPrimaryFields(props: {
   onChange: (patch: VideoProjectActionPresentationOverride) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack space-y-2">
       {props.part !== 'animation' && props.showPreset !== false && (
         <SelectInput
           label={translate('videoEditor.sidebar.actionPresetLabel')}
@@ -96,7 +96,7 @@ export function ActionPointFields(props: {
   onChange: (patch: VideoProjectActionPresentationOverride) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="sniptale-parameter-stack space-y-2">
       <NumberInput
         label={translate('videoEditor.sidebar.actionPointXLabel')}
         value={props.point.x}

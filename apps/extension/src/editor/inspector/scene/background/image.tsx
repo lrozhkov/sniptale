@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
   BackgroundImagePicker,
   backgroundActionClassName,
@@ -27,12 +28,12 @@ export function EditorInspectorFrameBackgroundImageEditor(
     props;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {frameDraft.backgroundImageData ? (
         <img
           src={frameDraft.backgroundImageData}
           alt={translate('editor.compact.frameBackgroundModeImage')}
-          className="h-28 w-full rounded-lg border border-[var(--sniptale-color-border-soft)] object-contain"
+          className="h-28 w-full rounded-[4px] border border-[var(--sniptale-color-border-soft)] object-contain"
         />
       ) : null}
       <BackgroundImagePicker
@@ -43,13 +44,15 @@ export function EditorInspectorFrameBackgroundImageEditor(
         }}
       />
       {frameDraft.backgroundImageData && (
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={backgroundActionClassName}
           onClick={onClearBackgroundImage}
         >
           {translate('editor.scene.clearImage')}
-        </button>
+        </ProductActionButton>
       )}
       {frameDraft.backgroundImageData ? (
         <EditorInspectorFrameBackgroundImageMode

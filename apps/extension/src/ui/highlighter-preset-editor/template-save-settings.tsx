@@ -1,12 +1,68 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CompactSelect } from '../compact-inspector-controls';
+import { useInspectorLayout } from '../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../compact-inspector-controls/text-field';
 
 type TemplateSaveOption = { label: string; value: string };
 
 function normalizeTemplateName(value: string): string {
   return value.normalize('NFKC').trim().toLocaleLowerCase();
+}
+
+const templateSaveRoleClasses = {
+  compact: {
+    labelClassName:
+      'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]',
+    fieldGroup: 'grid gap-1',
+    commandRow: 'grid grid-cols-[minmax(0,1fr)_auto] gap-1',
+    feedbackSize: 'text-[12px] leading-4',
+  },
+  pending: {
+    labelClassName: 'text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]',
+    fieldGroup: 'grid gap-1.5',
+    commandRow: 'grid grid-cols-[minmax(0,1fr)_auto] gap-1.5',
+    feedbackSize: 'text-[10px]',
+  },
+} as const;
+
+function TemplateNameField(props: {
+  disabled: boolean;
+  invalid: boolean;
+  label: string;
+  onChange(value: string): void;
+  value: string;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const [focused, setFocused] = useState(false);
+  const field = (
+    <ProductInput
+      ref={input}
+      aria-label={props.label}
+      aria-invalid={props.invalid}
+      className="sniptale-input-compact cursor-text"
+      disabled={props.disabled}
+      maxLength={64}
+      onChange={(event) => props.onChange(event.currentTarget.value)}
+      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      placeholder={focused ? '' : props.label}
+      style={{ cursor: 'text' }}
+      type="text"
+      value={props.value}
+    />
+  );
+  if (!inspector) return field;
+  return (
+    <div className="sniptale-text-value">
+      {field}
+      {!props.disabled && props.value.length > 0 ? (
+        <InspectorFieldClear label={props.label} target={input} />
+      ) : null}
+    </div>
+  );
 }
 
 export function TemplateSaveSettings(props: {
@@ -31,7 +87,7 @@ export function TemplateSaveSettings(props: {
   selectLabel: string;
 }) {
   const [name, setName] = useState('');
-  const [isNameFocused, setIsNameFocused] = useState(false);
+  const inspector = useInspectorLayout();
   const [selectedId, setSelectedId] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const normalizedName = normalizeTemplateName(name);
@@ -46,6 +102,35 @@ export function TemplateSaveSettings(props: {
   }, [props.options, selectedId]);
 
   const unavailable = props.disabled === true || props.isSaving === true;
+  const roleClasses = templateSaveRoleClasses[inspector ? 'compact' : 'pending'];
+  let feedback: ReactNode = null;
+  if (status)
+    feedback = (
+      <div
+        className={`${roleClasses.feedbackSize} text-[var(--sniptale-color-text-secondary)]`}
+        role="status"
+      >
+        {status}
+      </div>
+    );
+  if (props.error)
+    feedback = (
+      <div
+        className={`${roleClasses.feedbackSize} text-[var(--sniptale-color-danger)]`}
+        role="alert"
+      >
+        {props.error}
+      </div>
+    );
+  if (hasDuplicateName)
+    feedback = (
+      <div
+        className={`${roleClasses.feedbackSize} text-[var(--sniptale-color-danger)]`}
+        role="alert"
+      >
+        {props.duplicateNameErrorLabel}
+      </div>
+    );
   return (
     <div className="grid gap-3" data-ui="shared.highlighter-template-save-settings">
       {props.leadingContent ? (
@@ -54,26 +139,17 @@ export function TemplateSaveSettings(props: {
           <div className="h-px bg-[var(--sniptale-color-border-soft)]" />
         </>
       ) : null}
-      <div className="grid gap-1.5">
-        <label className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {props.createLabel}
-        </label>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
-          <ProductInput
-            aria-label={props.nameLabel}
-            aria-invalid={hasDuplicateName}
-            className="sniptale-input-compact cursor-text"
+      <div className={roleClasses.fieldGroup}>
+        <label className={roleClasses.labelClassName}>{props.createLabel}</label>
+        <div className={roleClasses.commandRow}>
+          <TemplateNameField
             disabled={unavailable}
-            maxLength={64}
-            onChange={(event) => {
-              setName(event.currentTarget.value);
+            invalid={hasDuplicateName}
+            label={props.nameLabel}
+            onChange={(value) => {
+              setName(value);
               setStatus(null);
             }}
-            onBlur={() => setIsNameFocused(false)}
-            onFocus={() => setIsNameFocused(true)}
-            placeholder={isNameFocused ? '' : props.nameLabel}
-            style={{ cursor: 'text' }}
-            type="text"
             value={name}
           />
           <ProductActionButton
@@ -93,10 +169,8 @@ export function TemplateSaveSettings(props: {
         </div>
       </div>
       <div className="h-px bg-[var(--sniptale-color-border-soft)]" />
-      <div className="grid gap-1.5">
-        <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {props.overwriteLabel}
-        </div>
+      <div className={roleClasses.fieldGroup}>
+        <div className={roleClasses.labelClassName}>{props.overwriteLabel}</div>
         <CompactSelect
           appearance="plain"
           aria-label={props.overwriteLabel}
@@ -127,19 +201,7 @@ export function TemplateSaveSettings(props: {
           {props.overwriteActionLabel}
         </ProductActionButton>
       </div>
-      {hasDuplicateName ? (
-        <div className="text-[10px] text-[var(--sniptale-color-danger)]" role="alert">
-          {props.duplicateNameErrorLabel}
-        </div>
-      ) : props.error ? (
-        <div className="text-[10px] text-[var(--sniptale-color-danger)]" role="alert">
-          {props.error}
-        </div>
-      ) : status ? (
-        <div className="text-[10px] text-[var(--sniptale-color-text-secondary)]" role="status">
-          {status}
-        </div>
-      ) : null}
+      {feedback}
     </div>
   );
 }

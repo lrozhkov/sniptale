@@ -73,7 +73,10 @@ export function GuideAiAssistant(props: AssistantProps) {
       </ContentToolbarButton>
       {open &&
         createPortal(
-          <div className="sniptale-ai-modal-root" data-theme={theme ?? undefined}>
+          <div
+            className="sniptale-compact-workspace sniptale-scenario-workspace sniptale-ai-modal-root"
+            data-theme={theme ?? undefined}
+          >
             <GuideAiDialog {...props} onClose={() => setOpen(false)} />
           </div>,
           resolveThemeSafePortalTarget(anchor.current)
@@ -182,7 +185,7 @@ function GuideAiDialog({
           closeTitle={t('scenario.editor.close')}
         />
         <ProductModalBody compact className="guide-ai-scroll-body">
-          <div className="guide-ai-body" aria-busy={pending}>
+          <div className="guide-ai-body sniptale-inspector-surface" aria-busy={pending}>
             {proposal ? (
               <GuideAiProposalReview session={session} images={images} t={t} />
             ) : (

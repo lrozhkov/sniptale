@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -173,3 +175,34 @@ it('keeps the closed future settings surface detached when no portal target is p
   ).toBeNull();
   act(() => root.unmount());
 });
+
+it.each([false, true])(
+  'scopes only the detached future settings surface when enabled=%s',
+  (scoped) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const portal = document.createElement('div');
+    const anchor = document.createElement('button');
+    document.body.append(host, portal, anchor);
+    const root = createRoot(host);
+    const content = (
+      <FutureStepBadgeSettingsPopover
+        anchorEl={anchor}
+        frameVisuals={{ borderColor: '#f97316', borderWidth: 2 }}
+        isOpen
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        onDisable={vi.fn()}
+        settings={createDefaultFrameStepBadge()}
+        portalTarget={portal}
+      />
+    );
+    act(() => root.render(scoped ? <InspectorLayout>{content}</InspectorLayout> : content));
+    const surface = portal.querySelector('[data-ui="content.toolbar.future-step-badge-popover"]')!;
+    expect(surface).not.toBeNull();
+    expect(surface.classList.contains('sniptale-inspector-surface')).toBe(scoped);
+    expect(host.childElementCount).toBe(0);
+    expect(portal.classList.contains('sniptale-compact-workspace')).toBe(false);
+    act(() => root.unmount());
+  }
+);

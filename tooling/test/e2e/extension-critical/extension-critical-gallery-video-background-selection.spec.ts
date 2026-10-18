@@ -32,25 +32,42 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.scene').click();
+      const kinds = dialog.locator('.review-background-kinds');
       const solid = button('gallery.videoReview.backgroundSolid');
-      await solid.click();
-      await expect(solid).toHaveAttribute('aria-pressed', 'true');
-      await expect(solid).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await expect(solid).toHaveCSS('box-shadow', 'none');
-      const modes = dialog.locator('.review-background-kinds button');
-      const geometry = await modes.evaluateAll((nodes) =>
-        nodes.map((node) => ({
-          y: node.getBoundingClientRect().y,
-          fits: node.scrollWidth <= node.clientWidth,
-        }))
-      );
-      expect(geometry).toHaveLength(3);
-      expect(geometry.every((value) => value.y === geometry[0]!.y && value.fits)).toBe(true);
-      const paint = dialog.locator('.review-background-paint');
-      await expect(paint.locator('button > svg')).toBeHidden();
+      const segmented = await solid.count();
+      if (segmented) {
+        await solid.click();
+        await expect(solid).toHaveAttribute('aria-pressed', 'true');
+        await expect(solid).toHaveCSS('border-top-width', '0px');
+        await expect(solid).toHaveCSS('box-shadow', 'none');
+        const geometry = await kinds.locator('button').evaluateAll((nodes) =>
+          nodes.map((node) => ({
+            y: node.getBoundingClientRect().y,
+            fits: node.scrollWidth <= node.clientWidth,
+          }))
+        );
+        expect(geometry).toHaveLength(3);
+        expect(geometry.every((value) => value.y === geometry[0]!.y && value.fits)).toBe(true);
+      } else {
+        const trigger = kinds.getByRole('button', {
+          name: label('gallery.videoReview.background'),
+          exact: true,
+        });
+        await trigger.click();
+        await page
+          .getByRole('option', { name: label('gallery.videoReview.backgroundSolid'), exact: true })
+          .click();
+        await expect(trigger).toContainText(label('gallery.videoReview.backgroundSolid'));
+      }
+      const paint = dialog.locator('.review-background-paint .sniptale-parameter-row');
       const fieldBox = (await paint.boundingBox())!;
-      const paintBox = (await paint.locator('button').boundingBox())!;
-      expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width, 0);
+      const paintBox = (await paint
+        .locator('[data-ui="shared.ui.paint-selector.trigger"]')
+        .boundingBox())!;
+      expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width - 8, 0);
+      await expect(paint.locator('[data-ui="shared.ui.color-selector.value-trigger"]')).toHaveCount(
+        1
+      );
       await page.screenshot({ path: testInfo.outputPath('solid-selection.png') });
 
       const more = dialog.getByRole('button', {

@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import React from 'react';
 import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
@@ -173,16 +174,17 @@ function ToolbarViewportCaptureButton(props: {
   disabled: boolean;
 }) {
   return (
-    <button
+    <ContentToolbarButton
+      type="button"
+      data-content-command="true"
       onClick={props.onClick}
-      className="sniptale-btn"
       title={props.title}
-      data-ui={props.dataUi}
+      dataUi={props.dataUi}
       data-sniptale-activation-bridge="defer"
       disabled={props.disabled}
     >
       {props.icon}
-    </button>
+    </ContentToolbarButton>
   );
 }
 
@@ -191,15 +193,16 @@ function ToolbarSelectionCaptureButton(props: {
   onClick: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   return (
-    <button
+    <ContentToolbarButton
+      type="button"
+      data-content-command="true"
       onClick={props.onClick}
-      className="sniptale-btn"
       title={translate('content.toolbar.selectionArea')}
-      data-ui="content.toolbar.capture-selection-button"
+      dataUi="content.toolbar.capture-selection-button"
       data-sniptale-activation-bridge="defer"
       disabled={props.disabled}
     >
       <Crop size={20} strokeWidth={2} />
-    </button>
+    </ContentToolbarButton>
   );
 }

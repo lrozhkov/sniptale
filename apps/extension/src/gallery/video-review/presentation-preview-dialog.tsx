@@ -53,7 +53,8 @@ export function ReviewPresentationPreviewDialog(props: Props) {
       data-ui="gallery.videoReview.presentationPreview"
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
-      className="fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0
+      className="sniptale-compact-workspace fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none
+        border-0 bg-transparent p-0
         text-[var(--sniptale-color-text-primary)]"
     >
       <ProductModal

@@ -29,7 +29,6 @@ export function useSettingsCollectionPointerReorder(props: {
 }) {
   const { announce, groups, onMove, resetKeyboardPreview } = props;
   const [preview, setPreview] = useState<SettingsCollectionKeyboardPreview | null>(null);
-  const [dragOffsetY, setDragOffsetY] = useState(0);
   const sessionRef = useRef<PointerSession | null>(null);
   const previewRef = useRef<SettingsCollectionKeyboardPreview | null>(null);
   const canMove = onMove !== undefined;
@@ -38,7 +37,6 @@ export function useSettingsCollectionPointerReorder(props: {
     sessionRef.current = null;
     previewRef.current = null;
     setPreview(null);
-    setDragOffsetY(0);
   }, []);
 
   const updatePreview = useCallback((next: SettingsCollectionKeyboardPreview) => {
@@ -77,7 +75,6 @@ export function useSettingsCollectionPointerReorder(props: {
         updatePreview(session.preview);
         announce(translate('settings.collection.announcements.pickedUp'));
       }
-      setDragOffsetY(event.clientY - session.startY);
       const next = movePointerPreviewToClientY(
         session.root,
         previewRef.current ?? session.preview,
@@ -100,12 +97,27 @@ export function useSettingsCollectionPointerReorder(props: {
       onMove(intent);
       announce(translate('settings.collection.announcements.moved'));
     };
+    const cancelSession = () => {
+      const session = sessionRef.current;
+      if (!session) return;
+      clear();
+      if (session.active) announce(translate('settings.collection.announcements.cancelled'));
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !sessionRef.current) return;
+      event.preventDefault();
+      cancelSession();
+    };
     const handleUp = (event: PointerEvent) => handleEnd(event, false);
     const handleCancel = (event: PointerEvent) => handleEnd(event, true);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('blur', cancelSession);
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp);
     window.addEventListener('pointercancel', handleCancel);
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', cancelSession);
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleCancel);
@@ -114,7 +126,6 @@ export function useSettingsCollectionPointerReorder(props: {
 
   return {
     preview,
-    dragOffsetY,
     clear,
     start(
       itemId: string,

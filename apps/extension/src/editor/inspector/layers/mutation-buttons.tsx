@@ -29,6 +29,7 @@ export function LayerMutationButtons(props: LayerMutationButtonsProps) {
     <div className="flex items-center gap-1">
       {buttons.map((button) => (
         <EditorIconButton
+          variant="utility"
           key={button.title}
           title={button.title}
           onClick={button.onClick}
@@ -71,7 +72,7 @@ function buildLayerMutationButtons(
         ),
       danger: true,
       disabled: !props.canDelete,
-      icon: <Trash2 size={13} strokeWidth={2} />,
+      icon: <Trash2 size={13} strokeWidth={2} className="text-[var(--sniptale-color-danger)]" />,
     },
   ];
 }

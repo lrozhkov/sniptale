@@ -187,3 +187,14 @@
   flex: 0 0 auto;
   white-space: nowrap;
 }
+
+/* Embedded property popovers retain their own row and contextual-slider geometry. */
+.sniptale-content-popover.sniptale-compact-workspace[data-theme],
+.sniptale-content-popover.sniptale-compact-workspace:not([data-theme]),
+.sniptale-content-popover .sniptale-compact-workspace {
+  --sniptale-parameter-row-height: 32px;
+  --sniptale-parameter-context-space: 0px;
+  --sniptale-inspector-range-bottom: 8px;
+  --sniptale-parameter-range-hit-height: 16px;
+  --sniptale-parameter-range-hit-top: -8px;
+}

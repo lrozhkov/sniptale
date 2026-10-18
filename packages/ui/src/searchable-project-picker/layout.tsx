@@ -64,7 +64,11 @@ export function SearchableProjectPickerLayout(props: SearchableProjectPickerLayo
 
   return (
     <div className={`grid ${props.presentation === 'compact' ? 'gap-3' : 'gap-4'}`}>
-      <SearchableProjectPickerSearch {...searchProps} />
+      {props.renderSearchField ? (
+        props.renderSearchField(searchProps)
+      ) : (
+        <SearchableProjectPickerSearch {...searchProps} />
+      )}
       <SearchableProjectPickerContent {...contentProps} />
     </div>
   );

@@ -1,3 +1,4 @@
+import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
 import {
   AlignLeft,
   AlignCenter,
@@ -55,11 +56,12 @@ export function TourNavigationLayoutSettings({
           },
         ] as const
       ).map(({ key, label, values }) => (
-        <div key={key} className="tour-layout-setting">
-          <span>{label}</span>
-          <div role="group" aria-label={label}>
+        <InspectorParameterRow key={key} label={label} valueMinimum={104}>
+          <div role="group" aria-label={label} className="flex gap-1">
             {values.map(({ value, Icon, label: title }) => (
               <ContentToolbarButton
+                tone="property"
+                className="!h-8 !w-8 !min-w-8 !p-0"
                 key={value}
                 title={title}
                 disabled={disabled}
@@ -70,7 +72,7 @@ export function TourNavigationLayoutSettings({
               </ContentToolbarButton>
             ))}
           </div>
-        </div>
+        </InspectorParameterRow>
       ))}
       {(
         [
@@ -99,11 +101,16 @@ export function TourNavigationLayoutSettings({
           onChange={(value) => onChange({ ...slide, layout: { ...layout, [key]: value } })}
         />
       ))}
-      <div className="tour-layout-setting">
-        <span>{t('scenario.editor.tourButtonColumns')}</span>
-        <div role="group" aria-label={t('scenario.editor.tourButtonColumns')}>
+      <InspectorParameterRow label={t('scenario.editor.tourButtonColumns')} valueMinimum={104}>
+        <div
+          role="group"
+          aria-label={t('scenario.editor.tourButtonColumns')}
+          className="flex gap-1"
+        >
           {([1, 2, 3] as const).map((columns) => (
             <ContentToolbarButton
+              tone="property"
+              className="!h-8 !w-8 !min-w-8 !p-0"
               key={columns}
               title={`${t('scenario.editor.tourButtonColumns')}: ${columns}`}
               disabled={disabled}
@@ -114,7 +121,7 @@ export function TourNavigationLayoutSettings({
             </ContentToolbarButton>
           ))}
         </div>
-      </div>
+      </InspectorParameterRow>
     </GuideInspectorGroup>
   );
 }

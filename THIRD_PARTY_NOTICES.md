@@ -2,34 +2,35 @@
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-## Manrope bundled font
+## Golos UI bundled font
 
-- Source package: `@fontsource-variable/manrope` 5.3.0
+- Source package: `@sniptale/ui`
+- Font version: `2.000`
 - License: `OFL-1.1`
-- Copyright: Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
-- License text: [`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)
+- Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos UI".
+- License text: [`packages/ui/src/styles/golos-ui/LICENSE.txt`](packages/ui/src/styles/golos-ui/LICENSE.txt)
 
-| Bundled file | Installed source | SHA-256 |
+| Bundled file | Source file | SHA-256 |
 | --- | --- | --- |
-| `apps/extension/public/fonts/manrope-cyrillic-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2` | `c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914` |
-| `apps/extension/public/fonts/manrope-latin-ext-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2` | `3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb` |
-| `apps/extension/public/fonts/manrope-latin-wght-normal.woff2` | `node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2` | `a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972` |
+| `packages/ui/src/styles/golos-ui/golos-ui-vf.woff2` | `packages/ui/src/styles/golos-ui/golos-ui-vf.woff2` | `ec7584959184bcbd5b6cf65c5aacc2ad3ca3afc42ec3b0976f0260c33d1900a1` |
+
+The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
+
+## Golos Text bundled font
+
+- Source package: `@sniptale/ui`
+- Font version: `2.005`
+- License: `OFL-1.1`
+- Copyright: Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos Text".
+- License text: [`packages/ui/src/styles/golos-text/LICENSE.txt`](packages/ui/src/styles/golos-text/LICENSE.txt)
+
+| Bundled file | Source file | SHA-256 |
+| --- | --- | --- |
+| `packages/ui/src/styles/golos-text/golos-text-vf.woff2` | `packages/ui/src/styles/golos-text/golos-text-vf.woff2` | `ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843` |
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
 ## Production dependency licenses
-
-### `@fontsource-variable/manrope` 5.3.0
-
-- Installed path: `node_modules/@fontsource-variable/manrope`
-- Declared license expression: `OFL-1.1`
-- Selected license: `OFL-1.1`
-- License source class: `installed-file`
-- License source: `node_modules/@fontsource-variable/manrope/LICENSE`
-- License storage: `canonical-file`
-- Redistributed license text: [`LICENSES/OFL-1.1.txt`](LICENSES/OFL-1.1.txt)
-- License text SHA-256: `d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30`
-- Repository/source: https://github.com/fontsource/font-files.git
 
 ### `@fontsource/marck-script` 5.3.0
 
@@ -275,11 +276,11 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Repository/source: https://github.com/Vanilagy/mediabunny.git
 - MPL-2.0 corresponding source: https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.3.tgz
 - Supplied modifications (combine with upstream source above):
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz) (SHA-256: 79ba17a912f532b34032e5f53319693d6f8720dec9f17934c2f6d278cd5a1076)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json) (SHA-256: 6f6f91fd786abf85cbc0281967836261e005d8fec6475f760a77ae2dd9294171)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch](LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch) (SHA-256: 37dca864f03e43540178c28155a49d40198038f8e7f1c2315e0684ef45c914b6)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz) (SHA-256: 7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json](LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json) (SHA-256: f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch](LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch) (SHA-256: 9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00)
   - [LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE](LICENSES/dependencies/mediabunny-1.61.3-modified/LICENSE) (SHA-256: 3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04)
-  - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 847ce2b0f9f2f5ac2cd17fc14dfbadf4a0b2f75343f9000c9f58048189854447)
+  - [LICENSES/dependencies/mediabunny-1.61.3-modified/README.md](LICENSES/dependencies/mediabunny-1.61.3-modified/README.md) (SHA-256: 1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10)
 - Original package integrity: sha512-kUqLKVXQVwHR62GkOJxYosAmXERJbqnXBgJDTtRlxHEYviVkMg/Evhl9XN6kedqS5LP1tV4kFKyzY/V4a4ofow==
 
 ### `pako` 1.0.11

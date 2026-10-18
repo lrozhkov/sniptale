@@ -35,6 +35,7 @@ function renderLane(args: {
   time: number;
   selection: ReviewAnchor;
   boundaries?: number[];
+  snapTimes?: number[];
   snapToKeyframes?: boolean;
   plane?: { left: number; width: number };
 }) {
@@ -54,6 +55,7 @@ function renderLane(args: {
           selection={args.selection}
           annotations={[]}
           edits={args.edits}
+          snapTimes={args.snapTimes}
           boundaries={args.boundaries ?? [0, 2, 4, 6, 8, 10]}
           {...(args.snapToKeyframes ? { snapToKeyframes: true } : {})}
           onEdit={vi.fn()}
@@ -408,3 +410,28 @@ it.each(['playhead', 'neighbor'] as const)(
     expect(change).not.toHaveBeenCalled();
   }
 );
+
+it('snaps both source edges to disposable range boundaries and retains Alt bypass', async () => {
+  const change = vi.fn();
+  const edit = cut(2, 4);
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    boundaries: [0, 10],
+    snapTimes: [1.5, 6.5],
+  });
+  await lane.event(lane.end, 'pointerdown', 400);
+  await lane.event(lane.block, 'pointermove', 655);
+  await lane.event(lane.block, 'pointerup', 655);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.5 });
+  await lane.event(lane.start, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 145);
+  await lane.event(lane.block, 'pointerup', 145);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 1.5, end: 4 });
+  await lane.event(lane.end, 'pointerdown', 400);
+  await lane.event(lane.block, 'pointermove', 655, { altKey: true });
+  await lane.event(lane.block, 'pointerup', 655);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.55 });
+});

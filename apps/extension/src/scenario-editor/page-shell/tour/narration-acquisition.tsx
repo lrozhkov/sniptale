@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { GuideActionMenu } from '../action-menu';
 import { FolderOpen, Mic, Upload, Plus } from 'lucide-react';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../../platform/i18n';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
-import { TourNarrationRecording } from './narration-recording';
+import { TourNarrationPlacement, TourNarrationRecording } from './narration-recording';
 import { TourAudioPicker } from './audio-materials';
 import type { TourAudioResource } from '@sniptale/runtime-contracts/scenario/types/tour';
 
@@ -40,6 +40,7 @@ export function TourNarrationAcquisition({
   children?: ReactNode;
   catalog?: AudioCatalog;
 }) {
+  const placement = useContext(TourNarrationPlacement);
   const [choosing, setChoosing] = useState(false);
   const [recording, setRecording] = useState<NarrationDestination | null>(null);
   const [pending, setPending] = useState(false);
@@ -76,7 +77,10 @@ export function TourNarrationAcquisition({
           menu={menu}
           uploadOnly={uploadOnly}
           disabled={disabled || pending}
-          onRecord={() => setRecording(structuredClone(destination))}
+          onRecord={() => {
+            setRecording(structuredClone(destination));
+            placement?.setActive(true);
+          }}
           onUpload={() => input.current?.click()}
           t={t}
         />
@@ -126,7 +130,10 @@ export function TourNarrationAcquisition({
               ? t('scenario.editor.tourAudioSaveResource')
               : t('scenario.editor.tourAudioApply')
           }
-          onClose={() => setRecording(null)}
+          onClose={() => {
+            setRecording(null);
+            placement?.setActive(false);
+          }}
           onApply={(blob, signal) => apply(blob, signal, recording)}
         />
       )}

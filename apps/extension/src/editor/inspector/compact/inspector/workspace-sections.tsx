@@ -24,7 +24,7 @@ function buildGridPaletteButtons(params: InspectorCommandParams) {
         params.updateColor((next) => params.updateWorkspace({ gridColor: next }), color)
       }
       className={cx(
-        'h-10 rounded-[12px] border transition hover:-translate-y-px',
+        'h-8 rounded-[4px] border transition',
         params.workspace.gridColor.toLowerCase() === color
           ? 'border-[color:var(--sniptale-color-border-accent-strong)] ' +
               'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_16%,transparent)]'
@@ -87,7 +87,7 @@ export function buildWorkspaceCompactCommands(params: InspectorCommandParams): C
           label={translate('editor.compact.workspaceColor')}
           value={params.workspace.backgroundColor}
         >
-          <div className="space-y-3">
+          <div className="space-y-1">
             {renderCompactWorkspaceColorField(params)}
             {renderCompactWorkspaceDefaultAction(params)}
           </div>
@@ -105,7 +105,7 @@ export function buildWorkspaceCompactCommands(params: InspectorCommandParams): C
           label={translate('editor.compact.neutralPresets')}
           value={params.workspace.backgroundColor}
         >
-          <div className="space-y-3">
+          <div className="space-y-1">
             {renderCompactWorkspacePaletteGrid(params)}
             {renderCompactWorkspaceDefaultAction(params)}
           </div>
@@ -139,7 +139,7 @@ export function buildGridCompactCommands(params: InspectorCommandParams): Compac
           label={translate('editor.compact.neutralPresets')}
           value={params.workspace.gridColor}
         >
-          <div className="grid grid-cols-4 gap-2">{buildGridPaletteButtons(params)}</div>
+          <div className="grid grid-cols-4 gap-1">{buildGridPaletteButtons(params)}</div>
         </CompactCommandField>
       ),
     },

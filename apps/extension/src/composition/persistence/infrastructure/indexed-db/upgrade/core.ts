@@ -18,6 +18,8 @@ import {
   PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -103,6 +105,8 @@ function assertSynchronousMigrationStep(result: unknown, step: 'migrate' | 'vali
 function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, STORE_NAME, 'id', ['createdAt']);
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
+  createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt']);
+  createStore(db, RECORDING_RECOVERY_BLOCKS_STORE, ['id', 'index'], ['id']);
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
   createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);

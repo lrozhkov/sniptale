@@ -24,7 +24,7 @@ export function EditorDocumentExportPreferencesFormatOption(props: {
         props.isSelected ? formatOptionSelectedClassName : formatOptionIdleClassName
       )}
     >
-      <span className="block text-[13px] font-semibold">{props.option.label}</span>
+      <span className="block text-[13px] font-medium">{props.option.label}</span>
     </button>
   );
 }

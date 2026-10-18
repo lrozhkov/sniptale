@@ -1,8 +1,9 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Grid2x2, Magnet, Map, Menu, Palette, ZoomIn, ZoomOut } from 'lucide-react';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
-import { RASTER_TOOL_ORDER, TOOL_ICONS, getToolLabel } from '../../chrome/tool-icons';
+import { RASTER_TOOL_ORDER, TOOL_ICONS } from '../../chrome/tool-icons';
 import { EditorIconButton } from '../../chrome/ui';
 import type { ToolbarInspector } from './types';
 import {
@@ -11,18 +12,6 @@ import {
   getDocumentRequiredTitle,
   toolbarSectionClassName,
 } from './section-helpers';
-
-const EDITOR_TOOLBAR_ZOOM_BUTTON_CLASS_NAME = [
-  'inline-flex min-h-10 min-w-[4.5rem] items-center justify-center rounded-[10px] border',
-  'border-transparent bg-transparent px-3 py-2.5 text-[11px] font-medium leading-none',
-  'text-[var(--sniptale-color-text-primary)] transition-all duration-150 focus-visible:outline-none',
-  'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_74%,transparent)]',
-  'focus-visible:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_74%,transparent)]',
-  'hover:text-[var(--sniptale-color-text-primary-strong)] active:translate-y-px',
-  'disabled:cursor-default disabled:opacity-55 disabled:hover:translate-y-0',
-].join(' ');
 
 export function EditorToolbarPrimarySection(props: {
   activeInspector: ToolbarInspector | 'tool';
@@ -82,17 +71,12 @@ export function EditorToolbarRasterSection(props: {
 }) {
   return (
     <div className={toolbarSectionClassName}>
-      {RASTER_TOOL_ORDER.map((tool) => (
-        <EditorIconButton
-          key={tool}
-          title={getDocumentRequiredTitle(getToolLabel(tool), props.hasImage)}
-          onClick={() => props.onActivateTool(tool)}
-          active={props.isToolButtonActive(tool)}
-          disabled={!props.hasImage}
-        >
-          {TOOL_ICONS[tool]}
-        </EditorIconButton>
-      ))}
+      <EditorToolbarToolButtons
+        tools={RASTER_TOOL_ORDER}
+        hasImage={props.hasImage}
+        isToolButtonActive={props.isToolButtonActive}
+        onActivateTool={props.onActivateTool}
+      />
     </div>
   );
 }
@@ -181,16 +165,16 @@ export function EditorToolbarZoomSection(props: { hasImage: boolean; zoomPercent
       >
         <ZoomOut size={18} strokeWidth={2} />
       </EditorIconButton>
-      <button
-        type="button"
+      <ContentToolbarButton
+        tone="utility"
         title={zoomToggleTitle}
         aria-label={zoomToggleTitle}
         onClick={() => handleZoomToggleClick(controller, props.hasImage, shouldFitToWindow)}
         disabled={!props.hasImage}
-        className={EDITOR_TOOLBAR_ZOOM_BUTTON_CLASS_NAME}
+        className="min-w-[4.5rem] tabular-nums"
       >
         {props.zoomPercent}%
-      </button>
+      </ContentToolbarButton>
       <EditorIconButton
         title={getDocumentRequiredTitle(translate('editor.toolbar.zoomIn'), props.hasImage)}
         onClick={() => controller.zoomIn()}

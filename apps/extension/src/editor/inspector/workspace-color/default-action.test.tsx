@@ -29,11 +29,15 @@ it('keeps the compact default action accessible with saving, default and failure
       translate('editor.compact.workspaceMakeDefault')
     );
     expect(button.className).not.toContain('w-full');
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg.lucide-save')).not.toBeNull();
     act(() => button.click());
     expect(save).toHaveBeenCalledOnce();
     render(true, false);
     expect(button.disabled).toBe(true);
-    expect(button.textContent).toBe(translate('common.states.saving'));
+    expect(button.textContent).toBe('');
+    expect(button.getAttribute('aria-busy')).toBe('true');
+    expect(button.querySelector('svg.lucide-loader-circle')).not.toBeNull();
     expect(button.getAttribute('aria-label')).toBe(
       translate('editor.compact.workspaceMakeDefault')
     );

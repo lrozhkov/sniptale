@@ -13,15 +13,19 @@ export interface BackgroundThumbnail {
   loading?: boolean;
   disabled?: boolean;
 }
-/** Compact ordered choices; the final cell reveals the next thirty items. */
-export function BackgroundThumbnails(props: {
+interface BackgroundThumbnailsProps {
   items: readonly BackgroundThumbnail[];
   label: string;
   onSelect(id: string): void;
   disabled?: boolean;
   dataUi?: string;
-}) {
-  const [count, setCount] = useState(9);
+  /** Initial visible choices; later reveals retain the thirty-choice increment. */
+  initialCount?: number | undefined;
+}
+
+/** Compact ordered choices; the final cell reveals the next thirty items. */
+export function BackgroundThumbnails(props: BackgroundThumbnailsProps) {
+  const [count, setCount] = useState(props.initialCount ?? 9);
   return (
     <div
       className="grid grid-cols-5 gap-2"

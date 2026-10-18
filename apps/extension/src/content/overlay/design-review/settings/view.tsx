@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
 import { Droplets, Image, Maximize2, Square, Type } from 'lucide-react';
 import { useLayoutEffect, useState, type ComponentType } from 'react';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
@@ -64,45 +66,52 @@ export function DesignReviewSettings(props: {
   }, [imageSelected, props.state.selection?.element]);
 
   return (
-    <div
-      className="grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]"
-      data-ui="content.design-review.settings"
-      data-focus-modality={modality}
-    >
-      <nav
-        className={[
-          'grid content-start gap-1 border-r border-solid p-1.5',
-          'border-[color:var(--sniptale-color-border-soft)]',
-        ].join(' ')}
-        aria-label={translate('content.designReview.settingsNavigation')}
-      >
-        {sections.map((option) => {
-          const Icon = option.icon;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              className={[
-                'inline-flex h-9 w-9 items-center justify-center rounded-[7px]',
-                section === option.key
-                  ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]'
-                  : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
-                'active:bg-[var(--sniptale-color-surface-hover)] focus:outline-none',
-                'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-              ].join(' ')}
-              aria-label={translate(option.labelKey)}
-              aria-pressed={section === option.key}
-              title={translate(option.labelKey)}
-              onClick={() => setSection(option.key)}
-            >
-              <Icon size={17} />
-            </button>
-          );
-        })}
-      </nav>
-      <div className="min-w-0 p-2.5">
-        <SettingsContent {...props} section={section} />
-      </div>
-    </div>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <div
+          className={[
+            'sniptale-design-review-chrome sniptale-compact-workspace sniptale-inspector-surface',
+            'grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]',
+          ].join(' ')}
+          data-ui="content.design-review.settings"
+          data-focus-modality={modality}
+        >
+          <nav
+            className={[
+              'grid content-start gap-1 border-r border-solid p-1',
+              'border-[color:var(--sniptale-color-border-soft)]',
+            ].join(' ')}
+            aria-label={translate('content.designReview.settingsNavigation')}
+          >
+            {sections.map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={[
+                    'inline-flex h-9 w-9 items-center justify-center rounded-[4px]',
+                    section === option.key
+                      ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
+                      : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
+                    'active:bg-[var(--sniptale-color-surface-hover)] focus:outline-none',
+                    'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+                  ].join(' ')}
+                  aria-label={translate(option.labelKey)}
+                  aria-pressed={section === option.key}
+                  title={translate(option.labelKey)}
+                  onClick={() => setSection(option.key)}
+                >
+                  <Icon size={17} />
+                </button>
+              );
+            })}
+          </nav>
+          <div className="min-w-0 p-2">
+            <SettingsContent {...props} section={section} />
+          </div>
+        </div>
+      </InspectorLayout>
+    </CommandPressScope>
   );
 }

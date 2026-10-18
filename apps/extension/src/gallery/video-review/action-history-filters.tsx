@@ -299,7 +299,7 @@ function HistoryFilterFields({
     ])
   );
   return (
-    <div className="review-history-filters space-y-2">
+    <div className="review-history-filters sniptale-parameter-stack">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.historyType')}

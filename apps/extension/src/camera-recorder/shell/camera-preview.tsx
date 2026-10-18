@@ -7,7 +7,7 @@ type PreviewState =
   | { stream: MediaStream; status: 'ready' };
 
 const PREVIEW_CLASS = [
-  'relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[16px]',
+  'relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[4px]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_84%,black_16%)]',
 ].join(' ');
 
@@ -19,7 +19,10 @@ export function CameraPreview({ webcamDeviceId }: { webcamDeviceId: string | nul
       {state.status === 'ready' ? (
         <MediaStreamVideo stream={state.stream} />
       ) : (
-        <div className="px-4 text-center text-sm text-[var(--sniptale-color-text-muted-strong)]">
+        <div
+          className="select-text px-4 text-center text-[14px] leading-5 font-normal
+          text-[var(--sniptale-color-text-muted-strong)]"
+        >
           {resolvePreviewStatusText(state.status)}
         </div>
       )}

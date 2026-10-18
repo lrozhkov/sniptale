@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
 import { ToolbarDockingGuides } from './docking-guides';
 import { ContentToolbarDragHandle, ContentToolbarShell } from '@sniptale/ui/content-toolbar';
@@ -25,13 +26,20 @@ function getToolbarVisibilityStyle(
   } as const;
 }
 
-function clearPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
-  if (event.button !== 0 || !(event.target instanceof Element)) return;
+function getPointerActivatedToolbarButton(event: React.MouseEvent<HTMLDivElement>) {
+  if (event.button !== 0 || !(event.target instanceof Element)) return null;
   const button = event.target.closest<HTMLButtonElement>('button.sniptale-btn');
-  if (!button || !event.currentTarget.contains(button) || button.disabled) return;
+  return button && event.currentTarget.contains(button) && !button.disabled ? button : null;
+}
+
+function blurPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
+  const button = getPointerActivatedToolbarButton(event);
+  if (button?.matches(':focus')) button.blur();
+}
+
+function preventPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
   // Both native mousedown and the activation bridge focus after this handler unless cancelled.
-  event.preventDefault();
-  if (button.matches(':focus')) button.blur();
+  if (getPointerActivatedToolbarButton(event)) event.preventDefault();
 }
 
 export function ToolbarShellContent(props: {
@@ -60,35 +68,38 @@ export function ToolbarShellContent(props: {
           uiScale
         )}
       >
-        <ContentToolbarShell
-          ref={derivedState.toolbarRef}
-          className="sniptale-content-ui-zoom-surface"
-          dragging={derivedState.isDragging}
-          dataUi="content.toolbar.root"
-          data-display-mode={derivedState.displayMode}
-          data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
-          data-menu-open={menuOpen ? 'true' : undefined}
-          onMouseDownCapture={clearPointerActivatedToolbarFocus}
-          onMouseOverCapture={onHoverCapture}
-        >
-          <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-              <circle cx="9" cy="12" r="1" />
-              <circle cx="9" cy="5" r="1" />
-              <circle cx="9" cy="19" r="1" />
-              <circle cx="15" cy="12" r="1" />
-              <circle cx="15" cy="5" r="1" />
-              <circle cx="15" cy="19" r="1" />
-            </svg>
-          </ContentToolbarDragHandle>
+        <CommandPressScope value={true}>
+          <ContentToolbarShell
+            ref={derivedState.toolbarRef}
+            className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
+            dragging={derivedState.isDragging}
+            dataUi="content.toolbar.root"
+            data-display-mode={derivedState.displayMode}
+            data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
+            data-menu-open={menuOpen ? 'true' : undefined}
+            onPointerDownCapture={blurPointerActivatedToolbarFocus}
+            onMouseDownCapture={preventPointerActivatedToolbarFocus}
+            onMouseOverCapture={onHoverCapture}
+          >
+            <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+                <circle cx="9" cy="12" r="1" />
+                <circle cx="9" cy="5" r="1" />
+                <circle cx="9" cy="19" r="1" />
+                <circle cx="15" cy="12" r="1" />
+                <circle cx="15" cy="5" r="1" />
+                <circle cx="15" cy="19" r="1" />
+              </svg>
+            </ContentToolbarDragHandle>
 
-          <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-          <ToolbarSecondaryControls
-            toolbarProps={toolbarProps}
-            viewModel={viewModel}
-            onViewportChange={onViewportChange}
-          />
-        </ContentToolbarShell>
+            <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+            <ToolbarSecondaryControls
+              toolbarProps={toolbarProps}
+              viewModel={viewModel}
+              onViewportChange={onViewportChange}
+            />
+          </ContentToolbarShell>
+        </CommandPressScope>
       </div>
     </>
   );

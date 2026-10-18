@@ -36,7 +36,9 @@ Recovery is a fresh `npm ci --ignore-scripts` followed by normalization. A proce
 
 `source.patch` is the reviewable five-file upstream TypeScript delta. The payload includes those complete modified source files and regenerated distribution entrypoints. Keep upstream MPL headers and this LICENSE. Supply the upstream corresponding source together with the modifications and reconstruction instructions in release source distribution. Upstream registry tarball integrity identifies the starting artifact, not the modified result.
 
-Reconstruction uses locked Node 24.18.0, TypeScript 6.0.3 and esbuild 0.28.2. Compile the five modified TS modules as ES2022/ESNext, preserving explicit `.js` relative imports. Emit their declarations/maps through a full TypeScript program using shipped shared declarations for the tarball's omitted shared TS source. Rebuild the package's five browser/Node CJS/ESM bundles from the resulting ESM index. Browser builds retain upstream's Node/fs exclusion.
+Live audio capture sets `MediaStreamTrackProcessor.maxBufferSize` to 128 frames. This bounded buffer retains samples during short document stalls. A separate queue holds at most 128 admitted samples while the encoder or writer waits. Queue overflow rejects `errorPromise`. Capture continues to discard paused samples independently of the writer. Resume replaces the native reader on the same track to discard its paused buffer. Timestamp, codec, pause, and finalization contracts remain unchanged.
+
+Reconstruction uses Node 24.21.0, TypeScript 6.0.3 and esbuild 0.28.2. Compile the five modified TS modules as ES2022/ESNext, preserving explicit `.js` relative imports. Emit their declarations/maps through a full TypeScript program using shipped shared declarations for the tarball's omitted shared TS source. Rebuild the package's five browser/Node CJS/ESM bundles from the resulting ESM index. Browser builds retain upstream's Node/fs exclusion.
 
 Add the same inline metadata union to the aggregate declaration. The manifest pins the resulting distribution bytes so install never depends on an available compiler version. The generated `LICENSES/dependencies/mediabunny-1.61.3-modified/README.md` describes exact package reconstruction from the integrity-checked upstream tarball and supplied replacement payload. That release directory contains the manifest, complete modified sources and distributions in the payload, reviewable source patch, and license. Task-local compiler/proof scripts are development evidence.
 
@@ -50,6 +52,8 @@ The optional public audio window admits only AAC fragmented MP4 and Opus WebM, 4
 Candidate code receives no GitHub token, Selectel credential, OIDC authority, or write access to the trusted checkout. Trusted-base code checks candidate identity, mandatory phases, receipt schemas and hashes, execution compatibility, artifact closure, and the final job graph.
 
 A control-digest change is reported as `candidate-controls`. It does not cause the previous implementation to run. Changed QA becomes trusted after merge to `main`.
+
+Shallow PR checkouts can lack merge-base ancestry. Compare their exact base and candidate trees. Full-history checkouts retain merge-base comparison. Neither mode reduces repository-wide Fast proof or harness selection. Missing or unreadable trees fail proof.
 
 Docs-only proof reuse requires an exact successful base proof, equal semantic and control digests, and changed paths classified by machine policy as non-gate inputs. Unknown paths require candidate execution.
 
@@ -81,4 +85,4 @@ For a release, complete Release checks on the source commit before creating its 
 
 Publication is restricted to `main`. It requires a GitHub-verifiable annotated version tag, the matching finalizer result, checked release assets, and attestations for every published subject. Diagnostic mode remains read-only and cannot enter the publisher environment.
 
-The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts evidence and never merges. Use it only for an external-capacity failure or incident. 
+The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts evidence and never merges. Use it only for an external-capacity failure or incident.

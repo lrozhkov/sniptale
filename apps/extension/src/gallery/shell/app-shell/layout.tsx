@@ -10,6 +10,7 @@ import { GalleryImportProgressCard } from '../../library/import-progress-card';
 import type { GalleryAppLayoutProps } from './types';
 import { GALLERY_MEDIA_IMPORT_ACCEPT } from '../../library/media-import-profile';
 import { GalleryImportDropTarget } from './import-drop-target';
+import { GalleryRecordingRecovery } from '../../recording-recovery';
 
 function GalleryImportInput(props: GalleryAppLayoutProps) {
   return (
@@ -226,6 +227,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           storageInfo={props.state.storage.storageInfo}
           viewMode={props.viewMode}
         />
+        <GalleryRecordingRecovery disabled={props.state.storage.isBusy} />
         <div className="flex min-h-0 min-w-0 flex-1 gap-2 overflow-hidden">
           <GallerySidebarSection {...props} />
           <GalleryMainSection {...props} />

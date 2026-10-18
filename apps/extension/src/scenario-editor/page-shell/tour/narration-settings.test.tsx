@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTourImageSlide } from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
 import { TourNarrationSettings } from './narration-settings';
+import { TourNarrationPlacement } from './narration-recording';
 vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
@@ -13,6 +14,8 @@ vi.mock('./narration-preview', () => ({ TourNarrationPreview: () => <div data-pr
 vi.mock('./fields', () => ({ TourTextField: () => null }));
 let root: Root;
 let host: HTMLDivElement;
+let recordingHost: HTMLDivElement;
+const onRecordingActive = vi.fn();
 const onImport = vi.fn();
 const onChange = vi.fn();
 const narration = {
@@ -28,25 +31,31 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
-  document.body.append(host);
+  recordingHost = document.createElement('div');
+  document.body.append(host, recordingHost);
   root = createRoot(host);
 });
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  recordingHost.remove();
   vi.unstubAllGlobals();
 });
 const render = (importDisabled = false) =>
   act(async () =>
     root.render(
-      <TourNarrationSettings
-        slide={slide}
-        disabled={false}
-        importDisabled={importDisabled}
-        onImport={onImport}
-        onChange={onChange}
-        t={createTranslator('en')}
-      />
+      <TourNarrationPlacement.Provider
+        value={{ host: recordingHost, setActive: onRecordingActive }}
+      >
+        <TourNarrationSettings
+          slide={slide}
+          disabled={false}
+          importDisabled={importDisabled}
+          onImport={onImport}
+          onChange={onChange}
+          t={createTranslator('en')}
+        />
+      </TourNarrationPlacement.Provider>
     )
   );
 const choose = () => {
@@ -130,13 +139,16 @@ it('opens a recording draft and closes it without altering saved narration', asy
   act(() =>
     [...host.querySelectorAll('button')].find((button) => button.textContent === 'Record')!.click()
   );
-  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(recordingHost.querySelector('[data-ui="audio-recording.inspector"]')).not.toBeNull();
+  expect(onRecordingActive).toHaveBeenLastCalledWith(true);
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   act(() =>
     [...document.querySelectorAll('button')]
       .find((button) => button.textContent === 'Cancel')!
       .click()
   );
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(recordingHost.querySelector('[data-ui="audio-recording.inspector"]')).toBeNull();
+  expect(onRecordingActive).toHaveBeenLastCalledWith(false);
   expect(onImport).not.toHaveBeenCalled();
   expect(onChange).not.toHaveBeenCalled();
 });

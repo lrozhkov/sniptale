@@ -28,18 +28,13 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "fonts/manrope-cyrillic-wght-normal.woff2",
-        "fonts/manrope-latin-ext-wght-normal.woff2",
-        "fonts/manrope-latin-wght-normal.woff2",
+        "assets/golos-text-vf.woff2",
+        "assets/golos-ui-vf.woff2",
+        "cursors/text.svg",
         "fonts/marck-script-cyrillic-400-normal.woff2",
         "fonts/marck-script-latin-400-normal.woff2"
       ],
-      "matches": ["http://*/*", "https://*/*", "file:///*"],
-      "use_dynamic_url": true
-    },
-    {
-      "resources": ["cursors/text.svg"],
-      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "matches": ["file:///*", "http://*/*", "https://*/*"],
       "use_dynamic_url": true
     }
   ],

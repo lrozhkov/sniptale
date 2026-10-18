@@ -1,7 +1,13 @@
+import {
+  InformationDisclosure,
+  InspectorDisclosureView,
+} from '../../../../ui/compact-inspector-controls/disclosure';
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { useEffect, useRef, useState } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
+  SettingsControlRow,
   settingsCompactWorkbenchClassName,
   settingsMetaLabelClassName,
 } from '../../../section-surface';
@@ -70,34 +76,47 @@ export function FilenameRulesSettings() {
   useAppLocale();
   const { draft, previewRules, status, valid, disabled, change, save, reset } =
     useFilenameRulesDraft();
+  const [overridesOpen, setOverridesOpen] = useState(false);
   const [activeField, setActiveField] = useState<keyof FilenameRules>('template');
   const inputs = useRef<Partial<Record<keyof FilenameRules, HTMLInputElement | null>>>({});
   const field = (key: keyof FilenameRules) => {
     const invalid = !isValidFilenameTemplate(draft[key] ?? '');
     return (
       <div key={key} className="space-y-1">
-        <label htmlFor={`filename-${key}`} className="text-sm font-medium">
-          {translate(`settings.filenameRules.${key}`)}
-        </label>
-        <ProductInput
-          ref={(element) => {
-            inputs.current[key] = element;
-          }}
-          id={`filename-${key}`}
-          value={draft[key] ?? ''}
-          disabled={disabled}
-          maxLength={200}
-          placeholder={
-            key === 'template'
-              ? DEFAULT_FILENAME_TEMPLATE
-              : translate('settings.filenameRules.inherit')
-          }
-          aria-invalid={invalid}
-          aria-describedby={invalid ? `filename-${key}-error` : undefined}
-          onFocus={() => setActiveField(key)}
-          onChange={(event) => change(key, event.target.value)}
-          className="w-full"
-        />
+        <SettingsControlRow label={translate(`settings.filenameRules.${key}`)}>
+          <div className="sniptale-text-value">
+            <ProductInput
+              aria-label={translate(`settings.filenameRules.${key}`)}
+              ref={(element) => {
+                inputs.current[key] = element;
+              }}
+              id={`filename-${key}`}
+              value={draft[key] ?? ''}
+              disabled={disabled}
+              maxLength={200}
+              placeholder={
+                key === 'template'
+                  ? DEFAULT_FILENAME_TEMPLATE
+                  : translate('settings.filenameRules.inherit')
+              }
+              aria-invalid={invalid}
+              aria-describedby={invalid ? `filename-${key}-error` : undefined}
+              onFocus={() => setActiveField(key)}
+              onChange={(event) => change(key, event.target.value)}
+              className="w-full"
+            />
+            {draft[key] && !disabled ? (
+              <InspectorFieldClear
+                label={translate(`settings.filenameRules.${key}`)}
+                target={{
+                  get current() {
+                    return inputs.current[key] ?? null;
+                  },
+                }}
+              />
+            ) : null}
+          </div>
+        </SettingsControlRow>
         {invalid ? (
           <p id={`filename-${key}-error`} role="alert" className="text-sm">
             {translate('settings.filenameRules.invalid')}
@@ -115,9 +134,7 @@ export function FilenameRulesSettings() {
       <h2 id="filename-heading" className={settingsMetaLabelClassName}>
         {translate('settings.filenameRules.heading')}
       </h2>
-      <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
-        {translate('settings.filenameRules.help')}
-      </p>
+
       {field('template')}
       <div
         className="flex flex-wrap gap-2"
@@ -143,36 +160,43 @@ export function FilenameRulesSettings() {
           </ProductActionButton>
         ))}
       </div>
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">
-          {translate('settings.filenameRules.overrides')}
-        </summary>
-        <div className="mt-3 space-y-3">{FILENAME_CATEGORIES.map(field)}</div>
-      </details>
-      <div
-        aria-label={translate('settings.filenameRules.preview')}
-        className="grid gap-x-5 gap-y-1 text-xs leading-5 sm:grid-cols-2"
+      <InspectorDisclosureView
+        dataUi="settings.filename-overrides"
+        variant="structural"
+        label={translate('settings.filenameRules.overrides')}
+        open={overridesOpen}
+        onOpenChange={setOverridesOpen}
+        bodyClassName="space-y-3 px-2 pt-2"
       >
-        {FILENAME_CATEGORIES.map((category, index) => {
-          const result = resolveFilename(
-            previewRules,
-            {
-              category,
-              type: category,
-              extension: ['png', 'mp4', 'html', 'zip', 'sniptale-settings.json'][index]!,
-              index: 1,
-            },
-            PREVIEW_CONTEXT
-          );
-          return (
-            <div key={category}>
-              <span>{translate(`settings.filenameRules.${category}`)}: </span>
-              <output className="break-all">{result.filename}</output>
-              {result.fallback ? <p>{translate('settings.filenameRules.fallback')}</p> : null}
-            </div>
-          );
-        })}
-      </div>
+        {FILENAME_CATEGORIES.map(field)}
+      </InspectorDisclosureView>
+      <InformationDisclosure label={translate('settings.filenameRules.preview')}>
+        <p>{translate('settings.filenameRules.help')}</p>
+        <div
+          aria-label={translate('settings.filenameRules.preview')}
+          className="grid gap-x-5 gap-y-1 text-xs leading-5 sm:grid-cols-2"
+        >
+          {FILENAME_CATEGORIES.map((category, index) => {
+            const result = resolveFilename(
+              previewRules,
+              {
+                category,
+                type: category,
+                extension: ['png', 'mp4', 'html', 'zip', 'sniptale-settings.json'][index]!,
+                index: 1,
+              },
+              PREVIEW_CONTEXT
+            );
+            return (
+              <div key={category}>
+                <span>{translate(`settings.filenameRules.${category}`)}: </span>
+                <output className="break-all">{result.filename}</output>
+                {result.fallback ? <p>{translate('settings.filenameRules.fallback')}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      </InformationDisclosure>
       <div className="flex flex-wrap items-center gap-2">
         <ProductActionButton
           compact

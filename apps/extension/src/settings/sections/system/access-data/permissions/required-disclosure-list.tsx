@@ -7,8 +7,8 @@ import {
 
 const categoryOrder: RequiredPermissionCategory[] = ['core', 'page', 'capture'];
 const categoryHeadingClassName = [
-  'text-xs font-semibold uppercase tracking-[0.08em]',
-  'text-[var(--sniptale-color-text-muted-strong)]',
+  'text-[13px] font-medium leading-[18px]',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 const categoryTitleKeys = {
@@ -18,12 +18,12 @@ const categoryTitleKeys = {
 } as const;
 
 const requiredGrantCardClassName = [
-  'grid gap-3 border-b px-4 py-3 last:border-b-0 md:border-b-0 md:border-r',
+  'grid gap-2 border-b px-3 py-2 last:border-b-0 md:border-b-0 md:border-r',
   'border-[var(--sniptale-color-border-soft)] md:[&:nth-child(2n)]:border-r-0',
 ].join(' ');
 
 const requiredGrantIconClassName = [
-  'flex h-8 w-8 flex-shrink-0 items-center justify-center',
+  'flex h-7 w-7 flex-shrink-0 items-center justify-center',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -34,13 +34,13 @@ function RequiredManifestGrantCard(props: { disclosure: RequiredManifestPermissi
     <div className={requiredGrantCardClassName}>
       <div className="flex items-start gap-3">
         <div className={requiredGrantIconClassName}>
-          <Icon size={17} />
+          <Icon size={16} />
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+          <h3 className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
             {translate(props.disclosure.nameKey)}
           </h3>
-          <p className="mt-1 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+          <p className="mt-1 text-xs leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             {translate(props.disclosure.descriptionKey)}
           </p>
         </div>
@@ -52,18 +52,18 @@ function RequiredManifestGrantCard(props: { disclosure: RequiredManifestPermissi
 export function RequiredManifestPermissionDisclosureList() {
   return (
     <section
-      className="grid gap-5"
+      className="grid gap-4"
       aria-label={translate('settings.permissions.requiredGrantsTitle')}
     >
       <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
         {translate('settings.permissions.requiredGrantsDescription')}
       </p>
       {categoryOrder.map((category) => (
-        <div key={category} className="grid gap-2.5">
+        <div key={category} className="grid gap-2">
           <h2 className={categoryHeadingClassName}>{translate(categoryTitleKeys[category])}</h2>
           <div
             className={[
-              'grid overflow-hidden rounded-[12px] border md:grid-cols-2',
+              'grid overflow-hidden rounded-[8px] border md:grid-cols-2',
               'border-[var(--sniptale-color-border-soft)]',
             ].join(' ')}
           >

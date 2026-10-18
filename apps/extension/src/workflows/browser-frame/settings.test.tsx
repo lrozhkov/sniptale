@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
 import { WindowHeaderSettings } from './settings';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { DEFAULT_WINDOW_HEADER, type WindowHeader } from '../../features/browser-frame/header';
 const acquire = vi.hoisted(() => vi.fn());
 const importIcon = vi.hoisted(() => vi.fn());
@@ -339,5 +340,41 @@ it('does not let a late website response overwrite a chosen file', async () => {
     expect(view.current()).toMatchObject({ faviconSource: 'file', faviconDataUrl: icon + 'local' });
   } finally {
     await view.dispose();
+  }
+});
+
+it('keeps the address and icon actions in one inspector value owner', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <InspectorLayout>
+          <WindowHeaderSettings
+            header={{ ...DEFAULT_WINDOW_HEADER, title: '', url: '' }}
+            onChange={vi.fn()}
+          />
+        </InspectorLayout>
+      )
+    );
+    const address = host.querySelector<HTMLInputElement>(
+      `input[aria-label="${translate('windowHeader.address')}"]`
+    )!;
+    const value = address.closest('.sniptale-parameter-value');
+    expect(address.placeholder).toBe('example.com');
+    expect(
+      value?.querySelector(`button[aria-label="${translate('windowHeader.favicon')}"]`)
+    ).not.toBeNull();
+    expect(
+      value?.querySelector(`button[aria-label="${translate('windowHeader.fileIcon')}"]`)
+    ).not.toBeNull();
+    expect(
+      host.querySelector<HTMLInputElement>(
+        `input[aria-label="${translate('windowHeader.tabTitle')}"]`
+      )?.placeholder
+    ).toBe(translate('windowHeader.tabTitle'));
+  } finally {
+    await act(async () => root.unmount());
   }
 });

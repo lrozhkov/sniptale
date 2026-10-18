@@ -21,16 +21,16 @@ export function TextSection({ actions, disabled, state }: SectionProps) {
   const change = actions.updateValue;
 
   return (
-    <div className="grid gap-2" data-ui="content.design-review.settings-text">
-      <div className="grid gap-2">
+    <div className="grid gap-1" data-ui="content.design-review.settings-text">
+      <div className="grid gap-1">
         <TextModeButtons actions={actions} disabled={disabled} state={state} />
         <TextAlignButtons actions={actions} disabled={disabled} state={state} />
       </div>
       <div
         data-ui="content.design-review.typography-fields"
-        className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2"
+        className="grid grid-cols-1 gap-x-2 gap-y-1"
       >
-        <div className="col-span-2">
+        <div className="col-span-1">
           <ColorField
             disabled={disabled}
             label={translate('content.designReview.color')}
@@ -39,7 +39,7 @@ export function TextSection({ actions, disabled, state }: SectionProps) {
           />
         </div>
         <TextSelectField
-          className="col-span-2"
+          className="col-span-1"
           disabled={disabled}
           label={translate('content.designReview.fontFamily')}
           options={getFontFamilyOptions(fieldState(state, actions, 'font-family').value)}
@@ -71,7 +71,7 @@ function TextNumericFields({ actions, disabled, state }: SectionProps) {
         onChange={(value) => change('line-height', value)}
       />
       <TextSelectField
-        className="col-span-2"
+        className="col-span-1"
         disabled={disabled}
         label={translate('content.designReview.letterSpacing')}
         options={getLetterSpacingOptions(fieldState(state, actions, 'letter-spacing').value)}

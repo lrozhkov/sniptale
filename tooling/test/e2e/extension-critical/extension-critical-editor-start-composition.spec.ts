@@ -161,13 +161,23 @@ for (const variant of [
         { storeName, projects, title }
       );
       await page.goto(url);
-      await expect(start.locator('section button')).toHaveCount(3);
+      const cards = start.locator('[data-ui="editor.start.project"]').filter({ hasText: title });
+      await expect(cards).toHaveCount(3);
+      await expect
+        .soft(start.locator('section h2'))
+        .toHaveCSS('font-weight', '500', { timeout: 100 });
+      for (const card of await cards.all()) {
+        await expect
+          .soft(card.locator('.line-clamp-2'))
+          .toHaveCSS('font-weight', '400', { timeout: 100 });
+        await expect.poll(() => card.getAttribute('title')).toContain(title);
+      }
       if (editor === 'editor') await expect(start.locator('section img').first()).toBeVisible();
       await page.screenshot({ path: info.outputPath(`${editor}-projects.png`) });
       expect(await start.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
         true
       );
-      const card = start.locator('section button').first();
+      const card = cards.first();
       await card.focus();
       await page.keyboard.press('Enter');
       await expect(start).toBeHidden();

@@ -1,5 +1,5 @@
+import { ToggleField, TextField, StatusRow } from '../../ui/compact-inspector-controls';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { ProductToggle, ProductInput } from '@sniptale/ui/product-form-controls';
 import { ListOrdered } from 'lucide-react';
 import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
 import type { Translate } from '../../platform/i18n';
@@ -35,25 +35,17 @@ export function GuideNumberingControls({
         icon={ListOrdered}
       >
         {item.kind === 'step' && (
-          <label className="guide-number-toggle">
-            <ProductToggle
-              size="sm"
-              aria-label={t('scenario.editor.guideShowNumber')}
-              checked={item.showNumber}
-              onClick={() => onChange({ ...item, showNumber: !item.showNumber }, null)}
-            />
-            {t('scenario.editor.guideShowNumber')}
-          </label>
-        )}
-        <label className="guide-number-toggle">
-          <ProductToggle
-            size="sm"
-            aria-label={t('scenario.editor.guideRestartNumbering')}
-            checked={restartAt !== undefined}
-            onClick={() => restart(restartAt === undefined ? 1 : undefined)}
+          <ToggleField
+            label={t('scenario.editor.guideShowNumber')}
+            value={item.showNumber}
+            onChange={(showNumber) => onChange({ ...item, showNumber }, null)}
           />
-          {t('scenario.editor.guideRestartNumbering')}
-        </label>
+        )}
+        <ToggleField
+          label={t('scenario.editor.guideRestartNumbering')}
+          value={restartAt !== undefined}
+          onChange={(enabled) => restart(enabled ? 1 : undefined)}
+        />
         {restartAt !== undefined && (
           <GuideInspectorNumber
             label={t('scenario.editor.guideStartAt')}
@@ -65,31 +57,31 @@ export function GuideNumberingControls({
           />
         )}
         {item.kind === 'step' && item.showNumber && (
-          <label className="guide-numbering-field">
-            <span>{t('scenario.editor.guideCustomNumber')}</span>
-            <ProductInput
-              value={item.numbering?.label ?? ''}
-              maxLength={GUIDE_LIMITS.maxNumberLabelLength}
-              placeholder={t('scenario.editor.guideAutomaticNumber')}
-              onChange={(event) =>
-                onChange(
-                  withNumbering(
-                    item,
-                    restartAt,
-                    event.target.value.trim() ? event.target.value : undefined
-                  ),
-                  `number-label:${item.id}`
-                )
-              }
-            />
-          </label>
+          <TextField
+            label={t('scenario.editor.guideCustomNumber')}
+            value={item.numbering?.label ?? ''}
+            maxLength={GUIDE_LIMITS.maxNumberLabelLength}
+            placeholder={t('scenario.editor.guideAutomaticNumber')}
+            onChange={(event) =>
+              onChange(
+                withNumbering(
+                  item,
+                  restartAt,
+                  event.target.value.trim() ? event.target.value : undefined
+                ),
+                `number-label:${item.id}`
+              )
+            }
+          />
         )}
-        <div className="guide-numbering-next">
-          <span>{t('scenario.editor.guideNextAutomaticNumber')}</span>
-          <output aria-label={t('scenario.editor.guideNextAutomaticNumber')}>
-            {resolveGuideNumbering(project.items).get(item.id)?.nextAutomaticNumber}
-          </output>
-        </div>
+        <StatusRow
+          label={t('scenario.editor.guideNextAutomaticNumber')}
+          value={
+            <output aria-label={t('scenario.editor.guideNextAutomaticNumber')}>
+              {resolveGuideNumbering(project.items).get(item.id)?.nextAutomaticNumber}
+            </output>
+          }
+        />
       </GuideInspectorGroup>
     </fieldset>
   );

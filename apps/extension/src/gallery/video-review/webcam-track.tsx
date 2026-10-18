@@ -1,9 +1,5 @@
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackCuts,
-  ReviewTrackRow,
-} from './track-row';
+import { ReviewTrackVisibilityButton } from './track-row';
+import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Camera, Eye, EyeOff, Settings2 } from 'lucide-react';
@@ -97,14 +93,15 @@ export function ReviewWebcamTrack(props: {
           >
             <Settings2 size={14} aria-hidden />
           </ReviewButton>
-          <ReviewButton
+          <ReviewTrackVisibilityButton
+            track="webcam"
             label={translate('gallery.videoReview.webcamApply')}
             className={reviewCompactTrackButtonClassName}
             aria-pressed={camera.enabled}
             onClick={() => admit(() => void editor.toggle())}
           >
             {camera.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
-          </ReviewButton>
+          </ReviewTrackVisibilityButton>
         </>
       }
     >
@@ -119,10 +116,6 @@ export function ReviewWebcamTrack(props: {
             (event.target instanceof Element && event.target.closest('button'))
           )
             return;
-          if (reviewTrackGestureLocked(event.currentTarget)) {
-            editor.select({ kind: 'webcam' });
-            return;
-          }
           const start = timeAt(event);
           const admission = deferReviewGesture(props.beforeAction, () =>
             editor.select({ kind: 'webcam' })

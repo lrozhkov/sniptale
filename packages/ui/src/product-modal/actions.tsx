@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useContext, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
@@ -21,6 +22,8 @@ export function ProductActionButton({
   type = 'button',
   ...props
 }: ProductActionButtonProps) {
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({ ...props, enabled: scoped });
   const toneClassName =
     tone === 'primary'
       ? [getControlPrimaryButtonClassName({ density: compact ? 'compact' : 'default' })]
@@ -43,10 +46,15 @@ export function ProductActionButton({
   return (
     <button
       {...props}
+      {...press.props}
+      data-command-press={scoped ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-command-tone={scoped ? tone : undefined}
+      data-command-active={scoped && active ? 'true' : undefined}
       type={type}
       className={[...toneClassName, className].filter(Boolean).join(' ')}
     >
-      {children}
+      {scoped ? <span className="sniptale-command-content">{children}</span> : children}
     </button>
   );
 }

@@ -159,11 +159,20 @@
   overscroll-behavior: contain;
   border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 94%, transparent);
   border-radius: 14px;
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-panel) 92%,
-    var(--sniptale-color-surface-canvas) 8%
-  );
+  background:
+    linear-gradient(
+      color-mix(
+        in srgb,
+        var(--sniptale-color-surface-panel) 92%,
+        var(--sniptale-color-surface-canvas) 8%
+      ),
+      color-mix(
+        in srgb,
+        var(--sniptale-color-surface-panel) 92%,
+        var(--sniptale-color-surface-canvas) 8%
+      )
+    ),
+    var(--sniptale-color-surface-canvas);
   box-shadow:
     0 18px 32px color-mix(in srgb, var(--sniptale-color-overlay) 18%, transparent),
     inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-border-subtle) 30%, transparent);
@@ -279,4 +288,54 @@
 
 .sniptale-select-option-group + .sniptale-select-option {
   margin-block-start: 4px;
+}
+
+/* Adopted surfaces retain canonical geometry through portaled selection menus. */
+.sniptale-compact-workspace .sniptale-select {
+  --sniptale-field-height: 32px;
+  --sniptale-field-padding-block: 5px;
+  --sniptale-field-padding-inline-start: 8px;
+  --sniptale-field-padding-inline-end: 28px;
+  --sniptale-field-gap: 6px;
+  --sniptale-field-radius: 4px;
+  --sniptale-field-font-size: 13px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-compact-workspace .sniptale-select-chevron-edge {
+  right: 8px;
+}
+.sniptale-select-menu.sniptale-compact-workspace {
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-select-menu.sniptale-compact-workspace .sniptale-select-option {
+  min-height: 36px;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  font: inherit;
+}
+.sniptale-select-menu.sniptale-compact-workspace .sniptale-select-option-selected {
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-select-menu.sniptale-compact-workspace .sniptale-select-option-description {
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+.sniptale-select-menu.sniptale-compact-workspace .sniptale-select-option-group {
+  display: grid;
+  gap: 2px;
+}
+.sniptale-select-menu.sniptale-compact-workspace
+  .sniptale-select-option-group
+  > .sniptale-select-option {
+  padding-inline-start: 24px;
+}
+.sniptale-select-menu.sniptale-compact-workspace
+  .sniptale-select-option-group
+  + .sniptale-select-option {
+  margin-block-start: 0;
 }

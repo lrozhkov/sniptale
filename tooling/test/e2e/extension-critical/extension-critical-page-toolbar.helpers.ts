@@ -4,10 +4,11 @@ import type { BrowserContext } from '@playwright/test';
 export async function openDesignReview(
   context: BrowserContext,
   extensionId: string,
-  hostOrigin: string
+  hostOrigin: string,
+  viewport = { width: 1280, height: 720 }
 ) {
   const page = await context.newPage();
-  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.setViewportSize(viewport);
   await page.goto(hostOrigin);
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);

@@ -178,7 +178,7 @@ function MicrophoneProcessingToggle({
       className={[
         OPTION_BUTTON_CLASS_NAME,
         active
-          ? 'text-[var(--sniptale-color-accent)]'
+          ? 'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]'
           : 'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       disabled={disabled || unsupported}

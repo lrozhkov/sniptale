@@ -46,7 +46,9 @@ export function DesignReviewFeedbackPanel(props: {
     <aside
       ref={panelRef}
       className={[
-        'pointer-events-auto fixed z-[2147483646] flex flex-col overflow-visible rounded-[14px] border shadow-2xl',
+        'sniptale-design-review-chrome sniptale-compact-workspace',
+        'pointer-events-auto fixed z-[2147483646] flex flex-col overflow-visible',
+        'rounded-[4px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}

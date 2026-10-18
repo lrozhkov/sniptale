@@ -1,19 +1,9 @@
-import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
-import cyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?inline';
-import extended from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?inline';
+import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
 import { isWindowHeaderFavicon, windowHeaderGeometry, type WindowHeader } from './header';
 
-const headerFontCss = [
-  [latin, 'U+0000-00FF,U+2000-206F'],
-  [cyrillic, 'U+0400-052F,U+2116'],
-  [extended, 'U+0100-024F,U+1E00-1EFF'],
-]
-  .map(
-    ([url, range]) =>
-      `@font-face{font-family:WindowHeaderFont;font-style:normal;` +
-      `font-weight:200 800;src:url("${url}") format("woff2");unicode-range:${range}}`
-  )
-  .join('');
+const headerFontCss =
+  `@font-face{font-family:"Sniptale Interface";font-style:normal;` +
+  `font-weight:400 700;src:url("${interfaceFont}") format("woff2");}`;
 
 function esc(value: string): string {
   return Array.from(value)
@@ -165,7 +155,7 @@ export function composeWindowHeaderSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.width}" ` +
     `height="${outputHeight}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${kind} ` +
     `${os} ${dark ? 'dark' : 'light'}"><title>${esc(title)}</title>` +
-    `<style>${headerFontCss}text{font-family:WindowHeaderFont,sans-serif}</style>`;
+    `<style>${headerFontCss}text{font-family:"Sniptale Interface",sans-serif}</style>`;
   s +=
     kind === 'browser'
       ? composeBrowserChrome(header, w, h, os, dark)

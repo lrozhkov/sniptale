@@ -1,9 +1,5 @@
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackRow,
-  ReviewTrackCuts,
-} from './track-row';
+import { ReviewTrackVisibilityButton } from './track-row';
+import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
@@ -28,7 +24,7 @@ import {
   getSnapCandidates,
   snapTimelineTime,
 } from '../../features/video/review/snap';
-import { reviewTrackStatusButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
+import { reviewTrackStatusButtonClassName, reviewTimeLabel } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { useReviewDragEscape } from './timeline-drag';
 
@@ -61,6 +57,7 @@ type ZoomTrackProps = {
   time: number | null;
   regions: readonly QuickEditZoomRegion[];
   edits: readonly ReviewEdit[];
+  snapTimes?: readonly number[] | undefined;
   /** Source-to-result projection; removed source points return null. */
   toOutputTime(source: number): number | null;
   selectedId: string | null;
@@ -228,13 +225,16 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   // Visible result-time endpoints, projected edit edges and playhead; codec frames are not focus targets.
   const snapEdges = useMemo(() => {
     const values = new Set<number>([0, duration]);
-    for (const value of edits.flatMap((edit) => [edit.start, edit.end])) {
+    for (const value of [
+      ...edits.flatMap((edit) => [edit.start, edit.end]),
+      ...(props.snapTimes ?? []),
+    ]) {
       const projected = toOutputTime(value);
       if (projected !== null) values.add(projected);
     }
     if (time !== null) values.add(time);
     return [...values].sort((a, b) => a - b);
-  }, [edits, time, toOutputTime, duration]);
+  }, [edits, time, toOutputTime, duration, props.snapTimes]);
   return (
     <ReviewTrackRow
       track="zoom"
@@ -244,14 +244,15 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       controls={
         <>
           {props.onToggleEnabled ? (
-            <ReviewButton
+            <ReviewTrackVisibilityButton
+              track={'zoom'}
               label={translate('gallery.videoReview.zoomEnabled')}
               aria-pressed={props.enabled !== false}
               onClick={props.onToggleEnabled}
               className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
             >
               {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewButton>
+            </ReviewTrackVisibilityButton>
           ) : null}
         </>
       }
@@ -285,7 +286,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             snapEdges={snapEdges}
             sourceSnapEdges={getSnapCandidates({
               edits,
-              boundaries: [0, props.projection?.duration ?? duration],
+              boundaries: [0, props.projection?.duration ?? duration, ...(props.snapTimes ?? [])],
               playhead: time === null ? null : (props.projection?.source(time) ?? time),
             })}
             row={rows.get(region.id) ?? 0}
@@ -535,10 +536,6 @@ function ReviewZoomRegionBlock(
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
-    if (reviewTrackGestureLocked(event.currentTarget)) {
-      props.onSelect(region.id);
-      return;
-    }
     const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(region.id));
     const target = event.target;
     const edge =

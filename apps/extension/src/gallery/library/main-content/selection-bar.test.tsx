@@ -116,7 +116,7 @@ it('renders selected-state actions and forwards callbacks', () => {
   expect(selectionBar?.className).toContain('flex-nowrap');
   expect(backupButton.className).toContain('!h-8');
   expect(backupButton.className).toContain('!min-h-8');
-  expect(backupButton.className).toContain('!rounded-[8px]');
+  expect(backupButton.className).toContain('!rounded-[4px]');
   expect(backupButton.className).toContain('!text-xs');
   expect(deleteButton.className).toContain('!text-xs');
   const summary = container?.querySelector('[data-ui="gallery.selection.summary"]');

@@ -11,3 +11,41 @@
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }
+
+/* Only Design Review chrome owns this interface role; source nodes stay outside it. */
+.sniptale-design-review-chrome {
+  --sniptale-font-sans: var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
+}
+
+/* The shared button's relative position must not displace the anchored dismiss target. */
+[data-ui='content.design-review.popover'] > .sniptale-dismiss-button {
+  position: absolute;
+}
+
+.sniptale-design-review-chrome
+  :is(.sniptale-glass-bold-button, [data-ui='shared.ui.content-toolbar-button']) {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border-radius: 4px;
+}
+
+.sniptale-design-review-chrome .sniptale-design-review-filter-menu button[data-command-tone] {
+  width: 100%;
+  height: auto !important;
+  min-height: 36px !important;
+  padding: 8px !important;
+  justify-content: flex-start;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Comment data keeps its document typography and native caret/selection contract. */
+.sniptale-design-review-chrome .sniptale-design-review-authored-text {
+  --sniptale-font-sans: var(--sniptale-font-document-sans);
+  font: 400 12px / 20px var(--sniptale-font-document-sans);
+  user-select: text;
+}

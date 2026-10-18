@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -165,4 +166,87 @@ it('loads a project preview after browsing beyond the six recent cards', async (
   const cards = container.querySelectorAll('[data-ui="editor.start.project"]');
   expect(cards).toHaveLength(7);
   expect(cards[6]?.querySelector('img')).not.toBeNull();
+});
+
+it('clears a migrated search through its native input and retains matching project navigation', () => {
+  const onSelect = vi.fn();
+  act(() =>
+    root.render(
+      <CommandPressScope.Provider value={true}>
+        <EditorStart
+          {...labels}
+          items={[{ id: 'one', title: 'One', detail: '' }]}
+          status="ready"
+          browseOnOpen
+          onSelect={onSelect}
+          onCreate={vi.fn()}
+          onOpen={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </CommandPressScope.Provider>
+    )
+  );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="editor.start.actions"] button:nth-of-type(2)')
+      ?.click()
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'Missing'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container.querySelector('[data-ui="editor.start.project"]')).toBeNull();
+  act(() => container.querySelector<HTMLButtonElement>('.sniptale-field-clear')?.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+  const project = container.querySelector<HTMLButtonElement>('[data-ui="editor.start.project"]')!;
+  expect(project.hasAttribute('data-command-press')).toBe(true);
+  act(() => project.click());
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('one');
+});
+
+it('keeps pending editor starts outside the compact press and clear contract', () => {
+  render([{ id: 'one', title: 'One', detail: '' }]);
+  expect(
+    container.querySelector('[data-ui="editor.start.project"]')?.hasAttribute('data-command-press')
+  ).toBe(false);
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+});
+
+it('keeps unavailable and pending projects inert in the migrated start surface', () => {
+  const onSelect = vi.fn();
+  const onCreate = vi.fn();
+  act(() =>
+    root.render(
+      <CommandPressScope value={true}>
+        <EditorStart
+          {...labels}
+          items={[{ id: 'one', title: 'One', detail: '', unavailable: true }]}
+          status="ready"
+          pending
+          onSelect={onSelect}
+          onCreate={onCreate}
+          onOpen={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </CommandPressScope>
+    )
+  );
+  const project = container.querySelector<HTMLButtonElement>('[data-ui="editor.start.project"]')!;
+  const create = container.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.start.actions"] button'
+  )!;
+  act(() => {
+    project.click();
+    create.click();
+  });
+  expect(project.disabled).toBe(true);
+  expect(create.disabled).toBe(true);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onCreate).not.toHaveBeenCalled();
 });

@@ -113,20 +113,20 @@ const CAPTURE_BUTTON_CLASS_NAME = [
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 const CAPTURE_ICON_CLASS_NAME = [
-  'h-7 w-7 text-[var(--sniptale-color-accent)]',
+  'h-6 w-6 stroke-[1.75] text-[var(--sniptale-color-accent)]',
   'transition-transform duration-180 ease-out motion-reduce:transition-none',
   'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
 
 const MENU_SMALL_ICON_CLASS_NAME = [
-  'h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]',
+  'h-[18px] w-[18px] stroke-[1.75] text-[var(--sniptale-color-text-secondary)]',
   'transition-[transform,color] duration-180 ease-out motion-reduce:transition-none',
   'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
   'group-hover:text-[var(--sniptale-color-text-primary)] group-disabled:text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group grid min-h-[54px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'group grid min-h-[58px] min-w-0 grid-rows-[18px_24px] content-center justify-items-center',
   'gap-1.5 rounded-[12px] border-0 bg-transparent px-1.5 py-1.5',
   'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
@@ -143,7 +143,7 @@ const DIVIDED_SECTION_CLASS_NAME = [
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
 ].join(' ');
 const CAPTURE_LABEL_CLASS_NAME = [
-  'whitespace-nowrap text-[9px] font-semibold leading-none',
+  'whitespace-nowrap text-[10px] font-medium leading-3',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 function getCaptureActions(): MenuAction[] {
@@ -363,7 +363,7 @@ function MenuQuickScenarios(props: {
           onClick={scenario.onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span className="min-h-5 text-[9px] font-medium leading-[10px]">{label}</span>
+          <span className="min-h-6 text-[10px] font-medium leading-3">{label}</span>
         </button>
       ))}
     </div>
@@ -405,9 +405,7 @@ function MenuWorkspace() {
           onClick={onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span className="min-h-5 text-[9px] font-medium leading-[10px]">
-            {translate(labelKey)}
-          </span>
+          <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
         </button>
       ))}
     </div>
@@ -439,7 +437,7 @@ function MenuToolbarButton({
       onClick={() => void onOpen(mode)}
     >
       <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-      <span className="min-h-5 text-[9px] font-medium leading-[10px]">{translate(labelKey)}</span>
+      <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
     </button>
   );
 }

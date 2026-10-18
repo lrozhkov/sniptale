@@ -211,6 +211,7 @@ it('keeps inspector titles specific to the selected lane and focus type', () => 
     editing: { selected: { kind: 'cut' } },
   };
   const cases = [
+    [{ kind: 'text', id: 'text' }, 'textFragment'],
     [{ kind: 'webcam' }, 'webcam'],
     [{ kind: 'webcam-position' }, 'webcam'],
     [{ kind: 'webcam-hidden' }, 'webcam'],

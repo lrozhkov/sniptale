@@ -14,7 +14,7 @@ export function ImageSettingsSectionQuality({
     <SettingsControlRow label={translate('imageSettings.section.qualityLabel')}>
       <NumericRow
         appearance="plain"
-        className="min-h-10 w-full !grid-cols-1 py-1.5 [&>div]:!col-start-1"
+        className="w-full"
         label={translate('imageSettings.section.qualityLabel')}
         labelVisible={false}
         min={1}

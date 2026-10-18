@@ -1,3 +1,4 @@
+import { HighlighterPresetEditorFooter } from '../footer';
 import { useEffect, useRef, useState } from 'react';
 import type {
   StepBadgePreset,
@@ -7,13 +8,7 @@ import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { HighlighterManualInspectorSurface } from '../manual-inspector-surface';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
+import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import {
   ProductGlassChip,
   ProductGlassInput,
@@ -22,7 +17,6 @@ import {
   ProductGlassSwitch,
   ProductGlassToggleRow,
 } from '@sniptale/ui/product-glass-controls';
-import { Braces, Hash, MapPin, Maximize2, Palette } from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import {
   createStepBadgeSettingsFromTemplate,
@@ -30,13 +24,19 @@ import {
 } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getStepBadgePresetDisplayName } from '../../../features/highlighter/step-badge-presets/display-name';
 import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
-import { StepBadgeColorSection, StepBadgeSizeSection } from './inspector';
+import {
+  getStepBadgeInspectorSections,
+  StepBadgeColorSection,
+  StepBadgeSizeSection,
+} from './inspector';
 import { StepBadgeCssSection } from './inspector-css';
 import { StepBadgePositionGrid } from './position-grid';
 import { StepBadgePresetPreview } from './thumbnail';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import { getDefaultStepBadgeAlphabet } from '../../../composition/frame-annotation-controls/step-badge/helpers';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 
 type StepBadgePresetEditorProps = {
   isNew?: boolean;
@@ -61,13 +61,7 @@ function StepBadgePresetSettingsInspector(props: {
   onPatch: (value: Partial<StepBadgeSettings>) => void;
   settings: StepBadgeSettings;
 }) {
-  const sections = [
-    { icon: Hash, id: 'numbering', label: translate('content.stepBadge.numberingSection') },
-    { icon: MapPin, id: 'position', label: translate('content.stepBadge.positionSection') },
-    { icon: Maximize2, id: 'size', label: translate('content.stepBadge.sizeSection') },
-    { icon: Palette, id: 'colors', label: translate('content.stepBadge.colorsSection') },
-    { icon: Braces, id: 'css', label: translate('content.stepBadge.cssSection') },
-  ] as const;
+  const sections = [...getStepBadgeInspectorSections()] as const;
   const renderSection = (section: PresetEditorSection) => {
     if (section === 'numbering') {
       return <StepBadgePresetNumberingSection {...props} />;
@@ -220,57 +214,45 @@ function PresetEditorBody(props: {
   tagIds: string[];
 }) {
   const template = createStepBadgeTemplateFromSettings(props.settings, 29.16);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const nameInput = (
+    <ProductInput
+      ref={nameRef}
+      aria-label={translate('highlighter.stepBadgePresets.editor.name')}
+      placeholder={translate('highlighter.stepBadgePresets.editor.name')}
+      className="cursor-text"
+      maxLength={64}
+      style={{ cursor: 'text' }}
+      value={props.name}
+      onChange={(event) => props.setName(event.target.value)}
+    />
+  );
   return (
     <ProductModalBody compact className="space-y-4">
       <div className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-4">
         <StepBadgePresetPreview settings={template} />
         <div className="space-y-4">
           <ProductField label={translate('highlighter.stepBadgePresets.editor.name')}>
-            <ProductInput
-              className="cursor-text"
-              maxLength={64}
-              style={{ cursor: 'text' }}
-              value={props.name}
-              onChange={(event) => props.setName(event.target.value)}
-            />
+            {inspector ? (
+              <div className="sniptale-text-value">
+                {nameInput}
+                {props.name.length > 0 ? (
+                  <InspectorFieldClear
+                    label={translate('highlighter.stepBadgePresets.editor.name')}
+                    target={nameRef}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              nameInput
+            )}
           </ProductField>
           <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
         </div>
       </div>
       <StepBadgePresetSettingsInspector onPatch={props.onPatch} settings={props.settings} />
     </ProductModalBody>
-  );
-}
-
-function PresetEditorFooter(props: {
-  isSaving: boolean;
-  name: string;
-  onClose: () => void;
-  onReset?: (() => void | Promise<void>) | undefined;
-  onSave: () => void;
-}) {
-  return (
-    <ProductModalFooter compact>
-      {props.onReset ? (
-        <ProductActionButton
-          tone="secondary"
-          disabled={props.isSaving}
-          onClick={() => void props.onReset?.()}
-        >
-          {translate('highlighter.stepBadgePresets.reset')}
-        </ProductActionButton>
-      ) : null}
-      <ProductActionButton tone="secondary" onClick={props.onClose}>
-        {translate('common.actions.cancel')}
-      </ProductActionButton>
-      <ProductActionButton
-        tone="primary"
-        disabled={!props.name.trim() || props.isSaving}
-        onClick={props.onSave}
-      >
-        {translate('common.actions.save')}
-      </ProductActionButton>
-    </ProductModalFooter>
   );
 }
 
@@ -338,7 +320,8 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
           setTagIds={setTagIds}
           tagIds={tagIds}
         />
-        <PresetEditorFooter
+        <HighlighterPresetEditorFooter
+          resetLabel={translate('highlighter.stepBadgePresets.reset')}
           isSaving={props.isSaving}
           name={name}
           onClose={props.onClose}

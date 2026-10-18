@@ -1,3 +1,5 @@
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { HighlighterPresetEditorFooter } from '../footer';
 import { useEffect, useRef, useState } from 'react';
 import type {
   CalloutAnchor,
@@ -6,13 +8,7 @@ import type {
   CalloutSettingsPatch,
   CalloutVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
+import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { CalloutManualSettings } from './inspector';
 import { CalloutSettingsPositionGrid } from './position-grid';
@@ -20,9 +16,11 @@ import { CalloutPresetPreview } from './thumbnail';
 import { useCalloutPresetEditorDraft } from './draft';
 import { usePresetEditorModalLifecycle } from '../modal-lifecycle';
 import { Eye } from 'lucide-react';
-import { editorInputClassName, editorPreviewFrameClassName } from '../constants';
+import { editorPreviewFrameClassName } from '../constants';
 import { AnnotationTemplateTagAssignment } from '../../annotation-template-query';
 import { clonePaint } from '@sniptale/foundation/paint';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
+import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 
 function getPresetPlacement(anchor: CalloutAnchor): CalloutPreset['placement'] {
   if (anchor === 'middle-left') return { anchor, side: 'left' };
@@ -89,22 +87,44 @@ function PresetEditorBody(props: {
   style: CalloutVisualStyle;
   tagIds: string[];
 }) {
+  const nameRef = useRef<HTMLInputElement>(null);
+  const inspector = useInspectorLayout();
+  const nameInput = (
+    <ProductInput
+      ref={nameRef}
+      aria-label={translate('highlighter.calloutPresets.editor.name')}
+      placeholder={translate('highlighter.calloutPresets.editor.name')}
+      maxLength={64}
+      onChange={(event) => props.setName(event.target.value)}
+      type="text"
+      value={props.name}
+    />
+  );
   return (
     <ProductModalBody compact className="space-y-4">
       <div>
-        <label className="mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]">
+        <label
+          className={
+            inspector
+              ? 'mb-1 block text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)]'
+              : 'mb-1.5 block text-xs text-[var(--sniptale-color-text-secondary)]'
+          }
+        >
           {translate('highlighter.calloutPresets.editor.name')}
         </label>
-        <input
-          className={[
-            editorInputClassName,
-            'cursor-text placeholder:text-[var(--sniptale-color-text-dim)]',
-          ].join(' ')}
-          maxLength={64}
-          onChange={(event) => props.setName(event.target.value)}
-          type="text"
-          value={props.name}
-        />
+        {inspector ? (
+          <div className="sniptale-text-value">
+            {nameInput}
+            {props.name.length > 0 ? (
+              <InspectorFieldClear
+                label={translate('highlighter.calloutPresets.editor.name')}
+                target={nameRef}
+              />
+            ) : null}
+          </div>
+        ) : (
+          nameInput
+        )}
       </div>
       <AnnotationTemplateTagAssignment onChange={props.setTagIds} value={props.tagIds} />
       <div
@@ -152,39 +172,6 @@ function PresetEditorBody(props: {
         />
       </div>
     </ProductModalBody>
-  );
-}
-
-function PresetEditorFooter(props: {
-  canReset: boolean;
-  isSaving: boolean;
-  name: string;
-  onClose: () => void;
-  onReset?: (() => void | Promise<void>) | undefined;
-  onSave: () => void;
-}) {
-  return (
-    <ProductModalFooter compact>
-      {props.canReset && props.onReset ? (
-        <ProductActionButton
-          tone="secondary"
-          disabled={props.isSaving}
-          onClick={() => void props.onReset?.()}
-        >
-          {translate('highlighter.calloutPresets.reset')}
-        </ProductActionButton>
-      ) : null}
-      <ProductActionButton tone="secondary" onClick={props.onClose}>
-        {translate('common.actions.cancel')}
-      </ProductActionButton>
-      <ProductActionButton
-        tone="primary"
-        disabled={!props.name.trim() || props.isSaving}
-        onClick={props.onSave}
-      >
-        {translate('common.actions.save')}
-      </ProductActionButton>
-    </ProductModalFooter>
   );
 }
 
@@ -236,12 +223,14 @@ export function CalloutPresetEditor(props: CalloutPresetEditorProps) {
           style={draft.style}
           tagIds={tagIds}
         />
-        <PresetEditorFooter
-          canReset={source.origin === 'system' && source.customized === true}
+        <HighlighterPresetEditorFooter
+          resetLabel={translate('highlighter.calloutPresets.reset')}
           isSaving={props.isSaving}
           name={draft.name}
           onClose={props.onClose}
-          {...(props.onReset ? { onReset: props.onReset } : {})}
+          {...(source.origin === 'system' && source.customized === true && props.onReset
+            ? { onReset: props.onReset }
+            : {})}
           onSave={() => void props.onSave({ ...preset, tagIds })}
         />
       </ProductModal>

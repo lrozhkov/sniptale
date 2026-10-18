@@ -22,6 +22,28 @@ Restore retains root-local OPFS staging and existing per-root claims. Thus, fail
 
 Keep one database because recording publication commits recording metadata, media, assets, and the completion outbox atomically.
 
+## Recording recovery
+
+The recordings domain owns `recording_recovery_sessions` and `recording_recovery_blocks` in the canonical database. Both stores contain authoritative user data. Database version 33 adds these stores and changes the recordings contract from 2 to 3. The migration preserves all earlier rows and immutable media.
+
+Each session has an identity and an incarnation. Ordered immutable blocks contain the encoded media bytes. A strict-durability transaction commits each block and its acknowledged session boundary together. Acknowledgement follows transaction completion.
+
+IndexedDB strict durability requests a disk flush before completion. This guarantee assumes that the operating system and hardware honor durability requests. Frames in the encoder and pending blocks in memory remain vulnerable to termination or power loss.
+
+A random epoch header in the sessions store fences delayed opening operations across local-data erasure. Only initialization creates this header. Opening captures the epoch before waiting for an identity lock and checks it again before writing. An absent or changed epoch refuses the old operation. An absent or changed incarnation refuses a delayed append.
+
+Database admission completes before an identity lock. Code must not hold a mutation permit while waiting for this lock. A live cross-context lock distinguishes an active writer from an interrupted writer.
+
+Failure stops affected producers and retains committed blocks. Finalization, publication, recovery, and download failures do not delete these blocks. Successful publication also retains the original safety copy. The original session receives its `published` flag inside the same transaction as canonical publication. Encoded output completion alone does not establish a saved Library recording.
+
+Saved blocks are internal protection for the canonical recording. Gallery displays no separate safety-copy row or cleanup action when either published target has a readable canonical file. If both targets become unavailable, Gallery exposes the retained source for recovery. Discovery does not write or delete data.
+
+Automatic expiry, Trash cleanup, and orphan cleanup cannot delete an unreferenced safety copy. Explicit discard, admitted canonical deletion, and complete local-data erasure can delete recovery data. Canonical deletion must first admit all source dependencies. Refused deletion retains the safety copy.
+
+Recovery uses a stable separate target identity and refuses replacement of an existing target. Playable-prefix recovery preserves every original block, including an incomplete suffix. Raw download retains the original bytes and order. A failed recovery leaves the source available for retry or raw download. Readers do not substitute original bytes into an unrelated canonical asset.
+
+Explicit media backup v6 excludes pending recordings and retained safety copies. Recovery UI exports interrupted sources. Ordinary Library download exports successfully saved videos. Do not classify these stores as temporary staging or rebuildable caches. Do not admit a destructive migration of recovery data until the backup contract covers the complete recovery inventory. Verified local-data erasure deletes both stores, including the epoch header. This feature requires no extension permission changes.
+
 ## Admission and migration
 
 Quick-edit logical formats 3 and 4 require project names and permanent lifecycles, including independent Trash admission times. Format 3 uses the legacy advanced baseline. Format 4 retains the complete document baseline. Physical formats 4 and 5 store these logical formats.
@@ -375,4 +397,4 @@ Crop edits use the existing content operation and workspace queue. Revision and 
 
 Gallery workspace colors belong to project UI settings, outside content history and export. Optional `ui.workspaceColors` stores independent light and dark values. Missing values use the resolved theme token without a default write. Advanced schema22, mediaLibrary26 and database31 prevent older writers from dropping the map. The additive migration preserves existing rows and immutable media. The existing UI autosave queue owns changes and retry.
 
-Gallery track controls use advanced schema23, mediaLibrary27 and database32. The additive migration preserves existing rows and immutable media. Optional UI gates separate original audio, voiceover, music and text. Legacy voiceover and music gates use the grouped audio value. Missing locks leave tracks editable. The review session orders control changes after accepted field captures. It checks all affected tracks before an ordinary mutation or resource transfer. A lock refusal does not suspend unrelated edits. Notes, history commands and accepted receipt recovery retain their existing behavior. Master changes preserve instance settings and update legacy enable flags atomically. Undo, Redo and return to history start restore these gates with the history cursor in one candidate. Local and durable history use the same cursor transition. Locks remain outside history. Reload discards failed control requests and invalidates queued continuations.
+Gallery track controls use advanced schema23, mediaLibrary27 and database32. The additive migration preserves existing rows and immutable media. Optional UI gates separate original audio, voiceover, music and text. Legacy voiceover and music gates use the grouped audio value. Legacy lock flags remain admitted and retained, but no longer restrict Gallery editing. The editor exposes no lock command. The review session orders master control changes after accepted field captures. Notes, history commands and accepted receipt recovery retain their existing behavior. Master changes preserve instance settings and update legacy enable flags atomically. Undo, Redo and return to history start restore these gates with the history cursor in one candidate. Local and durable history use the same cursor transition. Legacy lock data remains outside history. Reload discards failed control requests and invalidates queued continuations.

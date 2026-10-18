@@ -129,6 +129,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
         <ContentToolbarButton
           ref={state.triggerRef}
           active={state.active}
+          tone="property"
           disabled={props.disabled}
           aria-expanded={state.open}
           aria-haspopup="menu"
@@ -154,6 +155,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
           menuRef={state.menuRef}
         >
           <ProductToolbarMenu
+            className="sniptale-content-menu-adopted"
             compact={props.compact}
             placement={dropdown.menuPlacement}
             style={dropdown.style}

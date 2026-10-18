@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
 import {
   ProductToolbarMenu,
@@ -58,6 +59,7 @@ function CaptureActionDropdownItems(props: {
 }
 
 export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
+  const adopted = React.useContext(CommandPressScope);
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.captureButtonRef,
     displayMode: props.displayMode,
@@ -79,6 +81,7 @@ export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
       menuRef={props.captureDropdownMenuRef}
     >
       <ProductToolbarMenu
+        className={adopted ? 'sniptale-content-menu-adopted' : ''}
         compact={props.compactMenus}
         title={translate('content.toolbar.afterCaptureTitle')}
         variant="capture"

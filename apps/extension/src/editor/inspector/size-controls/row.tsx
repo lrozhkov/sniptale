@@ -34,7 +34,7 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
       {...sizePanelProps}
       data-ui={props.dataUi}
       className={[
-        'grid grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)] items-end gap-1.5',
+        'grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-end gap-1',
         props.className,
       ]
         .filter(Boolean)

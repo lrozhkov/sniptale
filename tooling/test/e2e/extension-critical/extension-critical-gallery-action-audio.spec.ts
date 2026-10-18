@@ -100,7 +100,7 @@ for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
 ]) {
-  test(`typed action audio inspector persists one mixed batch and Undo/Redo at ${viewport.width}`, async ({
+  test(`typed action audio inspector persists family batches and Undo/Redo at ${viewport.width}`, async ({
     page,
   }, info) => {
     const host = await startHostServer(),
@@ -215,12 +215,46 @@ for (const viewport of [
           .getByRole('button', { name: label('gallery.videoReview.actionAudio'), exact: true })
           .click();
       await audio.scrollIntoViewIfNeeded();
-      await audio
-        .getByRole('button', {
+      await expect(
+        audio.getByRole('button', {
           name: label('gallery.videoReview.actionAudioEnabled'),
           exact: false,
         })
-        .click();
+      ).toHaveCount(0);
+      for (const [family, preset] of [
+        ['mouse', 'gallery.videoReview.actionAudioMouseClassic'],
+        ['keyboard', 'gallery.videoReview.actionAudioKeyboardNatural'],
+        ['typing', 'gallery.videoReview.actionAudioTypingNatural'],
+      ] as const) {
+        const row = audio.locator(`[data-family="${family}"]`);
+        await row.locator('button[aria-haspopup="listbox"]').click();
+        await page.getByRole('option', { name: label(preset), exact: true }).click();
+        const listen = row.getByRole('button', {
+          name: label('gallery.videoReview.actionAudioListen'),
+          exact: true,
+        });
+        await expect(listen).toBeEnabled();
+        const choiceBox = (await row.locator('button[aria-haspopup="listbox"]').boundingBox())!;
+        const listenBox = (await listen.boundingBox())!;
+        expect(listenBox.x).toBeGreaterThanOrEqual(choiceBox.x + choiceBox.width);
+        expect(
+          Math.abs(choiceBox.y + choiceBox.height / 2 - listenBox.y - listenBox.height / 2)
+        ).toBeLessThanOrEqual(1);
+      }
+      for (const [key, minimum, maximum] of [
+        ['gallery.videoReview.actionAudioVolume', '0', '100'],
+        ['gallery.videoReview.actionAudioOffset', '-2', '2'],
+      ] as const) {
+        const number = audio.getByRole('textbox', { name: label(key), exact: true });
+        const row = number.locator(
+          'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"][1]'
+        );
+        await row.hover();
+        const slider = row.locator('input[type="range"]');
+        await expect(slider).toBeVisible();
+        await expect(slider).toHaveAttribute('min', minimum);
+        await expect(slider).toHaveAttribute('max', maximum);
+      }
       await expect
         .poll(async () => (await persistedReviewContent(page))?.actionAudio?.length)
         .toBe(3);
@@ -249,9 +283,9 @@ for (const viewport of [
         JSON.stringify({ ...configured, index: silent.index, advanced: content }, null, 2)
       );
       expect(configured.plan).toMatchObject({ kind: 'ready', video: 'copy', audio: 'process' });
-      expect(saved.history.slice(before.history.length)).toMatchObject([
-        { target: 'advancedContent' },
-      ]);
+      expect(saved.history.slice(before.history.length)).toMatchObject(
+        Array.from({ length: 3 }, () => ({ target: 'advancedContent' }))
+      );
       await page.screenshot({ path: info.outputPath('mixed-action-audio.png'), fullPage: false });
       const video = dialog.locator('[data-ui="gallery.videoReview.stage"] video');
       const probe = () =>
@@ -274,7 +308,9 @@ for (const viewport of [
           })
           .click();
         await expect(
-          dialog.getByText(label('gallery.videoReview.actionAudioResource'), { exact: true })
+          dialog
+            .locator('p[role="status"]')
+            .filter({ hasText: label('gallery.videoReview.actionAudioResource') })
         ).toBeVisible();
         await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
         await expect.poll(() => missingRequests).toBeGreaterThanOrEqual(2);
@@ -337,21 +373,27 @@ for (const viewport of [
           2
         )
       );
-      await button('gallery.videoReview.undo').click();
-      await expect
-        .poll(
-          async () => (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.cursor
-        )
-        .toBe(saved.cursor - 1);
+      for (let count = 1; count <= 3; count += 1) {
+        await button('gallery.videoReview.undo').click();
+        await expect
+          .poll(
+            async () =>
+              (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.cursor
+          )
+          .toBe(saved.cursor - count);
+      }
       expect((await persistedReviewContent(page))?.actionAudio).toBeUndefined();
-      await button('gallery.videoReview.redo').click();
-      await expect
-        .poll(
-          async () => (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.cursor
-        )
-        .toBe(saved.cursor);
+      for (let count = 1; count <= 3; count += 1) {
+        await button('gallery.videoReview.redo').click();
+        await expect
+          .poll(
+            async () =>
+              (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))?.cursor
+          )
+          .toBe(saved.cursor - 3 + count);
+      }
       await page.reload();
-      await open(page);
+      await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toBeVisible();
       expect((await persistedReviewContent(page))?.actionAudio).toEqual(content.actionAudio);
       if (viewport.width === 1920) {
         await button('gallery.videoReview.historyOpen').click();

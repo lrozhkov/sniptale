@@ -26,6 +26,7 @@ function createSettingsPanelControlMocks() {
     settingsEmptyStateClassName: 'settings-empty-state',
     settingsModalClassName: 'settings-modal',
     settingsModalFieldSurfaceClassName: 'settings-modal-field-surface',
+    SettingsControlRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     SettingsDragHandle: () => <span data-testid="settings-drag-handle">drag</span>,
     SettingsSwitch: (props: {
       checked: boolean;

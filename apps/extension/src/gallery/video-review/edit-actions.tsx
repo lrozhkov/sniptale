@@ -179,6 +179,7 @@ export function ReviewSpeedOptions(props: {
   return (
     <>
       <ProductSelect
+        menuClassName="sniptale-parameter-menu"
         aria-label={translate('gallery.videoReview.speedRate')}
         controlSize="sm"
         className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -190,6 +191,7 @@ export function ReviewSpeedOptions(props: {
         onChange={changeRate}
       />
       <ProductSelect<'speed' | 'mute'>
+        menuClassName="sniptale-parameter-menu"
         aria-label={translate('gallery.videoReview.speedAudio')}
         controlSize="sm"
         className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -449,7 +451,7 @@ export function ReviewRenderOptions({
   return (
     <div className="min-w-0 max-w-full text-xs" data-ui="gallery.videoReview.exportSettings">
       <fieldset disabled={busy} className="review-inspector-columns pb-2">
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 sniptale-parameter-stack">
           <SelectField
             className={reviewSelectFieldClassName}
             label={translate('videoEditor.exportDialog.formatLabel')}
@@ -490,7 +492,7 @@ export function ReviewRenderOptions({
             }}
           />
         </div>
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 sniptale-parameter-stack">
           <SelectField
             className={reviewSelectFieldClassName}
             label={translate('videoEditor.exportDialog.resolutionLabel')}

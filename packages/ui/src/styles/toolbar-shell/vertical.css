@@ -115,3 +115,74 @@
   width: 18px;
   height: 18px;
 }
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'] {
+  gap: min(4px, var(--sniptale-toolbar-gap));
+  /* Viewport fitting measures this root during resize, so its geometry must settle immediately. */
+  transition: none;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-btn[data-command-press]
+  svg {
+  width: 16px;
+  height: 16px;
+}
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-btn.sniptale-full-page-chevron[data-command-press]
+  svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'] .sniptale-drag-handle {
+  width: 36px;
+  height: 24px;
+}
+
+/* Device toggle and menu retain separate targets in one compact media row. */
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-video-recording='true'] {
+  --sniptale-toolbar-vertical-inline-size: calc(var(--sniptale-toolbar-button-size) + 28px);
+  padding-inline: 4px;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'] .sniptale-recording-media-control {
+  width: calc(var(--sniptale-toolbar-button-size) + 18px);
+  height: var(--sniptale-toolbar-button-size);
+  flex-direction: row;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-recording-media-control
+  .sniptale-full-page-primary {
+  border-inline-end-width: 0;
+  border-block-end-width: 1px;
+  border-radius: 4px 0 0 4px;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-recording-media-control
+  .sniptale-full-page-chevron {
+  flex: 0 0 18px;
+  min-width: 18px;
+  width: 18px;
+  max-width: 18px;
+  min-height: var(--sniptale-toolbar-button-size);
+  height: var(--sniptale-toolbar-button-size);
+  max-height: var(--sniptale-toolbar-button-size);
+  border-inline-start-width: 0;
+  border-block-start-width: 1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-content-menu-adopted
+  .sniptale-toolbar-menu-item
+  > svg,
+.sniptale-content-toolbar-adopted[data-display-mode='vertical']
+  .sniptale-content-menu-adopted
+  .sniptale-toolbar-menu-item
+  > .sniptale-toolbar-mode-icon {
+  width: 16px;
+  height: 16px;
+}

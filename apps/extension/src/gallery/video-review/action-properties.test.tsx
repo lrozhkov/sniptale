@@ -2,6 +2,9 @@
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { reviewClickSections } from './click-animation-fields';
+import { reviewKeySections } from './key-animation-fields';
+import { reviewActionAudioSection } from './action-audio-fields';
 import { ReviewActionProperties } from './action-properties';
 import { planReviewActionEdits } from '../../features/video/review/action-edits';
 import { translate } from '../../platform/i18n';
@@ -112,7 +115,8 @@ it('shows recorded target metadata as text and tolerates a disappearing selectio
   }
 });
 
-vi.mock('./key-animation-fields', () => ({
+vi.mock('./key-animation-fields', async (original) => ({
+  ...(await original<typeof import('./key-animation-fields')>()),
   ReviewKeyFields: (props: {
     information?: ReactNode;
     onChange(patch: { enabled: boolean }): void;
@@ -223,4 +227,31 @@ it('presents immutable recorded facts in an information section before animation
     act(() => root.unmount());
     vi.unstubAllGlobals();
   }
+});
+
+it.each([
+  [
+    'click',
+    () =>
+      reviewClickSections({
+        values: [],
+        onChange: vi.fn(),
+        extraSections: [reviewActionAudioSection(null)],
+      }),
+  ],
+  [
+    'key',
+    () =>
+      reviewKeySections({
+        values: [],
+        onChange: vi.fn(),
+        extraSections: [reviewActionAudioSection(null)],
+      }),
+  ],
+] as const)('places %s commands after the sound settings', (_, sections) => {
+  expect(
+    sections()
+      .map((section) => section.id)
+      .slice(-2)
+  ).toEqual(['action-audio', 'actions']);
 });

@@ -115,7 +115,7 @@ function renderStepColorSection(
 function renderStepTextGroup(props: StepControlsProps, settings: StepSettings) {
   return (
     <CollapsibleSection key="text" label={translate('editor.compact.stepTextGroup')}>
-      <div className="space-y-3 pt-3">
+      <div className="space-y-1 pt-2">
         {renderStepTypeSection(props, settings)}
         {renderStepValueSection(props, settings)}
         {renderStepAlphabetSection(props, settings)}
@@ -134,7 +134,7 @@ function renderStepTextGroup(props: StepControlsProps, settings: StepSettings) {
 function renderStepShapeGroup(props: StepControlsProps, settings: StepSettings) {
   return (
     <CollapsibleSection key="shape" label={translate('editor.compact.stepShapeGroup')}>
-      <div className="space-y-3 pt-3">
+      <div className="space-y-1 pt-2">
         {renderStepRangeSection(props, {
           key: 'size',
           ariaLabel: translate('editor.compact.stepSize'),
@@ -174,7 +174,7 @@ function renderStepShapeGroup(props: StepControlsProps, settings: StepSettings) 
 function renderStepStrokeGroup(props: StepControlsProps, settings: StepSettings) {
   return (
     <CollapsibleSection key="stroke" label={translate('editor.compact.stepStrokeGroup')}>
-      <div className="space-y-3 pt-3">
+      <div className="space-y-1 pt-2">
         {renderStepRangeSection(props, {
           key: 'strokeWidth',
           label: translate('editor.compact.stepStrokeWidth'),
@@ -220,7 +220,7 @@ export function renderStepControlsSection(props: StepControlsProps) {
   const controls = renderStepGroups(props, settings);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       {props.toolPresetHeader ? (
         <EditorInspectorPresetHeader state={props.toolPresetHeader}>
           {controls}

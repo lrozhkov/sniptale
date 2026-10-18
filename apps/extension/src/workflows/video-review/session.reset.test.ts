@@ -5,8 +5,10 @@ import {
   createQuickEditAdvancedContent,
 } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from './session';
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 
-function fixture() {
+function fixture(formatVersion: 1 | 3 | 4 = 1) {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   advanced.audio.original = { muted: true, volume: 0.5 };
@@ -46,6 +48,20 @@ function fixture() {
       annotation: { id: 'draft', text: 'Draft', anchor: { kind: 'point', time: 4 } },
     },
   };
+  if (formatVersion !== 1) {
+    snapshot.workspace.project = {
+      name: 'Saved project',
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    };
+    if (formatVersion === 4)
+      snapshot.workspace.baseline = {
+        annotations: [],
+        canvasComments: [],
+        edits: [],
+        advancedContent: reviewAdvancedContentBaseline(advanced),
+      };
+    snapshot.workspace.formatVersion = formatVersion;
+  }
   let durable = structuredClone(snapshot);
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(),
@@ -93,6 +109,37 @@ it('atomically clears history, draft and legacy advanced baseline while preservi
   expect(session.getSnapshot().document.edits).toEqual([]);
   expect(session.getSnapshot().snapshot.draft).toBeNull();
 });
+
+it.each([3, 4] as const)(
+  'resets canonical format %s while preserving project metadata, source and UI',
+  async (formatVersion) => {
+    const { session, snapshot } = fixture(formatVersion);
+    expect(parseVideoWorkspace(snapshot.workspace)).not.toBeNull();
+    await session.reset();
+    expect(session.getSnapshot().snapshot).toMatchObject({
+      workspace: {
+        formatVersion: 3,
+        project: snapshot.workspace.project,
+        source: snapshot.workspace.source,
+        sourceAssetId: snapshot.workspace.sourceAssetId,
+        history: [],
+        cursor: 0,
+        advanced: { ui: snapshot.workspace.advanced.ui },
+      },
+      draft: null,
+    });
+    expect(session.getSnapshot().snapshot.workspace.baseline).toBeUndefined();
+    expect(session.getSnapshot().document).toEqual({
+      annotations: [],
+      canvasComments: [],
+      edits: [],
+      advancedContent: createQuickEditAdvancedContent(),
+    });
+    await session.reload();
+    expect(session.getSnapshot().snapshot.workspace.project).toEqual(snapshot.workspace.project);
+    expect(session.getSnapshot().snapshot.workspace.history).toEqual([]);
+  }
+);
 
 it.each(['storage', 'conflict', 'changed-source'])(
   'preserves edits and recovery draft when reset fails with %s',

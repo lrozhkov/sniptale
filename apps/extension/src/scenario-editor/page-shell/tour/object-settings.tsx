@@ -1,3 +1,4 @@
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import {
   tourTextDefaults,
   resolveTourMarkerAppearance,
@@ -21,7 +22,6 @@ import {
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReactNode } from 'react';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourActionField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
 import { TourInspectorNumericRow } from './numeric-row';
@@ -90,33 +90,25 @@ export function TourHotspotSettings({
       categorized: true,
       content: (
         <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
-          <label className="guide-number-toggle">
-            <ProductToggle
-              size="sm"
-              disabled={disabled}
-              aria-label={t('scenario.editor.tourPulse')}
-              checked={value.pulse}
-              onClick={() => onChange({ ...value, pulse: !value.pulse })}
-            />
-            {t('scenario.editor.tourPulse')}
-          </label>
-          <label className="guide-number-toggle">
-            <ProductToggle
-              size="sm"
-              disabled={disabled}
-              checked={!value.markerAppearance}
-              aria-label={t('scenario.editor.tourMarkerInherit')}
-              onClick={() =>
-                onChange({
-                  ...value,
-                  markerAppearance: value.markerAppearance
-                    ? null
-                    : resolveTourMarkerAppearance(tour.style),
-                })
-              }
-            />
-            {t('scenario.editor.tourMarkerInherit')}
-          </label>
+          <ToggleField
+            disabled={disabled}
+            label={t('scenario.editor.tourPulse')}
+            value={value.pulse}
+            onChange={() => onChange({ ...value, pulse: !value.pulse })}
+          />
+          <ToggleField
+            disabled={disabled}
+            value={!value.markerAppearance}
+            label={t('scenario.editor.tourMarkerInherit')}
+            onChange={() =>
+              onChange({
+                ...value,
+                markerAppearance: value.markerAppearance
+                  ? null
+                  : resolveTourMarkerAppearance(tour.style),
+              })
+            }
+          />
           <TourMarkerFields
             value={resolveTourMarkerAppearance(tour.style, value)}
             accent={tour.style.accent}
@@ -178,13 +170,12 @@ function TourTargetArea({
       icon={ScanLine}
       title={t('scenario.editor.tourTargetArea')}
     >
-      <label className="guide-number-toggle" title={t('scenario.editor.tourTargetAreaHint')}>
-        <ProductToggle
-          size="sm"
+      <div title={t('scenario.editor.tourTargetAreaHint')}>
+        <ToggleField
           disabled={disabled}
-          aria-label={t('scenario.editor.tourTargetArea')}
-          checked={value.targetRect !== null}
-          onClick={() =>
+          label={t('scenario.editor.tourTargetArea')}
+          value={value.targetRect !== null}
+          onChange={() =>
             onChange({
               ...value,
               targetRect: value.targetRect
@@ -198,8 +189,7 @@ function TourTargetArea({
             })
           }
         />
-        {t('scenario.editor.tourTargetArea')}
-      </label>
+      </div>
       {value.targetRect && (
         <TourRectFields
           value={value.targetRect}

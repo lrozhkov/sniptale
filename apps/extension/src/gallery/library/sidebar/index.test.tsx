@@ -99,7 +99,7 @@ it('composes folder and tag sections inside the shared shell', () => {
     INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS
   );
   expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
+    'rounded-[4px]'
   );
   expect(container?.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(
     'overflow-hidden'
@@ -151,9 +151,8 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(props.onTrashModeChange).toHaveBeenCalledWith(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode />));
   const returnButton = button('gallery.app.returnToLibrary');
-  expect(returnButton.className).toContain('rounded-[var(--sniptale-radius-sm)]');
-  expect(returnButton.className).toContain('hover:border-');
-  expect(returnButton.className).toContain('focus-visible:ring-2');
+  expect(returnButton.className).toContain('w-full');
+  expect(returnButton.type).toBe('button');
   expect(container?.querySelector('[data-ui="test.folder-list"]')).toBeNull();
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
   expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
@@ -286,17 +285,9 @@ it('shows count loading and makes size semantics reachable from keyboard control
   const description = document.getElementById(footer.getAttribute('aria-describedby')!)!;
   expect(description.textContent).toContain(translate('gallery.app.trashSizeExplanation'));
   act(() => root?.render(<GallerySidebar {...props} trashMode />));
-  const disclosure = container!.querySelector<HTMLDetailsElement>(
-    '[data-ui="gallery.trash.summary"] details'
-  )!;
-  const summary = disclosure.querySelector<HTMLElement>('summary')!;
-  summary.focus();
-  expect(document.activeElement).toBe(summary);
-  act(() => summary.click());
-  expect(disclosure.open).toBe(true);
-  expect(disclosure.querySelector('p')!.textContent).toBe(
-    translate('gallery.app.trashSizeExplanation')
-  );
+  const info = container!.querySelector<HTMLElement>('[data-ui="gallery.trash.summary"] [title]')!;
+  expect(info.title).toBe(translate('gallery.app.trashSizeExplanation'));
+  expect(container!.querySelector('[data-ui="gallery.trash.summary"] details')).toBeNull();
 });
 
 it.each([0, 6, 42, 1234567])(
@@ -348,7 +339,7 @@ it('groups selection recovery and deletion before cleanup settings and whole-tra
   expect(retention.querySelector('h3')?.textContent).toBe(
     translate('gallery.app.trashRetentionTitle')
   );
-  expect(container!.querySelector('h2')?.textContent).toBe(translate('gallery.app.trashTitle'));
+  expect(container!.querySelector('h2')).toBeNull();
 });
 
 it('collapses presentation without mutating folder, filters or saved-view context', () => {

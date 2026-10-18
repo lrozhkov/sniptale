@@ -35,7 +35,7 @@ function VideoEditorLoadingState(): React.JSX.Element {
       <div
         style={VIDEO_EDITOR_PANEL_STYLE}
         className={[
-          'w-[min(28rem,calc(100vw-32px))] rounded-[16px] border',
+          'w-[min(28rem,calc(100vw-32px))] rounded-[4px] border',
           'border-[color:var(--sniptale-color-border-soft)] px-6 py-6 shadow-sm',
         ].join(' ')}
       >
@@ -49,8 +49,8 @@ function VideoEditorLoadingState(): React.JSX.Element {
             </div>
           </div>
           <div className="space-y-2.5">
-            <Skeleton className="h-10 w-full rounded-[12px]" />
-            <Skeleton className="h-10 w-[62%] rounded-[12px]" />
+            <Skeleton className="h-10 w-full rounded-[4px]" />
+            <Skeleton className="h-10 w-[62%] rounded-[4px]" />
           </div>
         </div>
         <p className="mt-4 text-sm text-[var(--sniptale-color-text-secondary)]">
@@ -72,17 +72,17 @@ function VideoEditorErrorState({ error }: { error: string }): React.JSX.Element 
     >
       <div
         className={[
-          'max-w-lg rounded-[16px] border',
+          'max-w-lg rounded-[4px] border',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_28%,var(--sniptale-color-border-soft)_72%)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_62%,var(--sniptale-color-surface-panel)_38%)]',
           'px-8 py-7',
           'shadow-sm',
         ].join(' ')}
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sniptale-color-danger)]">
+        <p className="text-sm leading-5 font-semibold text-[var(--sniptale-color-danger)]">
           {translate('videoEditor.app.title')}
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-[var(--sniptale-color-text-primary-strong)]">
+        <h1 className="mt-2 text-sm leading-5 font-semibold text-[var(--sniptale-color-text-primary-strong)]">
           {translate('videoEditor.app.openFailed')}
         </h1>
         <p className="mt-3 text-sm text-[var(--sniptale-color-text-secondary)]">

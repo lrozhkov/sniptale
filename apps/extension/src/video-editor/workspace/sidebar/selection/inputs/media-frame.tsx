@@ -1,3 +1,5 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
+import type { ReactNode } from 'react';
 import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
 import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
@@ -57,7 +59,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   }
 
   return (
-    <div className="space-y-1">
+    <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
       <InspectorDetails
         preferenceId="media-frame:videoEditor.sidebar.framingFineTune"
@@ -150,7 +152,7 @@ export function MediaShadowControls(
   >
 ) {
   return (
-    <div className="space-y-1">
+    <div className="sniptale-parameter-stack space-y-1">
       <SelectInput
         disabled={props.disabled}
         label={translate('videoEditor.sidebar.mediaShadowModeLabel')}
@@ -225,7 +227,10 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
     translate('videoEditor.sidebar.framingFillHint'),
   ];
   return (
-    <div className="grid grid-cols-3 gap-1 pb-2" data-ui="video-editor.framing-presets">
+    <div
+      className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,84px),1fr))] gap-1 pb-2"
+      data-ui="video-editor.framing-presets"
+    >
       {presets.map((preset, index) => {
         const transform = preset.transform;
         const active =
@@ -235,16 +240,12 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
             (key) => Math.abs(clip.transform[key] - transform[key]) < 0.5
           );
         return (
-          <InspectorActionButton
+          <FramingPresetButton
             key={preset.id}
-            compact
-            tone="toggle"
             active={active}
-            aria-pressed={active}
             disabled={props.locked}
-            aria-label={labels[index]}
-            title={hints[index]}
-            className="!h-auto min-w-0 flex-col !gap-1 !rounded-[var(--sniptale-radius-sm)] !px-1 !py-2"
+            label={labels[index]}
+            hint={hints[index]}
             onClick={() =>
               props.onUpdateMediaClipFitMode(clip.id, preset.fitMode, preset.fitScalePercent)
             }
@@ -255,7 +256,7 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
               viewBox={`0 0 ${props.project.width} ${props.project.height}`}
               preserveAspectRatio="xMidYMid meet"
               aria-hidden
-              className="overflow-hidden rounded-sm"
+              className="shrink-0 overflow-hidden rounded-sm"
             >
               <svg width={props.project.width} height={props.project.height} overflow="hidden">
                 <rect width="100%" height="100%" fill="var(--sniptale-color-surface-overlay)" />
@@ -269,12 +270,47 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
                 />
               </svg>
             </svg>
-            <span className="max-w-full whitespace-normal text-[12px] leading-normal">
+            <span className="max-w-full whitespace-normal text-[13px] leading-[18px]">
               {labels[index]}
             </span>
-          </InspectorActionButton>
+          </FramingPresetButton>
         );
       })}
     </div>
+  );
+}
+
+function FramingPresetButton(props: {
+  active: boolean;
+  disabled: boolean;
+  label: string | undefined;
+  hint: string | undefined;
+  onClick(): void;
+  children: ReactNode;
+}) {
+  const press = useCommandPress({ disabled: props.disabled, onClick: props.onClick });
+  return (
+    <button
+      {...press.props}
+      type="button"
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-inspector-tone="toggle"
+      aria-pressed={props.active}
+      aria-label={props.label}
+      title={props.hint}
+      disabled={props.disabled}
+      className={[
+        'min-w-0 rounded-[var(--sniptale-radius-sm)] border border-transparent px-1 py-2',
+        'text-[var(--sniptale-color-text-secondary)] disabled:opacity-40',
+      ].join(' ')}
+    >
+      <span
+        className="sniptale-command-content"
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+      >
+        {props.children}
+      </span>
+    </button>
   );
 }

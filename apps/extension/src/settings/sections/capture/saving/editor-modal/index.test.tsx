@@ -176,7 +176,7 @@ it('submits trimmed and sanitized values; the persistence action owns dismissal'
   const inputs = container?.querySelectorAll('input[type="text"]') ?? [];
   const nameInput = inputs[0] as HTMLInputElement;
   const pathInput = inputs[1] as HTMLInputElement;
-  const toggleButton = container?.querySelector('button[aria-pressed]') as HTMLButtonElement;
+  const toggleButton = container?.querySelector('input[type="checkbox"]') as HTMLInputElement;
 
   await act(async () => {
     setInputValue(nameInput, '  Screens  ');
@@ -213,11 +213,9 @@ it('updates its local state when the edited preset changes', async () => {
   const inputs = container?.querySelectorAll('input[type="text"]') ?? [];
   expect((inputs[0] as HTMLInputElement).value).toBe('Exports');
   expect((inputs[1] as HTMLInputElement).value).toBe('exports/final');
-  expect(
-    (container!.querySelector('button[aria-pressed]') as HTMLButtonElement).getAttribute(
-      'aria-pressed'
-    )
-  ).toBe('false');
+  expect((container!.querySelector('input[type="checkbox"]') as HTMLInputElement).checked).toBe(
+    false
+  );
 });
 
 it('logs save failures and keeps the modal open', async () => {

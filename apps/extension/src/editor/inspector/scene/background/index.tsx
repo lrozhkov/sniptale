@@ -1,7 +1,7 @@
 import { BackgroundThumbnails } from '../../../../ui/background-thumbnails';
 import { useGradientPresetCatalog } from '../../../../composition/gradient-preset-resources/use-gradient-preset-catalog';
 import { useState, type ReactElement } from 'react';
-import { createSolidPaint, type Paint } from '@sniptale/foundation/paint';
+import { createSolidPaint, serializePaintToCss, type Paint } from '@sniptale/foundation/paint';
 
 import {
   createEditorFrameGradientPatch,
@@ -68,7 +68,8 @@ function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorP
     <BackgroundThumbnails
       label={translate('editor.compact.frameBackgroundModeGradient')}
       dataUi="editor.frame.gradient-presets"
-      items={choices.map((preset) => {
+      initialCount={4}
+      items={choices.map((preset, index) => {
         const angle = preset.gradient.type === 'linear' ? preset.gradient.angle : 0;
         const stops = preset.gradient.stops.map((stop) => ({
           color: stop.color,
@@ -77,7 +78,10 @@ function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorP
         return {
           id: preset.id,
           name: preset.name,
+          groupLabel:
+            index === 0 ? translate('editor.compact.frameBackgroundModeGradient') : undefined,
           active:
+            props.frameDraft.backgroundMode === 'gradient' &&
             preset.gradient.type === 'linear' &&
             preset.gradient.angle === props.frameDraft.backgroundGradientAngle &&
             JSON.stringify(
@@ -117,13 +121,10 @@ export function EditorInspectorFrameBackgroundFillEditor(
   }
 
   return (
-    <div className="space-y-3">
-      {props.frameDraft.backgroundMode === 'gradient' ? (
-        <FrameGradientPresetChoices {...props} />
-      ) : null}
+    <div className="sniptale-parameter-stack">
       <CompactPaintSelector
         triggerVariant="swatch"
-        allowedModes={props.frameDraft.backgroundMode === 'gradient' ? ['linear'] : ['solid']}
+        allowedModes={['solid', 'linear']}
         showGradientAdvancedControls={false}
         title={translate('editor.scene.sceneBackgroundTitle')}
         label={translate('editor.scene.sceneBackgroundLabel')}
@@ -137,6 +138,29 @@ export function EditorInspectorFrameBackgroundFillEditor(
           )
         }
       />
+      <div className="space-y-3 px-2">
+        <BackgroundThumbnails
+          label={translate('editor.compact.frameBackgroundModeColor')}
+          dataUi="editor.frame.quick-colors"
+          initialCount={4}
+          items={props.frameBackgroundPalette.map((color, index) => ({
+            id: String(index),
+            name: color,
+            groupLabel:
+              index === 0 ? translate('editor.compact.frameBackgroundModeColor') : undefined,
+            active:
+              props.frameDraft.backgroundMode === 'color' &&
+              serializePaintToCss(createSolidPaint(color)) ===
+                serializePaintToCss(createSolidPaint(props.frameDraft.backgroundColor)),
+            style: { backgroundColor: color },
+          }))}
+          onSelect={(id) => {
+            const color = props.frameBackgroundPalette[Number(id)];
+            if (color) props.applyFramePatch(paintToFramePatch(createSolidPaint(color)));
+          }}
+        />
+        <FrameGradientPresetChoices {...props} />
+      </div>
     </div>
   );
 }

@@ -174,3 +174,44 @@ it('omits project data-ui hooks when no prefix is provided', () => {
 
   expect(container?.querySelector('[data-ui]')).toBeNull();
 });
+
+it('forwards the uncontrolled query through the optional search field without creating a project', async () => {
+  const renderSearchField = vi.fn(
+    (props: {
+      searchId: string;
+      searchPlaceholder: string;
+      value: string;
+      onChange: (value: string) => void;
+    }) => (
+      <input
+        id={props.searchId}
+        placeholder={props.searchPlaceholder}
+        value={props.value}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
+      />
+    )
+  );
+  const props = renderPicker({ renderSearchField });
+  await updateTextInput(container?.querySelector('input'), 'Beta');
+
+  expect(renderSearchField.mock.lastCall?.[0].value).toBe('Beta');
+  expect(renderSearchField.mock.lastCall?.[0].searchId).toBe(container?.querySelector('input')?.id);
+  expect(renderSearchField.mock.lastCall?.[0].searchPlaceholder).toBe('Find project');
+  expect(
+    container?.querySelector('[data-ui="shared.project-picker.project"]')?.textContent
+  ).toContain('Beta release');
+  expect(props.onCreateProject).not.toHaveBeenCalled();
+});
+
+it('keeps controlled query authority with the caller when a custom search field emits a change', async () => {
+  const onSearchQueryChange = vi.fn();
+  const renderSearchField = vi.fn((props: { value: string; onChange: (value: string) => void }) => (
+    <input value={props.value} onChange={(event) => props.onChange(event.currentTarget.value)} />
+  ));
+  const props = renderPicker({ searchQuery: 'Alpha', onSearchQueryChange, renderSearchField });
+  await updateTextInput(container?.querySelector('input'), 'Beta');
+
+  expect(onSearchQueryChange).toHaveBeenCalledWith('Beta');
+  expect(container?.querySelector('input')?.value).toBe('Alpha');
+  expect(props.onCreateProject).not.toHaveBeenCalled();
+});

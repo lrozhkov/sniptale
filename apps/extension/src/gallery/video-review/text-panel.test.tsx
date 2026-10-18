@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -38,8 +40,12 @@ vi.mock('./text-rewrite-panel', () => ({
   ),
 }));
 vi.mock('./text-voice-panel', () => ({
-  ReviewTextVoiceForm: (props: { ids: readonly string[]; onClose(): void }) => (
-    <section data-form="voice" data-ids={props.ids.join(',')}>
+  ReviewTextVoiceForm: (props: {
+    ids: readonly string[];
+    recordingMaximum?: number;
+    onClose(): void;
+  }) => (
+    <section data-form="voice" data-ids={props.ids.join(',')} data-maximum={props.recordingMaximum}>
       <button onClick={props.onClose}>Back</button>
     </section>
   ),
@@ -80,14 +86,19 @@ function Fixture({
   count = 120,
   voice,
   selectedId,
+  sourceClock = false,
 }: {
   count?: number;
   voice?: ReviewTextVoiceAccess;
   selectedId?: string;
+  sourceClock?: boolean;
 }) {
   const document = useRef<ReviewTextDocument>({
     version: 1,
-    fragments: Array.from({ length: count }, (_, index) => phrase(index)),
+    fragments: Array.from({ length: count }, (_, index) => ({
+      ...phrase(index),
+      ...(sourceClock ? { timeDomain: 'source' as const } : {}),
+    })),
   });
   const [, refresh] = useState(0);
   current = document.current;
@@ -104,10 +115,14 @@ function Fixture({
     seek,
     pause: vi.fn(),
   });
-  return selectedId ? (
-    <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
-  ) : (
-    <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
+  return (
+    <InspectorLayout>
+      {selectedId ? (
+        <ReviewSelectedTextProperties editor={editor} id={selectedId} busy={false} voice={voice} />
+      ) : (
+        <ReviewTextDocumentPanel editor={editor} snapshots={[]} busy={false} voice={voice} />
+      )}
+    </InspectorLayout>
   );
 }
 function voiceAccess(): ReviewTextVoiceAccess {
@@ -155,6 +170,29 @@ afterEach(() => {
 });
 const button = (label: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!;
+
+it('keeps document commands beside search', () => {
+  act(() => root.render(<Fixture count={3} voice={voiceAccess()} />));
+  const searchRow = host.querySelector('input[type="search"]')!.parentElement!.parentElement!;
+  expect(searchRow.contains(button('subtitlesTitle'))).toBe(true);
+  expect(searchRow.contains(button('textRewriteAll'))).toBe(true);
+  expect(searchRow.contains(button('textFragmentAdd'))).toBe(true);
+});
+
+it('keeps jump metadata independent from expansion', () => {
+  act(() => root.render(<Fixture count={3} />));
+  const card = host.querySelector('[data-text-id="text-1"]')!;
+  const jump = card.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.speechJump"]'
+  )!;
+  expect(jump.textContent).toContain('2');
+  expect(jump.textContent).toContain('00:04.00–00:07.00');
+  expect(jump.getAttribute('aria-description')).toBe('2 · 00:04.00–00:07.00');
+  expect(card.querySelector('button[aria-expanded]')!.textContent).toBe('Phrase 1');
+  act(() => jump.click());
+  expect(seek).toHaveBeenCalledWith(4, false);
+  expect(host.querySelectorAll('textarea')).toHaveLength(0);
+});
 
 it('opens exclusive local subtitles without configured voice access and returns focus to scope trigger', () => {
   act(() => root.render(<Fixture count={3} />));
@@ -332,4 +370,42 @@ it('limits batch deletion to matching selection and resets an empty search witho
   expect(host.querySelectorAll('[data-ui="gallery.videoReview.textPhrase"]')).toHaveLength(50);
   act(() => button('speechDeselectAll').click());
   expect(host.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(0);
+});
+
+it('keeps a selected text detail distinct from an expandable numbered list row', () => {
+  act(() => root.render(<Fixture count={1} selectedId="text-0" />));
+  const article = host.querySelector('[data-ui="gallery.videoReview.textPhrase"]')!;
+  expect(article.querySelector(':scope > div:first-child button[aria-expanded]')).toBeNull();
+  expect(article.querySelector('textarea')?.rows).toBe(6);
+  const timing = article.querySelector(
+    'input[aria-label="gallery.videoReview.textFragmentStart"]'
+  )!;
+  expect(
+    timing
+      .closest('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
+      ?.querySelector('.sniptale-numeric-entry > span')?.textContent
+  ).toBeTruthy();
+});
+
+it('passes the current source-clock fragment cap into the selected voice form without joining the session', () => {
+  const voice = voiceAccess();
+  act(() => root.render(<Fixture count={2} voice={voice} selectedId="text-1" sourceClock />));
+  act(() => host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!.click());
+  expect(host.querySelector('[data-form="voice"]')?.getAttribute('data-maximum')).toBe('596');
+  expect(voice.beforeRequest).not.toHaveBeenCalled();
+  expect(voice.session.getSnapshot().document.advancedContent.text?.fragments ?? []).toEqual([]);
+});
+
+it('keeps voice unavailable for a newly created blank fragment until the user enters text', () => {
+  const voice = voiceAccess();
+  act(() => root.render(<Fixture count={1} voice={voice} />));
+  act(() => button('textFragmentAdd').click());
+  const id = current.fragments[1]!.id;
+  act(() => root.render(<Fixture count={1} voice={voice} selectedId={id} />));
+  const start = host.querySelector<HTMLButtonElement>('[data-text-voice-trigger="selected"]')!;
+  expect(start.disabled).toBe(true);
+  act(() => start.click());
+  expect(host.querySelector('[data-form="voice"]')).toBeNull();
+  expect(voice.beforeRequest).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(host.querySelector('textarea'));
 });

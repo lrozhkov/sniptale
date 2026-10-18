@@ -1,4 +1,5 @@
 import React from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { EllipsisVertical } from 'lucide-react';
 import type { CompactCommand } from '../../inspector/compact';
 import {
@@ -45,20 +46,10 @@ function renderToggleCommand(command: CompactCommand): React.ReactNode {
 
 function renderButtonCommand(command: CompactCommand): React.ReactNode {
   return (
-    <button
-      type="button"
-      className={[
-        'flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2',
-        'text-left text-sm text-[var(--sniptale-color-text-primary)]',
-        command.active
-          ? [
-              'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
-              'text-[color:var(--sniptale-color-accent)]',
-              'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_28%,transparent)]',
-            ].join(' ')
-          : 'hover:bg-[var(--sniptale-color-surface-hover)]',
-        'disabled:opacity-50',
-      ].join(' ')}
+    <ProductActionButton
+      compact
+      tone="secondary"
+      className="w-full !justify-between text-left"
       disabled={command.disabled}
       {...(command.active === undefined ? {} : { 'aria-pressed': command.active })}
       onClick={() => {
@@ -71,7 +62,7 @@ function renderButtonCommand(command: CompactCommand): React.ReactNode {
           {resolveCompactCommandTrigger(command)}
         </span>
       ) : null}
-    </button>
+    </ProductActionButton>
   );
 }
 

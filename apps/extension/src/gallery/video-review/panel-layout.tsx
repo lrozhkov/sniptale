@@ -70,7 +70,7 @@ export function useReviewPanelLayout(enabled: boolean) {
   };
   const clamp = (panel: Panel, value: number) =>
     Math.round(Math.max(bounds[panel].min, Math.min(bounds[panel].max, value)));
-  const inspectorWidth = enabled ? clamp('inspector', preferences.inspector ?? 320) : 320;
+  const inspectorWidth = enabled ? clamp('inspector', preferences.inspector ?? 330) : 320;
   const timelineHeight =
     enabled && preferences.timeline !== null ? clamp('timeline', preferences.timeline) : null;
   const current = useRef({ enabled, preferences, bounds });
@@ -215,7 +215,7 @@ export function ReviewPanelResizeHandle({ resize }: { resize: PanelResize }) {
       tabIndex={0}
       className={`review-panel-resize absolute z-20 touch-none outline-offset-[-2px]
         focus-visible:outline focus-visible:outline-2
-        focus-visible:outline-[var(--sniptale-color-focus-ring)] ${
+        focus-visible:outline-[var(--sniptale-color-accent)] ${
           panel === 'inspector' ? 'inset-y-0 -left-1 w-2' : 'inset-x-0 -top-1 h-2'
         }`}
     />

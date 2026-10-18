@@ -1,5 +1,5 @@
 import type { GuideStyle, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { ColorField } from '../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { RotateCcw, Palette, LayoutTemplate, ScanLine } from 'lucide-react';
@@ -62,26 +62,21 @@ function StyleChoice<T extends string>({
   t: Translate;
   segmented?: boolean;
 }) {
-  return (
-    <div className="guide-inspector-choice">
-      <span>{label}</span>
-      {segmented ? (
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={label}
-          activeId={value}
-          options={options.map(([id, key]) => ({ id, label: t(`scenario.editor.${key}`) }))}
-          onChange={onChange}
-        />
-      ) : (
-        <CompactSelect
-          aria-label={label}
-          value={value}
-          options={options.map(([value, key]) => ({ value, label: t(`scenario.editor.${key}`) }))}
-          onChange={onChange}
-        />
-      )}
-    </div>
+  return segmented ? (
+    <SegmentedRow
+      label={label}
+      ariaLabel={label}
+      value={value}
+      options={options.map(([value, key]) => ({ value, label: t(`scenario.editor.${key}`) }))}
+      onChange={onChange}
+    />
+  ) : (
+    <SelectField
+      label={label}
+      value={value}
+      options={options.map(([value, key]) => ({ value, label: t(`scenario.editor.${key}`) }))}
+      onChange={onChange}
+    />
   );
 }
 
@@ -127,7 +122,6 @@ export function GuideStyleFields({
           <ColorField
             triggerVariant="swatch"
             floatingPlacement="side"
-            layout="stacked"
             label={t('scenario.editor.appearanceAccentElements')}
             title={t('scenario.editor.appearanceAccentElements')}
             value={guideDocumentStyle(style)['--guide-accent']!}

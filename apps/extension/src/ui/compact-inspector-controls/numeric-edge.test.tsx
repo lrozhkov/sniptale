@@ -186,7 +186,7 @@ it('keeps scrubbed range controls aligned inside the numeric row bounds', () => 
     '[data-ui="shared.ui.compact-inspector.numeric-range-track"]'
   );
   expect(range).not.toBeNull();
-  expect(scrub?.style.bottom).toBe('-1px');
+  expect(scrub?.style.bottom).toBe('var(--sniptale-inspector-range-bottom, -1px)');
   expect(track?.style.top).toBe('calc(var(--sniptale-range-track-height) / -2)');
   expect(range?.style.top).toBe('calc(var(--sniptale-range-thumb-size) / -2)');
   expect(range?.style.width).toBe('auto');

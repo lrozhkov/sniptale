@@ -35,7 +35,7 @@ export function ReviewHistoryResetChoices(props: {
   const width = Math.min(320, window.innerWidth - 24);
   const above = bounds.top > window.innerHeight / 2;
   const rowClass =
-    'w-full rounded-md px-3 py-2 text-left hover:bg-[var(--sniptale-color-surface-hover)] ' +
+    'w-full rounded-md px-2 py-2 text-left hover:bg-[var(--sniptale-color-surface-hover)] ' +
     'focus-visible:outline focus-visible:outline-2 ' +
     'focus-visible:outline-[var(--sniptale-color-accent)] disabled:opacity-50';
   return (
@@ -45,7 +45,8 @@ export function ReviewHistoryResetChoices(props: {
       portalTarget={props.target}
       popoverRef={surface}
       dataUi="gallery.videoReview.historyChoices"
-      className="sniptale-content-popover--compact !rounded-none !bg-[var(--sniptale-color-surface-canvas)]"
+      className="sniptale-content-popover--compact sniptale-parameter-menu
+        !rounded-[var(--sniptale-radius-sm)] !bg-[var(--sniptale-color-surface-panel)]"
       style={{
         position: 'fixed',
         width,
@@ -61,7 +62,7 @@ export function ReviewHistoryResetChoices(props: {
       <div
         role="dialog"
         aria-label={translate('gallery.videoReview.historyReset')}
-        className="max-h-[calc(100vh-24px)] overflow-y-auto p-1"
+        className="max-h-[calc(100vh-24px)] overflow-y-auto p-0"
         onKeyDown={(event) => {
           event.stopPropagation();
           if (event.key === 'Escape') {
@@ -79,7 +80,7 @@ export function ReviewHistoryResetChoices(props: {
           }
         }}
       >
-        <div className="px-3 py-2 text-sm font-semibold">
+        <div className="px-2 py-2 text-[14px] leading-5 font-semibold">
           {translate('gallery.videoReview.historyReset')}
         </div>
         <button
@@ -89,12 +90,14 @@ export function ReviewHistoryResetChoices(props: {
           disabled={!props.canStart || props.pending}
           onClick={props.onStart}
         >
-          <span className="block text-sm">{translate('gallery.videoReview.historyStart')}</span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          <span className="block text-[13px] leading-[18px] font-medium">
+            {translate('gallery.videoReview.historyStart')}
+          </span>
+          <span className="mt-0.5 block text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
             {translate('gallery.videoReview.historyStartDescription')}
           </span>
         </button>
-        <div className="mx-3 my-1 border-t border-[var(--sniptale-color-border)]" />
+        <div className="mx-2 my-1 border-t border-[var(--sniptale-color-border-soft)]" />
         <button
           type="button"
           className={rowClass}
@@ -102,10 +105,10 @@ export function ReviewHistoryResetChoices(props: {
           disabled={props.pending}
           onClick={props.onOriginal}
         >
-          <span className="block text-sm text-[var(--sniptale-color-danger)]">
+          <span className="block text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-danger)]">
             {translate('gallery.videoReview.resetOriginal')}
           </span>
-          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          <span className="mt-0.5 block text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
             {translate('gallery.videoReview.historyOriginalDescription')}
           </span>
         </button>

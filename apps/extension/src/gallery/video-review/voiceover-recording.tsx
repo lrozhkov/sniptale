@@ -26,6 +26,7 @@ export function useReviewVoiceoverRecording(args: {
   onOpenChange?(open: boolean): void;
 }) {
   const [recording, setRecording] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
   const [takeStart, setTakeStart] = useState<number | null>(null);
   const takeSegments = useRef(args.segments);
   const takeIds = useRef(new WeakMap<Blob, string>());
@@ -34,10 +35,13 @@ export function useReviewVoiceoverRecording(args: {
   const playback = useVoiceoverPlayback(args.video, () => takeStart ?? args.time);
   return {
     video: args.video,
+    opener,
     recording,
     takeStart,
     open: () => {
       if (!args.guard()) return;
+      opener.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       playback.open();
       reviewId.current = args.session.getSnapshot().snapshot.workspace.aggregateId;
       args.onOpenChange?.(true);

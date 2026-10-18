@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -194,69 +196,32 @@ async function expectAutoApplyCategoryConfiguration() {
   const phoneCategory = container?.querySelector<HTMLInputElement>(
     'input[aria-label="content.autoBlur.categoryPhone"]'
   );
-  expect(phoneCategory?.closest('label')?.className).not.toContain('accent-soft');
-  act(() => phoneCategory?.click());
+  const row = phoneCategory?.closest('.sniptale-parameter-row');
+  expect(row).not.toBeNull();
+  act(() => row?.querySelector<HTMLElement>('.sniptale-parameter-name')?.click());
+  expect(controller.toggleCategory).toHaveBeenCalledTimes(1);
   expect(controller.toggleCategory).toHaveBeenCalledWith(AUTO_BLUR_CATEGORIES.phone);
 }
 
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  modalMocks.loadHighlighterSettings.mockResolvedValue(DEFAULT_HIGHLIGHTER_SETTINGS);
+  modalMocks.subscribeToHighlighterSettings.mockReturnValue(() => undefined);
+});
+
+afterEach(() => {
+  act(() => {
+    root?.unmount();
+  });
+  root = null;
+  container?.remove();
+  container = null;
+  vi.unstubAllGlobals();
+});
+
 describe('AutoBlurModal', () => {
-  beforeEach(() => {
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-    modalMocks.loadHighlighterSettings.mockResolvedValue(DEFAULT_HIGHLIGHTER_SETTINGS);
-    modalMocks.subscribeToHighlighterSettings.mockReturnValue(() => undefined);
-  });
-
-  afterEach(() => {
-    act(() => {
-      root?.unmount();
-    });
-    root = null;
-    container?.remove();
-    container = null;
-    vi.unstubAllGlobals();
-  });
-
   it('renders selectable rows, marks already blurred targets, and wires footer actions', async () => {
     await expectRowsAndFooterWired();
-  });
-
-  it('applies the same enabled frame-template snapshot that the modal rendered', async () => {
-    let resolveInitialLoad: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
-    modalMocks.loadHighlighterSettings.mockReturnValue(
-      new Promise((resolve) => {
-        resolveInitialLoad = resolve;
-      })
-    );
-    let publishSettings: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
-    modalMocks.subscribeToHighlighterSettings.mockImplementation((listener) => {
-      publishSettings = listener;
-      return () => undefined;
-    });
-    const currentSettings = {
-      ...DEFAULT_HIGHLIGHTER_SETTINGS,
-      borderPresets: [
-        {
-          ...DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets[0]!,
-          color: '#13579b',
-          id: 'just-loaded-template',
-          name: 'Just loaded',
-        },
-      ],
-      defaultBorderPresetId: 'just-loaded-template',
-    };
-    const controller = createController();
-    await renderModal(controller);
-    await act(async () => {
-      publishSettings?.(currentSettings);
-      resolveInitialLoad?.(DEFAULT_HIGHLIGHTER_SETTINGS);
-      await Promise.resolve();
-    });
-
-    clickButton('content.autoBlur.apply');
-
-    expect(controller.apply).toHaveBeenCalledWith(
-      expect.objectContaining({ color: '#13579b', sourcePresetId: 'just-loaded-template' })
-    );
   });
 
   it('renders category parents for empty categories and exposes tree bulk actions', async () => {
@@ -334,5 +299,162 @@ describe('AutoBlurModal', () => {
     clickButton('content.autoBlur.apply');
 
     expect(controller.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves native mixed category selection and child click isolation', async () => {
+    const controller = createController({
+      selectedCategories: new Set(),
+      selectedMatchIds: new Set(['email-match']),
+    });
+    await renderModal(controller);
+    const category = container!.querySelector<HTMLInputElement>(
+      'input[aria-label="content.autoBlur.categoryEmail"]'
+    )!;
+    expect(category.indeterminate).toBe(true);
+    const rowClick = vi.fn();
+    window.addEventListener('click', rowClick);
+    act(() => category.click());
+    window.removeEventListener('click', rowClick);
+    expect(controller.toggleCategory).toHaveBeenCalledWith(AUTO_BLUR_CATEGORIES.email);
+    expect(controller.toggleCategory).toHaveBeenCalledTimes(1);
+    expect(rowClick).not.toHaveBeenCalled();
+    const child = container!.querySelector<HTMLInputElement>(
+      'input[aria-label="john.doe@example.com"]'
+    )!;
+    act(() => child.click());
+    expect(controller.toggleMatch).toHaveBeenCalledWith('email-match');
+    expect(controller.toggleMatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks dismissal and footer commands during Apply and retains data on a reported failure', async () => {
+    const controller = createController({ isApplying: true });
+    await renderModal(controller);
+    const dialog = container!.querySelector<HTMLElement>('[role="dialog"]')!;
+    act(() => dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    const footerButtons = container!.querySelectorAll<HTMLButtonElement>(
+      '.sniptale-modal-footer-sm button'
+    );
+    expect(footerButtons).toHaveLength(3);
+    expect(container!.querySelector<HTMLButtonElement>('.sniptale-modal-close')?.disabled).toBe(
+      true
+    );
+    for (const button of footerButtons) {
+      expect(button.disabled).toBe(true);
+      act(() => button.click());
+    }
+    expect(controller.close).not.toHaveBeenCalled();
+    expect(controller.reset).not.toHaveBeenCalled();
+    expect(controller.apply).not.toHaveBeenCalled();
+    await renderModal({
+      ...controller,
+      isApplying: false,
+      errorMessage: 'content.autoBlur.applyError',
+    });
+    expect(container!.textContent).toContain('content.autoBlur.applyError');
+    expect(container!.textContent).toContain('john.doe@example.com');
+    expect(
+      container!.querySelector<HTMLInputElement>('input[aria-label="john.doe@example.com"]')!
+        .checked
+    ).toBe(true);
+  });
+
+  it('forwards the native admitted Apply intent only in category configuration mode', async () => {
+    const controller = createController({ configurationMode: 'auto-apply', status: 'idle' });
+    await renderModal(controller);
+    const apply = [...container!.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'content.autoBlur.apply'
+    )!;
+    act(() =>
+      apply.dispatchEvent(
+        createBridgedMouseEvent('click', {
+          button: 0,
+          buttons: 0,
+          clientX: 10,
+          clientY: 10,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+        })
+      )
+    );
+    expect(controller.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ sourcePresetId: expect.any(String) }),
+      { kind: 'trusted-content-event' }
+    );
+    expect(container!.textContent).not.toContain('john.doe@example.com');
+  });
+});
+
+describe('AutoBlurModal template snapshot and nested dismissal', () => {
+  it('applies the same enabled frame-template snapshot that the modal rendered', async () => {
+    let resolveInitialLoad: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
+    modalMocks.loadHighlighterSettings.mockReturnValue(
+      new Promise((resolve) => {
+        resolveInitialLoad = resolve;
+      })
+    );
+    let publishSettings: ((settings: typeof DEFAULT_HIGHLIGHTER_SETTINGS) => void) | undefined;
+    modalMocks.subscribeToHighlighterSettings.mockImplementation((listener) => {
+      publishSettings = listener;
+      return () => undefined;
+    });
+    const currentSettings = {
+      ...DEFAULT_HIGHLIGHTER_SETTINGS,
+      borderPresets: [
+        {
+          ...DEFAULT_HIGHLIGHTER_SETTINGS.borderPresets[0]!,
+          color: '#13579b',
+          id: 'just-loaded-template',
+          name: 'Just loaded',
+        },
+      ],
+      defaultBorderPresetId: 'just-loaded-template',
+    };
+    const controller = createController();
+    await renderModal(controller);
+    await act(async () => {
+      publishSettings?.(currentSettings);
+      resolveInitialLoad?.(DEFAULT_HIGHLIGHTER_SETTINGS);
+      await Promise.resolve();
+    });
+
+    clickButton('content.autoBlur.apply');
+
+    expect(controller.apply).toHaveBeenCalledWith(
+      expect.objectContaining({ color: '#13579b', sourcePresetId: 'just-loaded-template' })
+    );
+  });
+
+  it('consumes template-popup Escape before allowing the next Escape to close the modal', async () => {
+    const controller = createController();
+    await renderModal(controller);
+    const trigger = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="content.autoBlur.frameTemplate"][aria-haspopup="listbox"]'
+    );
+    expect(trigger).not.toBeNull();
+    act(() => {
+      trigger!.focus();
+      trigger!.click();
+    });
+    expect(document.querySelector('[role="listbox"]')).not.toBeNull();
+    const escape = () =>
+      trigger!.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          key: 'Escape',
+        })
+      );
+    act(() => {
+      escape();
+    });
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(controller.close).not.toHaveBeenCalled();
+    act(() => {
+      escape();
+    });
+    expect(controller.close).toHaveBeenCalledTimes(1);
   });
 });

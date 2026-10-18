@@ -1,6 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
 import { Tag, X } from 'lucide-react';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { translate } from '../../../platform/i18n';
 import { GalleryTagInput } from './input';
 
@@ -21,16 +21,17 @@ export function GalleryTagInputDisclosure(props: GalleryTagInputDisclosureProps)
 
   if (!expanded) {
     return (
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         aria-label={translate('gallery.app.addTags')}
         onClick={() => setExpanded(true)}
-        className={`${getControlSecondaryButtonClassName({ density: 'compact' })}
-          !h-8 !min-h-8 !rounded-[8px] !px-2.5`}
+        className="shrink-0"
       >
         <Tag className="h-3.5 w-3.5" aria-hidden="true" />
         <span>{translate('gallery.app.addTags')}</span>
-      </button>
+      </ProductActionButton>
     );
   }
 
@@ -49,19 +50,18 @@ export function GalleryTagInputDisclosure(props: GalleryTagInputDisclosureProps)
           }}
         />
       </div>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         aria-label={translate('gallery.app.closeTagEditor')}
         title={translate('gallery.app.closeTagEditor')}
         onClick={() => setExpanded(false)}
-        className={[
-          'sniptale-dismiss-button',
-          `${getControlSecondaryButtonClassName({ density: 'compact' })}
-          !h-8 !min-h-8 !w-8 !min-w-8 !rounded-[8px] !p-0`,
-        ].join(' ')}
+        data-command-chrome="true"
+        className="sniptale-dismiss-button h-8 w-8 min-w-8 shrink-0"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

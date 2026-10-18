@@ -146,6 +146,25 @@ vi.mock('../../ui/compact-inspector-controls', () => ({
       ))}
     </select>
   ),
+  CompactSelect: (p: {
+    'aria-label': string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange(value: string): void;
+  }) => (
+    <select
+      aria-label={p['aria-label']}
+      value={p.value}
+      onChange={(e) => p.onChange(e.target.value)}
+    >
+      <option value="" />
+      {p.options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
   NumericRow: (p: {
     label: string;
     value: number | null;

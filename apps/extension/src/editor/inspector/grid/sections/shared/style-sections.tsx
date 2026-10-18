@@ -30,7 +30,7 @@ export function EditorInspectorGridStyleSections({
   updateWorkspace,
 }: GridStyleSectionsProps) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <ColorField
         title={translate('editor.compact.gridLineColor')}
         label={translate('editor.compact.gridLines')}

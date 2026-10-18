@@ -29,9 +29,9 @@ export function SelectionVisibilitySetting() {
   };
 
   return (
-    <div data-ui="editor.workspace.selection-visibility" className="space-y-1">
+    <div data-ui="editor.workspace.selection-visibility" className="sniptale-parameter-stack">
       <div data-inspector-toggle className="flex min-h-8 items-center justify-between gap-3">
-        <span className="min-w-0 text-xs">
+        <span className="min-w-0 text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-secondary)]">
           {translate('editor.compact.hideSelectionWhileDragging')}
         </span>
         <ProductGlassSwitch

@@ -35,12 +35,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await act(async () => {
-    root.unmount();
-    // React/jsdom host callbacks must finish before Vitest removes this window.
-    await settleTimerTurn(0);
-    await settleHostTurn();
-  });
+  await act(async () => root.unmount());
+  // act can schedule a passive host callback as it finishes. Drain after it returns.
+  await settleTimerTurn(0);
+  await settleHostTurn();
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

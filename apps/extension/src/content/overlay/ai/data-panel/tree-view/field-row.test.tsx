@@ -66,6 +66,7 @@ describe('FieldRow', () => {
 
     expect(row?.className).toContain('sniptale-tree-row-field-selected');
     expect(container?.textContent).toContain('Status: Open');
+    expect(checkbox?.getAttribute('aria-label')).toBe('Status');
     expect(toggleSelected).toHaveBeenCalledWith('field-1');
   });
 });

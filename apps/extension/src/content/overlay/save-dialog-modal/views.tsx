@@ -35,13 +35,13 @@ export function SaveDialogSessionFooter(props: {
 }) {
   return (
     <label className="sniptale-save-dialog-checkbox-row">
+      <span>{translate('content.saveDialog.rememberPreset')}</span>
       <input
+        className="sniptale-checkbox"
         type="checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.target.checked)}
-        className="sniptale-checkbox"
       />
-      <span>{translate('content.saveDialog.rememberPreset')}</span>
     </label>
   );
 }
@@ -66,6 +66,10 @@ export function SaveDialogContent(props: {
       subtitle={translate('content.saveDialog.subtitle')}
       closeLabel={translate('common.actions.close')}
       filenameLabel={translate('content.saveDialog.filenameLabel')}
+      filenameClearLabel={translate('shared.ui.clearField').replace(
+        '{field}',
+        translate('content.saveDialog.filenameLabel')
+      )}
       filename={props.filename}
       filenamePlaceholder={translate('content.saveDialog.filenamePlaceholder')}
       onFilenameChange={props.onFilenameChange}

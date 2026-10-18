@@ -27,7 +27,7 @@ import type { VideoEditorEffectsLibraryDockProps } from './types';
 const CATALOG_CARD_CLASS_NAME = 'contents';
 const DOCUMENT_CARD_CLASS_NAME = [
   'effect-catalog-card group/effect-card flex min-w-0 flex-col items-stretch gap-1.5',
-  'rounded-[6px] border p-1.5 cursor-grab active:cursor-grabbing',
+  'rounded-[4px] border p-1.5 cursor-grab active:cursor-grabbing',
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
@@ -115,7 +115,7 @@ export function CatalogSection(
           {props.kind === 'targetEffect' && (
             <label
               className={[
-                'flex items-center gap-2 border-b px-2 py-1 text-xs',
+                'flex flex-wrap items-center gap-2 border-b px-2 py-1 text-[13px]',
                 'border-[var(--sniptale-color-border-soft)]',
               ].join(' ')}
             >
@@ -225,6 +225,20 @@ function CatalogDocument(
   const drag = useEffectDocumentDrag();
   const target = resolveDocumentTarget(props.document.kind, props);
   const metadata = describeCatalogDocument(props.document, getCurrentLocale());
+  const applyDocument = (startTime: number, trackId?: string | null) =>
+    target &&
+    void props.run('apply', () =>
+      props.onApplyEffect({
+        catalog: props.catalog,
+        documentId: props.document.id,
+        ...(props.document.previewPresetId
+          ? { controlPresetId: props.document.previewPresetId }
+          : {}),
+        startTime,
+        ...(trackId ? { trackId } : {}),
+        target,
+      })
+    );
   return (
     <div
       className={DOCUMENT_CARD_CLASS_NAME}
@@ -245,11 +259,11 @@ function CatalogDocument(
       }}
       onDragEnd={drag.end}
     >
-      <div className="flex h-6 min-w-0 items-center">
+      <div className="flex min-h-8 min-w-0 items-center">
         <div className="min-w-0 flex-1">
           <p
             title={metadata.label}
-            className="truncate text-[11px] leading-4 font-medium text-[var(--sniptale-color-text-primary)]"
+            className="truncate text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]"
           >
             {metadata.label}
           </p>
@@ -277,20 +291,9 @@ function CatalogDocument(
             aria-label={getDocumentActionLabel(props.document.kind, target)}
             disabled={props.disabled || !target}
             onClick={() =>
-              target &&
-              void props.run('apply', () =>
-                props.onApplyEffect({
-                  catalog: props.catalog,
-                  documentId: props.document.id,
-                  ...(props.document.previewPresetId
-                    ? { controlPresetId: props.document.previewPresetId }
-                    : {}),
-                  startTime: props.currentTime,
-                  ...(props.document.kind === 'standalone' && props.selectedTrackId
-                    ? { trackId: props.selectedTrackId }
-                    : {}),
-                  target,
-                })
+              applyDocument(
+                props.currentTime,
+                props.document.kind === 'standalone' ? props.selectedTrackId : undefined
               )
             }
           >
@@ -305,21 +308,7 @@ function CatalogDocument(
               className="!h-6 !w-6 !min-w-6"
               title={translate('videoEditor.app.materialsAppend')}
               disabled={props.disabled || !target}
-              onClick={() =>
-                target &&
-                void props.run('apply', () =>
-                  props.onApplyEffect({
-                    catalog: props.catalog,
-                    documentId: props.document.id,
-                    ...(props.document.previewPresetId
-                      ? { controlPresetId: props.document.previewPresetId }
-                      : {}),
-                    startTime: props.appendTime!,
-                    ...(props.selectedTrackId ? { trackId: props.selectedTrackId } : {}),
-                    target,
-                  })
-                )
-              }
+              onClick={() => applyDocument(props.appendTime!, props.selectedTrackId)}
             >
               <ArrowRightToLine size={14} aria-hidden="true" />
             </EditorIconButton>
@@ -329,7 +318,7 @@ function CatalogDocument(
       {(metadata.themeLabel || metadata.styleLabel) && (
         <span
           title={[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
-          className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
+          className="block truncate text-xs text-[var(--sniptale-color-text-muted)]"
         >
           {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
         </span>

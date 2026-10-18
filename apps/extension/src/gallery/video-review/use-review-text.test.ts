@@ -3,7 +3,12 @@ import type {
   ReviewTextFragment,
   ReviewVoiceTextSnapshot,
 } from '../../features/video/review/text-document';
-import { queryReviewText, type ReviewTextFilters } from './use-review-text';
+import { createTrackProjection } from './track-projection';
+import {
+  reviewTextRecordingMaximum,
+  queryReviewText,
+  type ReviewTextFilters,
+} from './use-review-text';
 
 const all: ReviewTextFilters = { query: '', origin: 'all', voice: 'all', visibility: 'all' };
 const fragment = (index: number): ReviewTextFragment => ({
@@ -92,4 +97,37 @@ it('filters provenance and visibility independently of text and audio ownership'
       mixed.id,
     ]);
   }
+});
+
+it('uses optimistic result and source placement for the display cap across cuts and rates', () => {
+  const projection = createTrackProjection(12, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const editor = {
+    projection,
+    document: {
+      version: 1 as const,
+      fragments: [
+        { ...fragment(0), id: 'result', start: 1, end: 2 },
+        { ...fragment(0), id: 'source', timeDomain: 'source' as const, start: 8, end: 9 },
+        { ...fragment(0), id: 'past', start: 20, end: 21 },
+      ],
+    },
+  };
+  expect(projection.resultDuration).toBe(8);
+  expect(reviewTextRecordingMaximum(editor, 'result')).toBe(7);
+  expect(reviewTextRecordingMaximum(editor, 'source')).toBe(3);
+  expect(reviewTextRecordingMaximum(editor, 'past')).toBe(0);
+  expect(reviewTextRecordingMaximum(editor, 'missing')).toBe(0);
+  expect(reviewTextRecordingMaximum(editor, undefined)).toBe(0);
 });

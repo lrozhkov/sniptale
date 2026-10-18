@@ -9,6 +9,7 @@ import { usePaintSelectorLifecycle } from './lifecycle';
 import { usePaintModeState } from './mode-state';
 import { PaintSelectorPortal } from './popup';
 import { PaintSelectorTrigger } from './trigger';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 
 const createId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -61,6 +62,7 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
         label={props.label}
         onClick={state.open ? state.cancel : state.show}
         open={state.open}
+        onCommitColor={(color) => props.onChange(createSolidPaint(color))}
       />
       <PaintSelectorPortal
         {...(props.allowedModes === undefined ? {} : { allowedModes: props.allowedModes })}

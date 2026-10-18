@@ -59,6 +59,25 @@ it('starts globally disabled and preserves the configured appearance across disa
   act(() => toggle.click());
   expect(JSON.parse(host.querySelector('output')!.textContent!).style.position).toBe('top');
 });
+it('disables scene captions only for a busy editor and restores editing', async () => {
+  const change = vi.fn();
+  const settings = { ...createReviewCaptionSettings(), enabled: true };
+  await act(async () =>
+    root.render(<ReviewCaptionSceneControls settings={settings} disabled onChange={change} />)
+  );
+  const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle.disabled).toBe(true);
+  act(() => toggle.click());
+  expect(change).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLFieldSetElement>('fieldset')!.disabled).toBe(true);
+  await act(async () =>
+    root.render(
+      <ReviewCaptionSceneControls settings={settings} disabled={false} onChange={change} />
+    )
+  );
+  act(() => toggle.click());
+  expect(change).toHaveBeenCalledExactlyOnceWith({ ...settings, enabled: false });
+});
 it('shows inherited/local style compactly and never stales retained voice by appearance changes', async () => {
   const snapshot = { ...phrase, textId: phrase.id, kind: 'microphone' as const };
   const scene = { ...createReviewCaptionSettings(), enabled: true };

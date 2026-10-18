@@ -50,6 +50,7 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'recording_recovery_blocks') return JSON.stringify([value['id'], value['index']]);
   if (store === 'scenario_project_units')
     return JSON.stringify([value['projectId'], value['unitId'], value['revision']]);
   if (store === 'scenario_project_history')
@@ -128,10 +129,11 @@ beforeEach(() => {
     ],
   ]);
   harness.db.mockResolvedValue({
-    transaction() {
+    transaction(_stores: string[], _mode: string, options?: { durability?: string }) {
       const pending = structuredClone(rows);
       let aborted = false;
       return {
+        durability: options?.durability ?? 'default',
         abort() {
           aborted = true;
         },
@@ -156,6 +158,7 @@ beforeEach(() => {
                   .filter(isRecord)
                   .filter((value) => value[indexName] === key)
                   .map((value) => {
+                    if (name === 'recording_recovery_blocks') return [value['id'], value['index']];
                     if (
                       typeof value['aggregateId'] !== 'string' ||
                       typeof value['ordinal'] !== 'number'

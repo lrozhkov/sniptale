@@ -31,10 +31,8 @@ import {
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
 import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
-import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ReviewButton,
   ReviewInterval,
@@ -64,7 +62,10 @@ function ZoomTransitionSection(props: {
 }) {
   return (
     <ReviewDetails label={props.label} preferenceId={props.preferenceId} initiallyOpen>
-      <fieldset aria-label={props.label} className="review-inspector-phase min-w-0 space-y-2">
+      <fieldset
+        aria-label={props.label}
+        className="review-inspector-phase min-w-0 sniptale-parameter-stack"
+      >
         {props.children}
         <SegmentedRow<QuickEditZoomTransition['type']>
           columns={3}
@@ -117,10 +118,11 @@ export function ReviewZoomInspector(props: {
 }) {
   const { region, onChange } = props;
   const [tool, onTool] = useState<SpatialTool>('position');
+  const [resetTarget, setResetTarget] = useState<HTMLDivElement | null>(null);
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   return (
-    <ReviewSpatialToolContext.Provider value={{ tool, onTool }}>
+    <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget }}>
       <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
         <ReviewInterval
           start={sourceRange?.start ?? region.start}
@@ -186,6 +188,9 @@ export function ReviewZoomInspector(props: {
                         onChange={(cameraFollow) => onChange({ cameraFollow })}
                         onReset={() => onChange({ cameraFollow: null })}
                       />
+                    ) : null}
+                    {props.preview && !region.border && !region.spotlight ? (
+                      <div ref={setResetTarget} />
                     ) : null}
                   </div>
                 </ReviewInspectorColumns>
@@ -534,23 +539,21 @@ function ReviewFocusType({
   onChange(patch: QuickEditZoomRegionPatch): void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-        {translate('gallery.videoReview.focusType')}
-      </span>
-      <SegmentedSwitch<FocusType>
-        dataAttribute={{ 'data-ui': 'gallery.videoReview.focusType' }}
+    <div className="min-w-0" data-ui="gallery.videoReview.focusType">
+      <SegmentedRow<FocusType>
+        label={translate('gallery.videoReview.focusType')}
+        layout="stacked"
+        columns={3}
         ariaLabel={translate('gallery.videoReview.focusType')}
-        density="compact"
-        activeId={quickEditFocusType(region)}
+        value={quickEditFocusType(region)}
         options={[
           {
-            id: 'zoom',
+            value: 'zoom',
             label: translate('gallery.videoReview.zoomRegionLabel'),
             disabled: blocked,
           },
-          { id: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-          { id: 'border', label: translate('gallery.videoReview.focusBorder') },
+          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+          { value: 'border', label: translate('gallery.videoReview.focusBorder') },
         ]}
         onChange={(type) => {
           if (type === quickEditFocusType(region) || (type === 'zoom' && blocked)) return;
@@ -584,26 +587,18 @@ function ReviewMotionBlurSettings(props: {
       data-ui="gallery.videoReview.motionBlurSettings"
       data-phase={props.phase}
     >
-      <div
-        className="flex min-h-8 items-center justify-between gap-2 text-xs
-          text-[var(--sniptale-color-text-secondary)]"
-      >
-        <span>{translate('gallery.videoReview.motionBlur')}</span>
-        <ProductGlassSwitch
-          role="switch"
-          aria-label={translate('gallery.videoReview.motionBlur')}
-          aria-checked={value.enabled}
-          on={value.enabled}
-          onClick={() =>
-            props.onChange({
-              motionBlur: {
-                ...props.region.motionBlur,
-                [props.phase]: { ...value, enabled: !value.enabled },
-              },
-            })
-          }
-        />
-      </div>
+      <ToggleField
+        label={translate('gallery.videoReview.motionBlur')}
+        value={value.enabled}
+        onChange={(enabled) =>
+          props.onChange({
+            motionBlur: {
+              ...props.region.motionBlur,
+              [props.phase]: { ...value, enabled },
+            },
+          })
+        }
+      />
       {value.enabled ? (
         <ReviewNumberRow
           label={translate('gallery.videoReview.motionBlurStrength')}

@@ -76,7 +76,7 @@ function renderTextNode(node: ResolvedAnnotationRenderNode, baseStyle: React.CSS
         boxSizing: 'border-box',
         color: readAnnotationString(node.style['fill'], '#ffffff'),
         display: 'flex',
-        fontFamily: readAnnotationString(node.style['fontFamily'], 'Sniptale Sans, sans-serif'),
+        fontFamily: readAnnotationString(node.style['fontFamily'], 'Sniptale Text, sans-serif'),
         fontSize: createSceneLength(readAnnotationNumber(node.style['fontSize'], 18)),
         fontWeight: readAnnotationNumber(node.style['weight'], 600),
         lineHeight: readAnnotationNumber(node.style['lineHeight'], 1.2),

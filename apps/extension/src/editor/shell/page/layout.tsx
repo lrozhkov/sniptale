@@ -20,14 +20,14 @@ const EDITOR_PAGE_ROOT_CLASS_NAME = [
 ].join(' ');
 
 const editorOpenLoadingCardClassName = [
-  'flex items-center gap-3 rounded-xl px-5 py-4 shadow-lg',
+  'flex items-center gap-2 rounded-[4px] px-3 py-3 shadow-lg',
   'bg-[var(--sniptale-color-surface-panel)]',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const editorOpenErrorClassName = [
   'absolute inset-x-4 top-4 z-50 mx-auto max-w-lg',
-  'rounded-xl border border-[var(--sniptale-color-border-soft)] p-4 shadow-lg',
+  'rounded-[4px] border border-[var(--sniptale-color-border-soft)] p-4 shadow-lg',
   'bg-[var(--sniptale-color-surface-panel)]',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
@@ -156,6 +156,7 @@ export function EditorPageLayout(props: {
       ) : null}
       {confirmRecovery && props.openStatus === 'missing' ? (
         <ProductConfirmDialog
+          dialogClassName="sniptale-compact-workspace sniptale-image-dialog"
           title={translate('editor.page.recoverOriginalTitle')}
           message={
             <>

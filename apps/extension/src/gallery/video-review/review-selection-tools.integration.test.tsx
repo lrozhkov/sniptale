@@ -130,13 +130,18 @@ async function dragRange(
 /** History controls act on accepted content, after the product autosave acknowledgement. */
 async function waitForContentCommit(
   fixture: ReturnType<typeof createEditorFixture>,
-  cursor: number
+  cursor: number,
+  after?: Record<string, unknown>
 ) {
   await act(async () => {
     await vi.waitFor(
       () => {
-        expect(fixture.snapshot.workspace.cursor).toBe(cursor);
+        expect(
+          fixture.snapshot.workspace.cursor,
+          JSON.stringify(fixture.snapshot.workspace.history)
+        ).toBe(cursor);
         expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('advancedContent');
+        if (after) expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({ after });
       },
       { timeout: 2_500 }
     );
@@ -144,7 +149,7 @@ async function waitForContentCommit(
 }
 
 it('creates a source-audio mute from a range, opens properties and restores it through undo/redo', async () => {
-  const fixture = createEditorFixture(integration);
+  const fixture = createEditorFixture(integration, { inspectorWidth: 0 });
   integration.index.mockResolvedValue({
     duration: 4,
     boundaries: [0, 1, 2, 3, 4],
@@ -159,11 +164,13 @@ it('creates a source-audio mute from a range, opens properties and restores it t
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    // First entry commits zoom enablement before the independent audio gesture.
+    await waitForContentCommit(fixture, 1);
     expect(fixture.host.querySelector('[data-review-track="originalAudio"]')).not.toBeNull();
     expect(fixture.host.querySelector('[data-review-track="zoom"]')).not.toBeNull();
     await dragRange(fixture.host);
     await fixture.click('originalAudioRange');
-    await waitForContentCommit(fixture, 1);
+    await waitForContentCommit(fixture, 2);
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
     ).toHaveLength(1);
@@ -215,9 +222,13 @@ it('draws a source-audio volume edit with an independent toolbar default', async
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    // First entry commits zoom enablement before the independent audio gesture.
+    await waitForContentCommit(fixture, 1);
     await fixture.click('originalAudioRange');
     await dragRange(fixture.host, { lane: 'original' });
-    await waitForContentCommit(fixture, 1);
+    await waitForContentCommit(fixture, 2, {
+      audio: { original: { ranges: [expect.objectContaining({ volume: 0.5 })] } },
+    });
     const item = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.originalAudioRange"]'
     );

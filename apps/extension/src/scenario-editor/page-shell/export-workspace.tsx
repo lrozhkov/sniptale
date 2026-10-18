@@ -53,7 +53,10 @@ export function GuideExportWorkspace({
       <section className="guide-export-stage" aria-label={stageLabel}>
         {stage}
       </section>
-      <aside className="guide-export-inspector guide-export-controls" aria-label={title}>
+      <aside
+        className="guide-export-inspector guide-export-controls sniptale-inspector-surface"
+        aria-label={title}
+      >
         <header className="guide-export-heading">
           <ContentToolbarButton
             className="guide-labeled-action"

@@ -159,6 +159,7 @@ function buildRecordingBatchInputs(
         filename: artifact.filename,
         id: source.recordingId,
         preparedAsset: artifact.asset,
+        ...(artifact.recoverySource ? { recoverySource: artifact.recoverySource } : {}),
         recordingGroup,
         storageClass,
       };

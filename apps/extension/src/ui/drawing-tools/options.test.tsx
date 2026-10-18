@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DrawingBlurStrengthOptions,
@@ -55,26 +56,50 @@ describe('shared drawing option controls', () => {
     expect(markup).toContain('20px');
     expect(markup.replace(/<[^>]*>/g, '')).toBe('');
   });
-  it('places text size and family before foreground and background colors', () => {
+  it.each([false, true])('preserves text previews and color order with scope=%s', (scoped) => {
     const markup = renderToStaticMarkup(
-      <DrawingTextOptions
-        backgroundColor={null}
-        color="#123456"
-        colors={['#123456']}
-        floatingBoundaryRef={{ current: null }}
-        floatingPlacement="auto"
-        fontSize={20}
-        fontFamily="sans"
-        vertical={false}
-        onBackgroundColorChange={vi.fn()}
-        onColorChange={vi.fn()}
-        onFontSizeChange={vi.fn()}
-        onFontFamilyChange={vi.fn()}
-      />
+      <CommandPressScope value={scoped}>
+        <DrawingTextOptions
+          backgroundColor={null}
+          color="#123456"
+          colors={['#123456']}
+          floatingBoundaryRef={{ current: null }}
+          floatingPlacement="auto"
+          fontSize={20}
+          fontFamily="sans"
+          vertical={false}
+          onBackgroundColorChange={vi.fn()}
+          onColorChange={vi.fn()}
+          onFontSizeChange={vi.fn()}
+          onFontFamilyChange={vi.fn()}
+        />
+      </CommandPressScope>
     );
+    expect(markup).toContain('font-family:');
+    expect(markup).toContain('>Aa</span>');
+    expect(markup).toContain('font-size:13px');
+    expect(markup).toContain('font-size:14px');
+    expect(markup).toContain('font-size:15.5px');
     const color = markup.indexOf('shared.ui.color-selector');
     expect(markup.lastIndexOf('content.toolbar.drawing-options.text.size-')).toBeLessThan(color);
     expect(markup.lastIndexOf('content.toolbar.drawing-options.text.font-')).toBeLessThan(color);
     expect(color).toBeGreaterThan(0);
   });
+});
+
+it('uses neutral property choices only inside the migrated command scope', () => {
+  const options = (
+    <DrawingWidthOptions tool="pencil" value={4} values={[2, 4]} onChange={vi.fn()} />
+  );
+  const scoped = renderToStaticMarkup(
+    <CommandPressScope.Provider value>{options}</CommandPressScope.Provider>
+  );
+  expect(scoped.match(/data-command-property="true"/g)).toHaveLength(2);
+  expect(scoped).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(scoped).not.toContain('!text-[var(--sniptale-color-accent-emphasis)]');
+  expect(scoped).toContain('aria-pressed="true"');
+  const pending = renderToStaticMarkup(options);
+  expect(pending).not.toContain('data-command-property');
+  expect(pending).toContain('sniptale-glass-toolbar-button--active');
+  expect(pending).toContain('!text-[var(--sniptale-color-accent-emphasis)]');
 });

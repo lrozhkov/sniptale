@@ -10,22 +10,6 @@ import { WebSnapshotImportModalContent } from '../../library/modals/web-snapshot
 import { PreviewPanel } from '../../library/preview';
 import type { GalleryAppLayoutProps } from './types';
 
-const galleryConfirmDialogClassName = [
-  '!w-[min(400px,calc(100vw-32px))] !max-w-none !rounded-[12px]',
-  '!bg-[var(--sniptale-color-surface-panel)] !p-0 !font-[inherit]',
-  '[&_.sniptale-modal-header-sm]:!border-b-0 [&_.sniptale-modal-header-sm]:!bg-transparent',
-  '[&_.sniptale-modal-header-sm]:!px-4 [&_.sniptale-modal-header-sm]:!pb-1 [&_.sniptale-modal-header-sm]:!pt-4',
-  '[&_.sniptale-confirm-title]:!m-0',
-  '[&_.sniptale-modal-body-sm]:!gap-0 [&_.sniptale-modal-body-sm]:!bg-transparent',
-  '[&_.sniptale-modal-body-sm]:!px-4 [&_.sniptale-modal-body-sm]:!py-2',
-  '[&_.sniptale-confirm-message]:!m-0 [&_.sniptale-confirm-message]:!text-[var(--sniptale-color-text-secondary)]',
-  '[&_.sniptale-modal-footer-sm]:!gap-2 [&_.sniptale-modal-footer-sm]:!border-t-0',
-  '[&_.sniptale-modal-footer-sm]:!bg-transparent [&_.sniptale-modal-footer-sm]:!px-4',
-  '[&_.sniptale-modal-footer-sm]:!pb-4 [&_.sniptale-modal-footer-sm]:!pt-3',
-  '[&_.sniptale-modal-footer-sm_button]:!h-9 [&_.sniptale-modal-footer-sm_button]:!min-h-9',
-  '[&_.sniptale-modal-footer-sm_button]:!rounded-[8px] [&_.sniptale-modal-footer-sm_button]:!px-3.5',
-].join(' ');
-
 function GalleryImportOverlay(
   props: Pick<GalleryAppLayoutProps, 'onImport' | 'onPendingImportClose' | 'state'>
 ) {
@@ -112,7 +96,7 @@ function GalleryConfirmOverlay(
       message={props.state.storage.confirmDialog.message}
       confirmText={props.state.storage.confirmDialog.confirmText}
       cancelText={props.state.storage.confirmDialog.cancelText}
-      dialogClassName={galleryConfirmDialogClassName}
+      dialogClassName="sniptale-compact-workspace"
       onCancel={props.onConfirmDialogClose}
       onConfirm={props.state.storage.confirmDialog.onConfirm}
     />

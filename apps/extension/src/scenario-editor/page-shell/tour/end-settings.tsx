@@ -1,8 +1,9 @@
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useEffect, useState } from 'react';
 import { Flag } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductToggle, ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
 import type { Translate } from '../../../platform/i18n';
@@ -37,16 +38,12 @@ export function TourEndSettings({
         disabled={disabled}
         onChange={(description) => change({ description })}
       />
-      <label className="guide-number-toggle">
-        <ProductToggle
-          size="sm"
-          disabled={disabled}
-          aria-label={t('scenario.editor.tourRestart')}
-          checked={value.restart}
-          onClick={() => change({ restart: !value.restart })}
-        />
-        {t('scenario.editor.tourRestart')}
-      </label>
+      <ToggleField
+        disabled={disabled}
+        label={t('scenario.editor.tourRestart')}
+        value={value.restart}
+        onChange={() => change({ restart: !value.restart })}
+      />
       <TourEndButton
         value={value.button}
         disabled={disabled}
@@ -88,20 +85,16 @@ function TourEndButton({
   };
   return (
     <div className="tour-text-field">
-      <label className="guide-number-toggle">
-        <ProductToggle
-          size="sm"
-          disabled={disabled}
-          aria-label={t('scenario.editor.tourEndButton')}
-          checked={enabled}
-          onClick={() => {
-            if (enabled && value && !onChange(null)) return;
-            setEnabled(!enabled);
-            setInvalid(false);
-          }}
-        />
-        {t('scenario.editor.tourEndButton')}
-      </label>
+      <ToggleField
+        disabled={disabled}
+        label={t('scenario.editor.tourEndButton')}
+        value={enabled}
+        onChange={() => {
+          if (enabled && value && !onChange(null)) return;
+          setEnabled(!enabled);
+          setInvalid(false);
+        }}
+      />
       {enabled && (
         <>
           <TourTextField
@@ -190,23 +183,19 @@ function TourEndToggle({
     });
   return (
     <>
-      <label className="guide-number-toggle">
-        <ProductToggle
-          size="sm"
-          disabled={disabled}
-          aria-label={t('scenario.editor.tourEnabled')}
-          checked={tour.endScreen.enabled}
-          onClick={() => {
-            if (tour.endScreen.enabled && linked) setConfirm(true);
-            else
-              onChange({
-                ...tour,
-                endScreen: { ...tour.endScreen, enabled: !tour.endScreen.enabled },
-              });
-          }}
-        />
-        {t('scenario.editor.tourEnabled')}
-      </label>
+      <ToggleField
+        disabled={disabled}
+        label={t('scenario.editor.tourEnabled')}
+        value={tour.endScreen.enabled}
+        onChange={() => {
+          if (tour.endScreen.enabled && linked) setConfirm(true);
+          else
+            onChange({
+              ...tour,
+              endScreen: { ...tour.endScreen, enabled: !tour.endScreen.enabled },
+            });
+        }}
+      />
       {confirm && (
         <div role="alert" className="tour-review-notice">
           <p>{t('scenario.editor.tourDisableEndLinks')}</p>

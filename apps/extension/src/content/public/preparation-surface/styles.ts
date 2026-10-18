@@ -1,3 +1,4 @@
+import inspectorSurfaceStyles from '../../../ui/compact-inspector-controls/inspector-surface.css?inline';
 import baseStyles from '@sniptale/ui/styles?inline';
 import aiModalStyles from '@sniptale/ui/styles/ai-modal?inline';
 import glassStyles from '@sniptale/ui/styles/glass?inline';
@@ -14,10 +15,12 @@ import frameAnnotationInteractionStyles from '../../../features/highlighter/fram
 import frameAnnotationCalloutFontStyles from '../../../features/highlighter/frame-annotation/callout/font.css?inline';
 import contentHostStyles from './host.css?inline';
 
-const CONTENT_ENTRYPOINT_FONT_URL_PATTERNS = [
-  /url\((['"]?)\/node_modules\/@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)@fontsource-variable\/manrope\/files\/(manrope-[\w-]+\.woff2)\1\)/g,
-  /url\((['"]?)\.\/(manrope-[\w-]+\.woff2)\1\)/g,
+export { installContentInterfaceFonts } from './interface-fonts';
+
+const CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS = [
+  /url\((['"]?)\/packages\/ui\/src\/styles\/(?:golos-ui|golos-text)\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(?:golos-ui|golos-text)\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
+  /url\((['"]?)\.\/(golos-(?:ui|text)-vf\.woff2)\1\)/g,
 ] as const;
 
 const CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS = [
@@ -156,10 +159,14 @@ function findFirstCssCodeIndex(styles: string): number | null {
   return null;
 }
 
-function findCssDeclarationColon(styles: string): number | null {
+function findCssTopLevelDelimiter(
+  styles: string,
+  start: number,
+  delimiters: string
+): number | null {
   let parenthesesDepth = 0;
   let bracketsDepth = 0;
-  let cursor = 0;
+  let cursor = start;
   while (cursor < styles.length) {
     if (styles.startsWith('/*', cursor)) {
       cursor = findCssCommentEnd(styles, cursor);
@@ -178,7 +185,8 @@ function findCssDeclarationColon(styles: string): number | null {
     if (character === ')') parenthesesDepth = Math.max(0, parenthesesDepth - 1);
     if (character === '[') bracketsDepth += 1;
     if (character === ']') bracketsDepth = Math.max(0, bracketsDepth - 1);
-    if (character === ':' && parenthesesDepth === 0 && bracketsDepth === 0) return cursor;
+    if (parenthesesDepth === 0 && bracketsDepth === 0 && delimiters.includes(character))
+      return cursor;
     cursor += 1;
   }
   return null;
@@ -189,7 +197,7 @@ function normalizeCssStatement(styles: string): string {
   if (firstCodeIndex === null) return styles;
   if (styles[firstCodeIndex] === '@') return normalizeCssRemUnitsPreservingLiterals(styles);
 
-  const colonIndex = findCssDeclarationColon(styles);
+  const colonIndex = findCssTopLevelDelimiter(styles, 0, ':');
   if (colonIndex === null) return styles;
   return `${styles.slice(0, colonIndex + 1)}${normalizeCssRemUnitsPreservingLiterals(
     styles.slice(colonIndex + 1)
@@ -211,30 +219,12 @@ function normalizeCssScope(
   const normalized: string[] = [];
   let segmentStart = start;
   let cursor = start;
-  let parenthesesDepth = 0;
-  let bracketsDepth = 0;
-
   while (cursor < styles.length) {
-    if (styles.startsWith('/*', cursor)) {
-      cursor = findCssCommentEnd(styles, cursor);
-      continue;
-    }
+    const delimiter = findCssTopLevelDelimiter(styles, cursor, '{;}');
+    if (delimiter === null) break;
+    cursor = delimiter;
     const character = styles[cursor]!;
-    if (character === '"' || character === "'") {
-      cursor = findCssStringEnd(styles, cursor, character);
-      continue;
-    }
-    if (character === '\\') {
-      cursor += 2;
-      continue;
-    }
-    if (character === '(') parenthesesDepth += 1;
-    if (character === ')') parenthesesDepth = Math.max(0, parenthesesDepth - 1);
-    if (character === '[') bracketsDepth += 1;
-    if (character === ']') bracketsDepth = Math.max(0, bracketsDepth - 1);
-
-    const isStructural = parenthesesDepth === 0 && bracketsDepth === 0;
-    if (isStructural && character === '{') {
+    if (character === '{') {
       normalized.push(normalizeCssRulePrelude(styles.slice(segmentStart, cursor)), '{');
       const child = normalizeCssScope(styles, cursor + 1, true);
       normalized.push(child.styles);
@@ -243,13 +233,13 @@ function normalizeCssScope(
       segmentStart = cursor;
       continue;
     }
-    if (isStructural && character === ';') {
+    if (character === ';') {
       normalized.push(normalizeCssStatement(styles.slice(segmentStart, cursor)), ';');
       cursor += 1;
       segmentStart = cursor;
       continue;
     }
-    if (isStructural && character === '}' && stopAtClosingBrace) {
+    if (character === '}' && stopAtClosingBrace) {
       normalized.push(normalizeCssStatement(styles.slice(segmentStart, cursor)));
       return { end: cursor, styles: normalized.join('') };
     }
@@ -277,18 +267,12 @@ function resolveRuntimeAssetUrl(resourcePath: string): string | null {
 }
 
 export function resolveContentEntrypointStyleUrls(styles: string): string {
-  const withManropeUrls = CONTENT_ENTRYPOINT_FONT_URL_PATTERNS.reduce(
-    (resolvedStyles, pattern, index) => {
-      return resolvedStyles.replace(pattern, (_match, _quote: string, fileName: string) => {
-        const resourcePath =
-          index === 0
-            ? `node_modules/@fontsource-variable/manrope/files/${fileName}`
-            : `fonts/${fileName}`;
-        const runtimeUrl = resolveRuntimeAssetUrl(resourcePath);
-
-        return runtimeUrl ? `url("${runtimeUrl}")` : _match;
-      });
-    },
+  const withInterfaceUrls = CONTENT_ENTRYPOINT_INTERFACE_FONT_URL_PATTERNS.reduce(
+    (resolvedStyles, pattern) =>
+      resolvedStyles.replace(pattern, (match, _quote: string, fileName: string) => {
+        const url = resolveRuntimeAssetUrl(`assets/${fileName}`);
+        return url ? `url("${url}")` : match;
+      }),
     styles
   );
   return CONTENT_ENTRYPOINT_CALLOUT_FONT_URL_PATTERNS.reduce((resolvedStyles, pattern) => {
@@ -296,7 +280,7 @@ export function resolveContentEntrypointStyleUrls(styles: string): string {
       const runtimeUrl = resolveRuntimeAssetUrl(`fonts/${fileName}`);
       return runtimeUrl ? `url("${runtimeUrl}")` : _match;
     });
-  }, withManropeUrls);
+  }, withInterfaceUrls);
 }
 
 export function createContentEntrypointStyles(): string {
@@ -304,6 +288,7 @@ export function createContentEntrypointStyles(): string {
     resolveContentEntrypointStyleUrls(
       [
         contentHostStyles,
+        inspectorSurfaceStyles,
         baseStyles,
         aiModalStyles,
         glassStyles,

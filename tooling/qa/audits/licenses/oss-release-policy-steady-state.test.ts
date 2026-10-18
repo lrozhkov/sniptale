@@ -3,7 +3,10 @@ import path from 'node:path';
 
 import { expect, it } from 'vitest';
 
-import { sha256 } from '../../../release/policy/oss-release-policy.mjs';
+import {
+  INTERFACE_FONT_LICENSE_PATH,
+  sha256,
+} from '../../../release/policy/oss-release-policy.mjs';
 import { validateDocuments } from './oss-release-validation/docs.mjs';
 import { validateLegalFiles } from './oss-release-validation/policy.mjs';
 import { createTempRoot } from '../../test-support/test-helpers';
@@ -52,6 +55,7 @@ it('accepts one canonical legal file referenced by bundled and dependency policy
   const legal = new Map([
     ['LICENSE', readFileSync(path.resolve('LICENSE'), 'utf8')],
     ['LICENSES/OFL-1.1.txt', readFileSync(path.resolve('LICENSES/OFL-1.1.txt'), 'utf8')],
+    [INTERFACE_FONT_LICENSE_PATH, readFileSync(path.resolve(INTERFACE_FONT_LICENSE_PATH), 'utf8')],
     ['NOTICE', 'notice\n'],
     ['THIRD_PARTY_NOTICES.md', 'notices\n'],
     ['THIRD_PARTY_DEPENDENCIES.json', manifest],
@@ -64,6 +68,7 @@ it('accepts one canonical legal file referenced by bundled and dependency policy
       source,
     })),
     dependencyLegal: { manifestPath: 'THIRD_PARTY_DEPENDENCIES.json' },
+    bundledAssets: [],
   };
 
   expect(validateLegalFiles(root, policy)).toEqual([]);

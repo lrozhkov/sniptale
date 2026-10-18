@@ -16,7 +16,7 @@ export function NativeCaptureView(props: {
   const updateAdvanced = (advanced: Partial<NativeCaptureSettings['video']['advanced']>) =>
     updateVideo({ advanced: { ...props.settings.video.advanced, ...advanced } });
   return (
-    <section className={[settingsCompactWorkbenchClassName, 'space-y-5'].join(' ')}>
+    <section className={[settingsCompactWorkbenchClassName, 'space-y-3'].join(' ')}>
       <ToggleRow
         checked={props.settings.screenshots.includeCursor}
         disabled={props.disabled}

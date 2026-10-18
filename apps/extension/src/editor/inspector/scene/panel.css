@@ -6,12 +6,3 @@
 [data-ui='editor.frame.padding-fields'] [data-padding-link] {
   border: 0;
 }
-
-.editor-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] {
-  grid-template-columns: auto auto auto minmax(0, 1fr);
-  gap: 2px;
-}
-.editor-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] > button {
-  padding-inline: 4px !important;
-  white-space: nowrap;
-}

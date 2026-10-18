@@ -19,7 +19,7 @@ const QUALITY_OPTION_BASE_CLASS_NAME =
   'min-h-7 rounded-[7px] px-2 text-left text-xs font-medium transition-colors';
 const QUALITY_OPTION_ACTIVE_CLASS_NAME = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
+  'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]',
 ].join(' ');
 const QUALITY_OPTION_INACTIVE_CLASS_NAME = [
   'text-[var(--sniptale-color-text-secondary)]',

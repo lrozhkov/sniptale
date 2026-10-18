@@ -29,7 +29,7 @@ export function renderTextContentFields(
 
   const textClip = selectedClip;
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <TextContentField
         clipId={textClip.id}
         disabled={selectedTrackLocked}

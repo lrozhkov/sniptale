@@ -16,16 +16,28 @@ for (const theme of ['light', 'dark'] as const) {
       ).join('\n') + '\nКОНЕЦ ДЛИННОГО ШАГА'
     );
     const figure = page.locator('article#compare figure').first();
-    await figure.hover();
+    await figure.click();
     await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
     await page.getByRole('textbox', { name: 'Frame height', exact: true }).fill('2200');
     await page.getByRole('textbox', { name: 'Frame height', exact: true }).press('Enter');
-    await page
-      .locator('.guide-image-inspector')
-      .getByRole('button', { name: 'Done', exact: true })
-      .click();
+    await figure.getByRole('button', { name: 'Done', exact: true }).click();
+    const choose = async (label: string, value: string) => {
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const dropdown = page
+        .getByRole('button', { name: label, exact: true })
+        .and(page.locator('[aria-haspopup="listbox"]'));
+      if (await dropdown.count()) {
+        await dropdown.click();
+        await page.getByRole('option', { name: value, exact: true }).click();
+      } else await page.getByRole('button', { name: value, exact: true }).click();
+    };
     await page.getByRole('button', { name: 'Export', exact: true }).click();
-    await page.getByRole('button', { name: 'Step by step', exact: true }).click();
+    await choose('Reading mode', 'Step by step');
     await expect(page.locator('.guide-reader article')).toHaveCount(1);
     await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
     await expect(page.locator('.guide-print article')).toHaveCount(2);
@@ -58,9 +70,9 @@ for (const theme of ['light', 'dark'] as const) {
         name: 'letter-portrait-step',
       },
     ]) {
-      await page.getByRole('button', { name: settings.paper, exact: true }).click();
-      await page.getByRole('button', { name: settings.orientation, exact: true }).click();
-      await page.getByRole('button', { name: settings.pagination, exact: true }).click();
+      await choose('Paper size', settings.paper);
+      await choose('Orientation', settings.orientation);
+      await choose('Pagination', settings.pagination);
       await page.emulateMedia({ media: 'print' });
       await expect(page.locator('.guide-print article').last()).toHaveCSS(
         'break-before',

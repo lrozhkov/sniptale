@@ -28,7 +28,7 @@ export async function prepareReviewCaptions(args: {
 }) {
   args.signal.throwIfAborted();
   const font = (pixels: number) =>
-    `400 ${pixels}px "Sniptale Sans", ui-sans-serif, system-ui, sans-serif`;
+    `400 ${pixels}px "Sniptale Text", ui-sans-serif, system-ui, sans-serif`;
   const fontText = args.settings?.enabled
     ? args.document?.fragments
         .filter(

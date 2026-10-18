@@ -1,0 +1,56 @@
+.sniptale-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--sniptale-radius-sm);
+  list-style: none;
+  cursor: pointer;
+  font: 500 13px / 18px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+  user-select: none;
+}
+.sniptale-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.sniptale-disclosure > summary > :is(h3, h4, span) {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.sniptale-disclosure > summary > svg {
+  flex: none;
+}
+.sniptale-disclosure > summary > svg:last-child {
+  transition: transform 120ms ease;
+}
+.sniptale-disclosure[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.sniptale-disclosure > summary:hover {
+  color: var(--sniptale-color-text-primary);
+}
+.sniptale-disclosure > summary:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+.sniptale-disclosure[data-variant='information'] > summary {
+  gap: 6px;
+}
+.sniptale-information-body {
+  padding: 8px 8px 0 30px;
+  font: 400 13px / 18px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.sniptale-information-body > p + p {
+  margin-top: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-disclosure > summary > svg:last-child {
+    transition: none;
+  }
+}

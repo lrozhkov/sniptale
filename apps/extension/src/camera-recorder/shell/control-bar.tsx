@@ -1,21 +1,12 @@
 import { Pause, Play, Square, Trash2 } from 'lucide-react';
+import { useLayoutEffect, useRef, type Ref } from 'react';
 import { translate } from '../../platform/i18n';
 import { CameraWindowButton } from './button';
 import type { ControlCapability } from './types';
 
 const CONTROL_BAR_CLASS = [
-  'mt-4 grid gap-3 rounded-[18px] border border-[var(--sniptale-color-border-soft)]',
+  'mt-3 grid shrink-0 gap-2 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)] p-3',
-].join(' ');
-
-const SECONDARY_BUTTON_CLASS = [
-  'h-11 rounded-[12px] font-semibold',
-  'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-40',
-].join(' ');
-
-const DANGER_BUTTON_CLASS = [
-  'h-11 rounded-[12px] font-semibold text-[var(--sniptale-color-danger)]',
-  'hover:bg-[var(--sniptale-color-danger-soft)] disabled:opacity-40',
 ].join(' ');
 
 export function CameraControlBar(props: {
@@ -28,10 +19,19 @@ export function CameraControlBar(props: {
   onPauseResume: () => void;
   onStop: () => void;
 }) {
+  const focusTarget = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(props.cancelConfirmOpen);
+  useLayoutEffect(() => {
+    if (wasConfirming.current !== props.cancelConfirmOpen) {
+      focusTarget.current?.focus({ preventScroll: true });
+      wasConfirming.current = props.cancelConfirmOpen;
+    }
+  }, [props.cancelConfirmOpen]);
+
   return props.cancelConfirmOpen ? (
-    <CancelConfirmBar {...props} />
+    <CancelConfirmBar {...props} focusTarget={focusTarget} />
   ) : (
-    <ActiveControlBar {...props} />
+    <ActiveControlBar {...props} focusTarget={focusTarget} />
   );
 }
 
@@ -39,30 +39,28 @@ function CancelConfirmBar(props: {
   capability: ControlCapability | null;
   onContinue: () => void;
   onDelete: () => void;
+  focusTarget: Ref<HTMLButtonElement>;
 }) {
   return (
     <footer className={`${CONTROL_BAR_CLASS} grid-cols-2`}>
-      <button
-        className={SECONDARY_BUTTON_CLASS}
-        type="button"
+      <CameraWindowButton
+        ref={props.focusTarget}
+        label={translate('popup.video.cancelContinueRecording')}
         disabled={!props.capability}
         onClick={props.onContinue}
-      >
-        {translate('popup.video.cancelContinueRecording')}
-      </button>
-      <button
-        className={DANGER_BUTTON_CLASS}
-        type="button"
+      />
+      <CameraWindowButton
+        label={translate('popup.video.cancelDeleteRecording')}
         disabled={!props.capability}
+        tone="danger"
         onClick={props.onDelete}
-      >
-        {translate('popup.video.cancelDeleteRecording')}
-      </button>
+      />
     </footer>
   );
 }
 
 function ActiveControlBar(props: {
+  focusTarget: Ref<HTMLButtonElement>;
   capability: ControlCapability | null;
   isPaused: boolean;
   onCancel: () => void;
@@ -88,6 +86,7 @@ function ActiveControlBar(props: {
         onClick={props.onStop}
       />
       <CameraWindowButton
+        ref={props.focusTarget}
         icon={Trash2}
         label={translate('popup.video.cancelButton')}
         disabled={!props.capability}

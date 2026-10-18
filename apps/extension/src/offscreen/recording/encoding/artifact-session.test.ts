@@ -73,6 +73,16 @@ function createHarness(options: { appendError?: Error } = {}) {
   return { coordinator, writer, writtenParts };
 }
 
+function createEncoderErrorEvent(): ErrorEvent {
+  return Object.assign(new Event('error'), {
+    colno: 0,
+    error: new Error('The recording encoder failed.'),
+    filename: '',
+    lineno: 0,
+    message: 'The recording encoder failed.',
+  });
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
@@ -109,12 +119,21 @@ describe('recording artifact session', () => {
     const harness = createHarness();
     const session = await createRecordingArtifactSession({
       artifactId: 'recording-1',
+      groupId: 'capture-group',
+      role: 'microphone',
       coordinator: harness.coordinator,
       filename: 'recording.webm',
       mimeType: 'video/webm',
       recorderOptions: { mimeType: 'video/webm' },
       stream: new TestMediaStream([]),
     });
+    expect(harness.coordinator.openArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        artifactId: 'recording-1',
+        groupId: 'capture-group',
+        role: 'microphone',
+      })
+    );
 
     session.start();
     expect(session.recorder.start).toHaveBeenCalledWith(1_000);
@@ -144,6 +163,82 @@ describe('recording artifact session', () => {
     expect(onFailure).toHaveBeenCalledWith(appendError);
     expect(harness.coordinator.abort).toHaveBeenCalledOnce();
     expect(harness.writer.finalize).toHaveBeenCalledOnce();
+  });
+
+  it('persists terminal MediaRecorder data after an encoder error before releasing staging', async () => {
+    const harness = createHarness();
+    const session = await createRecordingArtifactSession({
+      artifactId: 'recording-1',
+      coordinator: harness.coordinator,
+      filename: 'recording.webm',
+      mimeType: 'video/webm',
+      recorderOptions: { mimeType: 'video/webm' },
+      stream: new TestMediaStream([]),
+    });
+    session.start();
+    session.recorder.onerror?.(createEncoderErrorEvent());
+    await expect(session.stop()).rejects.toThrow('encoder failed');
+    await vi.waitFor(() => expect(harness.coordinator.abort).toHaveBeenCalledOnce());
+    expect(harness.writer.append).toHaveBeenCalledWith(expect.any(Blob));
+    expect(await new Blob(harness.writtenParts).text()).toBe('terminal');
+    expect(harness.writer.finalize).not.toHaveBeenCalled();
+  });
+
+  it('accepts browser error data delivered asynchronously after the recorder becomes inactive', async () => {
+    const harness = createHarness();
+    const session = await createRecordingArtifactSession({
+      artifactId: 'recording-1',
+      coordinator: harness.coordinator,
+      filename: 'recording.webm',
+      mimeType: 'video/webm',
+      recorderOptions: { mimeType: 'video/webm' },
+      stream: new TestMediaStream([]),
+    });
+    session.setLifecycleCallbacks({
+      onFailure: () => {
+        void session.abort();
+      },
+    });
+    session.start();
+    Object.assign(session.recorder, { state: 'inactive' });
+    session.recorder.onerror?.(createEncoderErrorEvent());
+    const terminal = session.stop();
+    expect(harness.coordinator.abort).not.toHaveBeenCalled();
+    await Promise.resolve();
+    session.recorder.ondataavailable?.({ data: new Blob(['error-tail']) } as BlobEvent);
+    session.recorder.onstop?.(new Event('stop'));
+    await expect(terminal).rejects.toThrow('encoder failed');
+    await vi.waitFor(() => expect(harness.writtenParts).toHaveLength(1));
+    expect(await new Blob(harness.writtenParts).text()).toBe('error-tail');
+    expect(harness.coordinator.abort).toHaveBeenCalledOnce();
+  });
+
+  it('bounds error draining when the driver never emits terminal data or stop', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      const onFailure = vi.fn();
+      const session = await createRecordingArtifactSession({
+        artifactId: 'recording-1',
+        coordinator: harness.coordinator,
+        filename: 'recording.webm',
+        mimeType: 'video/webm',
+        recorderOptions: { mimeType: 'video/webm' },
+        stream: new TestMediaStream([]),
+      });
+      session.setLifecycleCallbacks({ onFailure });
+      session.start();
+      vi.mocked(session.recorder.stop).mockImplementation(() => undefined);
+      session.recorder.onerror?.(createEncoderErrorEvent());
+      const terminal = expect(session.stop()).rejects.toThrow('encoder failed');
+      expect(onFailure).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await terminal;
+      expect(onFailure).toHaveBeenCalledOnce();
+      expect(harness.coordinator.abort).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('is idempotent when multiple stop callers wait for one terminal artifact', async () => {

@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const selectMocks = vi.hoisted(() => ({ plain: vi.fn(), field: vi.fn() }));
 
-vi.mock('../../../ui/compact-inspector-controls', () => ({
+vi.mock('../../../ui/compact-inspector-controls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../ui/compact-inspector-controls')>()),
   CompactSelect: (props: {
     disabled?: boolean;
     onChange: (value: string) => void;
@@ -174,4 +175,72 @@ describe('grouped inspector exports', () => {
     expect(section.querySelector('button')?.textContent).toBe('Apply size');
     expect(section.querySelector('p')?.className).toBe(EDITOR_INSPECTOR_GROUP_META_CLASS_NAME);
   });
+});
+
+it('retains available selection when a named field becomes disabled and enabled again', () => {
+  const onChange = vi.fn();
+  const options = [
+    { label: 'Fit', value: 'fit' },
+    { label: 'Fill', value: 'fill' },
+  ] as const;
+  render(
+    <EditorInspectorSelectInput
+      label="Placement"
+      value="fit"
+      options={options}
+      onChange={onChange}
+    />
+  );
+  act(() => container!.querySelector('button')!.click());
+  expect(onChange).toHaveBeenLastCalledWith('fill');
+  render(
+    <EditorInspectorSelectInput
+      label="Placement"
+      value="fill"
+      options={options}
+      onChange={onChange}
+      disabled
+    />
+  );
+  expect(container!.querySelector('button')!.disabled).toBe(true);
+  act(() => container!.querySelector('button')!.click());
+  expect(onChange).toHaveBeenCalledTimes(1);
+  render(
+    <EditorInspectorSelectInput
+      value="fill"
+      options={options}
+      onChange={onChange}
+      disabled={false}
+    />
+  );
+  expect(selectMocks.plain.mock.lastCall?.[0]).toMatchObject({
+    'aria-label': '',
+    value: 'fill',
+    disabled: false,
+  });
+  expect(container!.querySelector('button')!.disabled).toBe(false);
+});
+
+it('keeps optional group headers out of unnamed content and supports independent metadata', () => {
+  render(
+    <EditorInspectorGroupSection>
+      <button>Apply</button>
+    </EditorInspectorGroupSection>
+  );
+  expect(container!.querySelector('section')!.children).toHaveLength(1);
+  expect(container!.querySelector('button')!.textContent).toBe('Apply');
+  render(
+    <EditorInspectorGroupSection meta="1280 × 720">
+      <button>Apply</button>
+    </EditorInspectorGroupSection>
+  );
+  expect(container!.querySelector('section')!.textContent).toContain('1280 × 720');
+  expect(container!.querySelector('p')).toBeNull();
+  render(
+    <EditorInspectorGroupSection label="Dimensions">
+      <button>Apply</button>
+    </EditorInspectorGroupSection>
+  );
+  expect(container!.querySelector('p')!.textContent).toBe('Dimensions');
+  expect(container!.querySelector('section')!.textContent).not.toContain('1280 × 720');
 });

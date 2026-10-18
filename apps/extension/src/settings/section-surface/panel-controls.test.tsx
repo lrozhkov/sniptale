@@ -15,17 +15,20 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     rangePropsSpy(props);
     return <div data-testid="range" data-class={props.className} />;
   },
-  ProductToggle: (props: {
+}));
+
+vi.mock('@sniptale/ui/product-glass-controls', () => ({
+  ProductGlassSwitch: (props: {
     className?: string;
-    checked?: boolean;
+    on?: boolean;
     onClick?: () => void;
-    size?: 'sm' | 'md';
+    'data-density'?: 'sm' | 'md';
   }) => {
     switchPropsSpy(props);
     return (
       <button
         data-testid="switch"
-        aria-pressed={props.checked}
+        aria-pressed={props.on}
         className={props.className}
         onClick={props.onClick}
       >
@@ -90,9 +93,9 @@ function verifySettingsSwitchAndRange() {
   expect(onClick).toHaveBeenCalledTimes(1);
   expect(switchPropsSpy).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      checked: true,
+      on: true,
       className: expect.stringContaining('custom-switch'),
-      size: 'md',
+      'data-density': 'md',
     })
   );
   expect(rangePropsSpy).toHaveBeenLastCalledWith(
@@ -118,6 +121,36 @@ function runSettingsPanelControlsSuite() {
     verifySettingsSwitchAndRange
   );
   it('renders the drag handle with caller-provided classes', verifyDragHandleRendering);
+  it('keeps a text parameter name passive and leaves direct editing available', () => {
+    renderElement(
+      <SettingsControlRow label="Name">
+        <input aria-label="Name" defaultValue="Draft" />
+      </SettingsControlRow>
+    );
+    const field = container!.querySelector('input')!;
+    const name = container!.querySelector<HTMLElement>('.sniptale-parameter-name')!;
+    act(() => name.click());
+    expect(document.activeElement).not.toBe(field);
+    act(() => field.focus());
+    expect(document.activeElement).toBe(field);
+    expect(field.value).toBe('Draft');
+  });
+  it('opens a dropdown only from its control rather than its name or row gap', () => {
+    const open = vi.fn();
+    renderElement(
+      <SettingsControlRow label="Language">
+        <button aria-haspopup="listbox" onClick={open}>
+          English
+        </button>
+      </SettingsControlRow>
+    );
+    act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-row')!.click());
+    act(() => container!.querySelector<HTMLElement>('.sniptale-parameter-name')!.click());
+    expect(open).not.toHaveBeenCalled();
+    act(() => container!.querySelector('button')!.click());
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps labels, descriptions, and controls in one shared compact row contract', () => {
     renderElement(
       <SettingsControlRow label="Language" description="Used throughout the application">
@@ -129,9 +162,8 @@ function runSettingsPanelControlsSuite() {
     expect(row?.textContent).toContain('Language');
     expect(row?.textContent).toContain('Used throughout the application');
     expect(row?.className).toContain('max-w-[720px]');
-    expect(row?.querySelector('[data-ui="settings.control-row.value"]')?.className).toContain(
-      'max-w-[280px]'
-    );
+    expect(row?.querySelector('.sniptale-parameter-name')?.textContent).toBe('Language');
+    expect(row?.querySelector('.sniptale-parameter-value button')?.textContent).toBe('Choose');
   });
 }
 

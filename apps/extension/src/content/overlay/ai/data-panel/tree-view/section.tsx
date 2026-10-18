@@ -24,11 +24,14 @@ export function TreeSection({
           type="checkbox"
           className="sniptale-checkbox"
           checked={state.selected}
+          aria-label={section.title}
           onChange={() => treeRenderProps.toggleSelected(section.id)}
           onClick={(event) => event.stopPropagation()}
         />
         <button
+          type="button"
           className="sniptale-expand-btn"
+          aria-expanded={state.expanded}
           onClick={() => treeRenderProps.toggleExpanded(section.id)}
           title={
             state.expanded ? translate('aiModal.collapseTitle') : translate('aiModal.expandTitle')

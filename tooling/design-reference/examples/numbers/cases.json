@@ -1,0 +1,70 @@
+{
+  "group": "numbers",
+  "version": "package-5",
+  "rules": "numbers.md",
+  "component": "NumericField",
+  "excludes": [
+    "independent switches",
+    "checkboxes",
+    "dropdown selection",
+    "full product parser parity"
+  ],
+  "cases": [
+    {
+      "id": "numbers.contextual-editing",
+      "title": "Слайдер под параметром",
+      "states": ["idle", "hover", "range-focus", "text-editing", "cancel"],
+      "proof": "The contextual slider hides immediately during direct numeric input and returns only when the interaction requires it."
+    },
+    {
+      "id": "numbers.ordinary",
+      "title": "Обычный слайдер",
+      "states": ["range-drag", "exact-input", "keyboard"],
+      "proof": "Always-visible range and exact field edit one value with the same theme accent as the contextual variant."
+    },
+    {
+      "id": "numbers.limits-step",
+      "title": "Шаг, пределы и удержание",
+      "states": ["minimum", "maximum", "stepper", "repeat", "release"],
+      "proof": "Step buttons and keyboard obey bounds; pointer hold repeats and release stops without a duplicate click."
+    },
+    {
+      "id": "numbers.mixed",
+      "title": "Разные значения",
+      "states": ["mixed", "explicit-value"],
+      "proof": "The range has no invented mixed position. Entering a number explicitly supplies a value."
+    },
+    {
+      "id": "numbers.invalid",
+      "title": "Ошибка ввода и восстановление",
+      "states": ["invalid", "error", "correction", "cancel"],
+      "proof": "Invalid text remains available for correction and cannot replace the accepted value."
+    },
+    {
+      "id": "numbers.disabled",
+      "title": "Недоступное значение",
+      "states": ["disabled-value", "disabled-range"],
+      "proof": "The accepted numeric value stays visible while both controls reject interaction."
+    },
+    {
+      "id": "numbers.precision-units",
+      "title": "Точность и единицы",
+      "states": ["decimal", "comma-input", "unit", "off-step-exact"],
+      "proof": "The exact field, range and exposed value remain consistent at the declared precision."
+    },
+    {
+      "id": "numbers.separate-bounds",
+      "title": "Ввод шире диапазона слайдера",
+      "states": ["outside-scrub-range", "focus-without-edit", "range-edit"],
+      "proof": "Typing and scrubbing have separate bounds. Range focus alone preserves the accepted out-of-range value."
+    },
+    {
+      "id": "numbers.range-only",
+      "title": "Слайдер с числом только для чтения",
+      "states": ["read-only-value", "range-drag", "range-keyboard"],
+      "proof": "A range-only setting does not acquire a new direct-edit contract."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

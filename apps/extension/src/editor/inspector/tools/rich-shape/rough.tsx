@@ -53,7 +53,7 @@ export function RichShapeLineRoughControls(props: RichShapeControlsProps) {
 
 export function RichShapeRoughFillControls(props: RichShapeControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <RichShapeRoughFillColorControl {...props} />
       <RichShapeRoughFillStyleControl {...props} />
       <RichShapeRoughFillTextureControls {...props} />

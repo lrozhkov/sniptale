@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsCollection } from '.';
+import { SettingsCollectionRowIdentity } from './row-identity';
 import type { SettingsCollectionItem } from './types';
 
 let container: HTMLDivElement;
@@ -63,6 +64,27 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+});
+
+it('retains full user titles and readable metadata for plain and rich values', () => {
+  const title = 'A user preset name with a long description that must remain complete';
+  const metadata = 'A complete provider endpoint or preset description';
+  const renderIdentity = (item: SettingsCollectionItem) =>
+    act(() => root.render(<SettingsCollectionRowIdentity item={item} />));
+  renderIdentity({ id: 'identity', title, meta: metadata, capabilities: {} });
+  expect(container.querySelector('[title]')?.getAttribute('title')).toBe(title);
+  expect(container.textContent).toBe(title + metadata);
+  expect(container.querySelectorAll('[title]')[1]?.getAttribute('title')).toBe(metadata);
+  renderIdentity({
+    id: 'identity',
+    title: <span>{title}</span>,
+    meta: <span>{metadata}</span>,
+    capabilities: {},
+  });
+  expect(container.textContent).toBe(title + metadata);
+  expect(container.querySelector('[title]')).toBeNull();
+  renderIdentity({ id: 'identity', title, capabilities: {} });
+  expect(container.textContent).toBe(title);
 });
 
 describe('SettingsCollection', () => {
@@ -277,17 +299,16 @@ describe('SettingsCollection', () => {
       [...container.querySelectorAll('[data-settings-collection-item]')].map((row) =>
         row.getAttribute('data-settings-collection-item')
       )
-    ).toEqual(['first', 'second']);
+    ).toEqual(['second', 'first']);
+    expect(onMove).not.toHaveBeenCalled();
     expect(
       container
         .querySelector('[data-settings-collection-dragging="true"]')
         ?.getAttribute('data-settings-collection-item')
     ).toBe('first');
     expect(
-      container
-        .querySelector('[data-settings-collection-item="second"]')
-        ?.getAttribute('data-settings-collection-drop-after')
-    ).toBe('true');
+      container.querySelector('[data-settings-collection-dragging]')?.getAttribute('style')
+    ).toBeNull();
     expect(container.querySelector('[draggable]')).toBeNull();
     act(() => dispatchPointer(handles[0] ?? null, 'pointerup', { clientY: 90 }));
     expect(onMove).toHaveBeenCalledWith({

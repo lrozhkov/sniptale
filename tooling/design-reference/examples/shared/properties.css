@@ -1,0 +1,106 @@
+.display-properties {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.display-property {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 8px;
+  min-height: 28px;
+  align-items: baseline;
+  padding-block: 5px;
+  font: 400 13px/18px var(--font-ui);
+}
+.display-property dt {
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.display-property dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  text-align: end;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.display-property-value:has(button) {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.display-property-value > span {
+  flex: 1;
+  min-width: 0;
+}
+.display-property .icon-action {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  flex-shrink: 0;
+  padding: 4px;
+  align-self: start;
+  margin-block: -3px;
+}
+.property-feedback {
+  font: 400 12px/16px var(--font-ui);
+  color: var(--secondary);
+  margin: 4px 0 0;
+}
+.property-feedback:empty {
+  display: none;
+}
+.related-objects {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.related-object {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px;
+  min-height: 32px;
+  box-sizing: border-box;
+  color: var(--secondary);
+  font: 400 13px/18px var(--font-ui);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.related-object svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  flex-shrink: 0;
+  margin-block: 1px;
+}
+.related-object span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.related-object:hover,
+.related-object:active {
+  color: var(--text);
+}
+.related-object:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.related-unavailable {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  color: var(--secondary);
+  font: 400 13px/18px var(--font-ui);
+}
+.related-unavailable > span {
+  overflow-wrap: anywhere;
+}

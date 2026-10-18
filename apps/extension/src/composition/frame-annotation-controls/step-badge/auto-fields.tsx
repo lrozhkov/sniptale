@@ -1,3 +1,5 @@
+import { SegmentedRow } from '../../../ui/compact-inspector-controls';
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import {
   ProductGlassChip,
   ProductGlassRow,
@@ -16,6 +18,40 @@ export function StepBadgeAutoFields(props: {
   onAlphabetChange: (alphabet: 'cyrillic' | 'latin') => void;
   onTypeChange: (type: AutoStepBadgeType) => void;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector)
+    return (
+      <div className="sniptale-parameter-stack">
+        <SegmentedRow
+          columns={2}
+          ariaLabel={translate('content.stepBadge.typeLabel')}
+          label={translate('content.stepBadge.typeLabel')}
+          value={props.settings.type}
+          options={buildStepBadgeTypeOptions().map((option) => ({
+            value: option.value,
+            label: translate(option.key),
+          }))}
+          onChange={(type) => {
+            if (type !== 'manual') props.onTypeChange(type);
+          }}
+        />
+        {props.settings.type === 'letter' ? (
+          <SegmentedRow
+            columns={2}
+            ariaLabel={translate('content.stepBadge.alphabetLabel')}
+            label={translate('content.stepBadge.alphabetLabel')}
+            value={props.settings.alphabet ?? ''}
+            onChange={(alphabet) => {
+              if (alphabet !== '') props.onAlphabetChange(alphabet);
+            }}
+            options={buildStepBadgeAlphabetOptions().map((option) => ({
+              value: option.value,
+              label: translate(option.key),
+            }))}
+          />
+        ) : null}
+      </div>
+    );
   return (
     <>
       <div className="sniptale-step-badge-group">

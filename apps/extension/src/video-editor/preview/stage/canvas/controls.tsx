@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { PreviewFrameRateReadout } from '../frame-rate';
 import { LoaderCircle, CircleAlert, Pause } from 'lucide-react';
 import { PreviewDisplaySettings } from './display-settings';
@@ -24,23 +25,15 @@ interface PreviewStageControlsProps {
   status: VideoEditorPreviewStatus;
 }
 
-const RETRY_CLASS_NAME = [
-  'h-9 rounded-[8px] border px-2 text-[11px] font-semibold',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_38%,var(--sniptale-color-border-soft)_62%)]',
-  'bg-[color:var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-danger)]',
-  'focus-visible:outline-none focus-visible:ring-2',
-  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-].join(' ');
-
 export function PreviewStageControls(props: PreviewStageControlsProps) {
   return (
     <div
-      className="pointer-events-auto flex h-9 shrink-0 items-center gap-2"
+      className="pointer-events-auto flex h-8 shrink-0 items-center gap-2"
       data-ui="video.preview.controls"
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div
-        className="flex h-9 shrink-0 items-center gap-2 empty:hidden"
+        className="flex h-8 shrink-0 items-center gap-2 empty:hidden"
         data-ui="video.preview.feedback"
       >
         {props.mode === 'cache' ? (
@@ -57,9 +50,9 @@ export function PreviewStageControls(props: PreviewStageControlsProps) {
 
 function PreviewPreferencesRetry(props: PreviewStageControlsProps) {
   return props.preferencesSaveFailed ? (
-    <button type="button" className={RETRY_CLASS_NAME} onClick={props.onPreferencesRetry}>
+    <ProductActionButton type="button" compact tone="secondary" onClick={props.onPreferencesRetry}>
       {translate('videoEditor.stage.previewPreferencesRetry')}
-    </button>
+    </ProductActionButton>
   ) : null;
 }
 
@@ -94,7 +87,10 @@ function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
       role="status"
       aria-label={label}
       title={label}
-      className="inline-flex h-9 items-center gap-1.5 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]"
+      className={[
+        'inline-flex h-8 items-center gap-1.5 text-xs leading-4 font-normal tabular-nums',
+        'text-[var(--sniptale-color-text-muted)]',
+      ].join(' ')}
     >
       {isPreparing ? (
         <>

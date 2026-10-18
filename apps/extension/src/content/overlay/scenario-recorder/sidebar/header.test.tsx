@@ -58,12 +58,12 @@ it('renders only the project summary without the sidebar steps label', () => {
     container
       ?.querySelector('[data-ui="content.scenario.sidebar.project-button"]')
       ?.getAttribute('title')
-  ).toBe('scenario.content.projectButton');
+  ).toBe('Scenario');
   expect(container?.textContent).toContain('Scenario');
   expect(container?.textContent).not.toContain('scenario.content.sidebar');
   expect(container?.textContent).not.toContain('scenario.content.stepsCount');
   expect(container?.querySelectorAll('.lucide-grip')).toHaveLength(1);
-  expect(surface?.className).toContain('rounded-[14px]');
+  expect(surface?.className).toContain('rounded-[4px]');
   expect(
     container?.querySelector('[data-ui="content.scenario.sidebar.drag-handle"]')
   ).not.toBeNull();

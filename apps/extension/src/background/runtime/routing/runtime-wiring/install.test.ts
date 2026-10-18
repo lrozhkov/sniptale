@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { setLocalePreference } = vi.hoisted(() => ({
+const { setLocalePreference, initializeLocalePreference } = vi.hoisted(() => ({
   setLocalePreference: vi.fn().mockResolvedValue(undefined),
+  initializeLocalePreference: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   setLocalePreference,
+  initializeLocalePreference,
 }));
 
 import {
@@ -36,6 +38,7 @@ function createDeferredLocaleWrite() {
 
 beforeEach(() => {
   setLocalePreference.mockResolvedValue(undefined);
+  initializeLocalePreference.mockResolvedValue(undefined);
 });
 
 it('ignores install events whose details do not parse', () => {
@@ -48,9 +51,9 @@ it('ignores install events whose details do not parse', () => {
   expect(rebuildBackgroundContextMenus).not.toHaveBeenCalled();
 });
 
-it('waits for English persistence before rebuilding first-install menus', async () => {
+it('waits for conditional locale initialization before rebuilding first-install menus', async () => {
   const localeWrite = createDeferredLocaleWrite();
-  setLocalePreference.mockReturnValueOnce(localeWrite.promise);
+  initializeLocalePreference.mockReturnValueOnce(localeWrite.promise);
   parseInstalledDetails.mockReturnValue({ reason: 'install' });
   registerInstallListener(logger);
 
@@ -58,7 +61,7 @@ it('waits for English persistence before rebuilding first-install menus', async 
 
   expect(logger.log).toHaveBeenCalledWith('Extension installed or updated', 'install');
   expect(logger.log).toHaveBeenCalledWith('First installation');
-  expect(setLocalePreference).toHaveBeenCalledWith('en');
+  expect(initializeLocalePreference).toHaveBeenCalledWith();
   expect(rebuildBackgroundContextMenus).not.toHaveBeenCalled();
 
   localeWrite.resolve();
@@ -81,7 +84,7 @@ it.each(['update', 'chrome_update', 'shared_module_update'] as const)(
 );
 
 it('surfaces a first-install locale initialization failure', async () => {
-  setLocalePreference.mockRejectedValueOnce(new Error('locale write failed'));
+  initializeLocalePreference.mockRejectedValueOnce(new Error('locale write failed'));
   parseInstalledDetails.mockReturnValue({ reason: 'install' });
   registerInstallListener(logger);
 
@@ -107,4 +110,20 @@ it('surfaces a first-install context-menu rebuild failure', async () => {
     'Failed to rebuild context menus after install/update',
     expect.objectContaining({ message: 'menu rebuild failed' })
   );
+});
+
+it('does not replace a locale selected before the first-install callback', async () => {
+  let storedLocale = 'ru';
+  setLocalePreference.mockImplementationOnce(async (locale: string) => {
+    storedLocale = locale;
+  });
+  parseInstalledDetails.mockReturnValue({ reason: 'install' });
+  registerInstallListener(logger);
+
+  initializeBackgroundRuntimeWiringMocks.installedListenerRef.current?.({ reason: 'install' });
+  await flushMicrotasks();
+
+  expect(storedLocale).toBe('ru');
+  expect(setLocalePreference).not.toHaveBeenCalled();
+  expect(initializeLocalePreference).toHaveBeenCalledOnce();
 });

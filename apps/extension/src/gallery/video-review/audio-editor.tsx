@@ -2,6 +2,7 @@ import {
   reviewInspectorActions,
   ReviewInspectorSections,
   ReviewInspectorColumns,
+  type ReviewInspectorSection,
 } from './inspector-sections';
 import { useContext } from 'react';
 import { ReviewIntervalMap } from './interval-timing';
@@ -12,22 +13,17 @@ import {
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { VolumeX, Trash2, AudioLines, Waves } from 'lucide-react';
-import {
-  ReviewInterval,
-  ReviewButton,
-  reviewTextButtonClassName,
-  reviewDeleteButtonClassName,
-} from './controls';
+import { Trash2, AudioLines, Waves } from 'lucide-react';
+import { ReviewInterval, ReviewButton, reviewDeleteButtonClassName } from './controls';
 import type { useReviewAudio } from './use-review-audio';
 
-/** Editor for the selected audio clip: level, mute, fades, and the delete action. */
+/** Editor for the selected audio clip: level, fades, and the delete action. */
 export function ReviewAudioClipEditor(props: {
   clip: QuickEditAudioClip;
   busy: boolean;
   lane?: 'voiceover' | 'music';
   cutSuppressed?: boolean;
-  embedded?: boolean;
+  recognition?: ReviewInspectorSection;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
@@ -64,16 +60,6 @@ export function ReviewAudioClipEditor(props: {
               onChange={(value) => props.onPatch({ volume: value / 100 })}
             />
           </ReviewInspectorColumns>
-          <ReviewButton
-            label={translate('gallery.videoReview.audioClipMute')}
-            aria-pressed={props.clip.muted}
-            disabled={props.busy}
-            className={`${reviewTextButtonClassName} !w-full justify-start`}
-            onClick={() => props.onPatch({ muted: !props.clip.muted })}
-          >
-            <VolumeX size={15} aria-hidden="true" />
-            <span>{translate('gallery.videoReview.audioClipMute')}</span>
-          </ReviewButton>
         </>
       ),
     },
@@ -134,16 +120,9 @@ export function ReviewAudioClipEditor(props: {
           {translate('gallery.videoReview.voiceoverCut')}
         </p>
       ) : null}
-      {props.embedded ? (
-        <div className="min-w-0 space-y-3">
-          {sections.map((section) => (
-            <div key={section.id}>{section.content}</div>
-          ))}
-          <ReviewInspectorSections sections={[actions]} />
-        </div>
-      ) : (
-        <ReviewInspectorSections sections={[...sections, actions]} />
-      )}
+      <ReviewInspectorSections
+        sections={[...sections, ...(props.recognition ? [props.recognition] : []), actions]}
+      />
     </div>
   );
 }
@@ -152,13 +131,13 @@ export function ReviewAudioClipEditor(props: {
 export function ReviewAudioInspectorSection(props: {
   audio: ReturnType<typeof useReviewAudio>;
   busy: boolean;
-  embedded?: boolean;
+  recognition?: ReviewInspectorSection;
 }) {
   const selected = props.audio.selected;
   if (!selected) return null;
   return (
     <ReviewAudioClipEditor
-      embedded={props.embedded ?? false}
+      {...(props.recognition ? { recognition: props.recognition } : {})}
       clip={selected.clip}
       lane={selected.lane}
       cutSuppressed={selected.cutSuppressed}

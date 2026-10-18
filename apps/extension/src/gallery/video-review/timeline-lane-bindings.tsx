@@ -20,6 +20,7 @@ export function ReviewZoomLane(props: {
   resultDuration: number;
   outputTime: number | null;
   edits: readonly ReviewEdit[];
+  snapTimes?: readonly number[] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   sourceSelection?: ReviewAnchor | undefined;
   toOutputTime(source: number): number | null;
@@ -38,6 +39,7 @@ export function ReviewZoomLane(props: {
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
       edits={props.edits}
+      snapTimes={props.snapTimes}
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
@@ -55,6 +57,7 @@ export function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 export function ReviewAudioLane(props: {
+  lane?: 'originalAudio' | 'voiceover' | 'music';
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   edits: readonly ReviewEdit[];
@@ -77,6 +80,7 @@ export function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      lane={props.lane}
       compact={props.compact}
       beforeAction={props.beforeAction}
       onOpenSpeech={props.onOpenSpeech}

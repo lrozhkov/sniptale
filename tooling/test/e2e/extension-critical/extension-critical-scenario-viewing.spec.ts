@@ -210,7 +210,7 @@ async function storedProject(page: Page, rename?: string) {
 test('built Library opens full guide and tour HTML with isolation and committed refresh semantics', async ({
   context,
   extensionId,
-}) => {
+}, info) => {
   const openExtensionPage = async (path: string) => {
     const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}${path}`);
@@ -268,6 +268,10 @@ test('built Library opens full guide and tour HTML with isolation and committed 
       };
     })
   ).toEqual({ storage: false, parentAccess: false, network: false, extension: false });
+  expect(
+    await child.evaluate(() => getComputedStyle(document.querySelector('article')!).fontFamily)
+  ).toContain('Sniptale Text');
+  await content.locator('.guide-read-image').hover();
   await content.locator('[data-guide-open]').click();
   await expect(content.locator('dialog')).toBeVisible();
   await content.locator('[data-close]').click();
@@ -278,7 +282,7 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await expect(content.getByRole('heading', { name: 'Library HTML proof' })).toBeVisible();
   await guide.getByRole('button', { name: /Refresh view|Обновить просмотр/ }).click();
   await expect(content.getByRole('heading', { name: 'Saved update' })).toBeVisible();
-  await guide.screenshot({ path: '.tmp/scenario-guide-view.png' });
+  await guide.screenshot({ path: info.outputPath('scenario-guide-view.png'), fullPage: false });
   await guide.evaluate(async () => {
     await chrome.storage.local.set({
       'sniptale-locale-preference': 'ru',
@@ -292,7 +296,10 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await refresh.press('Enter');
   await expect(content.locator('html')).toHaveAttribute('data-theme', 'dark');
   await guide.emulateMedia({ reducedMotion: 'reduce' });
-  await guide.screenshot({ path: '.tmp/scenario-guide-view-dark-ru.png' });
+  await guide.screenshot({
+    path: info.outputPath('scenario-guide-view-dark-ru.png'),
+    fullPage: false,
+  });
 
   const openingTour = context.waitForEvent('page');
   await library.getByRole('link', { name: /Play tour|Запустить тур/ }).click();
@@ -304,19 +311,23 @@ test('built Library opens full guide and tour HTML with isolation and committed 
   await expect
     .poll(() =>
       player
-        .locator('audio')
+        .locator('audio:not([data-tour-music])')
         .evaluate(
           (audio) => audio instanceof HTMLAudioElement && !audio.paused && audio.currentTime > 0
         )
     )
     .toBe(true);
   await player.getByRole('button', { name: /^(Pause|Пауза)$/ }).click();
+  await player.locator('[data-tour-seek]').focus();
+  await player.locator('[data-tour-seek]').press('Home');
+  await expect(player.locator('[data-tour-title]')).toHaveText('First slide');
+
   await player
     .getByRole('button', { name: /Next|Далее/ })
     .last()
     .click();
   await expect(player.locator('[data-tour-title]')).toHaveText('Second slide');
-  await tour.screenshot({ path: '.tmp/scenario-tour-view.png' });
+  await tour.screenshot({ path: info.outputPath('scenario-tour-view.png'), fullPage: false });
   await player.locator('[data-tour-next]').click();
   const destination = player.getByRole('link', { name: 'External destination' });
   await expect(destination).toHaveAttribute('rel', 'noopener noreferrer');
@@ -675,3 +686,46 @@ for (const { locale, theme } of [
     await library.close();
   });
 }
+
+test('built guide keeps bundled document fonts independent from viewer commands', async ({
+  context,
+  extensionId,
+}, info) => {
+  const library = await context.newPage();
+  await library.setViewportSize({ width: 1280, height: 560 });
+  await library.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
+  await expect(library.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  await seed(library);
+  const before = await storedProject(library);
+  await library.reload();
+  await library.getByRole('button', { name: 'Library HTML proof', exact: true }).first().click();
+  const opening = context.waitForEvent('page');
+  await library.getByRole('link', { name: /Open guide|Открыть руководство/ }).click();
+  const guide = await opening;
+  await guide.setViewportSize({ width: 1280, height: 560 });
+  const content = guide.frameLocator('.scenario-viewer-document > iframe').frameLocator('iframe');
+  await expect(content.getByRole('heading', { name: 'Library HTML proof' })).toBeVisible();
+  const font = () =>
+    content.locator('article').evaluate(async (article) => {
+      await document.fonts.ready;
+      return getComputedStyle(article).fontFamily;
+    });
+  await expect.poll(font).toContain('Sniptale Text');
+  const original = await font();
+  await guide.evaluate(() =>
+    document.documentElement.style.setProperty('--sniptale-font-interface', 'monospace')
+  );
+  expect(await font()).toBe(original);
+  await content.locator('.guide-read-image').hover();
+  await content.locator('[data-guide-open]').click();
+  await expect(content.locator('dialog')).toBeVisible();
+  await content.locator('[data-close]').click();
+  await expect(content.locator('dialog')).not.toBeVisible();
+  await guide.screenshot({ path: info.outputPath('guide-document-font.png'), fullPage: false });
+  expect(await storedProject(library)).toBe(before);
+  await storedProject(library, 'Saved font update');
+  await guide.getByRole('button', { name: /Refresh view|Обновить просмотр/ }).click();
+  await expect(content.getByRole('heading', { name: 'Saved font update' })).toBeVisible();
+  expect(await font()).toBe(original);
+  await guide.close();
+});

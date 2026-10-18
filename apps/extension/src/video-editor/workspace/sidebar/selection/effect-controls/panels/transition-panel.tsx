@@ -49,7 +49,7 @@ export function InspectTransitionPanel(props: TransitionPanelProps) {
             defaultActive: true,
             label: translate('videoEditor.sidebar.inspectorGroupTransition'),
             content: (
-              <div className="space-y-3">
+              <div className="sniptale-parameter-stack space-y-3">
                 <p className="break-words text-sm font-medium">
                   {instance
                     ? getEffectInstanceLabel(props.project, instance.id)

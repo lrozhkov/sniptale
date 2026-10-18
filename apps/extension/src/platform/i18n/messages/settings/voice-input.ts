@@ -37,6 +37,7 @@ export const settingsVoiceInputMessages = defineMessageSource({
   releaseToStop: { ru: 'Отпустите для остановки', en: 'Release to stop' },
   stop: { ru: 'Остановить', en: 'Stop' },
   refresh: { ru: 'Обновить статусы', en: 'Refresh statuses' },
+  diagnosticsTitle: { ru: 'Состояние и обработка речи', en: 'Speech status and processing' },
   apiStatus: { ru: 'Web Speech API', en: 'Web Speech API' },
   microphoneStatus: { ru: 'Микрофон', en: 'Microphone' },
   packageStatus: { ru: 'Локальный dictation-пакет', en: 'Local dictation package' },

@@ -1,3 +1,5 @@
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
+import { ToggleField as InspectorToggleField } from '../../../../../ui/compact-inspector-controls';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import type { CompactSelectOption } from '../../../../../ui/compact-inspector-controls';
@@ -42,10 +44,13 @@ export function SelectInput<T extends string>({
   options: CompactSelectOption<T>[];
   disabled?: boolean;
 }) {
+  const inspector = useInspectorLayout();
   if (label !== undefined) {
     return (
       <CompactInspectorSelectField
-        className="min-h-8! border-transparent! bg-transparent! px-0! py-0!"
+        className={
+          inspector ? undefined : 'min-h-8! border-transparent! bg-transparent! px-0! py-0!'
+        }
         label={label}
         value={value}
         onChange={onChange}
@@ -75,17 +80,25 @@ function DisabledColorPreview(props: { label: string; value: string }) {
     <StatusRow
       label={props.label}
       value={
-        <span className="inline-flex min-w-0 items-center gap-2" aria-disabled="true">
+        <span
+          className="inline-flex min-w-0 flex-row-reverse items-center gap-2"
+          aria-disabled="true"
+        >
           <span
             aria-hidden="true"
             className={[
-              'inline-flex h-5 w-5 shrink-0 rounded-[8px] border',
+              'inline-flex h-6 w-6 shrink-0 rounded-[4px] border',
               'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_90%,transparent)]',
               'bg-[color:var(--sniptale-color-surface-panel)]',
             ].join(' ')}
             style={{ backgroundColor: props.value }}
           />
-          <span className="truncate text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]">
+          <span
+            className={[
+              'whitespace-nowrap text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
+              'text-[var(--sniptale-color-text-primary)]',
+            ].join(' ')}
+          >
             {props.value.toUpperCase()}
           </span>
         </span>
@@ -111,6 +124,7 @@ export function ColorField({
   recentColors: readonly string[] | undefined;
   value: string;
 }) {
+  const inspector = useInspectorLayout();
   if (disabled) {
     return <DisabledColorPreview label={label} value={value} />;
   }
@@ -132,7 +146,7 @@ export function ColorField({
       {...colorSelectorProps}
       triggerVariant="swatch"
       floatingPlacement="side"
-      {...(className ? { className } : {})}
+      {...(!inspector && className ? { className } : {})}
     />
   );
 }
@@ -143,6 +157,16 @@ export function ToggleField(props: {
   label: string;
   onChange: (checked: boolean) => void;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector)
+    return (
+      <InspectorToggleField
+        label={props.label}
+        value={props.checked}
+        disabled={props.disabled}
+        onChange={props.onChange}
+      />
+    );
   return (
     <div data-inspector-toggle className="flex min-h-9 items-center justify-between gap-3">
       <span className="min-w-0 text-[length:var(--sniptale-compact-font-size,12px)]">

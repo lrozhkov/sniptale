@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 /**
  * Модальное окно выбора сохранения при действии «Выбор пресета».
  * Показывает подготовленные пути внутри Downloads и fallback на системный диалог.
@@ -84,21 +85,23 @@ export function SaveDialogModal({
   });
 
   return (
-    <SaveDialogContent
-      filename={filename}
-      loading={loading}
-      loadError={loadError}
-      onChoosePreset={(presetId, contentIntentSource) => {
-        void handlePreset(presetId, contentIntentSource ?? undefined);
-      }}
-      onChooseSystemFolder={(contentIntentSource) => {
-        void handleSystemDialog(contentIntentSource ?? undefined);
-      }}
-      onClose={onClose}
-      onFilenameChange={setFilename}
-      presets={presets}
-      sessionFooter={sessionFooter}
-    />
+    <CommandPressScope value={true}>
+      <SaveDialogContent
+        filename={filename}
+        loading={loading}
+        loadError={loadError}
+        onChoosePreset={(presetId, contentIntentSource) => {
+          void handlePreset(presetId, contentIntentSource ?? undefined);
+        }}
+        onChooseSystemFolder={(contentIntentSource) => {
+          void handleSystemDialog(contentIntentSource ?? undefined);
+        }}
+        onClose={onClose}
+        onFilenameChange={setFilename}
+        presets={presets}
+        sessionFooter={sessionFooter}
+      />
+    </CommandPressScope>
   );
 }
 

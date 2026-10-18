@@ -19,7 +19,7 @@ import { getMp4CodecOptions } from './codec-options';
 import type { ExportDialogFieldParams } from './field-contract';
 
 const EXPORT_FIELD_CLASS_NAME =
-  '!min-h-9 !rounded-md !border-transparent !bg-transparent !px-0 !py-0';
+  '!min-h-8 !rounded-[4px] !border-transparent !bg-transparent !px-0 !py-0';
 
 function getExportQualityOptions() {
   return [
@@ -195,7 +195,12 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         options={scopeOptions}
       />
       <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--sniptale-color-text-muted)]">
+        <h3
+          className={[
+            'mb-1 flex items-center gap-2 text-sm leading-5 font-semibold',
+            'text-[var(--sniptale-color-text-muted)]',
+          ].join(' ')}
+        >
           <FileVideo size={15} aria-hidden />
           {translate('videoEditor.exportDialog.fileSection')}
         </h3>
@@ -222,7 +227,12 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         ) : null}
       </section>
       <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--sniptale-color-text-muted)]">
+        <h3
+          className={[
+            'mb-1 flex items-center gap-2 text-sm leading-5 font-semibold',
+            'text-[var(--sniptale-color-text-muted)]',
+          ].join(' ')}
+        >
           <SlidersHorizontal size={15} aria-hidden />
           {translate('videoEditor.exportDialog.pictureSection')}
         </h3>

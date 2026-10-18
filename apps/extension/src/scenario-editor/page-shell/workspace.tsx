@@ -109,11 +109,12 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
               key={id}
               title={label}
               aria-pressed={props.panels.leftSection === id}
+              tone="outline"
               className="guide-section-tab"
               onClick={() => props.panels.openLeft(id)}
             >
               <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
+              <span data-command-caption>{label}</span>
             </ContentToolbarButton>
           ))}
         </div>
@@ -162,6 +163,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
 /** Both representations share the same panel geometry, header position and resize gutters. */
 export function ScenarioWorkspaceFrame({
   panels,
+  interactionBlocked = false,
   header,
   left,
   right,
@@ -169,6 +171,7 @@ export function ScenarioWorkspaceFrame({
   t,
 }: {
   panels: ReturnType<typeof useGuidePanels>;
+  interactionBlocked?: boolean;
   header: ReactNode;
   left: ReactNode;
   right: ReactNode;
@@ -183,15 +186,17 @@ export function ScenarioWorkspaceFrame({
       data-left-open={panels.leftOpen}
       data-right-open={panels.rightOpen}
     >
-      {left}
-      {panels.leftOpen && (
+      <div style={{ display: 'contents' }} inert={interactionBlocked}>
+        {left}
+      </div>
+      {!interactionBlocked && panels.leftOpen && (
         <GuidePanelDivider side="left" panels={panels} label={t('scenario.editor.outline')} />
       )}
-      <div ref={hoverIntent} className="guide-center-panel">
+      <div ref={hoverIntent} className="guide-center-panel" inert={interactionBlocked}>
         {header}
         {children}
       </div>
-      {panels.rightOpen && (
+      {!interactionBlocked && panels.rightOpen && (
         <GuidePanelDivider
           side="right"
           panels={panels}
@@ -287,7 +292,7 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
     <FloatingChromePanel
       role="complementary"
       id="guide-inspector-panel"
-      className="guide-inspector-panel"
+      className="guide-inspector-panel sniptale-inspector-surface"
       hidden={!props.open}
       aria-label={t('scenario.editor.guideInspector')}
     >
@@ -295,22 +300,11 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         <Settings2 size={16} aria-hidden="true" />
         <h2 title={inspectorTitle(props)}>{inspectorTitle(props)}</h2>
         {grouped && (
-          <ContentToolbarButton
-            tone="utility"
-            size="compact"
-            title={t(
-              props.panels.presentation === 'all'
-                ? 'scenario.editor.inspectorShowSections'
-                : 'scenario.editor.inspectorShowAll'
-            )}
-            onClick={props.panels.togglePresentation}
-          >
-            {props.panels.presentation === 'all' ? (
-              <List size={16} aria-hidden="true" />
-            ) : (
-              <PanelLeft size={16} aria-hidden="true" />
-            )}
-          </ContentToolbarButton>
+          <GuideInspectorPresentationToggle
+            presentation={props.panels.presentation}
+            onToggle={props.panels.togglePresentation}
+            t={t}
+          />
         )}
         <ContentToolbarButton
           tone="close"
@@ -382,5 +376,31 @@ export function GuidePanelControls({
         <Image size={16} aria-hidden="true" />
       </ContentToolbarButton>
     </div>
+  );
+}
+
+/** Switch the existing guide panel presentation without owning its state or eligibility. */
+export function GuideInspectorPresentationToggle(props: {
+  presentation: 'all' | 'sections';
+  onToggle: () => void;
+  t: Translate;
+}) {
+  return (
+    <ContentToolbarButton
+      tone="utility"
+      size="compact"
+      title={props.t(
+        props.presentation === 'all'
+          ? 'scenario.editor.inspectorShowSections'
+          : 'scenario.editor.inspectorShowAll'
+      )}
+      onClick={props.onToggle}
+    >
+      {props.presentation === 'all' ? (
+        <List size={16} aria-hidden="true" />
+      ) : (
+        <PanelLeft size={16} aria-hidden="true" />
+      )}
+    </ContentToolbarButton>
   );
 }

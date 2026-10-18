@@ -155,7 +155,7 @@ function OutputOptionGroup<TValue extends string | number>(props: {
               option.value === props.activeValue
                 ? [
                     'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-                    'text-[var(--sniptale-color-accent)]',
+                    'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]',
                   ].join(' ')
                 : [
                     'text-[var(--sniptale-color-text-secondary)]',

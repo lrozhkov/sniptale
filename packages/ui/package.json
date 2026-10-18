@@ -92,6 +92,7 @@
     "./styles/ai-modal/root": "./src/styles/ai-modal/root.css",
     "./styles/content-popover": "./src/styles/content-popover/index.css",
     "./styles/design-tokens": "./src/styles/design-tokens.css",
+    "./styles/fonts": "./src/styles/fonts.css",
     "./styles/feedback": "./src/styles/feedback/index.css",
     "./styles/feedback/root": "./src/styles/feedback/root.css",
     "./styles/glass/color-controls": "./src/styles/glass/color-controls.css",
@@ -131,7 +132,12 @@
     "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts",
     "./viewport-pan": "./src/viewport-pan/index.ts",
     "./product-modal/native-drawer": "./src/product-modal/native-drawer.tsx",
-    "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx"
+    "./material-browser/selectable-card": "./src/material-browser/selectable-card.tsx",
+    "./control-language/press": "./src/control-language/press.ts",
+    "./styles/interface-font-license": "./src/styles/golos-ui/LICENSE.txt",
+    "./styles/interface-font": "./src/styles/golos-ui/golos-ui-vf.woff2",
+    "./styles/document-font": "./src/styles/golos-text/golos-text-vf.woff2",
+    "./styles/document-font-license": "./src/styles/golos-text/LICENSE.txt"
   },
   "dependencies": {
     "@sniptale/foundation": "0.5.1",

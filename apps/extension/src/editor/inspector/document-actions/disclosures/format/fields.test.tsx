@@ -55,9 +55,9 @@ it('renders the format and quality controls from shared settings state', () => {
     container?.querySelector<HTMLInputElement>('input[aria-label="Качество изображения"]')?.value
   ).toBe('72');
   expect(container?.textContent).toContain('%');
-  expect(header?.className).toContain('text-[12px]');
-  expect(header?.className).toContain('font-bold');
-  expect(header?.className).toContain('uppercase');
+  expect(header?.className).toContain('text-[14px]');
+  expect(header?.className).toContain('font-semibold');
+  expect(header?.className).not.toContain('uppercase');
   expect(header?.className).not.toContain('text-[13px]');
 });
 

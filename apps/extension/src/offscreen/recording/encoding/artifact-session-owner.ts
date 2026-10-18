@@ -18,7 +18,7 @@ type ArtifactSessionPhase =
   | 'aborted';
 
 // Persist bounded chunks without asking MediaRecorder to emit continuously. A zero
-// timeslice can saturate OPFS with tiny writes and make a short recording take many
+// timeslice can saturate storage with tiny writes and make a short recording take many
 // seconds to drain when stopping.
 const RECORDING_CHUNK_TIMESLICE_MS = 1_000;
 
@@ -53,6 +53,7 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
   private abortPromise: Promise<void> | null = null;
   private callbacks: RecordingArtifactLifecycleCallbacks = {};
   private failure: Error | null = null;
+  private finishErrorDrain: (() => void) | null = null;
   private phase: ArtifactSessionPhase = 'ready';
   private readonly terminalSettlement: ReturnType<
     typeof createRecordingTerminal<FinalizedRecordingStagingArtifact>
@@ -111,6 +112,10 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
   abort(): Promise<void> {
     if (this.phase === 'finalized') return Promise.resolve();
     if (this.phase === 'aborted') return this.abortPromise ?? Promise.resolve();
+    if (this.phase === 'failed') {
+      this.abortPromise ??= this.input.coordinator.abort();
+      return this.abortPromise;
+    }
     this.phase = 'aborted';
     this.terminalSettlement.reject(
       new Error(`Recording artifact ${this.input.artifactId} was aborted.`)
@@ -124,11 +129,11 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
 
   private attachRecorderHandlers(): void {
     this.recorder.ondataavailable = (event) => {
-      if (!event.data || event.data.size === 0 || this.failure) return;
+      if (!event.data || event.data.size === 0 || (this.failure && !this.finishErrorDrain)) return;
       void this.input.writer.append(event.data).catch((error: unknown) => this.fail(error));
     };
     this.recorder.onerror = (event) => {
-      this.fail(getMediaRecorderError(event, 'The recording encoder failed.'));
+      this.fail(getMediaRecorderError(event, 'The recording encoder failed.'), true);
     };
     this.recorder.onstart = () => this.handleStarted();
     this.recorder.onstop = () => this.handleStopped();
@@ -145,6 +150,10 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
   }
 
   private handleStopped(): void {
+    if (this.finishErrorDrain) {
+      this.finishErrorDrain();
+      return;
+    }
     if (this.failure || this.phase === 'aborted' || this.phase === 'finalized') return;
     this.phase = 'finalizing';
     this.detachHandlers();
@@ -167,24 +176,40 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
     }
   }
 
-  private fail(reason: unknown): void {
+  private fail(reason: unknown, drainRecorder = false): void {
     if (this.failure || this.phase === 'finalized' || this.phase === 'aborted') return;
-    this.failure = toError(reason);
-    let terminalError: Error = this.failure;
+    const failure = toError(reason);
+    this.failure = failure;
     this.phase = 'failed';
-    this.detachHandlers();
-    this.stopRecorderBestEffort();
-    try {
-      this.callbacks.onFailure?.(this.failure);
-    } catch (callbackError) {
-      terminalError = new AggregateError(
-        [this.failure, toError(callbackError)],
-        'Recording failure handling also failed.'
-      );
+    const finish = () => {
+      this.finishErrorDrain = null;
+      this.detachHandlers();
+      this.stopRecorderBestEffort();
+      let terminalError: Error = failure;
+      try {
+        this.callbacks.onFailure?.(failure);
+      } catch (callbackError) {
+        terminalError = new AggregateError(
+          [failure, toError(callbackError)],
+          'Recording failure handling also failed.'
+        );
+      }
+      this.abortPromise ??= this.input.coordinator.abort();
+      void this.abortPromise.catch(() => undefined);
+      this.terminalSettlement.reject(terminalError);
+    };
+    if (!drainRecorder) {
+      finish();
+      return;
     }
-    this.abortPromise ??= this.input.coordinator.abort();
-    void this.abortPromise.catch(() => undefined);
-    this.terminalSettlement.reject(terminalError);
+    // MediaRecorder emits its final data after an error. Keep that handler until
+    // stop, but bound the wait when a broken driver never delivers stop.
+    const deadline = setTimeout(() => this.finishErrorDrain?.(), 1_000);
+    this.finishErrorDrain = () => {
+      clearTimeout(deadline);
+      finish();
+    };
+    this.stopRecorderBestEffort();
   }
 
   private cannotCompleteFinalization(): boolean {

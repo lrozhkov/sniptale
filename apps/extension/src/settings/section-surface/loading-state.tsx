@@ -5,13 +5,13 @@ import {
 import { Skeleton } from '@sniptale/ui/skeleton';
 
 const settingsCenteredLoadingCardClassName = [
-  'w-full max-w-[22rem] space-y-3 rounded-[20px] border',
+  'w-full max-w-[22rem] space-y-3 rounded-[4px] border',
   'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,var(--sniptale-color-surface-canvas)_14%)] p-5',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,var(--sniptale-color-surface-canvas)_14%)] p-3',
 ].join(' ');
 
 const settingsCardLoadingClassName = [
-  'mb-6 rounded-[18px] border border-[var(--sniptale-color-border-soft)] p-5',
+  'mb-6 rounded-[4px] border border-[var(--sniptale-color-border-soft)] p-3',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,var(--sniptale-color-surface-canvas)_18%)]',
   'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-subtle)_34%,transparent)]',
 ].join(' ');
@@ -39,8 +39,8 @@ export function SettingsCardLoadingState() {
     <div className={settingsCardLoadingClassName}>
       <div className="space-y-3">
         <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-10 w-full rounded-[12px]" />
-        <Skeleton className="h-10 w-full rounded-[12px]" />
+        <Skeleton className="h-10 w-full rounded-[4px]" />
+        <Skeleton className="h-10 w-full rounded-[4px]" />
         <Skeleton className="h-3 w-[82%]" />
       </div>
     </div>

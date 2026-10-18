@@ -37,12 +37,15 @@ export function MaterialAudioRecordingModal(props: AudioRecordingModalProps) {
   const session = useAudioRecordingDialogSession(props);
   const { titleId, handleKeyDown } = useAudioRecordingFocus(
     props.isOpen,
-    session.confirmation.open
+    session.confirmation.open,
+    props.presentation ?? 'modal',
+    props.returnFocusTo
   );
   if (!props.isOpen) return null;
   return (
     <MaterialRecordingDialog
       session={session}
+      presentation={props.presentation ?? 'modal'}
       titleId={titleId}
       handleKeyDown={handleKeyDown}
       title={props.title}
@@ -64,6 +67,7 @@ export function MaterialAudioRecordingModal(props: AudioRecordingModalProps) {
 
 function MaterialRecordingDialog({
   session,
+  presentation,
   titleId,
   handleKeyDown,
   device,
@@ -71,6 +75,7 @@ function MaterialRecordingDialog({
   saveLabel,
 }: {
   session: ReturnType<typeof useAudioRecordingDialogSession>;
+  presentation: 'modal' | 'inspector';
   titleId: string;
   handleKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
   device: React.ReactNode;
@@ -81,7 +86,8 @@ function MaterialRecordingDialog({
     session;
   return (
     <>
-      <ProductModal
+      <RecordingSurface
+        presentation={presentation}
         onKeyDown={(event) => {
           handleKeyDown(event);
           if (event.key === 'Escape' && !event.defaultPrevented && !session.confirmation.open) {
@@ -91,11 +97,7 @@ function MaterialRecordingDialog({
           }
         }}
         onClose={requestClose}
-        closeOnBackdrop={false}
         labelledBy={titleId}
-        width="min(600px, calc(100vw - 32px))"
-        maxHeight="min(760px, calc(100vh - 32px))"
-        scrollable
       >
         <AudioRecordingModalHeader
           title={title}
@@ -107,6 +109,7 @@ function MaterialRecordingDialog({
           {controller.transport.status !== 'recorded' && device}
           <fieldset disabled={isSaving || starting} className="contents">
             <AudioRecordingTransport
+              compact={presentation === 'inspector'}
               durationLabel={controller.transport.durationLabel}
               error={controller.transport.error}
               onStartRecording={startRecording}
@@ -127,13 +130,21 @@ function MaterialRecordingDialog({
             </p>
           )}
           <fieldset disabled={isSaving} className="contents">
-            {renderAudioRecordingTrimPanel(controller.trim, isSaving)}
+            {renderAudioRecordingTrimPanel(controller.trim, isSaving, presentation === 'inspector')}
           </fieldset>
         </ProductModalBody>
-        <ProductModalFooter compact className="shrink-0 !py-2">
+        <ProductModalFooter
+          compact
+          className={
+            presentation === 'inspector'
+              ? 'shrink-0 !flex-wrap !justify-start !gap-2 !p-2'
+              : 'shrink-0 !py-2'
+          }
+        >
           <AudioRecordingCancelButton disabled={isSaving} onClose={requestClose} />
           {controller.save.audioBlob && (
             <AudioRecordingDownloadButton
+              iconOnly={presentation === 'inspector'}
               disabled={isSaving || session.isDownloading}
               onDownload={session.downloadTake}
             />
@@ -146,8 +157,44 @@ function MaterialRecordingDialog({
             onSave={saveRecording}
           />
         </ProductModalFooter>
-      </ProductModal>
+      </RecordingSurface>
       <RecordingDiscardConfirmation value={session.confirmation} />
     </>
+  );
+}
+
+/** Presentation changes placement and keyboard containment, never take or commit authority. */
+function RecordingSurface(props: {
+  presentation: 'modal' | 'inspector';
+  labelledBy: string;
+  onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  if (props.presentation === 'inspector')
+    return (
+      <div
+        role="region"
+        aria-labelledby={props.labelledBy}
+        data-ui="audio-recording.inspector"
+        tabIndex={-1}
+        className="flex h-full min-h-0 min-w-0 flex-col outline-none"
+        onKeyDown={props.onKeyDown}
+      >
+        {props.children}
+      </div>
+    );
+  return (
+    <ProductModal
+      onKeyDown={props.onKeyDown}
+      onClose={props.onClose}
+      closeOnBackdrop={false}
+      labelledBy={props.labelledBy}
+      width="min(600px, calc(100vw - 32px))"
+      maxHeight="min(760px, calc(100vh - 32px))"
+      scrollable
+    >
+      {props.children}
+    </ProductModal>
   );
 }

@@ -169,6 +169,31 @@ for (const locale of ['en', 'ru'] as const) {
   }
 }
 
+async function verifySelectedFillPaint(toggle: Locator, offColor: string, offBackground: string) {
+  if ((await toggle.getAttribute('data-command-property')) === 'true') {
+    const expected = await toggle.evaluate((node) => {
+      const probe = node.ownerDocument.createElement('span');
+      probe.style.cssText = [
+        'position:fixed;visibility:hidden',
+        'color:var(--sniptale-color-text-primary)',
+        'background:var(--sniptale-color-surface-hover)',
+      ].join(';');
+      node.append(probe);
+      const style = getComputedStyle(probe);
+      const resolved = { color: style.color, background: style.backgroundColor };
+      probe.remove();
+      return resolved;
+    });
+    await expect(toggle).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+    await expect(toggle).toHaveCSS('background-color', expected.background);
+    await expect(toggle).toHaveCSS('color', expected.color);
+    await expect(toggle).not.toHaveCSS('background-color', offBackground);
+  } else {
+    await expect(toggle).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+  }
+  await expect(toggle).not.toHaveCSS('color', offColor);
+}
+
 async function verifyFillControls(page: Page, editor: boolean) {
   for (const [tool, suffix, groupSuffix] of [
     ['shape', 'shape.fill-toggle', 'shape.fill'],
@@ -190,7 +215,11 @@ async function verifyFillControls(page: Page, editor: boolean) {
     if ((await toggle.getAttribute('aria-pressed')) === 'true') await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+    await page.mouse.move(0, 0);
+    if ((await toggle.getAttribute('data-command-property')) === 'true')
+      await expect(toggle).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const offColor = await toggle.evaluate((node) => getComputedStyle(node).color);
+    const offBackground = await toggle.evaluate((node) => getComputedStyle(node).backgroundColor);
     const offSize = await toggle.boundingBox();
     await toggle.hover();
     await expect(toggle).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
@@ -216,8 +245,7 @@ async function verifyFillControls(page: Page, editor: boolean) {
     await expect(toggle).toHaveCSS('outline-style', 'solid');
     await toggle.press('Space');
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    await expect(toggle).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
-    await expect(toggle).not.toHaveCSS('color', offColor);
+    await verifySelectedFillPaint(toggle, offColor, offBackground);
     const activeSize = await toggle.boundingBox();
     expect(activeSize!.width).toBe(offSize!.width);
     expect(activeSize!.height).toBe(offSize!.height);
@@ -229,7 +257,7 @@ async function verifyFillControls(page: Page, editor: boolean) {
     await toggle.press('Space');
     await expect(color).toHaveAttribute('aria-pressed', 'true');
     await toggle.hover();
-    await expect(toggle).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+    await verifySelectedFillPaint(toggle, offColor, offBackground);
     await expect(toggle).toBeInViewport();
   }
 }
@@ -338,6 +366,16 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
     await verifyDrawingParameterOrder(page, false);
     await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+    const freePlacement = page.getByRole('button', {
+      name: /Free toolbar placement|Свободное размещение панели/u,
+    });
+    if (
+      !(await freePlacement.evaluate((node) =>
+        node.classList.contains('sniptale-popover-item-selected')
+      ))
+    )
+      await freePlacement.click();
+    await expect(freePlacement).toHaveClass(/sniptale-popover-item-selected/u);
     await page.getByRole('button', { name: /Vertical view|Вертикальный вид/ }).click();
     await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
     await page.mouse.move(450, 280);
@@ -348,6 +386,34 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await page.mouse.click(500, 300);
     const actions = page.locator('[data-ui="drawing.selection.actions"]');
     await expect(actions).toBeVisible();
+    const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
+    const scrollSnapshots = [];
+    const readScroll = () =>
+      pair.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return {
+          clientHeight: node.clientHeight,
+          scrollHeight: node.scrollHeight,
+          scrollTop: node.scrollTop,
+          left: box.left,
+          top: box.top,
+          right: box.right,
+          bottom: box.bottom,
+          viewportWidth: innerWidth,
+          viewportHeight: innerHeight,
+        };
+      });
+    const checkPairBounds = async () => {
+      const state = await readScroll();
+      expect(state.left).toBeGreaterThanOrEqual(-1);
+      expect(state.top).toBeGreaterThanOrEqual(-1);
+      expect(state.right).toBeLessThanOrEqual(state.viewportWidth + 1);
+      expect(state.bottom).toBeLessThanOrEqual(state.viewportHeight + 1);
+    };
+    scrollSnapshots.push({ stage: 'selection-before-scroll', ...(await readScroll()) });
+    await actions.scrollIntoViewIfNeeded();
+    scrollSnapshots.push({ stage: 'selection-after-scroll', ...(await readScroll()) });
+    await checkPairBounds();
     const first = actions.locator('[data-ui="drawing.selection.actions.front"]');
     const second = actions.locator('[data-ui="drawing.selection.actions.forward"]');
     const a = (await first.boundingBox())!;
@@ -359,7 +425,7 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(1280);
     expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
-    await page.screenshot({ path: info.outputPath('vertical-layer-actions.png') });
+    await page.screenshot({ path: info.outputPath('vertical-layer-actions.png'), fullPage: false });
     const duplicate = actions.locator('[data-ui="drawing.selection.actions.duplicate"]');
     await duplicate.focus();
     await page.keyboard.press('Enter');
@@ -372,11 +438,22 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await page.mouse.move(1240, 25, { steps: 8 });
     await page.mouse.up();
     await expect(actions).toBeVisible();
+    scrollSnapshots.push({ stage: 'edge-before-scroll', ...(await readScroll()) });
+    await actions.scrollIntoViewIfNeeded();
+    scrollSnapshots.push({ stage: 'edge-after-scroll', ...(await readScroll()) });
+    await checkPairBounds();
+    await info.attach('drawing-pair-scroll.json', {
+      body: JSON.stringify(scrollSnapshots, null, 2),
+      contentType: 'application/json',
+    });
     const edge = (await actions.boundingBox())!;
     expect(edge.x).toBeGreaterThanOrEqual(0);
     expect(edge.x + edge.width).toBeLessThanOrEqual(1280);
     expect(edge.y + edge.height).toBeLessThanOrEqual(720);
-    await page.screenshot({ path: info.outputPath('vertical-layer-actions-edge.png') });
+    await page.screenshot({
+      path: info.outputPath('vertical-layer-actions-edge.png'),
+      fullPage: false,
+    });
     await page.setViewportSize({ width: 1280, height: 1080 });
     await page.locator('[data-ui="content.toolbar.settings-button"]').click();
     await page.getByRole('button', { name: /Horizontal view|Горизонтальный вид/ }).click();

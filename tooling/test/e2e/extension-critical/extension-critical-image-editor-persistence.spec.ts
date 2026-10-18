@@ -463,46 +463,61 @@ test('autosave presentation does not finish an active frame drag', async ({ page
 test('inspector numeric and paint controls retain shared hover, focus and Escape behavior', async ({
   context,
   hostOrigin,
-}) => {
+}, info) => {
   const page = await context.newPage();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
   await waitForEditorReady(page);
   await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
   const framePanel = page.locator('[data-ui="editor.frame-panel"]');
-  const categoryRail = framePanel.locator('nav');
-  await expect(categoryRail.locator('button')).toHaveCount(2);
-  await expect(framePanel.locator('[data-section="background"]')).toBeVisible();
-  await expect(framePanel.locator('[data-ui="editor.frame.quick-colors"] button')).toHaveCount(8);
+  const kinds = framePanel.locator('[data-ui="editor.frame.background-mode"]');
+  const colorLabel = translate('editor.compact.frameBackgroundModeColor', 'ru');
+  const modeDropdown = kinds.locator('button[aria-haspopup="listbox"]');
+  if (await modeDropdown.count()) {
+    await modeDropdown.click();
+    await page.getByRole('option', { name: colorLabel, exact: true }).click();
+    await expect(modeDropdown).toHaveAttribute('aria-expanded', 'false');
+  } else {
+    const colorMode = kinds.getByRole('button', { name: colorLabel, exact: true });
+    await colorMode.click();
+    await expect(colorMode).toHaveAttribute('aria-pressed', 'true');
+  }
+  await expect(framePanel.locator('[data-ui="editor.frame.source-basics"]')).toBeVisible();
+  await expect(framePanel.locator('[data-ui="editor.frame.source-glow"]')).toBeVisible();
   const panelBounds = await framePanel.boundingBox();
-  const railBounds = await categoryRail.boundingBox();
+  const kindsBounds = await kinds.boundingBox();
   expect(panelBounds).not.toBeNull();
-  expect(railBounds).not.toBeNull();
-  expect(railBounds!.x).toBe(panelBounds!.x);
-  const firstNavButtonBounds = await categoryRail.locator('button').first().boundingBox();
-  expect(firstNavButtonBounds).not.toBeNull();
-  const leftRailInset = firstNavButtonBounds!.x - railBounds!.x;
-  const rightRailInset =
-    railBounds!.x + railBounds!.width - firstNavButtonBounds!.x - firstNavButtonBounds!.width;
-  expect(Math.abs(leftRailInset - rightRailInset)).toBeLessThanOrEqual(2);
-  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-frame-background-panel.png` });
-  const actions = page.locator('[data-ui="editor.frame-panel"] > [data-ui="editor.frame.actions"]');
-  const actionBounds = await actions.boundingBox();
-  expect(actionBounds).not.toBeNull();
-  expect(actionBounds!.y).toBeGreaterThan(railBounds!.y);
-  const field = page.getByRole('textbox', { name: 'Скругление углов', exact: true });
-  const row = page
-    .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
-    .filter({ has: field });
+  expect(kindsBounds).not.toBeNull();
+  const leftInset = kindsBounds!.x - panelBounds!.x;
+  const rightInset = panelBounds!.x + panelBounds!.width - kindsBounds!.x - kindsBounds!.width;
+  expect(leftInset).toBeGreaterThanOrEqual(8);
+  expect(Math.abs(leftInset - rightInset)).toBeLessThanOrEqual(2);
+  await page.screenshot({
+    path: info.outputPath('editor-frame-background-panel.png'),
+    fullPage: false,
+  });
+  const actions = framePanel.locator(':scope > [data-ui="editor.frame.actions"]');
+  await actions.scrollIntoViewIfNeeded();
+  await expect(actions.getByRole('button')).toBeVisible();
+  const field = framePanel.getByRole('textbox', { name: 'Скругление углов', exact: true });
+  const row = framePanel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').filter({
+    has: page.getByRole('textbox', { name: 'Скругление углов', exact: true }),
+  });
+  await row.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
   const range = row.locator('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]');
   await expect(row).toHaveAttribute('data-appearance', 'plain');
   await expect(range).toHaveCSS('opacity', '0');
   await row.hover();
   await expect(range).toHaveCSS('opacity', '1');
-  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-shared-range-hover.png` });
+  await page.screenshot({
+    path: info.outputPath('editor-shared-range-hover.png'),
+    fullPage: false,
+  });
   await field.focus();
   const shell = row.locator('[data-ui="shared.ui.compact-inspector.numeric-value-field"]');
   await expect(shell).toHaveAttribute('data-focus-appearance', 'accent-box');
+  // This harness mounts the unscoped EditorPage; native migration proof uses the product entry.
   await expect(shell).toHaveCSS('border-radius', '7px');
   // Shared numeric inputs retain the browser's native text-input cursor.
   await expect(field).toHaveCSS('cursor', 'auto');
@@ -513,18 +528,40 @@ test('inspector numeric and paint controls retain shared hover, focus and Escape
   await field.press('Escape');
   await expect(field).toHaveValue('7');
   await field.focus();
-  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-shared-input-focus.png` });
-  const trigger = page.locator('[data-ui="shared.ui.paint-selector.trigger"]');
+  await page.screenshot({
+    path: info.outputPath('editor-shared-input-focus.png'),
+    fullPage: false,
+  });
+  const trigger = framePanel.locator('[data-ui="shared.ui.paint-selector.trigger"]').first();
   await trigger.click();
   await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
-  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-shared-paint-picker.png` });
+  await page.screenshot({
+    path: info.outputPath('editor-shared-paint-picker.png'),
+    fullPage: false,
+  });
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await categoryRail.locator('button').nth(1).click();
-  await expect(framePanel.locator('[data-section="background"]')).toHaveCount(0);
-  await expect(framePanel.locator('[data-section="additional"] details')).toHaveCount(2);
-  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-frame-additional-panel.png` });
+  const border = framePanel.locator('[data-ui="editor.frame.source-border"]');
+  const advanced = border.locator('[data-ui="editor.inspector.disclosure"]');
+  await expect(advanced).toHaveCount(1);
+  const summary = advanced.locator('summary');
+  if (await advanced.evaluate((element) => element.hasAttribute('open'))) await summary.click();
+  const style = advanced.getByRole('button', {
+    name: translate('highlighter.editor.styleLabel', 'ru'),
+    exact: true,
+  });
+  await expect(style).toBeHidden();
+  await summary.click();
+  await expect(advanced).toHaveAttribute('open', '');
+  await expect(style).toBeVisible();
+  await expect(
+    advanced.locator('[data-ui="shared.ui.color-selector.picker-trigger"]')
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath('editor-frame-border-advanced.png'),
+    fullPage: false,
+  });
   await page.close();
 });
 

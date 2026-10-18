@@ -4,6 +4,7 @@ import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import { useContext } from 'react';
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
 import { Clock3 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
@@ -46,21 +47,21 @@ const iconButtonBase =
   'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
-const iconHoverBorder = ' enabled:hover:!border-[var(--sniptale-color-border-strong)] ';
 const iconSelection =
   ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
-/** Selected tools use an accent icon; only hover draws a border. */
-export const reviewIconButtonClassName = iconButtonBase + iconHoverBorder + iconSelection;
+/** Selected tools use an accent icon; hover brightens ordinary commands without a frame. */
+export const reviewIconButtonClassName = iconButtonBase + iconSelection;
 
 /** Compact lane toggles brighten their icon while retaining a quiet border. */
-export const reviewCompactTrackButtonClassName = iconButtonBase + iconSelection;
+export const reviewCompactTrackButtonClassName =
+  'review-track-compact ' + iconButtonBase + iconSelection;
 
 /** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
 export const reviewTrackStatusButtonClassName =
+  'review-track-status ' +
   iconButtonBase +
-  iconHoverBorder +
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
@@ -95,7 +96,7 @@ export function ReviewToolGroup({
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
   ' review-inspector-danger enabled:hover:!text-[var(--sniptale-color-danger)] ' +
-  'enabled:hover:!border-[var(--sniptale-color-danger)]';
+  'enabled:hover:!border-transparent';
 
 /** Source placement and playback duration remain distinct without adding inspector rows. */
 export function ReviewInterval({
@@ -134,10 +135,11 @@ export function ReviewInterval({
   const rangeTitle = `${rangeLabel}: ${range}`;
   return (
     <div
-      className="flex min-h-8 min-w-0 items-center justify-between gap-2 py-0.5 text-xs tabular-nums"
+      className="flex min-h-8 min-w-0 items-center justify-between gap-2 border-b
+      border-[var(--sniptale-color-border-soft)] px-2 pt-0.5 pb-2 text-[13px] tabular-nums"
       data-ui="gallery.videoReview.interval"
     >
-      <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
+      <span className="shrink-0 font-normal text-[var(--sniptale-color-text-secondary)]">
         {translate(
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
@@ -187,12 +189,13 @@ export function ReviewInterval({
 }
 
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
-export const reviewSelectFieldClassName = '!min-h-9 !border-0 !bg-transparent !px-0 !py-0';
+export const reviewSelectFieldClassName = 'w-full min-w-0';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
   label,
   primary = false,
+  chrome = false,
   toolbarLabel,
   toolbarPriority = 6,
   children,
@@ -201,10 +204,12 @@ export function ReviewButton({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   primary?: boolean;
+  chrome?: boolean;
   toolbarLabel?: string | undefined;
   /** Lower priorities lose their caption first when the toolbar runs out of space. */
   toolbarPriority?: number;
 }) {
+  const press = useCommandPress(props);
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
@@ -216,16 +221,23 @@ export function ReviewButton({
       data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
       data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}
-      className={`${tone}
+      {...press.props}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+      data-command-chrome={chrome ? 'true' : undefined}
+      data-command-primary={primary ? 'true' : undefined}
+      className={`review-command ${tone}
       !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
     >
-      {children ?? label}
-      {toolbarLabel !== undefined ? (
-        <span data-review-toolbar-label aria-hidden="true">
-          {toolbarLabel}
-        </span>
-      ) : null}
+      <span className="review-command-content sniptale-command-content">
+        {children ?? label}
+        {toolbarLabel !== undefined ? (
+          <span data-review-toolbar-label aria-hidden="true">
+            {toolbarLabel}
+          </span>
+        ) : null}
+      </span>
     </button>
   );
 }

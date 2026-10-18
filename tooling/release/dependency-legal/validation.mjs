@@ -4,10 +4,10 @@ import path from 'node:path';
 import { readOssReleasePolicy, sha256 } from '../policy/oss-release-policy.mjs';
 import { formatThirdPartyNotices, generateDependencyLegalClosure } from './index.mjs';
 
-function manropeMetadata(policy) {
-  const manrope = policy.bundledAssets.find((asset) => asset.id === 'manrope');
-  if (!manrope) throw new Error('OSS release policy is missing Manrope metadata.');
-  return { ...manrope, licensePath: 'LICENSES/OFL-1.1.txt' };
+function interfaceFontMetadata(policy) {
+  const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
+  if (!interfaceFont) throw new Error('OSS release policy is missing Interface font metadata.');
+  return { ...interfaceFont, licensePath: 'packages/ui/src/styles/golos-ui/LICENSE.txt' };
 }
 
 async function collectFiles(root, relativeDirectory) {
@@ -101,7 +101,8 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
   errors.push(...(await validateLicenseArtifacts(root, policy, closure)));
   const expectedNotices = formatThirdPartyNotices({
     entries: closure.entries,
-    manrope: manropeMetadata(policy),
+    interfaceFont: interfaceFontMetadata(policy),
+    documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
   });
   const notices = await fs.readFile(path.resolve(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
   if (notices !== expectedNotices) errors.push('THIRD_PARTY_NOTICES.md is incomplete or stale');

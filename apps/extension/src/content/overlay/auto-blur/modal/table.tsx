@@ -29,9 +29,11 @@ export function AutoBlurTable(props: AutoBlurTableProps) {
     );
 
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
-        <div className="sniptale-label-sm">{translate('content.autoBlur.rowsTitle')}</div>
+        <div className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
+          {translate('content.autoBlur.rowsTitle')}
+        </div>
         <AutoBlurTableActions
           isAnyExpanded={isAnyExpanded}
           isAnySelected={isAnySelected}
@@ -53,8 +55,8 @@ function AutoBlurTableHeader() {
   return (
     <div
       className={[
-        'grid grid-cols-[2.25rem_9rem_minmax(0,1fr)_10rem] px-2 text-xs',
-        'text-[var(--sniptale-color-text-dim)]',
+        'grid grid-cols-[2.25rem_9rem_minmax(0,1fr)_10rem] px-2 text-[13px] leading-[18px] font-medium',
+        'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
     >
       <div />

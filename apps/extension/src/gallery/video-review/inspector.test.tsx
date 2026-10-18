@@ -130,6 +130,61 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
   }
 });
 
+it.each([false, true])(
+  'restores a removed note action locally unless focus moved elsewhere=%s',
+  (focusElsewhere) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    const other = document.createElement('button');
+    document.body.append(host, other);
+    const root = createRoot(host);
+    const note = { id: 'note', text: 'Note', anchor: { kind: 'point' as const, time: 2 } };
+    const render = (visible: boolean, busy = false) =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={visible ? [note] : []}
+          selectedId={visible ? note.id : null}
+          busy={busy}
+          message={null}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onHover={vi.fn()}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          {null}
+        </ReviewInspector>
+      );
+    try {
+      act(() => render(true));
+      const remove = host.querySelector<HTMLButtonElement>('[data-note-delete]')!;
+      remove.focus();
+      if (focusElsewhere) other.focus();
+      act(() => remove.click());
+      act(() => render(true, true));
+      // Native disabling blurs the active button before its row disappears.
+      if (remove.disabled && document.activeElement === remove) {
+        document.body.tabIndex = -1;
+        document.body.focus();
+        document.body.removeAttribute('tabindex');
+      }
+      act(() => render(false));
+      expect(host.querySelector('[data-note-delete]')).toBeNull();
+      expect(document.activeElement).toBe(
+        focusElsewhere ? other : host.querySelector('.review-inspector-list')
+      );
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      other.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
 it('keeps scene navigation independent of selection and resets Basic to notes', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -595,5 +650,55 @@ it('opens the track document in the third context and closes it on selection or 
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
+  }
+});
+
+it('keeps the recorder mounted in a temporary third tab below the filename', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          settingsAvailable
+          scene={<span>scene parameters</span>}
+          recording={<input aria-label="retained take" defaultValue="draft" />}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onEdit={vi.fn()}
+          onHover={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          {null}
+        </ReviewInspector>
+      )
+    );
+    const tabs = host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')!;
+    expect(tabs.textContent).toContain('gallery.videoReview.recordVoiceover');
+    expect(host.querySelector('header h2')?.textContent).toBe('clip.webm');
+    const take = host.querySelector<HTMLInputElement>('[aria-label="retained take"]')!;
+    act(() =>
+      Array.from(tabs.querySelectorAll('button'))
+        .find((b) => b.textContent === 'gallery.videoReview.scene')!
+        .click()
+    );
+    expect(take.closest('[hidden]')).not.toBeNull();
+    act(() =>
+      Array.from(tabs.querySelectorAll('button'))
+        .find((b) => b.textContent === 'gallery.videoReview.recordVoiceover')!
+        .click()
+    );
+    expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
+    expect(take.closest('[hidden]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
   }
 });

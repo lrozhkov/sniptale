@@ -1,3 +1,5 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
@@ -26,14 +28,16 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
       ].join(' ')}
       data-ui="content.design-review.delete-confirmation"
     >
-      <div className="text-sm font-bold">
+      <div className="text-[14px] leading-5 font-semibold">
         {translate('content.designReview.deleteConfirmTitle')}
       </div>
       <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
         {translate('content.designReview.deleteConfirmBody')}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           className={[
             'h-9 rounded-[8px] border border-[color:var(--sniptale-color-border-soft)] text-xs font-semibold',
@@ -43,8 +47,10 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
           onClick={props.onCancel}
         >
           {translate('content.designReview.cancel')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          compact
+          tone="danger"
           type="button"
           className={[
             'h-9 rounded-[8px] bg-[var(--sniptale-color-danger)] text-xs font-semibold text-white',
@@ -54,7 +60,7 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
           onClick={props.onConfirm}
         >
           {translate('content.designReview.delete')}
-        </button>
+        </ProductActionButton>
       </div>
     </div>
   );
@@ -136,8 +142,9 @@ export function DesignReviewPopover(props: {
       ref={view.containedPopoverRef}
       data-ui="content.design-review.popover"
       className={[
+        'sniptale-design-review-chrome sniptale-compact-workspace',
         'pointer-events-auto fixed z-[2147483646] cursor-default overflow-visible',
-        'rounded-[12px] border shadow-2xl',
+        'rounded-[4px] border shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
@@ -150,7 +157,8 @@ export function DesignReviewPopover(props: {
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <button
+      <ContentToolbarButton
+        tone="close"
         type="button"
         className={[
           'sniptale-dismiss-button',
@@ -166,7 +174,7 @@ export function DesignReviewPopover(props: {
         onClick={props.actions.close}
       >
         <X size={16} />
-      </button>
+      </ContentToolbarButton>
       <div
         className="grid grid-rows-[auto_minmax(0,1fr)] overflow-visible"
         data-ui="content.design-review.popover-layout"

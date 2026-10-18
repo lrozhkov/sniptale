@@ -34,7 +34,7 @@ export function EffectImportControl(props: {
         <EditorIconButton
           disabled={props.disabled}
           title={translate('videoEditor.effectsLibrary.importMany')}
-          className="!w-auto min-w-0 flex-1 !justify-start gap-2 px-2 text-xs"
+          className="!w-auto min-w-0 flex-1 !justify-start gap-1.5 px-2 text-[13px]"
           onClick={() => inputRef.current?.click()}
         >
           <Upload size={16} aria-hidden="true" />

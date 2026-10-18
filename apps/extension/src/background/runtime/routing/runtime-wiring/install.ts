@@ -1,11 +1,11 @@
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
-import { setLocalePreference } from '../../../../platform/i18n';
+import { initializeLocalePreference } from '../../../../platform/i18n';
 import { rebuildBackgroundContextMenus } from '../../context-menu/service';
 import { parseInstalledDetails } from './parsers';
 import type { RuntimeWiringLogger } from './shared';
 
 function initializeFirstInstallLocale(logger: RuntimeWiringLogger): Promise<void> {
-  return setLocalePreference('en').catch((error) => {
+  return initializeLocalePreference().catch((error) => {
     logger.warn('Failed to initialize first-install locale', error);
   });
 }

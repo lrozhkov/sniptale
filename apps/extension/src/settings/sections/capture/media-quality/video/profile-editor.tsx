@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import {
   getDefaultVideoOutputCodec,
   isVideoOutputCodecCompatible,
@@ -11,14 +11,15 @@ import {
   type VideoOutputProfile,
   type VideoRecordingProfile,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
   ProductModal,
   ProductModalBody,
   ProductModalFooter,
   ProductModalHeader,
 } from '@sniptale/ui/product-modal';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { CompactSegmentedSelector } from '../../../../../ui/compact-inspector-controls/control-renderers';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import { useProfileCodecSupport } from './profile-support';
@@ -54,16 +55,17 @@ function VideoProfileFormatFields(props: {
         <legend className="mb-2 text-sm font-medium">
           {translate('settings.videoQuality.qualityLabel')}
         </legend>
-        <SegmentedSwitch
+        <CompactSegmentedSelector
+          columns={4}
           ariaLabel={translate('settings.videoQuality.qualityLabel')}
-          activeId={props.configuration.quality}
+          value={props.configuration.quality}
           options={[
             VideoQuality.LOW,
             VideoQuality.MEDIUM,
             VideoQuality.HIGH,
             VideoQuality.ULTRA,
           ].map((value) => ({
-            id: value,
+            value,
             label: getQualityLabel(value),
           }))}
           onChange={(quality) => props.onChange({ ...props.configuration, quality })}
@@ -82,11 +84,11 @@ function VideoProfileFormatFields(props: {
             <label
               key={container}
               className={[
-                'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors',
+                'flex cursor-pointer items-start gap-3 rounded-[4px] border px-3 py-3 transition-colors',
                 'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2',
                 'has-[:focus-visible]:outline-[var(--sniptale-color-focus-ring)]',
                 props.configuration.container === container
-                  ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-hover)]'
+                  ? 'border-[var(--sniptale-color-border-strong)] bg-[var(--sniptale-color-surface-hover)]'
                   : 'border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
               ].join(' ')}
             >
@@ -96,7 +98,7 @@ function VideoProfileFormatFields(props: {
                 value={container}
                 aria-label={container === VideoOutputContainer.MP4 ? 'MP4' : 'WebM'}
                 checked={props.configuration.container === container}
-                className="mt-1 h-3.5 w-3.5 shrink-0 outline-none accent-[var(--sniptale-color-accent)]"
+                className="mt-1 h-3.5 w-3.5 shrink-0 outline-none accent-[var(--sniptale-color-text-primary)]"
                 onChange={() =>
                   props.onChange({
                     ...props.configuration,
@@ -108,7 +110,7 @@ function VideoProfileFormatFields(props: {
                 }
               />
               <span className="min-w-0">
-                <span className="block text-sm font-semibold">
+                <span className="block text-[13px] font-medium">
                   {container === VideoOutputContainer.MP4 ? 'MP4' : 'WebM'}
                 </span>
                 <span className="mt-1 block text-xs text-[var(--sniptale-color-text-muted)]">
@@ -128,10 +130,7 @@ function VideoProfileFormatFields(props: {
           {translate('settings.videoQuality.advanced')}
         </summary>
         <div className="pt-3">
-          <SettingsControlRow
-            className="!min-h-10 !py-1 sm:!grid-cols-[minmax(0,1fr)_minmax(0,240px)]"
-            label={translate('settings.videoQuality.codecLabel')}
-          >
+          <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
             <ProductSelect
               aria-label={translate('settings.videoQuality.codecLabel')}
               menuPlacement="auto"
@@ -170,13 +169,7 @@ function VideoProfileGeometryFields(props: {
   }));
   return (
     <>
-      <ProductField
-        label={
-          <span className="text-sm font-medium tracking-normal">
-            {translate('settings.videoQuality.resolutionLabel')}
-          </span>
-        }
-      >
+      <SettingsControlRow label={translate('settings.videoQuality.resolutionLabel')}>
         <ProductSelect
           aria-label={translate('settings.videoQuality.resolutionLabel')}
           menuPlacement="auto"
@@ -196,14 +189,8 @@ function VideoProfileGeometryFields(props: {
             }
           }}
         />
-      </ProductField>
-      <ProductField
-        label={
-          <span className="text-sm font-medium tracking-normal">
-            {translate('settings.videoQuality.frameRateLabel')}
-          </span>
-        }
-      >
+      </SettingsControlRow>
+      <SettingsControlRow label={translate('settings.videoQuality.frameRateLabel')}>
         <ProductSelect
           aria-label={translate('settings.videoQuality.frameRateLabel')}
           menuPlacement="auto"
@@ -217,7 +204,7 @@ function VideoProfileGeometryFields(props: {
             }
           }}
         />
-      </ProductField>
+      </SettingsControlRow>
     </>
   );
 }
@@ -229,6 +216,7 @@ export function VideoQualityProfileEditor(props: {
   profile?: VideoRecordingProfile;
 }) {
   const titleId = useId();
+  const nameInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(() => createDraft(props.profile));
   const codecSupport = useProfileCodecSupport(draft.configuration.codec);
   const cannotSave =
@@ -268,24 +256,27 @@ export function VideoQualityProfileEditor(props: {
       />
       <ProductModalBody compact asForm onSubmit={onSubmit} className="min-h-0 overflow-hidden">
         <div className="grid min-h-0 gap-4 overflow-y-auto">
-          <ProductField
-            label={
-              <span className="text-sm font-medium tracking-normal">
-                {translate('settings.videoQuality.nameLabel')}
-              </span>
-            }
-          >
-            <ProductInput
-              aria-label={translate('settings.videoQuality.nameLabel')}
-              className="sniptale-input-compact"
-              autoFocus
-              maxLength={80}
-              placeholder={translate('settings.videoQuality.namePlaceholder')}
-              value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
-            />
-          </ProductField>
-          <div className="grid grid-cols-2 gap-x-4 border-b border-[var(--sniptale-color-border-subtle)] pb-4">
+          <SettingsControlRow label={translate('settings.videoQuality.nameLabel')}>
+            <div className="sniptale-text-value">
+              <ProductInput
+                ref={nameInput}
+                aria-label={translate('settings.videoQuality.nameLabel')}
+                className="sniptale-input-compact"
+                autoFocus
+                maxLength={80}
+                placeholder={translate('settings.videoQuality.namePlaceholder')}
+                value={draft.name}
+                onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
+              />
+              {draft.name ? (
+                <InspectorFieldClear
+                  label={translate('settings.videoQuality.nameLabel')}
+                  target={nameInput}
+                />
+              ) : null}
+            </div>
+          </SettingsControlRow>
+          <div className="sniptale-parameter-stack border-b border-[var(--sniptale-color-border-subtle)] pb-3">
             <VideoProfileGeometryFields
               configuration={draft.configuration}
               onChange={(configuration) => setDraft({ ...draft, configuration })}

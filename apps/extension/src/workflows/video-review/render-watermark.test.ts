@@ -65,7 +65,8 @@ afterEach(() => {
 it('loads the selected bundled face and actual text once before measuring and reuses its painted surface', async () => {
   const value = settings();
   const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
-  expect(load).toHaveBeenCalledWith('700 24px "Sniptale Sans"', value.text.value);
+  expect(load).toHaveBeenCalledWith('700 24px "Sniptale Text"', value.text.value);
+  expect(contexts[0]!.font).toBe('700 24px "Sniptale Text"');
   expect(load.mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(contexts[0]!.measureText).mock.invocationCallOrder[0]!
   );
@@ -183,15 +184,22 @@ it.each([
     renderer.dispose();
   }
 );
-it('accepts generic system families without fabricating downloadable faces', async () => {
-  load.mockResolvedValue([]);
-  const value = settings();
-  value.text.font = 'serif';
-  value.text.weight = 'normal';
-  const renderer = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
-  expect(load).toHaveBeenCalledWith('400 24px serif', value.text.value);
-  renderer.dispose();
-});
+it.each([
+  ['serif', 'serif'],
+  ['mono', 'monospace'],
+] as const)(
+  'keeps the explicit %s system family without a downloadable face',
+  async (font, family) => {
+    load.mockResolvedValue([]);
+    const value = settings();
+    value.text.font = font;
+    value.text.weight = 'normal';
+    const renderer = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+    expect(load).toHaveBeenCalledWith(`400 24px ${family}`, value.text.value);
+    expect(contexts[0]!.font).toBe(`400 24px ${family}`);
+    renderer.dispose();
+  }
+);
 it('closes a late bitmap and never paints when resource acquisition is cancelled', async () => {
   const controller = new AbortController();
   const bitmap = { width: 400, height: 200, close: vi.fn() };
@@ -561,7 +569,7 @@ it('loads and paints italic with the same font description in preview and export
   const value = settings();
   value.text.italic = true;
   const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
-  expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Sans"', value.text.value);
-  expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Sans"');
+  expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Text"', value.text.value);
+  expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Text"');
   painter.dispose();
 });

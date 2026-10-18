@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { LucideIcon } from 'lucide-react';
 import { KeyRound, Lock, RotateCcw, Unlock } from 'lucide-react';
 
@@ -16,7 +17,8 @@ function SecretProtectionActionButton(props: {
   const Icon = props.icon;
 
   return (
-    <button
+    <ProductActionButton
+      tone="secondary"
       type="button"
       className={aiProvidersAddButtonClassName}
       disabled={props.state.isBusy}
@@ -24,7 +26,7 @@ function SecretProtectionActionButton(props: {
     >
       <Icon size={14} />
       {props.label}
-    </button>
+    </ProductActionButton>
   );
 }
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -38,4 +39,25 @@ it('surfaces a localized preview failure and exposes an explicit retry action', 
 
   act(() => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   expect(onRetry).toHaveBeenCalledTimes(1);
+});
+
+it('cancels retry pressure without retrying and preserves the error until an explicit command', () => {
+  const onRetry = vi.fn();
+  act(() =>
+    root?.render(
+      <CommandPressScope value={true}>
+        <PreviewEffectRuntimeError onRetry={onRetry} />
+      </CommandPressScope>
+    )
+  );
+  const button = container!.querySelector<HTMLButtonElement>('button')!;
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+  expect(button.getAttribute('data-pressing')).toBe('true');
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  act(() => button.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true })));
+  expect(button.getAttribute('data-pressing')).toBeNull();
+  expect(container!.querySelector('[role="alert"]')).not.toBeNull();
+  expect(onRetry).not.toHaveBeenCalled();
+  act(() => button.click());
+  expect(onRetry).toHaveBeenCalledOnce();
 });

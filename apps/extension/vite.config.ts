@@ -37,10 +37,9 @@ const REQUIRED_APP_HTML_OUTPUTS = [
   'apps/extension/src/video-editor/index.html',
   'apps/extension/src/web-snapshot-viewer/index.html',
 ] as const;
-const MANROPE_FONT_FILES = [
-  'manrope-cyrillic-wght-normal.woff2',
-  'manrope-latin-ext-wght-normal.woff2',
-  'manrope-latin-wght-normal.woff2',
+const BUNDLED_FONT_FILES = [
+  { folder: 'golos-ui', fileName: 'golos-ui-vf.woff2' },
+  { folder: 'golos-text', fileName: 'golos-text-vf.woff2' },
 ] as const;
 const RELEASE_OXC_MINIFY_OPTIONS = {
   codegen: true,
@@ -83,28 +82,6 @@ function buildDefines(mode: string) {
   };
 }
 
-async function copyManropeFontForCrxDev(outDir: string, fileName: string) {
-  const sourcePath = join(
-    BUILD_LAYOUT.repositoryRoot,
-    'node_modules',
-    '@fontsource-variable',
-    'manrope',
-    'files',
-    fileName
-  );
-  const targetPath = join(
-    outDir,
-    'node_modules',
-    '@fontsource-variable',
-    'manrope',
-    'files',
-    fileName
-  );
-
-  await mkdir(dirname(targetPath), { recursive: true });
-  await copyFile(sourcePath, targetPath);
-}
-
 function copyDevExtensionFonts(): Plugin {
   let copied = false;
 
@@ -118,9 +95,20 @@ function copyDevExtensionFonts(): Plugin {
         }
 
         await Promise.all(
-          MANROPE_FONT_FILES.map((fileName) =>
-            copyManropeFontForCrxDev(server.config.build.outDir, fileName)
-          )
+          BUNDLED_FONT_FILES.map(async ({ folder, fileName }) => {
+            const source = join(
+              BUILD_LAYOUT.repositoryRoot,
+              'packages',
+              'ui',
+              'src',
+              'styles',
+              folder,
+              fileName
+            );
+            const target = join(server.config.build.outDir, 'assets', fileName);
+            await mkdir(dirname(target), { recursive: true });
+            await copyFile(source, target);
+          })
         );
         copied = true;
       };

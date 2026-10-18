@@ -1,7 +1,8 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductDropdownItem, ProductDropdownMenu } from '@sniptale/ui/product-menus/dropdown';
+import { ProductDropdownMenu } from '@sniptale/ui/product-menus/dropdown';
 import { useGlassSelectOverlay } from '@sniptale/ui/glass-select/overlay-state';
 import {
   resolveThemeSafePortalTarget,
@@ -30,20 +31,35 @@ function GuideMenuItems({
   return (
     <ProductDropdownMenu role="group" aria-label={label}>
       {items.map((item) => (
-        <ProductDropdownItem
-          key={item.label}
-          danger={item.danger ?? false}
-          disabled={item.disabled ?? false}
-          onClick={() => {
-            close();
-            item.onSelect();
-          }}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </ProductDropdownItem>
+        <GuideMenuCommand key={item.label} item={item} close={close} />
       ))}
     </ProductDropdownMenu>
+  );
+}
+
+function GuideMenuCommand({ item, close }: { item: GuideMenuItem; close: () => void }) {
+  const press = useCommandPress({
+    disabled: item.disabled,
+    onClick: () => {
+      close();
+      item.onSelect();
+    },
+  });
+  return (
+    <button
+      type="button"
+      {...press.props}
+      disabled={item.disabled ?? false}
+      title={item.label}
+      className={`sniptale-dropdown-item${item.danger ? ' danger' : ''}`}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+    >
+      <span className="sniptale-command-content">
+        {item.icon}
+        <span>{item.label}</span>
+      </span>
+    </button>
   );
 }
 
@@ -144,7 +160,10 @@ export function GuideActionMenu({
             ref={menuRef}
             id={id}
             data-theme={theme ?? undefined}
-            className="sniptale-ai-modal-root guide-action-menu"
+            className={[
+              'sniptale-compact-workspace sniptale-scenario-workspace sniptale-ai-modal-root',
+              'guide-action-menu',
+            ].join(' ')}
             style={portalStyle}
             onMouseEnter={hover.cancel}
             onMouseLeave={hover.leave}

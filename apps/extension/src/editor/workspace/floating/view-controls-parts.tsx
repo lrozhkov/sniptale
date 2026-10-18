@@ -11,20 +11,21 @@ import { CompactWorkspacePopoverContent } from './view-controls-popovers';
 const VIEW_POPOVER_CLASS_NAME = floatingChromeClassNames(
   'absolute right-0 top-[calc(100%+0.375rem)] z-50',
   'w-[min(22rem,calc(100vw-1.5rem-var(--editor-floating-edge-right,0px)))]',
-  'overflow-visible !rounded-none p-3'
+  'overflow-visible !rounded-[4px] p-3'
 );
 
 const VIEW_MAP_POPOVER_CLASS_NAME = floatingChromeClassNames(
   'absolute right-0 top-[calc(100%+0.375rem)] z-50',
-  'w-[var(--editor-view-toolbar-width,min(18rem,calc(100vw-1.5rem)))] !rounded-none p-3'
+  'w-[var(--editor-view-toolbar-width,min(18rem,calc(100vw-1.5rem)))] !rounded-[4px] p-3'
 );
 
 export type ViewPopoverId = 'workspace' | 'map';
 
-function OutsideCanvasIcon() {
+function OutsideCanvasIcon({ active }: { active: boolean }) {
   return (
     <svg
       aria-hidden="true"
+      className={active ? 'text-[var(--sniptale-color-accent)]' : undefined}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -54,8 +55,12 @@ function ViewToolbarPopoverAnchor(props: {
   return (
     <div className="contents">
       <ContentToolbarButton
+        tone="utility"
         title={props.title}
         active={props.active}
+        aria-expanded={props.open}
+        aria-haspopup="dialog"
+        menuIndicator
         disabled={props.disabled}
         onClick={() => props.onToggle(props.id)}
         dataUi={`editor.floating.view-controls.${props.id}`}
@@ -144,6 +149,7 @@ export function ViewSettingsControls(props: {
     <ContentToolbarGroup className="gap-1.5" dataUi="editor.floating.view-controls.settings-group">
       <WorkspacePopoverButton {...props} />
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(
           translate('editor.toolbar.showOutsideCanvas'),
           props.hasImage
@@ -154,16 +160,22 @@ export function ViewSettingsControls(props: {
         onClick={props.onToggleShowOutsideCanvas}
         dataUi="editor.floating.view-controls.show-outside-canvas"
       >
-        <OutsideCanvasIcon />
+        <OutsideCanvasIcon active={props.showOutsideCanvas} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone="utility"
         title={getDocumentRequiredTitle(translate('editor.toolbar.magnetMode'), props.hasImage)}
         active={props.magnetEnabled}
+        aria-pressed={props.magnetEnabled}
         disabled={!props.hasImage}
         onClick={props.onToggleMagnet}
         dataUi="editor.floating.view-controls.magnet"
       >
-        <Magnet size={15} strokeWidth={2} />
+        <Magnet
+          size={15}
+          strokeWidth={2}
+          className={props.magnetEnabled ? 'text-[var(--sniptale-color-accent)]' : undefined}
+        />
       </ContentToolbarButton>
       <MapPopoverButton {...props} />
     </ContentToolbarGroup>

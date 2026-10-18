@@ -1,9 +1,15 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SegmentedRow } from '../../../ui/compact-inspector-controls';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import type { ImageEditorController } from '../../controller';
-import { SelectField } from '../../chrome/ui';
+import { NumericValueField, SelectField } from '../../chrome/ui';
+import {
+  InspectorLayout,
+  InspectorParameterRow,
+} from '../../../ui/compact-inspector-controls/layout';
+import { AspectToggle } from '../sidebar-shared';
 import {
   applySelectedAspectRatio,
   applySizePreset,
@@ -15,12 +21,7 @@ import {
   type SizeDraft,
 } from './resize-tool-options';
 import { useCanvasResizePreview } from './resize-tool-preview';
-import {
-  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
-  INSPECTOR_INLINE_BUTTON_CLASS_NAME,
-  INSPECTOR_SECTION_SURFACE_CLASS_NAME,
-} from '../chrome';
-import { SizeControlsRow } from '../size-controls';
+import { INSPECTOR_SECTION_SURFACE_CLASS_NAME } from '../chrome';
 import { useEditorStore } from '../../state/useEditorStore';
 
 type ResizeToolMode = 'canvas' | 'image';
@@ -144,77 +145,81 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
   });
 
   return (
-    <div className="space-y-3">
-      {isCanvasMode ? (
-        <CanvasCropModeSwitch
-          mode={canvasCropMode}
-          onSelect={(cropMode) => {
-            if (canvasCropMode === cropMode) return;
-            setCanvasCropMode(cropMode);
-            props.controller.clearCropSelection();
-            props.setCanvasSizeDraft(props.canvasSize);
-            if (cropMode === 'expand') {
-              props.controller.previewCanvasSize(props.canvasSize.width, props.canvasSize.height);
-            }
-          }}
-        />
-      ) : null}
-      {isCanvasMode ? (
-        <p
-          aria-live="polite"
-          className="text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]"
-        >
-          {translate(
-            canvasCropMode === 'expand'
-              ? 'editor.compact.expandCanvasDescription'
-              : props.cropReady
-                ? 'editor.compact.cropReadyDescription'
-                : 'editor.compact.cropWithinCanvasDescription'
-          )}
-        </p>
-      ) : null}
-      <ResizeToolSizePanel
-        active={active}
-        bounds={isCanvasMode && canvasCropMode === 'crop' ? props.canvasSize : undefined}
-        isCanvasMode={isCanvasMode}
-        updateLockedDraft={props.updateLockedDraft}
-      />
-      {!activeSizeIsValid ? (
-        <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
-          {translate('editor.compact.invalidImageDimensions')}
-        </p>
-      ) : null}
-      {cropSizeExceedsCanvas ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('editor.compact.cropSizeExceedsCanvas')}
-        </p>
-      ) : null}
-      <div className={isCanvasMode ? 'grid grid-cols-[auto_minmax(0,1fr)] gap-2' : undefined}>
+    <InspectorLayout>
+      <div className="space-y-2">
         {isCanvasMode ? (
-          <button
-            type="button"
-            className={`${INSPECTOR_INLINE_BUTTON_CLASS_NAME} !w-auto px-3`}
-            onClick={() => props.controller.cancelCropMode()}
-          >
-            {translate('common.actions.cancel')}
-          </button>
+          <CanvasCropModeSwitch
+            mode={canvasCropMode}
+            onSelect={(cropMode) => {
+              if (canvasCropMode === cropMode) return;
+              setCanvasCropMode(cropMode);
+              props.controller.clearCropSelection();
+              props.setCanvasSizeDraft(props.canvasSize);
+              if (cropMode === 'expand') {
+                props.controller.previewCanvasSize(props.canvasSize.width, props.canvasSize.height);
+              }
+            }}
+          />
         ) : null}
-        <button
-          type="button"
-          className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
-          disabled={applyDisabled}
-          onClick={() => applyResizeToolMode(props, mode, canvasCropMode)}
-        >
-          {translate(
-            mode === 'image'
-              ? 'editor.compact.applyImageSize'
-              : canvasCropMode === 'expand'
-                ? 'editor.compact.applyExpandCanvas'
-                : 'editor.compact.applyCropCanvas'
-          )}
-        </button>
+        {isCanvasMode ? (
+          <p
+            aria-live="polite"
+            className="text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]"
+          >
+            {translate(
+              canvasCropMode === 'expand'
+                ? 'editor.compact.expandCanvasDescription'
+                : props.cropReady
+                  ? 'editor.compact.cropReadyDescription'
+                  : 'editor.compact.cropWithinCanvasDescription'
+            )}
+          </p>
+        ) : null}
+        <ResizeToolSizePanel
+          active={active}
+          bounds={isCanvasMode && canvasCropMode === 'crop' ? props.canvasSize : undefined}
+          isCanvasMode={isCanvasMode}
+          updateLockedDraft={props.updateLockedDraft}
+        />
+        {!activeSizeIsValid ? (
+          <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
+            {translate('editor.compact.invalidImageDimensions')}
+          </p>
+        ) : null}
+        {cropSizeExceedsCanvas ? (
+          <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+            {translate('editor.compact.cropSizeExceedsCanvas')}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2 px-2">
+          {isCanvasMode ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              type="button"
+              onClick={() => props.controller.cancelCropMode()}
+            >
+              {translate('common.actions.cancel')}
+            </ProductActionButton>
+          ) : null}
+          <ProductActionButton
+            compact
+            tone="primary"
+            type="button"
+            disabled={applyDisabled}
+            onClick={() => applyResizeToolMode(props, mode, canvasCropMode)}
+          >
+            {translate(
+              mode === 'image'
+                ? 'editor.compact.applyImageSize'
+                : canvasCropMode === 'expand'
+                  ? 'editor.compact.applyExpandCanvas'
+                  : 'editor.compact.applyCropCanvas'
+            )}
+          </ProductActionButton>
+        </div>
       </div>
-    </div>
+    </InspectorLayout>
   );
 }
 
@@ -255,7 +260,7 @@ function ResizeToolSizePanel(props: {
 
   return (
     <section aria-label={label} className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
-      <div className="space-y-3">
+      <div className="sniptale-parameter-stack">
         <ResizeToolDimensionRow
           active={props.active}
           bounds={props.bounds}
@@ -274,17 +279,37 @@ function ResizeToolDimensionRow(props: {
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
   return (
-    <SizeControlsRow
-      width={props.active.draft.width}
-      height={props.active.draft.height}
-      maxWidth={props.bounds?.width}
-      maxHeight={props.bounds?.height}
-      locked={props.active.locked}
-      onWidthChange={(width) => updateSizeDraft(props, 'width', width)}
-      onHeightChange={(height) => updateSizeDraft(props, 'height', height)}
-      onToggleLock={() => props.active.setLocked((next) => !next)}
-      dataSizePanelDimensions
-    />
+    <div data-size-panel-dimensions className="sniptale-parameter-stack">
+      {(['width', 'height'] as const).map((field) => {
+        const label = translate(
+          field === 'width' ? 'editor.compact.widthDimension' : 'editor.compact.heightDimension'
+        );
+        return (
+          <InspectorParameterRow key={field} label={label} valueMinimum={140}>
+            <div className="flex w-full items-center justify-end gap-2">
+              {field === 'width' ? (
+                <AspectToggle
+                  compact
+                  checked={props.active.locked}
+                  onClick={() => props.active.setLocked((next) => !next)}
+                />
+              ) : null}
+              <NumericValueField
+                label={label}
+                value={props.active.draft[field]}
+                min={1}
+                max={props.bounds?.[field]}
+                precision={0}
+                unit="px"
+                normalizeValue={(value) => Math.max(1, Math.round(value))}
+                onPreviewValue={() => undefined}
+                onCommitValue={(value) => updateSizeDraft(props, field, value)}
+              />
+            </div>
+          </InspectorParameterRow>
+        );
+      })}
+    </div>
   );
 }
 

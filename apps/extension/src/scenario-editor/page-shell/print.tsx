@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -144,50 +143,51 @@ function PrintSettingsControls({
   t: Translate;
 }) {
   return (
-    <fieldset className="guide-print-settings guide-export-controls" disabled={pending}>
+    <fieldset
+      className="guide-print-settings guide-export-controls sniptale-inspector-surface"
+      disabled={pending}
+    >
       <legend className="sr-only">{t('scenario.editor.guidePrintSettings')}</legend>
-      <SegmentedSwitch
-        density="compact"
+      <SegmentedRow
+        columns={2}
+        label={t('scenario.editor.guidePrintPaper')}
         ariaLabel={t('scenario.editor.guidePrintPaper')}
-        activeId={settings.pageSize}
+        value={settings.pageSize}
         options={[
-          { id: 'a4', label: 'A4' },
-          { id: 'letter', label: t('scenario.editor.guidePrintLetter') },
+          { value: 'a4', label: 'A4' },
+          { value: 'letter', label: t('scenario.editor.guidePrintLetter') },
         ]}
         onChange={(pageSize) => onChange({ ...settings, pageSize })}
       />
-      <SegmentedSwitch
-        density="compact"
+      <SegmentedRow
+        columns={2}
+        label={t('scenario.editor.guidePrintOrientation')}
         ariaLabel={t('scenario.editor.guidePrintOrientation')}
-        activeId={settings.orientation}
+        value={settings.orientation}
         options={[
-          { id: 'portrait', label: t('scenario.editor.guidePrintPortrait') },
-          { id: 'landscape', label: t('scenario.editor.guidePrintLandscape') },
+          { value: 'portrait', label: t('scenario.editor.guidePrintPortrait') },
+          { value: 'landscape', label: t('scenario.editor.guidePrintLandscape') },
         ]}
         onChange={(orientation) => onChange({ ...settings, orientation })}
       />
-      <SegmentedSwitch
-        density="compact"
+      <SegmentedRow
+        columns={2}
+        label={t('scenario.editor.guidePrintPagination')}
         ariaLabel={t('scenario.editor.guidePrintPagination')}
-        activeId={settings.pagination}
+        value={settings.pagination}
         options={[
-          { id: 'flow', label: t('scenario.editor.guideReaderFlow') },
-          { id: 'step', label: t('scenario.editor.guidePrintStep') },
+          { value: 'flow', label: t('scenario.editor.guideReaderFlow') },
+          { value: 'step', label: t('scenario.editor.guidePrintStep') },
         ]}
         onChange={(pagination) => onChange({ ...settings, pagination })}
       />
       {settings.pagination === 'flow' && (
-        <label className="guide-print-keep-steps">
-          <ProductToggle
-            size="sm"
-            checked={settings.keepStepsTogether ?? false}
-            aria-label={t('scenario.editor.guidePrintKeepSteps')}
-            onClick={() =>
-              onChange({ ...settings, keepStepsTogether: !settings.keepStepsTogether })
-            }
-          />
-          <span>{t('scenario.editor.guidePrintKeepSteps')}</span>
-        </label>
+        <ToggleField
+          label={t('scenario.editor.guidePrintKeepSteps')}
+          value={settings.keepStepsTogether ?? false}
+          disabled={pending}
+          onChange={(keepStepsTogether) => onChange({ ...settings, keepStepsTogether })}
+        />
       )}
     </fieldset>
   );

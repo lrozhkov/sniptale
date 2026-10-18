@@ -1,4 +1,3 @@
-import { reviewTrackGestureLocked } from './track-row';
 import type { ReviewBeforeAction } from './note-transitions';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
@@ -119,7 +118,6 @@ export function reviewPlaneLane(
   if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
     return 'item';
   if (target.closest('[data-dragging="true"]')) return 'item';
-  if (reviewTrackGestureLocked(target)) return 'seek';
   const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
   if (audio)
     return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';

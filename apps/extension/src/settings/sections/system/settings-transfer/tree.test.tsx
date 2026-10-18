@@ -49,9 +49,40 @@ it('exposes nested checkbox tree semantics and an indeterminate parent', () => {
   expect(treeItems[2]?.getAttribute('aria-level')).toBe('3');
   const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
   expect(checkboxes[0]?.indeterminate).toBe(true);
-  expect(checkboxes[0]?.classList.contains('sniptale-checkbox')).toBe(true);
+  expect(checkboxes[0]?.classList.contains('sniptale-parameter-check')).toBe(true);
   act(() => checkboxes[2]?.click());
   expect(onToggle).toHaveBeenCalledWith(child, false);
+});
+
+it('dims and disables only dependency-required selections and their collection children', () => {
+  const child = node('required.child', 'required', []);
+  const required = { ...node('required', null, [child]), requiredBy: ['dependent'] };
+  const dependent = node('dependent', null, []);
+  const onToggle = vi.fn();
+  const renderSelection = (selected: string[]) =>
+    act(() =>
+      root.render(
+        <SettingsTransferTree
+          nodes={[required, dependent]}
+          selected={new Set(selected)}
+          onToggle={onToggle}
+          onBulkToggle={vi.fn()}
+        />
+      )
+    );
+  renderSelection(['required', 'required.child', 'dependent']);
+  const inputs = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+  expect(inputs[0]?.disabled).toBe(true);
+  expect(inputs[1]?.disabled).toBe(true);
+  expect(inputs[2]?.disabled).toBe(false);
+  expect(inputs[0]?.closest('label')?.className).toContain('opacity-50');
+  act(() => inputs[0]?.click());
+  expect(onToggle).not.toHaveBeenCalled();
+  renderSelection(['required', 'required.child']);
+  expect(inputs[0]?.disabled).toBe(false);
+  expect(inputs[1]?.disabled).toBe(false);
+  act(() => inputs[0]?.click());
+  expect(onToggle).toHaveBeenCalledWith(required, false);
 });
 
 it('collapses branches and keeps the tree in its own scroll container', () => {
@@ -104,7 +135,9 @@ it('searches by user-facing name and key and bulk-selects only matches', () => {
   );
 
   expect(container.textContent).toContain('Soft glass');
-  expect(container.textContent).toContain('styles.surfaces.items.surface-a');
+  expect(
+    container.querySelector('[title="Soft glass (styles.surfaces.items.surface-a)"]')
+  ).not.toBeNull();
   const input = container.querySelector<HTMLInputElement>(
     '[aria-label="settings.settingsTransfer.searchLabel"]'
   );

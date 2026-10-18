@@ -10,7 +10,7 @@ export function floatingChromeClassNames(
 export const FLOATING_CHROME_ROOT_CLASS_NAME = 'pointer-events-none absolute inset-0 z-30';
 
 export const FLOATING_CHROME_PANEL_CLASS_NAME = [
-  'pointer-events-auto rounded-[14px] border',
+  'pointer-events-auto rounded-[var(--sniptale-radius-floating-chrome,14px)] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   'border-t-[color:color-mix(in_srgb,var(--sniptale-color-text-inverse)_22%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',

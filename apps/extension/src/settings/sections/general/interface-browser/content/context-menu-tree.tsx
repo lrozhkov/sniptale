@@ -291,7 +291,7 @@ export function ContextMenuTreeView(props: TreeViewProps) {
           'border-[var(--sniptale-color-border-soft)]',
         ].join(' ')}
       >
-        <h3 className="text-sm font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
+        <h3 className="text-[13px] font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
         {hasDisabledContextMenuSection(tree.nodes) ? (
           <button
             type="button"
@@ -327,7 +327,7 @@ export function ContextMenuTreeView(props: TreeViewProps) {
         ].join(' ')}
       >
         {rows.length === 0 ? (
-          <p className="p-3 text-sm text-[var(--sniptale-color-text-muted)]">
+          <p className="p-3 text-[13px] text-[var(--sniptale-color-text-muted)]">
             {t('settings.appearance.contextMenuEmptyTree')}
           </p>
         ) : null}

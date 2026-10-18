@@ -2,6 +2,7 @@ import { Settings2 } from 'lucide-react';
 
 import type { PromptTemplate } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { openAIModalSettings } from './settings-navigation';
 
@@ -26,7 +27,7 @@ export function AIModalPromptTemplatePicker(props: {
         controlSize="sm"
         dataUi="ai-modal.template-picker"
         disabled={props.disabled || props.isLoading || enabledTemplates.length === 0}
-        menuClassName="sniptale-ai-modal-template-menu"
+        menuClassName="sniptale-ai-modal-template-menu sniptale-ai-template-menu-adopted"
         menuScrollable
         onChange={(templateId) => {
           const template = enabledTemplates.find((candidate) => candidate.id === templateId);
@@ -44,7 +45,8 @@ export function AIModalPromptTemplatePicker(props: {
         }
         value=""
       />
-      <button
+      <ProductActionButton
+        tone="secondary"
         aria-label={translate('aiModal.openPromptTemplatesSettings')}
         className="sniptale-ai-modal-inline-settings"
         disabled={props.disabled}
@@ -53,7 +55,7 @@ export function AIModalPromptTemplatePicker(props: {
         type="button"
       >
         <Settings2 aria-hidden="true" size={14} />
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

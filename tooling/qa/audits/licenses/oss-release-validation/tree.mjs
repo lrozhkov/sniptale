@@ -1,7 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { sha256 } from '../../../../release/policy/oss-release-policy.mjs';
+import {
+  CANONICAL_LICENSE_DIGESTS,
+  DOCUMENT_FONT_PATH,
+  DOCUMENT_FONT_LICENSE_PATH,
+  DOCUMENT_FONT_SHA256,
+  INTERFACE_FONT_PATH,
+  INTERFACE_FONT_LICENSE_PATH,
+  sha256,
+} from '../../../../release/policy/oss-release-policy.mjs';
 import { sameStringSet } from './policy.mjs';
 
 export function validatePackages(root, policy, inventory) {
@@ -25,16 +33,15 @@ export function validatePackages(root, policy, inventory) {
       errors.push(`package-lock license drift: ${lockKey || '<root>'}`);
     }
   }
-  const manropeDependency = lock.packages?.['node_modules/@fontsource-variable/manrope'];
-  if (manropeDependency?.version !== '5.3.0' || manropeDependency?.license !== 'OFL-1.1') {
-    errors.push('package-lock Manrope provenance drift');
-  }
   return errors;
 }
 
 function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
   const errors = [];
   const fileNames = artifacts.map((entry) => path.basename(entry.path)).sort();
+  const publicFileNames = artifacts
+    .filter((entry) => entry.path.startsWith('apps/extension/public/fonts/'))
+    .map((entry) => path.basename(entry.path));
   const manifest = JSON.parse(
     readFileSync(path.resolve(root, 'apps/extension/manifest.json'), 'utf8')
   );
@@ -42,7 +49,7 @@ function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
     .flatMap((entry) => entry.resources ?? [])
     .filter((entry) => entry.startsWith('fonts/'))
     .map((entry) => entry.slice('fonts/'.length));
-  if (!sameStringSet(fileNames, manifestFonts))
+  if (!sameStringSet(publicFileNames, manifestFonts))
     errors.push('manifest bundled font population drift');
   const layout = JSON.parse(
     readFileSync(path.resolve(root, 'apps/extension/build/layout.data.json'), 'utf8')
@@ -53,7 +60,9 @@ function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
     .map((entry) => readFileSync(path.resolve(root, entry.path), 'utf8'));
   for (const fileName of fileNames) {
     if (
-      !layoutText.includes(`fonts/${fileName}`) ||
+      !layoutText.includes(
+        `${['golos-ui-vf.woff2', 'golos-text-vf.woff2'].includes(fileName) ? 'assets' : 'fonts'}/${fileName}`
+      ) ||
       !styleConsumers.some((styles) => styles.includes(fileName))
     ) {
       errors.push(`bundled font consumer drift: ${fileName}`);
@@ -65,7 +74,12 @@ function validateBundledFontConsumers(root, artifacts, releaseConsumers) {
 function validateBundledAssetSourceParity(root, asset) {
   const errors = [];
   for (const artifact of asset?.artifacts ?? []) {
-    const expectedSourcePath = `node_modules/${asset.sourcePackage}/files/${path.basename(artifact.path)}`;
+    const expectedSourcePath =
+      asset.id === 'golos-ui'
+        ? INTERFACE_FONT_PATH
+        : asset.id === 'golos-text'
+          ? DOCUMENT_FONT_PATH
+          : `node_modules/${asset.sourcePackage}/files/${path.basename(artifact.path)}`;
     if (artifact.sourcePath !== expectedSourcePath) {
       errors.push(`bundled font installed source mapping drift: ${artifact.path}`);
       continue;
@@ -81,18 +95,82 @@ function validateBundledAssetSourceParity(root, asset) {
   return errors;
 }
 
-function validateManropeLicenseSource(root) {
+function validateInterfaceFontSource(root, asset) {
   const errors = [];
+  if (
+    asset?.sourcePackage !== '@sniptale/ui' ||
+    asset?.version !== '2.000' ||
+    asset?.license !== 'OFL-1.1' ||
+    asset?.licensePath !== INTERFACE_FONT_LICENSE_PATH ||
+    asset?.copyright !==
+      'Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos UI".' ||
+    asset?.artifacts?.length !== 1 ||
+    asset.artifacts[0].path !== INTERFACE_FONT_PATH
+  )
+    errors.push('Golos UI provenance metadata drift');
   try {
-    const installed = readFileSync(
-      path.resolve(root, 'node_modules/@fontsource-variable/manrope/LICENSE')
+    const packageJson = JSON.parse(
+      readFileSync(path.resolve(root, 'packages/ui/package.json'), 'utf8')
     );
-    const canonical = readFileSync(path.resolve(root, 'LICENSES/OFL-1.1.txt'));
-    if (!installed.equals(canonical)) {
-      errors.push('Manrope installed license differs from canonical OFL text');
+    if (
+      packageJson.exports?.['./styles/interface-font'] !==
+        './src/styles/golos-ui/golos-ui-vf.woff2' ||
+      packageJson.exports?.['./styles/interface-font-license'] !==
+        './src/styles/golos-ui/LICENSE.txt'
+    )
+      errors.push('Golos UI canonical asset export drift');
+  } catch {
+    errors.push('Golos UI canonical asset exports are missing');
+  }
+  try {
+    const license = readFileSync(path.resolve(root, INTERFACE_FONT_LICENSE_PATH));
+    if (sha256(license) !== CANONICAL_LICENSE_DIGESTS.get(INTERFACE_FONT_LICENSE_PATH)) {
+      errors.push('Golos UI license digest drift');
     }
   } catch {
-    errors.push('Manrope installed license source is missing');
+    errors.push('Golos UI license source is missing');
+  }
+  return errors;
+}
+
+function validateDocumentFontSource(root, asset) {
+  if (!asset && !existsSync(path.resolve(root, DOCUMENT_FONT_PATH))) return [];
+  const errors = [];
+  if (
+    asset?.sourcePackage !== '@sniptale/ui' ||
+    asset?.version !== '2.005' ||
+    asset?.license !== 'OFL-1.1' ||
+    asset?.licensePath !== DOCUMENT_FONT_LICENSE_PATH ||
+    asset?.copyright !==
+      'Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos Text".' ||
+    asset?.artifacts?.length !== 1 ||
+    asset.artifacts[0].path !== DOCUMENT_FONT_PATH ||
+    asset.artifacts[0].sha256 !== DOCUMENT_FONT_SHA256
+  )
+    errors.push('Golos Text provenance metadata drift');
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(path.resolve(root, 'packages/ui/package.json'), 'utf8')
+    );
+    if (
+      packageJson.exports?.['./styles/document-font'] !==
+        './src/styles/golos-text/golos-text-vf.woff2' ||
+      packageJson.exports?.['./styles/document-font-license'] !==
+        './src/styles/golos-text/LICENSE.txt'
+    )
+      errors.push('Golos Text canonical asset export drift');
+  } catch {
+    errors.push('Golos Text canonical asset exports are missing');
+  }
+  try {
+    if (
+      sha256(readFileSync(path.resolve(root, DOCUMENT_FONT_LICENSE_PATH))) !==
+      CANONICAL_LICENSE_DIGESTS.get(DOCUMENT_FONT_LICENSE_PATH)
+    ) {
+      errors.push('Golos Text license digest drift');
+    }
+  } catch {
+    errors.push('Golos Text license source is missing');
   }
   return errors;
 }
@@ -115,20 +193,17 @@ export function validateBundledAssets(root, policy, inventory) {
       errors.push(`bundled font digest drift: ${entry.path}`);
     }
   }
-  const manrope = policy.bundledAssets.find((asset) => asset.id === 'manrope');
-  if (
-    manrope?.sourcePackage !== '@fontsource-variable/manrope' ||
-    manrope?.version !== '5.3.0' ||
-    manrope?.license !== 'OFL-1.1' ||
-    manrope?.copyright !==
-      'Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)'
-  ) {
-    errors.push('Manrope provenance metadata drift');
-  }
   return [
     ...errors,
     ...policy.bundledAssets.flatMap((asset) => validateBundledAssetSourceParity(root, asset)),
-    ...validateManropeLicenseSource(root),
+    ...validateInterfaceFontSource(
+      root,
+      policy.bundledAssets.find((asset) => asset.id === 'golos-ui')
+    ),
+    ...validateDocumentFontSource(
+      root,
+      policy.bundledAssets.find((asset) => asset.id === 'golos-text')
+    ),
     ...validateBundledFontConsumers(root, declared, inventory.currentTree.releaseConsumers),
   ];
 }

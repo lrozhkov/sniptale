@@ -1,5 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { DB_VERSION, SCENARIO_PROJECT_UNITS_STORE } from '../core.stores';
+import {
+  DB_VERSION,
+  SCENARIO_PROJECT_UNITS_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
+} from '../core.stores';
 import { betaV19Fixture } from '../fixtures/beta-v19';
 import { DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
@@ -21,10 +26,16 @@ it('adds only an empty indexed unit store before publishing the current scenario
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 19, DB_VERSION, tx);
-  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith(SCENARIO_PROJECT_UNITS_STORE, {
-    keyPath: ['projectId', 'unitId', 'revision'],
-  });
-  expect(createIndex).toHaveBeenCalledExactlyOnceWith('projectId', 'projectId');
+  expect(db.createObjectStore.mock.calls).toEqual([
+    [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
+    [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
+    [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
+  ]);
+  expect(createIndex.mock.calls).toEqual([
+    ['projectId', 'projectId'],
+    ['createdAt', 'createdAt'],
+    ['id', 'id'],
+  ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();

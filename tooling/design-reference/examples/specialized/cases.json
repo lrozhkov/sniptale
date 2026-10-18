@@ -1,0 +1,40 @@
+{
+  "group": "specialized",
+  "version": "package-5",
+  "rules": "specialized.md",
+  "component": "TimelineProbe / CanvasProbe / InspectorFrameProbe / bindGesture",
+  "excludes": [
+    "full playback engine",
+    "media snapping parity",
+    "complete color plane",
+    "production history"
+  ],
+  "cases": [
+    {
+      "id": "specialized.timeline",
+      "title": "Таймлайн: координаты и границы",
+      "states": ["seek", "trim", "zoom", "keyboard"],
+      "proof": "Bounded source-based time mapping uses an independently scrolling right viewport."
+    },
+    {
+      "id": "specialized.canvas",
+      "title": "Холст: масштаб и перетаскивание",
+      "states": ["drag", "zoom", "numeric", "bounds"],
+      "proof": "A 100-unit fixture keeps normalized coordinates independent of viewport scaling."
+    },
+    {
+      "id": "specialized.inspector",
+      "title": "Оболочка инспектора",
+      "states": ["expanded", "collapsed", "short", "scroll"],
+      "proof": "Frame commands preserve field state and keep footer actions reachable."
+    },
+    {
+      "id": "specialized.recovery",
+      "title": "Прерывание жеста",
+      "states": ["escape", "pointercancel", "capture-loss", "blur", "second-pointer"],
+      "proof": "One pointer owns the gesture. Interrupted preview restores accepted state."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

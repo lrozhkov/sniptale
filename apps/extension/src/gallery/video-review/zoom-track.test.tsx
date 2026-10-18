@@ -67,6 +67,7 @@ function renderTrack(
   overrides?: {
     beforeAction?: Parameters<typeof ReviewZoomTrack>[0]['beforeAction'];
     edits?: ReviewEdit[];
+    snapTimes?: readonly number[];
     toOutputTime?: (source: number) => number | null;
     enabled?: boolean;
     onLink?: (id: string, targetId: string | null) => void;
@@ -93,6 +94,7 @@ function renderTrack(
           {...(time === null ? { time: null } : { time })}
           regions={regions}
           edits={overrides?.edits ?? edits}
+          snapTimes={overrides?.snapTimes}
           toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
           projection={overrides?.projection}
           selectedId={null}
@@ -762,3 +764,40 @@ it.each(['start', 'end'] as const)(
     expect(readout?.textContent).toBe('Duration 2.00 sWas 2.00 s · 0.00 s');
   }
 );
+
+it('snaps a focus trim to a source loop edge through a speed projection', async () => {
+  const speed: ReviewEdit = {
+    id: 'speed',
+    kind: 'speed',
+    start: 2,
+    end: 6,
+    requestedStart: 2,
+    requestedEnd: 6,
+    rate: 2,
+    audio: 'speed',
+  };
+  const projection = createTrackProjection(10, [speed]);
+  const commit = vi.fn();
+  const view = renderTrack([zoom('a', 0, 2)], commit, null, {
+    projection,
+    toOutputTime: projection.output,
+    duration: 8,
+    snapTimes: [4, 7],
+  });
+  const block = view.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  const end = block.querySelector('[data-zoom-edge="end"]')!;
+  await view.event(end, 'pointerdown', 200);
+  await view.event(block, 'pointermove', 395);
+  await view.event(block, 'pointerup', 395);
+  expect(commit).toHaveBeenCalledWith(
+    'a',
+    expect.objectContaining({ end: 3 }),
+    'end',
+    expect.any(Object)
+  );
+});

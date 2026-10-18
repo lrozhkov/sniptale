@@ -200,7 +200,9 @@ async function render(
   return { session, beforeRequest, props };
 }
 async function click(label: string) {
-  const button = Array.from(host.querySelectorAll('button')).find(
+  const button = Array.from(
+    host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[type=checkbox]')
+  ).find(
     (element) => element.getAttribute('aria-label') === label || element.textContent === label
   );
   if (!button) throw new Error(`Missing button ${label}`);
@@ -316,11 +318,14 @@ it('keeps source attenuation off and unavailable for silent/unknown media, and c
   const mutedLabel = 'gallery.videoReview.textVoiceMuteSource';
   await render();
   expect(
-    host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)?.disabled
+    host.querySelector<HTMLButtonElement>(`button[role=switch][aria-label="${mutedLabel}"]`)
+      ?.disabled
   ).toBe(true);
   expect(host.textContent).toContain('gallery.videoReview.textVoiceMuteUnavailable');
   const { beforeRequest } = await render(['first'], undefined, () => true);
-  const toggle = host.querySelector<HTMLButtonElement>(`button[aria-label="${mutedLabel}"]`)!;
+  const toggle = host.querySelector<HTMLButtonElement>(
+    `button[role=switch][aria-label="${mutedLabel}"]`
+  )!;
   expect(toggle.getAttribute('aria-checked')).toBe('false');
   await click(mutedLabel);
   expect(toggle.getAttribute('aria-checked')).toBe('true');
@@ -597,7 +602,9 @@ it('keeps batch local modes unavailable and routes Back and mode changes through
     'gallery.videoReview.textVoiceMicrophone',
     'gallery.videoReview.textVoiceGallery',
   ]) {
-    const button = [...host.querySelectorAll('button')].find((node) => node.textContent === key);
+    const button = [
+      ...host.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button,input[type=checkbox]'),
+    ].find((node) => node.textContent === key);
     expect(button?.disabled).toBe(true);
   }
   expect(host.textContent).toContain('gallery.videoReview.textVoiceLocalSingle');
@@ -624,4 +631,16 @@ it('keeps batch local modes unavailable and routes Back and mode changes through
   expect(props.onClose).not.toHaveBeenCalled();
   await act(async () => beforeAction.mock.calls[1]![0]());
   expect(props.onClose).toHaveBeenCalledOnce();
+});
+
+it('presents one selected phrase as parameters without a redundant count or a permanent refresh action', async () => {
+  const { session, props } = await render();
+  expect(
+    host.querySelector('[role="switch"][aria-label="gallery.videoReview.textVoiceMuteSource"]')
+  ).not.toBeNull();
+  expect(host.textContent).not.toContain('gallery.videoReview.textVoiceScope');
+  expect(host.querySelector('[aria-label="gallery.videoReview.speechReloadModels"]')).toBeNull();
+  await act(async () => session.setAutosaveEnabled(true));
+  await act(async () => root.render(<ReviewTextVoiceForm {...props} />));
+  expect(host.querySelector('[aria-label="gallery.videoReview.speechGenerate"]')).not.toBeNull();
 });

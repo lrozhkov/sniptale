@@ -106,6 +106,7 @@ function DrawingToolControl(props: {
         ref={triggerRef}
         type="button"
         active={props.active}
+        data-content-tool="true"
         aria-pressed={props.active}
         aria-expanded={disclosureAvailable ? props.showOptions : undefined}
         aria-label={label}

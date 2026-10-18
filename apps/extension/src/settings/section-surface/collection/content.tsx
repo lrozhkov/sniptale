@@ -45,7 +45,7 @@ export function SettingsCollectionContent(props: {
         pointerDragging
           ? 'overflow-visible cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
           : 'overflow-hidden',
-        'rounded-xl border',
+        'rounded-[4px] border',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface)]',
       ].join(' ')}
@@ -55,29 +55,21 @@ export function SettingsCollectionContent(props: {
           {group.label === undefined && group.description === undefined ? null : (
             <div className="border-b border-[var(--sniptale-color-border-subtle)] px-3 py-2">
               {group.label === undefined ? null : (
-                <div className="text-xs font-semibold">{group.label}</div>
+                <div className="text-[14px] leading-5 font-semibold">{group.label}</div>
               )}
               {group.description === undefined ? null : (
-                <div className="mt-0.5 text-xs text-[var(--sniptale-color-text-dim)]">
+                <div className="mt-0.5 text-[12px] leading-4 text-[var(--sniptale-color-text-dim)]">
                   {group.description}
                 </div>
               )}
             </div>
           )}
-          {group.items.map((item, index) => {
-            const dropTarget = reorder.pointerDropTarget;
-            const isTargetGroup = dropTarget?.groupId === group.id;
-            const dropBefore = isTargetGroup && dropTarget.beforeItemId === item.id;
-            const dropAfter =
-              isTargetGroup && dropTarget.beforeItemId === null && index === group.items.length - 1;
+          {group.items.map((item) => {
             return (
               <SettingsCollectionRow
                 key={item.id}
                 item={item}
                 dragging={reorder.draggingItemId === item.id}
-                dragOffsetY={reorder.dragOffsetY}
-                dropAfter={dropAfter}
-                dropBefore={dropBefore}
                 pointerDragging={pointerDragging}
                 reorderingEnabled={collection.onMove !== undefined}
                 dragInstructionsId={reorder.a11y.dragInstructionsId}

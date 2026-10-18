@@ -79,7 +79,10 @@ export function GuideResourceDrawer({
         createPortal(
           <div
             data-theme={theme ?? undefined}
-            className={`sniptale-ai-modal-root${dragging ? ' guide-resource-dragging' : ''}`}
+            className={[
+              'sniptale-compact-workspace sniptale-scenario-workspace sniptale-ai-modal-root',
+              dragging ? 'guide-resource-dragging' : '',
+            ].join(' ')}
           >
             <GuideResourceDialog t={t} onClose={close} toolbarRef={setToolbarTarget}>
               <GuideImageResources

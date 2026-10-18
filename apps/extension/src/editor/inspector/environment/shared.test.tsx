@@ -12,7 +12,7 @@ it('reuses the shared scene panel shell and inline button chrome for environment
 
   expect(markup).toContain('Environment');
   expect(markup).toContain('Workspace');
-  expect(markup).toContain('rounded-[14px]');
-  expect(panelButtonClassName).toContain('rounded-[12px]');
+  expect(markup).toContain('rounded-[4px]');
+  expect(panelButtonClassName).toContain('rounded-[4px]');
   expect(panelButtonClassName).toContain('border-none');
 });

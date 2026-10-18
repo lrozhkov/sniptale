@@ -21,7 +21,7 @@ export const SAVE_FORMAT_OPTIONS: Array<{
 ];
 
 export const formatOptionBaseClassName = [
-  'flex h-9 items-center justify-center rounded-[10px] border border-transparent px-2',
+  'flex h-8 items-center justify-center rounded-[4px] border border-transparent px-2',
   'text-center transition',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_82%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_82%,transparent)]',

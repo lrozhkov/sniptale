@@ -14,7 +14,7 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
     if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
   }, [props.sceneBackground.kind]);
   return (
-    <div className="grid gap-3">
+    <div className="sniptale-parameter-stack grid gap-3">
       <SelectInput
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
         value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
@@ -48,7 +48,7 @@ function SceneBackgroundEditor(props: SceneBackgroundFieldProps) {
 
 function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
   return (
-    <div className="grid gap-3">
+    <div className="sniptale-parameter-stack grid gap-3">
       {props.imageAssets.length > 0 && (
         <SelectInput
           label={translate('videoEditor.sidebar.sceneBackgroundImageAssetLabel')}

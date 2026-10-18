@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { X } from 'lucide-react';
 
 import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
@@ -37,7 +38,9 @@ export function SettingsPopoverHeader(props: {
         onPointerDown={(event) => event.stopPropagation()}
       >
         {props.sourceAction ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             aria-label={props.sourceAction.description}
             className="sniptale-settings-popover-mode-action"
             onClick={props.sourceAction.onClick}
@@ -45,30 +48,36 @@ export function SettingsPopoverHeader(props: {
             type="button"
           >
             {props.sourceAction.label}
-          </button>
+          </ProductActionButton>
         ) : null}
         {props.destructiveAction ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             className="sniptale-settings-popover-destructive-action"
             onClick={props.destructiveAction.onClick}
             title={props.destructiveAction.label}
             type="button"
           >
             {props.destructiveAction.label}
-          </button>
+          </ProductActionButton>
         ) : null}
         {props.action ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             className="sniptale-settings-popover-mode-action"
             onClick={props.action.onClick}
             title={props.action.label}
             type="button"
           >
             {props.action.label}
-          </button>
+          </ProductActionButton>
         ) : null}
         {props.context === 'element' ? (
-          <button
+          <ProductActionButton
+            compact
+            tone="secondary"
             aria-label={props.closeLabel}
             className="sniptale-dismiss-button sniptale-settings-popover-close"
             onClick={props.onClose}
@@ -76,7 +85,7 @@ export function SettingsPopoverHeader(props: {
             type="button"
           >
             <X aria-hidden="true" size={14} />
-          </button>
+          </ProductActionButton>
         ) : null}
       </div>
     </div>

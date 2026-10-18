@@ -141,13 +141,13 @@ it('commits drag, rolls back cancellation to natural size, and contains keyboard
     fixture.pointer('inspector', 'pointerdown', 900);
     fixture.pointer('inspector', 'pointermove', 700);
     fixture.pointer('inspector', 'pointerup', 700);
-    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 520px');
+    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 530px');
     fixture.pointer('inspector', 'pointerdown', 700);
     fixture.pointer('inspector', 'pointermove', 650);
     act(() => window.dispatchEvent(new Event('blur')));
-    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 520px');
+    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 530px');
     fixture.key('inspector', 'ArrowLeft');
-    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 544px');
+    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 554px');
     fixture.key('inspector', 'ArrowRight');
     fixture.key('inspector', ' ');
     expect(keys).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ it('commits drag, rolls back cancellation to natural size, and contains keyboard
     act(() =>
       fixture.handle('inspector').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     );
-    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 320px');
+    expect(fixture.container.style.gridTemplateColumns).toBe('1fr 330px');
   } finally {
     window.removeEventListener('keydown', keys);
     fixture.cleanup();
@@ -174,11 +174,11 @@ it.each(['pointercancel', 'lostpointercapture'])(
       fixture.key('inspector', 'ArrowLeft');
       fixture.pointer('inspector', 'pointerdown', 900);
       fixture.pointer('inspector', 'pointermove', 700);
-      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 544px');
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 554px');
       fixture.pointer('inspector', event, 700);
-      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 344px');
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 354px');
       fixture.pointer('inspector', 'pointermove', 600);
-      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 344px');
+      expect(fixture.container.style.gridTemplateColumns).toBe('1fr 354px');
     } finally {
       fixture.cleanup();
     }

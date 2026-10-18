@@ -27,6 +27,7 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
     <>
       <ContentToolbarButton
         type="button"
+        data-content-tool="true"
         active={pinned}
         aria-pressed={pinned}
         dataUi="content.toolbar.navigation.pin-to-tab"
@@ -44,6 +45,7 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
       </ContentToolbarButton>
       <ContentToolbarButton
         type="button"
+        tone="utility"
         dataUi="content.toolbar.navigation.collapse"
         title={translate('content.toolbar.hideToolbar')}
         onClick={(event) => {

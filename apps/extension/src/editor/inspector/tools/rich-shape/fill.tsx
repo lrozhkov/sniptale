@@ -69,7 +69,7 @@ function RichShapeFillBody(props: RichShapeControlsProps) {
   const fillModeOptions = createFillModeOptions(props.roughCapable || props.shape.rough.enabled);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <RichShapeFillModeSelector
         mode={mode}
         options={fillModeOptions}
@@ -168,7 +168,7 @@ function RichShapeGradientFillControls(props: RichShapeControlsProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <EditorGradientControls
         angle={fill?.angle ?? 90}
         stops={stops}

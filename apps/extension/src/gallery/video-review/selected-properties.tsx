@@ -4,7 +4,7 @@ import { ReviewTextVoiceForm } from './text-voice-panel';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
 import { useReviewTextFormMode } from './text-voice-focus';
 import type { ReviewTextVoiceAccess } from './use-text-voice';
-import type { useReviewText } from './use-review-text';
+import { reviewTextRecordingMaximum, type useReviewText } from './use-review-text';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { ReviewSpeechPanel } from './speech-panel';
@@ -165,8 +165,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 mainVideo={props.mainVideo}
                 resultTime={props.focusTime}
                 {...(props.onPreviewFrame ? { onJump: props.onPreviewFrame } : {})}
-                sound={(applying) => (
-                  <ReviewAudioInspectorSection audio={audio} busy={busy || applying} embedded />
+                renderSections={(recognition, applying) => (
+                  <ReviewAudioInspectorSection
+                    audio={audio}
+                    busy={busy || applying}
+                    recognition={recognition}
+                  />
                 )}
                 {...(props.onSelectText ? { onSelectText: props.onSelectText } : {})}
               />
@@ -301,7 +305,24 @@ function SelectedEdit(
         </p>
       ) : null}
       <div className="review-inspector-columns">
-        <div className="min-w-0 space-y-3">
+        <ReviewDetails
+          level="section"
+          label={translate('gallery.videoReview.intervalBounds')}
+          preferenceId="group:edit-timing"
+          initiallyOpen
+        >
+          <ReviewEditRangeFields
+            key={`${selected.id}:${advanced.ui.mode}`}
+            edit={selected}
+            edits={resource.session.getSnapshot().document.edits}
+            duration={resource.source.duration}
+            boundaries={
+              advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+            }
+            onApply={(range) => editing.commitRange(range, selected)}
+          />
+        </ReviewDetails>
+        <div className="min-w-0 sniptale-parameter-stack">
           {selected.kind === 'speed' ? (
             <ReviewSpeedOptions
               layout="inspector"
@@ -322,16 +343,6 @@ function SelectedEdit(
             />
           ) : null}
         </div>
-        <ReviewEditRangeFields
-          key={`${selected.id}:${advanced.ui.mode}`}
-          edit={selected}
-          edits={resource.session.getSnapshot().document.edits}
-          duration={resource.source.duration}
-          boundaries={
-            advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-          }
-          onApply={(range) => editing.commitRange(range, selected)}
-        />
       </div>
       <ReviewInspectorSections
         sections={[
@@ -401,7 +412,7 @@ function CutTransitionFields(props: {
     >
       <fieldset
         disabled={saving}
-        className="min-w-0 space-y-2"
+        className="min-w-0 sniptale-parameter-stack"
         data-ui="gallery.videoReview.cutTransition"
       >
         <SelectField<ReviewCutTransition['type'] | 'none'>
@@ -434,7 +445,7 @@ function CutTransitionFields(props: {
               <NumericRow
                 key={field}
                 appearance="plain"
-                className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+                className="w-full"
                 label={translate(
                   field === 'total'
                     ? 'gallery.videoReview.zoomTransitionDuration'
@@ -452,7 +463,7 @@ function CutTransitionFields(props: {
                 onCommitValue={(value) => void commit(change(field, value))}
               />
             ))}
-            <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+            <p role="status" className="px-2 text-xs text-[var(--sniptale-color-text-muted)]">
               {plan
                 ? translate('gallery.videoReview.cutTransitionEffective')
                     .replace(
@@ -545,6 +556,7 @@ export function ReviewSelectedTextProperties(props: {
       <ReviewTextVoiceForm
         access={props.voice}
         ids={voiceMode.ids}
+        recordingMaximum={reviewTextRecordingMaximum(props.editor, props.id)}
         disabled={props.busy}
         onClose={voiceMode.close}
       />

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { CommandPressScope } from '../control-language/press';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -187,4 +188,29 @@ it('renders shared editor toolbar shell, section, and responsive divider chrome'
   expect(section?.className).toContain('gap-1.5');
   expect(section?.className).toContain('custom-section');
   expect(divider?.className).toContain('hidden h-8 lg:block');
+});
+
+it('keeps the scoped utility target stable through hold cancellation and native activation', () => {
+  const onClick = vi.fn();
+  const ref = { current: null as HTMLButtonElement | null };
+  render(
+    <CommandPressScope value={true}>
+      <EditorIconButton ref={ref} title="Undo" variant="utility" onClick={onClick}>
+        <span>Undo icon</span>
+      </EditorIconButton>
+    </CommandPressScope>
+  );
+  const button = container?.querySelector('button');
+  expect(ref.current).toBe(button);
+  expect(button?.dataset['commandChrome']).toBe('true');
+  expect(button?.querySelector(':scope > .sniptale-command-content')?.textContent).toBe(
+    'Undo icon'
+  );
+  act(() => button?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+  expect(button?.dataset['pressing']).toBe('true');
+  act(() => button?.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(button?.dataset['pressing']).toBeUndefined();
+  expect(onClick).not.toHaveBeenCalled();
+  act(() => button?.click());
+  expect(onClick).toHaveBeenCalledTimes(1);
 });

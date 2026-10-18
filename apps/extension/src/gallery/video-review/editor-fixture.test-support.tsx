@@ -45,7 +45,7 @@ interface EditorFixtureIntegration {
   export: ReturnType<typeof vi.fn>;
 }
 
-function stubReviewDom() {
+function stubReviewDom(inspectorWidth: number) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -87,7 +87,11 @@ function stubReviewDom() {
   ) {
     this.dispatchEvent(new Event('play'));
   });
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.closest('aside') ? inspectorWidth : 640;
+  });
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(360);
   const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:review');
   const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
@@ -230,10 +234,16 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
 
 export function createEditorFixture(
   integration: EditorFixtureIntegration,
-  options?: { history?: readonly ReviewOperation[] }
+  options?: {
+    history?: readonly ReviewOperation[];
+    /** Zero retains JSDOM's absent inspector layout for history-only scenarios. */
+    inspectorWidth?: number;
+  }
 ) {
   integration.index.mockRejectedValue(new Error('No safe index'));
-  const { show, close, createUrl, revokeUrl, clipboard } = stubReviewDom();
+  const { show, close, createUrl, revokeUrl, clipboard } = stubReviewDom(
+    options?.inspectorWidth ?? 640
+  );
   const session = stubReviewSession(integration, [...(options?.history ?? [])]);
   const host = document.createElement('div');
   document.body.appendChild(host);

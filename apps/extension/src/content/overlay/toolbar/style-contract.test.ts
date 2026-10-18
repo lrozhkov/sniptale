@@ -1,3 +1,7 @@
+import { cloneElement, createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
@@ -138,10 +142,24 @@ function expectToolbarSizeContract(): void {
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar'");
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar-divider'");
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar-button'");
-  expect(contentToolbarSource.replace(/\s+/g, ' ')).toContain(
-    "selected && tone !== 'utility' && tone !== 'outline' && tone !== 'close' && " +
-      "'sniptale-glass-toolbar-button--active'"
+  const propertyMarkup = renderToStaticMarkup(
+    createElement(
+      CommandPressScope,
+      { value: true },
+      cloneElement(createElement(ContentToolbarButton, null, 'Font'), {
+        active: true,
+        tone: 'property',
+      })
+    )
   );
+  expect(propertyMarkup).toContain('data-command-property="true"');
+  expect(propertyMarkup).toContain('data-active="true"');
+  expect(propertyMarkup).not.toContain('sniptale-glass-toolbar-button--active');
+  const toolMarkup = renderToStaticMarkup(
+    cloneElement(createElement(ContentToolbarButton, null, 'Draw'), { active: true })
+  );
+  expect(toolMarkup).toContain('data-active="true"');
+  expect(toolMarkup).toContain('sniptale-glass-toolbar-button--active');
   expect(contentToolbarSource).toContain("tone === 'close' && 'sniptale-btn-close'");
   expect(contentToolbarSource).not.toContain('sniptale-btn-sm sniptale-btn-close');
   expect(toolbarStylesheet).toContain('interpolate-size: allow-keywords;');

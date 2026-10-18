@@ -24,7 +24,9 @@
   --sniptale-video-stack-space: calc(var(--spacing) * 4);
 }
 
-:is(.space-y-1\.5, .space-y-2, .space-y-2\.5, .space-y-3, .space-y-4)
+:is(.space-y-1\.5, .space-y-2, .space-y-2\.5, .space-y-3, .space-y-4):not(
+    .sniptale-compact-workspace .sniptale-parameter-stack
+  )
   > :not([hidden])
   ~ :not([hidden]) {
   --tw-space-y-reverse: 0;

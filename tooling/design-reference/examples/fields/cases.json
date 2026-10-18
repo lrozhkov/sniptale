@@ -1,0 +1,47 @@
+{
+  "group": "fields",
+  "version": "package-5",
+  "rules": "fields.md",
+  "component": "TextField / ActionButton / AsyncCommand",
+  "excludes": ["numeric parsing", "catalog selection", "picker values"],
+  "cases": [
+    {
+      "id": "fields.inspector",
+      "title": "Текст в инспекторе",
+      "states": ["editing", "accepted", "cancelled", "invalid"],
+      "proof": "Blur and Enter accept a valid draft. Escape restores the accepted value."
+    },
+    {
+      "id": "fields.form",
+      "title": "Форма с подтверждением",
+      "states": ["draft", "invalid", "pending", "error", "retry", "accepted", "cancel"],
+      "proof": "Draft and accepted values remain separate through persistence failure."
+    },
+    {
+      "id": "fields.states",
+      "title": "Только чтение, недоступность и mixed",
+      "states": ["readonly", "disabled", "mixed"],
+      "proof": "Read-only remains selectable. Disabled and mixed states do not invent values."
+    },
+    {
+      "id": "fields.multiline",
+      "title": "Многострочный ввод",
+      "states": ["newline", "blur", "cancel"],
+      "proof": "Enter inserts a newline rather than submitting."
+    },
+    {
+      "id": "fields.search",
+      "title": "Запрос поиска",
+      "states": ["results", "empty"],
+      "proof": "Query filters results without changing stored scene names."
+    },
+    {
+      "id": "fields.long",
+      "title": "Длинный текст и разные письменности",
+      "states": ["wrapping", "unicode"],
+      "proof": "Labels and multiline values stay readable at narrow widths."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

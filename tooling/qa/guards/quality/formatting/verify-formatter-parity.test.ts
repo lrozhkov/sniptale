@@ -6,16 +6,25 @@ import { expect, it } from 'vitest';
 
 import ROOT_PACKAGE from '../../../../../package.json';
 import FORMATTER_MIGRATION from '../../../../configs/qa/formatter-migration.data.json';
+import { createTempRoot, initGitRepo } from '../../../test-support/test-helpers';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
-function sha256GitFile(commit: string, path: string) {
+function sha256GitFile(root: string, commit: string, path: string) {
   return createHash('sha256')
-    .update(execFileSync('git', ['show', `${commit}:${path}`]))
+    .update(execFileSync('git', ['show', `${commit}:${path}`], { cwd: root }))
     .digest('hex');
 }
 
 it('seals the complete classified Prettier-to-Oxfmt difference population', () => {
+  const history = createTempRoot('formatter-migration-history-');
+  initGitRepo(history);
+  // Exact commit, path-tree and blob objects keep the seal verifiable in shallow clones.
+  execFileSync('git', ['unpack-objects'], {
+    cwd: history,
+    input: fs.readFileSync(new URL('./fixtures/formatter-migration-sources.pack', import.meta.url)),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   expect(FORMATTER_MIGRATION).toMatchObject({
     schemaVersion: 2,
     sourceFormatter: 'prettier@3.8.1',
@@ -47,11 +56,12 @@ it('seals the complete classified Prettier-to-Oxfmt difference population', () =
     expect(entry.beforeSha256).toMatch(SHA256_PATTERN);
     expect(entry.migrationSha256).toMatch(SHA256_PATTERN);
     expect(entry.beforeSha256).not.toBe(entry.migrationSha256);
-    expect(sha256GitFile(FORMATTER_MIGRATION.baselineCommit, entry.beforePath), entry.path).toBe(
-      entry.beforeSha256
-    );
     expect(
-      sha256GitFile(FORMATTER_MIGRATION.migrationCommit, entry.migrationPath),
+      sha256GitFile(history, FORMATTER_MIGRATION.baselineCommit, entry.beforePath),
+      entry.path
+    ).toBe(entry.beforeSha256);
+    expect(
+      sha256GitFile(history, FORMATTER_MIGRATION.migrationCommit, entry.migrationPath),
       entry.path
     ).toBe(entry.migrationSha256);
     expect(fs.existsSync(entry.path), entry.path).toBe(true);

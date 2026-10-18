@@ -78,7 +78,7 @@ it('omits the value badge when a panel section has no value', () => {
   );
 
   expect(markup).toContain('Background');
-  expect(markup).toContain('rounded-[14px]');
+  expect(markup).toContain('rounded-[4px]');
   expect(markup).not.toContain('uppercase');
   expect(markup).not.toContain('tracking-[0.14em]');
 });

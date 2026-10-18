@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -29,6 +31,7 @@ it('edits the automatic numbering type without exposing a concrete badge value',
   expect(document.querySelector('input[aria-label="Значение"]')).toBeNull();
   expect(document.querySelector('[data-field-label="Значение"]')).toBeNull();
   const nameInput = document.querySelector<HTMLInputElement>('input[maxlength="64"]');
+  expect(nameInput?.parentElement?.querySelector('.sniptale-field-clear')).toBeNull();
   const tagAssignment = document.querySelector(
     '[data-ui="shared.annotation-template-tag-assignment"]'
   );
@@ -116,4 +119,46 @@ it('starts a new preset with empty tag metadata', async () => {
   expect(document.body.textContent).toContain('Сохранить');
   await act(async () => root.unmount());
   host.remove();
+});
+
+it('clears the migrated preset name without committing or changing the preview', async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const onSave = vi.fn();
+  const preset = createSystemStepBadgePresetCatalog()[0]!;
+  try {
+    await act(async () =>
+      root.render(
+        <CommandPressScope value={true}>
+          <InspectorLayout>
+            <StepBadgePresetEditor
+              isOpen
+              isSaving={false}
+              onClose={vi.fn()}
+              onSave={onSave}
+              preset={preset}
+            />
+          </InspectorLayout>
+        </CommandPressScope>
+      )
+    );
+    const input = document.querySelector<HTMLInputElement>('input[maxlength="64"]')!;
+    const preview = input
+      .closest('[class*="grid-cols-"]')
+      ?.querySelector(':scope > span[aria-hidden="true"]');
+    expect(preview).not.toBeNull();
+    const before = preview!.outerHTML;
+    const clear = input.parentElement!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+    expect(clear).not.toBeNull();
+    await act(async () => clear.click());
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(input.maxLength).toBe(64);
+    expect(preview!.outerHTML).toBe(before);
+    expect(onSave).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
 });

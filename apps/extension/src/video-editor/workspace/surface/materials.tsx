@@ -1,3 +1,5 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { useMaterialDrag } from '../../chrome/material-drag';
 import { formatPreciseTime } from '../../../composition/library-preview/time-format';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
@@ -14,7 +16,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { ProductToolbarMenu, ProductToolbarMenuItem } from '@sniptale/ui/product-menus/toolbar';
+import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import {
   Pencil,
   Check,
@@ -211,29 +213,39 @@ function MaterialsFilters(props: {
             aria-hidden
             className="shrink-0 text-[var(--sniptale-color-text-muted)]"
           />
-          <input
-            ref={searchRef}
-            value={props.query}
-            onChange={(event) => props.onQueryChange(event.target.value)}
-            aria-label={translate('videoEditor.sidebar.materialsSearch')}
-            placeholder={translate('videoEditor.sidebar.materialsSearch')}
-            className={[
-              'h-8 min-w-0 flex-1 bg-transparent text-sm outline-none',
-              'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
-            ].join(' ')}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.stopPropagation();
-                props.onQueryChange('');
-                setSearchOpen(false);
-                requestAnimationFrame(() =>
-                  filterRef.current
-                    ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.search"]')
-                    ?.focus()
-                );
-              }
-            }}
-          />
+          <div className="relative min-w-0 flex-1 pr-6">
+            <input
+              ref={searchRef}
+              value={props.query}
+              onChange={(event) => props.onQueryChange(event.target.value)}
+              aria-label={translate('videoEditor.sidebar.materialsSearch')}
+              placeholder={translate('videoEditor.sidebar.materialsSearch')}
+              className={[
+                'h-8 w-full min-w-0 bg-transparent text-[13px] leading-[18px] font-medium outline-none',
+                'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
+              ].join(' ')}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation();
+                  props.onQueryChange('');
+                  setSearchOpen(false);
+                  requestAnimationFrame(() =>
+                    filterRef.current
+                      ?.querySelector<HTMLButtonElement>(
+                        '[data-ui="video-editor.materials.search"]'
+                      )
+                      ?.focus()
+                  );
+                }
+              }}
+            />
+            {props.query ? (
+              <InspectorFieldClear
+                label={translate('videoEditor.sidebar.materialsSearch')}
+                target={searchRef}
+              />
+            ) : null}
+          </div>
           <ProductActionButton
             className={'sniptale-dismiss-button'}
             compact
@@ -256,6 +268,7 @@ function MaterialsFilters(props: {
         <>
           <CompactSelect
             appearance="plain"
+            menuClassName="sniptale-parameter-menu"
             value={props.category}
             onChange={props.onCategoryChange}
             aria-label={translate('videoEditor.sidebar.materialsCategory')}
@@ -440,10 +453,11 @@ function MaterialsImportMenu(props: {
               style={portalStyle}
               data-theme={theme ?? undefined}
               data-ui="video-editor.materials.import-menu"
+              className="sniptale-compact-workspace sniptale-extension-surface"
             >
               <ProductToolbarMenu
                 compact
-                title={translate('videoEditor.app.materialsFromDisk')}
+                className="!rounded-[4px] !p-[5px]"
                 style={{
                   position: 'relative',
                   top: 'auto',
@@ -454,17 +468,16 @@ function MaterialsImportMenu(props: {
                 }}
               >
                 {MATERIAL_IMPORT_OPTIONS.map(({ kind, icon: Icon, labelKey }) => (
-                  <ProductToolbarMenuItem
+                  <MaterialImportCommand
                     key={kind}
                     disabled={props.disabled}
                     onClick={() => {
                       setVisible(false);
                       props.onChoose(kind);
                     }}
-                  >
-                    <Icon size={16} aria-hidden="true" />
-                    <span>{translate(labelKey)}</span>
-                  </ProductToolbarMenuItem>
+                    icon={<Icon size={16} aria-hidden="true" />}
+                    label={translate(labelKey)}
+                  />
                 ))}
               </ProductToolbarMenu>
             </div>,
@@ -472,6 +485,36 @@ function MaterialsImportMenu(props: {
           )
         : null}
     </div>
+  );
+}
+
+function MaterialImportCommand(props: {
+  disabled: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  const press = useCommandPress(props);
+  return (
+    <button
+      type="button"
+      {...press.props}
+      disabled={props.disabled}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
+      title={props.label}
+      className={[
+        'flex min-h-9 w-full items-center gap-1.5 rounded-[4px] px-2 text-left text-[13px]',
+        'leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-2',
+        'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+      ].join(' ')}
+    >
+      <span className="sniptale-command-content">
+        {props.icon}
+        {props.label}
+      </span>
+    </button>
   );
 }
 
@@ -572,6 +615,8 @@ function MaterialName(props: {
   const [draft, setDraft] = useState<string | null>(null);
   const editingRef = useRef(false);
   const nameRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const press = useCommandPress({ onClick: props.onSelect, disabled: props.disabled });
   const finishRename = (commit: boolean) => {
     if (!editingRef.current) return;
     editingRef.current = false;
@@ -582,31 +627,51 @@ function MaterialName(props: {
     <div ref={nameRef} className="flex min-h-12 min-w-0 flex-1 items-center gap-1">
       <div className="min-w-0 flex-1">
         {draft !== null ? (
-          <input
-            autoFocus
-            aria-label={translate('videoEditor.app.materialsRename')}
-            value={draft}
-            onFocus={(event) => event.currentTarget.select()}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={() => finishRename(true)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' && event.key !== 'Escape') return;
-              event.preventDefault();
-              event.stopPropagation();
-              finishRename(event.key === 'Enter');
-              nameRef.current?.querySelector<HTMLButtonElement>('[data-material-rename]')?.focus();
-            }}
-            className={[
-              'h-8 w-full min-w-0 rounded-[var(--sniptale-radius-sm)] border',
-              'border-[var(--sniptale-color-accent)] bg-transparent px-2 text-[13px] outline-none',
-            ].join(' ')}
-          />
+          <div className="relative">
+            <input
+              ref={inputRef}
+              autoFocus
+              aria-label={translate('videoEditor.app.materialsRename')}
+              value={draft}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={() => finishRename(true)}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== 'Escape') return;
+                event.preventDefault();
+                event.stopPropagation();
+                finishRename(event.key === 'Enter');
+                nameRef.current
+                  ?.querySelector<HTMLButtonElement>('[data-material-rename]')
+                  ?.focus();
+              }}
+              className={[
+                'h-8 w-full min-w-0 rounded-[var(--sniptale-radius-sm)] border',
+                'border-[var(--sniptale-color-accent)] bg-transparent pl-2 pr-8 text-[13px]',
+                'leading-[18px] font-medium outline-none',
+              ].join(' ')}
+            />
+            {draft ? (
+              <InspectorFieldClear
+                label={translate('videoEditor.app.materialsRename')}
+                target={inputRef}
+              />
+            ) : null}
+          </div>
         ) : (
-          <ProductActionButton
-            compact
-            tone="toggle"
-            active={props.selected}
-            className="!min-h-12 w-full min-w-0 flex-1 flex-col !items-start justify-center !gap-0.5 !px-2 text-left"
+          <button
+            type="button"
+            {...press.props}
+            disabled={props.disabled}
+            data-command-press=""
+            data-pressing={press.pressed ? 'true' : undefined}
+            className={[
+              'min-h-12 w-full min-w-0 flex-1 rounded-[4px] px-2 py-1 text-left',
+              'font-medium text-[var(--sniptale-color-text-primary)]',
+              'hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-2',
+              'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+              props.selected ? 'bg-[var(--sniptale-color-surface-hover)]' : 'bg-transparent',
+            ].join(' ')}
             draggable={!props.disabled && !materialDrag.pending}
             onDragStart={(event) => {
               if (props.disabled || materialDrag.pending) {
@@ -618,27 +683,31 @@ function MaterialName(props: {
             aria-pressed={props.selected}
             aria-label={props.asset.name}
             aria-describedby={`material-usage-${props.asset.id}`}
-            onClick={props.onSelect}
           >
-            <span className="w-full truncate text-[13px]" title={props.asset.name}>
-              {props.asset.name}
-            </span>
-            <span
-              id={`material-usage-${props.asset.id}`}
-              className="flex max-w-full min-w-0 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
-              title={translate(
-                props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
-              )}
-            >
-              <span className="shrink-0">{formatBytes(props.asset.metadata.size)} ·</span>
-              {props.used && <Check size={12} className="shrink-0" aria-hidden="true" />}
-              <span className={props.used ? '@max-[260px]/library:sr-only truncate' : 'truncate'}>
-                {translate(
+            <span className="sniptale-command-content !flex !flex-col !items-start !gap-0.5 w-full">
+              <span className="w-full truncate text-[13px] leading-[18px]" title={props.asset.name}>
+                {props.asset.name}
+              </span>
+              <span
+                id={`material-usage-${props.asset.id}`}
+                className={[
+                  'flex max-w-full min-w-0 items-center gap-1 text-xs leading-4 font-normal',
+                  'text-[var(--sniptale-color-text-muted)]',
+                ].join(' ')}
+                title={translate(
                   props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
                 )}
+              >
+                <span className="shrink-0">{formatBytes(props.asset.metadata.size)} ·</span>
+                {props.used && <Check size={12} className="shrink-0" aria-hidden="true" />}
+                <span className={props.used ? '@max-[260px]/library:sr-only truncate' : 'truncate'}>
+                  {translate(
+                    props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
+                  )}
+                </span>
               </span>
             </span>
-          </ProductActionButton>
+          </button>
         )}
       </div>
       <ProductActionButton

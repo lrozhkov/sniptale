@@ -8,6 +8,8 @@ interface CreateRecordingArtifactSessionInput {
   artifactId: string;
   coordinator: RecordingStagingCoordinator;
   filename: string;
+  groupId?: string;
+  role?: string;
   mimeType: string;
   recorderOptions: MediaRecorderOptions;
   stream: MediaStream;
@@ -21,6 +23,8 @@ export async function createRecordingArtifactSession(
   const writer = await input.coordinator.openArtifact({
     artifactId: input.artifactId,
     filename: input.filename,
+    ...(input.groupId ? { groupId: input.groupId } : {}),
+    ...(input.role ? { role: input.role } : {}),
     mimeType: input.mimeType,
   });
   try {

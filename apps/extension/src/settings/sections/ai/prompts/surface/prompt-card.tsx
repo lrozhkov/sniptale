@@ -1,3 +1,5 @@
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { translate } from '../../../../../platform/i18n';
 import { ProductTextarea } from '@sniptale/ui/product-form-controls';
@@ -28,7 +30,7 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
         {translate(props.descriptionKey)}
       </p>
       <div className={settingsModalFieldSurfaceClassName}>
-        <div className="relative">
+        <div className="sniptale-text-value">
           <ProductTextarea
             ref={(node) => {
               props.prompt.textareaRef.current = node;
@@ -43,6 +45,12 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
             onChange={(event) => props.prompt.setValue(event.currentTarget.value)}
             style={{ resize: 'none', marginBottom: 0 }}
           />
+          {props.prompt.value && (
+            <InspectorFieldClear
+              label={translate(props.titleKey)}
+              target={props.prompt.textareaRef}
+            />
+          )}
           <div
             className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
             onMouseDown={props.prompt.handleResizeStart}
@@ -65,7 +73,8 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
         )}
         <div className="mt-3 flex justify-end gap-2">
           {props.prompt.status.canReset ? (
-            <button
+            <ProductActionButton
+              tone="secondary"
               type="button"
               aria-label={translate('settings.aiProviders.globalPromptResetButton')}
               title={translate('settings.aiProviders.globalPromptResetButton')}
@@ -76,9 +85,10 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
               className={getControlSecondaryButtonClassName({ density: 'compact' })}
             >
               <RotateCcw aria-hidden="true" size={15} />
-            </button>
+            </ProductActionButton>
           ) : null}
-          <button
+          <ProductActionButton
+            tone="secondary"
             type="button"
             disabled={props.prompt.status.isSaving || !props.prompt.status.isDirty}
             onClick={() => {
@@ -87,7 +97,7 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
             className={getControlSecondaryButtonClassName({ density: 'compact' })}
           >
             {translate('common.actions.save')}
-          </button>
+          </ProductActionButton>
         </div>
         {props.prompt.status.saveError ? (
           <p className="mt-2 text-sm text-[var(--sniptale-color-danger)]">

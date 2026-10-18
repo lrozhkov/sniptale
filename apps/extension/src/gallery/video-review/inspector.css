@@ -4,17 +4,16 @@
   display: flex;
   align-items: center;
   min-height: 32px;
-  font: 600 13px / 20px var(--sniptale-font-sans);
-  color: var(--sniptale-color-text-primary);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
 }
 [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-secondary);
 }
 [data-ui='gallery.videoReview.inspector']
-  input:not([type='range']):not([type='checkbox']):not([type='file']),
-[data-ui='gallery.videoReview.inspector'] textarea {
-  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  :where(input:not([type='range']):not([type='checkbox']):not([type='file']), textarea) {
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
   background: var(--sniptale-color-surface-panel);
   border-radius: var(--sniptale-radius-sm);
@@ -115,8 +114,8 @@
   padding: 0;
   list-style: none;
   border-radius: var(--sniptale-radius-sm);
-  color: var(--sniptale-color-text-primary);
-  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
   cursor: pointer;
 }
 [data-ui='gallery.videoReview.disclosure'] > summary::-webkit-details-marker {
@@ -131,6 +130,7 @@
   min-height: 0;
   margin: 0;
   font: inherit;
+  color: inherit;
   overflow-wrap: anywhere;
 }
 [data-ui='gallery.videoReview.disclosure'] > summary > svg {
@@ -156,7 +156,7 @@
 }
 [data-ui='gallery.videoReview.disclosure'][data-level='group'] > summary {
   min-height: 28px;
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 [data-ui='gallery.videoReview.disclosure'] > .review-inspector-section-body {
   padding-top: 8px;
@@ -166,7 +166,7 @@
 }
 [data-ui='gallery.videoReview.inspector'] .review-inspector-phase > legend {
   color: var(--sniptale-color-text-primary);
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] {
   margin-inline: -12px;
@@ -182,7 +182,7 @@
   [data-ui='shared.categorized-inspector.section-heading'] {
   min-height: 32px;
   margin-bottom: 8px;
-  font: 600 13px / 20px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface-heading) 13px / 20px var(--sniptale-font-sans);
   overflow-wrap: anywhere;
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button {
@@ -195,54 +195,19 @@
   color: var(--sniptale-color-text-primary-strong);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button[aria-pressed='true'] {
-  background: var(--sniptale-color-accent-soft);
-  color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
 }
 [data-ui='gallery.videoReview.inspectorCategories'] > nav button[aria-pressed='true']:hover {
-  color: var(--sniptale-color-accent-emphasis);
+  color: var(--sniptale-color-text-primary);
 }
 [data-ui='gallery.videoReview.zoomPreview'] > div:first-child {
   flex-wrap: wrap;
 }
 [data-ui='gallery.videoReview.zoomPreview'] h5 {
-  font: 500 12px / 18px var(--sniptale-font-sans);
+  font: var(--sniptale-font-weight-interface) 12px / 18px var(--sniptale-font-sans);
 }
 @layer utilities {
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType']) {
-    border: 0 !important;
-    background: transparent !important;
-    border-radius: var(--sniptale-radius-sm);
-  }
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
-    > span[aria-hidden] {
-    background: var(--sniptale-color-surface-hover);
-    box-shadow: none;
-    border-radius: var(--sniptale-radius-sm);
-  }
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
-    button {
-    min-height: 28px !important;
-    padding: 4px 8px !important;
-    border-color: transparent !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    color: var(--sniptale-color-text-secondary) !important;
-    font: 400 12px / 18px var(--sniptale-font-sans) !important;
-  }
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
-    button[aria-pressed='true'] {
-    color: var(--sniptale-color-text-primary) !important;
-    font-weight: 500 !important;
-  }
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
-    button:hover:not(:disabled) {
-    color: var(--sniptale-color-text-primary-strong) !important;
-  }
-  :is([data-ui='gallery.videoReview.previewMode'], [data-ui='gallery.videoReview.focusType'])
-    button:focus-visible {
-    outline: 2px solid var(--sniptale-color-accent);
-    outline-offset: -2px;
-  }
   [data-ui='gallery.videoReview.inspector'] .review-inspector-close:hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
     border-color: transparent !important;
@@ -260,7 +225,7 @@
   [data-ui='gallery.videoReview.inspector']
     :is(.review-inspector-danger, [data-note-delete]):hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
-    border-color: var(--sniptale-color-danger) !important;
+    border-color: transparent !important;
     background: transparent !important;
   }
 }
@@ -292,8 +257,10 @@
   background: transparent;
 }
 
-[data-ui='gallery.videoReview.inspector'] {
-  container: review-inspector / inline-size;
+/* Keep both query contracts when shared surface CSS loads after this owner. */
+[data-ui='gallery.videoReview.inspector'].sniptale-inspector-surface {
+  container-name: review-inspector inspector-surface;
+  container-type: inline-size;
 }
 
 /* Whole semantic groups flow in DOM order; nested groups fall back to one column. */
@@ -313,6 +280,11 @@
 
 .review-inspector-scroll {
   container: review-inspector-content / inline-size;
+}
+
+[data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {
+  /* The inspector already contributes an 8px gap after its navigation boundary. */
+  padding-top: 4px;
 }
 
 .review-inspector-section-column {
@@ -341,10 +313,10 @@
   .review-inspector-section-column {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0;
     min-width: 0;
   }
-  .review-inspector-section-column > .review-inspector-section,
+  .review-inspector-section-column > .review-inspector-section:first-child,
   .review-inspector-section-column
     + .review-inspector-section-column
     > .review-inspector-section:first-child {
@@ -367,5 +339,81 @@
   [data-ui='gallery.videoReview.interval'] {
     width: calc((100cqw - 12px) / 2);
     max-width: 100%;
+  }
+}
+
+/* Mixed parameter families share one rhythm within the migrated workspace. */
+.sniptale-compact-workspace .review-inspector-section-body,
+.sniptale-compact-workspace .review-inspector-columns {
+  row-gap: 4px;
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] {
+  background: var(--sniptale-color-surface-panel);
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary {
+  min-height: 32px;
+  padding-inline: 8px;
+  font: var(--sniptale-font-weight-interface-heading) 14px / 20px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.disclosure'][data-level='group']
+  > summary {
+  min-height: 28px;
+  font: var(--sniptale-font-weight-interface-heading) 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.disclosure'] > summary:hover {
+  box-shadow: none;
+}
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.disclosure']
+  > .review-inspector-section-body {
+  padding-top: 8px;
+}
+.sniptale-compact-workspace [data-ui='gallery.videoReview.inspector'] :is(label, legend) {
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
+}
+.sniptale-compact-workspace
+  [data-ui='shared.ui.compact-inspector.numeric-value-field']
+  :is(input, span) {
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-sans);
+}
+
+.sniptale-compact-workspace
+  [data-ui='gallery.videoReview.inspector']
+  :is([data-ui='background.image.picker'], .review-background-swatches) {
+  min-width: 0;
+  padding-inline: 8px;
+}
+.sniptale-compact-workspace .review-inspector-section-body > button {
+  margin-inline: 8px;
+  max-width: calc(100% - 16px);
+}
+
+.sniptale-compact-workspace .review-inspector-parameter-command {
+  width: calc(100% - 16px);
+  margin-inline: 8px;
+  justify-content: flex-start;
+}
+
+/* Object commands retain the shared content inset without borrowing tool chrome. */
+.review-recognition-commands {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 8px 8px 0;
+  min-width: 0;
+}
+@layer utilities {
+  .review-inspector-actions button,
+  .review-recognition-commands button,
+  .review-spatial-reset button {
+    background: transparent !important;
+    border-color: transparent !important;
+  }
+  .review-inspector-actions button:not(:focus-visible),
+  .review-recognition-commands button:not(:focus-visible),
+  .review-spatial-reset button:not(:focus-visible) {
+    box-shadow: none !important;
   }
 }

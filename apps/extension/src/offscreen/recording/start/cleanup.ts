@@ -24,11 +24,15 @@ function cleanupOwnedRecordingResources(): void {
 
   const artifactSession = recordingContext.artifactSession;
   const stagingCoordinator = recordingContext.stagingCoordinator;
-  void (artifactSession?.abort() ?? stagingCoordinator?.abort() ?? Promise.resolve()).catch(
-    (error) => {
+  const discard = recordingContext.discardOnStop;
+  const retirement = artifactSession?.abort() ?? stagingCoordinator?.abort() ?? Promise.resolve();
+  void retirement
+    .finally(async () => {
+      if (discard) await stagingCoordinator?.discard?.();
+    })
+    .catch((error) => {
       logger.warn('Recording staging cleanup failed', error);
-    }
-  );
+    });
 
   if (recordingContext.audioMixer) {
     recordingContext.audioMixer.cleanup().catch((error) => {

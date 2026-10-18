@@ -14,6 +14,8 @@ export interface ProductSaveDialogProps {
   filename: string;
   disabled?: boolean;
   filenamePlaceholder?: string;
+  /** Localized Clear name. Omit to retain the existing filename field presentation. */
+  filenameClearLabel?: string;
   onFilenameChange: (value: string) => void;
   presetLabel: ReactNode;
   presetCount: ReactNode;

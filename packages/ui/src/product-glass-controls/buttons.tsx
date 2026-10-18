@@ -1,4 +1,5 @@
-import { forwardRef } from 'react';
+import { forwardRef, useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 import { resolveRangeVisualStyle } from '../range-control/style';
 import { joinClassNames } from './helpers';
@@ -98,6 +99,8 @@ export const ProductGlassSwitch = forwardRef<HTMLButtonElement, ProductGlassSwit
     { on = false, className = '', type = 'button', children, ...props },
     ref
   ) {
+    const scoped = useContext(CommandPressScope);
+    const press = useCommandPress({ ...props, enabled: scoped });
     return (
       <button
         ref={ref}
@@ -108,6 +111,9 @@ export const ProductGlassSwitch = forwardRef<HTMLButtonElement, ProductGlassSwit
           className
         )}
         {...props}
+        {...press.props}
+        data-command-press={scoped ? '' : undefined}
+        data-pressing={press.pressed ? 'true' : undefined}
       >
         {children ?? <span className="sniptale-glass-switch-thumb" />}
       </button>
@@ -158,9 +164,11 @@ export const ProductGlassInput = forwardRef<HTMLInputElement, ProductGlassInputP
 
 export const ProductGlassBoldButton = forwardRef<HTMLButtonElement, ProductGlassBoldButtonProps>(
   function ProductGlassBoldButton(
-    { active = false, className = '', type = 'button', ...props },
+    { active = false, className = '', type = 'button', children, ...props },
     ref
   ) {
+    const scoped = useContext(CommandPressScope);
+    const press = useCommandPress({ ...props, enabled: scoped });
     return (
       <button
         ref={ref}
@@ -171,7 +179,14 @@ export const ProductGlassBoldButton = forwardRef<HTMLButtonElement, ProductGlass
           className
         )}
         {...props}
-      />
+        {...press.props}
+        data-command-press={scoped ? '' : undefined}
+        data-command-property={scoped ? 'true' : undefined}
+        data-active={scoped ? String(active) : undefined}
+        data-pressing={press.pressed ? 'true' : undefined}
+      >
+        {scoped ? <span className="sniptale-command-content">{children}</span> : children}
+      </button>
     );
   }
 );

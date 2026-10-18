@@ -1,0 +1,74 @@
+/* Gallery placement adapts shared recorder views without changing their capture controller. */
+.review-voiceover-inspector [data-ui='audio-recording.setup'] > div:last-child {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.review-voiceover-inspector [data-ui='audio-recording.setup'] > div:last-child > span {
+  width: 100%;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+}
+.review-voiceover-inspector [data-ui='audio-recording.setup'] > div:last-child > span > span {
+  min-width: 0;
+  flex: 1;
+  color: var(--sniptale-color-text-secondary);
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-options'] > div:first-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px auto 40px;
+  column-gap: 6px;
+  min-height: 40px;
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-limit'] {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-options'] span[id] {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--sniptale-color-text-secondary);
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-options'] input {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  padding-inline: 6px;
+  background: transparent;
+  border-color: transparent;
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-options'] input:focus {
+  background: var(--sniptale-color-surface-input);
+  border-color: var(--sniptale-color-border-soft);
+  box-shadow: none;
+  outline: none;
+}
+.review-voiceover-inspector [data-ui='audio-recording.duration-options'] input + span {
+  grid-column: 3;
+  grid-row: 1;
+}
+.review-voiceover-inspector [data-ui='audio-recording.level'] {
+  flex-wrap: wrap;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.review-voiceover-inspector [data-ui='audio-recording.level'] > span:first-child {
+  display: none;
+}
+.review-voiceover-inspector [data-ui='audio-recording.level'] [role='meter'] {
+  flex: 1;
+}
+
+/* The utility layer owns ProductInput's explicit important width. */
+@layer utilities {
+  .review-voiceover-inspector [data-ui='audio-recording.duration-options'] input {
+    width: 64px !important;
+  }
+}
+
+.review-voiceover-inspector
+  [data-ui='audio-recording.duration-options']
+  input[aria-invalid='true'] {
+  border-color: var(--sniptale-color-danger);
+}

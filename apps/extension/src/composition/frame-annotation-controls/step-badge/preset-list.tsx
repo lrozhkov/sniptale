@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { StepBadgePreset } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { useState } from 'react';
 
@@ -78,7 +79,9 @@ export function StepBadgePresetSection(props: {
                   onClick={() => props.onApply(preset)}
                   showActiveIndicator
                 >
-                  <StepBadgePresetPreview compact settings={preset.settings} />
+                  <span className="sniptale-content-annotation-preview">
+                    <StepBadgePresetPreview compact settings={preset.settings} />
+                  </span>
                   <ProductGlassPresetMeta>
                     <AnnotationTemplatePresetMetaLine
                       name={
@@ -91,7 +94,9 @@ export function StepBadgePresetSection(props: {
                   </ProductGlassPresetMeta>
                 </ProductGlassPresetItem>
                 <span className="sniptale-callout-preset-actions">
-                  <button
+                  <ProductActionButton
+                    compact
+                    tone="secondary"
                     aria-label={translate('content.templateFork.fork')}
                     className="sniptale-callout-preset-action"
                     data-template-fork-source={preset.id}
@@ -101,9 +106,11 @@ export function StepBadgePresetSection(props: {
                     type="button"
                   >
                     <CopyPlus size={15} />
-                  </button>
+                  </ProductActionButton>
                   {preset.origin === 'system' && preset.customized === true ? (
-                    <button
+                    <ProductActionButton
+                      compact
+                      tone="secondary"
                       className="sniptale-callout-preset-action"
                       disabled={pending}
                       onClick={() => props.onReset(preset)}
@@ -111,9 +118,11 @@ export function StepBadgePresetSection(props: {
                       type="button"
                     >
                       <RotateCcw size={15} />
-                    </button>
+                    </ProductActionButton>
                   ) : null}
-                  <button
+                  <ProductActionButton
+                    compact
+                    tone="secondary"
                     className="sniptale-callout-preset-action"
                     disabled={pending || (!disabled && enabledCount <= 1)}
                     onClick={() => props.onToggle(preset)}
@@ -123,7 +132,7 @@ export function StepBadgePresetSection(props: {
                     type="button"
                   >
                     {disabled ? <Eye size={15} /> : <EyeOff size={15} />}
-                  </button>
+                  </ProductActionButton>
                 </span>
               </div>
             );

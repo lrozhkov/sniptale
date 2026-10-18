@@ -170,6 +170,7 @@ it.skipIf(process.platform !== 'linux').each(['proof', 'release'])(
     };
     delete environment[HOST_QUEUE_TICKET_ENV];
     delete environment.SNIPTALE_QA_OBSERVABILITY_ROOT;
+    delete environment.SNIPTALE_CI_IN_CONTAINER;
     const child = spawn(process.execPath, [path.join(root, 'tooling/ci/local.mjs'), lane], {
       cwd: root,
       env: environment,

@@ -1,3 +1,7 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../ui/compact-inspector-controls/layout';
+import '../ui/compact-inspector-controls/inspector-surface.css';
+import './image-surface.css';
 import { renderPageShell } from '../ui/page-bootstrap';
 import { EditorPage } from './shell/page';
 import { EditorResourceAdmission } from '../composition/editor-resource-admission';
@@ -18,9 +22,15 @@ initTracer('editor');
 
 renderPageShell({
   element: (
-    <EditorResourceAdmission>
-      <EditorPage />
-    </EditorResourceAdmission>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <div className="sniptale-compact-workspace sniptale-image-workspace sniptale-image-page">
+          <EditorResourceAdmission>
+            <EditorPage />
+          </EditorResourceAdmission>
+        </div>
+      </InspectorLayout>
+    </CommandPressScope>
   ),
   namespace: 'EditorEntrypoint',
 });

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { TableNode, TableRow } from '@sniptale/runtime-contracts/dom-tree';
 import { getDefaultTreeNodeState } from '../tree/helpers';
 import type { TreeRenderProps } from '../tree/types';
@@ -20,6 +21,7 @@ type TableRowItemProps = {
 };
 
 function TableRowItem({ excluded, headers, row, state, toggleSelected }: TableRowItemProps) {
+  const contentId = useId();
   return (
     <div
       className={['sniptale-tree-row', state.selected && 'sniptale-tree-row-field-selected']
@@ -32,9 +34,10 @@ function TableRowItem({ excluded, headers, row, state, toggleSelected }: TableRo
         className="sniptale-checkbox"
         style={{ marginTop: '2px' }}
         checked={state.selected}
+        aria-labelledby={contentId}
         onChange={() => toggleSelected(row.id)}
       />
-      <div className="sniptale-ai-table-row-content">
+      <div id={contentId} className="sniptale-ai-table-row-content">
         {headers
           .filter((header) => !excluded.includes(header))
           .map((header, index, filtered) => (

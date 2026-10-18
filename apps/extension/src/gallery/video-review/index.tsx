@@ -144,23 +144,27 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
         <div
           ref={panels.container}
           data-ui="gallery.videoReview.workspace"
-          inert={voiceover.recording}
           style={{
             ...workspaceColor.style,
             gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
             gridTemplateRows: `minmax(0,1fr) ${panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`}`,
           }}
-          className={`grid h-full min-h-0 min-w-[1254px] ${voiceover.recording ? 'pb-40' : ''}`}
+          className="grid h-full min-h-0 min-w-[1254px]"
         >
-          <ReviewPreviewBinding
-            onOpenPreviewSettings={navigation.openPreview}
-            previewPreferences={previewPreferences.preferences}
-            onPreviewRaster={setPreviewRaster}
-            resource={resource}
-            state={state}
-            sceneActive={navigation.shown === 'scene'}
-          />
+          <div className="contents" inert={voiceover.recording}>
+            <ReviewPreviewBinding
+              onOpenPreviewSettings={navigation.openPreview}
+              previewPreferences={previewPreferences.preferences}
+              onPreviewRaster={setPreviewRaster}
+              resource={resource}
+              state={state}
+              sceneActive={navigation.shown === 'scene'}
+            />
+          </div>
           <ReviewInspectorBinding
+            recording={
+              voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
+            }
             onJoinPreview={onJoinPreview ?? joinPreview.open}
             preview={
               <ReviewPreviewInspector
@@ -184,7 +188,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             resizeHandle={
               panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
             }
-            fullHeight={fullHeight}
+            fullHeight={fullHeight || voiceover.recording}
             onToggleHeight={() => setFullHeight((value) => !value)}
             resource={resource}
             state={state}
@@ -194,10 +198,11 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             onClose={onClose}
           />
           <div
+            inert={voiceover.recording}
             ref={panels.timeline}
             className={
               `relative ${voiceover.recording ? 'opacity-50' : ''} ` +
-              (fullHeight
+              (fullHeight || voiceover.recording
                 ? 'col-start-1 row-start-2 min-h-0 min-w-0'
                 : 'col-span-full min-h-0 min-w-0')
             }
@@ -248,7 +253,6 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
                   : undefined
               }
               setTrackVisibility={state.setTrackVisibility}
-              setTrackLocked={state.setTrackLocked}
               setMode={state.setMode}
               telemetryAvailable={state.projected.markers.length > 0}
               time={state.time}
@@ -274,7 +278,6 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           </div>
         </div>
       </div>
-      <ReviewVoiceoverLayer voiceover={voiceover} />
       {music.drawer && <MusicLibraryDrawer {...music.drawer} />}
     </>
   );

@@ -1,3 +1,5 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GalleryKeyboardHelp } from './keyboard-help';
 import type { GalleryDeletionOpening } from '../deletion/types';
 import { useEffect, useRef, useState, type RefObject, type MouseEventHandler } from 'react';
@@ -18,7 +20,6 @@ import {
 import type { StorageEstimateInfo } from '../../../features/media-hub/storage-capacity';
 import { translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS } from '@sniptale/ui/inspector-shell';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { GalleryViewMode } from '../types';
@@ -34,13 +35,12 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
 
-const galleryDangerBannerButtonClassName = [
-  getControlSecondaryButtonClassName({ density: 'compact', shape: 'pill', tone: 'danger' }),
-  'uppercase tracking-[0.12em]',
-].join(' ');
+const galleryDangerBannerButtonClassName = 'shrink-0';
 
-const viewModeButtonClassName =
-  'relative z-10 inline-flex h-full w-8 items-center justify-center rounded-[6px] leading-none transition-colors';
+const viewModeButtonClassName = [
+  'sniptale-library-view-mode inline-flex h-8 w-8 shrink-0 items-center justify-center',
+  'rounded-[4px] leading-none transition-colors',
+].join(' ');
 
 interface GalleryHeaderStorageProps {
   activeStorageBarClass: string;
@@ -65,16 +65,20 @@ function GalleryStorageMenuAction(props: {
   onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
   const Icon = props.icon;
+  const press = useCommandPress({ disabled: props.disabled, onClick: props.onClick });
 
   return (
     <button
+      {...press.props}
+      data-command-press=""
+      data-pressing={press.pressed ? 'true' : undefined}
       ref={props.buttonRef}
       type="button"
       role="menuitem"
       disabled={props.disabled}
-      onClick={props.onClick}
       className={cx(
-        'flex h-9 w-full items-center gap-2.5 rounded-[8px] px-2.5 text-left text-sm transition-colors',
+        `flex h-9 w-full items-center gap-1.5 rounded-[4px] px-2 text-left text-[13px] leading-[18px]
+          transition-colors`,
         props.danger
           ? 'text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
           : [
@@ -85,8 +89,10 @@ function GalleryStorageMenuAction(props: {
         'disabled:cursor-not-allowed disabled:opacity-50'
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{props.label}</span>
+      <span className="sniptale-command-content">
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{props.label}</span>
+      </span>
     </button>
   );
 }
@@ -153,13 +159,13 @@ function GalleryStorageSummary(props: ReturnType<typeof getStoragePresentation>)
         <div key={label}>
           <div
             className={[
-              'text-[10px] uppercase tracking-[0.1em]',
+              'text-[12px] leading-4 font-normal',
               'text-[var(--sniptale-color-text-muted)]',
             ].join(' ')}
           >
             {label}
           </div>
-          <div className="mt-0.5 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+          <div className="mt-0.5 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]">
             {value}
           </div>
         </div>
@@ -179,7 +185,7 @@ function GalleryStorageMenu(
       role="menu"
       aria-label={translate('gallery.app.storageTools')}
       data-ui="gallery.header.storage-menu"
-      className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-[10px] border
+      className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-[4px] border
         border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
         bg-[linear-gradient(var(--sniptale-color-surface-panel),var(--sniptale-color-surface-panel))]
         p-2 shadow-xl"
@@ -193,7 +199,7 @@ function GalleryStorageMenu(
           onClick={() => props.closeAndRun(props.onExportBackup)}
         />
         <div
-          className="px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.1em]
+          className="px-2.5 pb-1 pt-2 text-[12px] leading-4 font-normal
           text-[var(--sniptale-color-text-muted)]"
         >
           {translate('gallery.app.importSection')}
@@ -262,7 +268,9 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
 
   return (
     <div ref={menu.rootRef} className="relative shrink-0" data-ui="gallery.header.storage">
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         aria-expanded={menu.isOpen}
         aria-haspopup="menu"
@@ -270,7 +278,7 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
         title={presentation.title}
         onClick={() => menu.setIsOpen((value) => !value)}
         className={[
-          'flex h-8 w-40 items-center gap-2 rounded-[8px] border px-2 text-left transition-colors',
+          'flex h-8 w-40 items-center gap-2 rounded-[4px] border px-2 text-left transition-colors',
           'border-[var(--sniptale-color-border-soft)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
           'hover:border-[var(--sniptale-color-border-strong)]',
@@ -280,7 +288,7 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
         ].join(' ')}
       >
         <HardDrive
-          className="h-4 w-4 shrink-0 text-[var(--sniptale-color-accent-emphasis)]"
+          className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-secondary)]"
           aria-hidden="true"
         />
         <span
@@ -292,7 +300,7 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
         >
           <span
             className={cx(
-              'block truncate text-[10px] font-medium leading-3',
+              'block truncate text-[12px] font-normal leading-4',
               'text-[var(--sniptale-color-text-secondary)]',
               !showProgress && 'text-center'
             )}
@@ -314,7 +322,7 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
           ) : null}
         </span>
         <Settings2 className="h-3.5 w-3.5 shrink-0 text-[var(--sniptale-color-text-muted)]" />
-      </button>
+      </ProductActionButton>
 
       {menu.isOpen ? (
         <GalleryStorageMenu {...props} closeAndRun={menu.closeAndRun} presentation={presentation} />
@@ -333,6 +341,7 @@ function GalleryHeaderSortControl(
       onChange={props.onSortModeChange}
       controlSize="sm"
       containerClassName="w-[10.5rem] shrink-0"
+      menuClassName="sniptale-parameter-menu"
       className="!h-8 !min-h-8 w-full"
       options={[
         { value: 'newest', label: translate('gallery.app.sortNewest') },
@@ -357,15 +366,19 @@ function GalleryViewModeButton(props: {
   const Icon = props.icon;
 
   return (
-    <button
+    <ProductActionButton
+      tone="secondary"
+      compact
       type="button"
+      aria-pressed={props.active}
+      data-command-chrome="true"
       title={props.label}
       aria-label={props.label}
       onClick={props.onClick}
       className={cx(
         viewModeButtonClassName,
         props.active
-          ? 'text-[var(--sniptale-color-accent-emphasis)]'
+          ? 'text-[var(--sniptale-color-text-primary)]'
           : [
               'text-[var(--sniptale-color-text-secondary)]',
               'hover:text-[var(--sniptale-color-text-primary)]',
@@ -376,7 +389,7 @@ function GalleryViewModeButton(props: {
       <span className="flex h-4 w-4 items-center justify-center" aria-hidden="true">
         <Icon className="block h-[15px] w-[15px]" />
       </span>
-    </button>
+    </ProductActionButton>
   );
 }
 
@@ -384,31 +397,14 @@ function GalleryViewModeToggle(props: {
   onViewModeChange: GalleryMainContentProps['onViewModeChange'];
   viewMode: GalleryViewMode;
 }) {
-  const activeIndex = ['list', 'compact-grid', 'large-grid'].indexOf(props.viewMode);
-
   return (
     <div
       aria-label={translate('gallery.app.viewModeLabel')}
       role="group"
-      className={[
-        'relative grid h-8 w-[6.5rem] shrink-0 grid-cols-3 items-center',
-        'overflow-hidden rounded-[8px] border p-0.5',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-      ].join(' ')}
+      data-ui="gallery.header.view-mode"
+      className="flex h-8 shrink-0 items-center gap-0.5 rounded-[4px] border
+        border-[var(--sniptale-color-border-soft)] px-0.5"
     >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0.5 top-0.5 rounded-[6px]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,var(--sniptale-color-accent)_10%)]
-          shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]
-          transition-transform duration-200 ease-out motion-reduce:transition-none"
-        style={{
-          left: '0.125rem',
-          width: 'calc((100% - 0.25rem) / 3)',
-          transform: `translateX(${Math.max(0, activeIndex) * 100}%)`,
-        }}
-      />
       <GalleryViewModeButton
         active={props.viewMode === 'list'}
         icon={AlignJustify}
@@ -446,16 +442,11 @@ function GalleryHeaderControls(
     GalleryHeaderStorageProps & {
       onSearchCommit: (value: string) => void;
       searchNavigation?: GallerySearchNavigation;
-      stackWhenNarrow: boolean;
     }
 ) {
   return (
     <div
-      className={cx(
-        'ml-auto flex min-w-max shrink-0 flex-nowrap items-center justify-end gap-2',
-        props.stackWhenNarrow &&
-          'max-2xl:row-start-1 max-2xl:ml-0 max-2xl:justify-self-start max-2xl:justify-start'
-      )}
+      className="ml-auto flex min-w-max shrink-0 flex-nowrap items-center justify-end gap-2"
       data-ui="gallery.header.controls"
     >
       <GalleryHeaderSearchField
@@ -488,7 +479,7 @@ export function GalleryHeaderBanner(
 
   return (
     <div
-      className="mt-3 flex flex-wrap items-center gap-3 rounded-[14px]
+      className="mt-3 flex flex-wrap items-center gap-3 rounded-[4px]
         border border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_34%,var(--sniptale-color-border-soft)_66%)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_66%,var(--sniptale-color-surface-panel)_34%)]
         px-4 py-3 text-sm
@@ -496,13 +487,15 @@ export function GalleryHeaderBanner(
     >
       <ShieldAlert className="h-4 w-4" />
       <span className="flex-1">{banner}</span>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         onClick={onBannerDismiss}
         className={galleryDangerBannerButtonClassName}
       >
         {translate('common.actions.close')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -542,9 +535,9 @@ export function GalleryHeader(
     <header
       className={cx(
         'relative z-30 flex h-12 min-h-12 shrink-0 items-center gap-4',
-        'rounded-[var(--sniptale-radius-lg)] border py-1.5',
-        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] shadow-sm',
-        hasWorkspaceActions && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
+        'rounded-[4px] border py-1.5',
+        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] ',
+        hasWorkspaceActions && 'h-auto'
       )}
     >
       <div
@@ -562,7 +555,7 @@ export function GalleryHeader(
               <Library className="h-[22px] w-[22px]" aria-hidden="true" />
             )}
           </span>
-          <h1 className="truncate text-base font-semibold text-[var(--sniptale-color-text-primary)]">
+          <h1 className="truncate text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate(props.trashMode ? 'gallery.app.trashTitle' : 'gallery.app.title')}
           </h1>
         </div>
@@ -570,8 +563,7 @@ export function GalleryHeader(
       <div
         className={cx(
           'flex min-w-0 flex-1 flex-nowrap items-center gap-2 pr-3',
-          hasWorkspaceActions &&
-            'max-2xl:grid max-2xl:h-full max-2xl:grid-cols-1 max-2xl:grid-rows-[2rem_2rem] max-2xl:gap-y-2'
+          hasWorkspaceActions && 'flex-wrap-reverse gap-y-2'
         )}
         data-ui="gallery.header.workspace"
       >
@@ -579,7 +571,7 @@ export function GalleryHeader(
           <div
             className={cx(
               'min-w-0 flex-1',
-              hasWorkspaceActions && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
+              hasWorkspaceActions && 'min-w-max shrink-0 basis-auto overflow-visible'
             )}
           >
             {hasSelection ? (
@@ -589,7 +581,7 @@ export function GalleryHeader(
             ) : null}
           </div>
         ) : null}
-        <GalleryHeaderControls {...props} stackWhenNarrow={hasWorkspaceActions} />
+        <GalleryHeaderControls {...props} />
       </div>
     </header>
   );

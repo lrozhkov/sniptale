@@ -1,5 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useState } from 'react';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { SegmentedRow } from '../../../../ui/compact-inspector-controls';
 import type { SettingsTransferTreeNode } from '../../../../contracts/settings-transfer';
 import { translate } from '../../../../platform/i18n';
 import { settingsAddButtonClassName, settingsPanelClassName } from '../../../section-surface';
@@ -56,16 +57,18 @@ export function SettingsTransferExportFlow() {
         {translate('settings.settingsTransfer.exportDescription')}
       </p>
       <div className="my-4 max-w-md">
-        <SegmentedSwitch
-          activeId={kind}
+        <SegmentedRow
+          columns={2}
+          value={kind}
+          label={translate('settings.settingsTransfer.exportKindLabel')}
           ariaLabel={translate('settings.settingsTransfer.exportKindLabel')}
           options={[
             {
-              id: 'backup',
+              value: 'backup',
               label: translate('settings.settingsTransfer.completeBackup'),
             },
             {
-              id: 'selective',
+              value: 'selective',
               label: translate('settings.settingsTransfer.selectivePackage'),
             },
           ]}
@@ -85,7 +88,8 @@ export function SettingsTransferExportFlow() {
           {error}
         </p>
       ) : null}
-      <button
+      <ProductActionButton
+        tone="secondary"
         className={settingsAddButtonClassName}
         disabled={busy || (kind === 'selective' && selected.size === 0)}
         onClick={() => void exportSettings()}
@@ -93,7 +97,7 @@ export function SettingsTransferExportFlow() {
         {busy
           ? translate('settings.settingsTransfer.working')
           : translate('settings.settingsTransfer.download')}
-      </button>
+      </ProductActionButton>
     </section>
   );
 }

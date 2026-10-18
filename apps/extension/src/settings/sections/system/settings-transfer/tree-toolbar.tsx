@@ -1,8 +1,10 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Search, X } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 
 const buttonClassName =
-  'min-h-8 rounded-lg border border-[var(--sniptale-color-border-soft)] px-2.5 text-xs ' +
+  'min-h-8 rounded-[4px] border border-[var(--sniptale-color-border-soft)] px-2.5 text-xs ' +
   'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-hover)] ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -27,7 +29,7 @@ export function SettingsTransferTreeToolbar(props: {
     >
       <label
         className={
-          'flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border ' +
+          'flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-[4px] border ' +
           'border-[var(--sniptale-color-border-soft)] px-2.5'
         }
       >
@@ -51,17 +53,19 @@ export function SettingsTransferTreeToolbar(props: {
           </span>
         ) : null}
         {props.query ? (
-          <button
+          <ContentToolbarButton
+            tone="close"
             className={'sniptale-dismiss-button'}
             type="button"
             aria-label={translate('settings.settingsTransfer.clearSearch')}
             onClick={() => props.onQueryChange('')}
           >
             <X aria-hidden="true" size={15} />
-          </button>
+          </ContentToolbarButton>
         ) : null}
       </label>
-      <button
+      <ProductActionButton
+        tone="secondary"
         type="button"
         className={`${buttonClassName} shrink-0`}
         disabled={props.expandableCount === 0}
@@ -72,15 +76,16 @@ export function SettingsTransferTreeToolbar(props: {
             ? 'settings.settingsTransfer.collapseAll'
             : 'settings.settingsTransfer.expandAll'
         )}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
+        tone="secondary"
         type="button"
         className={`${buttonClassName} shrink-0`}
         disabled={props.scopeCount === 0}
         onClick={props.onToggleScope}
       >
         {translate(resolveScopeActionKey(hasQuery, props.scopeSelected))}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

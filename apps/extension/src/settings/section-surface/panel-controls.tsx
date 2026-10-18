@@ -1,11 +1,9 @@
 import { GripVertical } from 'lucide-react';
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 
-import {
-  ProductRange,
-  ProductToggle,
-  type ProductRangeProps,
-} from '@sniptale/ui/product-form-controls';
+import { ProductRange, type ProductRangeProps } from '@sniptale/ui/product-form-controls';
 import {
   settingsAddButtonClassName,
   settingsEmptyStateClassName,
@@ -35,7 +33,16 @@ export function SettingsSwitch({
   checked: boolean;
   size?: 'sm' | 'md';
 }) {
-  return <ProductToggle {...props} checked={checked} className={className} size={size} />;
+  return (
+    <ProductGlassSwitch
+      {...props}
+      role="switch"
+      aria-checked={checked}
+      on={checked}
+      className={className}
+      data-density={size}
+    />
+  );
 }
 
 export function SettingsRange({ className = '', ...props }: ProductRangeProps) {
@@ -48,35 +55,39 @@ export function SettingsControlRow(props: {
   description?: ReactNode;
   label: ReactNode;
   valueClassName?: string;
+  valueMinimum?: number;
+  keepInline?: boolean;
 }) {
+  const control = (
+    <div
+      data-ui="settings.control-row.value"
+      className={['settings-control-value', props.valueClassName ?? ''].join(' ')}
+    >
+      {props.children}
+    </div>
+  );
   return (
     <div
       data-ui="settings.control-row"
-      className={[
-        'grid min-h-12 w-full max-w-[720px] items-center gap-2 py-2.5',
-        'sm:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] sm:gap-5',
-        props.className ?? '',
-      ].join(' ')}
+      className={['w-full max-w-[720px]', props.className ?? ''].join(' ')}
     >
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-          {props.label}
+      {typeof props.label === 'string' ? (
+        <InspectorParameterRow
+          label={props.label}
+          valueMinimum={props.valueMinimum ?? 220}
+          keepInline={props.keepInline ?? false}
+        >
+          {control}
+        </InspectorParameterRow>
+      ) : (
+        <div className="sniptale-parameter-row" data-layout="inline">
+          <span className="sniptale-parameter-name">{props.label}</span>
+          <div className="sniptale-parameter-value">{control}</div>
         </div>
-        {props.description ? (
-          <div className="mt-0.5 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {props.description}
-          </div>
-        ) : null}
-      </div>
-      <div
-        data-ui="settings.control-row.value"
-        className={[
-          'w-full max-w-[280px] min-w-0 sm:justify-self-end',
-          props.valueClassName ?? '',
-        ].join(' ')}
-      >
-        {props.children}
-      </div>
+      )}
+      {props.description ? (
+        <div className="settings-control-description">{props.description}</div>
+      ) : null}
     </div>
   );
 }

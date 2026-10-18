@@ -100,12 +100,14 @@ export function VideoEditorLibraryNavigation(props: {
           <Icon
             size={16}
             className={
-              props.active === id ? 'shrink-0 text-[var(--sniptale-color-accent)]' : 'shrink-0'
+              props.active === id
+                ? 'shrink-0 text-[var(--sniptale-color-text-primary)]'
+                : 'shrink-0'
             }
             aria-hidden="true"
           />
           {props.active === id && (
-            <span className="hidden truncate text-[12px] font-medium @[220px]/library-nav:block">
+            <span className="hidden truncate text-[13px] leading-[18px] font-medium @[220px]/library-nav:block">
               {label}
             </span>
           )}

@@ -14,7 +14,10 @@ interface VideoEditorImportToolbarProps {
 }
 
 function getActionButtonClassName(fullWidth: boolean): string {
-  return ['gap-2 text-[12px]', fullWidth ? 'w-full justify-start' : 'justify-center'].join(' ');
+  return [
+    'gap-1.5 text-[13px] leading-[18px]',
+    fullWidth ? 'w-full justify-start' : 'justify-center',
+  ].join(' ');
 }
 
 function ImportActionButton({
@@ -60,33 +63,33 @@ export function VideoEditorImportToolbar(props: VideoEditorImportToolbarProps) {
     >
       <ImportActionButton
         title={translate('videoEditor.sidebar.toolbarNew')}
-        icon={<FilePlus2 size={15} strokeWidth={2} />}
+        icon={<FilePlus2 size={16} strokeWidth={2} />}
         onClick={() => void props.onCreateProject()}
         accent
         fullWidth
       />
       <ImportActionButton
         title={translate('videoEditor.sidebar.toolbarImage')}
-        icon={<ImagePlus size={15} strokeWidth={2} />}
+        icon={<ImagePlus size={16} strokeWidth={2} />}
         onClick={props.onImportImage}
         fullWidth
       />
       <ImportActionButton
         title={translate('videoEditor.sidebar.toolbarVideo')}
-        icon={<Film size={15} strokeWidth={2} />}
+        icon={<Film size={16} strokeWidth={2} />}
         onClick={props.onImportVideo}
         fullWidth
       />
       <ImportActionButton
         title={translate('videoEditor.sidebar.toolbarAudio')}
-        icon={<FileAudio2 size={15} strokeWidth={2} />}
+        icon={<FileAudio2 size={16} strokeWidth={2} />}
         onClick={props.onImportAudio}
         fullWidth
       />
       {props.onRecordAudio ? (
         <ImportActionButton
           title={translate('videoEditor.sidebar.toolbarRecord')}
-          icon={<Mic size={15} strokeWidth={2} />}
+          icon={<Mic size={16} strokeWidth={2} />}
           onClick={props.onRecordAudio}
           fullWidth
         />

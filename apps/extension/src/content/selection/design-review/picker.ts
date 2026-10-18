@@ -284,6 +284,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
           [
             '[data-ui="content.design-review.feedback-panel"]',
             '[data-ui="content.design-review.action-menu"]',
+            '[data-ui="content.toolbar.root"][data-menu-open="true"]',
           ].join(',')
         )
       ) {

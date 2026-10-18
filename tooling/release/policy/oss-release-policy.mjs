@@ -3,14 +3,25 @@ import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+export const INTERFACE_FONT_PATH = 'packages/ui/src/styles/golos-ui/golos-ui-vf.woff2';
+export const INTERFACE_FONT_LICENSE_PATH = 'packages/ui/src/styles/golos-ui/LICENSE.txt';
+
+export const DOCUMENT_FONT_PATH = 'packages/ui/src/styles/golos-text/golos-text-vf.woff2';
+export const DOCUMENT_FONT_LICENSE_PATH = 'packages/ui/src/styles/golos-text/LICENSE.txt';
+export const DOCUMENT_FONT_SHA256 =
+  'ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843';
+
 export const OSS_RELEASE_POLICY_PATH = 'tooling/configs/qa/oss-release.data.json';
 export const REQUIRED_RELEASE_LEGAL_PATHS = [
   'LICENSE',
   'LICENSES/OFL-1.1.txt',
+  'packages/ui/src/styles/golos-ui/LICENSE.txt',
   'NOTICE',
   'THIRD_PARTY_NOTICES.md',
 ];
 export const CANONICAL_LICENSE_DIGESTS = new Map([
+  [DOCUMENT_FONT_LICENSE_PATH, '2c7e44f733787b9d9fe9ee3f857e24bed455523b14804ebf73480c125e4b6784'],
+  [INTERFACE_FONT_LICENSE_PATH, 'c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9'],
   ['LICENSE', 'e9df4c4e4e64b8168a71c3c67668dcffabbe8fca11d4ac4a7d5482562cd1679c'],
   ['LICENSES/OFL-1.1.txt', 'd826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30'],
 ]);
@@ -29,7 +40,10 @@ export function readOssReleasePolicy(repoRoot = process.cwd()) {
   ) {
     throw new Error('OSS release policy legal payload paths must be one-to-one.');
   }
-  for (const requiredPath of REQUIRED_RELEASE_LEGAL_PATHS) {
+  const requiredPaths = policy.bundledAssets?.some((asset) => asset.id === 'golos-text')
+    ? [...REQUIRED_RELEASE_LEGAL_PATHS, DOCUMENT_FONT_LICENSE_PATH]
+    : REQUIRED_RELEASE_LEGAL_PATHS;
+  for (const requiredPath of requiredPaths) {
     if (!archivePaths.includes(requiredPath) || !sourcePaths.includes(requiredPath)) {
       throw new Error(`OSS release policy is missing canonical legal file: ${requiredPath}`);
     }

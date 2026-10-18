@@ -24,13 +24,13 @@ export function MediaPreviewPane(props: {
     <aside
       data-ui="video-editor.library.media-preview"
       className={[
-        'flex min-h-0 min-w-0 flex-col gap-3 rounded-xl border p-3',
+        'flex min-h-0 min-w-0 flex-col gap-3 rounded-[4px] border p-3',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
     >
       {item ? (
         <>
-          <h2 className="shrink-0 truncate text-sm font-medium" title={item.filename}>
+          <h2 className="shrink-0 break-words text-[13px] font-medium" title={item.filename}>
             {item.filename}
           </h2>
           <LibraryPreviewContent key={item.id} item={item} media={media} isImage={isImage} />
@@ -85,7 +85,7 @@ function LibraryPreviewContent({
       </LibraryAudioPreview>
     );
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-[var(--sniptale-color-surface-canvas)]">
+    <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-[4px] bg-[var(--sniptale-color-surface-canvas)]">
       {media.url ? (
         isImage ? (
           <LibraryImagePreview key={media.url} src={media.url} filename={item.filename} />
@@ -191,7 +191,7 @@ function LibraryAudioPreview({
   return (
     <div
       className={[
-        'flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto rounded-lg p-4',
+        'flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-auto rounded-[4px] p-4',
         'bg-[var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
     >
@@ -232,7 +232,7 @@ function LibraryMediaInsert(props: {
         ].join(' ')}
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-[var(--sniptale-color-text-muted)]">
+          <p className="break-words text-xs text-[var(--sniptale-color-text-secondary)]">
             {[
               !isImage && item.duration !== null ? formatDuration(item.duration) : null,
               formatDimensions(item.width, item.height),

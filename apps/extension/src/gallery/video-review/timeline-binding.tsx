@@ -1,4 +1,5 @@
 import { cancelReviewTimelineGestures } from './timeline-drag';
+import { useReviewTrackOrder } from './track-order';
 import { ReviewTrackControlsProvider } from './track-row';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
@@ -94,7 +95,6 @@ type TimelineBindingProps = {
   advanced: QuickEditAdvancedState;
   onToggleActions?: (() => void) | undefined;
   setTrackVisibility(track: Exclude<QuickEditTrack, 'source'> | 'audio', visible: boolean): void;
-  setTrackLocked?(track: QuickEditTrack, locked: boolean): void;
   setMode(mode: 'basic' | 'advanced'): void;
   telemetryAvailable: boolean;
   time: number;
@@ -205,6 +205,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
+  const trackOrder = useReviewTrackOrder(
+    features.mode === 'advanced' && configuring && !props.busy
+  );
   useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const annotation = useAnnotationPlacement(props);
@@ -212,6 +215,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     <ReviewTrackControlsProvider
       value={{
         ui: props.advanced.ui,
+        order: trackOrder,
         configuring: features.mode === 'advanced' && configuring,
         busy: props.busy,
         unavailable: {
@@ -219,27 +223,23 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           originalAudio:
             props.editing.exporter.index !== null && !props.editing.exporter.index.audioCodec,
         },
-        setEnabled: (track, enabled) =>
+        setEnabled: (track, enabled) => {
+          cancelReviewTimelineGestures();
           (props.beforeAction ?? ((action) => action()))(() =>
             track === 'webcam' && enabled && !props.advanced.webcam
               ? void props.webcam?.toggle()
               : props.setTrackVisibility(track, enabled)
-          ),
-        setLocked: (track, locked) => {
-          cancelReviewTimelineGestures();
-          focus.clear();
-          annotation.clear();
-          (props.beforeAction ?? ((action) => action()))(() =>
-            props.setTrackLocked?.(track, locked)
           );
         },
       }}
     >
       <ReviewTimeline
+        trackOrder={trackOrder.order}
         actionsTrackVisible={
           (features.mode === 'advanced' && configuring) || features.actionsTrackVisible
         }
         sourceId={props.annotationSourceId}
+        snapTimes={reviewLoopSnapTimes(props)}
         annotationTool={annotation.tool.active}
         annotationDrawing={annotation.drawing}
         annotationEffectsTrack={
@@ -255,7 +255,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
               compact={compact}
               projection={projection}
               selectedId={props.selectedAnnotationEffectId ?? null}
-              snapTimes={props.edits.flatMap((edit) => [edit.start, edit.end])}
+              snapTimes={[
+                ...props.edits.flatMap((edit) => [edit.start, edit.end]),
+                ...reviewLoopSnapTimes(props),
+              ]}
               beforeAction={props.beforeAction}
               drawing={annotation.drawing}
               onPlace={annotation.place}
@@ -347,6 +350,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                   resultDuration={props.resultDuration}
                   outputTime={props.outputTime}
                   edits={props.edits}
+                  snapTimes={reviewLoopSnapTimes(props)}
                   zoom={props.zoom}
                   toOutputTime={props.toOutputTime}
                 />
@@ -448,8 +452,8 @@ function useAnnotationPlacement(props: TimelineBindingProps) {
     if (!advanced || props.editing.mode || props.audio.originalTool || props.zoom.drawing) clear();
   }, [advanced, props.editing.mode, props.audio.originalTool, props.zoom.drawing, clear]);
   useEffect(() => {
-    if (catalog.phase === 'ready' && selected && !choice) setSelected('');
-  }, [catalog.phase, selected, choice]);
+    if (active && catalog.phase === 'ready' && !choice) setSelected(choices[0]?.value ?? '');
+  }, [active, catalog.phase, choice, choices]);
   useEffect(() => {
     if (!active) return;
     const escape = (event: KeyboardEvent) => {
@@ -666,12 +670,24 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
   };
 }
 
+/** Disposable playback boundaries stay in source time until a lane projects them. */
+function reviewLoopSnapTimes(props: Pick<TimelineBindingProps, 'playbackRange'>): number[] {
+  return props.playbackRange ? [props.playbackRange.start, props.playbackRange.end] : [];
+}
+
 /** Projects the existing audio lane snap targets onto its result clock. */
 export function reviewAudioSnapTimes(
-  props: Pick<TimelineBindingProps, 'outputTime' | 'edits' | 'toOutputTime' | 'advanced'>
+  props: Pick<
+    TimelineBindingProps,
+    'outputTime' | 'edits' | 'toOutputTime' | 'advanced' | 'playbackRange'
+  >
 ) {
   return [
     ...(props.outputTime === null ? [] : [props.outputTime]),
+    ...reviewLoopSnapTimes(props).flatMap((time) => {
+      const output = props.toOutputTime(time);
+      return output === null ? [] : [output];
+    }),
     ...props.edits
       .flatMap((edit) => [props.toOutputTime(edit.start), props.toOutputTime(edit.end)])
       .filter((time): time is number => time !== null),
@@ -810,36 +826,40 @@ function reviewTimelineAudioTrack(
     features.audioTrackVisible ||
     !!props.editing.exporter.index?.audioCodec
     ? {
-        audioTrack: (
-          <ReviewAudioLaneBinding
-            compact={compact}
-            beforeAction={props.beforeAction}
-            selectedEditId={props.editing.selected?.id}
-            edits={props.edits}
-            onOriginalRange={(range) => {
-              props.onClearSelection();
-              props.setSelection({
-                kind: 'point',
-                time: range.kind === 'range' ? range.start : range.time,
-              });
-            }}
-            onSelectSpeed={props.editing.select}
-            showAddedAudio={features.mode === 'advanced'}
-            hasOriginalAudio={
-              props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
-            }
-            projection={projection}
-            snapTimes={reviewAudioSnapTimes(props)}
-            audioState={props.audioState}
-            waveforms={props.waveforms}
-            resultDuration={props.resultDuration}
-            audio={props.audio}
-            busy={props.busy}
-            onImportFile={props.onImportAudioFile}
-            onRecordVoiceover={props.onRecordVoiceover}
-            onOpenMusic={props.onOpenMusic}
-            onOpenSpeech={props.onOpenSpeech}
-          />
+        audioTracks: Object.fromEntries(
+          (['originalAudio', 'voiceover', 'music'] as const).map((lane) => [
+            lane,
+            <ReviewAudioLaneBinding
+              lane={lane}
+              compact={compact}
+              beforeAction={props.beforeAction}
+              selectedEditId={props.editing.selected?.id}
+              edits={props.edits}
+              onOriginalRange={(range) => {
+                props.onClearSelection();
+                props.setSelection({
+                  kind: 'point',
+                  time: range.kind === 'range' ? range.start : range.time,
+                });
+              }}
+              onSelectSpeed={props.editing.select}
+              showAddedAudio={features.mode === 'advanced'}
+              hasOriginalAudio={
+                props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
+              }
+              projection={projection}
+              snapTimes={reviewAudioSnapTimes(props)}
+              audioState={props.audioState}
+              waveforms={props.waveforms}
+              resultDuration={props.resultDuration}
+              audio={props.audio}
+              busy={props.busy}
+              onImportFile={props.onImportAudioFile}
+              onRecordVoiceover={props.onRecordVoiceover}
+              onOpenMusic={props.onOpenMusic}
+              onOpenSpeech={props.onOpenSpeech}
+            />,
+          ])
         ),
       }
     : {};

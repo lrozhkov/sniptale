@@ -5,6 +5,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import postcss from 'postcss';
+import { collectModuleImportGraph } from '../../../analysis/dependency-graph/module-import-graph.mjs';
+import { createSourceFile, ts } from '../../../analysis/structural-risk/ast.mjs';
 
 import { repoRoot } from '../../../analysis/repository/shared-paths.mjs';
 import { isExecutedAsScript, printViolations } from '../../../runtime/process/shared-cli.mjs';
@@ -161,11 +164,126 @@ function hasOriginOnlyPath(match) {
   return separator >= 0 && match.slice(match.indexOf('/', separator + 3)) === '/*';
 }
 
+function propertyValue(object, name) {
+  return object?.properties?.find(
+    (property) => ts.isPropertyAssignment(property) && property.name.getText() === name
+  )?.initializer;
+}
+
+function unwrap(node) {
+  return node && ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node;
+}
+
+function hasStableEmittedAssetNames(rootDir) {
+  const source = createSourceFile(
+    'apps/extension/vite.config.ts',
+    fs.readFileSync(path.join(rootDir, 'apps/extension/vite.config.ts'), 'utf8')
+  );
+  const exported = source.statements.find(ts.isExportAssignment)?.expression;
+  const factory = exported && ts.isCallExpression(exported) ? exported.arguments[0] : null;
+  if (!factory || !ts.isArrowFunction(factory)) return false;
+  const build = propertyValue(unwrap(factory.body), 'build');
+  const options = propertyValue(build, 'rollupOptions');
+  if (!options || !ts.isCallExpression(options) || !ts.isIdentifier(options.expression))
+    return false;
+  const owner = source.statements.find(
+    (statement) =>
+      ts.isFunctionDeclaration(statement) && statement.name?.text === options.expression.text
+  );
+  const returned = owner?.body?.statements.find(ts.isReturnStatement)?.expression;
+  const assetNames = propertyValue(propertyValue(unwrap(returned), 'output'), 'assetFileNames');
+  return assetNames && ts.isStringLiteral(assetNames) && assetNames.text === 'assets/[name].[ext]';
+}
+
+function collectStyleFiles(rootDir, directory) {
+  return fs.readdirSync(path.join(rootDir, directory), { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.posix.join(directory, entry.name);
+    if (entry.isDirectory()) return collectStyleFiles(rootDir, relative);
+    return entry.isFile() && relative.endsWith('.css') ? [relative] : [];
+  });
+}
+
+function isWithinDirectory(directory, file) {
+  const relative = path.relative(directory, file);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function resolveFontSource(rootDir, stylesheet, specifier, stylesDirectory) {
+  if (/^@fontsource(?:-variable)?\/[a-z0-9-]+\/files\/[^/]+\.woff2$/u.test(specifier)) {
+    return path.join(rootDir, 'node_modules', specifier);
+  }
+  if (!specifier.startsWith('./') && !specifier.startsWith('../')) return null;
+  const source = path.resolve(rootDir, path.dirname(stylesheet), specifier);
+  if (!isWithinDirectory(stylesDirectory, source)) return null;
+  if (!isWithinDirectory(fs.realpathSync(stylesDirectory), fs.realpathSync(source))) return null;
+  return source;
+}
+
+function emittedFontResourceExists(rootDir, resource) {
+  if (!/^assets\/[a-zA-Z0-9][a-zA-Z0-9._-]*\.woff2$/u.test(resource)) return false;
+  try {
+    if (!hasStableEmittedAssetNames(rootDir)) return false;
+    const uiPackagePath = 'packages/ui/package.json';
+    const exported = readJson(rootDir, uiPackagePath).exports?.['./styles'];
+    if (typeof exported !== 'string' || !exported.startsWith('./') || !exported.endsWith('.css'))
+      return false;
+    const entry = path.posix.join('packages/ui', exported);
+    if (!entry.startsWith('packages/ui/')) return false;
+    const stylesDirectory = path.resolve(rootDir, 'packages/ui/src/styles');
+    if (!isWithinDirectory(stylesDirectory, path.resolve(rootDir, entry))) return false;
+    const files = collectStyleFiles(rootDir, path.posix.dirname(entry));
+    const readFile = (file) => fs.readFileSync(path.join(rootDir, file), 'utf8');
+    const graph = collectModuleImportGraph({ root: rootDir, files, readFile });
+    const reachable = new Set([entry]);
+    const pending = [entry];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      for (const edge of graph.resourceEdges.filter((edge) => edge.importer === current)) {
+        if (!edge.target.endsWith('.css') || reachable.has(edge.target)) continue;
+        reachable.add(edge.target);
+        pending.push(edge.target);
+      }
+    }
+    const sources = new Set();
+    let invalidSource = false;
+    for (const stylesheet of reachable) {
+      const stylesheetPath = path.resolve(rootDir, stylesheet);
+      if (!isWithinDirectory(stylesDirectory, stylesheetPath)) return false;
+      if (!isWithinDirectory(fs.realpathSync(stylesDirectory), fs.realpathSync(stylesheetPath)))
+        return false;
+      postcss.parse(readFile(stylesheet)).walkAtRules('font-face', (rule) => {
+        rule.walkDecls('src', (declaration) => {
+          const urls = [
+            ...declaration.value.matchAll(/url\((?:"([^"]+)"|'([^']+)'|([^\s)]+))\)/gu),
+          ];
+          if (urls.length !== 1) return;
+          const specifier = urls[0][1] ?? urls[0][2] ?? urls[0][3];
+          if (`assets/${path.posix.basename(specifier)}` !== resource) return;
+          const source = resolveFontSource(rootDir, stylesheet, specifier, stylesDirectory);
+          if (source && fs.existsSync(source) && fs.statSync(source).isFile())
+            sources.add(fs.realpathSync(source));
+          else invalidSource = true;
+        });
+      });
+    }
+    return !invalidSource && sources.size === 1;
+  } catch {
+    return false;
+  }
+}
+
 function manifestResourceExists(rootDir, resource) {
   const relativePath = resource.startsWith('apps/extension/src/')
     ? resource
     : path.join('apps/extension/public', resource);
-  return fs.existsSync(path.join(rootDir, relativePath));
+  return (
+    fs.existsSync(path.join(rootDir, relativePath)) || emittedFontResourceExists(rootDir, resource)
+  );
 }
 
 function collectContentScriptShapeViolations(rootDir, entries, file) {
@@ -260,14 +378,16 @@ function collectWebAccessibleResourcePolicy(entry, index, file) {
           ),
         ]
   );
-  const hasManrope = (isStringArray(entry.resources) ? entry.resources : []).some((resource) =>
-    /^fonts\/manrope-[\w-]+\.woff2$/u.test(resource)
+  const hasBundledFont = (isStringArray(entry.resources) ? entry.resources : []).some(
+    (resource) =>
+      resource === 'assets/golos-ui-vf.woff2' ||
+      /^fonts\/marck-script-[\w-]+\.woff2$/u.test(resource)
   );
-  if (hasManrope && entry.use_dynamic_url !== true) {
+  if (hasBundledFont && entry.use_dynamic_url !== true) {
     violations.push(
       createSchemaViolation(
         file,
-        `web_accessible_resources[${index}] Manrope fonts require use_dynamic_url: true.`
+        `web_accessible_resources[${index}] Bundled fonts require use_dynamic_url: true.`
       )
     );
   }

@@ -1,3 +1,4 @@
+import { createStrictRecordingTransaction } from '../recordings/recovery/transaction';
 import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
@@ -24,6 +25,8 @@ import {
   PROJECT_EXPORTS_STORE,
   WEB_SNAPSHOTS_STORE,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
@@ -290,31 +293,30 @@ async function commitCascadeTransaction(
   physicalDelete: PhysicalDelete,
   expectedSource?: MediaDependencyTarget
 ): Promise<void> {
-  const tx = db.transaction(
-    [
-      MEDIA_LIBRARY_STORE,
-      VIDEO_PROJECTS_STORE,
-      SCENARIO_PROJECTS_STORE,
-      SCENARIO_PROJECT_HISTORY_STORE,
-      SCENARIO_PROJECT_UNITS_STORE,
-      SCENARIO_ASSETS_STORE,
-      VIDEO_WORKSPACES_STORE,
-      VIDEO_WORKSPACE_HISTORY_STORE,
-      VIDEO_WORKSPACE_DRAFTS_STORE,
-      PROJECT_ASSETS_STORE,
-      PROJECT_EXPORTS_STORE,
-      WEB_SNAPSHOTS_STORE,
-      STORE_NAME,
-      RECORDING_TELEMETRY_STORE,
-      THUMBNAILS_STORE,
-      IMAGE_WORKSPACES_STORE,
-      AGGREGATE_PRESENTATIONS_STORE,
-      ASSET_REFS_STORE,
-      ASSET_OWNERS_STORE,
-      ASSET_OPERATIONS_STORE,
-    ],
-    'readwrite'
-  );
+  const tx = createStrictRecordingTransaction(db, [
+    MEDIA_LIBRARY_STORE,
+    VIDEO_PROJECTS_STORE,
+    SCENARIO_PROJECTS_STORE,
+    SCENARIO_PROJECT_HISTORY_STORE,
+    SCENARIO_PROJECT_UNITS_STORE,
+    SCENARIO_ASSETS_STORE,
+    VIDEO_WORKSPACES_STORE,
+    VIDEO_WORKSPACE_HISTORY_STORE,
+    VIDEO_WORKSPACE_DRAFTS_STORE,
+    PROJECT_ASSETS_STORE,
+    PROJECT_EXPORTS_STORE,
+    WEB_SNAPSHOTS_STORE,
+    STORE_NAME,
+    RECORDING_TELEMETRY_STORE,
+    RECORDING_RECOVERY_SESSIONS_STORE,
+    RECORDING_RECOVERY_BLOCKS_STORE,
+    THUMBNAILS_STORE,
+    IMAGE_WORKSPACES_STORE,
+    AGGREGATE_PRESENTATIONS_STORE,
+    ASSET_REFS_STORE,
+    ASSET_OWNERS_STORE,
+    ASSET_OPERATIONS_STORE,
+  ]);
   try {
     const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
     const now = Date.now();

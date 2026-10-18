@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { FileText, Focus, Layers, ListChecks, ListFilter, Search, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
+import { FileText, Focus, Layers, ListChecks, ListFilter, Search } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -122,6 +123,7 @@ function GuideAiStepSelection({
   t: Translate;
 }) {
   const [query, setQuery] = useState('');
+  const search = useRef<HTMLInputElement>(null);
   const [selectedOnly, setSelectedOnly] = useState(false);
   const { stepIds, chooseStep, chooseSteps, pending } = session;
   const selected = new Set(stepIds);
@@ -156,6 +158,7 @@ function GuideAiStepSelection({
         <div className="guide-ai-selection-search">
           <Search size={14} aria-hidden="true" />
           <ProductInput
+            ref={search}
             type="text"
             className="sniptale-input-compact"
             aria-label={t('scenario.editor.guideAiSearchSteps')}
@@ -164,18 +167,12 @@ function GuideAiStepSelection({
             disabled={pending}
             onChange={(event) => setQuery(event.target.value)}
           />
-          {query && (
-            <ContentToolbarButton
-              tone="close"
-              title={t('aiModal.clearSearchLabel')}
-              disabled={pending}
-              onClick={() => setQuery('')}
-            >
-              <X size={13} aria-hidden="true" />
-            </ContentToolbarButton>
-          )}
+          {query && !pending ? (
+            <InspectorFieldClear label={t('scenario.editor.guideAiSearchSteps')} target={search} />
+          ) : null}
         </div>
         <ContentToolbarButton
+          tone="property"
           title={t(selectedOnly ? 'aiModal.showAllDataLabel' : 'aiModal.showSelectedOnlyLabel')}
           aria-pressed={selectedOnly}
           disabled={pending}

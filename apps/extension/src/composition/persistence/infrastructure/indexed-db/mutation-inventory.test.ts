@@ -20,6 +20,10 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
+  // Recording publication writes only its caller's admitted transaction.
+  'apps/extension/src/composition/persistence/recordings/recovery/publication.ts',
+  // Recovery and cascade owners acquire mutation admission before requesting strict transactions.
+  'apps/extension/src/composition/persistence/recordings/recovery/transaction.ts',
   // Uses only the caller's transaction under its existing active mutation permit.
   'apps/extension/src/composition/persistence/review-workspaces/storage.ts',
   // Reads and writes only the existing caller transaction; caller owns its active permit/commit/abort.

@@ -1,5 +1,18 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'shared-db-canonical-media-deletion',
+    productionFile: 'apps/extension/src/composition/persistence/media-library/delete-cascade.ts',
+    reason:
+      'Canonical deletion includes retained Scenario consumers and recording safety copies. ' +
+      'The existing Scenario, source, dependency and deletion suites prove the complete transaction.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/media-library/dependencies.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-video-dependency-envelope',
     productionFile: 'apps/extension/src/composition/persistence/media-library/dependencies.ts',
     exclusive: true,

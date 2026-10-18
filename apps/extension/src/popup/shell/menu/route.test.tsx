@@ -332,12 +332,12 @@ it('runs the secondary capture scenarios in their displayed order', async () => 
   ).toEqual(quickScenarioLabels);
   expect(
     [...(quickScenarioGrid?.querySelectorAll('button') ?? [])].every((button) =>
-      button.className.includes('grid-rows-[18px_20px]')
+      button.className.includes('grid-rows-[18px_24px]')
     )
   ).toBe(true);
   expect(
     [...(quickScenarioGrid?.querySelectorAll('button span') ?? [])].every((label) =>
-      label.className.includes('min-h-5')
+      label.className.includes('min-h-6')
     )
   ).toBe(true);
 });

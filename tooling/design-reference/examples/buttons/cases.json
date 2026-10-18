@@ -1,0 +1,149 @@
+{
+  "group": "buttons",
+  "version": "package-5",
+  "rules": "buttons.md",
+  "component": "ActionButton / PressedButton / ButtonToolbar / AsyncCommand; reused choices and layer owners",
+  "excludes": ["property radio choices", "navigation tabs", "command menu contents"],
+  "cases": [
+    {
+      "id": "buttons.roles",
+      "title": "Роли команд",
+      "states": ["primary", "secondary"],
+      "proof": "Commands execute actions with Enter and Space."
+    },
+    {
+      "id": "buttons.utility",
+      "title": "Тихие служебные действия",
+      "states": ["icon-only", "focus"],
+      "proof": "Utility buttons retain neutral appearance and accessible names."
+    },
+    {
+      "id": "buttons.pressed",
+      "title": "Независимые режимы",
+      "states": ["on", "off"],
+      "proof": "Pressed buttons retain stable names and independent states."
+    },
+    {
+      "id": "buttons.async",
+      "title": "Ожидание и повтор",
+      "states": ["pending", "error", "retry", "success"],
+      "proof": "Prevent duplicate execution and preserve focus during recovery."
+    },
+    {
+      "id": "buttons.undo",
+      "title": "Обратимое удаление",
+      "states": ["deleted", "restored"],
+      "proof": "Undo restores the item and focus follows the available action."
+    },
+    {
+      "id": "buttons.densities",
+      "title": "Плотность и недоступность",
+      "states": ["compact", "standard", "spacious", "disabled"],
+      "proof": "Role and density are modifications of one component."
+    },
+    {
+      "id": "buttons.long",
+      "title": "Длинное название команды",
+      "states": ["wrapping"],
+      "proof": "Action text stays readable without horizontal overflow."
+    },
+    {
+      "id": "buttons.surfaces",
+      "title": "Поверхность и граница",
+      "states": ["quiet", "filled", "outlined-on-canvas"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.icons",
+      "title": "Текст и иконки",
+      "states": ["text", "icon-text", "icon-only"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.toolbar",
+      "title": "Режимы тулбара",
+      "states": ["selected", "unselected", "roving-focus"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.toolbar-disclosure",
+      "title": "Раскрытие дополнительных инструментов",
+      "states": ["collapsed", "expanded", "keyboard", "repeat-click", "dismissal"],
+      "proof": "A corner down triangle appears only on disclosure triggers. Repeated click and Escape close the toolbar panel without changing a mode."
+    },
+    {
+      "id": "buttons.menus",
+      "title": "Раскрытие меню команд",
+      "states": ["closed", "expanded", "keyboard"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.compound",
+      "title": "Режим и контекстный выбор",
+      "states": ["on", "off", "retained-property"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.exclusive",
+      "title": "Один инструмент · иконка с текстом",
+      "states": ["exclusive", "radio"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.cycle",
+      "title": "Полный цикл нажатия",
+      "states": ["down", "hold", "release", "cancel", "outside", "keyboard"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.native",
+      "title": "Системный выбор файла",
+      "states": ["native-dialog", "cancel", "selected"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.form",
+      "title": "Кнопка отправки формы",
+      "states": ["submit", "invalid", "accepted"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.repeat",
+      "title": "Удержание с повтором",
+      "states": ["repeat", "limit", "release"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.confirmation",
+      "title": "Необратимая операция",
+      "states": ["confirm", "cancel"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.destination",
+      "title": "Переход по ссылке",
+      "states": ["native-link"],
+      "proof": "Semantic ownership and actual activation paths remain distinct from appearance and physical press."
+    },
+    {
+      "id": "buttons.chrome",
+      "title": "Системные действия · только иконка",
+      "states": ["idle", "hover", "held", "keyboard-focus", "cleared", "closed"],
+      "proof": "Chrome controls brighten without a surface. Clear restores input focus. Close exposes a reopening command."
+    },
+    {
+      "id": "buttons.indicators",
+      "title": "Стрелки · команды и боковое раскрытие",
+      "states": ["down", "side", "submenu", "edge-flip", "keyboard", "dismissal"],
+      "proof": "Menu indicators expose disclosure. Nested menus preserve parent focus and dismiss the full chain after a command."
+    },
+    {
+      "id": "buttons.exclusive-icons",
+      "title": "Один инструмент · только иконки",
+      "states": ["selected", "hover", "keyboard", "disabled-contract"],
+      "proof": "Native radio tools retain a subtle selected boundary without a check or disclosure indicator."
+    }
+  ],
+  "geometryRevision": "standard-4-dialog-8",
+  "interactionRevision": "button-cycle-1"
+}

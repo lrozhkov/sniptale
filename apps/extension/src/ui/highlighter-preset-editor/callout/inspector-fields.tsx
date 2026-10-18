@@ -8,7 +8,7 @@ import {
   ProductGlassChip,
   ProductGlassRow,
 } from '@sniptale/ui/product-glass-controls';
-import { PaintBucket, Palette, Square } from 'lucide-react';
+import { ChevronDown, PaintBucket, Palette, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode, SyntheticEvent } from 'react';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../../../composition/persistence/highlighter/additional-settings';
 import { CompactColorSelector } from '../../color-selector';
 import { NumericRow } from '../../compact-inspector-controls';
+import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import {
   resolveCalloutBoundColor,
@@ -158,7 +159,10 @@ export function NumericProperty(props: {
 }
 
 export function SettingsStack(props: { children: ReactNode }) {
-  return <div className="grid gap-2">{props.children}</div>;
+  const inspector = useInspectorLayout();
+  return (
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>{props.children}</div>
+  );
 }
 
 const knownAdditionalSettingsState = new Map<HighlighterAdditionalSettingsSection, boolean>();
@@ -171,6 +175,7 @@ export function AdditionalSettings(props: {
     () => knownAdditionalSettingsState.get(props.section) ?? false
   );
   const changedByUser = useRef(false);
+  const inspector = useInspectorLayout();
 
   useEffect(() => {
     if (knownAdditionalSettingsState.has(props.section)) return;
@@ -196,20 +201,35 @@ export function AdditionalSettings(props: {
 
   return (
     <details
-      className="group mt-1 border-t border-solid border-[color:var(--sniptale-color-border-soft)] pt-1.5"
+      className={
+        inspector
+          ? 'group border-t border-solid border-[color:var(--sniptale-color-border-soft)] pt-1'
+          : 'group mt-1 border-t border-solid border-[color:var(--sniptale-color-border-soft)] pt-1.5'
+      }
       onToggle={handleToggle}
       open={isOpen}
     >
       <summary
         className={[
-          'cursor-pointer select-none text-[11px] font-semibold',
+          inspector
+            ? [
+                'flex min-h-8 w-full cursor-pointer list-none items-center justify-between gap-2',
+                'rounded-[4px] px-2 text-[13px] leading-[18px] font-medium',
+                "[&::-webkit-details-marker]:hidden [&::marker]:content-['']",
+              ].join(' ')
+            : 'cursor-pointer select-none text-[11px] font-semibold',
           'text-[var(--sniptale-color-text-secondary)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {translate('content.callout.additionalSettings')}
+        {inspector ? (
+          <ChevronDown size={16} aria-hidden="true" className="shrink-0 group-open:rotate-180" />
+        ) : null}
       </summary>
-      <div className="mt-2 grid gap-2">{props.children}</div>
+      <div className={inspector ? 'sniptale-parameter-stack mt-1' : 'mt-2 grid gap-2'}>
+        {props.children}
+      </div>
     </details>
   );
 }

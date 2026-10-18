@@ -90,7 +90,7 @@ it('renders loading and empty states for gallery content', () => {
   renderGrid(createProps({ isLoading: true }));
   expect(container?.textContent).toContain('gallery.app.loading');
   expect(container?.querySelector('[data-ui="gallery.content.surface"]')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
+    'rounded-[4px]'
   );
 
   renderGrid(createProps());

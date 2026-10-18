@@ -7,14 +7,14 @@ import {
   type PresentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
-import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
-import { translate, useAppLocale } from '../../platform/i18n';
 import {
-  ReviewButton,
-  ReviewDetails,
-  reviewDeleteButtonClassName,
-  reviewSelectFieldClassName,
-} from './controls';
+  ColorField,
+  SegmentedRow,
+  SelectField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
+import { translate, useAppLocale } from '../../platform/i18n';
+import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
@@ -64,21 +64,6 @@ export function ReviewPresentationInspector(props: ReviewPresentationInspectorPr
         ))}
       </div>
     </fieldset>
-  );
-}
-
-function Enabled(props: { label: string; value: boolean; onChange(value: boolean): void }) {
-  return (
-    <SelectField
-      className={reviewSelectFieldClassName}
-      label={props.label}
-      value={props.value ? 'on' : 'off'}
-      options={[
-        { value: 'off', label: label('presentationOff') },
-        { value: 'on', label: label('presentationOn') },
-      ]}
-      onChange={(value) => props.onChange(value === 'on')}
-    />
   );
 }
 
@@ -226,7 +211,7 @@ function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
             label={label(
               props.slot === 'intro' ? 'presentationResetIntro' : 'presentationResetOutro'
             )}
-            className={`${reviewDeleteButtonClassName} mt-3`}
+            className="review-inspector-parameter-command"
             onClick={() => props.onChange(patch({ ...control, mode: 'none' }))}
           >
             <RotateCcw size={14} aria-hidden="true" />
@@ -255,7 +240,7 @@ function FadeFields(
   return (
     <div className="min-w-0 space-y-1">
       {props.media && (
-        <Enabled
+        <ToggleField
           label={label(props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut')}
           value={fade.enabled}
           onChange={(enabled) => props.onChange(patch({ enabled }))}
@@ -284,7 +269,7 @@ function FadeFields(
             onChange={(color) => props.onChange(patch({ color }))}
             onPreviewChange={(color) => props.onPreview(color ? patch({ color }) : null)}
           />
-          <Enabled
+          <ToggleField
             label={label('presentationAudioFade')}
             value={fade.audioFade ?? props.settings.audioFade}
             onChange={(audioFade) => props.onChange(patch({ audioFade }))}
@@ -294,6 +279,7 @@ function FadeFields(
               props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
             )}
             disabled={props.previewDisabled || !props.onJoinPreview}
+            className="review-inspector-parameter-command"
             onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
           >
             <Play size={14} aria-hidden="true" />
@@ -461,7 +447,7 @@ function VideoFields(
         />
       </ReviewDetails>
       {props.hasAudio && (
-        <Enabled
+        <ToggleField
           label={label('presentationSound')}
           value={!video.audio.muted}
           onChange={(enabled) =>

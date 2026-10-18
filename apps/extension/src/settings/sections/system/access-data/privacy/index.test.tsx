@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -28,7 +30,11 @@ async function renderSection() {
   }
 
   await act(async () => {
-    root?.render(<PrivacySection />);
+    root?.render(
+      <CommandPressScope value={true}>
+        <PrivacySection />
+      </CommandPressScope>
+    );
   });
 }
 

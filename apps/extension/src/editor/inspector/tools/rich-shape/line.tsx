@@ -27,7 +27,7 @@ export function RichShapeLineSection(props: RichShapeControlsProps & { compact?:
 
 function RichShapeLineBody(props: RichShapeControlsProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <RichShapeLineColorField {...props} />
       <RichShapeLineWidthField {...props} />
       <RichShapeLineTransparencyField {...props} />

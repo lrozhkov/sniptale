@@ -1,8 +1,9 @@
+import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Play, Timer } from 'lucide-react';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
@@ -29,18 +30,15 @@ export function TourPlaybackSettings({
           ['autoZoom', t('scenario.editor.tourAutoZoom')],
         ] as const
       ).map(([key, label]) => (
-        <label className="guide-number-toggle" key={key}>
-          <ProductToggle
-            size="sm"
-            disabled={disabled}
-            checked={tour.playback[key]}
-            aria-label={label}
-            onClick={() =>
-              onChange({ ...tour, playback: { ...tour.playback, [key]: !tour.playback[key] } })
-            }
-          />
-          {label}
-        </label>
+        <ToggleField
+          key={key}
+          disabled={disabled}
+          value={tour.playback[key]}
+          label={label}
+          onChange={() =>
+            onChange({ ...tour, playback: { ...tour.playback, [key]: !tour.playback[key] } })
+          }
+        />
       ))}
       <TourInspectorNumericRow
         label={t('scenario.editor.tourMinimumHold')}
@@ -53,7 +51,9 @@ export function TourPlaybackSettings({
         onPreview={changeMinimum}
         onChange={changeMinimum}
       />
-      <p className="guide-inspector-hint">{t('scenario.editor.tourAutoplayHint')}</p>
+      <InformationDisclosure label={t('common.actions.details')}>
+        <p>{t('scenario.editor.tourAutoplayHint')}</p>
+      </InformationDisclosure>
     </GuideInspectorGroup>
   );
 }
@@ -78,9 +78,8 @@ export function TourTimingSettings({
   return (
     <GuideInspectorGroup id="timing" icon={Timer} title={t('scenario.editor.tourTiming')}>
       <div className="tour-text-field">
-        <span>{t('scenario.editor.tourDurationMode')}</span>
-        <CompactSelect
-          aria-label={t('scenario.editor.tourDurationMode')}
+        <SelectField
+          label={t('scenario.editor.tourDurationMode')}
           value={timing.mode}
           disabled={disabled}
           options={[
@@ -105,28 +104,23 @@ export function TourTimingSettings({
             onChange={changeHold}
           />
           {slide.narration && (
-            <label className="guide-number-toggle">
-              <ProductToggle
-                size="sm"
-                disabled={disabled}
-                checked={timing.truncateNarration}
-                aria-label={t('scenario.editor.tourTruncateNarration')}
-                onClick={() =>
-                  onChange({
-                    ...slide,
-                    timing: { ...timing, truncateNarration: !timing.truncateNarration },
-                  })
-                }
-              />
-              {t('scenario.editor.tourTruncateNarration')}
-            </label>
+            <ToggleField
+              disabled={disabled}
+              value={timing.truncateNarration}
+              label={t('scenario.editor.tourTruncateNarration')}
+              onChange={() =>
+                onChange({
+                  ...slide,
+                  timing: { ...timing, truncateNarration: !timing.truncateNarration },
+                })
+              }
+            />
           )}
         </>
       )}
       <div className="tour-text-field">
-        <span>{t('scenario.editor.tourAutomaticTransition')}</span>
-        <CompactSelect
-          aria-label={t('scenario.editor.tourAutomaticTransition')}
+        <SelectField
+          label={t('scenario.editor.tourAutomaticTransition')}
           value={timing.autoplayTarget ?? ''}
           disabled={disabled}
           options={[
@@ -141,7 +135,9 @@ export function TourTimingSettings({
           }
         />
       </div>
-      <p className="guide-inspector-hint">{t('scenario.editor.tourTimingHint')}</p>
+      <InformationDisclosure label={t('common.actions.details')}>
+        <p>{t('scenario.editor.tourTimingHint')}</p>
+      </InformationDisclosure>
     </GuideInspectorGroup>
   );
 }

@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useLayoutEffect, useState } from 'react';
 import { Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
@@ -135,7 +136,7 @@ function renderDisplayModeItems(props: {
   );
 }
 
-function renderToolbarSettingsUtilityItems(props: {
+type ToolbarSettingsUtilityItemsProps = {
   compactMenus: boolean;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
@@ -152,7 +153,9 @@ function renderToolbarSettingsUtilityItems(props: {
   screenshotMode: boolean;
   showPinItem?: boolean;
   showHideItem?: boolean;
-}) {
+};
+
+function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsProps) {
   return (
     <>
       <ProductToolbarMenuDivider />
@@ -249,6 +252,7 @@ function renderDisableScreenshotModeItem(props: {
 function ToolbarSettingsDropdownContent(
   props: ToolbarSettingsDropdownProps & { placement: 'up' | 'down' }
 ) {
+  const adopted = React.useContext(CommandPressScope);
   const placement = props.placement;
   const menuPlacement = resolveToolbarMenuPlacement(props.displayMode, placement);
   const menuProps = {
@@ -260,7 +264,7 @@ function ToolbarSettingsDropdownContent(
   };
 
   return (
-    <ProductToolbarMenu {...menuProps}>
+    <ProductToolbarMenu {...menuProps} className={adopted ? 'sniptale-content-menu-adopted' : ''}>
       {props.onFreePlacementChange ? (
         <ToolbarSettingsItem
           icon={<Move aria-hidden className="sniptale-popover-icon" />}
@@ -286,29 +290,13 @@ function ToolbarSettingsDropdownContent(
   );
 }
 
-type ToolbarSettingsDropdownProps = {
-  compactMenus: boolean;
+type ToolbarSettingsDropdownProps = ToolbarSettingsUtilityItemsProps & {
   displayMode: ContentToolbarDisplayMode;
   freePlacement?: boolean;
   onFreePlacementChange?: ((value: boolean) => void) | undefined;
   menuRef: React.RefObject<HTMLDivElement | null>;
   menuStyle?: React.CSSProperties;
-  onClose: () => void;
-  onCompactMenusChange: (compactMenus: boolean) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;
-  onDisableScreenshotMode: (activationEvent?: Event) => void;
-  onHide: () => void;
-  onPinToTabChange: (
-    value: boolean,
-    contentIntentSource?: ContentPrivilegedActionIntentSource
-  ) => void;
-  pinToTab: boolean;
-  pinToTabAvailable: boolean;
-  pinToTabLocked: boolean;
-  autoBlurEnabled?: boolean;
-  screenshotMode: boolean;
-  showPinItem?: boolean;
-  showHideItem?: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   viewportRightInset?: number;
 };

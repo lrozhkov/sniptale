@@ -135,7 +135,7 @@ describe('editor toolbar ownership seam', () => {
 
     const zoomToggleAtOneHundred = queryZoomToggleButton(100);
     expect(zoomToggleAtOneHundred.title).toContain(translate('editor.toolbar.fitToWindow'));
-    expect(zoomToggleAtOneHundred.className).toContain('border-transparent bg-transparent');
+    expect(zoomToggleAtOneHundred.className).toContain('sniptale-btn-utility');
     expect(zoomToggleAtOneHundred.className).not.toContain('border-none');
     expect(
       document.querySelector(`button[title="${translate('editor.toolbar.fitToWindow')}"]`)

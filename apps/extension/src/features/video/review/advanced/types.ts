@@ -38,6 +38,7 @@ export interface QuickEditUiState {
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
   advancedTracksInitialized?: boolean;
   tracks: QuickEditTrackVisibility;
+  /** Retained legacy data; the editor no longer applies lane locks. */
   lockedTracks?: Partial<Record<QuickEditTrack, boolean>>;
   /** Editor-only overlay display; the data and the export flag are untouched. */
   overlaysVisible: boolean;

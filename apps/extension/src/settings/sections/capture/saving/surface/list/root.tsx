@@ -77,16 +77,15 @@ export function PresetsList(props: SavePresetsListProps) {
               {translate('savePresets.section.listDescription')}
             </p>
           </div>
-          <label className="w-full max-w-[280px] text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
-            {translate('savePresets.section.searchLabel')}
-            <ProductInput
+          <div className="w-full max-w-[280px]">
+            <TextField
+              label={translate('savePresets.section.searchLabel')}
               type="search"
-              className="mt-1 w-full"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={translate('savePresets.section.searchPlaceholder')}
             />
-          </label>
+          </div>
         </div>
         <SettingsCollection
           ariaLabel={translate('savePresets.section.folderPresetsLabel')}
@@ -122,4 +121,4 @@ export function PresetsList(props: SavePresetsListProps) {
   );
 }
 import { useState } from 'react';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { TextField } from '../../../../../../ui/compact-inspector-controls';

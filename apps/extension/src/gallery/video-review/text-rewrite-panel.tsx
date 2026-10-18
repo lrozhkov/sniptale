@@ -1,8 +1,8 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
-import { ProductField, ProductTextarea, ProductSelect } from '@sniptale/ui/product-form-controls';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { ToggleField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
 import { AIModelSelector } from '../../features/ai/model-selector';
-import { ReviewButton, ReviewDetails, reviewTextButtonClassName } from './controls';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { useReviewTextRewrite } from './use-text-rewrite';
 import { ReviewTextRewritePreview } from './text-rewrite-preview';
@@ -30,12 +30,11 @@ export function ReviewTextRewriteForm(props: {
   const operation = useReviewTextRewrite(props);
   const { preview } = operation;
   const error = operation.error ?? operation.disclosureError;
-  const context = preview?.context ?? operation.disclosure?.context;
   const label = (key: keyof typeof errors) => translate(errors[key]);
   return (
     <section
       data-ui="gallery.videoReview.textRewrite"
-      className="min-w-0 space-y-2"
+      className="min-w-0 sniptale-parameter-stack"
       onKeyDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2">
@@ -52,30 +51,24 @@ export function ReviewTextRewriteForm(props: {
           {translate('gallery.videoReview.textRewriteTitle')}
         </span>
       </div>
-      <p className="text-xs">
-        {translate(
-          props.wholeDocument
-            ? 'gallery.videoReview.textRewriteAllScope'
-            : 'gallery.videoReview.textRewriteSelectedScope'
-        ).replace('{count}', String(props.ids.length))}
-      </p>
+      {props.wholeDocument || props.ids.length > 1 ? (
+        <p className="text-xs">
+          {translate(
+            props.wholeDocument
+              ? 'gallery.videoReview.textRewriteAllScope'
+              : 'gallery.videoReview.textRewriteSelectedScope'
+          ).replace('{count}', String(props.ids.length))}
+        </p>
+      ) : null}
       <RewriteSettings
         operation={operation}
         disabled={props.disabled}
         wholeDocument={props.wholeDocument}
       />
       <p className="text-xs">{translate('gallery.videoReview.textRewriteDisclosure')}</p>
-      <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
-      {context && (
-        <ReviewDetails
-          label={translate('gallery.videoReview.textRewriteOutbound')}
-          preferenceId="text-rewrite-disclosure"
-        >
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs">
-            {JSON.stringify(context, null, 2)}
-          </pre>
-        </ReviewDetails>
-      )}
+      {!props.access.session.getSnapshot().autosaveEnabled ? (
+        <p className="text-xs">{translate('gallery.videoReview.textVoiceSaveDisclosure')}</p>
+      ) : null}
       {error && (
         <p role="alert" className="text-xs">
           {label(error in errors ? (error as keyof typeof errors) : 'failed')}
@@ -132,12 +125,13 @@ function RewriteSettings({
   const patch = (change: Partial<typeof options>) =>
     operation.setOptions((current) => ({ ...current, ...change }));
   return (
-    <fieldset disabled={locked} className="min-w-0 space-y-2">
-      <ProductField label={translate('gallery.videoReview.textRewriteModel')}>
+    <fieldset disabled={locked} className="min-w-0 sniptale-parameter-stack">
+      <InspectorParameterRow stacked label={translate('gallery.videoReview.textRewriteModel')}>
         {operation.catalog ? (
           <AIModelSelector
             models={operation.catalog.models}
             providers={operation.catalog.providers}
+            onOpen={operation.reloadModels}
             selectedModelId={operation.modelId || null}
             onSelect={(id) => operation.setModelId(id ?? '')}
             disabled={locked}
@@ -150,16 +144,8 @@ function RewriteSettings({
             </span>
           )
         )}
-      </ProductField>
-      {!!operation.providerName && (
-        <p className="text-xs">
-          {translate('gallery.videoReview.textRewriteDestination').replace(
-            '{provider}',
-            operation.providerName
-          )}
-        </p>
-      )}
-      {!operation.catalog && operation.error && (
+      </InspectorParameterRow>
+      {((!operation.catalog && operation.error) || operation.catalog?.models.length === 0) && (
         <ReviewButton
           label={translate('gallery.videoReview.speechReloadModels')}
           className={buttonClass}
@@ -168,36 +154,27 @@ function RewriteSettings({
           {translate('gallery.videoReview.speechReloadModels')}
         </ReviewButton>
       )}
-      <ProductField label={translate('gallery.videoReview.textRewritePrompt')}>
-        <ProductTextarea
-          aria-label={translate('gallery.videoReview.textRewritePrompt')}
-          rows={3}
-          value={options.prompt}
-          maxLength={4_000}
-          onChange={(event) => patch({ prompt: event.target.value })}
-        />
-      </ProductField>
-      <ProductField label={translate('gallery.videoReview.textRewriteMode')}>
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.textRewriteMode')}
-          value={options.mode}
-          options={[
-            { value: 'phrases', label: translate('gallery.videoReview.textRewritePhrases') },
-            { value: 'script', label: translate('gallery.videoReview.textRewriteScript') },
-          ]}
-          onChange={(mode: 'phrases' | 'script') => patch({ mode, resegment: false })}
-        />
-      </ProductField>
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span>{translate('gallery.videoReview.textRewriteTiming')}</span>
-        <ProductGlassSwitch
-          role="switch"
-          aria-label={translate('gallery.videoReview.textRewriteTiming')}
-          aria-checked={options.changeIntervals}
-          on={options.changeIntervals}
-          onClick={() => patch({ changeIntervals: !options.changeIntervals, resegment: false })}
-        />
-      </div>
+      <TextareaField
+        label={translate('gallery.videoReview.textRewritePrompt')}
+        rows={3}
+        value={options.prompt}
+        maxLength={4_000}
+        onChange={(prompt) => patch({ prompt })}
+      />
+      <SelectField
+        label={translate('gallery.videoReview.textRewriteMode')}
+        value={options.mode}
+        options={[
+          { value: 'phrases', label: translate('gallery.videoReview.textRewritePhrases') },
+          { value: 'script', label: translate('gallery.videoReview.textRewriteScript') },
+        ]}
+        onChange={(mode: 'phrases' | 'script') => patch({ mode, resegment: false })}
+      />
+      <ToggleField
+        label={translate('gallery.videoReview.textRewriteTiming')}
+        value={options.changeIntervals}
+        onChange={(changeIntervals) => patch({ changeIntervals, resegment: false })}
+      />
       {options.changeIntervals && window && (
         <>
           <p className="text-xs">{translate('gallery.videoReview.textRewriteWindow')}</p>
@@ -222,16 +199,11 @@ function RewriteSettings({
         </>
       )}
       {wholeDocument && options.mode === 'script' && options.changeIntervals && (
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span>{translate('gallery.videoReview.textRewriteStructure')}</span>
-          <ProductGlassSwitch
-            role="switch"
-            aria-label={translate('gallery.videoReview.textRewriteStructure')}
-            aria-checked={options.resegment}
-            on={options.resegment}
-            onClick={() => patch({ resegment: !options.resegment })}
-          />
-        </div>
+        <ToggleField
+          label={translate('gallery.videoReview.textRewriteStructure')}
+          value={options.resegment}
+          onChange={(resegment) => patch({ resegment })}
+        />
       )}
     </fieldset>
   );

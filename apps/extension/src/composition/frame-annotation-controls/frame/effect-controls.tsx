@@ -1,3 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls';
 import { Droplet, Focus, Square } from 'lucide-react';
 
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
@@ -34,6 +37,28 @@ export function FrameEffectModeSelector(props: {
   effectMode: EffectMode;
   onChange: (mode: EffectMode) => void;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector)
+    return (
+      <ContentPopoverSection className="sniptale-frame-effect-mode-section">
+        <div className="grid grid-cols-3 gap-1">
+          {EFFECT_MODES.map(({ icon: Icon, mode }) => (
+            <ProductActionButton
+              compact
+              tone="toggle"
+              active={props.effectMode === mode}
+              aria-pressed={props.effectMode === mode}
+              key={mode}
+              onClick={() => props.onChange(mode)}
+              title={getEffectLabel(mode)}
+            >
+              <Icon size={15} />
+              <span>{getEffectLabel(mode)}</span>
+            </ProductActionButton>
+          ))}
+        </div>
+      </ContentPopoverSection>
+    );
   return (
     <ContentPopoverSection className="sniptale-frame-effect-mode-section">
       <ProductGlassOptionGrid>
@@ -57,10 +82,22 @@ export function FrameEffectModeSelector(props: {
 }
 
 export function FrameDecorationToggle(props: {
+  embedded?: boolean;
   onChange: (showBorder: boolean) => void;
   showBorder: boolean;
 }) {
   const label = translate('content.overlayControls.showBorderTitle');
+  const inspector = useInspectorLayout();
+  if (inspector) {
+    const toggle = <ToggleField label={label} value={props.showBorder} onChange={props.onChange} />;
+    return props.embedded ? (
+      toggle
+    ) : (
+      <ContentPopoverSection className="sniptale-frame-decoration-section">
+        {toggle}
+      </ContentPopoverSection>
+    );
+  }
   return (
     <ContentPopoverSection className="sniptale-frame-decoration-section">
       <PropertyField label={label}>
@@ -77,24 +114,36 @@ export function FrameDecorationToggle(props: {
 }
 
 export function FrameBlurControls(props: {
+  embedded?: boolean;
   handleBlurChange: (amount: number) => void;
   handleBlurTypeChange: (blurType: BlurType) => void;
   settings: BlurSettings;
 }) {
+  const inspector = useInspectorLayout();
   const label = translate('content.overlayControls.blurStrengthLabelPrefix');
-  return (
-    <ContentPopoverSection>
-      <div className="grid gap-3">
-        <NumericRow
-          appearance="plain"
-          label={label}
-          max={25}
-          min={1}
-          onCommitValue={props.handleBlurChange}
-          onPreviewValue={props.handleBlurChange}
-          scrub={{ max: 25, min: 1 }}
-          value={props.settings.amount}
+  const fields = (
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
+      <NumericRow
+        appearance="plain"
+        label={label}
+        max={25}
+        min={1}
+        onCommitValue={props.handleBlurChange}
+        onPreviewValue={props.handleBlurChange}
+        scrub={{ max: 25, min: 1 }}
+        value={props.settings.amount}
+      />
+      {inspector ? (
+        <SelectField
+          label={translate('content.overlayControls.blurTypeLabel')}
+          onChange={props.handleBlurTypeChange}
+          options={buildBlurTypeOptions().map((option) => ({
+            label: option.label,
+            value: option.value,
+          }))}
+          value={props.settings.blurType}
         />
+      ) : (
         <PropertyField label={translate('content.overlayControls.blurTypeLabel')}>
           <CompactSelect
             appearance="plain"
@@ -107,46 +156,48 @@ export function FrameBlurControls(props: {
             value={props.settings.blurType}
           />
         </PropertyField>
-      </div>
-    </ContentPopoverSection>
+      )}
+    </div>
   );
+  return props.embedded ? fields : <ContentPopoverSection>{fields}</ContentPopoverSection>;
 }
 
 export function FrameFocusControls(props: {
+  embedded?: boolean;
   handleFocusBlurChange: (blurAmount: number) => void;
   handleFocusChange: (opacity: number) => void;
   settings: FocusSettings;
 }) {
+  const inspector = useInspectorLayout();
   const dimmingLabel = translate('content.overlayControls.focusDimmingLabelPrefix');
   const blurLabel = translate('content.overlayControls.focusBlurLabel');
   const dimmingValue = Math.round(props.settings.opacity * 100);
   const handleDimmingChange = (nextValue: number) => props.handleFocusChange(nextValue / 100);
-  return (
-    <ContentPopoverSection>
-      <div className="grid gap-3">
-        <NumericRow
-          appearance="plain"
-          label={dimmingLabel}
-          max={100}
-          min={0}
-          onCommitValue={handleDimmingChange}
-          onPreviewValue={handleDimmingChange}
-          scrub={{ max: 100, min: 0 }}
-          unit="%"
-          value={dimmingValue}
-        />
-        <NumericRow
-          appearance="plain"
-          label={blurLabel}
-          max={25}
-          min={0}
-          onCommitValue={props.handleFocusBlurChange}
-          onPreviewValue={props.handleFocusBlurChange}
-          scrub={{ max: 25, min: 0 }}
-          unit="px"
-          value={props.settings.blurAmount ?? 0}
-        />
-      </div>
-    </ContentPopoverSection>
+  const fields = (
+    <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
+      <NumericRow
+        appearance="plain"
+        label={dimmingLabel}
+        max={100}
+        min={0}
+        onCommitValue={handleDimmingChange}
+        onPreviewValue={handleDimmingChange}
+        scrub={{ max: 100, min: 0 }}
+        unit="%"
+        value={dimmingValue}
+      />
+      <NumericRow
+        appearance="plain"
+        label={blurLabel}
+        max={25}
+        min={0}
+        onCommitValue={props.handleFocusBlurChange}
+        onPreviewValue={props.handleFocusBlurChange}
+        scrub={{ max: 25, min: 0 }}
+        unit="px"
+        value={props.settings.blurAmount ?? 0}
+      />
+    </div>
   );
+  return props.embedded ? fields : <ContentPopoverSection>{fields}</ContentPopoverSection>;
 }

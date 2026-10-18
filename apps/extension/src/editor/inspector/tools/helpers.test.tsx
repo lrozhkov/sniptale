@@ -74,8 +74,8 @@ afterEach(() => {
 });
 
 it('exports shared chrome classes and preserves shared tool props', () => {
-  expect(panelButtonClassName).toContain('rounded-[12px]');
-  expect(primaryPanelButtonClassName).toContain('text-[12px] font-medium');
+  expect(panelButtonClassName).toContain('rounded-[4px]');
+  expect(primaryPanelButtonClassName).toContain('text-[13px] font-medium');
   expect(secondaryPanelButtonClassName).toContain('border-none');
   expect(
     selectSharedToolProps({

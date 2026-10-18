@@ -11,17 +11,17 @@ interface HotkeyInputProps {
   placeholder?: string;
 }
 
-const hotkeyInputRecordingClassName = [
-  'border-[var(--sniptale-color-border-accent-strong)]',
-  'shadow-[0_0_15px_color-mix(in_srgb,var(--sniptale-color-accent)_20%,transparent)]',
-].join(' ');
+const hotkeyInputRecordingClassName = ['border-[var(--sniptale-color-border-accent-strong)]'].join(
+  ' '
+);
 
 const hotkeyInputIdleClassName = 'border-[var(--sniptale-color-border-soft)]';
 
 const hotkeyInputFieldBaseClassName = [
-  'flex h-9 min-w-0 flex-1 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-left',
+  'flex h-8 min-w-0 flex-1 cursor-pointer items-center rounded-[4px] border px-3 py-1.5 text-left',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_42%,transparent)]',
-  'text-sm text-[var(--sniptale-color-text-primary)] transition-all duration-200 focus:outline-none',
+  'text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-primary)]',
+  'transition-all duration-200 focus:outline-none',
   'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 
@@ -32,7 +32,7 @@ function HotkeyInputClearButton({ handleClear }: { handleClear: (event: MouseEve
       onClick={handleClear}
       className={[
         'sniptale-dismiss-button',
-        'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+        'flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
         'transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
@@ -126,7 +126,7 @@ export function HotkeyInput({
         <p
           id={hintId}
           role="status"
-          className="mt-1 text-[11px] leading-4 text-[var(--sniptale-color-accent)]"
+          className="mt-1 text-xs leading-4 text-[var(--sniptale-color-accent)]"
         >
           {translate('settings.hotkeyInput.recordingHint')}
         </p>

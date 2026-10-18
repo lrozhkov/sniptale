@@ -317,12 +317,14 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
   const { host, props } = renderTimeline({
     originalRangeTool: true,
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
-    audioTrack: (
-      <>
-        <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />
-        <div data-ui="gallery.videoReview.audioLane" />
-      </>
-    ),
+    audioTracks: {
+      originalAudio: (
+        <>
+          <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />
+          <div data-ui="gallery.videoReview.audioLane" />
+        </>
+      ),
+    },
   });
   const plane = planeWithMetrics(host);
   const source = host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!;
@@ -396,15 +398,17 @@ it('clears range hover before original audio takes local pointer capture', () =>
   const localDown = vi.fn((event: React.PointerEvent) => event.stopPropagation());
   const { host } = renderTimeline({
     originalRangeTool: true,
-    audioTrack: (
-      <ReviewTrackRow label="Original audio">
-        <div
-          data-ui="gallery.videoReview.audioLane"
-          data-original-audio-lane
-          onPointerDown={localDown}
-        />
-      </ReviewTrackRow>
-    ),
+    audioTracks: {
+      originalAudio: (
+        <ReviewTrackRow label="Original audio">
+          <div
+            data-ui="gallery.videoReview.audioLane"
+            data-original-audio-lane
+            onPointerDown={localDown}
+          />
+        </ReviewTrackRow>
+      ),
+    },
   });
   const plane = planeWithMetrics(host);
   const lane = host.querySelector('[data-original-audio-lane]')!;
@@ -548,7 +552,9 @@ it('keeps source video and ruler out of original gain drawing and uses seek curs
 it('reveals only the active tool lane vertically and preserves horizontal scrolling and selections', () => {
   const { host, props } = renderTimeline({
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
-    audioTrack: <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />,
+    audioTracks: {
+      originalAudio: <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />,
+    },
     annotationEffectsTrack: <ActualAnnotationLane />,
     playbackRange: { start: 1, end: 3 },
   });

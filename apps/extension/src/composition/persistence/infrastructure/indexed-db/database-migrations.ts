@@ -13,6 +13,8 @@ import {
   SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
 } from './core.stores.ts';
 
 // The beta baseline has no predecessor. Every future database version must append a complete,
@@ -747,6 +749,35 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         ].every((name) => db.objectStoreNames.contains(name))
       )
         throw new Error('Track control stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'recordings', from: 2, to: 3 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 32,
+    toDatabaseVersion: 33,
+    risk: 'additive',
+    stores: [RECORDING_RECOVERY_SESSIONS_STORE, RECORDING_RECOVERY_BLOCKS_STORE],
+    migrate(db) {
+      db.createObjectStore(RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }).createIndex(
+        'createdAt',
+        'createdAt'
+      );
+      db.createObjectStore(RECORDING_RECOVERY_BLOCKS_STORE, {
+        keyPath: ['id', 'index'],
+      }).createIndex('id', 'id');
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![RECORDING_RECOVERY_SESSIONS_STORE, RECORDING_RECOVERY_BLOCKS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      ) {
+        throw new Error('Recording recovery stores are unavailable.');
+      }
       return undefined;
     },
   },

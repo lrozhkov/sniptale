@@ -15,7 +15,7 @@ describe('document action shared UI', () => {
   it('keeps file action rows transparent until hover or focus', () => {
     expect(documentActionsSurfaceClassName).toBe('space-y-1.5');
     expect(primaryPanelButtonClassName).toContain('inline-flex');
-    expect(primaryPanelButtonClassName).toContain('h-10');
+    expect(primaryPanelButtonClassName).toContain('h-8');
     expect(primaryPanelButtonClassName).toContain('bg-transparent');
     expect(primaryPanelButtonClassName).toContain('hover:bg-');
     expect(secondaryPanelButtonClassName).toContain('bg-transparent');

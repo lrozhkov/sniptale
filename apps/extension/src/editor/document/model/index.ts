@@ -75,6 +75,8 @@ export function fontFamilyToCss(fontFamily: string): string {
     case 'cursive':
       return '"Segoe Print", "Bradley Hand", "Comic Sans MS", cursive';
     case 'sans':
+    case 'Sniptale Text':
+      return '"Sniptale Text", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     default:
       return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   }

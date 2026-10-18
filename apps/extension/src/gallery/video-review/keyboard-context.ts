@@ -38,7 +38,11 @@ export function reviewOwnsPlaybackKeys(target: HTMLElement): boolean {
     )
   )
     return true;
-  if (target.closest('[aria-haspopup][aria-expanded="true"],[role="checkbox"],[role="radio"]'))
+  if (
+    target.closest(
+      '[aria-haspopup][aria-expanded="true"],[role="checkbox"],[role="radio"],[role="switch"]'
+    )
+  )
     return true;
   return reviewOwnsKeys(target) && !target.closest('input[type="range"],[role="slider"]');
 }

@@ -14,7 +14,7 @@ export function EditorDocumentExportPreferencesQualitySection(props: {
   };
 
   return (
-    <section className="space-y-2">
+    <section className="sniptale-parameter-stack">
       <NumericRow
         label={translate('imageSettings.section.qualityLabel')}
         value={props.settings.imageQuality}

@@ -40,11 +40,12 @@ function createInspectorIcon(Icon: LucideIcon) {
 }
 
 export function EditorToolbarToolButtons(props: {
+  tools?: readonly EditorTool[];
   hasImage: boolean;
   isToolButtonActive: (tool: EditorTool) => boolean;
   onActivateTool: (tool: EditorTool) => void;
 }) {
-  return TOOL_ORDER.map((tool) => (
+  return (props.tools ?? TOOL_ORDER).map((tool) => (
     <EditorIconButton
       key={tool}
       title={getDocumentRequiredTitle(getToolLabel(tool), props.hasImage)}

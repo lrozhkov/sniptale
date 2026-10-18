@@ -3,7 +3,7 @@ import { EditorInspectorGridStyleSections, EditorInspectorGridToggleSections } f
 
 export function GridPanelSections(props: GridPanelBodyProps) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <EditorInspectorGridToggleSections
         gridEnabled={props.gridEnabled}
         gridSnapEnabled={props.gridSnapEnabled}

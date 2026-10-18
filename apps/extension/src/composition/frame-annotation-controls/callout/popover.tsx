@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
 import type {
@@ -14,7 +15,11 @@ import {
   type CalloutSettingsPatch,
 } from '../../../features/highlighter/frame-annotation/callout/model';
 import { createCalloutSaveSection } from './save-section';
-import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
+import {
+  resolvePopoverPortalTarget,
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../popover/surface';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
 import type { TemplateSourceControl } from '../popover/template-source';
@@ -34,6 +39,7 @@ export function FutureCalloutSettingsPopover(props: {
   templateSourceControl?: TemplateSourceControl;
   frameColors?: CalloutFrameColors;
 }) {
+  const inspector = useInspectorLayout();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [localSettings, setLocalSettings] = useState(props.settings);
   const [nestedLayerOpen, setNestedLayerOpen] = useState(false);
@@ -126,6 +132,9 @@ export function FutureCalloutSettingsPopover(props: {
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
       className={[
+        inspector
+          ? 'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface'
+          : '',
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
@@ -161,14 +170,4 @@ export function FutureCalloutSettingsPopover(props: {
       />
     </ContentPopoverAdapter>
   );
-}
-
-function resolvePopoverPortalTarget(
-  target: Element | DocumentFragment | undefined
-): HTMLElement | ShadowRoot | DocumentFragment {
-  return target instanceof HTMLElement ||
-    target instanceof ShadowRoot ||
-    target instanceof DocumentFragment
-    ? target
-    : document.body;
 }

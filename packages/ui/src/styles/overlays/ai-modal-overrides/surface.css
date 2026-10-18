@@ -323,3 +323,159 @@
   background: transparent;
   box-shadow: none;
 }
+
+/* The content modal keeps its own scroll and resize owners. */
+.sniptale-ai-modal-adopted {
+  font: 500 13px/18px var(--sniptale-font-interface);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-header-content {
+  min-width: 0;
+  gap: 8px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-icon-badge {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-header-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-context-info {
+  overflow-wrap: anywhere;
+  font: 400 12px/16px var(--sniptale-font-interface);
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-modal-body {
+  gap: 12px;
+  min-height: 0;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-textarea {
+  padding: 8px 12px 48px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-input);
+  box-shadow: none;
+  font: 500 13px/18px var(--sniptale-font-interface);
+  text-align: start;
+  user-select: text;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-textarea:focus {
+  border-color: var(--sniptale-color-border-strong) !important;
+  box-shadow: none !important;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-textarea::placeholder {
+  color: var(--sniptale-color-text-secondary);
+  font: inherit;
+  opacity: 1;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-template-picker {
+  left: auto;
+  right: auto;
+  inset-inline-start: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 88px);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-template-select .sniptale-select-sm {
+  --sniptale-field-height: 32px;
+  --sniptale-field-radius: 4px;
+  --sniptale-field-font-size: 13px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-template-select {
+  width: 180px;
+  max-width: calc(100% - 36px);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-voice-control {
+  left: auto;
+  right: auto;
+  inset-inline-end: 40px;
+  bottom: 8px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-submit-hint {
+  left: auto;
+  right: auto;
+  inset-inline-end: 8px;
+  bottom: 8px;
+  width: 32px;
+  height: 32px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-inline-settings {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-voice-error,
+.sniptale-ai-modal-adopted .sniptale-ai-modal-model-error {
+  max-width: 100%;
+  font: 400 14px/20px var(--sniptale-font-interface);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.sniptale-ai-modal-adopted .sniptale-modal-footer {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-model-controls {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-model-field {
+  min-width: 0;
+  flex: 1;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-footer-actions {
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-token-text {
+  font: 400 12px/16px var(--sniptale-font-interface);
+}
+
+.sniptale-ai-template-menu-adopted.sniptale-ai-modal-template-menu {
+  width: min(420px, calc(100vw - 24px)) !important;
+  font: 500 13px/18px var(--sniptale-font-interface);
+}
+
+.sniptale-ai-template-menu-adopted .sniptale-select-value-label-menu {
+  font: 500 13px/18px var(--sniptale-font-interface);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-ai-template-menu-adopted .sniptale-select-option-description {
+  color: var(--sniptale-color-text-secondary);
+  font: 400 12px/16px var(--sniptale-font-interface);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.sniptale-ai-template-menu-adopted .sniptale-select-option:focus-visible {
+  outline: 2px solid var(--sniptale-color-border-accent-strong);
+  outline-offset: -2px;
+}

@@ -1,4 +1,3 @@
-import { useId } from 'react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -213,6 +212,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             </ReviewButton>
             {props.originalAudioEditor.originalTool && sourceAudioReady ? (
               <ProductSelect
+                menuClassName="sniptale-parameter-menu"
                 aria-label={translate('gallery.videoReview.volume')}
                 controlSize="sm"
                 className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -312,7 +312,7 @@ export function ReviewTrackControls(props: {
         </>
       ) : null}
       {props.density ? (
-        <div className="flex shrink-0 items-center">
+        <div className="ml-auto flex w-7 shrink-0 items-center justify-center">
           <ReviewTrackHeightButton {...props.density} />
         </div>
       ) : null}
@@ -368,6 +368,7 @@ function ReviewFocusToolControl({
       </ReviewButton>
       {tool.active ? (
         <ProductSelect
+          menuClassName="sniptale-parameter-menu"
           aria-label={translate('gallery.videoReview.focusType')}
           controlSize="sm"
           className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -397,9 +398,6 @@ function ReviewAnnotationToolControl(props: {
 }) {
   const { tool, busy, admit } = props;
   const hint = annotationTypeHint(tool);
-  const requiredId = useId();
-  const required =
-    tool.phase === 'ready' && !tool.pending && !tool.value && tool.options.length > 0;
   return (
     <ReviewToolGroup
       active={tool.active}
@@ -426,8 +424,8 @@ function ReviewAnnotationToolControl(props: {
       {tool.active ? (
         <>
           <ProductSelect
+            menuClassName="sniptale-parameter-menu"
             aria-label={translate('gallery.videoReview.annotationEffectsChoose')}
-            aria-describedby={required ? requiredId : undefined}
             dataUi="gallery.videoReview.annotationType"
             controlSize="sm"
             className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
@@ -439,14 +437,6 @@ function ReviewAnnotationToolControl(props: {
             disabled={busy || tool.pending || tool.phase !== 'ready' || !tool.options.length}
             onChange={(value) => admit(() => tool.onChoose(value))}
           />
-          {required ? (
-            <span id={requiredId} className="-ml-1 text-[var(--sniptale-color-danger)]">
-              <span aria-hidden="true">*</span>
-              <span className="sr-only">
-                {translate('gallery.videoReview.annotationEffectsRequired')}
-              </span>
-            </span>
-          ) : null}
           <ReviewAnnotationToolFeedback {...props} hint={hint} />
         </>
       ) : null}

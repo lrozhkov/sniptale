@@ -55,7 +55,7 @@ export function NumericRow({ className, ...props }: NumericRowProps) {
       appearance="plain"
       focusAppearance="accent-box"
       {...props}
-      className={cx('min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!', className)}
+      {...(className === undefined ? {} : { className })}
     />
   );
 }

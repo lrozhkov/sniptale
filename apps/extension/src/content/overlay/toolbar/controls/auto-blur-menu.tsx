@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useCallback, useRef } from 'react';
 import { Check, ScanSearch, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
@@ -172,6 +173,7 @@ function AutoBlurDropdown(props: DropdownProps) {
   return (
     <div ref={props.menuRef as React.Ref<HTMLDivElement>} data-ui="content.toolbar.auto-blur-menu">
       <ProductToolbarMenu
+        className="sniptale-content-menu-adopted"
         compact={props.compactMenus}
         title={translate('content.toolbar.autoBlur')}
         variant="capture"
@@ -246,6 +248,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
     <div className="relative sniptale-toolbar-privacy-group-start">
       <ContentToolbarButton
         ref={bindings.triggerRef}
+        tone="property"
         active={props.autoBlur?.autoApplyEnabled === true}
         onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
           event.stopPropagation();
@@ -261,7 +264,7 @@ export function AutoBlurMenu(props: AutoBlurMenuProps) {
         <ShieldCheck size={20} strokeWidth={2} />
       </ContentToolbarButton>
 
-      {renderAutoBlurDropdown(props, bindings)}
+      <CommandPressScope value={false}>{renderAutoBlurDropdown(props, bindings)}</CommandPressScope>
     </div>
   );
 }

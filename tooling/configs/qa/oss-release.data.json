@@ -128,22 +128,22 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md",
-      "sha256": "847ce2b0f9f2f5ac2cd17fc14dfbadf4a0b2f75343f9000c9f58048189854447",
+      "sha256": "1b1ccd436594b1bbcf231e78d1f2b46f01b9d095579c0f6937a92e5fbc978b10",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/README.md"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json",
-      "sha256": "6f6f91fd786abf85cbc0281967836261e005d8fec6475f760a77ae2dd9294171",
+      "sha256": "f2de38358f81dca7095c5663099982b2b07b6f22885b7a9b4e8dec5c076a2856",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-manifest.json"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz",
-      "sha256": "79ba17a912f532b34032e5f53319693d6f8720dec9f17934c2f6d278cd5a1076",
+      "sha256": "7ee5cb96bb3bdaee81ae9a5f8671aba99edbae7f1c7460cf648134d75d816980",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/patch-payload.json.gz"
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch",
-      "sha256": "37dca864f03e43540178c28155a49d40198038f8e7f1c2315e0684ef45c914b6",
+      "sha256": "9726490611bc920c98c1330234ff31ac426ad69d9cfd9234c1675eb733a80d00",
       "source": "LICENSES/dependencies/mediabunny-1.61.3-modified/source.patch"
     },
     {
@@ -233,18 +233,28 @@
     },
     {
       "archivePath": "NOTICE",
-      "sha256": "a35ee4ae151a38693b3faaf4fe9bd9d28d5587969e7557bc3136aee47d333ef5",
+      "sha256": "ca04f3ab3cfdb979c94ad3adb04bc07d2a3b8db1cca680ebf3663422102a5d9a",
       "source": "NOTICE"
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "0d85b0fb2aae890026dd9c9c83a37428cac20453e7990be1c178282d924de60d",
+      "sha256": "b9c983c82a6c58efd74e4bcdc78e054fc3f64b9e20e807365c4e7b22dacb763a",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "012a3724b078c8ad1c2227f6dd72a9b955f525bd2499054559d4d7bbaf438e94",
+      "sha256": "cf33237720d1846ed5e2c65d13c906940ddbe3f44dc56e7bab245b81fe67ed40",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "packages/ui/src/styles/golos-text/LICENSE.txt",
+      "sha256": "2c7e44f733787b9d9fe9ee3f857e24bed455523b14804ebf73480c125e4b6784",
+      "source": "packages/ui/src/styles/golos-text/LICENSE.txt"
+    },
+    {
+      "archivePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
+      "sha256": "c8e985ff79ce19d0c8029ef5d772c18044cdcafb5294e629722c979d169820a9",
+      "source": "packages/ui/src/styles/golos-ui/LICENSE.txt"
     }
   ],
   "bundledAssets": [
@@ -268,26 +278,32 @@
       ]
     },
     {
-      "id": "manrope",
-      "sourcePackage": "@fontsource-variable/manrope",
-      "version": "5.3.0",
+      "id": "golos-ui",
+      "sourcePackage": "@sniptale/ui",
+      "version": "2.000",
       "license": "OFL-1.1",
-      "copyright": "Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)",
+      "licensePath": "packages/ui/src/styles/golos-ui/LICENSE.txt",
+      "copyright": "Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name \"Golos UI\".",
       "artifacts": [
         {
-          "path": "apps/extension/public/fonts/manrope-cyrillic-wght-normal.woff2",
-          "sha256": "c268b459a9329e59fecf39a17618efd44c71735532048d60b12aab76a8c14914",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2"
-        },
+          "path": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2",
+          "sha256": "ec7584959184bcbd5b6cf65c5aacc2ad3ca3afc42ec3b0976f0260c33d1900a1",
+          "sourcePath": "packages/ui/src/styles/golos-ui/golos-ui-vf.woff2"
+        }
+      ]
+    },
+    {
+      "id": "golos-text",
+      "sourcePackage": "@sniptale/ui",
+      "version": "2.005",
+      "license": "OFL-1.1",
+      "licensePath": "packages/ui/src/styles/golos-text/LICENSE.txt",
+      "copyright": "Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name \"Golos Text\".",
+      "artifacts": [
         {
-          "path": "apps/extension/public/fonts/manrope-latin-ext-wght-normal.woff2",
-          "sha256": "3911b66d9f2e005a4b989223405d0e5032619c668597ba467cc76a23c8fffcfb",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2"
-        },
-        {
-          "path": "apps/extension/public/fonts/manrope-latin-wght-normal.woff2",
-          "sha256": "a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972",
-          "sourcePath": "node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2"
+          "path": "packages/ui/src/styles/golos-text/golos-text-vf.woff2",
+          "sha256": "ee021f497d8f5b323b9dc5653b88380be86a176de08cbe74d6fe721cafe9c843",
+          "sourcePath": "packages/ui/src/styles/golos-text/golos-text-vf.woff2"
         }
       ]
     }
@@ -309,14 +325,7 @@
   "dependencyLegal": {
     "manifestPath": "THIRD_PARTY_DEPENDENCIES.json",
     "licenseDirectory": "LICENSES/dependencies",
-    "canonicalLicenseAliases": [
-      {
-        "packageName": "@fontsource-variable/manrope",
-        "version": "5.3.0",
-        "archivePath": "LICENSES/OFL-1.1.txt",
-        "sha256": "d826ab6583b12c26807d8716a545bdbbb672df04f48608a364ba9efdbe501c30"
-      }
-    ],
+    "canonicalLicenseAliases": [],
     "pinnedSources": [
       {
         "packageName": "@iconify-icons/tabler",

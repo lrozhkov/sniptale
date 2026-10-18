@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sniptale · Design reference</title>
+  <link rel="stylesheet" href="/packages/ui/src/styles/design-tokens.css" /><link
+    rel="stylesheet"
+    href="catalog.css"
+  />
+  <body>
+    <header>
+      <div>
+        <h1>Дизайн-система Sniptale</h1>
+        <p>Рабочие примеры и правила по группам контролов.</p>
+      </div>
+      <nav aria-label="Пакет">
+        <a href="../../docs/design/index.md">Design guide</a><a href="README.md">О пакете</a
+        ><a href="?lang=ru" lang="ru">RU</a><a href="?lang=en" lang="en">EN</a
+        ><button id="theme" type="button">Тёмная тема</button>
+      </nav>
+    </header>
+    <main>
+      <div class="catalog-scroll">
+        <table>
+          <caption class="sr-only">
+            Группы, рабочие примеры и правила
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Группа</th>
+              <th scope="col">Примеры</th>
+              <th scope="col">Правила</th>
+            </tr>
+          </thead>
+          <tbody id="groups"></tbody>
+        </table>
+      </div>
+      <p id="status" role="status"></p>
+    </main>
+    <footer>Единые правила и рабочие примеры интерфейса.</footer>
+    <script type="module" src="catalog.js"></script>
+  </body>
+</html>

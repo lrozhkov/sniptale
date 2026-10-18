@@ -48,7 +48,7 @@ export const EditorInspectorContent: React.FC<EditorInspectorContentProps> = (pr
     <>
       <div
         className={[
-          'sniptale-inspector-surface editor-inspector-surface space-y-3',
+          'sniptale-inspector-surface editor-inspector-surface sniptale-parameter-stack',
           props.inspector === 'frame' ? 'h-full min-h-0' : '',
         ].join(' ')}
       >

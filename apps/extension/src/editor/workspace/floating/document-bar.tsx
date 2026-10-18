@@ -1,3 +1,4 @@
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { Library, LoaderCircle } from 'lucide-react';
 import {
   createContext,
@@ -355,6 +356,45 @@ function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
   return hasImage ? translate('editor.page.documentTitle') : translate('editor.page.title');
 }
 
+function EditorDocumentRenameCommand(props: {
+  title: string;
+  disabled: boolean;
+  onEdit: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: scoped,
+    disabled: props.disabled,
+    onClick: props.onEdit,
+  });
+  return (
+    <div className={DOCUMENT_TITLE_CLASS_NAME}>
+      <button
+        ref={props.triggerRef}
+        data-ui="editor.floating.document-bar.title"
+        type="button"
+        disabled={props.disabled}
+        {...press.props}
+        data-command-press={scoped ? '' : undefined}
+        data-command-chrome={scoped ? 'true' : undefined}
+        data-pressing={press.pressed ? 'true' : undefined}
+        title={props.title}
+        className={[
+          'min-h-8 truncate rounded-[4px] text-left text-[13px] font-medium leading-[18px]',
+          'text-[var(--sniptale-color-text-primary)] hover:underline focus-visible:outline',
+          'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-border-strong)]',
+          'disabled:no-underline',
+        ].join(' ')}
+      >
+        <span className={scoped ? 'sniptale-command-content min-w-0 truncate' : undefined}>
+          {props.title}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
@@ -365,24 +405,12 @@ function EditorFloatingDocumentSummary(props: {
   const promotionButtonRef = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <div className={DOCUMENT_TITLE_CLASS_NAME}>
-        <button
-          ref={props.triggerRef}
-          data-ui="editor.floating.document-bar.title"
-          type="button"
-          disabled={!props.hasImage}
-          onClick={props.onEdit}
-          title={resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
-          className={[
-            'truncate rounded text-left text-sm font-semibold leading-snug',
-            'text-[var(--sniptale-color-text-primary)] hover:underline focus-visible:outline',
-            'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-border-strong)]',
-            'disabled:no-underline',
-          ].join(' ')}
-        >
-          {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
-        </button>
-      </div>
+      <EditorDocumentRenameCommand
+        title={resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
+        disabled={!props.hasImage}
+        onEdit={props.onEdit}
+        triggerRef={props.triggerRef}
+      />
       {storage.promotionButtonVisible ? (
         <ContentToolbarButton
           ref={promotionButtonRef}

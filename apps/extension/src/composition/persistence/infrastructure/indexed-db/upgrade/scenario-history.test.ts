@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
 } from '../core.stores';
@@ -28,10 +30,14 @@ it('adds only an empty scenario history store before publishing the current cont
   expect(db.createObjectStore.mock.calls).toEqual([
     [SCENARIO_PROJECT_HISTORY_STORE, { keyPath: ['projectId', 'revision'] }],
     [SCENARIO_PROJECT_UNITS_STORE, { keyPath: ['projectId', 'unitId', 'revision'] }],
+    [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
+    [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
     ['projectId', 'projectId'],
+    ['createdAt', 'createdAt'],
+    ['id', 'id'],
   ]);
   expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 7 });

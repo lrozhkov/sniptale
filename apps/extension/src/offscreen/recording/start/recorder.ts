@@ -185,6 +185,8 @@ export async function finalizeRecordingBootstrap(params: {
   const mimeType = encoderConfig.container === 'mp4' ? 'video/mp4' : 'video/webm';
   const artifactSession = await createLiveRecordingArtifactSession({
     artifactId: params.resolvedRecordingId,
+    groupId: params.resolvedRecordingId,
+    role: 'display',
     coordinator: stagingCoordinator,
     encoding: encoderConfig,
     filename: await createOutputFilename(
@@ -353,20 +355,33 @@ async function finalizeStoppedRecorder(
     cleanupResources();
     resolveStop?.({ result: 'stopped' });
   } catch (error) {
+    let terminalError = error;
+    const staging = recordingContext.stagingCoordinator;
+    if (recordingContext.discardOnStop) {
+      try {
+        await (staging?.discard?.() ?? staging?.abort());
+      } catch (discardError) {
+        terminalError = new AggregateError(
+          [error, discardError],
+          'Recording finalization and explicit discard failed.',
+          { cause: discardError }
+        );
+      }
+    }
     recordingContext.artifactSession = null;
     recordingContext.stagingCoordinator = null;
     cleanupResources();
-    if (error instanceof PostRecordPublicationError) {
-      rejectStop?.(error);
+    if (terminalError instanceof PostRecordPublicationError) {
+      rejectStop?.(terminalError);
     } else if (resolveStop) {
       resolveStop({
-        error: error instanceof Error ? error.message : String(error),
+        error: terminalError instanceof Error ? terminalError.message : String(terminalError),
         result: 'terminal-failure',
       });
     } else {
-      rejectStop?.(error);
+      rejectStop?.(terminalError);
     }
-    throw error;
+    throw terminalError;
   }
 }
 

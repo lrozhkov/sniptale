@@ -9,7 +9,7 @@ body {
   overflow: hidden;
 }
 body {
-  font-family: system-ui, sans-serif;
+  font-family: var(--sniptale-font-interface);
   background: transparent;
   color: #fff;
 }
@@ -49,6 +49,8 @@ a:focus-visible {
 /* One bottom toolbar owns every chrome control; it stays in flow so it can never
    cover the content frame, and auto-hide only changes paint, not geometry. */
 .tour-toolbar {
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
+  user-select: none;
   flex: none;
   width: var(--tour-frame-width, 100%);
   max-width: 100%;
@@ -80,7 +82,7 @@ a:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: var(--sniptale-font-weight-interface-heading, 500);
 }
 .tour-playback-status {
   flex: 0 1 auto;
@@ -89,7 +91,9 @@ a:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
   color: color-mix(in srgb, var(--tour-text) 75%, transparent);
 }
 .tour-controls {
@@ -253,6 +257,7 @@ a:focus-visible {
   display: none;
 }
 .tour-hint-text {
+  font-family: var(--sniptale-font-document-sans);
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -318,6 +323,8 @@ a:focus-visible {
 }
 /* The player owns drawer geometry, including embedded and resized previews. */
 .tour-navigation {
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
+  user-select: none;
   position: absolute;
   inset: 0 0 0 auto;
   width: min(360px, 90%);
@@ -341,15 +348,17 @@ a:focus-visible {
 .tour-contents-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--tour-text) 20%, transparent);
 }
 .tour-contents-title {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 1rem;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--sniptale-font-weight-interface-heading, 500);
   overflow-wrap: anywhere;
 }
 .tour-navigation .tour-contents-list {
@@ -370,6 +379,10 @@ a:focus-visible {
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
+  background: transparent;
+}
+.tour-navigation .tour-contents-list .tour-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tour-text) 8%, transparent);
 }
 .tour-navigation .tour-contents-list .tour-button[aria-current] {
   background: color-mix(in srgb, var(--tour-text) 12%, var(--tour-surface));
@@ -489,13 +502,17 @@ a:focus-visible {
 }
 .tour-counter {
   flex: none;
-  font-size: 0.75rem;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, currentColor 72%, transparent);
   white-space: nowrap;
 }
 .tour-time {
-  font-size: 0.75rem;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -606,11 +623,13 @@ a:focus-visible {
   max-width: 100%;
 }
 .tour-navigation-content h1 {
+  font-family: var(--sniptale-font-document-sans);
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: clamp(1rem, 3vw, 2rem);
 }
 .tour-navigation-text {
+  font-family: var(--sniptale-font-document-sans);
   margin: 0;
   overflow: hidden;
   overflow-wrap: anywhere;
@@ -660,6 +679,7 @@ a:focus-visible {
   opacity: 0.65;
 }
 .tour-hint-action-title {
+  font-family: var(--sniptale-font-document-sans);
   min-width: 0;
   margin-right: auto;
   overflow-wrap: anywhere;
@@ -682,13 +702,15 @@ a:focus-visible {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .tour-hint [data-tour-hint-close] {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
   display: grid;
   place-items: center;
   opacity: 0.7;
   transition: opacity 100ms ease;
+  font-family: var(--sniptale-font-interface);
+  user-select: none;
 }
 .tour-hint [data-tour-hint-close]:hover:not(:disabled),
 .tour-hint [data-tour-hint-close]:focus-visible {
@@ -708,15 +730,16 @@ a:focus-visible {
   justify-content: flex-end;
   gap: 6px;
   align-items: center;
-  font-size: 0.75rem;
+  font: var(--sniptale-font-weight-interface, 400) 13px / 18px var(--sniptale-font-interface);
+  user-select: none;
 }
 .tour-hint-controls button {
   flex: none;
   width: auto;
   min-width: 0;
-  min-height: 28px;
-  padding: 4px 9px;
-  border-radius: 7px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 4px;
 }
 .tour-hint-controls [data-tour-hint-next] {
   background: color-mix(in srgb, currentColor 7%, transparent);
@@ -724,7 +747,9 @@ a:focus-visible {
 .tour-hint-controls span {
   order: -1;
   margin-right: auto;
-  font-size: 0.6875rem;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   opacity: 0.65;
 }
@@ -896,9 +921,10 @@ a:focus-visible {
 }
 
 .tour-controls .tour-button {
-  min-height: 28px;
-  padding: 4px 6px;
-  border: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   background: transparent;
 }
 .tour-controls .tour-button:hover:not(:disabled) {
@@ -928,13 +954,13 @@ a:focus-visible {
 
 .tour-controls [data-tour-manual][aria-pressed='true'],
 .tour-controls [data-tour-full-view][aria-pressed='true'] {
-  background: color-mix(in srgb, currentColor 16%, transparent);
-  box-shadow: inset 0 0 0 1px currentColor;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--tour-accent) 35%, transparent);
+  color: var(--tour-accent);
 }
-
 .tour-hint [data-tour-hint-close] svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 .tour-hint .tour-hint-controls .tour-narration-controls,
 .tour-hint[data-presentation^='caption-'] .tour-hint-controls .tour-narration-controls {
@@ -946,11 +972,62 @@ a:focus-visible {
 .tour-hint-controls .tour-narration-controls button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 7px;
 }
 .tour-narration-controls svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+}
+
+.tour-navigation .tour-button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-color: transparent;
+  background: transparent;
+}
+.tour-contents-header .tour-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tour-text) 8%, transparent);
+}
+.tour-toolbar .tour-icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 7px;
+}
+.tour-toolbar .tour-button svg,
+.tour-hint-controls button svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.tour-toolbar .tour-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--tour-text) 28%, transparent);
+}
+.tour-toolbar [data-tour-manual][aria-pressed='true']:hover:not(:disabled),
+.tour-toolbar [data-tour-full-view][aria-pressed='true']:hover:not(:disabled) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--tour-accent) 55%, transparent);
+}
+.tour-toolbar .tour-button:active:not(:disabled),
+.tour-navigation .tour-button:active:not(:disabled),
+.tour-hint-controls button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--tour-text) 12%, transparent);
+}
+@media (pointer: coarse) {
+  .tour-toolbar .tour-button,
+  .tour-navigation .tour-button,
+  .tour-hint-controls button,
+  .tour-hint [data-tour-hint-close] {
+    min-height: 44px;
+  }
+  .tour-toolbar .tour-icon-button,
+  .tour-hint-controls .tour-narration-controls button,
+  .tour-hint [data-tour-hint-close] {
+    width: 44px;
+    height: 44px;
+  }
 }

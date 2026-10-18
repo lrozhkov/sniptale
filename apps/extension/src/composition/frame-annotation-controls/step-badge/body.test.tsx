@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import { StepBadgeAutoSection, StepBadgeValueSection } from './views';
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -191,4 +195,93 @@ it('uses the fallback fork handler and supports the optional template source con
       ?.click()
   );
   expect(sourceChange).toHaveBeenCalledWith('frame-default');
+});
+
+for (const scoped of [false, true]) {
+  it(`preserves numbering choices and native reorder admission with inspector scope ${scoped}`, () => {
+    const preset = createSystemStepBadgePresetCatalog()[0]!;
+    const settings = {
+      ...createStepBadgeSettingsFromTemplate(preset.settings),
+      type: 'letter' as const,
+    };
+    const onAuto = vi.fn();
+    const onAlphabet = vi.fn();
+    const onReorder = vi.fn();
+    const content = (
+      <>
+        <StepBadgeAutoSection
+          embedded
+          isAuto
+          settings={settings}
+          onAlphabetChange={onAlphabet}
+          onAutoModeChange={onAuto}
+          onTypeChange={vi.fn()}
+        />
+        <StepBadgeValueSection
+          embedded
+          frameId="frame-numbered"
+          isAuto
+          value="A"
+          onValueChange={vi.fn()}
+          onReorder={onReorder}
+        />
+      </>
+    );
+    act(() =>
+      root.render(
+        scoped ? (
+          <CommandPressScope value={true}>
+            <InspectorLayout>{content}</InspectorLayout>
+          </CommandPressScope>
+        ) : (
+          content
+        )
+      )
+    );
+    const toggle = host.querySelector<HTMLButtonElement>('.sniptale-glass-switch')!;
+    act(() => toggle.click());
+    expect(onAuto).toHaveBeenCalledWith(false);
+    const alphabet = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === translate('content.stepBadge.alphabetLatin')
+    );
+    expect(host.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
+    const reorder = host.querySelector<HTMLButtonElement>(
+      `button[title="${translate('content.stepBadge.moveUp')}"]`
+    )!;
+    const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    act(() => reorder.dispatchEvent(down));
+    expect(down.defaultPrevented).toBe(true);
+    act(() => reorder.click());
+    expect(onReorder).toHaveBeenCalledWith('up', 'frame-numbered');
+    expect(alphabet).toBeDefined();
+    act(() => alphabet!.click());
+    expect(onAlphabet).toHaveBeenCalledWith('latin');
+    expect(host.querySelector('.sniptale-field-clear')).toBeNull();
+  });
+}
+
+it('clears only the editable manual value through its native input owner', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <StepBadgeValueSection
+            embedded
+            frameId="frame-manual"
+            isAuto={false}
+            value="AB"
+            onValueChange={onChange}
+          />
+        </InspectorLayout>
+      </CommandPressScope>
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  expect(input.maxLength).toBe(2);
+  const clear = host.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  expect(clear.type).toBe('button');
+  act(() => clear.click());
+  expect(onChange).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(input);
 });

@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnchor } from '../../features/video/review/types';
+import { ReviewTimelineHoverGuide } from './timeline-hover';
 import { ReviewTimeline } from './timeline';
 import { useReviewTimelineGeometry } from './timeline-geometry';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -76,7 +77,7 @@ it('keeps the transport icon-only and stable while its accessible Play/Pause act
   const pause = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.pause"]')!;
   expect(pause.title).toBe('gallery.videoReview.pause');
   expect(pause.textContent).toBe('');
-  expect(pause.querySelector('svg.lucide-pause')).not.toBeNull();
+  expect(pause.querySelectorAll('svg rect')).toHaveLength(2);
   expect(pause.className).toBe(play.className);
 });
 
@@ -211,7 +212,9 @@ it('previews the boundary that basic cut drawing will select', () => {
 });
 
 it('keeps the seek cursor during plane capture from an audio lane', () => {
-  const { host } = renderTimeline({ audioTrack: <div data-ui="gallery.videoReview.audioLane" /> });
+  const { host } = renderTimeline({
+    audioTracks: { originalAudio: <div data-ui="gallery.videoReview.audioLane" /> },
+  });
   const plane = planeWithMetrics(host);
   const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
   act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));
@@ -494,13 +497,14 @@ it('fits the time plane to live CSS width without a resize-observer frame of ove
   expect(viewport.style.overflowX).toBe('hidden');
 });
 
-it('keeps export navigation last and available while timeline edits are busy', async () => {
+it('keeps export before keyboard help and available while timeline edits are busy', async () => {
   const onOpenExport = vi.fn();
   renderTimeline({ busy: true, onOpenExport });
   const buttons = environment.host!.querySelectorAll<HTMLButtonElement>(
     '[data-ui="gallery.videoReview.toolbar"] button'
   );
-  const opener = buttons[buttons.length - 1]!;
+  expect(buttons[buttons.length - 1]!.getAttribute('aria-label')).toBe('gallery.keyboard.title');
+  const opener = buttons[buttons.length - 2]!;
   expect(opener.getAttribute('aria-label')).toBe('gallery.videoReview.exportSection');
   expect(opener.getAttribute('title')).toBe('gallery.videoReview.exportSection');
   expect(opener.previousElementSibling?.getAttribute('data-ui')).toBe(
@@ -720,4 +724,69 @@ it('keeps a separate ruler marker aligned with the scrolling source playhead', (
   renderTimeline({ time: 3, duration: 4 });
   expect(cap.style.left).toBe(head.style.left);
   expect(ruler.contains(head)).toBe(false);
+});
+
+it('retains timeline keyboard focus when a committed row becomes inert', () => {
+  const zoomTrack = (
+    <div>
+      <input aria-label="Child value" />
+      <button type="button">Child command</button>
+    </div>
+  );
+  const { host } = renderTimeline({ zoomTrack });
+  document.body.appendChild(host);
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const field = host.querySelector<HTMLInputElement>('[aria-label="Child value"]')!;
+  const command = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.textContent === 'Child command'
+  )!;
+  const external = document.createElement('button');
+  document.body.appendChild(external);
+  try {
+    for (const target of [field, command]) {
+      renderTimeline({ zoomTrack, busy: false });
+      target.focus();
+      expect(document.activeElement).toBe(target);
+      renderTimeline({ zoomTrack, busy: true });
+      // jsdom does not implement the native blur caused by an inert ancestor.
+      act(() => target.blur());
+      expect(document.activeElement).toBe(plane);
+    }
+    renderTimeline({ zoomTrack, busy: false });
+    field.focus();
+    act(() => field.blur());
+    expect(document.activeElement).toBe(document.body);
+    field.focus();
+    renderTimeline({ zoomTrack, busy: true });
+    act(() => external.focus());
+    expect(document.activeElement).toBe(external);
+  } finally {
+    external.remove();
+    host.remove();
+  }
+});
+
+it('moves the time label away from the cursor while retaining the visible ruler bounds', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 70, 18)
+  );
+  const viewport = document.createElement('div');
+  const render = (x: number, pointerY: number) =>
+    act(() =>
+      environment.root!.render(
+        <ReviewTimelineHoverGuide
+          viewport={{ current: viewport }}
+          gutter={100}
+          width={700}
+          hover={{ x, time: 2, snapped: false, lane: 'ruler', pointerX: x, pointerY }}
+        />
+      )
+    );
+  const offset = () => environment.host!.querySelector('span')!.style.transform;
+  render(300, 12);
+  expect(offset()).toBe('translateX(-78px)');
+  render(300, 80);
+  expect(offset()).toBe('translateX(4px)');
+  render(101, 12);
+  expect(offset()).toBe('translateX(32px)');
 });

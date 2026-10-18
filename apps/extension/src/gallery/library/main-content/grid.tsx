@@ -34,7 +34,7 @@ function renderGalleryGridContent(
     return (
       <div
         className={[
-          'flex h-full min-h-[420px] items-center justify-center',
+          'flex h-full min-h-32 items-center justify-center',
           'text-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
       >
@@ -107,10 +107,10 @@ export function GalleryGrid(
       data-ui="gallery.content.surface"
       tabIndex={props.filteredItems.length === 0 || !activeMaterialRendered ? 0 : -1}
       className={[
-        'min-h-0 flex-1 overflow-auto rounded-[var(--sniptale-radius-lg)]',
+        'min-h-0 flex-1 overflow-auto rounded-[4px]',
         'border border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]',
-        'shadow-sm',
+
         props.viewMode === 'list' ? 'p-0' : 'p-4',
       ].join(' ')}
     >

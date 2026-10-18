@@ -50,12 +50,6 @@ export const PRODUCT_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[
     ],
     usageContexts: [
       usage(
-        'content.ai.confirm-dialog',
-        'Контент > AI > Confirm dialog',
-        'Content > AI > Confirm dialog',
-        ['apps/extension/src/content/overlay/ai/template-list/view/dialogs.tsx']
-      ),
-      usage(
         'settings.providers.confirm-dialog',
         'Настройки > AI providers > Confirm dialog',
         'Settings > AI providers > Confirm dialog',

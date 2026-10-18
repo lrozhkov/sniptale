@@ -35,7 +35,7 @@ export function LibraryMediaAdd(props: {
   return (
     <div className="flex min-w-0 shrink-0 flex-col items-end gap-1">
       <ContentToolbarButton
-        className={props.compact ? '!h-7 !w-7 !p-0' : 'shrink-0 !h-10 !w-auto gap-2 !px-4'}
+        className={props.compact ? '!h-8 !w-8 !p-0' : 'shrink-0 !h-8 !w-auto gap-1.5 !px-2.5'}
         dataUi="video-editor.library.add-material"
         title={label}
         aria-label={label}
@@ -43,7 +43,7 @@ export function LibraryMediaAdd(props: {
         onClick={() => void add()}
       >
         {state === 'added' ? <Check size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
-        {!props.compact && <span className="whitespace-nowrap text-xs">{label}</span>}
+        {!props.compact && <span className="whitespace-normal text-[13px]">{label}</span>}
       </ContentToolbarButton>
       {state === 'failed' && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-primary)]">

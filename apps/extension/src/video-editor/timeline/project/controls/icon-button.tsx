@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 
-const TIMELINE_ICON_BUTTON_CLASS_NAME =
-  '!h-[var(--timeline-control-height,24px)] !w-[var(--timeline-control-width,24px)] !rounded-md';
+const TIMELINE_ICON_BUTTON_CLASS_NAME = [
+  '!h-[var(--timeline-control-height,24px)] !w-[var(--timeline-control-width,24px)]',
+  '!rounded-[var(--sniptale-radius-sm)]',
+].join(' ');
 
 export function TimelineIconButton(props: {
   active?: boolean | undefined;
@@ -17,6 +19,7 @@ export function TimelineIconButton(props: {
 }) {
   const button = (
     <EditorIconButton
+      variant={props.active === undefined ? 'utility' : 'tool'}
       title={props.title}
       onClick={props.onClick}
       className={[

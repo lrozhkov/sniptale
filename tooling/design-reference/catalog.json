@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "version": "package-5",
+  "updated": "2026-10-15",
+  "review": {
+    "technical": "affected constructions checked",
+    "user": "pending"
+  },
+  "groups": [
+    {
+      "id": "foundations",
+      "title": "Общие основы",
+      "description": "Семантика, цвет, типографика, геометрия, материалы, фокус и движение.",
+      "examples": [
+        {
+          "title": "Эталон: основы",
+          "url": "examples/foundations/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Foundations",
+          "path": "../../docs/design/foundations.md"
+        },
+        {
+          "title": "Proof and handoff",
+          "path": "../../docs/design/verification.md"
+        }
+      ]
+    },
+    {
+      "id": "selection",
+      "title": "Toggle, checkbox и radio",
+      "description": "Независимые функции, состав операции и один выбор из группы.",
+      "examples": [
+        {
+          "title": "Эталон: toggle, checkbox, radio",
+          "url": "examples/selection/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Selection controls",
+          "path": "../../docs/design/selection.md"
+        }
+      ]
+    },
+    {
+      "id": "numbers",
+      "title": "Числовое управление",
+      "description": "Slider, hover-slider и точное числовое значение.",
+      "examples": [
+        {
+          "title": "Эталон: числовые поля и слайдеры",
+          "url": "examples/numbers/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Numeric editing",
+          "path": "../../docs/design/numbers.md"
+        }
+      ]
+    },
+    {
+      "id": "choices",
+      "title": "Сегменты, dropdown и стили",
+      "description": "Один параметр; поиск; radio-плитки; меню по границам узкой колонки.",
+      "examples": [
+        {
+          "title": "Эталон: сегменты и dropdown",
+          "url": "examples/choices/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Segments and dropdowns",
+          "path": "../../docs/design/choices-and-surfaces.md"
+        }
+      ]
+    },
+    {
+      "id": "buttons",
+      "title": "Кнопки и команды",
+      "description": "Команды, системные иконки, режимы тулбара, выбор инструмента и раскрытие меню.",
+      "examples": [
+        {
+          "title": "Эталон: кнопки и команды",
+          "url": "examples/buttons/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Buttons and commands",
+          "path": "../../docs/design/buttons.md"
+        }
+      ]
+    },
+    {
+      "id": "fields",
+      "title": "Поля и формы",
+      "description": "Текст, многострочный ввод, поиск, ошибки и подтверждение.",
+      "examples": [
+        {
+          "title": "Эталон: текстовые поля и формы",
+          "url": "examples/fields/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Fields and forms",
+          "path": "../../docs/design/fields.md"
+        }
+      ]
+    },
+    {
+      "id": "properties",
+      "title": "Свойства и связанные объекты",
+      "description": "Нередактируемые значения, копирование и переходы к связанным проектам.",
+      "examples": [
+        {
+          "title": "Свойства и связанные объекты",
+          "url": "examples/properties/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Displayed properties",
+          "path": "../../docs/design/properties.md"
+        }
+      ]
+    },
+    {
+      "id": "navigation",
+      "title": "Навигация и разделы",
+      "description": "Tabs, категории инспектора, переключение представлений.",
+      "examples": [
+        {
+          "title": "Эталон: навигация и раскрытие",
+          "url": "examples/navigation/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Navigation and disclosure",
+          "path": "../../docs/design/navigation.md"
+        }
+      ]
+    },
+    {
+      "id": "collections",
+      "title": "Списки и выбор объектов",
+      "description": "Строки, деревья, множественный выбор и групповые операции.",
+      "examples": [
+        {
+          "title": "Эталон: списки и массовый выбор",
+          "url": "examples/collections/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Collections",
+          "path": "../../docs/design/collections.md"
+        }
+      ]
+    },
+    {
+      "id": "layers",
+      "title": "Всплывающие слои и picker",
+      "description": "Popover, dialog, меню, палитра и выбор цвета.",
+      "examples": [
+        {
+          "title": "Эталон: слои, диалоги и цвет",
+          "url": "examples/layers/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Floating layers and feedback",
+          "path": "../../docs/design/layers.md"
+        }
+      ]
+    },
+    {
+      "id": "specialized",
+      "title": "Уникальные механики",
+      "description": "Timeline, canvas, жесты, range/scrub и специализированные инспекторы.",
+      "examples": [
+        {
+          "title": "Эталон: уникальные механики",
+          "url": "examples/specialized/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Specialized mechanics",
+          "path": "../../docs/design/specialized.md"
+        }
+      ]
+    },
+    {
+      "id": "compositions",
+      "title": "Контролы в экранах приложения",
+      "description": "Быстрый редактор видео, галерея, редакторы и настройки.",
+      "examples": [
+        {
+          "title": "Эталон: контролы в экранах",
+          "url": "examples/compositions/?view=both",
+          "version": "package-5"
+        }
+      ],
+      "rules": [
+        {
+          "title": "Screen compositions",
+          "path": "../../docs/design/compositions.md"
+        }
+      ]
+    }
+  ]
+}

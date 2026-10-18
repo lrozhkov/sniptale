@@ -7,6 +7,7 @@ import { resolvePortalTheme } from '@sniptale/ui/theme/safe-portal';
 
 const {
   createRootMock,
+  installContentInterfaceFontsMock,
   initializeTopLevelContentRuntimeMock,
   installContentUiActivationBridgeMock,
   activationBridgeCleanupMock,
@@ -16,6 +17,7 @@ const {
   sendRuntimeMessageMock,
 } = vi.hoisted(() => ({
   createRootMock: vi.fn(),
+  installContentInterfaceFontsMock: vi.fn(),
   initializeTopLevelContentRuntimeMock: vi.fn(),
   installContentUiActivationBridgeMock: vi.fn(),
   activationBridgeCleanupMock: vi.fn(),
@@ -57,6 +59,7 @@ vi.mock('../ui-activation-bridge', () => ({
 
 vi.mock('../../public/preparation-surface/styles', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../public/preparation-surface/styles')>()),
+  installContentInterfaceFonts: installContentInterfaceFontsMock,
   createContentEntrypointStyles: () => `
 :host {
   all: initial;
@@ -123,6 +126,7 @@ function expectContentShadowStyles(shadowRoot: ShadowRoot | null | undefined): v
 
 beforeEach(() => {
   vi.clearAllMocks();
+  installContentInterfaceFontsMock.mockResolvedValue(undefined);
   Reflect.deleteProperty(globalThis, '__sniptaleContentRuntimeCleanup');
   createRootMock.mockReturnValue({ render: vi.fn(), unmount: rootUnmountMock });
   initializeTopLevelContentRuntimeMock.mockReturnValue(runtimeCleanupMock);
@@ -334,4 +338,26 @@ it('defers initialization until document body exists', async () => {
       document.documentElement.appendChild(originalBody);
     }
   }
+});
+
+it('starts without waiting for fonts and retries failed installation on same-version reinjection', async () => {
+  let reject!: (reason: Error) => void;
+  installContentInterfaceFontsMock.mockImplementationOnce((root: ShadowRoot) => {
+    expect(root.host.isConnected).toBe(true);
+    return new Promise<void>((_resolve, onReject) => {
+      reject = onReject;
+    });
+  });
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  initializeTopLevelContentEntry();
+  const root = document.getElementById(CONTENT_ROOT_ID)?.shadowRoot;
+  expect(installContentInterfaceFontsMock).toHaveBeenCalledWith(root);
+  expect(createRootMock).toHaveBeenCalledOnce();
+  expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledOnce();
+  reject(new Error('font unavailable'));
+  await Promise.resolve();
+  initializeTopLevelContentEntry();
+  expect(installContentInterfaceFontsMock).toHaveBeenCalledTimes(2);
+  expect(installContentInterfaceFontsMock).toHaveBeenLastCalledWith(root);
+  expect(createRootMock).toHaveBeenCalledOnce();
 });

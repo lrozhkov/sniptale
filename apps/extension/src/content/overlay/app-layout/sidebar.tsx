@@ -1,3 +1,4 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { FileStack } from 'lucide-react';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
@@ -88,6 +89,12 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
   const isHidden = !shouldRenderContentScenarioRecorderSidebar(args) || captureSuspended;
   const focusTarget = useRef<'panel' | 'restore' | null>(null);
   const restoreButton = useRef<HTMLButtonElement>(null);
+  const restorePress = useCommandPress({
+    onClick: (event) => {
+      if (event.detail === 0) focusTarget.current = 'panel';
+      args.scenario.actions.setSidebarVisible(true);
+    },
+  });
   const sidebarPosition = useScenarioRecorderSidebarPosition(
     !isHidden && args.scenario.state.sidebarVisible
   );
@@ -112,19 +119,22 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
   if (!args.scenario.state.sidebarVisible) {
     return (
       <button
+        {...restorePress.props}
         type="button"
         ref={restoreButton}
-        className="sniptale-show-toolbar-button"
+        data-command-press=""
+        data-pressing={restorePress.pressed ? 'true' : undefined}
+        className="sniptale-show-toolbar-button sniptale-compact-workspace !size-8 !rounded-[4px]
+          !animate-none !border-[var(--sniptale-color-border-soft)] !bg-[var(--sniptale-color-surface-panel)]
+          !text-[var(--sniptale-color-text-primary)] !shadow-none [&_svg]:!size-4"
         style={{ right: 'calc(76px * var(--sniptale-content-ui-scale))' }}
         data-ui="content.scenario.sidebar.restore"
         aria-label={translate('scenario.content.restorePanel')}
         title={translate('scenario.content.restorePanel')}
-        onClick={(event) => {
-          if (event.detail === 0) focusTarget.current = 'panel';
-          args.scenario.actions.setSidebarVisible(true);
-        }}
       >
-        <FileStack aria-hidden="true" size={20} />
+        <span className="sniptale-command-content">
+          <FileStack aria-hidden="true" size={16} />
+        </span>
       </button>
     );
   }

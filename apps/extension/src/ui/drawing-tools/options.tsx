@@ -1,8 +1,9 @@
 import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
@@ -25,10 +26,14 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!border",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!gap-0",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!rounded-md",
-  "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-[5px]",
+  "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-0",
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!justify-center",
   "[&_[data-ui='shared.ui.color-selector.value-trigger']]:hidden",
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!w-full",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!h-7",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:!h-5",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:!w-5",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:shrink-0",
 ].join(' ');
 
 function QuickOptionButton(props: {
@@ -38,17 +43,20 @@ function QuickOptionButton(props: {
   label: string;
   onClick: () => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.active}
       aria-label={props.label}
       aria-pressed={props.active}
       title={props.label}
       dataUi={props.dataUi}
       className={[
-        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
-        props.active ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
+        !scoped && props.active ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
       ].join(' ')}
       onClick={props.onClick}
     >
@@ -273,16 +281,21 @@ export function ArrowDrawDirectionOption(props: {
   dataUi: string;
   onChange: (value: boolean) => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   const label = translate('editor.compact.arrowDrawFromTip');
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.active}
       aria-label={label}
       aria-pressed={props.active}
       title={label}
       dataUi={props.dataUi}
-      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
+      className={[
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
+      ].join(' ')}
       onClick={() => props.onChange(!props.active)}
     >
       <ArrowDownLeft aria-hidden size={16} />
@@ -404,21 +417,26 @@ function DrawingFillToggle(props: {
   emptyIconUi: string;
   onClick: () => void;
 }) {
+  const scoped = useContext(CommandPressScope);
   return (
     <ContentToolbarButton
       type="button"
+      tone={scoped ? 'property' : 'default'}
       active={props.filled}
       aria-pressed={props.filled}
       aria-label={props.label}
       title={props.label}
       dataUi={props.dataUi}
       className={[
-        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0',
+        scoped ? '!rounded-[4px]' : '!rounded-md',
         'focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2',
         'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
-        props.filled
-          ? '!text-[var(--sniptale-color-accent-emphasis)]'
-          : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
+        scoped
+          ? ''
+          : props.filled
+            ? '!text-[var(--sniptale-color-accent-emphasis)]'
+            : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       onClick={props.onClick}
     >

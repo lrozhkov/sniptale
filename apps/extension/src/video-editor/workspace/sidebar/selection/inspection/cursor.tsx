@@ -169,7 +169,7 @@ function CursorBehaviorSection(props: {
   onUpdateCursorSampleVisibility: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSampleVisibility'];
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       {props.canInterpolate ? (
         <TemporalEasingSelect
           label={translate('videoEditor.sidebar.cursorInterpolationLabel')}

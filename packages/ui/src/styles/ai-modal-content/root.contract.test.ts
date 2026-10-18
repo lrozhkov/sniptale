@@ -5,9 +5,11 @@ import { describe, expect, it } from 'vitest';
 const aiModalContentOwnerStylesheet = readFileSync(new URL('./index.css', import.meta.url), 'utf8');
 
 describe('ai-modal-content contract', () => {
-  it('keeps the canonical ai-modal-content owner as the import-only aggregator', () => {
+  it('keeps the canonical ai-modal-content owner as the layer declaration and import aggregator', () => {
     expect(aiModalContentOwnerStylesheet.trim()).toBe(
       [
+        '@layer theme, base, components, utilities;',
+        '',
         "@import './base.css';",
         "@import './preview-tree.css';",
         "@import './template-menu.css';",

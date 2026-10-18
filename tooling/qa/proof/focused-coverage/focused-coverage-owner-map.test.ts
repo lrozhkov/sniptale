@@ -15,6 +15,28 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it('includes conditional locale initialization without dropping preference IO owner proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence/infrastructure/preference-service';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/browser-io.ts`)).toEqual([
+    `${root}/accessors.test.ts`,
+    `${root}/helpers.test.ts`,
+    `${root}/index.test.ts`,
+    'apps/extension/src/platform/i18n/locale/initialization.test.ts',
+  ]);
+});
+
+it('includes retained Scenario consumers in canonical media deletion proof', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence/media-library';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/delete-cascade.ts`)).toEqual([
+    `${root}/delete-cascade.scenario.test.ts`,
+    `${root}/delete-cascade.sources.test.ts`,
+    `${root}/delete-cascade.test.ts`,
+    `${root}/dependencies.test.ts`,
+  ]);
+});
+
 it('keeps offscreen lifecycle recovery and saved-result proof despite the runtime export mapping', async () => {
   const module = await importOwnerMap();
   const root = 'apps/extension/src/background/media/video/runtime/handlers/state';
@@ -384,4 +406,32 @@ it('selects completion refresh, body states, and native clock response proof', a
   ).toContain(
     `${root}/background/media/video/runtime/handlers/state/recording-state.clock.test.ts`
   );
+});
+
+it.each([
+  'document-settings.tsx',
+  'mask-settings.tsx',
+  'transition-settings.tsx',
+  'playback-settings.tsx',
+  'camera-settings.tsx',
+])('routes tour %s to stage appearance and inherited settings proof', async (file) => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      `apps/extension/src/scenario-editor/page-shell/tour/${file}`
+    )
+  ).toEqual([
+    'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+    'apps/extension/src/scenario-editor/page-shell/tour/inspector-styles.test.tsx',
+  ]);
+});
+
+it('executes real tour library and workspace proof when the page test substitutes tour UI', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/scenario-editor/page-shell';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/tour/library.tsx`)).toEqual([
+    `${root}/ScenarioEditorPage.test.tsx`,
+    `${root}/tour/library.test.tsx`,
+    `${root}/tour/workspace.test.tsx`,
+  ]);
 });

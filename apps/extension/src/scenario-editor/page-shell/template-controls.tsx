@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { LayoutTemplate, Save } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { InspectorFieldClear } from '../../ui/compact-inspector-controls/text-field';
 import { GUIDE_LIMITS, type GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { classifyGuideStepContent } from '../../features/scenario/project/public';
 import type { GuideTemplateApplication } from '../../composition/persistence/scenario/store/public';
@@ -106,47 +107,15 @@ export function GuideTemplateControls({
           {t('scenario.editor.templateSave')}
         </ProductActionButton>
         {saving && (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (name.trim()) void run(() => onSave(name.trim()), true);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape' && !busy) {
-                event.preventDefault();
-                event.stopPropagation();
-                cancelSave();
-              }
-            }}
-          >
-            <ProductInput
-              ref={input}
-              aria-label={t('scenario.editor.templateName')}
-              value={name}
-              maxLength={GUIDE_LIMITS.maxLabelLength}
-              disabled={busy}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <div className="guide-template-save-actions">
-              <ProductActionButton
-                tone="primary"
-                compact
-                type="submit"
-                disabled={busy || !name.trim()}
-              >
-                {t('scenario.editor.templateSave')}
-              </ProductActionButton>
-              <ProductActionButton
-                tone="secondary"
-                compact
-                type="button"
-                disabled={busy}
-                onClick={cancelSave}
-              >
-                {t('common.actions.cancel')}
-              </ProductActionButton>
-            </div>
-          </form>
+          <GuideTemplateSaveForm
+            input={input}
+            name={name}
+            busy={busy}
+            onNameChange={setName}
+            onCancel={cancelSave}
+            onSave={() => void run(() => onSave(name.trim()), true)}
+            t={t}
+          />
         )}
         {feedback && (
           <p role={feedback === 'failed' ? 'alert' : 'status'}>
@@ -159,6 +128,69 @@ export function GuideTemplateControls({
         )}
       </div>
     </GuideInspectorGroup>
+  );
+}
+
+/** Native save-form presentation preserves the owning transaction and its draft. */
+function GuideTemplateSaveForm({
+  input,
+  name,
+  busy,
+  onNameChange,
+  onCancel,
+  onSave,
+  t,
+}: {
+  input: RefObject<HTMLInputElement | null>;
+  name: string;
+  busy: boolean;
+  onNameChange(name: string): void;
+  onCancel(): void;
+  onSave(): void;
+  t: Translate;
+}) {
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (name.trim()) onSave();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !busy) {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
+    >
+      <div className="sniptale-text-value">
+        <ProductInput
+          ref={input}
+          aria-label={t('scenario.editor.templateName')}
+          value={name}
+          maxLength={GUIDE_LIMITS.maxLabelLength}
+          disabled={busy}
+          onChange={(event) => onNameChange(event.target.value)}
+        />
+        {name && !busy ? (
+          <InspectorFieldClear label={t('scenario.editor.templateName')} target={input} />
+        ) : null}
+      </div>
+      <div className="guide-template-save-actions">
+        <ProductActionButton tone="primary" compact type="submit" disabled={busy || !name.trim()}>
+          {t('scenario.editor.templateSave')}
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          compact
+          type="button"
+          disabled={busy}
+          onClick={onCancel}
+        >
+          {t('common.actions.cancel')}
+        </ProductActionButton>
+      </div>
+    </form>
   );
 }
 

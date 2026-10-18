@@ -7,7 +7,7 @@
   align-items: center;
   min-height: 32px;
   margin-bottom: 8px;
-  font: 600 13px / 20px var(--sniptale-font-sans);
+  font: 600 14px / 20px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
   overflow-wrap: anywhere;
 }

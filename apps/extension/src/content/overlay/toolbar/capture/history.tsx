@@ -126,6 +126,7 @@ function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
 
   return (
     <ContentToolbarButton
+      tone="utility"
       type="button"
       dataUi={`content.toolbar.history-${props.action}-button`}
       title={translate(copyKey)}

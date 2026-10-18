@@ -21,7 +21,7 @@ function MotionAreaCoordinateSection(props: {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <MotionAreaBoundsFields area={area} onUpdateArea={updateArea} panel={props.panel} />
     </div>
   );
@@ -65,7 +65,7 @@ export function ManualAreaFields(props: {
     props.panel.placementMode.motionRegionId === props.motionRegionId;
 
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionAreaButtons
         isPickingOnStage={isPickingOnStage}
         motionRegionId={props.motionRegionId}

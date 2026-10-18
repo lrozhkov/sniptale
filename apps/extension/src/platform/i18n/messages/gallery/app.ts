@@ -4,7 +4,7 @@ export const galleryAppMessages = defineMessageSource({
   sidebarCollapse: { ru: 'Свернуть меню библиотеки', en: 'Collapse library sidebar' },
   sidebarExpand: { ru: 'Развернуть меню библиотеки', en: 'Expand library sidebar' },
   trashTitle: { ru: 'Корзина', en: 'Trash Bin' },
-  trashSummaryCount: { ru: 'В корзине', en: 'In Trash Bin' },
+  trashSummaryCount: { ru: 'Всего объектов', en: 'Total objects' },
   trashTotalSize: { ru: 'Общий объём', en: 'Total size' },
   trashSizeExplanation: {
     ru: 'Объём всех материалов корзины, включая связанные ресурсы, документы и предпросмотры. Размер файла в строке не включает эти ресурсы.',

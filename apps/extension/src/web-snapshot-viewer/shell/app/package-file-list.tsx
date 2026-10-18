@@ -1,16 +1,9 @@
 import { Download, ExternalLink, Eye, File, Image, LoaderCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate, type AppLocale } from '../../../platform/i18n';
 import type { ViewerPackageFile } from '../../viewer/package-files';
 import { formatCatalogFileSize, getCatalogFileFormat } from './file-presentation';
-
-const downloadButtonClassName = [
-  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded',
-  'text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]',
-  'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-  'disabled:cursor-wait disabled:opacity-50',
-].join(' ');
 
 export function ViewerPackageFileList(props: {
   files: ViewerPackageFile[];
@@ -49,7 +42,7 @@ export function ViewerPackageFileList(props: {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]">
+    <div className="overflow-hidden rounded-[4px] border border-[var(--sniptale-color-border-soft)]">
       {props.files.map((file) => {
         const isActive = activePath === file.path;
         const Icon = file.kind === 'exported-image' ? Image : File;
@@ -58,23 +51,45 @@ export function ViewerPackageFileList(props: {
             className="border-b border-[var(--sniptale-color-border-soft)] last:border-b-0"
             key={file.path}
           >
-            <div className="flex min-w-0 items-center gap-3 px-3 py-2.5">
+            <div className="flex min-h-14 min-w-0 items-center gap-2 px-2 py-2">
               <Icon
                 aria-hidden
-                className="size-5 shrink-0 text-[var(--sniptale-color-text-muted)]"
+                className="size-4 shrink-0 text-[var(--sniptale-color-text-muted)]"
               />
-              <button
+              <div className="min-w-0 flex-1">
+                <p
+                  className={[
+                    'select-text truncate text-[13px] leading-[18px] font-normal',
+                    'text-[var(--sniptale-color-text-primary)]',
+                  ].join(' ')}
+                  title={file.path}
+                >
+                  {file.name}
+                </p>
+                <p
+                  className={[
+                    'select-text truncate text-[12px] leading-4 font-normal',
+                    'text-[var(--sniptale-color-text-secondary)]',
+                  ].join(' ')}
+                >
+                  {getCatalogFileFormat(file)} · {file.mimeType} ·{' '}
+                  {formatCatalogFileSize(file.size)}
+                </p>
+              </div>
+              <ContentToolbarButton
+                tone="utility"
                 aria-label={`${previewLabel}: ${file.name}`}
-                className={downloadButtonClassName}
+                className="h-8 w-8 cursor-pointer !p-0 disabled:cursor-wait"
                 onClick={(event) => props.onPreviewPackageFile(file, event.currentTarget)}
                 title={previewLabel}
                 type="button"
               >
-                <Eye aria-hidden="true" size={13} />
-              </button>
-              <button
+                <Eye aria-hidden="true" size={16} />
+              </ContentToolbarButton>
+              <ContentToolbarButton
+                tone="utility"
                 aria-label={`${openLabel}: ${file.name}`}
-                className={downloadButtonClassName}
+                className="h-8 w-8 cursor-pointer !p-0 disabled:cursor-wait"
                 disabled={activePath !== null}
                 onClick={() =>
                   runPackageFileAction(file, 'open', () => props.onOpenPackageFile(file))
@@ -83,15 +98,16 @@ export function ViewerPackageFileList(props: {
                 type="button"
               >
                 {isActive ? (
-                  <LoaderCircle aria-hidden="true" className="animate-spin" size={13} />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
                 ) : (
-                  <ExternalLink aria-hidden="true" size={13} />
+                  <ExternalLink aria-hidden="true" size={16} />
                 )}
-              </button>
-              <button
+              </ContentToolbarButton>
+              <ContentToolbarButton
+                tone="utility"
                 type="button"
                 aria-label={`${downloadLabel}: ${file.name}`}
-                className={downloadButtonClassName}
+                className="h-8 w-8 cursor-pointer !p-0 disabled:cursor-wait"
                 disabled={activePath !== null}
                 onClick={() =>
                   runPackageFileAction(file, 'download', () => props.onDownloadPackageFile(file))
@@ -99,27 +115,15 @@ export function ViewerPackageFileList(props: {
                 title={downloadLabel}
               >
                 {isActive ? (
-                  <LoaderCircle aria-hidden="true" className="animate-spin" size={13} />
+                  <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
                 ) : (
-                  <Download aria-hidden="true" size={13} />
+                  <Download aria-hidden="true" size={16} />
                 )}
-              </button>
-              <div className="min-w-0 flex-1">
-                <p
-                  className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
-                  title={file.path}
-                >
-                  {file.name}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] text-[var(--sniptale-color-text-muted)]">
-                  {getCatalogFileFormat(file)} · {file.mimeType} ·{' '}
-                  {formatCatalogFileSize(file.size)}
-                </p>
-              </div>
+              </ContentToolbarButton>
             </div>
             {error?.path === file.path ? (
               <p
-                className="px-11 pb-2 text-[10px] text-[var(--sniptale-color-danger)]"
+                className="select-text px-2 pb-2 text-[14px] leading-5 font-normal text-[var(--sniptale-color-danger)]"
                 role="status"
               >
                 {translate(

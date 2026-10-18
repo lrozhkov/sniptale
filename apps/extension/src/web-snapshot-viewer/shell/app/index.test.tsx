@@ -320,7 +320,7 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
     `button[aria-label="${translate('webSnapshotViewer.app.expandToolbar', 'en')}"]`
   ) as HTMLButtonElement | null;
   expect(expandButton).toBeTruthy();
-  expect(expandButton?.className).toContain('right-6');
+  expect(expandButton?.parentElement?.className).toContain('right-6');
 
   act(() => expandButton?.click());
   expect(container?.textContent).toContain('Page title');

@@ -110,3 +110,10 @@
 .sniptale-product-toggle-sm.sniptale-product-toggle-checked .sniptale-product-toggle-thumb {
   transform: translateX(14px);
 }
+
+.sniptale-input:not([type='number']):not([inputmode='decimal']):not([inputmode='numeric']):not(
+    .font-mono
+  ),
+.sniptale-textarea:not(.font-mono) {
+  font-family: var(--sniptale-font-document-sans);
+}

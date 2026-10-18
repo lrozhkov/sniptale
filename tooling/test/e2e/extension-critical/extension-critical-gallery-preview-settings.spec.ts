@@ -26,7 +26,13 @@ async function proveInspectorBreakpoints(page: Page, info: TestInfo) {
   const width = () =>
     inspector.evaluate((node) => {
       const style = getComputedStyle(node);
-      return node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      return (
+        node.getBoundingClientRect().width -
+        parseFloat(style.borderLeftWidth) -
+        parseFloat(style.borderRightWidth) -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight)
+      );
     });
   const evidence = [];
   for (const target of [523, 524, 525]) {
@@ -39,10 +45,14 @@ async function proveInspectorBreakpoints(page: Page, info: TestInfo) {
       await page.mouse.move(box.x + box.width / 2 + current - target, box.y + 20, { steps: 4 });
       await page.mouse.up();
     }
-    await expect.poll(width).toBe(target);
+    await expect.poll(async () => Math.abs((await width()) - target)).toBeLessThanOrEqual(0.5);
     const groupBox = await group.boundingBox();
     if (!groupBox) throw new Error('Missing inspector navigation group');
-    expect(groupBox.width).toBeCloseTo(target < 524 ? target : (target - 12) / 2, 0);
+    const measuredWidth = await width();
+    expect(groupBox.width).toBeCloseTo(
+      measuredWidth < 524 ? measuredWidth : (measuredWidth - 12) / 2,
+      0
+    );
     const labels = await group.getByRole('button').evaluateAll((buttons) =>
       buttons.map((button) => ({
         text: button.textContent?.trim(),
@@ -146,6 +156,10 @@ for (const variant of variants) {
     const manual = review.locator('[data-ui="gallery.videoReview.manualPreview"]');
     const canvas = manual.locator('canvas');
     const field = (key: Message) => panel.getByRole('button', { name: label(key), exact: true });
+    const showFrameRate = panel.getByRole('switch', {
+      name: label('gallery.videoReview.previewShowFrameRate'),
+      exact: true,
+    });
     const choose = async (key: Message, option: string) => {
       await field(key).click();
       await page.getByRole('option', { name: option, exact: true }).click();
@@ -203,9 +217,7 @@ for (const variant of variants) {
       await expect(field('gallery.videoReview.previewPaused')).toHaveText(
         label('gallery.videoReview.previewPausedSame')
       );
-      await expect(field('gallery.videoReview.previewShowFrameRate')).toHaveText(
-        label('gallery.videoReview.previewOff')
-      );
+      await expect(showFrameRate).toHaveAttribute('aria-checked', 'false');
       await expect(manual).toBeHidden();
       await panel.press('Escape');
       await expect(gear).toBeFocused();
@@ -258,10 +270,7 @@ for (const variant of variants) {
       await expect(panel.getByLabel(label('gallery.videoReview.previewActualRaster'))).toHaveText(
         '640 × 360'
       );
-      await choose(
-        'gallery.videoReview.previewShowFrameRate',
-        label('gallery.videoReview.previewOn')
-      );
+      await showFrameRate.click();
       const fps = review.locator('[data-ui="gallery.videoReview.previewFPS"]');
       await expect(fps).toHaveText('— FPS');
       await expect(fps).toHaveAttribute(
@@ -325,16 +334,15 @@ for (const variant of variants) {
       await page.evaluate(async (stored) => {
         await chrome.storage.local.set(stored);
       }, savedStorage);
-      await open(recordingCardId);
+      // The persisted editor session restores the open review after reload.
+      await expect(video).toBeVisible();
       await gear.click();
       await expect(field('gallery.videoReview.previewResolution')).toHaveText('360p');
       await expect(field('gallery.videoReview.previewFrameRate')).toHaveText('≤ 15 FPS');
       await expect(field('gallery.videoReview.previewPaused')).toHaveText(
         label('gallery.videoReview.previewPausedDetailed')
       );
-      await expect(field('gallery.videoReview.previewShowFrameRate')).toHaveText(
-        label('gallery.videoReview.previewOn')
-      );
+      await expect(showFrameRate).toHaveAttribute('aria-checked', 'true');
       await field('gallery.videoReview.previewReset').click();
       await expect(field('gallery.videoReview.previewResolution')).toHaveText(
         label('gallery.videoReview.previewCurrent')

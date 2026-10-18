@@ -599,65 +599,44 @@ it('keeps source mute autosave payload independent of unchanged text and preserv
   expect(stored.workspace.history).toHaveLength(1);
 });
 
-it.each([true, false])(
-  'refuses locked lane commands before writes and keeps Notes usable (autosave %s)',
-  async (autosave) => {
-    const snapshot = initial();
-    snapshot.workspace.advanced.ui.lockedTracks = { source: true, originalAudio: true };
-    const write = vi.fn(async () => snapshot);
-    const session = createVideoReviewSession(snapshot, {
-      readVideoWorkspace: async () => snapshot,
-      commitVideoWorkspace: write,
-      saveVideoWorkspaceAdvanced: write,
-      saveVideoWorkspaceDraft: write,
-      saveVideoWorkspaceSnapshot: write,
-      moveVideoWorkspaceHistory: write,
-    });
-    session.setAutosaveEnabled(autosave);
-    const audio: ReviewOperation = {
-      id: 'gain',
-      at: 2,
-      target: 'sourceAudio',
-      before: { muted: false, volume: 1 },
-      after: { muted: true, volume: 1 },
-    };
-    await expect(session.commit(audio)).rejects.toThrow('originalAudio');
-    const attempted = vi.fn();
-    await expect(session.commitDurable(audio, attempted)).rejects.toThrow('originalAudio');
-    expect(attempted).not.toHaveBeenCalled();
-    const before = session.getSnapshot().document.advancedContent;
-    await expect(
-      session.commit({
-        id: 'compound',
-        at: 3,
-        target: 'advancedContent',
-        before,
-        after: {
-          ...before,
-          actionsEnabled: false,
-          audio: { ...before.audio, original: { ...before.audio.original, volume: 0.5 } },
-        },
-      })
-    ).rejects.toThrow('originalAudio');
-    expect(session.getSnapshot().document.advancedContent).toEqual(before);
-    expect(write).not.toHaveBeenCalled();
-    expect(session.getSnapshot()).toMatchObject({ error: null, pending: 0, dirty: false });
-    await session.commit({
-      id: 'note',
-      at: 3,
-      target: 'annotation',
-      before: null,
-      after: annotation,
-    });
-    expect(session.getSnapshot().error).toBeNull();
-    if (!autosave) expect(session.getSnapshot().document.annotations).toEqual([annotation]);
-    await session.flush();
-  }
-);
+it('admits a durable lane edit with legacy locks and preserves them in saved history', async () => {
+  const snapshot = initial();
+  snapshot.workspace.advanced.ui.lockedTracks = { source: true, originalAudio: true };
+  const operation: ReviewOperation = {
+    id: 'gain',
+    at: 2,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 1 },
+  };
+  const committed = structuredClone(snapshot);
+  committed.workspace.history = [operation];
+  committed.workspace.cursor = 1;
+  committed.workspace.revision = 2;
+  const write = vi.fn(async () => committed);
+  const session = createVideoReviewSession(snapshot, {
+    readVideoWorkspace: async () => snapshot,
+    commitVideoWorkspace: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+    moveVideoWorkspaceHistory: write,
+  });
+  const admitted = vi.fn();
+  await session.commitDurable(operation, admitted);
+  expect(admitted).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().document.advancedContent.audio.original.muted).toBe(true);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.lockedTracks).toEqual({
+    source: true,
+    originalAudio: true,
+  });
+  expect(write).toHaveBeenCalledOnce();
+});
 
 it('changes a master atomically while content Undo preserves lane membership', async () => {
   const snapshot = initial();
   snapshot.workspace.advanced.ui.mode = 'advanced';
+  snapshot.workspace.advanced.ui.lockedTracks = { actions: true };
   const write = vi.fn(async () => snapshot);
   const session = createVideoReviewSession(snapshot, {
     readVideoWorkspace: async () => snapshot,
@@ -668,7 +647,6 @@ it('changes a master atomically while content Undo preserves lane membership', a
     moveVideoWorkspaceHistory: write,
   });
   session.setAutosaveEnabled(false);
-  await session.setTrackControl('actions', { locked: true });
   await session.setTrackControl('actions', { enabled: false });
   expect(session.getSnapshot().snapshot.workspace.advanced.ui).toMatchObject({
     lockedTracks: { actions: true },
@@ -684,5 +662,33 @@ it('changes a master atomically while content Undo preserves lane membership', a
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.tracks.actions).toBe(true);
   expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
   expect(session.getSnapshot().snapshot.workspace.advanced.ui.lockedTracks?.actions).toBe(true);
+  expect(write).not.toHaveBeenCalled();
+});
+
+it('retains legacy lock flags while admitting ordinary authored lane edits', async () => {
+  const snapshot = initial();
+  snapshot.workspace.advanced.ui.lockedTracks = { source: true, originalAudio: true };
+  const write = vi.fn(async () => snapshot);
+  const session = createVideoReviewSession(snapshot, {
+    readVideoWorkspace: async () => snapshot,
+    commitVideoWorkspace: write,
+    saveVideoWorkspaceAdvanced: write,
+    saveVideoWorkspaceDraft: write,
+    saveVideoWorkspaceSnapshot: write,
+    moveVideoWorkspaceHistory: write,
+  });
+  session.setAutosaveEnabled(false);
+  await session.commit({
+    id: 'legacy-unlocked-gain',
+    at: 1,
+    target: 'sourceAudio',
+    before: { muted: false, volume: 1 },
+    after: { muted: true, volume: 1 },
+  });
+  expect(session.getSnapshot().document.advancedContent.audio.original.muted).toBe(true);
+  expect(session.getSnapshot().snapshot.workspace.advanced.ui.lockedTracks).toEqual({
+    source: true,
+    originalAudio: true,
+  });
   expect(write).not.toHaveBeenCalled();
 });

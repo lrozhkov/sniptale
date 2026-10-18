@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { AIModalContent } from './body';
 import type { AIModalProps } from './types';
 import { useAIModalState } from '../session';
@@ -10,11 +11,13 @@ export default function AIModal(props: AIModalProps) {
   }
 
   return (
-    <AIModalContent
-      {...props}
-      treeData={props.treeData ?? null}
-      isLoading={props.isLoading ?? false}
-      state={state}
-    />
+    <CommandPressScope value={true}>
+      <AIModalContent
+        {...props}
+        treeData={props.treeData ?? null}
+        isLoading={props.isLoading ?? false}
+        state={state}
+      />
+    </CommandPressScope>
   );
 }

@@ -17,14 +17,14 @@ const documentPreviewClassName =
   '[background-position:0_0,8px_8px] [background-size:16px_16px]';
 
 const viewportPreviewRootClassName =
-  'pointer-events-auto absolute right-3 top-3 z-30 select-none rounded-[14px] border ' +
+  'pointer-events-auto absolute right-3 top-3 z-30 select-none rounded-[4px] border ' +
   'max-[720px]:top-[4.75rem] ' +
   'border-[var(--sniptale-color-border-soft)] ' +
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)] p-3 ' +
   'shadow-sm';
 
 const viewportPreviewFrameClassName =
-  'pointer-events-none absolute rounded-[10px] border ' +
+  'pointer-events-none absolute rounded-none border ' +
   'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)] ' +
   'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]';
 

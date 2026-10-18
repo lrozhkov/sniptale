@@ -1,4 +1,5 @@
 import type { ReviewInspectorNavigation } from './inspector-navigation';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import type { ReviewBeforeAction } from './note-transitions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ReviewInspectorPresentation } from './inspector-sections';
@@ -18,7 +19,7 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -37,7 +38,8 @@ type InspectorSection =
   | 'history'
   | 'preview'
   | 'speech'
-  | 'text';
+  | 'text'
+  | 'recording';
 
 function inspectorNavigationOptions(args: {
   shown: InspectorSection;
@@ -46,11 +48,17 @@ function inspectorNavigationOptions(args: {
   selectionLabel: string | undefined;
   actionHistory: boolean;
   actions: boolean;
+  recording?: boolean;
 }): { id: InspectorSection; label: string }[] {
   const options: { id: InspectorSection; label: string }[] = [];
   options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
   if (args.settingsAvailable)
     options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.recording)
+    return [
+      ...options,
+      { id: 'recording', label: translate('gallery.videoReview.recordVoiceover') },
+    ];
   if (args.shown === 'preview') {
     options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
     return options;
@@ -70,6 +78,7 @@ function inspectorNavigationOptions(args: {
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
+  recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
   annotations: readonly ReviewAnnotation[];
@@ -109,106 +118,136 @@ export function ReviewInspector(props: {
 }) {
   const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
   const previewHost = useRef<HTMLDivElement>(null);
+  const [recordingTab, setRecordingTab] = useState(true);
+  const recordingAvailable = !!props.recording;
+  const recordingShown = recordingAvailable && recordingTab;
+  useEffect(() => {
+    if (!recordingAvailable) setRecordingTab(true);
+  }, [recordingAvailable]);
   useEffect(() => {
     if (shown === 'preview') previewHost.current?.focus({ preventScroll: true });
   }, [shown]);
   return (
-    <aside
-      onKeyDown={(event) => {
-        if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
-          event.preventDefault();
-          event.stopPropagation();
-          props.navigation.closePreview();
-        }
-      }}
-      data-ui="gallery.videoReview.inspector"
-      className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 border-l
+    <InspectorLayout>
+      <aside
+        onKeyDown={(event) => {
+          if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
+            event.preventDefault();
+            event.stopPropagation();
+            props.navigation.closePreview();
+          }
+        }}
+        data-ui="gallery.videoReview.inspector"
+        className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
           props.fullHeight ? 'col-start-2 row-start-1 row-span-2' : ''
         }`}
-    >
-      {props.resizeHandle}
-      <ReviewInspectorHeader
-        {...props}
-        onBack={props.onBack}
-        presentation={presentation}
-        section={shown}
-        onTogglePresentation={() =>
-          (props.beforeAction ?? ((action) => action()))(() =>
-            setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
-          )
-        }
-      />
-      <ReviewInspectorStatus {...props} />
-      {props.settingsAvailable ||
-      props.selectionLabel ||
-      props.actions ||
-      shown === 'preview' ||
-      shown === 'speech' ? (
-        <div
-          className="review-inspector-navigation shrink-0"
-          data-ui="gallery.videoReview.inspectorNavigation"
-        >
-          <SegmentedSwitch<InspectorSection>
-            density="compact"
-            activeId={shown}
-            ariaLabel={translate('gallery.videoReview.inspector')}
-            options={inspectorNavigationOptions({
-              shown,
-              context,
-              settingsAvailable: props.settingsAvailable,
-              selectionLabel: props.selectionLabel,
-              actionHistory: !!props.actionHistory,
-              actions: !!props.actions,
-            })}
-            onChange={setSection}
-          />
-        </div>
-      ) : null}
-      <div hidden={shown !== 'history'} className="review-history-host min-h-0 flex-1">
-        <ReviewInspectorPresentation value={presentation} section="history">
-          {props.actionHistory}
-        </ReviewInspectorPresentation>
-      </div>
-      <div
-        hidden={shown === 'history'}
-        ref={scroll}
-        className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
       >
-        <ReviewInspectorPresentation
-          value={presentation}
-          section={shown}
-          selectionScope={props.selectionPreferenceScope}
+        {props.resizeHandle}
+        <div inert={!!props.recording}>
+          <ReviewInspectorHeader
+            {...props}
+            onBack={props.onBack}
+            presentation={presentation}
+            section={shown}
+            onTogglePresentation={() =>
+              (props.beforeAction ?? ((action) => action()))(() =>
+                setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+              )
+            }
+          />
+          <ReviewInspectorStatus {...props} />
+        </div>
+        {props.settingsAvailable ||
+        props.selectionLabel ||
+        props.actions ||
+        shown === 'preview' ||
+        shown === 'speech' ||
+        props.recording ? (
+          <div
+            className="review-inspector-navigation shrink-0"
+            data-ui="gallery.videoReview.inspectorNavigation"
+          >
+            <SegmentedSwitch<InspectorSection>
+              density="compact"
+              activeId={recordingShown ? 'recording' : shown}
+              ariaLabel={translate('gallery.videoReview.inspector')}
+              options={inspectorNavigationOptions({
+                shown,
+                context,
+                settingsAvailable: props.settingsAvailable,
+                selectionLabel: props.selectionLabel,
+                actionHistory: !!props.actionHistory,
+                actions: !!props.actions,
+                recording: !!props.recording,
+              })}
+              onChange={(section) => {
+                if (props.recording) setRecordingTab(section === 'recording');
+                if (section !== 'recording') setSection(section);
+              }}
+            />
+          </div>
+        ) : null}
+        <div
+          inert={!!props.recording}
+          hidden={recordingShown || shown !== 'history'}
+          className="review-history-host min-h-0 flex-1"
         >
-          {shown === 'preview' ? (
-            <div
-              ref={previewHost}
-              tabIndex={-1}
-              aria-label={translate('gallery.videoReview.previewSection')}
-              data-ui="gallery.videoReview.previewInspector"
-            >
-              {props.preview}
-            </div>
-          ) : shown === 'history' ? null : shown === 'export' ? (
-            <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
-              {props.actions}
-              <ReviewBackupAction {...props} />
-            </section>
-          ) : shown === 'text' ? (
-            props.textDocument
-          ) : shown === 'speech' ? (
-            props.speech
-          ) : shown === 'scene' ? (
-            props.scene
-          ) : shown === 'selected' ? (
-            props.children
-          ) : (
-            <ReviewNotes {...props} />
-          )}
-        </ReviewInspectorPresentation>
-      </div>
-      <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
-    </aside>
+          <ReviewInspectorPresentation value={presentation} section="history">
+            {props.actionHistory}
+          </ReviewInspectorPresentation>
+        </div>
+        <div
+          inert={!!props.recording}
+          hidden={recordingShown || shown === 'history'}
+          ref={scroll}
+          className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
+        >
+          <ReviewInspectorPresentation
+            value={presentation}
+            section={shown}
+            selectionScope={props.selectionPreferenceScope}
+          >
+            {shown === 'preview' ? (
+              <div
+                ref={previewHost}
+                tabIndex={-1}
+                aria-label={translate('gallery.videoReview.previewSection')}
+                data-ui="gallery.videoReview.previewInspector"
+              >
+                {props.preview}
+              </div>
+            ) : shown === 'history' ? null : shown === 'export' ? (
+              <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
+                {props.actions}
+                <ReviewBackupAction {...props} />
+              </section>
+            ) : shown === 'text' ? (
+              props.textDocument
+            ) : shown === 'speech' ? (
+              props.speech
+            ) : shown === 'scene' ? (
+              props.scene
+            ) : shown === 'selected' ? (
+              props.children
+            ) : (
+              <ReviewNotes {...props} />
+            )}
+          </ReviewInspectorPresentation>
+        </div>
+        {props.recording ? (
+          <div
+            hidden={!recordingShown}
+            className="min-h-0 flex-1 overflow-y-auto"
+            data-ui="gallery.videoReview.recordingTab"
+          >
+            {props.recording}
+          </div>
+        ) : (
+          <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
+        )}
+      </aside>
+    </InspectorLayout>
   );
 }
 
@@ -224,14 +263,16 @@ function ReviewAnnotationList(props: {
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
 }) {
+  const list = useRef<HTMLOListElement>(null);
   return (
-    <ol className="review-inspector-list space-y-2">
+    <ol ref={list} tabIndex={-1} className="review-inspector-list space-y-2">
       {props.annotations.map((annotation) => (
         <li
           key={annotation.id}
           data-selected={props.selectedId === annotation.id}
           data-editing={props.editingId === annotation.id}
-          className={`group relative rounded-lg ${props.editingId === annotation.id ? '' : 'border p-3'}
+          className={`group relative rounded-[var(--sniptale-radius-sm)]
+              ${props.editingId === annotation.id ? '' : 'border p-3'}
               ${
                 props.selectedId === annotation.id
                   ? 'border-[var(--sniptale-color-accent)]'
@@ -274,7 +315,12 @@ function ReviewAnnotationList(props: {
                     disabled={props.busy}
                     className={reviewIconButtonClassName}
                     data-note-delete
-                    onClick={() => props.onDelete(annotation)}
+                    onClick={(event) => {
+                      // Busy disables this action before its row disappears.
+                      if (event.currentTarget.ownerDocument.activeElement === event.currentTarget)
+                        list.current?.focus({ preventScroll: true });
+                      props.onDelete(annotation);
+                    }}
                   >
                     <Trash2 size={16} aria-hidden="true" />
                   </ReviewButton>

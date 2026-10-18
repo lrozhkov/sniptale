@@ -523,7 +523,6 @@ function reviewAdvancedControls(
         advancedState.setMode(mode);
       }),
     setTrackVisibility: advancedState.setTrackVisibility,
-    setTrackLocked: advancedState.setTrackLocked,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setWorkspaceColor: advancedState.setWorkspaceColor,
     setKeyAnimations: advancedState.setKeyAnimations,

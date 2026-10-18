@@ -3,7 +3,7 @@ import type React from 'react';
 import { ProductModalBody } from '@sniptale/ui/product-modal';
 
 const FORM_SUBMIT_ERROR_CLASS_NAME =
-  'rounded-[12px] border border-[var(--sniptale-color-danger-border)] ' +
+  'rounded-[4px] border border-[var(--sniptale-color-danger-border)] ' +
   'bg-[var(--sniptale-color-danger-soft)] px-3 py-2 text-sm text-[var(--sniptale-color-danger-text)]';
 
 export function AiProvidersFormModalBody(props: {

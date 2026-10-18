@@ -54,9 +54,11 @@ export function useRecordingDismissal(args: {
 /** Render after the recorder so confirmation owns the highest interaction layer. */
 export function RecordingDiscardConfirmation(props: {
   value: ReturnType<typeof useRecordingDismissal>;
+  dialogClassName?: string;
 }) {
   return (
     <ProductConfirmDialog
+      {...(props.dialogClassName ? { dialogClassName: props.dialogClassName } : {})}
       isOpen={props.value.open}
       title={translate('videoEditor.app.recordAudioDiscardTitle')}
       message={translate('videoEditor.app.recordAudioDiscardMessage')}

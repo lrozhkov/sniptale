@@ -47,6 +47,7 @@ function InteractionButton(props: {
     <ContentToolbarButton
       type="button"
       active={props.active}
+      data-content-tool="true"
       aria-pressed={props.active}
       aria-label={props.label}
       title={props.label}
@@ -97,6 +98,7 @@ function AutoHideControl(props: {
         ref={triggerRef}
         type="button"
         active={props.delay > 0}
+        tone="property"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={label}
@@ -117,6 +119,7 @@ function AutoHideControl(props: {
           menuRef={menuRef}
         >
           <ProductToolbarMenu
+            className="sniptale-content-menu-adopted"
             compact={props.compactMenus}
             placement={dropdown.menuPlacement}
             style={dropdown.style}

@@ -83,7 +83,7 @@ function ShadowFieldBody(props: {
   onChange: (value: string) => void;
 }) {
   return (
-    <div data-ui="content.design-review.shadow-field" className="grid gap-2">
+    <div data-ui="content.design-review.shadow-field" className="grid gap-1">
       <ShadowModeRow {...props} />
       {props.model.mode === 'enabled' ? (
         <ShadowSubControls disabled={props.disabled} model={props.model} />
@@ -123,7 +123,7 @@ function ShadowPreview(props: { model: ShadowFieldModel }) {
     <div
       aria-hidden="true"
       className={[
-        'h-8 rounded-[7px] border bg-[var(--sniptale-color-surface-panel)]',
+        'h-8 rounded-[4px] border bg-[var(--sniptale-color-surface-panel)]',
         'border-[color:var(--sniptale-color-border-soft)]',
       ].join(' ')}
       style={{
@@ -198,7 +198,7 @@ function ShadowLengthInput(props: {
 
 function UnsupportedValueNotice() {
   return (
-    <div className="text-[11px] font-semibold text-[var(--sniptale-color-warning)]">
+    <div className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-warning)]">
       {translate('content.designReview.unsupportedCssValue')}
     </div>
   );

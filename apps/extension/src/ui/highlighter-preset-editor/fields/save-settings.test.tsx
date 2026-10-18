@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { InspectorLayout } from '../../compact-inspector-controls/layout';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -213,4 +215,35 @@ it('forwards floating interaction ownership and disables the shared form', () =>
       'input[aria-label="content.overlayControls.frameStylePresetName"]'
     )?.disabled
   ).toBe(true);
+});
+
+it('clears a scoped preset name through its existing draft and retains focus', async () => {
+  const onSave = vi.fn().mockResolvedValue(true);
+  await act(async () =>
+    root.render(
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <BorderManualSaveSettings isSaving={false} onSave={onSave} presets={[preset('a')]} />
+        </InspectorLayout>
+      </CommandPressScope>
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>('input[maxlength="64"]')!;
+  await act(async () => setInputValue(input, 'Draft name'));
+  const clear = container.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+  expect(clear).not.toBeNull();
+  await act(async () => clear.click());
+  expect(input.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(getButton('content.overlayControls.frameStyleCreate').disabled).toBe(true);
+  expect(onSave).not.toHaveBeenCalled();
+});
+
+it('leaves the pending preset-save surface without scoped Clear controls', () => {
+  act(() =>
+    root.render(<BorderManualSaveSettings isSaving={false} onSave={vi.fn()} presets={[]} />)
+  );
+  const input = container.querySelector<HTMLInputElement>('input[maxlength="64"]')!;
+  act(() => setInputValue(input, 'Pending draft'));
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
 });

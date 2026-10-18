@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { Search } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { CommandPaletteAction, LocalizedCommandPaletteGroup } from './types';
@@ -42,14 +44,22 @@ function CommandPaletteResultRow(props: {
   onSelect: () => void;
   onHover: () => void;
 }) {
+  const compact = useContext(CommandPressScope);
+  const press = useCommandPress({
+    enabled: compact,
+    disabled: props.action.disabled,
+    onClick: props.onSelect,
+  });
   return (
     <button
+      {...press.props}
+      data-command-press={compact ? '' : undefined}
+      data-pressing={press.pressed ? 'true' : undefined}
       type="button"
       role="option"
       aria-selected={props.selected}
       data-selected={props.selected ? 'true' : 'false'}
       disabled={props.action.disabled}
-      onClick={props.onSelect}
       onMouseMove={props.onHover}
       className={buildResultRowClassName(props.selected, props.action.disabled)}
     >
@@ -75,13 +85,13 @@ function CommandPaletteResultCopy(props: { action: CommandPaletteAction }) {
   return (
     <span className="min-w-0 flex-1">
       {props.action.section ? (
-        <span className="mb-1 block text-[11px] uppercase tracking-wider text-[var(--sniptale-color-text-dim)]">
+        <span className="mb-1 block text-[11px] uppercase tracking-wider text-[var(--sniptale-color-text-secondary)]">
           {props.action.section}
         </span>
       ) : null}
       <span className="block text-sm font-medium text-inherit">{props.action.title}</span>
       {secondaryCopy ? (
-        <span className="mt-1 block text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
+        <span className="mt-1 block text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
           {secondaryCopy}
         </span>
       ) : null}
@@ -115,7 +125,7 @@ export function CommandPaletteEmptyState() {
       <div className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
         {translate('shared.ui.commandPaletteEmptyTitle')}
       </div>
-      <div className="mt-2 text-xs leading-5 text-[var(--sniptale-color-text-dim)]">
+      <div className="mt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
         {translate('shared.ui.commandPaletteEmptyDescription')}
       </div>
     </div>
@@ -134,7 +144,7 @@ function CommandPaletteGroup(props: {
       <div
         className={
           'px-2 text-xs font-semibold uppercase tracking-wider ' +
-          'text-[var(--sniptale-color-text-dim)]'
+          'text-[var(--sniptale-color-text-secondary)]'
         }
       >
         {props.group.label}

@@ -82,7 +82,7 @@ function ExportDialogBooleanToggle({
       active={checked}
       label={
         <span
-          className="inline-flex min-w-0 items-center gap-2 text-[12px] font-semibold
+          className="inline-flex min-w-0 items-center gap-2 text-[13px] leading-[18px] font-medium
             text-[var(--sniptale-color-text-primary)]"
         >
           {icon}

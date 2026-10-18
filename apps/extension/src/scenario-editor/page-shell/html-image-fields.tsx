@@ -1,5 +1,4 @@
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
-import { CompactSelect } from '../../ui/compact-inspector-controls/select';
+import { ToggleField, SelectField } from '../../ui/compact-inspector-controls';
 import type { GuideHtmlImageSettings } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import './html-workbench.css';
@@ -18,42 +17,36 @@ export function GuideHtmlImageFields({
 }) {
   const frame = value.content === 'frame';
   return (
-    <div className="guide-html-fields">
-      <label>
-        <span>{t('scenario.editor.htmlContent')}</span>
-        <CompactSelect
-          disabled={disabled}
-          aria-label={t('scenario.editor.htmlContent')}
-          value={value.content}
-          options={[
-            { value: 'full', label: t('scenario.editor.htmlFull') },
-            { value: 'frame', label: t('scenario.editor.htmlFrame') },
-          ]}
-          onChange={(content) => onChange({ content })}
-        />
-      </label>
-      <label
+    <div className="guide-html-fields sniptale-parameter-stack">
+      <SelectField
+        label={t('scenario.editor.htmlContent')}
+        disabled={disabled}
+        value={value.content}
+        options={[
+          { value: 'full', label: t('scenario.editor.htmlFull') },
+          { value: 'frame', label: t('scenario.editor.htmlFrame') },
+        ]}
+        onChange={(content) => onChange({ content })}
+      />
+      <div
         className="guide-html-switch"
         title={t(
           frame ? 'scenario.editor.htmlFrameOptimizeHint' : 'scenario.editor.htmlOptimizeHint'
         )}
       >
-        <span>{t('scenario.editor.htmlOptimize')}</span>
-        <ProductToggle
-          size="sm"
+        <ToggleField
+          label={t('scenario.editor.htmlOptimize')}
           disabled={disabled || frame}
-          checked={frame || value.optimize}
-          aria-label={t('scenario.editor.htmlOptimize')}
-          onClick={() => onChange({ optimize: !value.optimize })}
+          value={frame || value.optimize}
+          onChange={(optimize) => onChange({ optimize })}
         />
-      </label>
+      </div>
       {(frame || value.optimize) && (
         <>
-          <label title={frame ? t('scenario.editor.htmlFrameSizeHint') : undefined}>
-            <span>{t('scenario.editor.htmlMaxEdge')}</span>
-            <CompactSelect
+          <div title={frame ? t('scenario.editor.htmlFrameSizeHint') : undefined}>
+            <SelectField
+              label={t('scenario.editor.htmlMaxEdge')}
               disabled={disabled || frame}
-              aria-label={t('scenario.editor.htmlMaxEdge')}
               value={String(value.maxEdge)}
               options={htmlImageEdges.map((edge) => ({
                 value: String(edge),
@@ -64,38 +57,33 @@ export function GuideHtmlImageFields({
                 if (maxEdge !== undefined) onChange({ maxEdge });
               }}
             />
-          </label>
-          <label>
-            <span>{t('scenario.editor.htmlQuality')}</span>
-            <CompactSelect
-              disabled={disabled}
-              aria-label={t('scenario.editor.htmlQuality')}
-              value={String(value.quality)}
-              options={htmlImageQualities.map((quality) => ({
-                value: String(quality),
-                label: `${quality * 100}%`,
-              }))}
-              onChange={(next) => {
-                const quality = htmlImageQualities.find((quality) => String(quality) === next);
-                if (quality !== undefined) onChange({ quality });
-              }}
-            />
-          </label>
+          </div>
+          <SelectField
+            label={t('scenario.editor.htmlQuality')}
+            disabled={disabled}
+            value={String(value.quality)}
+            options={htmlImageQualities.map((quality) => ({
+              value: String(quality),
+              label: `${quality * 100}%`,
+            }))}
+            onChange={(next) => {
+              const quality = htmlImageQualities.find((quality) => String(quality) === next);
+              if (quality !== undefined) onChange({ quality });
+            }}
+          />
         </>
       )}
-      <label
+      <div
         className="guide-html-switch"
         title={t(frame ? 'scenario.editor.htmlFrameViewerHint' : 'scenario.editor.htmlViewerHint')}
       >
-        <span>{t('scenario.editor.htmlViewer')}</span>
-        <ProductToggle
-          size="sm"
+        <ToggleField
+          label={t('scenario.editor.htmlViewer')}
           disabled={disabled || frame}
-          checked={!frame && value.viewer}
-          aria-label={t('scenario.editor.htmlViewer')}
-          onClick={() => onChange({ viewer: !value.viewer })}
+          value={!frame && value.viewer}
+          onChange={(viewer) => onChange({ viewer })}
         />
-      </label>
+      </div>
     </div>
   );
 }

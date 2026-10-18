@@ -11,14 +11,14 @@ import {
 } from '../../workflows/media-hub/post-record-actions';
 
 const POST_RECORD_MAIN_CLASS = [
-  'flex h-screen items-center justify-center',
-  'bg-[var(--sniptale-color-surface-canvas)] p-5 text-[var(--sniptale-color-text-primary)]',
+  'sniptale-compact-workspace flex h-screen items-start justify-center overflow-y-auto',
+  'bg-[var(--sniptale-color-surface-canvas)] p-3 text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const POST_RECORD_PANEL_CLASS = [
-  'flex w-full max-w-[520px] flex-col gap-3 rounded-[18px]',
+  'my-auto flex w-full max-w-[520px] shrink-0 flex-col gap-3 rounded-[4px]',
   'border border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] p-5',
+  'bg-[var(--sniptale-color-surface-panel)] p-4',
 ].join(' ');
 
 export function CameraPostRecordPanel({
@@ -51,16 +51,26 @@ export function CameraPostRecordPanel({
     });
 
   return (
-    <main className={POST_RECORD_MAIN_CLASS}>
-      <section className={POST_RECORD_PANEL_CLASS}>
+    <main className={POST_RECORD_MAIN_CLASS} data-ui="camera-recorder.result">
+      <section className={POST_RECORD_PANEL_CLASS} aria-labelledby="camera-recorder-result-title">
         <div className="text-center">
-          <div className="text-lg font-semibold">{translate('popup.video.postRecordTitle')}</div>
-          <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted-strong)]">
+          <h1 id="camera-recorder-result-title" className="m-0 text-[14px] leading-5 font-medium">
+            {translate('popup.video.postRecordTitle')}
+          </h1>
+          <div className="mt-1 text-[14px] leading-5 font-normal text-[var(--sniptale-color-text-muted-strong)]">
             {translate('popup.video.postRecordDescription')}
           </div>
         </div>
         <CameraPostRecordActions isBusy={isBusy} result={result} decide={decide} />
-        {error ? <div className="text-sm text-[var(--sniptale-color-danger)]">{error}</div> : null}
+        {error ? (
+          <div
+            role="alert"
+            className="select-text text-[14px] leading-5 font-normal
+            [overflow-wrap:anywhere] text-[var(--sniptale-color-danger)]"
+          >
+            {error}
+          </div>
+        ) : null}
       </section>
     </main>
   );

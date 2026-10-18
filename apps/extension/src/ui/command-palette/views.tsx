@@ -1,3 +1,6 @@
+import './compact.css';
+import { useContext } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import type { KeyboardEvent, RefObject } from 'react';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import type { CommandPaletteAction, LocalizedCommandPaletteGroup } from './types';
@@ -47,6 +50,7 @@ function CommandPaletteSurfaceContent(props: CommandPaletteSurfaceProps) {
 }
 
 export function CommandPaletteSurface(props: CommandPaletteSurfaceProps) {
+  const compact = useContext(CommandPressScope);
   return (
     <ProductModal
       isOpen={props.isOpen}
@@ -56,7 +60,12 @@ export function CommandPaletteSurface(props: CommandPaletteSurfaceProps) {
       role="dialog"
       labelledBy={props.titleId}
       onKeyDown={props.onKeyDown}
-      dialogClassName="max-w-[min(640px,calc(100vw-32px))] overflow-hidden"
+      dialogClassName={[
+        'max-w-[min(640px,calc(100vw-32px))] overflow-hidden',
+        compact && 'sniptale-compact-workspace sniptale-compact-palette',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <CommandPaletteSurfaceContent {...props} />
     </ProductModal>

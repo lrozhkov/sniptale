@@ -1,4 +1,5 @@
-import { forwardRef } from 'react';
+import { forwardRef, useContext } from 'react';
+import { CommandPressScope, useCommandPress } from '../control-language/press';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
@@ -110,7 +111,7 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   children: ReactNode;
   active?: boolean;
   menuIndicator?: boolean;
-  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline';
+  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline' | 'property';
   size?: 'default' | 'compact';
   dataUi?: string;
 }
@@ -131,6 +132,8 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
     },
     ref
   ) {
+    const scoped = useContext(CommandPressScope);
+    const press = useCommandPress({ ...props, enabled: scoped });
     const selected = active || props['aria-pressed'] === true || props['aria-pressed'] === 'true';
     const dataActive = selected ? 'true' : undefined;
     const resolvedAriaLabel = ariaLabel ?? (typeof title === 'string' ? title : undefined);
@@ -138,6 +141,13 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
     return (
       <button
         {...props}
+        {...press.props}
+        data-command-press={scoped ? '' : undefined}
+        data-command-property={scoped && tone === 'property' ? 'true' : undefined}
+        data-pressing={press.pressed ? 'true' : undefined}
+        data-command-chrome={
+          scoped && (tone === 'utility' || tone === 'close') ? 'true' : undefined
+        }
         ref={ref}
         title={typeof title === 'string' ? title : undefined}
         aria-label={resolvedAriaLabel}
@@ -151,6 +161,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
             tone !== 'utility' &&
             tone !== 'outline' &&
             tone !== 'close' &&
+            tone !== 'property' &&
             'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',
@@ -162,7 +173,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
           className
         )}
       >
-        {children}
+        {scoped ? <span className="sniptale-command-content">{children}</span> : children}
       </button>
     );
   }

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { RotateCcw } from 'lucide-react';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../platform/i18n';
-import { ReviewButton, reviewDeleteButtonClassName } from './controls';
+import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { ReviewHistoryResetChoices } from './history-reset-choices';
 
 /** Choice, confirmation and submission share one disposable UI owner. */
@@ -43,9 +43,8 @@ export function ReviewResetControl(props: {
     <>
       <ReviewButton
         label={translate('gallery.videoReview.historyReset')}
-        toolbarLabel={translate('gallery.videoReview.historyReset')}
-        toolbarPriority={1}
-        className={`${reviewDeleteButtonClassName} ml-2`}
+        chrome
+        className={reviewIconButtonClassName}
         disabled={props.busy}
         onClick={(event) => (anchor ? close() : setAnchor(event.currentTarget))}
       >
@@ -66,6 +65,7 @@ export function ReviewResetControl(props: {
         ? createPortal(
             <div onKeyDown={(event) => event.stopPropagation()}>
               <ProductConfirmDialog
+                dialogClassName="sniptale-compact-workspace"
                 title={translate('gallery.videoReview.resetOriginal')}
                 message={
                   <>

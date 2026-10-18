@@ -21,19 +21,19 @@ export function ApplyToFutureFramesGuard(props: { onCancel: () => void; onConfir
   return (
     <div
       aria-label={translate('content.templateFork.applyToFutureTitle')}
-      className="grid gap-3 p-3"
+      className="grid gap-2 p-2"
       data-ui="content.template-fork.apply-to-future-guard"
       role="region"
     >
       <div className="grid gap-1">
-        <div className="text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('content.templateFork.applyToFutureTitle')}
         </div>
-        <div className="text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+        <div className="text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
           {translate('content.templateFork.applyToFutureDescription')}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         <ProductActionButton compact onClick={props.onCancel} tone="secondary">
           {translate('common.actions.cancel')}
         </ProductActionButton>
@@ -49,10 +49,10 @@ export function ApplyToFutureFramesSetting(props: { onClick: () => void }) {
   return (
     <div className="grid gap-2" data-ui="content.template-fork.apply-to-future-setting">
       <div className="grid gap-1">
-        <div className="text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('content.templateFork.futureSettingsTitle')}
         </div>
-        <div className="text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+        <div className="text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
           {translate('content.templateFork.futureSettingsDescription')}
         </div>
       </div>

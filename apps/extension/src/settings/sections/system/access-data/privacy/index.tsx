@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
 
@@ -69,14 +70,15 @@ function PrivacyActionRow(props: {
           </p>
         </div>
       </div>
-      <button
+      <ProductActionButton
+        tone="danger"
         type="button"
         disabled={props.disabled}
         className={getControlSecondaryButtonClassName({ tone: 'danger' })}
         onClick={() => props.onRun(props.action)}
       >
         {props.disabled ? translate('settings.privacy.working') : labels.button}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

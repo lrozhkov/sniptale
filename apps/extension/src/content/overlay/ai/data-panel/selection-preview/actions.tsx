@@ -25,6 +25,7 @@ export function DataSelectionPreviewActions({
       onPointerDown={stopHeaderToggle}
     >
       <button
+        type="button"
         className="sniptale-ctrl-btn"
         onClick={(event) => {
           event.stopPropagation();
@@ -43,6 +44,7 @@ export function DataSelectionPreviewActions({
           : translate('aiModal.expandAllButton')}
       </button>
       <button
+        type="button"
         className={`sniptale-ctrl-btn${isAnySelected ? ' active' : ''}`}
         onClick={(event) => {
           event.stopPropagation();

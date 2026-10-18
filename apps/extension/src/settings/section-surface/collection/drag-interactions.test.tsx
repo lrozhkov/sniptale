@@ -164,7 +164,7 @@ describe('SettingsCollection drag lifecycle', () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 
-  it('keeps the source under the pointer, previews stable targets, and commits once on release', () => {
+  it('opens a live slot without overlapping rows and commits once on release', () => {
     const onMove = vi.fn();
     const threeItems: readonly SettingsCollectionItem[] = [
       ...items,
@@ -190,20 +190,16 @@ describe('SettingsCollection drag lifecycle', () => {
       [...container.querySelectorAll('[data-settings-collection-item]')].map((row) =>
         row.getAttribute('data-settings-collection-item')
       )
-    ).toEqual(['first', 'second', 'third']);
+    ).toEqual(['second', 'first', 'third']);
     const firstRow = container.querySelector<HTMLElement>(
       '[data-settings-collection-item="first"]'
     );
     const secondRow = container.querySelector<HTMLElement>(
       '[data-settings-collection-item="second"]'
     );
-    expect(firstRow?.style.transform).toBe('translate3d(0, 70px, 0)');
+    expect(firstRow?.style.transform).toBe('');
+    expect(onMove).not.toHaveBeenCalled();
     expect(secondRow?.className).not.toContain('hover:bg-');
-    expect(
-      container
-        .querySelector('[data-settings-collection-item="third"]')
-        ?.getAttribute('data-settings-collection-drop-before')
-    ).toBe('true');
     expect(
       container
         .querySelector('[data-settings-collection-root]')
@@ -215,14 +211,9 @@ describe('SettingsCollection drag lifecycle', () => {
       [...container.querySelectorAll('[data-settings-collection-item]')].map((row) =>
         row.getAttribute('data-settings-collection-item')
       )
-    ).toEqual(['first', 'second', 'third']);
-    expect(firstRow?.style.transform).toBe('translate3d(0, 130px, 0)');
-    expect(
-      container
-        .querySelector('[data-settings-collection-item="third"]')
-        ?.getAttribute('data-settings-collection-drop-after')
-    ).toBe('true');
-
+    ).toEqual(['second', 'third', 'first']);
+    expect(firstRow?.style.transform).toBe('');
+    expect(onMove).not.toHaveBeenCalled();
     act(() => dispatchPointer(window.document.body, 'pointerup', { clientY: 140 }));
     expect(onMove).toHaveBeenCalledTimes(1);
     expect(onMove).toHaveBeenCalledWith({
@@ -233,4 +224,40 @@ describe('SettingsCollection drag lifecycle', () => {
     });
     expect(firstRow?.style.transform).toBe('');
   });
+  it.each(['Escape', 'blur'])(
+    'restores the original slots on %s without a persistence command',
+    (reason) => {
+      const onMove = vi.fn();
+      act(() =>
+        root.render(
+          <SettingsCollection
+            ariaLabel="Cancel preview"
+            items={items}
+            onAction={vi.fn()}
+            onMove={onMove}
+          />
+        )
+      );
+      const handle = container.querySelector<HTMLElement>('[aria-label="Изменить позицию"]');
+      act(() => dispatchPointer(handle, 'pointerdown', { clientY: 10 }));
+      act(() => dispatchPointer(document.body, 'pointermove', { clientY: 90 }));
+      expect(
+        container
+          .querySelector('[data-settings-collection-item]')
+          ?.getAttribute('data-settings-collection-item')
+      ).toBe('second');
+      act(() =>
+        window.dispatchEvent(
+          reason === 'Escape' ? new KeyboardEvent('keydown', { key: 'Escape' }) : new Event('blur')
+        )
+      );
+      act(() => dispatchPointer(document.body, 'pointerup', { clientY: 90 }));
+      expect(
+        container
+          .querySelector('[data-settings-collection-item]')
+          ?.getAttribute('data-settings-collection-item')
+      ).toBe('first');
+      expect(onMove).not.toHaveBeenCalled();
+    }
+  );
 });

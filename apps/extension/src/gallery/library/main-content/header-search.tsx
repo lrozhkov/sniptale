@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { Search, X } from 'lucide-react';
 import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
@@ -21,7 +22,7 @@ export function GalleryHeaderSearchField(props: {
 
   return (
     <div
-      className="flex h-8 w-36 min-w-0 shrink-0 items-center gap-1.5 rounded-[8px] border
+      className="flex h-8 w-36 min-w-0 shrink-0 items-center gap-1.5 rounded-[4px] border
         border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]
         px-1.5 transition-[width,border-color,background-color] duration-200 ease-out
@@ -63,12 +64,15 @@ export function GalleryHeaderSearchField(props: {
               ? translate('gallery.app.scenarioSearchPlaceholder')
               : translate('gallery.app.searchPlaceholder')
         }
-        className="min-w-0 flex-1 bg-transparent text-sm text-[var(--sniptale-color-text-primary)]
+        className="min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] text-[var(--sniptale-color-text-primary)]
           outline-none placeholder:text-[var(--sniptale-color-text-muted)]
           focus:placeholder:text-transparent"
       />
       {props.search ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
+          data-command-chrome="true"
           type="button"
           data-ui="gallery.header.clearSearch"
           aria-label={translate('gallery.app.clearSearch')}
@@ -78,12 +82,12 @@ export function GalleryHeaderSearchField(props: {
             (props.searchNavigation?.inputRef ?? inputRef).current?.focus();
           }}
           className="sniptale-dismiss-button flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center
-            rounded-[6px]  transition-colors
+            rounded-[4px]  transition-colors
             focus-visible:outline-none focus-visible:ring-2
             focus-visible:ring-[var(--sniptale-color-accent)]"
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );

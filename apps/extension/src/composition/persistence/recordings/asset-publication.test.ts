@@ -209,6 +209,7 @@ function createTransaction(
   mediaValue?: unknown
 ) {
   return {
+    durability: 'strict' as const,
     done,
     abort: vi.fn(() => writes.splice(0)),
     objectStore(name: string) {
@@ -320,4 +321,91 @@ it('rejects a retained own review before recording replacement or outbox writes'
   ).rejects.toThrow();
   expect(writes).toEqual([]);
   expect(mocks.completeDelete).not.toHaveBeenCalled();
+});
+
+it.each(['missing-source', 'new-incarnation', 'new-epoch', 'unbound-target'])(
+  'refuses recovery publication after %s before writing canonical effects',
+  async (reason) => {
+    const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+    const tx = createTransaction(writes, Promise.resolve());
+    const objectStore = tx.objectStore;
+    tx.objectStore = (name: string) => ({
+      ...objectStore(name),
+      get: vi.fn(async (key: unknown) => {
+        if (name !== 'recording_recovery_sessions') return objectStore(name).get(key);
+        if (key === '@epoch')
+          return { id: '@epoch', token: reason === 'new-epoch' ? 'replaced' : 'epoch' };
+        if (reason === 'missing-source') return undefined;
+        return {
+          id: 'source',
+          recoveryId: reason === 'unbound-target' ? 'different' : 'recording-1',
+          incarnation: reason === 'new-incarnation' ? 'new' : 'incarnation',
+          epoch: 'epoch',
+          filename: 'clip.webm',
+          mimeType: 'video/webm',
+          createdAt: 1,
+          size: 3,
+          blockCount: 1,
+          complete: true,
+          published: false,
+        };
+      }),
+    });
+    mocks.runMutation.mockImplementation(async (operation) => operation({ transaction: () => tx }));
+    const base = journal();
+    const candidate = {
+      ...base,
+      payload: {
+        ...base.payload,
+        recoverySources: {
+          'recording-1': { id: 'source', incarnation: 'incarnation', epoch: 'epoch' },
+        },
+      },
+    };
+    await expect(publishRecordingAssetJournal(candidate)).rejects.toThrow('superseded');
+    expect(writes).toEqual([]);
+    expect(tx.abort).toHaveBeenCalledOnce();
+  }
+);
+
+it('marks a restored source saved only in the successful canonical publication transaction', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const tx = createTransaction(writes, Promise.resolve());
+  const objectStore = tx.objectStore;
+  tx.objectStore = (name: string) => ({
+    ...objectStore(name),
+    get: vi.fn(async (key: unknown) => {
+      if (name !== 'recording_recovery_sessions') return objectStore(name).get(key);
+      if (key === '@epoch') return { id: '@epoch', token: 'epoch' };
+      return {
+        id: 'source',
+        recoveryId: 'recording-1',
+        incarnation: 'incarnation',
+        epoch: 'epoch',
+        filename: 'clip.webm',
+        mimeType: 'video/webm',
+        createdAt: 1,
+        size: 3,
+        blockCount: 1,
+        complete: false,
+        published: false,
+      };
+    }),
+  });
+  mocks.runMutation.mockImplementation(async (operation) => operation({ transaction: () => tx }));
+  const base = journal();
+  await publishRecordingAssetJournal({
+    ...base,
+    payload: {
+      ...base.payload,
+      recoverySources: {
+        'recording-1': { id: 'source', incarnation: 'incarnation', epoch: 'epoch' },
+      },
+    },
+  });
+  expect(writes).toContainEqual([
+    'recording_recovery_sessions',
+    'put',
+    expect.objectContaining({ id: 'source', published: true }),
+  ]);
 });

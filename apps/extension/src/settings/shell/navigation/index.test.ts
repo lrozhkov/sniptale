@@ -33,13 +33,13 @@ describe('settings navigation items', () => {
     expect(SETTINGS_NAV_ITEMS).not.toContainEqual(expect.objectContaining({ id: 'drafts' }));
   });
 
-  it('keeps every deferred section loader executable and aligned with its export', async () => {
-    await Promise.all(
-      Object.values(DEFERRED_SETTINGS_SECTION_LOADERS).map(async (descriptor) =>
-        expect(descriptor.load()).resolves.toHaveProperty(descriptor.exportName)
-      )
-    );
-  }, 15_000);
+  it.each(Object.entries(DEFERRED_SETTINGS_SECTION_LOADERS))(
+    'loads the deferred %s section and its registered export',
+    async (_section, descriptor) => {
+      await expect(descriptor.load()).resolves.toHaveProperty(descriptor.exportName);
+    },
+    15_000
+  );
 
   it('keeps visible tabs and normalizes unknown persisted values', () => {
     expect(normalizeSettingsTab('media-quality')).toBe('media-quality');

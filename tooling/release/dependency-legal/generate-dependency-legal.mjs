@@ -10,10 +10,10 @@ import {
 } from '../policy/oss-release-policy.mjs';
 import { generateDependencyLegalClosure, writeDependencyLegalClosure } from './index.mjs';
 
-function manropeMetadata(policy) {
-  const manrope = policy.bundledAssets.find((asset) => asset.id === 'manrope');
-  if (!manrope) throw new Error('OSS release policy is missing Manrope metadata.');
-  return { ...manrope, licensePath: 'LICENSES/OFL-1.1.txt' };
+function interfaceFontMetadata(policy) {
+  const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
+  if (!interfaceFont) throw new Error('OSS release policy is missing Interface font metadata.');
+  return { ...interfaceFont, licensePath: 'packages/ui/src/styles/golos-ui/LICENSE.txt' };
 }
 
 async function legalFileEntry(repoRoot, relativePath) {
@@ -37,12 +37,14 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
   await writeDependencyLegalClosure({
     closure,
     manifestPath: policy.dependencyLegal.manifestPath,
-    manrope: manropeMetadata(policy),
+    interfaceFont: interfaceFontMetadata(policy),
+    documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
     outputRoot: repoRoot,
   });
   const legalPaths = [
     ...new Set([
       ...REQUIRED_RELEASE_LEGAL_PATHS,
+      ...policy.bundledAssets.flatMap((asset) => (asset.licensePath ? [asset.licensePath] : [])),
       policy.dependencyLegal.manifestPath,
       ...closure.entries.map((entry) => entry.archivePath),
       ...(closure.sourceFiles ?? []).map((file) => file.archivePath),

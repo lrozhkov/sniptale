@@ -54,3 +54,12 @@ it('passes edited preset names through the field owner', () => {
 
   expect(setName).toHaveBeenCalledWith('Weekly export');
 });
+
+it('clears the name through the native field event without submitting the form', () => {
+  const setName = renderNameField();
+  const clear = container!.querySelector<HTMLButtonElement>('button.sniptale-field-clear')!;
+  expect(clear.type).toBe('button');
+  act(() => clear.click());
+  expect(setName).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(container!.querySelector('input'));
+});

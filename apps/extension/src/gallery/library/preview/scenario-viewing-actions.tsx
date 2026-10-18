@@ -7,12 +7,12 @@ import { createTranslator, useAppLocale } from '../../../platform/i18n';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 
 const inspectorLinkClassName = [
-  'w-full !justify-start !rounded-[8px] !px-3 text-left gap-2',
+  'gallery-preview-action',
   getControlSecondaryButtonClassName({ density: 'compact' }),
 ].join(' ');
 
 const inlineLinkClassName = [
-  'rounded-md border border-[var(--sniptale-color-border-soft)]',
+  'rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
   'px-3 py-2 text-sm underline focus-visible:outline',
 ].join(' ');
 

@@ -83,7 +83,7 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
       aria-label={translate('videoEditor.app.sourceViewer')}
       className={[
         'flex h-full min-h-0',
-        'min-w-0 flex-col rounded-lg',
+        'min-w-0 flex-col rounded-[4px]',
         'outline-offset-2 focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
     >
@@ -111,7 +111,7 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
           {!image && <SourceTimingControls playback={viewer} fps={props.fps} />}
           <div className="flex shrink-0 items-center gap-1 border-l border-[var(--sniptale-color-border-soft)] pl-3">
             <ContentToolbarButton
-              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[4px] !px-2.5"
               disabled={!canPlace}
               aria-label={translate('videoEditor.app.sourceAppend')}
               title={translate('videoEditor.app.materialsAppend')}
@@ -121,7 +121,7 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
               {translate('videoEditor.app.sourceAppend')}
             </ContentToolbarButton>
             <ContentToolbarButton
-              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[4px] !px-2.5"
               disabled={!canPlace}
               aria-label={translate('videoEditor.app.sourceInsert')}
               title={translate('videoEditor.app.materialsInsertHint')}
@@ -131,7 +131,7 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
               {translate('videoEditor.app.sourceInsert')}
             </ContentToolbarButton>
             <ContentToolbarButton
-              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[4px] !px-2.5"
               disabled={!canPlace}
               aria-label={translate('videoEditor.app.sourceOverlay')}
               title={translate('videoEditor.app.materialsOverlay')}
@@ -198,7 +198,7 @@ function SourceMediaSurface({
       className={[
         'relative flex min-h-0',
         'flex-1 items-center justify-center',
-        'overflow-hidden rounded-lg bg-[var(--sniptale-color-surface-panel)]',
+        'overflow-hidden rounded-[4px] bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
     >
       {assetUrl &&

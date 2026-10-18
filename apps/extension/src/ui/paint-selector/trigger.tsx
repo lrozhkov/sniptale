@@ -2,6 +2,8 @@ import type { RefObject } from 'react';
 import { serializePaintToCss, type GradientType, type Paint } from '@sniptale/foundation/paint';
 import { ChevronDown, Palette } from 'lucide-react';
 import { translate } from '../../platform/i18n';
+import { InspectorParameterRow, useInspectorLayout } from '../compact-inspector-controls/layout';
+import { ColorValue } from '../color-selector/trigger';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME,
@@ -30,7 +32,9 @@ export function PaintSelectorTrigger(props: {
   label: string;
   onClick: () => void;
   open: boolean;
+  onCommitColor(color: string): void;
 }) {
+  const inspector = useInspectorLayout();
   const stopCount = translate('highlighter.paintPicker.stops');
   const summary =
     props.draft.kind === 'solid'
@@ -48,6 +52,44 @@ export function PaintSelectorTrigger(props: {
     ].join(', '),
     backgroundSize: '100% 100%, 8px 8px',
   };
+  if (inspector)
+    return (
+      <InspectorParameterRow label={props.label} valueMinimum={132}>
+        <div className="sniptale-paint-value">
+          {props.draft.kind === 'solid' ? (
+            <ColorValue
+              value={props.draft.color}
+              displayValue={summary}
+              label={`${props.label} · HEX`}
+              disabled={props.disabled === true || props.open}
+              allowAlpha
+              allowTransparent
+              onCommit={props.onCommitColor}
+            />
+          ) : (
+            <span className="paint-inspector-value">{summary}</span>
+          )}
+          <button
+            ref={props.buttonRef}
+            type="button"
+            disabled={props.disabled}
+            aria-label={props.label}
+            aria-expanded={props.open}
+            onClick={props.onClick}
+            title={summary}
+            data-ui="shared.ui.paint-selector.trigger"
+            className="sniptale-paint-swatch-trigger"
+          >
+            <span
+              aria-hidden="true"
+              className="paint-inspector-swatch"
+              data-ui="shared.ui.paint-selector.preview"
+              style={previewStyle}
+            />
+          </button>
+        </div>
+      </InspectorParameterRow>
+    );
   if (props.variant === 'swatch') {
     return (
       <div className="paint-inspector-field">

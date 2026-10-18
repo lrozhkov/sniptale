@@ -98,8 +98,8 @@ export function EditorDocumentTitleEditor(props: {
             readOnly={saving}
             value={draft}
             className={[
-              'w-full min-w-0 rounded-md border border-[var(--sniptale-color-border-strong)]',
-              'bg-[var(--sniptale-color-surface-panel)] pl-2 pr-8 py-1.5 text-sm',
+              'block h-9 w-full min-w-0 rounded-[4px] border border-[var(--sniptale-color-border-strong)]',
+              'bg-[var(--sniptale-color-surface-panel)] px-2 py-1.5 text-[13px] font-medium leading-[18px]',
               'text-[var(--sniptale-color-text-primary)] outline-none focus-visible:ring-1',
               'focus-visible:ring-[var(--sniptale-color-border-strong)]',
             ].join(' ')}

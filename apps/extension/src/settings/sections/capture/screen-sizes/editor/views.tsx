@@ -1,9 +1,17 @@
-import type { Dispatch, FormEvent, SetStateAction } from 'react';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
+import { SettingsControlRow } from '../../../../section-surface';
+import {
+  useRef,
+  type CSSProperties,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from 'react';
 
 import { translate } from '../../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../../contracts/settings';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import {
   clampViewportDimension,
@@ -18,24 +26,39 @@ function ViewportPresetNameField(props: {
   label: string;
   setLabel: Dispatch<SetStateAction<string>>;
 }) {
+  const input = useRef<HTMLInputElement>(null);
+  const label = translate('viewportPresets.editor.nameLabel');
   return (
-    <ProductField
-      label={translate('viewportPresets.editor.nameLabel')}
-      hint={translate('viewportPresets.editor.nameHint')}
-    >
-      <ProductInput
-        type="text"
-        value={props.label}
-        onChange={(event) => props.setLabel(event.target.value)}
-        placeholder={translate('viewportPresets.editor.namePlaceholder')}
-        maxLength={VIEWPORT_PRESET_MAX_NAME_LENGTH}
-        required
-        disabled={props.disabled}
-        autoFocus
-      />
-    </ProductField>
+    <SettingsControlRow label={label} description={translate('viewportPresets.editor.nameHint')}>
+      <div className="sniptale-text-value">
+        <ProductInput
+          ref={input}
+          aria-label={label}
+          type="text"
+          value={props.label}
+          onChange={(event) => props.setLabel(event.target.value)}
+          placeholder={translate('viewportPresets.editor.namePlaceholder')}
+          maxLength={VIEWPORT_PRESET_MAX_NAME_LENGTH}
+          required
+          disabled={props.disabled}
+          autoFocus
+        />
+        {props.label && !props.disabled ? (
+          <InspectorFieldClear label={label} target={input} />
+        ) : null}
+      </div>
+    </SettingsControlRow>
   );
 }
+
+const dimensionInputStyle: CSSProperties = {
+  MozAppearance: 'textfield',
+  WebkitAppearance: 'none',
+  marginInlineStart: 'auto',
+  maxWidth: 96,
+  textAlign: 'right',
+  display: 'block',
+};
 
 function ViewportPresetDimensionFields(props: {
   disabled: boolean;
@@ -45,11 +68,15 @@ function ViewportPresetDimensionFields(props: {
   width: number;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="sniptale-parameter-stack">
       <div>
-        <ProductField label={translate('viewportPresets.editor.widthLabel')}>
+        <SettingsControlRow
+          label={translate('viewportPresets.editor.widthLabel')}
+          valueMinimum={80}
+        >
           <ProductInput
             type="number"
+            aria-label={translate('viewportPresets.editor.widthLabel')}
             value={props.width}
             onChange={(event) =>
               props.setWidth(clampViewportDimension(event.target.value, maxViewportPresetDimension))
@@ -58,15 +85,19 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+            style={dimensionInputStyle}
           />
-        </ProductField>
+        </SettingsControlRow>
       </div>
 
       <div>
-        <ProductField label={translate('viewportPresets.editor.heightLabel')}>
+        <SettingsControlRow
+          label={translate('viewportPresets.editor.heightLabel')}
+          valueMinimum={80}
+        >
           <ProductInput
             type="number"
+            aria-label={translate('viewportPresets.editor.heightLabel')}
             value={props.height}
             onChange={(event) =>
               props.setHeight(
@@ -77,9 +108,9 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+            style={dimensionInputStyle}
           />
-        </ProductField>
+        </SettingsControlRow>
       </div>
     </div>
   );

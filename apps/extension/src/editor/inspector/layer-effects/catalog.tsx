@@ -49,7 +49,8 @@ function LayerEffectsCatalogItem(props: {
       type="button"
       aria-pressed={props.activeEffectId === props.definition.id}
       className={cx(
-        'flex min-h-8 w-full items-center justify-between gap-2 rounded-[6px] px-2 text-left text-xs',
+        'flex min-h-8 w-full items-center justify-between gap-2 rounded-[4px] px-2 text-left',
+        'text-[13px] font-medium leading-[18px]',
         'text-[color:var(--sniptale-color-text-secondary)] hover:bg-[color:var(--sniptale-color-surface-hover)]',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--sniptale-color-accent)]',
         props.activeEffectId === props.definition.id &&

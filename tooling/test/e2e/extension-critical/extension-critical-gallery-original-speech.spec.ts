@@ -92,7 +92,7 @@ for (const variant of [
         await page.mouse.down();
         await page.mouse.move(rect.x + (rect.width * 4) / duration, rect.y + 15, { steps: 6 });
         await page.mouse.up();
-        const selectedOnly = panel.getByRole('switch', {
+        const selectedOnly = panel.getByRole('checkbox', {
           name: label('gallery.videoReview.recognitionSelection'),
           exact: true,
         });
@@ -259,7 +259,7 @@ for (const variant of [
           await capture('recognition-columns-' + width + '.png');
         }
       await page.reload();
-      await open();
+      await expect(dialog).toBeVisible();
       await openSpeech();
       expect((await persistedReviewContent(page))?.text?.fragments).toHaveLength(accepted);
       expect((await persistedReviewContent(page))?.audio).toEqual(originalAudio);

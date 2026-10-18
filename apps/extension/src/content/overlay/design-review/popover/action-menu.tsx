@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { BrowserDesignReviewAction } from '../../../parser/page-preparation/annotations';
 import { translate } from '../../../../platform/i18n';
 import { DESIGN_REVIEW_ACTIONS, getDesignReviewActionTone } from '../action-catalog';
@@ -18,15 +19,18 @@ export function DesignReviewActionMenu(props: {
         const selected = option.action === props.action;
         const label = translate(option.labelKey);
         return (
-          <button
+          <ProductActionButton
+            compact
+            tone="toggle"
+            active={selected}
             key={option.action}
             type="button"
             aria-label={label}
             aria-pressed={selected}
             title={label}
             className={[
-              'inline-flex h-7 min-w-6 shrink-0 cursor-pointer items-center justify-center gap-0.5',
-              'rounded-[7px] border border-transparent px-1 text-xs font-semibold',
+              'inline-flex h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center gap-0.5',
+              'rounded-[4px] border border-transparent px-1 text-[13px] leading-[18px] font-medium',
               'text-[var(--sniptale-color-text-secondary)]',
               'hover:bg-[var(--sniptale-color-surface-input)]',
               'active:bg-[var(--sniptale-color-surface-hover)]',
@@ -45,7 +49,7 @@ export function DesignReviewActionMenu(props: {
                 {label}
               </span>
             ) : null}
-          </button>
+          </ProductActionButton>
         );
       })}
     </div>

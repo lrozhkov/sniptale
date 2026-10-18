@@ -65,7 +65,7 @@ export function CursorSkinFields(props: {
       />
     );
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       {props.showCaptureCapability !== false ? (
         <CursorCaptureCapability captureMode={props.captureMode} />
       ) : null}
@@ -126,7 +126,7 @@ function CursorAppearanceFields(props: {
   onUpdateCursorSkin: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSkin'];
 }) {
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack space-y-3">
       <CursorPresetField preset={props.preset} onUpdateCursorSkin={props.onUpdateCursorSkin} />
       {props.showAnimation ? (
         <>

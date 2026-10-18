@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import type {
   StepBadgeAnchor,
   StepBadgePreset,
@@ -6,9 +7,10 @@ import type {
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
-import { Braces, Hash, MapPin, Maximize2, Palette, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import {
+  getStepBadgeInspectorSections,
   StepBadgeColorSection,
   StepBadgeSizeSection,
 } from '../../../ui/highlighter-preset-editor/step-badge/inspector';
@@ -57,14 +59,11 @@ type StepBadgeManualSettingsProps = {
 };
 
 export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
+  const inspector = useInspectorLayout();
   const selectedAnchor = props.settings.anchor ?? 'top-left';
   const selectedOffsets = props.settings.offsetDirections ?? [];
   const sections = [
-    { icon: Hash, id: 'numbering', label: translate('content.stepBadge.numberingSection') },
-    { icon: MapPin, id: 'position', label: translate('content.stepBadge.positionSection') },
-    { icon: Maximize2, id: 'size', label: translate('content.stepBadge.sizeSection') },
-    { icon: Palette, id: 'colors', label: translate('content.stepBadge.colorsSection') },
-    { icon: Braces, id: 'css', label: translate('content.stepBadge.cssSection') },
+    ...getStepBadgeInspectorSections(),
     {
       icon: Save,
       id: 'save',
@@ -75,7 +74,7 @@ export function StepBadgeManualSettings(props: StepBadgeManualSettingsProps) {
   const renderSection = (section: ManualSection) => {
     if (section === 'numbering') {
       return (
-        <div className="grid gap-3">
+        <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-3'}>
           <StepBadgeAutoSection {...props} embedded settings={props.settings} />
           {!props.isAuto ? (
             <StepBadgeValueSection

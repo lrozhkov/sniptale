@@ -1,3 +1,6 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import type { ReactNode } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
 import { CopyPlus, Eye, EyeOff } from 'lucide-react';
 
@@ -61,6 +64,18 @@ function getFrameEffectTitle(effectMode: EffectMode) {
   return translate('content.interactiveFrame.effectFocus');
 }
 
+type FrameManualBorderEditor = {
+  cssDraft: string;
+  cssError: string | null;
+  isSaving: boolean;
+  onCssDraftChange: (value: string) => void;
+  save: (input: {
+    name?: string;
+    overwrite?: BorderPreset;
+    tagIds?: readonly string[];
+  }) => Promise<boolean>;
+};
+
 interface FrameSettingsPopoverContentProps {
   acceptAction?: (event: Event) => boolean;
   compact?: boolean;
@@ -89,20 +104,21 @@ interface FrameSettingsPopoverContentProps {
   onFloatingInteractionChange?: (open: boolean) => void;
   pendingPresetIds: ReadonlySet<string>;
   selectedPresetId?: string;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
+}
+
+function FrameEffectParameterGroup(props: { children: ReactNode }) {
+  return useInspectorLayout() ? (
+    <ContentPopoverSection>
+      <div className="sniptale-parameter-stack">{props.children}</div>
+    </ContentPopoverSection>
+  ) : (
+    props.children
+  );
 }
 
 export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentProps) {
+  const inspector = useInspectorLayout();
   const workflow = useTemplateForkWorkflow({
     ...(props.selectedPresetId ? { activeTemplateId: props.selectedPresetId } : {}),
     onFork: props.handleForkPreset ?? props.handleSelectPreset,
@@ -159,31 +175,35 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
             }}
           />
           {props.effectMode === 'blur' ? (
-            <>
+            <FrameEffectParameterGroup>
               <FrameBlurControls
+                embedded={inspector}
                 handleBlurChange={props.handleBlurChange}
                 handleBlurTypeChange={props.handleBlurTypeChange}
                 settings={props.localBlurSettings}
               />
               <FrameDecorationToggle
+                embedded={inspector}
                 onChange={props.handleBlurShowBorderChange}
                 showBorder={props.localBlurSettings.showBorder ?? false}
               />
-            </>
+            </FrameEffectParameterGroup>
           ) : null}
 
           {props.effectMode === 'focus' ? (
-            <>
+            <FrameEffectParameterGroup>
               <FrameFocusControls
+                embedded={inspector}
                 handleFocusBlurChange={props.handleFocusBlurChange}
                 handleFocusChange={props.handleFocusChange}
                 settings={props.localFocusSettings}
               />
               <FrameDecorationToggle
+                embedded={inspector}
                 onChange={props.handleFocusShowBorderChange}
                 showBorder={props.localFocusSettings.showBorder ?? false}
               />
-            </>
+            </FrameEffectParameterGroup>
           ) : null}
 
           <FrameBorderSection
@@ -235,17 +255,7 @@ function FrameBorderSection(props: {
   selectedPresetId?: string;
   localBorderSettings: AppliedBorderSettings;
   linkedTemplateOptions: LinkedAnnotationTemplateOptions;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
   manualStatus?: string;
   onCreated: () => void;
   onUseForNewFrames?: () => void;
@@ -408,7 +418,9 @@ function FramePresetRow(props: {
         </ProductGlassPresetMeta>
       </ProductGlassPresetItem>
       <span className="sniptale-frame-style-preset-actions">
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           aria-label={translate('content.templateFork.fork')}
           className="sniptale-frame-style-preset-action"
           data-frame-style-action="fork"
@@ -423,8 +435,10 @@ function FramePresetRow(props: {
           type="button"
         >
           <CopyPlus size={15} />
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          compact
+          tone="secondary"
           aria-label={visibilityActionLabel}
           className="sniptale-frame-style-preset-action"
           data-frame-style-action="toggle-visibility"
@@ -438,7 +452,7 @@ function FramePresetRow(props: {
           type="button"
         >
           {isEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
-        </button>
+        </ProductActionButton>
       </span>
     </div>
   );
@@ -456,17 +470,7 @@ function FrameManualMode(props: {
   handleManualBorderChange: (patch: BorderVisualStylePatch) => void;
   localBorderSettings: AppliedBorderSettings;
   linkedTemplateOptions: LinkedAnnotationTemplateOptions;
-  manual: {
-    cssDraft: string;
-    cssError: string | null;
-    isSaving: boolean;
-    onCssDraftChange: (value: string) => void;
-    save: (input: {
-      name?: string;
-      overwrite?: BorderPreset;
-      tagIds?: readonly string[];
-    }) => Promise<boolean>;
-  };
+  manual: FrameManualBorderEditor;
   manualStatus?: string;
   onCreated: () => void;
   onUseForNewFrames?: () => void;

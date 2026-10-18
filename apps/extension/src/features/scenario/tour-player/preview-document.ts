@@ -45,7 +45,14 @@ export async function admitSavedScenarioHtml(
       mode === 'guide'
         ? `default-src 'none'; script-src 'sha256-${hash}'; img-src data:; font-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`
         : `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
-    return policies[0]?.getAttribute('content') === expectedPolicy;
+    const policy = policies[0]?.getAttribute('content');
+    if (policy === expectedPolicy) return true;
+    // Font data is admitted only with the current extension-supplied Tour executable.
+    return (
+      mode === 'tour' &&
+      hash === scriptHash &&
+      policy === expectedPolicy.replace('media-src data:;', 'media-src data:; font-src data:;')
+    );
   });
   if (!admittedHash) return false;
   if (document.querySelector('base, iframe, frame, object, embed')) return false;

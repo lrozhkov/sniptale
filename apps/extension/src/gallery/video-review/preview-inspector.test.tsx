@@ -43,6 +43,14 @@ it('shows current defaults and actual raster, commits local settings and offers 
   try {
     render();
     expect(host.textContent).toContain('405 × 720');
+    const actual = host.querySelector('[aria-label="gallery.videoReview.previewActualRaster"]')!;
+    expect(host.querySelector('.sniptale-parameter-row')).toBe(
+      actual.closest('.sniptale-parameter-row')
+    );
+    expect(actual.closest('.sniptale-parameter-row')?.textContent).toContain(
+      'gallery.videoReview.previewActualRaster'
+    );
+    expect(actual.closest('.sniptale-parameter-row')?.querySelector('[aria-haspopup]')).toBeNull();
     expect(host.textContent?.match(/gallery.videoReview.previewCurrent/g)).toHaveLength(2);
     const select = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
     act(() => select.click());
@@ -72,7 +80,13 @@ it('shows current defaults and actual raster, commits local settings and offers 
     expect(onChange).toHaveBeenLastCalledWith({ frameRate: '15' });
     await choose(2, 'gallery.videoReview.previewPausedDetailed');
     expect(onChange).toHaveBeenLastCalledWith({ pausedQuality: 'detailed' });
-    await choose(3, 'gallery.videoReview.previewOn');
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[role="switch"][aria-label="gallery.videoReview.previewShowFrameRate"]'
+        )!
+        .click()
+    );
     expect(onChange).toHaveBeenLastCalledWith({ showFrameRate: true });
 
     const button = (key: string) =>

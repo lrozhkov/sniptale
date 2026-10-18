@@ -1,5 +1,38 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'preference-initialization-consumer',
+    productionFile:
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/browser-io.ts',
+    allowCrossOwner: true,
+    reason:
+      'Locale initialization proves conditional writes, failure, and ordering with user choices and erasure.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/accessors.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/helpers.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/preference-service/index.test.ts',
+      'apps/extension/src/platform/i18n/locale/initialization.test.ts',
+    ],
+  },
+  {
+    owner: 'video-review-local-session-reset',
+    productionFile: 'apps/extension/src/workflows/video-review/local-session.ts',
+    reason: 'Local reset candidates use session reset, queue, history and snapshot CAS proof.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/local-session.test.ts',
+      'apps/extension/src/workflows/video-review/session.reset.test.ts',
+      'apps/extension/src/workflows/video-review/session.test.ts',
+      'apps/extension/src/workflows/video-review/session.history-start.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-paint-selector-trigger',
+    productionFile: 'apps/extension/src/ui/paint-selector/trigger.tsx',
+    reason:
+      'Trigger variants, expansion, cancellation and focus restoration use the selector integration suite.',
+    testFiles: ['apps/extension/src/ui/paint-selector/index.test.tsx'],
+  },
+  {
     owner: 'cursor-timeline-consumers',
     productionFile: 'apps/extension/src/features/video/project/cursor-focus-path/timeline.ts',
     reason:

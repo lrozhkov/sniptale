@@ -84,7 +84,7 @@ function registerOrderTest() {
     expect(
       rowChildren[2]?.querySelector('[aria-label="editor.compact.heightDimension"]')
     ).not.toBeNull();
-    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)]');
+    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)]');
   });
 }
 

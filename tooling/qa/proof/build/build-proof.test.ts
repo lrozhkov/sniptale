@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   createBuildProofInputs,
@@ -16,6 +16,9 @@ const roots: string[] = [];
 const inheritedControlDigest = process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
 
 beforeEach(() => {
+  vi.stubEnv('SNIPTALE_BUILD_PROOF_AUTHORITY', undefined);
+  vi.stubEnv('SNIPTALE_BUILD_PROOF_PATH', undefined);
+  vi.stubEnv('SNIPTALE_BUILD_ARCHIVE_PATH', undefined);
   process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = `sha256:${'a'.repeat(64)}`;
 });
 
@@ -54,8 +57,7 @@ function createRoot() {
 }
 
 afterEach(() => {
-  delete process.env.SNIPTALE_BUILD_PROOF_PATH;
-  delete process.env.SNIPTALE_BUILD_ARCHIVE_PATH;
+  vi.unstubAllEnvs();
   if (inheritedControlDigest == null) delete process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST;
   else process.env.SNIPTALE_CANDIDATE_CONTROL_DIGEST = inheritedControlDigest;
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });

@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../platform/i18n';
 import { CompactCommandField, type CompactCommand } from '..';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../../chrome';
@@ -21,7 +22,7 @@ function renderToolTemplateTrigger(
     <span
       aria-hidden="true"
       className={[
-        'flex h-5 w-5 items-center justify-center overflow-hidden rounded-[6px]',
+        'flex h-5 w-5 items-center justify-center overflow-hidden rounded-[4px]',
         'text-[color:var(--sniptale-color-accent)]',
       ].join(' ')}
     >
@@ -52,9 +53,9 @@ export function buildToolTemplateCommand(params: ToolCommandParams): CompactComm
     value,
     content: (
       <CompactCommandField label={label} value={value}>
-        <div className="space-y-3">
+        <div className="space-y-1">
           <EditorInspectorTemplateCards {...templateCardsProps} />
-          <button
+          <ProductActionButton
             type="button"
             disabled={state.saveDisabled}
             onClick={state.onOpenSavePanel}
@@ -62,7 +63,7 @@ export function buildToolTemplateCommand(params: ToolCommandParams): CompactComm
             data-editor-template-save-trigger="true"
           >
             {translate('editor.compact.saveAsTemplate')}
-          </button>
+          </ProductActionButton>
           {state.savePanel ? <EditorInspectorPresetSavePanel state={state.savePanel} /> : null}
         </div>
       </CompactCommandField>

@@ -86,7 +86,8 @@ export function FeedbackPreview(props: {
       data-theme={theme ?? undefined}
       data-floating-ui-capture-transient="true"
       className={[
-        'pointer-events-none fixed z-[2147483647] rounded-[12px] border p-4 shadow-2xl',
+        'sniptale-design-review-chrome sniptale-compact-workspace',
+        'pointer-events-none fixed z-[2147483647] rounded-[4px] border p-4 shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
@@ -94,18 +95,20 @@ export function FeedbackPreview(props: {
       style={{ scale, transformOrigin: 'top left', overflow: 'hidden' }}
     >
       <div
-        className={`flex items-center gap-2 text-sm font-bold ${getDesignReviewActionTone(action)}`}
+        className={`flex items-center gap-2 text-[14px] leading-5 font-semibold ${getDesignReviewActionTone(action)}`}
       >
         <Icon size={18} />
         {translate(option.labelKey)}
       </div>
       <div className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">{props.label}</div>
-      <div className="mt-1 truncate font-mono text-[10px] text-[var(--sniptale-color-text-dim)]">
+      <div className="mt-1 truncate font-mono text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
         {props.record.evidence.targetPath}
       </div>
       <div className="my-3 border-t border-solid border-[color:var(--sniptale-color-border-soft)]" />
-      <p className="whitespace-pre-wrap break-words text-xs leading-5">{props.summary}</p>
-      <div className="mt-3 text-right text-[10px] text-[var(--sniptale-color-text-dim)]">
+      <p className="sniptale-design-review-authored-text whitespace-pre-wrap break-words text-xs leading-5">
+        {props.summary}
+      </p>
+      <div className="mt-3 text-right text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
         {translate('content.designReview.panelClickHint')}
       </div>
     </aside>,

@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import type React from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -38,69 +40,74 @@ function FrameSettingsPopoverSurface(props: {
   const { catalog, handlers, settings, surface } = props.controller;
 
   return (
-    <div
-      ref={props.popoverRef}
-      className={[
-        'sniptale-frame-settings-popover',
-        'sniptale-glass-popover',
-        'sniptale-content-popover',
-        'sniptale-content-ui-zoom-surface',
-        'sniptale-content-popover--toolbar-menu',
-        props.request.scope === 'session' ? 'sniptale-main-toolbar-popover' : '',
-        props.request.compact ? 'sniptale-content-popover--compact' : '',
-      ].join(' ')}
-      data-sniptale-activation-bridge="defer"
-      data-theme={surface.portalTheme ?? undefined}
-      data-frame-id={props.request.frameId}
-      onMouseDown={stopPopoverPropagation}
-      onClick={stopPopoverPropagation}
-      style={getThemedPortalStyle(surface.portalTheme, { width: SETTINGS_POPOVER_WIDTH })}
-    >
-      <div className="sniptale-content-popover-body">
-        <FrameSettingsPopoverContent
-          acceptAction={(event) => Boolean(createTrustedContentActionIntentSource(event))}
-          compact={props.request.compact ?? false}
-          effectMode={props.request.effectMode}
-          globalSettings={{ ...settings.global, borderPresets: catalog.visibleBorderPresets }}
-          handleBlurChange={handlers.handleBlurChange}
-          handleBlurShowBorderChange={handlers.handleBlurShowBorderChange}
-          handleBlurTypeChange={handlers.handleBlurTypeChange}
-          handleFocusBlurChange={handlers.handleFocusBlurChange}
-          handleFocusChange={handlers.handleFocusChange}
-          handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
-          handleForkPreset={handlers.handleForkPreset}
-          onApplyToFuture={() =>
-            dispatchFutureFrameDefaultsChanged({
-              kind: 'frame',
-              settings: {
-                blurSettings: settings.localBlur,
-                borderSettings: settings.localBorder,
-                effectMode: props.request.effectMode,
-                focusSettings: settings.localFocus,
-              },
-            })
-          }
-          handleManualBorderChange={handlers.handleManualBorderChange}
-          handleSelectPreset={handlers.handleSelectPreset}
-          handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
-          localBlurSettings={settings.localBlur}
-          localBorderSettings={settings.localBorder}
-          localFocusSettings={settings.localFocus}
-          linkedTemplateOptions={props.linkedTemplateOptions}
-          pendingPresetIds={catalog.pendingPresetIds}
-          onShowPresets={catalog.refreshPresets}
-          manual={catalog.manual}
-          onFloatingInteractionChange={surface.onFloatingInteractionChange}
-          headerContext={props.request.scope === 'session' ? 'toolbar' : 'element'}
-          {...(props.request.scope === 'session' ? {} : { headerDrag: props.drag })}
-          onClose={props.request.onClose}
-          onEffectModeChange={props.request.onEffectModeChange ?? (() => undefined)}
-          {...(settings.selectedPresetId === undefined
-            ? {}
-            : { selectedPresetId: settings.selectedPresetId })}
-        />
-      </div>
-    </div>
+    <CommandPressScope value={true}>
+      <InspectorLayout>
+        <div
+          ref={props.popoverRef}
+          className={[
+            'sniptale-frame-settings-popover',
+            'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface',
+            'sniptale-glass-popover',
+            'sniptale-content-popover',
+            'sniptale-content-ui-zoom-surface',
+            'sniptale-content-popover--toolbar-menu',
+            props.request.scope === 'session' ? 'sniptale-main-toolbar-popover' : '',
+            props.request.compact ? 'sniptale-content-popover--compact' : '',
+          ].join(' ')}
+          data-sniptale-activation-bridge="defer"
+          data-theme={surface.portalTheme ?? undefined}
+          data-frame-id={props.request.frameId}
+          onMouseDown={stopPopoverPropagation}
+          onClick={stopPopoverPropagation}
+          style={getThemedPortalStyle(surface.portalTheme, { width: SETTINGS_POPOVER_WIDTH })}
+        >
+          <div className="sniptale-content-popover-body">
+            <FrameSettingsPopoverContent
+              acceptAction={(event) => Boolean(createTrustedContentActionIntentSource(event))}
+              compact={props.request.compact ?? false}
+              effectMode={props.request.effectMode}
+              globalSettings={{ ...settings.global, borderPresets: catalog.visibleBorderPresets }}
+              handleBlurChange={handlers.handleBlurChange}
+              handleBlurShowBorderChange={handlers.handleBlurShowBorderChange}
+              handleBlurTypeChange={handlers.handleBlurTypeChange}
+              handleFocusBlurChange={handlers.handleFocusBlurChange}
+              handleFocusChange={handlers.handleFocusChange}
+              handleFocusShowBorderChange={handlers.handleFocusShowBorderChange}
+              handleForkPreset={handlers.handleForkPreset}
+              onApplyToFuture={() =>
+                dispatchFutureFrameDefaultsChanged({
+                  kind: 'frame',
+                  settings: {
+                    blurSettings: settings.localBlur,
+                    borderSettings: settings.localBorder,
+                    effectMode: props.request.effectMode,
+                    focusSettings: settings.localFocus,
+                  },
+                })
+              }
+              handleManualBorderChange={handlers.handleManualBorderChange}
+              handleSelectPreset={handlers.handleSelectPreset}
+              handleTogglePresetEnabled={handlers.handleTogglePresetEnabled}
+              localBlurSettings={settings.localBlur}
+              localBorderSettings={settings.localBorder}
+              localFocusSettings={settings.localFocus}
+              linkedTemplateOptions={props.linkedTemplateOptions}
+              pendingPresetIds={catalog.pendingPresetIds}
+              onShowPresets={catalog.refreshPresets}
+              manual={catalog.manual}
+              onFloatingInteractionChange={surface.onFloatingInteractionChange}
+              headerContext={props.request.scope === 'session' ? 'toolbar' : 'element'}
+              {...(props.request.scope === 'session' ? {} : { headerDrag: props.drag })}
+              onClose={props.request.onClose}
+              onEffectModeChange={props.request.onEffectModeChange ?? (() => undefined)}
+              {...(settings.selectedPresetId === undefined
+                ? {}
+                : { selectedPresetId: settings.selectedPresetId })}
+            />
+          </div>
+        </div>
+      </InspectorLayout>
+    </CommandPressScope>
   );
 }
 

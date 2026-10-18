@@ -1,3 +1,4 @@
+import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { Mic, Unlink } from 'lucide-react';
 import type {
   TourAudioResource,
@@ -9,7 +10,6 @@ import type { importScenarioNarration } from '../../../composition/persistence/s
 import { getTourNarrationTarget } from '../../../features/scenario/project/public';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourInspectorNumericRow } from './numeric-row';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
 import { TourNarrationPreview } from './narration-preview';
@@ -93,14 +93,12 @@ export function TourNarrationSettings({
           },
         }}
       />
-      {!narration && <p className="guide-inspector-hint">{t('scenario.editor.tourAudioHint')}</p>}
       {narration && (
         <>
           {objectId ? (
             <div className="tour-text-field">
-              <span>{t('scenario.editor.tourAudioTrigger')}</span>
-              <CompactSelect
-                aria-label={t('scenario.editor.tourAudioTrigger')}
+              <SelectField
+                label={t('scenario.editor.tourAudioTrigger')}
                 disabled={disabled}
                 value={trigger}
                 options={[

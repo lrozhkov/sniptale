@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -215,6 +217,47 @@ it('retains caption alignment in the print projection', async () => {
       )
     );
     expect(s.host.querySelector('figcaption')?.style.textAlign).toBe('end');
+  } finally {
+    await s.close();
+  }
+});
+
+it('keeps labeled print parameters disposable and activates the trailing switch through its name', async () => {
+  const s = setup();
+  const close = vi.fn();
+  const original = structuredClone(s.project.print);
+  try {
+    await act(async () =>
+      s.root.render(
+        <CommandPressScope value={true}>
+          <InspectorLayout>
+            <GuidePrint
+              project={s.project}
+              images={{ asset: 'blob:image' }}
+              t={t}
+              onClose={close}
+            />
+          </InspectorLayout>
+        </CommandPressScope>
+      )
+    );
+    const name = [...s.host.querySelectorAll<HTMLElement>('.sniptale-parameter-name')].find(
+      (node) => node.textContent === 'Keep steps together'
+    )!;
+    expect(name).toBeDefined();
+    const toggle = s.host.querySelector<HTMLButtonElement>(
+      '[role="switch"][aria-label="Keep steps together"]'
+    )!;
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    await act(async () => name.click());
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    await act(async () => button(s.host, 'Landscape').click());
+    expect(s.host.querySelector('style')?.textContent).toContain('landscape');
+    await act(async () => button(s.host, 'Back').click());
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({ keepStepsTogether: true, orientation: 'landscape' })
+    );
+    expect(s.project.print).toEqual(original);
   } finally {
     await s.close();
   }

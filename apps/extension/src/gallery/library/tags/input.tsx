@@ -1,15 +1,30 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEventHandler,
   type RefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  resolveThemeSafePortalTarget,
+  useResolvedPortalTheme,
+} from '@sniptale/ui/theme/safe-portal';
+import { resolveCompactSelectMenuStyle } from '@sniptale/ui/compact-inspector-controls/select-helpers';
+import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
+import { useFloatingSurfaceWheelContainment } from '@sniptale/ui/floating-interactions/wheel';
 import { Plus, Tag } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
+
+const tagOptionActiveClassName =
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-secondary)_18%,var(--sniptale-color-surface-panel))]';
+const tagOptionHoverClassName =
+  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-secondary)_12%,var(--sniptale-color-surface-panel))]';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -29,7 +44,8 @@ interface GalleryTagInputProps {
 
 function GalleryTagInputField(props: {
   autoFocus: boolean;
-  compact: boolean;
+  activeOptionId: string | undefined;
+  explicitSubmit: boolean;
   inputRef: RefObject<HTMLInputElement | null>;
   listId: string;
   onBlur: () => void;
@@ -45,127 +61,214 @@ function GalleryTagInputField(props: {
   return (
     <div
       className={cx(
-        'flex min-w-0 items-center gap-2 rounded-[8px] border border-[var(--sniptale-color-border-soft)]',
+        'flex min-w-0 items-center gap-2 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] transition-colors',
         'focus-within:border-[var(--sniptale-color-border-accent-strong)]',
-        props.compact ? 'h-8 px-2.5' : 'min-h-10 px-3 py-2'
+        'h-8 px-2.5'
       )}
     >
       <Tag
         aria-hidden="true"
-        className={cx(
-          'shrink-0 text-[var(--sniptale-color-text-muted)]',
-          props.compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-        )}
+        className={cx('shrink-0 text-[var(--sniptale-color-text-muted)]', 'h-4 w-4')}
       />
-      <input
-        autoFocus={props.autoFocus}
-        ref={props.inputRef}
-        aria-autocomplete="list"
-        aria-controls={props.listId}
-        aria-expanded={props.showOptions}
-        role="combobox"
-        value={props.value}
-        onBlur={props.onBlur}
-        onChange={(event) => props.onChange(event.target.value)}
-        onFocus={props.onFocus}
-        onKeyDown={props.onKeyDown}
-        placeholder={props.placeholder}
+      <div
         className={cx(
-          'min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--sniptale-color-text-muted)]',
-          props.compact ? 'text-xs' : 'text-sm'
+          'relative flex h-8 items-center',
+          props.explicitSubmit
+            ? 'w-[calc(12ch+2rem)] shrink-0 text-[13px] font-normal'
+            : 'min-w-0 flex-1'
         )}
-      />
+        style={{ fontFamily: 'var(--sniptale-font-document-sans)' }}
+      >
+        <input
+          aria-label={props.placeholder}
+          autoFocus={props.autoFocus}
+          ref={props.inputRef}
+          aria-autocomplete="list"
+          aria-activedescendant={props.activeOptionId}
+          aria-controls={props.listId}
+          aria-expanded={props.showOptions}
+          role="combobox"
+          value={props.value}
+          onBlur={props.onBlur}
+          onChange={(event) => props.onChange(event.target.value)}
+          onFocus={props.onFocus}
+          onKeyDown={props.onKeyDown}
+          placeholder={props.placeholder}
+          className={cx(
+            'min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--sniptale-color-text-muted)]',
+            'h-full w-full pr-8 text-[13px] leading-[18px] font-normal'
+          )}
+        />
+        {props.value.length > 0 ? (
+          <InspectorFieldClear label={props.placeholder} target={props.inputRef} />
+        ) : null}
+      </div>
       {props.showSubmit ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           onMouseDown={(event) => event.preventDefault()}
           onClick={props.onSubmit}
-          className={cx(
-            getControlPrimaryButtonClassName({ density: 'compact' }),
-            '!h-6 !min-h-6 !rounded-[6px] !px-2 text-xs'
-          )}
         >
           {translate('gallery.app.apply')}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );
 }
 
+function isTagAnchorVisible(anchor: HTMLElement) {
+  const rect = anchor.getBoundingClientRect();
+  if (!anchor.isConnected || rect.bottom <= 0 || rect.top >= window.innerHeight) return false;
+  for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    if (!/(auto|scroll|hidden|clip)/.test(style.overflowY)) continue;
+    const bounds = parent.getBoundingClientRect();
+    if (bounds.height > 0 && (rect.bottom <= bounds.top || rect.top >= bounds.bottom)) return false;
+    if (parent.matches('dialog[open]')) break;
+  }
+  return true;
+}
+
+function useTagOptionsLayer({
+  activeIndex,
+  anchor,
+  canCreate,
+  onAnchorHidden,
+  suggestionCount,
+}: {
+  activeIndex: number;
+  anchor: HTMLDivElement;
+  canCreate: boolean;
+  onAnchorHidden: () => void;
+  suggestionCount: number;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const wheelRef = useFloatingSurfaceWheelContainment(menuRef);
+  const theme = useResolvedPortalTheme(anchor);
+  const [style, setStyle] = useState(() => resolveCompactSelectMenuStyle(anchor));
+  useLayoutEffect(() => {
+    const updatePosition = () => {
+      if (!isTagAnchorVisible(anchor)) {
+        onAnchorHidden();
+        return;
+      }
+      setStyle(resolveCompactSelectMenuStyle(anchor));
+    };
+    const unbind = bindFloatingInteractionPositionListeners(anchor, updatePosition);
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePosition);
+    observer?.observe(anchor);
+    return () => {
+      observer?.disconnect();
+      unbind?.();
+    };
+  }, [anchor, onAnchorHidden]);
+  useLayoutEffect(() => {
+    menuRef.current
+      ?.querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, canCreate, suggestionCount]);
+  return { wheelRef, theme, style, portalTarget: resolveThemeSafePortalTarget(anchor) };
+}
+
 function GalleryTagOptions(props: {
   activeIndex: number;
+  anchor: HTMLDivElement;
   canCreate: boolean;
   listId: string;
+  onAnchorHidden: () => void;
   onSelect: (tag: string) => void;
   suggestions: string[];
   value: string;
 }) {
-  return (
+  const { wheelRef, theme, style, portalTarget } = useTagOptionsLayer({
+    activeIndex: props.activeIndex,
+    anchor: props.anchor,
+    canCreate: props.canCreate,
+    onAnchorHidden: props.onAnchorHidden,
+    suggestionCount: props.suggestions.length,
+  });
+  const createLabel = `${translate('gallery.app.createTag')} “${props.value.trim()}”`;
+  return createPortal(
     <div
       aria-label={translate('gallery.app.tagOptionsLabel')}
-      className="absolute left-0 top-[calc(100%+6px)] z-50 w-max min-w-full
-        max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-[8px]
+      className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-[4px] p-[5px]
         border border-[var(--sniptale-color-border-soft)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]
         shadow-lg backdrop-blur-sm"
+      data-floating-ui-root="true"
+      data-floating-ui-owned-by={props.listId}
+      data-theme={theme ?? undefined}
       id={props.listId}
+      ref={wheelRef}
       role="listbox"
+      style={{
+        ...style,
+        position: 'fixed',
+        zIndex: 2147483647,
+        colorScheme: theme ?? undefined,
+        fontFamily: 'var(--sniptale-font-interface)',
+      }}
     >
-      <div className="max-h-48 overflow-y-auto p-1">
-        {props.suggestions.map((tag, index) => (
-          <button
-            aria-selected={props.activeIndex === index}
-            key={tag}
-            role="option"
-            type="button"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              props.onSelect(tag);
-            }}
-            className={cx(
-              'flex w-full cursor-pointer items-center rounded-[6px] px-2.5 py-2 text-left text-sm',
-              'text-[var(--sniptale-color-text-primary)] transition-colors',
-              props.activeIndex === index
-                ? 'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]'
-                : 'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_42%,transparent)]'
-            )}
-          >
-            <span className="truncate">{tag}</span>
-          </button>
-        ))}
-      </div>
+      {props.suggestions.map((tag, index) => (
+        <button
+          aria-selected={props.activeIndex === index}
+          id={`${props.listId}-option-${index}`}
+          key={tag}
+          role="option"
+          tabIndex={-1}
+          title={tag}
+          type="button"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            props.onSelect(tag);
+          }}
+          className={cx(
+            `flex w-full shrink-0 cursor-pointer items-center rounded-[4px] min-h-8 px-2 py-1 text-left
+                text-[13px] leading-[18px] font-normal`,
+            'text-[var(--sniptale-color-text-primary)] transition-colors',
+            props.activeIndex === index ? tagOptionActiveClassName : tagOptionHoverClassName
+          )}
+        >
+          <span className="truncate">{tag}</span>
+        </button>
+      ))}
       {props.canCreate ? (
         <button
           aria-selected={props.activeIndex === props.suggestions.length}
+          id={`${props.listId}-option-${props.suggestions.length}`}
           role="option"
+          tabIndex={-1}
+          title={createLabel}
           type="button"
           onMouseDown={(event) => {
             event.preventDefault();
             props.onSelect(props.value);
           }}
           className={cx(
-            'flex w-full cursor-pointer items-center gap-2 border-t px-3 py-2.5 text-left text-sm',
+            `flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-[4px] border-t
+              min-h-8 px-2 py-1 text-left text-[13px] leading-[18px] font-normal`,
             'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
             props.activeIndex === props.suggestions.length
-              ? 'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_54%,transparent)]'
-              : 'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_42%,transparent)]'
+              ? tagOptionActiveClassName
+              : tagOptionHoverClassName
           )}
         >
-          <Plus className="h-4 w-4 shrink-0 text-[var(--sniptale-color-accent-emphasis)]" />
-          <span className="truncate">
-            {translate('gallery.app.createTag')} “{props.value.trim()}”
-          </span>
+          <Plus className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-secondary)]" />
+          <span className="truncate">{createLabel}</span>
         </button>
       ) : null}
-    </div>
+    </div>,
+    portalTarget
   );
 }
 
 export function GalleryTagInput({
   allTags,
   autoFocus = false,
-  compact = false,
   excludeTags = [],
   explicitSubmit = false,
   onChange,
@@ -175,6 +278,7 @@ export function GalleryTagInput({
 }: GalleryTagInputProps) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const blurTimeoutRef = useRef<number | null>(null);
   const [focused, setFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -231,10 +335,13 @@ export function GalleryTagInput({
   };
 
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0" ref={anchorRef} data-floating-ui-owner-id={listId}>
       <GalleryTagInputField
+        activeOptionId={
+          showOptions && activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined
+        }
         autoFocus={autoFocus}
-        compact={compact}
+        explicitSubmit={explicitSubmit}
         inputRef={inputRef}
         listId={listId}
         onBlur={() => {
@@ -259,6 +366,10 @@ export function GalleryTagInput({
             setFocused(true);
             setActiveIndex((current) => (current <= 0 ? optionCount - 1 : current - 1));
           } else if (event.key === 'Escape') {
+            if (showOptions) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
             setFocused(false);
             setActiveIndex(-1);
           } else if (event.key === 'Enter') {
@@ -273,11 +384,13 @@ export function GalleryTagInput({
         value={value}
       />
 
-      {showOptions ? (
+      {showOptions && anchorRef.current ? (
         <GalleryTagOptions
           activeIndex={activeIndex}
+          anchor={anchorRef.current}
           canCreate={canCreate}
           listId={listId}
+          onAnchorHidden={() => setFocused(false)}
           onSelect={select}
           suggestions={suggestions}
           value={value}

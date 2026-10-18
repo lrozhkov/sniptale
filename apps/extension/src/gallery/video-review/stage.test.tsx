@@ -162,6 +162,32 @@ const renderStage = (
   };
 };
 
+it.each([
+  { drawing: true, button: 0, x: 160, y: 90, admitted: true },
+  { drawing: false, button: 0, x: 160, y: 90, admitted: false },
+  { drawing: true, button: 2, x: 160, y: 90, admitted: false },
+  { drawing: true, button: 0, x: -5, y: -5, admitted: false },
+])('preserves native pointer focus unless drawing admits $drawing/$button/$x', async (scenario) => {
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  renderStage({ drawing: scenario.drawing });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  const capture = vi.fn();
+  Object.assign(stage, {
+    getBoundingClientRect: () => new DOMRect(0, 0, 800, 450),
+    setPointerCapture: capture,
+  });
+  const event = new MouseEvent('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+    button: scenario.button,
+    clientX: scenario.x,
+    clientY: scenario.y,
+  });
+  await act(async () => stage.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(scenario.admitted);
+  expect(capture).toHaveBeenCalledTimes(scenario.admitted ? 1 : 0);
+});
+
 it('keeps caption conflict pointer navigation out of scene gesture preparation', async () => {
   presentation.active = true;
   presentation.conflicts = [{ fragmentId: 'phrase', start: 0, end: 2, reason: 'space' }];
@@ -843,5 +869,23 @@ it('cancels brief preview preparation and restarts the delay for the next operat
     expect(host.textContent).not.toContain('gallery.videoReview.previewLoading');
   } finally {
     vi.useRealTimers();
+  }
+});
+
+it('retains the decoded native header across detailed pause and playback handoffs', () => {
+  const windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Browser' };
+  const header = vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+    joinColor: '#fff',
+    url: 'data:image/svg+xml,header',
+    image: { width: 800, height: 86, close: vi.fn() },
+    failed: false,
+    retry: vi.fn(),
+  });
+  const props = { scene: { background: disabled, camera: identity, windowHeader } };
+  for (const manual of [false, true, false, true]) {
+    presentation.active = manual;
+    presentation.ready = true;
+    renderStage(props);
+    expect(header.mock.lastCall![0]).toEqual(windowHeader);
   }
 });

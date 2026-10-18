@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
 import type {
@@ -22,7 +23,11 @@ import {
   createStepBadgeTemplateFromSettings,
 } from '../../../features/highlighter/step-badge-presets/catalog';
 import { getLinkedStepBadgeDiameter } from '../../../features/highlighter/step-badge-presets/style';
-import { SETTINGS_POPOVER_HEIGHT, SETTINGS_POPOVER_WIDTH } from '../popover/surface';
+import {
+  resolvePopoverPortalTarget,
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../popover/surface';
 import { usePopoverInteractionDismissal } from '../popover/interaction-dismissal';
 import type { SettingsPopoverContext } from '../popover/header';
 import { useFrameAnnotationPopoverPresentation } from '../popover/presentation';
@@ -48,6 +53,7 @@ export function FutureStepBadgeSettingsPopover(props: {
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
 }) {
+  const inspector = useInspectorLayout();
   const locale = useAppLocale();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const [local, setLocal] = useState(props.settings);
@@ -109,6 +115,9 @@ export function FutureStepBadgeSettingsPopover(props: {
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
       className={[
+        inspector
+          ? 'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface'
+          : '',
         'sniptale-callout-settings-popover sniptale-glass-popover',
         'sniptale-glass-popover--wide sniptale-content-popover--compact',
         'sniptale-content-popover--toolbar-menu sniptale-content-popover--scroll',
@@ -169,14 +178,4 @@ export function FutureStepBadgeSettingsPopover(props: {
       />
     </ContentPopoverAdapter>
   );
-}
-
-function resolvePopoverPortalTarget(
-  target: Element | DocumentFragment | undefined
-): HTMLElement | ShadowRoot | DocumentFragment {
-  return target instanceof HTMLElement ||
-    target instanceof ShadowRoot ||
-    target instanceof DocumentFragment
-    ? target
-    : document.body;
 }

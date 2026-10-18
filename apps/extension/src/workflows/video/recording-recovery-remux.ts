@@ -1,0 +1,127 @@
+import {
+  ALL_FORMATS,
+  BlobSource,
+  EncodedAudioPacketSource,
+  EncodedPacketSink,
+  EncodedVideoPacketSource,
+  Input,
+  Mp4OutputFormat,
+  Output,
+  StreamTarget,
+  VideoSampleSink,
+  AudioSampleSink,
+  WebMOutputFormat,
+  type EncodedPacket,
+  type StreamTargetChunk,
+} from 'mediabunny';
+import {
+  createSeekableAssetObjectWriter,
+  readAssetFile,
+} from '../../composition/persistence/assets';
+import type { PersistenceMutationTransitionPermit } from '../../composition/persistence/infrastructure/mutation-barrier';
+
+/** A broken suffix ends packet reading; it never removes the source or acknowledges output. */
+async function nextRetainedPacket(sink: EncodedPacketSink, packet: EncodedPacket) {
+  try {
+    return await sink.getNextPacket(packet);
+  } catch {
+    return null;
+  }
+}
+
+/** Remuxes packets to disk with bounded mux buffers, then decodes the complete result. */
+export async function remuxRecoveryRecording(
+  file: File,
+  persistenceTransitionPermit?: PersistenceMutationTransitionPermit
+) {
+  const mimeType = file.type.includes('mp4') ? 'video/mp4' : 'video/webm';
+  const writer = await createSeekableAssetObjectWriter(
+    { mimeType },
+    persistenceTransitionPermit ? { persistenceTransitionPermit } : {}
+  );
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  let output: Output | undefined;
+  try {
+    const video = await input.getPrimaryVideoTrack();
+    const audio = await input.getPrimaryAudioTrack();
+    if (!video?.codec) throw new Error('The saved recording has no readable video track.');
+    const videoConfig = await video.getDecoderConfig();
+    const audioConfig = await audio?.getDecoderConfig();
+    if (!videoConfig || (audio && (!audio.codec || !audioConfig)))
+      throw new Error('The saved recording has no usable codec configuration.');
+    const videoSink = new EncodedPacketSink(video);
+    const audioSink = audio ? new EncodedPacketSink(audio) : null;
+    let v = await videoSink.getFirstPacket();
+    let a = audioSink ? await audioSink.getFirstPacket() : null;
+    if (!v || (await video.determinePacketType(v)) !== 'key')
+      throw new Error('The saved recording has no independent starting frame.');
+    output = new Output({
+      format:
+        mimeType === 'video/mp4'
+          ? new Mp4OutputFormat({ fastStart: 'fragmented' })
+          : new WebMOutputFormat(),
+      target: new StreamTarget(
+        new WritableStream<StreamTargetChunk>({
+          async write(chunk) {
+            await writer.writeAt(chunk.position, new Blob([chunk.data]));
+          },
+        }),
+        { chunked: true, chunkSize: 1024 * 1024 }
+      ),
+    });
+    const videoSource = new EncodedVideoPacketSource(video.codec);
+    const audioSource = audio?.codec ? new EncodedAudioPacketSource(audio.codec) : null;
+    output.addVideoTrack(videoSource, { rotation: video.rotation });
+    if (audioSource) output.addAudioTrack(audioSource);
+    await output.start();
+    while (v || a) {
+      if (v && (!a || v.timestamp <= a.timestamp)) {
+        await videoSource.add(v, { decoderConfig: videoConfig });
+        v = await nextRetainedPacket(videoSink, v);
+      } else if (a && audioSink && audioSource && audioConfig) {
+        await audioSource.add(a, { decoderConfig: audioConfig });
+        a = await nextRetainedPacket(audioSink, a);
+      } else {
+        throw new Error('The saved audio track cannot be recovered.');
+      }
+    }
+    videoSource.close();
+    audioSource?.close();
+    await output.finalize();
+    const prepared = await writer.finalize();
+    const result = await readAssetFile(prepared.ref, file.name);
+    await validateRecoveredRecording(result);
+    return { file: result, preparedAsset: prepared, release: () => writer.abort() };
+  } catch (error) {
+    await output?.cancel().catch(() => undefined);
+    await writer.abort();
+    throw error;
+  } finally {
+    input.dispose();
+  }
+}
+
+async function validateRecoveredRecording(file: File) {
+  const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
+  try {
+    const video = await input.getPrimaryVideoTrack();
+    if (!video) throw new Error('The recovered video track is missing.');
+    let frames = 0;
+    for await (const sample of new VideoSampleSink(video).samples()) {
+      frames++;
+      sample.close();
+    }
+    if (!frames) throw new Error('The recovered recording has no decodable frames.');
+    const audio = await input.getPrimaryAudioTrack();
+    if (audio) {
+      let samples = 0;
+      for await (const sample of new AudioSampleSink(audio).samples()) {
+        samples++;
+        sample.close();
+      }
+      if (!samples) throw new Error('The recovered audio track has no decodable samples.');
+    }
+  } finally {
+    input.dispose();
+  }
+}

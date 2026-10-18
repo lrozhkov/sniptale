@@ -1,7 +1,6 @@
 import type { ReviewTextFragment } from '../../features/video/review/text-types';
 import { ReviewDetails } from './controls';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { ColorField, SegmentedRow } from '../../ui/compact-inspector-controls';
+import { ColorField, SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
 import {
   createReviewCaptionSettings,
   type ReviewCaptionSettings,
@@ -76,21 +75,16 @@ export function ReviewCaptionSceneControls(props: {
   const settings = props.settings ?? createReviewCaptionSettings();
   return (
     <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.captionScene">
-      <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-        <span>{translate('gallery.videoReview.captionsEnabled')}</span>
-        <ProductGlassSwitch
-          on={settings.enabled}
-          disabled={props.disabled}
-          role="switch"
-          aria-checked={settings.enabled}
-          aria-label={translate('gallery.videoReview.captionsEnabled')}
-          onClick={() => props.onChange({ ...settings, enabled: !settings.enabled })}
-        />
-      </div>
+      <ToggleField
+        value={settings.enabled}
+        disabled={props.disabled}
+        label={translate('gallery.videoReview.captionsEnabled')}
+        onChange={(enabled) => props.onChange({ ...settings, enabled })}
+      />
       {settings.enabled && (
         <ReviewCaptionStyleControls
           style={settings.style}
-          disabled={props.disabled ?? false}
+          disabled={!!props.disabled}
           onChange={(style) => props.onChange({ ...settings, style })}
         />
       )}
@@ -108,42 +102,27 @@ export function ReviewFragmentCaptionControls(props: {
   const { fragment } = props;
   return (
     <>
-      <div
-        className={[
-          'flex min-h-8 items-center justify-between gap-2 text-xs',
-          'text-[var(--sniptale-color-text-secondary)]',
-        ].join(' ')}
-      >
-        <span>{translate('gallery.videoReview.textFragmentShown')}</span>
-        <ProductGlassSwitch
-          role="switch"
-          aria-label={translate('gallery.videoReview.textFragmentShown')}
-          aria-checked={fragment.showInVideo}
-          on={fragment.showInVideo}
-          disabled={props.disabled}
-          onClick={() => props.onChange({ showInVideo: !fragment.showInVideo })}
-        />
-      </div>
+      <ToggleField
+        label={translate('gallery.videoReview.textFragmentShown')}
+        value={fragment.showInVideo}
+        disabled={props.disabled}
+        onChange={(showInVideo) => props.onChange({ showInVideo })}
+      />
       {fragment.showInVideo && (
         <ReviewDetails
           preferenceId="group:text-style"
           label={translate('gallery.videoReview.captionStyle')}
         >
-          <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-            <span>{translate('gallery.videoReview.captionInherit')}</span>
-            <ProductGlassSwitch
-              on={!fragment.style}
-              disabled={props.disabled}
-              role="switch"
-              aria-checked={!fragment.style}
-              aria-label={translate('gallery.videoReview.captionInherit')}
-              onClick={() =>
-                props.onChange({
-                  style: fragment.style ? null : { ...props.settings.style },
-                })
-              }
-            />
-          </div>
+          <ToggleField
+            value={!fragment.style}
+            disabled={props.disabled}
+            label={translate('gallery.videoReview.captionInherit')}
+            onChange={() =>
+              props.onChange({
+                style: fragment.style ? null : { ...props.settings.style },
+              })
+            }
+          />
           {fragment.style && (
             <ReviewCaptionStyleControls
               style={fragment.style}

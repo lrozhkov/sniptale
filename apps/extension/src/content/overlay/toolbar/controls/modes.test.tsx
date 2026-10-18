@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -83,7 +85,11 @@ function renderModeButtons(
   }
 
   act(() => {
-    root?.render(<ModeButtonsHarness {...params} />);
+    root?.render(
+      <CommandPressScope value={!params.videoRecordingMode}>
+        <ModeButtonsHarness {...params} />
+      </CommandPressScope>
+    );
   });
 }
 
@@ -104,7 +110,9 @@ beforeEach(() => {
 it('activates Drawing through its distinct Working Mode option', () => {
   const onToggleDrawing = vi.fn();
   renderModeButtons({ onToggleDrawing });
+  expect(queryModeSelectorButton()?.getAttribute('data-command-property')).toBe('true');
   act(() => queryModeSelectorButton()?.click());
+  expect(document.querySelector('.sniptale-content-menu-adopted')).not.toBeNull();
   act(() => {
     document
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.mode-option.drawing"]')

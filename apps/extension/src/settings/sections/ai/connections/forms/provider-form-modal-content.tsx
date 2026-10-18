@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import type React from 'react';
 
 import { translate } from '../../../../../platform/i18n';
@@ -57,37 +59,57 @@ function ProviderApiKeyField(props: ProviderFormModalContentProps) {
 }
 
 function ProviderNameField(props: ProviderFormModalContentProps) {
+  const field = useRef<HTMLInputElement>(null);
   return (
     <ProductField
       label={translate('settings.aiProviders.providerNameLabel')}
       error={props.errors['name']}
     >
-      <ProductInput
-        type="text"
-        value={props.formData.name}
-        onChange={props.onNameChange}
-        placeholder={translate('settings.aiProviders.providerNamePlaceholder')}
-        invalid={Boolean(props.errors['name'])}
-      />
+      <div className="sniptale-text-value">
+        <ProductInput
+          ref={field}
+          type="text"
+          value={props.formData.name}
+          onChange={props.onNameChange}
+          placeholder={translate('settings.aiProviders.providerNamePlaceholder')}
+          invalid={Boolean(props.errors['name'])}
+        />
+        {props.formData.name && (
+          <InspectorFieldClear
+            label={translate('settings.aiProviders.providerNameLabel')}
+            target={field}
+          />
+        )}
+      </div>
     </ProductField>
   );
 }
 
 function ProviderApiUrlField(props: ProviderFormModalContentProps) {
+  const field = useRef<HTMLInputElement>(null);
   return (
     <ProductField
       label={translate('settings.aiProviders.providerApiUrlLabel')}
       error={props.errors['baseUrl']}
       hint={translate('settings.aiProviders.providerApiUrlHint')}
     >
-      <ProductInput
-        type="url"
-        value={props.formData.baseUrl}
-        onChange={props.onBaseUrlChange}
-        placeholder={translate('settings.aiProviders.providerApiUrlPlaceholder')}
-        className="font-mono"
-        invalid={Boolean(props.errors['baseUrl'])}
-      />
+      <div className="sniptale-text-value">
+        <ProductInput
+          ref={field}
+          type="url"
+          value={props.formData.baseUrl}
+          onChange={props.onBaseUrlChange}
+          placeholder={translate('settings.aiProviders.providerApiUrlPlaceholder')}
+          className="font-mono"
+          invalid={Boolean(props.errors['baseUrl'])}
+        />
+        {props.formData.baseUrl && (
+          <InspectorFieldClear
+            label={translate('settings.aiProviders.providerApiUrlLabel')}
+            target={field}
+          />
+        )}
+      </div>
     </ProductField>
   );
 }

@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React from 'react';
 import {
   ProductToolbarMenu,
@@ -60,6 +61,7 @@ function TimerDropdownItems(props: {
 }
 
 export function TimerDropdown(props: TimerDropdownProps) {
+  const adopted = React.useContext(CommandPressScope);
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.timerButtonRef,
     displayMode: props.displayMode,
@@ -78,6 +80,7 @@ export function TimerDropdown(props: TimerDropdownProps) {
   return (
     <ToolbarMenuDropdown dataUi="content.toolbar.timer-menu" menuRef={props.timerDropdownMenuRef}>
       <ProductToolbarMenu
+        className={adopted ? 'sniptale-content-menu-adopted' : ''}
         title={translate('content.toolbar.delayTitle')}
         compact={props.compactMenus}
         placement={menuPlacement}

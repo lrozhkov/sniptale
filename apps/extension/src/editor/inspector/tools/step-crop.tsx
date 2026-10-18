@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import type { ImageEditorController } from '../../controller';
@@ -13,7 +14,7 @@ export function renderCropControlsSection(props: {
   secondaryPanelButtonClassName: string;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <PanelSection
         label={translate('editor.compact.crop')}
         value={
@@ -22,21 +23,21 @@ export function renderCropControlsSection(props: {
             : translate('editor.compact.cropAreaWaiting')
         }
       >
-        <div className="text-sm leading-6 text-[color:var(--sc-text-secondary)]">
+        <div className="text-[12px] leading-4 text-[color:var(--sc-text-secondary)]">
           {props.cropReady
             ? translate('editor.compact.cropReadyDescription')
             : translate('editor.compact.cropWaitingDescription')}
         </div>
       </PanelSection>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-        <button
-          type="button"
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-1">
+        <ProductActionButton
+          tone="secondary"
           className={cx(props.secondaryPanelButtonClassName, '!w-auto px-3')}
           onClick={() => props.controller.cancelCropMode()}
         >
           {translate('editor.compact.cancel')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
           type="button"
           className={cx(
             props.primaryPanelButtonClassName,
@@ -50,7 +51,7 @@ export function renderCropControlsSection(props: {
           disabled={!props.cropReady}
         >
           {translate('editor.compact.apply')}
-        </button>
+        </ProductActionButton>
       </div>
     </div>
   );

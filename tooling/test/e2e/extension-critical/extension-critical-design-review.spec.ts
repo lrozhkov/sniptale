@@ -447,19 +447,25 @@ test('web copy retains authored text drawings and frames after Library reopen', 
   );
   await expect(snapshot.locator('.sniptale-frame-container')).toHaveCount(1);
   await expect(snapshot.locator('body')).toContainText('Retained frame comment');
-  await expect(snapshot.locator('.sniptale-drawing-canvas')).toHaveAttribute(
-    'data-sniptale-canvas-rasterized',
-    'true'
+  const retainedInk = snapshot.locator('canvas[data-sniptale-canvas-rasterized="true"]');
+  await expect(retainedInk).toHaveCount(2);
+  for (const canvas of await retainedInk.all())
+    await expect(canvas).not.toHaveCSS('background-image', 'none');
+  const retainedInkBounds = await retainedInk.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const bounds = node.getBoundingClientRect();
+      return { top: bounds.top + scrollY, bottom: bounds.bottom + scrollY };
+    })
   );
-  await expect(snapshot.locator('.sniptale-drawing-canvas')).not.toHaveCSS(
-    'background-image',
-    'none'
-  );
-  const retainedDrawingHeight = await snapshot
-    .locator('.sniptale-drawing-canvas')
-    .evaluate((node) => node.getBoundingClientRect().height);
-  expect(retainedDrawingHeight).toBeGreaterThan(900);
-  await viewer.screenshot({ path: testInfo.outputPath('library-annotations.png') });
+  expect(
+    Math.max(...retainedInkBounds.map((bounds) => bounds.bottom)) -
+      Math.min(...retainedInkBounds.map((bounds) => bounds.top))
+  ).toBeGreaterThan(900);
+  expect(retainedInkBounds.filter((bounds) => bounds.top > 900)).toHaveLength(1);
+  await viewer.screenshot({
+    path: testInfo.outputPath('library-annotations.png'),
+    fullPage: false,
+  });
   const downloadPromise = viewer.waitForEvent('download');
   await viewer.getByRole('button', { name: /^(Download HTML|Скачать HTML)$/u }).click();
   const download = await downloadPromise;
@@ -471,35 +477,34 @@ test('web copy retains authored text drawings and frames after Library reopen', 
   await expect(standalone.locator('body')).toContainText('Retained drawing note');
   await expect(standalone.locator('body')).toContainText('Retained frame comment');
   await expect(standalone.locator('.sniptale-frame-container')).toHaveCount(1);
-  await expect(standalone.locator('.sniptale-drawing-canvas')).not.toHaveCSS(
-    'background-image',
-    'none'
-  );
+  const standaloneInk = standalone.locator('canvas[data-sniptale-canvas-rasterized="true"]');
+  await expect(standaloneInk).toHaveCount(2);
+  for (const canvas of await standaloneInk.all())
+    await expect(canvas).not.toHaveCSS('background-image', 'none');
   await expect(
     standalone.locator(
       '[data-ui="shared.ui.content-toolbar"], .sniptale-resize-handle, script, [onclick]'
     )
   ).toHaveCount(0);
-  const hasOffscreenInk = await standalone
-    .locator('.sniptale-drawing-canvas')
-    .evaluate(async (node) => {
-      const background = getComputedStyle(node).backgroundImage;
-      const image = new Image();
-      image.src = background.slice(5, -2);
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const context = canvas.getContext('2d')!;
-      context.drawImage(image, 0, 0);
-      const top = Math.floor(canvas.height / 2);
-      const pixels = context.getImageData(0, top, canvas.width, canvas.height - top).data;
-      return pixels.some((value, index) => index % 4 === 3 && value > 0);
-    });
+  const hasOffscreenInk = await standaloneInk.evaluateAll(async (nodes) => {
+    const node = nodes.find((canvas) => canvas.getBoundingClientRect().top + scrollY > 900);
+    if (!node) return false;
+    const background = getComputedStyle(node).backgroundImage;
+    const image = new Image();
+    image.src = background.slice(5, -2);
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    return pixels.some((value, index) => index % 4 === 3 && value > 0);
+  });
   expect(hasOffscreenInk).toBe(true);
   await standalone.screenshot({
     path: testInfo.outputPath('standalone-annotations.png'),
-    fullPage: true,
+    fullPage: false,
   });
   await standalone.close();
   await expect(
@@ -509,3 +514,62 @@ test('web copy retains authored text drawings and frames after Library reopen', 
   await popup.close();
   await page.close();
 });
+
+for (const locale of ['en', 'ru'] as const)
+  for (const theme of ['light', 'dark'] as const)
+    for (const size of [
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
+    ]) {
+      test(`saved review prose uses Text ${locale} ${theme} ${size.width}`, async ({
+        context,
+        extensionId,
+        hostOrigin,
+      }, info) => {
+        const setup = await context.newPage();
+        await setup.setViewportSize(size);
+        await setup.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`);
+        await setup.evaluate(
+          async ({ locale, theme }) => {
+            await chrome.storage.local.set({
+              'sniptale-locale-preference': locale,
+              'sniptale-theme-preference': theme,
+            });
+          },
+          { locale, theme }
+        );
+        await setup.close();
+        const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+        const target = (await page.locator('#measurement-target').boundingBox())!;
+        await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+        const popover = page.locator('[data-ui="content.design-review.popover"]');
+        const comment = popover.getByRole('textbox', {
+          name: /Element comment|Комментарий к элементу/u,
+        });
+        await comment.fill('Author text: Комментарий 123');
+        await comment.press('Enter');
+        await expect(popover).toHaveCount(0);
+        await page.locator('[data-ui="content.toolbar.design-review-panel-button"]').click();
+        const summary = page.locator('[data-ui="content.design-review.feedback-summary"]').first();
+        await expect(summary).toHaveText('Author text: Комментарий 123');
+        await expect.soft(summary).toHaveCSS('font-family', /Sniptale Text/);
+        await page.locator('[data-ui="content.design-review.feedback-item"]').first().hover();
+        const preview = page.locator('[data-ui="content.design-review.feedback-preview"]');
+        await expect(preview).toBeVisible();
+        await expect
+          .soft(preview.locator('.sniptale-design-review-authored-text'))
+          .toHaveCSS('font-family', /Sniptale Text/);
+        await expect(
+          preview.getByText('Author text: Комментарий 123', { exact: true })
+        ).toBeVisible();
+        await expect(
+          page.locator('[data-ui="content.design-review.feedback-panel"] header strong')
+        ).toHaveCSS('font-family', /Sniptale Interface/);
+        await page.screenshot({
+          path: info.outputPath('saved-feedback-fonts.png'),
+          fullPage: false,
+        });
+        await popup.close();
+        await page.close();
+      });
+    }

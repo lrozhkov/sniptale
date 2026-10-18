@@ -1,7 +1,12 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
-import { readOssReleasePolicy, sha256 } from '../../../release/policy/oss-release-policy.mjs';
+import {
+  INTERFACE_FONT_PATH,
+  DOCUMENT_FONT_PATH,
+  readOssReleasePolicy,
+  sha256,
+} from '../../../release/policy/oss-release-policy.mjs';
 import { discoverOssReleaseConsumers } from './oss-release-consumer-discovery.mjs';
 
 function normalize(relativePath) {
@@ -55,7 +60,12 @@ function collectCurrentReleaseInventory(root, policy) {
   const treePaths = collectCurrentTreePaths(root);
   const rootPackage = readJson(root, 'package.json');
   const fontPaths = treePaths
-    .filter((entry) => entry.startsWith('apps/extension/public/fonts/'))
+    .filter(
+      (entry) =>
+        entry.startsWith('apps/extension/public/fonts/') ||
+        entry === INTERFACE_FONT_PATH ||
+        entry === DOCUMENT_FONT_PATH
+    )
     .sort();
   return {
     bundledFonts: hashEntries(root, fontPaths),

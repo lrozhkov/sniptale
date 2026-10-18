@@ -293,20 +293,24 @@ async function resetReviewEditor(
   args.seek(0, false);
 }
 
+function getReviewCursorSource(
+  sourceGeometry: Parameters<typeof useReviewEditorWiring>[0]['sourceGeometry'],
+  session: Parameters<typeof useReviewEditorWiring>[0]['session'],
+  duration: number
+) {
+  return {
+    width: sourceGeometry?.width ?? session.getSnapshot().snapshot.workspace.source.width,
+    height: sourceGeometry?.height ?? session.getSnapshot().snapshot.workspace.source.height,
+    duration,
+  };
+}
+
 function useReviewCursorFocus(args: Parameters<typeof useReviewEditorWiring>[0]) {
   const cursorFocusPath = useMemo(
     () =>
       resolveReviewCursorFocusPath(
         args.telemetry,
-        {
-          width:
-            args.sourceGeometry?.width ??
-            args.session.getSnapshot().snapshot.workspace.source.width,
-          height:
-            args.sourceGeometry?.height ??
-            args.session.getSnapshot().snapshot.workspace.source.height,
-          duration: args.sourceDuration,
-        },
+        getReviewCursorSource(args.sourceGeometry, args.session, args.sourceDuration),
         args.advanced.cursorFocusPath
       ),
     [
@@ -321,15 +325,7 @@ function useReviewCursorFocus(args: Parameters<typeof useReviewEditorWiring>[0])
     const recorded = reviewCursorFocusTimelineKeys(
       deriveReviewCursorFocusPath(
         args.telemetry,
-        {
-          width:
-            args.sourceGeometry?.width ??
-            args.session.getSnapshot().snapshot.workspace.source.width,
-          height:
-            args.sourceGeometry?.height ??
-            args.session.getSnapshot().snapshot.workspace.source.height,
-          duration: args.sourceDuration,
-        },
+        getReviewCursorSource(args.sourceGeometry, args.session, args.sourceDuration),
         true
       )
     );

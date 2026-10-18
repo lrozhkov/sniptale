@@ -1,11 +1,23 @@
 import type { ReactNode } from 'react';
 import { TextWithOverflowHint } from '../compact-inspector-controls/overflow-hint';
+import { InspectorParameterRow, useInspectorLayout } from '../compact-inspector-controls/layout';
 
 export function HighlighterPresetPropertyField(props: {
   children: ReactNode;
   compactLabel?: boolean;
   label: string;
 }) {
+  const inspector = useInspectorLayout();
+  if (inspector)
+    return (
+      <InspectorParameterRow
+        label={props.label}
+        valueMinimum={160}
+        dataUi="shared.highlighter-preset-editor.property-field"
+      >
+        {props.children}
+      </InspectorParameterRow>
+    );
   return (
     <div
       data-ui="shared.highlighter-preset-editor.property-field"

@@ -197,15 +197,16 @@ function ScenarioImageEditor<Target>({
     <main className="guide-page guide-image-editor">
       {phase === 'review' ? (
         <ProductModal
+          dialogClassName="sniptale-compact-workspace sniptale-scenario-workspace"
           role="alertdialog"
           onClose={() => connection.current?.cancelReview()}
           maxWidth={480}
         >
-          <ProductModalHeader title={t('scenario.editor.tourImageReviewTitle')} />
-          <ProductModalBody>
+          <ProductModalHeader compact title={t('scenario.editor.tourImageReviewTitle')} />
+          <ProductModalBody compact>
             <p>{t('scenario.editor.tourImageReviewHint')}</p>
           </ProductModalBody>
-          <ProductModalFooter>
+          <ProductModalFooter compact>
             <ProductActionButton
               compact
               tone="secondary"

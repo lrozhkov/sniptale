@@ -161,6 +161,9 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.fit"]')!.click()
     );
     expect(onZoom).toHaveBeenCalledWith(1);
+    expect(
+      host.querySelector('[aria-label="gallery.videoReview.fit"] [data-review-toolbar-label]')
+    ).toBeNull();
     act(() =>
       root.render(
         <ReviewToolbar

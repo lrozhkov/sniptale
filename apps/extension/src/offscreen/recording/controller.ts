@@ -288,6 +288,7 @@ async function stopActiveRecording(
   }
 
   if (recordingContext.lifecycleState === 'starting') {
+    recordingContext.discardOnStop = discard;
     const recordingId = recordingContext.currentRecordingId;
     const hadActiveSession = hasActiveRecordingSession();
     recordingContext.cancelStartingRecorder();

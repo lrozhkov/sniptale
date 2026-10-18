@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, Scan } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate, type AppLocale } from '../../../platform/i18n';
 
 const MIN_ZOOM = 0.1;
@@ -166,57 +167,54 @@ export interface ViewerZoomControls {
 export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: AppLocale }) {
   if (!props.canZoom) return null;
   const percent = `${Math.round(props.zoom * 100)}%`;
-  const buttonClassName = [
-    'inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-md px-2 text-xs font-semibold',
-    'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
-    'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
-    'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
-  ].join(' ');
 
   return (
     <div
       role="group"
       aria-label={translate('webSnapshotViewer.app.zoomControls', props.locale)}
-      className="flex shrink-0 items-center rounded-md border border-[var(--sniptale-color-border-soft)]"
+      className="flex shrink-0 items-center gap-2"
     >
-      <button
+      <ContentToolbarButton
+        tone="utility"
         type="button"
         aria-label={translate('webSnapshotViewer.app.zoomOut', props.locale)}
-        className={buttonClassName}
+        className="h-8 w-8 cursor-pointer !p-0"
         onClick={props.onZoomOut}
       >
-        <Minus aria-hidden="true" size={14} />
-      </button>
-      <button
+        <Minus aria-hidden="true" size={16} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        tone="utility"
         type="button"
         aria-label={translate('webSnapshotViewer.app.actualSize', props.locale)}
         title={translate('webSnapshotViewer.app.actualSize', props.locale)}
-        className={`${buttonClassName} min-w-14 border-x border-[var(--sniptale-color-border-soft)]`}
+        className="h-8 cursor-pointer !w-auto !min-w-14 !px-2 tabular-nums"
         onClick={props.onReset}
       >
         {percent}
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        tone="utility"
         type="button"
         aria-label={translate('webSnapshotViewer.app.zoomIn', props.locale)}
-        className={buttonClassName}
+        className="h-8 w-8 cursor-pointer !p-0"
         onClick={props.onZoomIn}
       >
-        <Plus aria-hidden="true" size={14} />
-      </button>
+        <Plus aria-hidden="true" size={16} />
+      </ContentToolbarButton>
       {props.canFitToWidth ? (
-        <button
+        <ContentToolbarButton
+          tone="property"
+          active={props.fitToWidth}
           type="button"
           aria-label={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
           aria-pressed={props.fitToWidth}
           title={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
-          className={`${buttonClassName} border-l border-[var(--sniptale-color-border-soft)] ${
-            props.fitToWidth ? 'bg-[var(--sniptale-color-surface-muted)]' : ''
-          }`}
+          className="h-8 w-8 cursor-pointer !p-0"
           onClick={props.onFitToWidth}
         >
-          <Scan aria-hidden="true" size={14} />
-        </button>
+          <Scan aria-hidden="true" size={16} />
+        </ContentToolbarButton>
       ) : null}
     </div>
   );

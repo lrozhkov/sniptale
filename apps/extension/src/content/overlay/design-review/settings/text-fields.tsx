@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { CompactInput } from '../../../../ui/compact-inspector-controls';
 import { Field, PAGE_STYLE_CONTROL_CLASS_NAME } from './field-shell';
 
@@ -26,6 +28,7 @@ export function CssTextField(props: {
   placeholder?: string | undefined;
   value: string;
 }) {
+  const input = useRef<HTMLInputElement>(null);
   const emptyValues = props.emptyValues ?? ['none', 'normal'];
   const displayedValue = displayCssTextValue(props.value, emptyValues);
   const displayedDefault = displayCssTextValue(props.defaultValue ?? '', emptyValues);
@@ -37,18 +40,24 @@ export function CssTextField(props: {
       modified={props.modified}
       onReset={props.onReset}
     >
-      <CompactInput
-        aria-label={props.label}
-        className={PAGE_STYLE_CONTROL_CLASS_NAME}
-        disabled={props.disabled}
-        placeholder={props.placeholder}
-        value={displayedValue}
-        onChange={(event) =>
-          props.onChange(
-            inputCssTextValue(event.currentTarget.value, props.defaultValue ?? '', emptyValues)
-          )
-        }
-      />
+      <div className="sniptale-text-value">
+        <CompactInput
+          ref={input}
+          aria-label={props.label}
+          className={`${PAGE_STYLE_CONTROL_CLASS_NAME} !pr-8`}
+          disabled={props.disabled}
+          placeholder={props.placeholder}
+          value={displayedValue}
+          onChange={(event) =>
+            props.onChange(
+              inputCssTextValue(event.currentTarget.value, props.defaultValue ?? '', emptyValues)
+            )
+          }
+        />
+        {!props.disabled && displayedValue.length > 0 ? (
+          <InspectorFieldClear label={props.label} target={input} />
+        ) : null}
+      </div>
     </Field>
   );
 }

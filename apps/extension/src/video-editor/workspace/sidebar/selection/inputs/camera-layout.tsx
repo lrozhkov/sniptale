@@ -76,7 +76,10 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
         matchesCameraPlacement(props.project, clip, option.placement)
       ));
   return (
-    <div className="space-y-3" data-ui="video-editor.camera-placement-controls">
+    <div
+      className="sniptale-parameter-stack space-y-3"
+      data-ui="video-editor.camera-placement-controls"
+    >
       <CameraPositionNavigation {...props} />
       <div
         className="video-inspector-camera-layout"

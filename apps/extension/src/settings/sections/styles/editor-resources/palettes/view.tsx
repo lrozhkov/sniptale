@@ -62,7 +62,7 @@ export function PalettesSettings() {
           ))}
         </div>
         {state.key === 'drawing' ? (
-          <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+          <p className="text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             {translate('settings.editor.drawingQuickColorsDescription')}
           </p>
         ) : null}

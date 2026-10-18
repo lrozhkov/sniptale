@@ -1,4 +1,3 @@
-import { reviewTrackGestureLocked } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
@@ -26,6 +25,7 @@ type SelectionProps = {
   edits?: readonly ReviewEdit[];
   selectedEditId?: string | undefined;
   boundaries?: readonly number[];
+  snapTimes?: readonly number[] | undefined;
   snapToKeyframes?: boolean;
   onEdit?(edit: ReviewEdit): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
@@ -140,10 +140,6 @@ function ReviewEditBlock(
       onPointerDown={(event) => {
         if (props.rangeEnabled === false || event.button !== 0 || committing.current) return;
         event.stopPropagation();
-        if (reviewTrackGestureLocked(event.currentTarget)) {
-          props.onEdit?.(edit);
-          return;
-        }
         const target = event.target;
         const edge =
           target instanceof Element
@@ -174,6 +170,7 @@ function ReviewEditBlock(
           bypass: event.altKey,
           edits: props.edits,
           boundaries: props.boundaries,
+          snapTimes: props.snapTimes,
           playhead: props.time,
           current: edit,
           keyframeMove: !!props.snapToKeyframes,

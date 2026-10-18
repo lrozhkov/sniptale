@@ -7,7 +7,7 @@ import { VideoReviewLoadError } from '../../workflows/video-review/source';
 
 vi.mock('../../platform/i18n', () => ({ translate: (key: string) => key }));
 
-it('keeps opening navigation and failure recovery available in the same status surface', async () => {
+it('shows only loading feedback until a failure makes recovery actions available', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -20,9 +20,7 @@ it('keeps opening navigation and failure recovery available in the same status s
     expect(host.querySelector('[role="status"]')?.textContent).toContain(
       'gallery.videoReview.loading'
     );
-    expect(host.querySelectorAll('button')).toHaveLength(1);
-    act(() => host.querySelector('button')!.click());
-    expect(onBack).toHaveBeenCalledOnce();
+    expect(host.querySelectorAll('button')).toHaveLength(0);
     await act(async () =>
       root.render(
         <ReviewLoadStatus
@@ -35,6 +33,12 @@ it('keeps opening navigation and failure recovery available in the same status s
     expect(host.querySelector('[role="alert"]')?.textContent).toContain(
       'gallery.videoReview.workspaceLoadFailed'
     );
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('button[aria-label="gallery.videoReview.back"]')!
+        .click()
+    );
+    expect(onBack).toHaveBeenCalledOnce();
     act(() =>
       host
         .querySelector<HTMLButtonElement>('button[aria-label="gallery.videoReview.retry"]')!

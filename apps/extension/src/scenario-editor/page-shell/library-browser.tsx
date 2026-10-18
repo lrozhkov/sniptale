@@ -1,3 +1,4 @@
+import { useCommandPress } from '@sniptale/ui/control-language/press';
 import { MaterialBrowser } from '@sniptale/ui/material-browser';
 import { LibraryNavigation } from '../../composition/library-preview/navigation';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
@@ -393,10 +394,15 @@ function LibraryCard({
   onDragStart: (() => void) | undefined;
   onChoose(): void;
 }) {
+  const openPress = useCommandPress({ onClick: onChoose, disabled });
+  const selectPress = useCommandPress({ onClick: onSelect, disabled });
   return (
     <div className="guide-library-card-container">
       <button
         type="button"
+        {...openPress.props}
+        data-command-press=""
+        data-pressing={openPress.pressed ? 'true' : undefined}
         ref={cardRef}
         className="guide-library-card"
         draggable={
@@ -417,24 +423,27 @@ function LibraryCard({
         disabled={disabled}
         data-selected={selected}
         aria-pressed={item.kind !== 'image' && item.kind !== 'screenshot' ? selected : undefined}
-        onClick={onChoose}
       >
-        <LibraryRaster item={item} t={t} />
-        <span className="guide-library-card-name" title={item.filename}>
-          {item.filename}
+        <span className="sniptale-command-content guide-library-card-content">
+          <LibraryRaster item={item} t={t} />
+          <span className="guide-library-card-name" title={item.filename}>
+            {item.filename}
+          </span>
         </span>
       </button>
       {(item.kind === 'image' || item.kind === 'screenshot') && (
         <button
           type="button"
+          {...selectPress.props}
+          data-command-press=""
+          data-pressing={selectPress.pressed ? 'true' : undefined}
           className="guide-library-card-select"
           disabled={disabled}
           aria-label={`${t('gallery.app.selectItem')}: ${item.filename}`}
           aria-pressed={order > 0}
           title={order > 0 ? `${t('scenario.editor.guideImportOrder')}: ${order}` : undefined}
-          onClick={onSelect}
         >
-          {order > 0 ? order : null}
+          <span className="sniptale-command-content">{order > 0 ? order : null}</span>
         </button>
       )}
     </div>

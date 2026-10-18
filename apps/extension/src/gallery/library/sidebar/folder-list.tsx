@@ -62,22 +62,21 @@ function GalleryFolderRow(
         title={props.compact ? FOLDER_LABELS[props.folder] : undefined}
         onClick={() => props.onFolderFilterChange(props.folder)}
         className={[
-          'flex w-full items-center rounded-[8px] border text-left transition-colors',
-          props.compact ? 'h-10 justify-center' : 'h-9 justify-between px-2.5',
+          'flex w-full items-center rounded-[4px] border text-left transition-colors',
+          props.compact ? 'h-8 justify-center' : 'h-8 justify-between gap-2 px-2',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
           'focus-visible:ring-[var(--sniptale-color-text-primary)]',
           active ? activeFolderClassName : inactiveFolderClassName,
         ].join(' ')}
       >
-        <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] font-medium">
           <Icon className="h-4 w-4" aria-hidden="true" />
           {!props.compact ? <span className="truncate">{FOLDER_LABELS[props.folder]}</span> : null}
         </span>
         {props.compact ? null : props.countsKnown ? (
           <span
-            className="rounded-full border border-[var(--sniptale-color-border-soft)]
-              bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]
-              px-2 py-0.5 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
+            className="min-w-6 shrink-0 text-right text-xs leading-4 font-normal tabular-nums
+            text-[var(--sniptale-color-text-secondary)]"
           >
             {props.counts[props.folder] ?? 0}
           </span>
@@ -111,8 +110,8 @@ function GalleryFolderPlaceholders() {
       data-ui="gallery.sidebar.folderLoading"
     >
       <div className="h-3 w-16 rounded bg-[var(--sniptale-color-surface-hover)]" />
-      <div className="h-9 rounded-[8px] bg-[var(--sniptale-color-surface-hover)]" />
-      <div className="h-9 rounded-[8px] bg-[var(--sniptale-color-surface-hover)]" />
+      <div className="h-8 rounded-[4px] bg-[var(--sniptale-color-surface-hover)]" />
+      <div className="h-8 rounded-[4px] bg-[var(--sniptale-color-surface-hover)]" />
     </div>
   );
 }
@@ -172,7 +171,7 @@ export function GalleryFolderList(props: FolderListProps) {
   return (
     <div
       aria-busy={props.countsLoading ?? false}
-      className="flex shrink-0 flex-col gap-2"
+      className="flex shrink-0 flex-col gap-1"
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocusedFolder(null);
       }}
@@ -181,25 +180,25 @@ export function GalleryFolderList(props: FolderListProps) {
       {props.countsKnown ? (
         <>
           {!props.compact && projects.length > 0 ? (
-            <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
+            <div className="px-2 pt-3 pb-1 text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.preview.projectsHeading')}
             </div>
           ) : null}
           {projects.map(renderRow)}
           {!props.compact && materials.length > 0 ? (
-            <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
+            <div className="px-2 pt-3 pb-1 text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.preview.materialsHeading')}
             </div>
           ) : null}
           {materials.map(renderRow)}
           {!props.compact && hiddenSavedViewFolders.length > 0 ? (
             <section data-ui="gallery.sidebar.hiddenSavedViews">
-              <h3 className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
+              <h3 className="px-2 pt-3 pb-1 text-xs leading-4 font-normal text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.app.savedViewsHeading')}
               </h3>
               {hiddenSavedViewFolders.map((folder) => (
                 <div key={folder} className="mt-2 space-y-1">
-                  <p className="px-2.5 text-xs text-[var(--sniptale-color-text-muted)]">
+                  <p className="px-2 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
                     {FOLDER_LABELS[folder]}
                   </p>
                   <GallerySavedViewRows

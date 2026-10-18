@@ -1,0 +1,9 @@
+/* Runtime adoption leaves timeline coordinates and authored preview fonts with their owners. */
+.sniptale-video-workspace {
+  --sniptale-radius-floating-chrome: 4px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}

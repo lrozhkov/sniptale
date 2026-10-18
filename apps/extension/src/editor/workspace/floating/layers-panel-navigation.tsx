@@ -99,7 +99,7 @@ export function EditorFloatingLayersNavigation(props: {
       className={cx(
         'pointer-events-auto flex shrink-0 items-center gap-1 border-b p-2',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
-        props.collapsed && 'flex-row rounded-[14px] border bg-[var(--sniptale-color-surface-panel)]'
+        props.collapsed && 'flex-row rounded-[4px] border bg-[var(--sniptale-color-surface-panel)]'
       )}
     >
       {layersMode ? renderModeButton(layersMode, props) : null}

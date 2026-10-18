@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,12 +34,16 @@ async function renderControls(
   root = createRoot(container);
   await act(async () => {
     root?.render(
-      <AutoBlurBlurControls
-        blurSettings={blurSettings}
-        borderPresets={borderPresets}
-        defaultBorderPresetId={DEFAULT_BORDER_PRESET.id}
-        setBlurSettings={setBlurSettings}
-      />
+      <CommandPressScope value={true}>
+        <InspectorLayout>
+          <AutoBlurBlurControls
+            blurSettings={blurSettings}
+            borderPresets={borderPresets}
+            defaultBorderPresetId={DEFAULT_BORDER_PRESET.id}
+            setBlurSettings={setBlurSettings}
+          />
+        </InspectorLayout>
+      </CommandPressScope>
     );
   });
   return setBlurSettings;
@@ -99,5 +106,24 @@ describe('auto-blur-modal/controls', () => {
       showBorder: true,
       borderPresetId: selectedPreset.id,
     });
+  });
+
+  it('keeps choice names passive and activates the switch name once', async () => {
+    const update = await renderControls();
+    const names = [...container!.querySelectorAll<HTMLElement>('.sniptale-parameter-name')];
+    const switchName = names.find((name) => name.textContent === 'content.autoBlur.showBorder')!;
+    act(() => switchName.click());
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith({ amount: 12, blurType: 'distortion', showBorder: true });
+    const typeName = names.find((name) => name.textContent === 'content.autoBlur.blurType')!;
+    act(() => typeName.click());
+    expect(document.body.querySelector('[role="option"]')).toBeNull();
+    const choice = typeName
+      .closest('.sniptale-parameter-row')!
+      .querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
+    expect(choice).not.toBeNull();
+    act(() => choice.click());
+    expect(document.body.querySelector('[role="option"]')).not.toBeNull();
+    expect(update).toHaveBeenCalledTimes(1);
   });
 });

@@ -28,6 +28,7 @@ type Cache = WeakMap<Blob, Map<string, ReviewLocalTextVoicePreview>>;
 type Props = {
   access: ReviewTextVoiceAccess;
   fragmentId: string;
+  maximum?: number | undefined;
   operation: Operation;
   disabled?: boolean | undefined;
 };
@@ -83,7 +84,7 @@ function useTextRecordingTake(
     const basis = captureReviewTextTakeBasis(props.access.session, props.fragmentId);
     maximum = Math.max(0, basis.resultDuration - basis.resultStart);
   } catch {
-    /* Invalid placement is refused by Start without acquiring a microphone. */
+    /* Pending editor fields have a display cap; Start joins them before basis validation and acquisition. */
   }
   const playback = useVoiceoverPlayback(context.video, () => {
     const current = owner.current;
@@ -111,7 +112,7 @@ function useTextRecordingTake(
     }
   };
   return {
-    maximum,
+    maximum: props.maximum ?? maximum,
     stop,
     discard,
     prepare: () => {
@@ -348,7 +349,11 @@ function TextVoiceRecordingBody(
   const { transport, trim } = session.controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
   return (
-    <div className="min-w-0 space-y-2" data-ui="gallery.videoReview.textVoiceRecording">
+    <div
+      className="review-voiceover-inspector sniptale-inspector-surface
+        sniptale-compact-switches min-w-0 space-y-2"
+      data-ui="gallery.videoReview.textVoiceRecording"
+    >
       {trim ? (
         <VoiceoverTakeReview
           session={session}
@@ -383,7 +388,10 @@ function TextVoiceRecordingBody(
           {session.saveError || transport.error || translate('gallery.videoReview.speechChanged')}
         </p>
       )}
-      <RecordingDiscardConfirmation value={recording.confirmation} />
+      <RecordingDiscardConfirmation
+        dialogClassName="sniptale-compact-workspace"
+        value={recording.confirmation}
+      />
     </div>
   );
 }

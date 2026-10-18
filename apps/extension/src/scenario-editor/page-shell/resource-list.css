@@ -293,3 +293,32 @@
   width: 16px;
   height: 16px;
 }
+
+.sniptale-scenario-workspace .guide-resource-name,
+.sniptale-scenario-workspace
+  .guide-library-panel
+  :is(.guide-image-upload-compact, .tour-audio-acquisition)
+  > button {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-scenario-workspace
+  .guide-library-panel
+  :is(.guide-image-resources, .tour-audio-resources)
+  h3 {
+  font: 600 14px / 20px var(--sniptale-font-interface);
+}
+.sniptale-scenario-workspace .guide-library-panel .tour-audio-label > small {
+  font: 400 12px / 16px var(--sniptale-font-interface);
+}
+.sniptale-scenario-workspace .guide-resource-main > .sniptale-command-content {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.sniptale-scenario-workspace .guide-resource-row {
+  min-height: 56px;
+  border-radius: 4px;
+}
+.sniptale-scenario-workspace .guide-resource-list [role='alert'] {
+  font: 400 14px / 20px var(--sniptale-font-interface);
+}

@@ -154,7 +154,11 @@ it('starts and stops capture, shows permission failure, and exposes the shared m
   state.transport.status = 'idle';
   await render();
   expect(host.querySelector('[role="dialog"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="Microphone"]')).not.toBeNull();
+  const microphone = host.querySelector('[aria-labelledby$="-label"]');
+  expect(microphone).not.toBeNull();
+  expect(document.getElementById(microphone!.getAttribute('aria-labelledby')!)?.textContent).toBe(
+    'Microphone'
+  );
   await act(async () => button('Start recording').click());
   expect(state.transport.startRecording).toHaveBeenCalledOnce();
   state.transport.status = 'recording';

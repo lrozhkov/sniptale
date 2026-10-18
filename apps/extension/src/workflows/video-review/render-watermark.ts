@@ -69,7 +69,7 @@ function createCache(size: Size, raster?: Raster): RenderCanvasLease {
 
 function textFont(text: QuickEditWatermarkSettings['text'], pixels: number) {
   const family =
-    text.font === 'sans' ? '"Sniptale Sans"' : text.font === 'serif' ? 'serif' : 'monospace';
+    text.font === 'sans' ? '"Sniptale Text"' : text.font === 'serif' ? 'serif' : 'monospace';
   return `${text.italic ? 'italic ' : ''}${text.weight === 'bold' ? 700 : 400} ${pixels}px ${family}`;
 }
 

@@ -738,7 +738,7 @@ it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', 
   expect(current().hotspots[0]!.targetRect).toEqual(rectangle);
   const point = structuredClone(current().hotspots[0]!.point);
   const area = host.querySelector('section[aria-label="Auto-zoom area"]')!;
-  expect(area.querySelector('label')?.title).toContain('one hotspot');
+  expect(area.querySelector<HTMLElement>('[title]')?.title).toContain('one hotspot');
   expect(area.querySelector('input[aria-label="X range"]')?.getAttribute('max')).toBe('80');
   const x = area.querySelector<HTMLInputElement>('input[aria-label="X"]')!;
   await act(async () => {

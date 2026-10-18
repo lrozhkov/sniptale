@@ -8,7 +8,10 @@ export function EditorDocumentExportPreferencesFormatSection(props: {
   settings: ReturnType<typeof useEditorExportSettingsState>;
 }) {
   return (
-    <section className="space-y-2" aria-label={translate('imageSettings.section.formatLabel')}>
+    <section
+      className="sniptale-parameter-stack"
+      aria-label={translate('imageSettings.section.formatLabel')}
+    >
       <div className="grid grid-cols-3 gap-2">
         {SAVE_FORMAT_OPTIONS.map((option) => (
           <EditorDocumentExportPreferencesFormatOption

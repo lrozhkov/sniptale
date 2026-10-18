@@ -9,6 +9,7 @@ import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
 import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
+import { useInspectorLayout } from './layout';
 
 export interface NumericValueFieldProps {
   /** Enter commits then advances by default; blur ends an isolated inspector edit. */
@@ -61,6 +62,19 @@ function NumericValueFieldView({
   state: ReturnType<typeof useNumericValueFieldState>;
 }) {
   const quietFocus = props.focusAppearance === 'quiet';
+  const inspector = useInspectorLayout();
+  const [pointerFocus, setPointerFocus] = useState(false);
+  const value = (
+    <>
+      <NumericValueInput
+        props={props}
+        state={state}
+        pointerFocus={pointerFocus}
+        setPointerFocus={setPointerFocus}
+      />
+      <NumericUnitLabel state={state} />
+    </>
+  );
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-value-field"
@@ -69,18 +83,32 @@ function NumericValueFieldView({
         'group/compact-numeric relative flex',
         'w-[6.25rem] shrink-0 items-center',
         'gap-0',
-        COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
-        !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+        inspector ? 'sniptale-numeric-value' : COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+        !inspector && !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
         props.className
       )}
     >
-      <NumericValueInput props={props} state={state} />
-      <NumericUnitLabel state={state} />
+      {inspector ? (
+        <span
+          className="sniptale-numeric-entry"
+          onPointerDown={(event) => {
+            if (event.button !== 0 || props.disabled || event.target === state.inputRef.current)
+              return;
+            event.preventDefault();
+            setPointerFocus(true);
+            state.inputRef.current?.focus();
+          }}
+        >
+          {value}
+        </span>
+      ) : (
+        value
+      )}
       <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
-      {quietFocus && (
+      {quietFocus && !inspector && (
         <span
           aria-hidden="true"
           className={[
@@ -97,33 +125,46 @@ function NumericValueFieldView({
 function NumericValueInput({
   props,
   state,
+  pointerFocus,
+  setPointerFocus,
 }: {
   props: NumericValueFieldProps;
   state: ReturnType<typeof useNumericValueFieldState>;
+  pointerFocus: boolean;
+  setPointerFocus(value: boolean): void;
 }) {
   return (
     <input
       ref={state.inputRef}
+      data-pointer-focus={pointerFocus || undefined}
       aria-label={props.label}
       disabled={props.disabled}
       inputMode="decimal"
+      size={Math.max(1, state.draft.length)}
       type="text"
       value={state.draft}
       placeholder={props.value === null ? '—' : undefined}
       onFocus={(event) => state.handleFocus(event, props.disabled === true)}
       onChange={state.handleChange}
-      onBlur={state.commitDraft}
-      onKeyDown={state.handleKeyDown}
-      onPointerDown={state.handlePointerDown}
+      onBlur={() => {
+        setPointerFocus(false);
+        state.commitDraft();
+      }}
+      onKeyDown={(event) => {
+        setPointerFocus(false);
+        state.handleKeyDown(event);
+      }}
+      onPointerDown={(event) => {
+        setPointerFocus(true);
+        state.handlePointerDown(event);
+      }}
       className={COMPACT_INLINE_VALUE_INPUT_CLASS_NAME}
     />
   );
 }
 
 function NumericUnitLabel({ state }: { state: ReturnType<typeof useNumericValueFieldState> }) {
-  const focused =
-    typeof document !== 'undefined' && document.activeElement === state.inputRef.current;
-  if (!state.unitLabel || state.editing || focused) {
+  if (!state.unitLabel) {
     return null;
   }
 
@@ -157,12 +198,15 @@ export function NumericRow({
   ...props
 }: NumericRowProps) {
   const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
+  const inspector = useInspectorLayout();
 
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-row"
       data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
+      data-has-scrub={scrub ? 'true' : undefined}
+      data-layout={inspector ? 'inline' : undefined}
       onPointerMove={range.show}
       onPointerLeave={range.hide}
       onFocusCapture={(event) => {
@@ -182,7 +226,8 @@ export function NumericRow({
             'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
           ].join(' '),
         appearance === 'plain' && 'grid grid-cols-[7.5rem_minmax(0,1fr)] py-0.5',
-        className
+        className,
+        inspector && 'sniptale-parameter-row'
       )}
     >
       {labelVisible ? <NumericRowLabel appearance={appearance} label={label} /> : null}
@@ -246,13 +291,15 @@ function NumericRowLabel({
   appearance: 'surface' | 'plain';
   label: string;
 }) {
+  const inspector = useInspectorLayout();
   return (
     <TextWithOverflowHint
       className={cx(
         'min-w-0 truncate font-semibold text-[color:var(--sniptale-color-text-secondary)]',
         appearance === 'plain'
           ? 'text-[length:var(--sniptale-compact-font-size,11px)]'
-          : 'flex-1 text-[length:var(--sniptale-compact-font-size,12px)]'
+          : 'flex-1 text-[length:var(--sniptale-compact-font-size,12px)]',
+        inspector && 'sniptale-parameter-name'
       )}
       text={label}
     />

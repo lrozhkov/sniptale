@@ -9,7 +9,8 @@ import {
 } from '../../features/video/review/advanced/action-audio';
 import { translate } from '../../platform/i18n';
 
-vi.mock('../../ui/compact-inspector-controls', () => ({
+vi.mock('../../ui/compact-inspector-controls', async (original) => ({
+  ...(await original<typeof import('../../ui/compact-inspector-controls')>()),
   SelectField: (p: {
     label: string;
     value: string;
@@ -18,6 +19,25 @@ vi.mock('../../ui/compact-inspector-controls', () => ({
   }) => (
     <select
       aria-label={p.label}
+      value={p.value}
+      onChange={(event) => p.onChange(event.currentTarget.value)}
+    >
+      <option value="" />
+      {p.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+  CompactSelect: (p: {
+    'aria-label': string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange(value: string): void;
+  }) => (
+    <select
+      aria-label={p['aria-label']}
       value={p.value}
       onChange={(event) => p.onChange(event.currentTarget.value)}
     >
@@ -46,11 +66,6 @@ vi.mock('../../ui/compact-inspector-controls', () => ({
       }}
     />
   ),
-  OptionRow: (p: { label: string; value: string; onToggle(): void }) => (
-    <button onClick={p.onToggle}>
-      {p.label} {p.value}
-    </button>
-  ),
 }));
 
 it('scopes family selectors to typed targets and patches only the edited common field', () => {
@@ -69,6 +84,9 @@ it('scopes family selectors to typed targets and patches only the edited common 
         <ReviewActionAudioFields targets={targets} settings={[]} busy={false} onChange={onChange} />
       )
     );
+    expect(
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.actionAudioEnabled')}"]`)
+    ).toBeNull();
     const selectors = host.querySelectorAll('select');
     expect(selectors).toHaveLength(3);
     act(() => {
@@ -81,7 +99,7 @@ it('scopes family selectors to typed targets and patches only the edited common 
       selectors[2]!.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(onChange).toHaveBeenLastCalledWith([targets[1]], { presetId: 'typing-natural-v1' });
-    const volume = host.querySelector<HTMLInputElement>('input')!;
+    const volume = host.querySelector<HTMLInputElement>('input[type="number"]')!;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(volume, '25');
       volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -124,11 +142,7 @@ it('paired phases and recorded repeats target their own families and stop auditi
     },
   ];
   const clickLabel = (label: Parameters<typeof translate>[0]) =>
-    act(() =>
-      [...host.querySelectorAll('button')]
-        .find((button) => button.textContent?.startsWith(translate(label)))!
-        .click()
-    );
+    act(() => host.querySelector<HTMLElement>(`[aria-label="${translate(label)}"]`)!.click());
   try {
     act(() =>
       root.render(
@@ -177,6 +191,48 @@ it('paired phases and recorded repeats target their own families and stop auditi
     );
     expect(stop).toHaveBeenCalledOnce();
     expect(host.textContent).toBe('');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('shows None for a persisted disabled preset and keeps audition beside its selector', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const target: ReviewActionAudioTarget = { ref: { kind: 'action', id: 'mouse' }, family: 'mouse' };
+  const audition = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionAudioFields
+          targets={[target]}
+          settings={[
+            {
+              ...REVIEW_ACTION_AUDIO_DEFAULT,
+              ref: target.ref,
+              presetId: 'mouse-soft-v1',
+              enabled: false,
+            },
+          ]}
+          busy={false}
+          onChange={vi.fn()}
+          onAudition={audition}
+        />
+      )
+    );
+    const select = host.querySelector('select')!;
+    expect(select.value).toBe('none');
+    const listen = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.actionAudioListen')}"]`
+    )!;
+    expect(listen.disabled).toBe(true);
+    expect(
+      select.closest('[data-family]')?.querySelector('[data-audio-choice-row]')?.contains(listen)
+    ).toBe(true);
+    act(() => listen.click());
+    expect(audition).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

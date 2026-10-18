@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreateProjectSection, PickerSection, ProjectListState, ProjectSearchField } from './parts';
+import { CommandPressScope } from '../control-language/press';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -142,4 +143,23 @@ describe('searchable project picker parts prefixed helpers', () => {
     );
     expect(renderedContainer.querySelector('[data-ui="picker.project-list"]')).not.toBeNull();
   });
+});
+
+it('adopts the create command under the existing scope and preserves the unscoped family', () => {
+  const pending = renderToStaticMarkup(
+    <CreateProjectSection canCreate createButtonLabel="Create" onCreateProject={() => undefined} />
+  );
+  const adopted = renderToStaticMarkup(
+    <CommandPressScope value={true}>
+      <CreateProjectSection
+        canCreate
+        createButtonLabel="Create"
+        onCreateProject={() => undefined}
+      />
+    </CommandPressScope>
+  );
+  expect(pending).toContain('sniptale-color-accent-soft');
+  expect(pending).not.toContain('data-command-press');
+  expect(adopted).toContain('data-command-tone="primary"');
+  expect(adopted).toContain('sniptale-command-content');
 });

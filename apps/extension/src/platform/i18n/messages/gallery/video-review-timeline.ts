@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewTimelineMessages = defineMessageSource({
+  intervalBounds: { ru: 'Границы интервала', en: 'Interval bounds' },
   resizeDuration: { ru: 'Длительность {duration}', en: 'Duration {duration}' },
   resizeBefore: { ru: 'Было {duration}', en: 'Was {duration}' },
   resizeSeconds: { ru: '{value} с', en: '{value} s' },

@@ -64,7 +64,7 @@ function NativeTrayActionRow(props: {
         onChange={(shortcutLabel) => props.updateTrayAction(props.action.key, { shortcutLabel })}
       />
       {props.conflict ? (
-        <p className="text-xs leading-5 text-[var(--sniptale-color-danger)] md:col-start-3">
+        <p className="text-xs leading-4 text-[var(--sniptale-color-danger)] md:col-start-3">
           {translate('settings.nativeApp.shortcutDuplicate')}
         </p>
       ) : null}
@@ -79,12 +79,14 @@ function NativeTrayActionCopy(props: {
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-sm text-[var(--sniptale-color-text-primary)]">{props.label}</p>
-      <p className="text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+      <p className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]">
+        {props.label}
+      </p>
+      <p className="text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
         {translate(props.action.description)}
       </p>
       {!props.supported ? (
-        <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-danger)]">
+        <p className="mt-1 text-xs leading-4 text-[var(--sniptale-color-danger)]">
           {translate('settings.nativeApp.trayUnsupportedMode')}
         </p>
       ) : null}
@@ -160,10 +162,10 @@ export function NativeTrayActionFields(props: {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div>
         <p className={settingsMetaLabelClassName}>{translate('settings.nativeApp.trayTitle')}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        <p className="mt-1 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
           {translate('settings.nativeApp.trayDescription')}
         </p>
       </div>

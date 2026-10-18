@@ -1,3 +1,6 @@
+import './preview.css';
+import { BadgeCheck, ChevronDown, Info } from 'lucide-react';
+import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
 import { hasGalleryKeyboardLayer } from '../keyboard/context';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
@@ -62,28 +65,32 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' 
   return (
     <div className="shrink-0" data-ui="gallery.preview.inspectorHeader">
       <div className="min-w-0">
-        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-base font-semibold">
+        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-[14px] leading-5 font-medium">
           <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
           {FOLDER_LABELS[folder]}
         </h2>
-        <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
-          {formatDate(props.item.createdAt)}
+        <div className="mt-1 flex items-center gap-2 text-sm text-[var(--sniptale-color-text-muted)]">
+          <span>{formatDate(props.item.createdAt)}</span>
+          {!props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
+            <span
+              title={translate('gallery.app.permanentStorage')}
+              aria-label={translate('gallery.app.permanentStorage')}
+            >
+              <BadgeCheck size={14} aria-hidden="true" />
+            </span>
+          ) : null}
         </div>
         {isDraft && !props.trashMode ? (
           <div
-            className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
+            className="mt-1 grid grid-cols-[minmax(0,max-content)_auto] items-center justify-start gap-x-2
               text-xs font-medium text-[var(--sniptale-color-warning)]"
           >
-            <span className="whitespace-nowrap">
+            <span className="min-w-0 break-words">
               {props.item.expiresAt
                 ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
                 : translate('gallery.app.draftNoExpiration')}
             </span>
             {!props.trashMode ? <PreviewPromotionAction {...props} /> : null}
-          </div>
-        ) : !props.trashMode && props.item.lifecycle?.storageClass === 'library' ? (
-          <div className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.app.permanentStorage')}
           </div>
         ) : null}
       </div>
@@ -96,33 +103,73 @@ function PreviewFilenameField(
 ) {
   const editable = !props.trashMode && isMetadataEditable(props.item);
   const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isFile = isGalleryMediaItem(props.item) || isGalleryScenarioExportItem(props.item);
+  const dot = isFile ? props.item.filename.lastIndexOf('.') : -1;
+  const extension =
+    dot > 0 && dot < props.item.filename.length - 1 ? props.item.filename.slice(dot) : '';
+  const stem =
+    extension && props.filenameDraft.endsWith(extension)
+      ? props.filenameDraft.slice(0, -extension.length)
+      : props.filenameDraft;
 
   return (
-    <div>
-      <label
-        htmlFor={inputId}
-        className="mb-2 block text-xs font-semibold uppercase
-          tracking-[0.12em] text-[var(--sniptale-color-text-muted-strong)]"
-      >
+    <div className="gallery-preview-filename">
+      <span id={inputId} className="gallery-preview-section-label">
         {isGalleryScenarioItem(props.item)
           ? translate('gallery.preview.scenarioName')
           : translate('gallery.preview.filename')}
-      </label>
-      {props.trashMode ? (
-        <p className="break-words text-sm text-[var(--sniptale-color-text-primary)]">
+      </span>
+      {!editable ? (
+        <p className="break-words text-[13px] font-normal leading-[18px] text-[var(--sniptale-color-text-primary)]">
           {props.filenameDraft}
         </p>
       ) : (
-        <input
-          id={inputId}
-          value={props.filenameDraft}
-          onChange={(event) => props.onFilenameChange(event.target.value)}
-          readOnly={!editable}
-          className="w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-sm
-          text-[var(--sniptale-color-text-primary)] outline-none transition
-          focus:border-[var(--sniptale-color-border-accent-strong)] read-only:cursor-default"
-        />
+        <div className="gallery-preview-filename-value">
+          <div className="gallery-preview-filename-input">
+            <input
+              ref={inputRef}
+              aria-labelledby={inputId}
+              placeholder={translate(
+                isGalleryScenarioItem(props.item)
+                  ? 'gallery.preview.scenarioName'
+                  : 'gallery.preview.filename'
+              )}
+              value={stem}
+              onChange={(event) =>
+                props.onFilenameChange(
+                  event.target.value.trim() ? event.target.value + extension : ''
+                )
+              }
+              onBlur={() => {
+                if (!stem.trim()) props.onFilenameChange(props.item.filename);
+              }}
+              aria-describedby={extension ? `${inputId}-extension` : undefined}
+              readOnly={!editable}
+              className="w-full min-w-0 bg-transparent text-[13px] font-normal leading-[18px]
+              text-[var(--sniptale-color-text-primary)] outline-none"
+            />
+            {stem ? (
+              <InspectorFieldClear
+                target={inputRef}
+                label={translate(
+                  isGalleryScenarioItem(props.item)
+                    ? 'gallery.preview.scenarioName'
+                    : 'gallery.preview.filename'
+                )}
+              />
+            ) : null}
+          </div>
+          {extension ? (
+            <span
+              id={`${inputId}-extension`}
+              data-ui="gallery.preview.filenameExtension"
+              className="gallery-preview-filename-extension"
+            >
+              {extension}
+            </span>
+          ) : null}
+        </div>
       )}
     </div>
   );
@@ -151,9 +198,18 @@ function PreviewPanelSidebar(
           trashMode={Boolean(props.trashMode)}
         />
         <UnavailableProjectNotice item={props.item} />
-        <PreviewMetadataCards item={props.item} />
+        <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
+          <summary>
+            <Info size={14} aria-hidden="true" />
+            <span>{translate('gallery.preview.properties')}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </summary>
+          <div className="gallery-preview-disclosure-body">
+            <PreviewMetadataCards item={props.item} />
+            <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
+          </div>
+        </details>
         <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
-        <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
         <PreviewTagEditor
           {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
           item={props.item}
@@ -376,7 +432,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
           first.focus();
         }
       }}
-      className="fixed inset-0 z-40 flex
+      className="gallery-preview-panel fixed inset-0 z-40 flex
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_72%,black_20%)]
       "
     >
@@ -384,7 +440,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
         <div
           data-ui="gallery.preview.surface"
           className={`relative grid h-full w-full min-w-0 overflow-hidden
-            rounded-[var(--sniptale-radius-lg)]
+            rounded-[8px]
             border border-[var(--sniptale-color-border-soft)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
             text-[var(--sniptale-color-text-primary)] shadow-sm

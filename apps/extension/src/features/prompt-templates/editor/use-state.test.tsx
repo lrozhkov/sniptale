@@ -194,3 +194,12 @@ describe('prompt template editor keyboard shortcuts', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+it('does not move the caret back to Name after the user enters Content', async () => {
+  await renderHarness();
+  const content = document.createElement('textarea');
+  container!.append(content);
+  content.focus();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(document.activeElement).toBe(content);
+});

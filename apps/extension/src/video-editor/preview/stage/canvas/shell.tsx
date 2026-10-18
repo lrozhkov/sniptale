@@ -17,9 +17,9 @@ import { PreviewStageZoomNavigator } from './navigator';
 
 const PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME = 'absolute inset-4 min-h-0';
 
-const STAGE_CONTROL_BUTTON_CLASS_NAME = '!h-9 !w-9 !min-w-9 !px-0';
+const STAGE_CONTROL_BUTTON_CLASS_NAME = '!h-8 !w-8 !min-w-8 !px-0';
 const STAGE_HEADER_CLASS_NAME = [
-  'flex shrink-0 items-center justify-end gap-2 border-b px-3 py-2',
+  'flex h-13 shrink-0 items-center justify-end gap-2 border-b px-3',
   'border-[color:var(--sniptale-color-border-soft)]',
 ].join(' ');
 
@@ -110,6 +110,7 @@ function StageShellActionButton(props: {
   return (
     <ContentToolbarButton
       type="button"
+      tone="utility"
       title={props.title}
       dataUi="video-editor.preview.fullscreen-toggle"
       onClick={(event) => {
@@ -165,7 +166,7 @@ function PreviewStageShellControls(
 ) {
   return (
     <div className={STAGE_HEADER_CLASS_NAME} data-ui="video.preview.header">
-      <div className="flex min-h-9 min-w-0 flex-1 items-center">
+      <div className="flex min-h-8 min-w-0 flex-1 items-center">
         {props.isFullscreen ? null : props.headerContent}
       </div>
       <div hidden={props.alternateActive}>
@@ -268,7 +269,7 @@ function PreviewStageContent(props: {
     <div
       className={
         props.fullscreen
-          ? 'absolute inset-0 min-h-0 overflow-hidden rounded-lg bg-black'
+          ? 'absolute inset-0 min-h-0 overflow-hidden rounded-[4px] bg-black'
           : PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME
       }
     >

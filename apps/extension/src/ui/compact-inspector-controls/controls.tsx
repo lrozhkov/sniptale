@@ -1,9 +1,74 @@
 import type React from 'react';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { CompactColorSelector, type CompactColorSelectorProps } from '../color-selector';
 import { CompactSelect, type CompactSelectOption } from './primitives';
 import { CompactSegmentedSelector } from './control-renderers';
 import { cx } from './shared';
+import { InspectorParameterRow, useInspectorLayout } from './layout';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+
+/** Immediate boolean parameters retain the shared name/value construction. */
+export function ToggleField(props: {
+  label: string;
+  value: boolean;
+  disabled?: boolean | undefined;
+  onChange(value: boolean): void;
+}) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <InspectorParameterRow
+      label={props.label}
+      keepInline
+      className="sniptale-boolean-parameter"
+      onActivate={() => trigger.current?.click()}
+    >
+      <ProductGlassSwitch
+        ref={trigger}
+        role="switch"
+        aria-label={props.label}
+        aria-checked={props.value}
+        on={props.value}
+        disabled={props.disabled}
+        onClick={() => props.onChange(!props.value)}
+      />
+    </InspectorParameterRow>
+  );
+}
+
+/** Conditions and mixed boolean values retain native checkbox semantics in the value column. */
+export function CheckboxField(props: {
+  label: string;
+  value: boolean;
+  indeterminate?: boolean | undefined;
+  disabled?: boolean | undefined;
+  onChange(value: boolean): void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    if (input.current) input.current.indeterminate = props.indeterminate ?? false;
+  });
+  return (
+    <InspectorParameterRow
+      label={props.label}
+      keepInline
+      className="sniptale-boolean-parameter"
+      onActivate={() => input.current?.click()}
+    >
+      <input
+        ref={input}
+        type="checkbox"
+        className="sniptale-parameter-check"
+        aria-label={props.label}
+        checked={props.value}
+        disabled={props.disabled}
+        onChange={(event) => {
+          props.onChange(event.currentTarget.checked);
+          event.currentTarget.indeterminate = props.indeterminate ?? false;
+        }}
+      />
+    </InspectorParameterRow>
+  );
+}
 
 const FIELD_LABEL_CLASS_NAME = [
   'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
@@ -37,11 +102,30 @@ export function ColorField({
   ...props
 }: CompactColorSelectorProps & { layout?: 'inline' | 'stacked' }) {
   const [open, setOpen] = useState(false);
+  const inspector = useInspectorLayout();
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     props.onOpenChange?.(nextOpen);
   };
 
+  if (inspector)
+    return (
+      <InspectorParameterRow
+        label={props.label}
+        valueMinimum={140}
+        stacked={layout === 'stacked'}
+        dataUi="shared.ui.compact-inspector.color-field"
+        className={className}
+      >
+        <div className="w-full min-w-0">
+          <CompactColorSelector
+            {...props}
+            className="w-full min-w-0"
+            onOpenChange={handleOpenChange}
+          />
+        </div>
+      </InspectorParameterRow>
+    );
   return (
     <div
       data-ui="shared.ui.compact-inspector.color-field"
@@ -83,6 +167,29 @@ export function SelectField<T extends string>(props: {
 }) {
   const [open, setOpen] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
+  const inspector = useInspectorLayout();
+
+  if (inspector)
+    return (
+      <InspectorParameterRow
+        label={props.label}
+        valueText={props.options.find((option) => option.value === props.value)?.label}
+        dataUi="shared.ui.compact-inspector.select-field"
+        className={props.className}
+      >
+        <CompactSelect
+          aria-label={props.label}
+          value={props.value}
+          options={props.options}
+          onChange={props.onChange}
+          disabled={props.disabled}
+          onOpenChange={setOpen}
+          appearance="plain"
+          className={props.selectClassName}
+          {...(props.menuClassName === undefined ? {} : { menuClassName: props.menuClassName })}
+        />
+      </InspectorParameterRow>
+    );
 
   return (
     <div
@@ -127,6 +234,7 @@ export function SegmentedRow<T extends string>(props: {
   onChange: (value: T) => void;
 }) {
   const columns = props.columns ?? 3;
+  const inspector = useInspectorLayout();
   const stacked = props.layout === 'stacked';
   const selector = (
     <CompactSegmentedSelector
@@ -139,8 +247,20 @@ export function SegmentedRow<T extends string>(props: {
   );
 
   if (props.label === undefined) {
-    return selector;
+    return inspector ? <div className="sniptale-parameter-unlabelled">{selector}</div> : selector;
   }
+
+  if (inspector)
+    return (
+      <InspectorParameterRow
+        label={typeof props.label === 'string' ? props.label : props.ariaLabel}
+        stacked={stacked}
+        valueOptions={props.options.map((option) => option.label)}
+        dataUi="shared.ui.compact-inspector.segmented-field"
+      >
+        {selector}
+      </InspectorParameterRow>
+    );
 
   return (
     <div

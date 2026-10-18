@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import '../../../ui/compact-inspector-controls/inspector-surface.css';
 import { translate, type AppLocale } from '../../../platform/i18n';
 import {
   DesignSystemFloatingPreviewFrame,
@@ -9,7 +12,7 @@ import {
   CompactRange,
   CompactSelect,
   NumericRow,
-  OptionRow,
+  ToggleField,
   PanelHeader,
   SelectField,
   TextField,
@@ -20,6 +23,25 @@ import {
   renderReferencePanelPreview,
 } from './design-system-examples';
 import { renderToggleGridPreview } from './toggle-grid.preview.tsx';
+
+/** Render migrated parameter families through the same surface and layout owner as the editor. */
+function InspectorPreviewFrame({
+  minHeight,
+  children,
+}: {
+  minHeight: number;
+  children: ReactNode;
+}) {
+  return (
+    <DesignSystemFloatingPreviewFrame minHeight={minHeight} className="justify-start">
+      <InspectorLayout>
+        <div className="sniptale-compact-workspace sniptale-inspector-surface w-full">
+          {children}
+        </div>
+      </InspectorLayout>
+    </DesignSystemFloatingPreviewFrame>
+  );
+}
 
 function renderCompactInputPreview(locale: AppLocale) {
   const title = translate('designSystem.page.compactInspectorPreviewSceneTitle', locale);
@@ -60,22 +82,22 @@ function renderCompactSelectPreview(locale: AppLocale) {
 function renderTextFieldPreview(locale: AppLocale) {
   const title = translate('designSystem.page.compactInspectorPreviewSceneTitle', locale);
   return (
-    <DesignSystemFloatingPreviewFrame minHeight={132} className="justify-start">
-      <div className="sniptale-ai-modal-root sniptale-theme-dark w-full max-w-[320px]">
+    <InspectorPreviewFrame minHeight={132}>
+      <div className="sniptale-ai-modal-root w-full max-w-[320px]">
         <TextField
           label={translate('designSystem.page.compactInspectorPreviewTitleLabel', locale)}
           value={title}
           readOnly
         />
       </div>
-    </DesignSystemFloatingPreviewFrame>
+    </InspectorPreviewFrame>
   );
 }
 
 function renderSelectFieldPreview(locale: AppLocale) {
   return (
-    <DesignSystemFloatingPreviewFrame minHeight={132} className="justify-start">
-      <div className="sniptale-ai-modal-root sniptale-theme-dark w-full max-w-[320px]">
+    <InspectorPreviewFrame minHeight={132}>
+      <div className="sniptale-ai-modal-root w-full max-w-[320px]">
         <SelectField
           label={translate('designSystem.page.compactInspectorPreviewStyleLabel', locale)}
           value="dash"
@@ -92,7 +114,7 @@ function renderSelectFieldPreview(locale: AppLocale) {
           ]}
         />
       </div>
-    </DesignSystemFloatingPreviewFrame>
+    </InspectorPreviewFrame>
   );
 }
 
@@ -121,8 +143,8 @@ function renderPanelHeaderPreview(locale: AppLocale) {
 
 function renderNumericRowPreview(locale: AppLocale) {
   return (
-    <DesignSystemFloatingPreviewFrame minHeight={172} className="justify-start">
-      <div className="sniptale-ai-modal-root w-full max-w-[340px] space-y-2">
+    <InspectorPreviewFrame minHeight={172}>
+      <div className="sniptale-ai-modal-root w-full max-w-[340px] sniptale-parameter-stack">
         <NumericRow
           label={translate('designSystem.page.compactInspectorPreviewSize', locale)}
           value={64}
@@ -144,30 +166,35 @@ function renderNumericRowPreview(locale: AppLocale) {
           onCommitValue={() => undefined}
         />
       </div>
-    </DesignSystemFloatingPreviewFrame>
+    </InspectorPreviewFrame>
   );
 }
 
 function renderToggleRowsPreview(locale: AppLocale) {
   return (
-    <DesignSystemFloatingPreviewFrame minHeight={184} className="justify-start">
-      <div className="sniptale-ai-modal-root w-full max-w-[340px] space-y-2">
-        <OptionRow
-          active
+    <InspectorPreviewFrame minHeight={184}>
+      <div className="sniptale-ai-modal-root w-full max-w-[340px] sniptale-parameter-stack">
+        <ToggleField
+          value
           label={translate('designSystem.page.compactInspectorPreviewDynamicWidth', locale)}
-          onToggle={() => undefined}
+          onChange={() => undefined}
         />
-        <OptionRow
+        <ToggleField
+          value={false}
           label={translate('designSystem.page.compactInspectorPreviewSmoothing', locale)}
-          onToggle={() => undefined}
+          onChange={() => undefined}
         />
-        <OptionRow
+        <ToggleField
           disabled
           label={translate('designSystem.page.compactInspectorPreviewStabilization', locale)}
-          value={translate('designSystem.page.compactInspectorPreviewUnavailable', locale)}
+          value={false}
+          onChange={() => undefined}
         />
+        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('designSystem.page.compactInspectorPreviewUnavailable', locale)}
+        </p>
       </div>
-    </DesignSystemFloatingPreviewFrame>
+    </InspectorPreviewFrame>
   );
 }
 

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextRewriteForm } from './text-rewrite-panel';
@@ -135,12 +136,14 @@ async function fill(element: HTMLInputElement | HTMLTextAreaElement, value: stri
 async function mountForm(wholeDocument = false, withSecondSource = false) {
   await act(async () =>
     root.render(
-      <ReviewTextRewriteForm
-        access={access(withSecondSource)}
-        ids={withSecondSource ? ['text', 'second'] : ['text']}
-        wholeDocument={wholeDocument}
-        onClose={vi.fn()}
-      />
+      <InspectorLayout>
+        <ReviewTextRewriteForm
+          access={access(withSecondSource)}
+          ids={withSecondSource ? ['text', 'second'] : ['text']}
+          wholeDocument={wholeDocument}
+          onClose={vi.fn()}
+        />
+      </InspectorLayout>
     )
   );
   await fill(host.querySelector('textarea')!, 'Shorten');
@@ -301,7 +304,7 @@ it('names the prompt, discloses the recipient, and disables Start before a valid
     host.querySelector('textarea[aria-label="gallery.videoReview.textRewritePrompt"]')
   ).not.toBeNull();
   expect(host.textContent).toContain('Disclosed provider');
-  expect(host.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('false');
+  expect(host.querySelector('[role=switch]')?.getAttribute('aria-checked')).toBe('false');
   expect(host.querySelector('[aria-label="gallery.videoReview.textRewriteStructure"]')).toBeNull();
   const start = host.querySelector<HTMLButtonElement>(
     'button[aria-label="gallery.videoReview.textRewriteStart"]'
@@ -310,3 +313,74 @@ it('names the prompt, discloses the recipient, and disables Start before a valid
   expect(source.beforeRequest).not.toHaveBeenCalled();
   expect(host.querySelector('dialog')).toBeNull();
 });
+
+it('clears the rewrite prompt draft without submitting or changing the source document', async () => {
+  await mountForm();
+  const prompt = host.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="gallery.videoReview.textRewritePrompt"]'
+  )!;
+  await act(async () =>
+    prompt
+      .closest('.sniptale-parameter-row')!
+      .querySelector<HTMLButtonElement>('.sniptale-field-clear')!
+      .click()
+  );
+  expect(prompt.value).toBe('');
+  expect(document.activeElement).toBe(prompt);
+  expect(jobs.generate).not.toHaveBeenCalled();
+  expect(jobs.apply).not.toHaveBeenCalled();
+  await fill(prompt, 'Shorten again');
+  await click('textRewriteStart');
+  expect(jobs.generate).toHaveBeenCalledTimes(1);
+  expect(jobs.generate.mock.calls[0]?.[1].context.prompt).toBe('Shorten again');
+});
+
+it('uses a timing switch and keeps the outbound notice without single-item counters or raw context JSON', async () => {
+  await mountForm();
+  expect(
+    host.querySelector('[role="switch"][aria-label="gallery.videoReview.textRewriteTiming"]')
+  ).not.toBeNull();
+  expect(host.textContent).not.toContain('gallery.videoReview.textRewriteSelectedScope');
+  expect(host.textContent).not.toContain('gallery.videoReview.textRewriteDestination');
+  expect(host.textContent).toContain('gallery.videoReview.textRewriteDisclosure');
+  expect(host.textContent).not.toContain('gallery.videoReview.textRewriteOutbound');
+  expect(jobs.generate).not.toHaveBeenCalled();
+});
+
+it('offers explicit catalog retry after successful empty discovery without selecting a replacement', async () => {
+  const available = await catalog();
+  catalog.mockResolvedValueOnce({ ...available, models: [] });
+  await mountForm();
+  const retry = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.speechReloadModels"]'
+  );
+  expect(retry).not.toBeNull();
+  expect(jobs.generate).not.toHaveBeenCalled();
+  await act(async () => retry!.click());
+  expect(catalog).toHaveBeenCalledTimes(3);
+  expect(host.querySelector('[aria-label="gallery.videoReview.speechReloadModels"]')).toBeNull();
+  const picker = host.querySelector<HTMLButtonElement>(
+    'button[data-invalid="true"][aria-expanded]'
+  );
+  expect(picker).not.toBeNull();
+  vi.spyOn(picker!.parentElement!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
+  await act(async () => picker!.click());
+  expect(document.body.textContent).toContain('Configured text model');
+  expect(jobs.generate).not.toHaveBeenCalled();
+});
+
+it.each(['ru', 'en'] as const)(
+  'discloses metadata-only history in the %s rewrite notice',
+  async (locale) => {
+    const { translate } =
+      await vi.importActual<typeof import('../../platform/i18n')>('../../platform/i18n');
+    const notice = translate('gallery.videoReview.textRewriteDisclosure', locale);
+    expect(notice).toContain(
+      locale === 'ru'
+        ? 'В истории AI сохраняются только модель, время и статус запроса.'
+        : 'AI history stores only model, time and request status.'
+    );
+  }
+);

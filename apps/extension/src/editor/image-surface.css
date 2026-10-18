@@ -1,0 +1,25 @@
+/* The image editor adopts ordinary controls without changing canvas coordinates. */
+.sniptale-image-workspace {
+  --sniptale-radius-floating-chrome: 4px;
+}
+.sniptale-image-page {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.sniptale-image-page [data-ui='editor.page.root'] {
+  min-width: 1280px;
+}
+.sniptale-image-workspace button[data-command-icon] {
+  border-radius: 4px;
+  background: transparent;
+}
+.sniptale-image-workspace button[data-command-icon='tool'][data-active='false']:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-text-secondary) 14%, transparent);
+}
+.sniptale-image-workspace button[data-command-icon='tool'][data-active='true'] {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 20%, transparent);
+}
+.sniptale-image-workspace button[data-command-icon='tool'][data-active='true']:hover {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 35%, transparent);
+}

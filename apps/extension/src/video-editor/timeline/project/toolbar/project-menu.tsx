@@ -35,7 +35,7 @@ export function ProjectMenu(props: { projectName: string; onExport: () => void }
         className={toolbarIconButtonClassName}
         title={translate('videoEditor.app.projectMenu')}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         disabled={pending}
         onClick={() => setOpen(!open)}
         dataUi="video-editor.timeline.toolbar.project-menu"

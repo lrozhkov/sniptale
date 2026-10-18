@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { ResourcePresetNameField } from '../preset-name-field';
+import { useEffect, useRef, useState } from 'react';
 import {
   ProductModal,
   ProductModalBody,
@@ -32,6 +33,7 @@ export function GradientPresetEditor(props: {
   preset: StoredGradientPreset | null;
 }) {
   const [name, setName] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
   const [paint, setPaint] = useState<Paint>({ kind: 'gradient', gradient: fallbackGradient() });
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -74,17 +76,13 @@ export function GradientPresetEditor(props: {
         )}
       />
       <ProductModalBody compact>
-        <div className="grid gap-4">
-          <label className="grid gap-1 text-xs">
-            {translate('settings.editor.presetName')}
-            <input
-              aria-label={translate('settings.editor.presetName')}
-              disabled={saving}
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-          </label>
+        <div className="grid gap-3">
+          <ResourcePresetNameField
+            inputRef={nameRef}
+            value={name}
+            disabled={saving}
+            onChange={setName}
+          />
           <CompactPaintSelector
             disabled={saving}
             label={translate('settings.editor.gradients.paint')}
@@ -100,7 +98,7 @@ export function GradientPresetEditor(props: {
         </div>
       </ProductModalBody>
       <ProductModalFooter compact>
-        <ProductActionButton disabled={saving} onClick={props.onClose}>
+        <ProductActionButton disabled={saving} onClick={props.onClose} tone="secondary">
           {translate('common.actions.cancel')}
         </ProductActionButton>
         <ProductActionButton

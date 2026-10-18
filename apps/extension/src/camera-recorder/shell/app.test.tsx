@@ -173,6 +173,9 @@ it('surfaces camera recorder registration failures', async () => {
   expect(container?.textContent).toContain(
     'popup.video.loadingPopupError. common.errors.browserCommunicationDetail'
   );
+  expect(
+    Array.from(container?.querySelectorAll('button') ?? []).every((button) => button.disabled)
+  ).toBe(true);
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
     cameraRegistrationToken: 'launch-1',
@@ -256,7 +259,7 @@ it('keeps camera recording details compactly below the video preview', async () 
   await renderApp();
 
   const video = container?.querySelector('video');
-  const title = Array.from(container?.querySelectorAll('div') ?? []).find(
+  const title = Array.from(container?.querySelectorAll('h1') ?? []).find(
     (element) => element.textContent === 'popup.video.cameraWindowTitle'
   );
   expect(video).not.toBeNull();
@@ -461,4 +464,171 @@ it('does not restore an acknowledged result from an older in-flight refresh', as
   });
   expect(container?.textContent).not.toContain('popup.video.postRecordTitle');
   closeSpy.mockRestore();
+});
+
+function getCommand(label: string): HTMLButtonElement {
+  const button = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (candidate) => candidate.textContent?.trim() === label
+  );
+  if (!button) throw new Error(`Missing command: ${label}`);
+  return button;
+}
+
+async function openCancelConfirmation() {
+  const cancel = getCommand('popup.video.cancelButton');
+  cancel.focus();
+  await act(async () => cancel.click());
+  const continueButton = getCommand('popup.video.cancelContinueRecording');
+  expect(document.activeElement).toBe(continueButton);
+  return continueButton;
+}
+
+it('returns focus and active controls after Continue with exactly one current resume command', async () => {
+  mockRegisteredRecordingState();
+  sendRuntimeMessageMock.mockResolvedValue({
+    success: true,
+    controlToken: 'control-token-1',
+    recordingId: 'rec-1',
+    state: createRecordingState(),
+  });
+  await renderApp();
+  const continueButton = await openCancelConfirmation();
+
+  await act(async () => continueButton.click());
+
+  expect(document.activeElement).toBe(getCommand('popup.video.cancelButton'));
+  expect(getCommand('popup.video.stopButton').disabled).toBe(false);
+  expect(getCommand('popup.video.pauseButton').disabled).toBe(false);
+  expect(container?.textContent).not.toContain('popup.video.cancelContinueRecording');
+  expect(
+    sendRuntimeMessageMock.mock.calls.filter(
+      ([message]) => message.type === VideoMessageType.RESUME_RECORDING
+    )
+  ).toEqual([
+    [
+      {
+        type: VideoMessageType.RESUME_RECORDING,
+        controlToken: 'control-token-1',
+        recordingId: 'rec-1',
+      },
+    ],
+  ]);
+});
+
+it('keeps active controls and focus reachable after refused Continue so the user can retry', async () => {
+  mockRegisteredRecordingState();
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'Resume rejected' });
+  await renderApp();
+  const continueButton = await openCancelConfirmation();
+
+  await act(async () => continueButton.click());
+
+  expect(container?.textContent).toContain('common.errors.actionFailed');
+  expect(document.activeElement).toBe(getCommand('popup.video.cancelButton'));
+  expect(getCommand('popup.video.stopButton').disabled).toBe(false);
+  expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(3);
+
+  sendRuntimeMessageMock.mockResolvedValue({
+    success: true,
+    controlToken: 'control-token-1',
+    recordingId: 'rec-1',
+    state: createRecordingState(),
+  });
+  const retry = await openCancelConfirmation();
+  await act(async () => retry.click());
+  expect(container?.textContent).not.toContain('common.errors.actionFailed');
+  expect(document.activeElement).toBe(getCommand('popup.video.cancelButton'));
+});
+
+it('keeps microphone property activation on the existing capability and accepted media state', async () => {
+  mockRegisteredRecordingState();
+  sendRuntimeMessageMock.mockResolvedValue({ success: false, error: 'Update rejected' });
+  await renderApp();
+  const microphone = container?.querySelector<HTMLButtonElement>('[aria-pressed]');
+  expect(microphone?.getAttribute('aria-pressed')).toBe('true');
+  expect(microphone?.getAttribute('aria-label')).toBe('popup.video.activeMicrophoneMute');
+
+  await act(async () => microphone?.click());
+
+  expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+    type: VideoMessageType.UPDATE_SETTINGS,
+    controlToken: 'control-token-1',
+    recordingId: 'rec-1',
+    settings: { microphoneEnabled: false },
+  });
+  expect(microphone?.getAttribute('aria-pressed')).toBe('true');
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    'common.errors.actionFailed'
+  );
+});
+
+it.each(['refused', 'rejected', 'refresh-rejected'] as const)(
+  'keeps inline Delete open and recoverable when %s',
+  async (failure) => {
+    mockRegisteredRecordingState();
+    if (failure === 'refused') {
+      sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'Discard rejected' });
+    } else if (failure === 'rejected') {
+      sendRuntimeMessageMock.mockRejectedValueOnce(new Error('Discard failed'));
+    } else {
+      sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+      sendRuntimeMessageMock.mockRejectedValueOnce(new Error('Refresh failed'));
+    }
+    const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+    try {
+      await renderApp();
+      await openCancelConfirmation();
+      await act(async () => getCommand('popup.video.cancelDeleteRecording').click());
+
+      expect(close).not.toHaveBeenCalled();
+      expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+        'common.errors.actionFailed'
+      );
+      expect(getCommand('popup.video.cancelContinueRecording').disabled).toBe(false);
+    } finally {
+      close.mockRestore();
+    }
+  }
+);
+
+it('closes accepted inline Delete once and only after its state refresh succeeds', async () => {
+  mockRegisteredRecordingState();
+  const refreshed = createDeferred<{
+    success: true;
+    controlToken: string;
+    recordingId: string;
+    state: ReturnType<typeof createRecordingState>;
+  }>();
+  sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  sendRuntimeMessageMock.mockReturnValueOnce(refreshed.promise);
+  const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+  try {
+    await renderApp();
+    await openCancelConfirmation();
+    await act(async () => getCommand('popup.video.cancelDeleteRecording').click());
+
+    expect(sendRuntimeMessageMock).toHaveBeenNthCalledWith(3, {
+      type: VideoMessageType.STOP_RECORDING,
+      controlToken: 'control-token-1',
+      discard: true,
+      recordingId: 'rec-1',
+    });
+    expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
+      type: VideoMessageType.GET_RECORDING_STATE,
+    });
+    expect(close).not.toHaveBeenCalled();
+
+    await act(async () => {
+      refreshed.resolve({
+        success: true,
+        controlToken: 'control-token-1',
+        recordingId: 'rec-1',
+        state: createRecordingState(),
+      });
+    });
+
+    expect(close).toHaveBeenCalledTimes(1);
+  } finally {
+    close.mockRestore();
+  }
 });

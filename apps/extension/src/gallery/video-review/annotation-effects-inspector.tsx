@@ -1,6 +1,6 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useMemo, useRef } from 'react';
 import { Clock3, Copy, Move, Palette, Shapes, Trash2 } from 'lucide-react';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import {
   applyEffectV1ControlPreset,
   resolveEffectLocaleText,
@@ -9,7 +9,12 @@ import {
   type EffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { ColorField, SelectField, TextField } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  SelectField,
+  TextField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 import { resolveReviewAnnotationEffectControls } from '../../features/video/review/annotation-effects/layout';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
@@ -187,17 +192,12 @@ function AnnotationParameters(
             props.duration,
             's'
           )}
-          <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-            <span>{translate('gallery.videoReview.annotationEnabled')}</span>
-            <ProductGlassSwitch
-              on={instance.enabled}
-              disabled={disabled}
-              role="switch"
-              aria-checked={instance.enabled}
-              aria-label={translate('gallery.videoReview.annotationEnabled')}
-              onClick={() => editor.change(instance.id, { enabled: !instance.enabled })}
-            />
-          </div>
+          <ToggleField
+            value={instance.enabled}
+            disabled={disabled}
+            label={translate('gallery.videoReview.annotationEnabled')}
+            onChange={(enabled) => editor.change(instance.id, { enabled })}
+          />
         </>
       ),
     },
@@ -365,17 +365,14 @@ function AnnotationParameters(
   ];
   return (
     <div data-ui="gallery.videoReview.annotationInspector">
-      <div className="flex min-h-8 min-w-0 items-center justify-between gap-2 text-xs">
-        <span className="shrink-0 text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.videoReview.annotationName')}
-        </span>
+      <InspectorParameterRow label={translate('gallery.videoReview.annotationName')}>
         <span
-          className="min-w-0 truncate text-[var(--sniptale-color-text-primary)]"
+          className="block min-w-0 w-full truncate text-right text-[var(--sniptale-color-text-primary)]"
           title={resolveEffectLocaleText(document.label, locale)}
         >
           {resolveEffectLocaleText(document.label, locale)}
         </span>
-      </div>
+      </InspectorParameterRow>
       {editor.failure && (
         <div role="alert">
           {translate(

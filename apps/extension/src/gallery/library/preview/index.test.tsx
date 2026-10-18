@@ -116,11 +116,11 @@ function render(props: PreviewPanelProps) {
   });
 }
 
-it('uses the shared large-surface radius for the preview workspace', () => {
+it('uses the compact dialog radius for the preview workspace', () => {
   render(createProps());
 
   expect(container?.querySelector('[data-ui="gallery.preview.surface"]')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
+    'rounded-[8px]'
   );
 });
 
@@ -157,7 +157,7 @@ afterEach(() => {
 });
 
 it('renders preview shell, updates the filename, and forwards close actions', () => {
-  const props = createProps();
+  const props = createProps({ item: createMediaItem() });
 
   render(props);
 
@@ -173,13 +173,49 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
     throw new Error('Expected preview panel controls');
   }
 
-  setInputValue(input, 'renamed.png');
+  setInputValue(input, 'renamed');
   act(() => {
     closeButton.click();
   });
 
   expect(props.onFilenameChange).toHaveBeenCalledWith('renamed.png');
   expect(props.onClose).toHaveBeenCalledTimes(1);
+});
+
+it('clears the filename draft through input and restores focus without accepting it', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const input = container?.querySelector('input');
+  const clear = container?.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+  if (!input || !clear) throw new Error('Missing filename editor');
+  act(() => clear.click());
+  expect(props.onFilenameChange).toHaveBeenCalledWith('');
+  expect(document.activeElement).toBe(input);
+  expect(props.onSave).not.toHaveBeenCalled();
+  render({ ...props, filenameDraft: '' });
+  expect(container?.querySelector('.sniptale-field-clear')).toBeNull();
+});
+
+it('keeps the filename name passive while the input retains direct editing', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const input = container?.querySelector('input');
+  const name = container?.querySelector<HTMLElement>('.gallery-preview-section-label');
+  if (!input || !name) throw new Error('Missing filename editor');
+  act(() => name.click());
+  expect(document.activeElement).not.toBe(input);
+  act(() => input.focus());
+  act(() => name.click());
+  expect(document.activeElement).toBe(input);
+  setInputValue(input, 'direct-edit');
+  expect(props.onFilenameChange).toHaveBeenCalledWith('direct-edit.png');
+  expect(props.onSave).not.toHaveBeenCalled();
+});
+
+it('shows the translated filename name as an empty draft placeholder', () => {
+  render(createProps({ item: createMediaItem(), filenameDraft: '' }));
+  const input = container?.querySelector('input');
+  expect(input?.placeholder).toBe('gallery.preview.filename');
 });
 
 it('renders source link when available and fallback copy when missing', () => {
@@ -194,6 +230,11 @@ it('renders source link when available and fallback copy when missing', () => {
 
   const sourceLink = container?.querySelector('a[href="https://example.test/source"]');
   expect(sourceLink?.textContent).toBe('https://example.test/source');
+  const properties = sourceLink?.closest('details');
+  expect(properties?.querySelector('summary')?.textContent).toContain('gallery.preview.properties');
+  expect(
+    sourceLink?.closest('[data-ui="gallery.preview.source"]')?.querySelector('summary')
+  ).toBeNull();
 
   render(createProps());
 
@@ -286,15 +327,10 @@ it('uses project name as the source fallback and keeps non-HTML exports read-onl
     })
   );
 
-  const input = container?.querySelector('input');
-
-  if (!(input instanceof HTMLInputElement)) {
-    throw new Error('Expected preview filename input');
-  }
-
+  expect(container?.querySelector('input')).toBeNull();
+  expect(container?.querySelector('.gallery-preview-filename p')?.textContent).toBe('preview.png');
   expect(container?.textContent).toContain('Quarterly Demo');
   expect(container?.textContent).toContain('gallery.preview.filename');
-  expect(input.readOnly).toBe(true);
 });
 
 it('surfaces unavailable project recovery state and keeps its identity read-only', () => {
@@ -311,7 +347,8 @@ it('surfaces unavailable project recovery state and keeps its identity read-only
     'gallery.preview.unavailableInvalidProject'
   );
   expect(container?.textContent).toContain('gallery.preview.unavailableProjectRecovery');
-  expect(container?.querySelector('input')?.readOnly).toBe(true);
+  expect(container?.querySelector('input')).toBeNull();
+  expect(container?.querySelector('.gallery-preview-filename p')?.textContent).toBe('preview.png');
 });
 
 it('hides the inspector sidebar when collapsed and closes on Escape', () => {
@@ -519,7 +556,9 @@ it('allows editing the selected HTML export filename', () => {
   const input = container?.querySelector('input');
   expect(input).toBeInstanceOf(HTMLInputElement);
   expect(input?.readOnly).toBe(false);
-  expect(input?.labels?.[0]?.textContent).toBe('gallery.preview.filename');
+  const name = document.getElementById(input!.getAttribute('aria-labelledby')!);
+  expect(name?.textContent).toBe('gallery.preview.filename');
+  expect(input?.labels).toHaveLength(0);
 });
 
 it('edits the active quick-edit project name and makes it read-only in Trash', async () => {
@@ -553,7 +592,7 @@ it('shows permanent storage after promotion and omits active draft expiry in Tra
       item: { ...baseProps.item, lifecycle: { savedAt: 2, storageClass: 'library', updatedAt: 2 } },
     })
   );
-  expect(container?.textContent).toContain('gallery.app.permanentStorage');
+  expect(container?.querySelector('[title="gallery.app.permanentStorage"]')).not.toBeNull();
   render(
     createProps({
       trashMode: true,
@@ -566,4 +605,39 @@ it('shows permanent storage after promotion and omits active draft expiry in Tra
   );
   expect(container?.textContent).not.toContain('gallery.app.draftExpires');
   expect(container?.textContent).not.toContain('gallery.app.draftNoExpiration');
+});
+
+it('edits the file stem while retaining its extension outside the editor', () => {
+  const props = createProps({ item: createMediaItem({ filename: 'preview.png' }) });
+  render(props);
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  expect(input.value).toBe('preview');
+  expect(
+    container!.querySelector('[data-ui="gallery.preview.filenameExtension"]')?.textContent
+  ).toBe('.png');
+  act(() => setInputValue(input, 'renamed'));
+  expect(props.onFilenameChange).toHaveBeenLastCalledWith('renamed.png');
+  render({ ...props, filenameDraft: '' });
+  act(() => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(props.onFilenameChange).toHaveBeenLastCalledWith('preview.png');
+});
+
+it('closes a focused whitespace-only file stem without saving its extension alone', () => {
+  let draft = 'preview.png';
+  const onClose = vi.fn(() => draft);
+  render(
+    createProps({
+      item: createMediaItem({ filename: 'preview.png' }),
+      onFilenameChange: (value) => {
+        draft = value;
+      },
+      onClose,
+    })
+  );
+  const input = container!.querySelector<HTMLInputElement>('input')!;
+  input.focus();
+  setInputValue(input, '   ');
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.activeElement).toBe(input);
+  expect(onClose).toHaveReturnedWith('');
 });

@@ -1,12 +1,6 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type RefObject,
-  type ReactNode,
-} from 'react';
+import { useContext, useRef, type RefObject, type ReactNode } from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
   DRAWING_ARROW_WIDTHS,
@@ -48,115 +42,7 @@ import {
   updateQuickToolOption,
   type ConfigurableDrawingQuickOptionsTool,
 } from './drawing-options-updates';
-import {
-  resolveToolbarFloatingMenuStyle,
-  resolveToolbarMenuPlacement,
-  TOOLBAR_SECONDARY_MENU_Z_INDEX,
-} from '../menu/floating.helpers';
-import { getToolbarMenuPosition } from '../menu/position';
-
-type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
-
-const DRAWING_OPTIONS_DIMENSIONS: Record<
-  'horizontal' | 'vertical',
-  Record<DrawingQuickOptionsTool, { height: number; width: number }>
-> = {
-  horizontal: {
-    arrow: { height: 48, width: 600 },
-    blur: { height: 48, width: 336 },
-    marker: { height: 48, width: 560 },
-    pencil: { height: 48, width: 340 },
-    shape: { height: 48, width: 694 },
-    selection: { height: 48, width: 676 },
-    text: { height: 48, width: 700 },
-  },
-  vertical: {
-    arrow: { height: 290, width: 190 },
-    blur: { height: 174, width: 136 },
-    marker: { height: 250, width: 190 },
-    pencil: { height: 170, width: 190 },
-    shape: { height: 365, width: 190 },
-    selection: { height: 365, width: 190 },
-    text: { height: 420, width: 190 },
-  },
-};
-
-function useDrawingOptionsLayout(args: {
-  displayMode: 'horizontal' | 'vertical';
-  hasSelection: boolean;
-  panelRef: RefObject<HTMLDivElement | null>;
-  tool: DrawingQuickOptionsTool;
-  triggerRef: RefObject<HTMLButtonElement | null>;
-}) {
-  const [, setViewportRevision] = useState(0);
-  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
-  useLayoutEffect(() => {
-    const surface = args.panelRef.current?.closest<HTMLElement>(
-      '[data-ui="content.toolbar.drawing-options.pair"], .sniptale-drawing-options-menu'
-    );
-    const root =
-      surface?.closest<HTMLElement>('[data-ui="content.toolbar.drawing-options.pair"]') ?? surface;
-    const measure = () => {
-      if (!root) return;
-      const width = root.offsetWidth;
-      const height = root.offsetHeight;
-      if (!width || !height) return;
-      setMeasured((current) =>
-        current?.width === width && current.height === height ? current : { width, height }
-      );
-    };
-    const refresh = () => {
-      measure();
-      setViewportRevision((value) => value + 1);
-    };
-    measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    if (root) observer?.observe(root);
-    window.addEventListener('resize', refresh);
-    window.addEventListener('scroll', refresh, true);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', refresh);
-      window.removeEventListener('scroll', refresh, true);
-    };
-  }, [args.displayMode, args.hasSelection, args.panelRef, args.tool]);
-  const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
-  const menuHeight =
-    measured?.height ??
-    dimensions.height + (args.hasSelection && args.displayMode === 'vertical' ? 294 : 0);
-  const menuWidth = Math.min(
-    measured?.width ??
-      dimensions.width + (args.hasSelection && args.displayMode === 'horizontal' ? 294 : 0),
-    Math.max(0, window.innerWidth - 16)
-  );
-  const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
-  const positioned = resolveToolbarFloatingMenuStyle({
-    anchorEl: args.triggerRef.current,
-    displayMode: args.displayMode,
-    menuHeight,
-    menuWidth,
-    placement,
-    preferredTop: args.hasSelection ? -16 : 0,
-  });
-  const fallback: CSSProperties =
-    args.displayMode === 'vertical'
-      ? { left: 'calc(100% + 10px)', top: 0 }
-      : { left: 0, top: 'calc(100% + 10px)' };
-  const verticalOverflow: CSSProperties =
-    args.displayMode === 'vertical' ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' } : {};
-  return {
-    placement: resolveToolbarMenuPlacement(args.displayMode, placement),
-    style: {
-      ...(positioned ?? fallback),
-      maxWidth: 'calc(100vw - 16px)',
-      minWidth: 0,
-      overflowX: 'auto',
-      padding: '8px',
-      zIndex: TOOLBAR_SECONDARY_MENU_Z_INDEX,
-      ...verticalOverflow,
-    } satisfies CSSProperties,
-  };
-}
+import { useDrawingOptionsLayout, type DrawingQuickOptionsTool } from './drawing-options-layout';
 
 type DrawingOptionsBodyProps = {
   children: ReactNode;
@@ -191,6 +77,7 @@ function DrawingOptionsPair(
     totalCount: number;
   }
 ) {
+  const adopted = useContext(CommandPressScope);
   const options = (
     <DrawingOptionsBody panelRef={props.panelRef} tool={props.tool} displayMode={props.displayMode}>
       {props.children}
@@ -222,7 +109,7 @@ function DrawingOptionsPair(
           key={key}
           compact
           variant="drawing"
-          className="sniptale-drawing-options-popover"
+          className={`sniptale-drawing-options-popover ${adopted ? 'sniptale-drawing-options-adopted' : ''}`}
           style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
         >
           {content}
@@ -645,6 +532,7 @@ function DrawingOptionsSurface(
     snapshot: DrawingSessionSnapshot;
   }
 ) {
+  const adopted = useContext(CommandPressScope);
   if (props.selected) {
     return (
       <DrawingOptionsPair
@@ -664,7 +552,7 @@ function DrawingOptionsSurface(
     <ProductToolbarMenu
       compact
       variant="drawing"
-      className="sniptale-drawing-options-popover"
+      className={`sniptale-drawing-options-popover ${adopted ? 'sniptale-drawing-options-adopted' : ''}`}
       placement={props.layout.placement}
       style={props.layout.style}
     >

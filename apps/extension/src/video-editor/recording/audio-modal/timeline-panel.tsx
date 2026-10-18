@@ -45,8 +45,8 @@ export function TimelineRecordingPanel(props: {
     </ProductActionButton>
   );
   const context = (
-    <div className="min-w-0 text-sm">
-      <span id={props.titleId} className="font-medium">
+    <div className="min-w-0 text-sm leading-5">
+      <span id={props.titleId} className="font-semibold">
         {translate('videoEditor.app.recordAudioVoiceover')}
       </span>
       <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
@@ -109,7 +109,7 @@ export function TimelineRecordingPanel(props: {
         </p>
       )}
       {(props.error || transport.error) && (
-        <p role="alert" className="text-xs text-[var(--sniptale-color-danger-text)]">
+        <p role="alert" className="text-sm leading-5 text-[var(--sniptale-color-danger-text)]">
           {props.error || transport.error}
         </p>
       )}

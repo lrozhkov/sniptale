@@ -11,8 +11,8 @@ interface SizeControlInputProps {
 /** Dimensions share numeric editing, stepper, focus and cancellation with other inspectors. */
 export function SizeControlInput(props: SizeControlInputProps) {
   return (
-    <div data-ui={props.dataUi} className="min-w-0">
-      <span className="block text-[11px] text-[color:var(--sniptale-color-text-secondary)]">
+    <div data-ui={props.dataUi} className="min-w-0 sniptale-parameter-stack">
+      <span className="block text-[12px] text-[color:var(--sniptale-color-text-secondary)]">
         {props.label}
       </span>
       <NumericValueField

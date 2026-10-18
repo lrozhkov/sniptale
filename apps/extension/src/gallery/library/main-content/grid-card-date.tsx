@@ -1,59 +1,75 @@
-import { Clock3, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import type { GalleryItem } from '../items';
 import { formatDate } from '../ui';
 
-function getDraftDatePresentation(items: GalleryItem[]) {
-  const drafts = items.filter((item) => item.lifecycle?.storageClass === 'temporary');
-  if (drafts.length === 0) return null;
-
-  const expirationDates = drafts
+function expirationHint(items: GalleryItem[]) {
+  const drafts = items.filter(
+    (item) => item.lifecycle?.storageClass === 'temporary' && item.lifecycle.trashedAt === undefined
+  );
+  if (!drafts.length) return null;
+  const dates = drafts
     .map((item) => item.expiresAt)
-    .filter((expiresAt): expiresAt is number => expiresAt !== undefined);
-  const expiresAt = expirationDates.length > 0 ? Math.min(...expirationDates) : undefined;
-  const createdAt = formatDate(drafts[0]!.createdAt);
-
-  const dateLabel = expiresAt === undefined ? createdAt : formatDate(expiresAt);
+    .filter((date): date is number => typeof date === 'number');
+  const date = dates.length ? formatDate(Math.min(...dates)) : null;
   return {
-    dateLabel,
-    hint:
-      expiresAt !== undefined
-        ? `${translate('gallery.app.draftExpires')} ${dateLabel}`
-        : [
-            `${translate('gallery.app.createdLabel')} ${createdAt}`,
-            translate('gallery.app.draftNoExpiration'),
-          ].join(' · '),
+    date,
+    hint: date
+      ? `${translate('gallery.app.draftExpires')} ${date}`
+      : translate('gallery.app.draftNoExpiration'),
   };
 }
 
+/** Creation stays primary; expiry is secondary metadata, never a replacement date. */
 export function GalleryGridCardDate({
   items,
-  compact,
+  presentation = 'grid',
 }: {
   items: GalleryItem[];
-  compact: boolean;
+  presentation?: 'grid' | 'list';
 }) {
   const firstItem = items[0];
   if (!firstItem) return null;
-
-  const trashedAt = firstItem.lifecycle?.trashedAt;
-  const draft = trashedAt === undefined ? getDraftDatePresentation(items) : null;
-  const dateLabel =
-    trashedAt !== undefined
-      ? formatDate(trashedAt)
-      : (draft?.dateLabel ?? formatDate(firstItem.createdAt));
-
+  const created = formatDate(firstItem.createdAt);
+  const expiry = expirationHint(items);
   return (
     <span
-      className={`flex min-w-0 items-center gap-1 ${draft ? 'font-medium text-[var(--sniptale-color-warning)]' : ''}`}
-      title={draft?.hint}
+      className="flex min-w-0 flex-col"
+      title={`${translate('gallery.app.createdLabel')} ${created}`}
     >
-      {trashedAt !== undefined || (draft && compact) ? (
-        <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      ) : draft ? (
-        <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span className="truncate">{created}</span>
+      {presentation === 'list' && expiry ? (
+        <span
+          className="mt-0.5 flex min-w-0 items-center gap-1 text-[var(--sniptale-color-warning)]"
+          title={expiry.hint}
+        >
+          <Trash2 size={12} className="shrink-0" aria-hidden="true" />
+          {expiry.date ? (
+            <span className="sr-only">{translate('gallery.app.draftExpires')} </span>
+          ) : null}
+          <span className="truncate">{expiry.date ?? expiry.hint}</span>
+        </span>
       ) : null}
-      <span className="truncate">{dateLabel}</span>
+    </span>
+  );
+}
+
+/** The warning icon uses a quiet backing over captured pixels and a native deadline hint. */
+export function GalleryCardExpiration({ items }: { items: GalleryItem[] }) {
+  const expiry = expirationHint(items);
+  if (!expiry) return null;
+  const { hint } = expiry;
+  return (
+    <span
+      data-ui="gallery.card.expiration"
+      title={hint}
+      aria-label={hint}
+      role="img"
+      className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-[4px]
+        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_80%,transparent)]
+        text-[var(--sniptale-color-warning)]"
+    >
+      <Trash2 size={16} aria-hidden="true" />
     </span>
   );
 }

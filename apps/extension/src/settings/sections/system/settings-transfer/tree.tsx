@@ -83,7 +83,7 @@ export function SettingsTransferTree(props: {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]">
+    <div className="overflow-hidden rounded-[8px] border border-[var(--sniptale-color-border-soft)]">
       <SettingsTransferTreeToolbar
         query={query}
         matchCount={filtered.matchedIds.size}
@@ -95,7 +95,7 @@ export function SettingsTransferTree(props: {
         onToggleExpansion={toggleVisibleExpansion}
         onToggleScope={() => props.onBulkToggle(bulkNodes, !isScopeSelected)}
       />
-      <div className="max-h-[min(52vh,32rem)] overflow-y-auto overscroll-contain p-2.5">
+      <div className="max-h-[min(52vh,32rem)] overflow-y-auto overscroll-contain p-2">
         {filtered.nodes.length > 0 ? (
           <ul
             role="tree"

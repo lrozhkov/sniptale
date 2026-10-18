@@ -5,6 +5,10 @@ import path from 'node:path';
 import { sha256 } from './oss-release-policy.mjs';
 
 const LEGAL_CONTENTS = new Map([
+  [
+    'packages/ui/src/styles/golos-ui/LICENSE.txt',
+    readFileSync(path.resolve('packages/ui/src/styles/golos-ui/LICENSE.txt'), 'utf8'),
+  ],
   ['LICENSE', readFileSync(path.resolve('LICENSE'), 'utf8')],
   ['NOTICE', 'Sniptale fixture notice\n'],
   ['THIRD_PARTY_NOTICES.md', '# Fixture notices\n'],

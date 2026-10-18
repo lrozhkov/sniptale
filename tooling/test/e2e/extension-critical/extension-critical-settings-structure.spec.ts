@@ -144,17 +144,14 @@ for (const locale of ['en', 'ru'] as const) {
       });
       await restore.focus();
       await page.keyboard.press('Shift+Tab');
-      const restingBackground = await restore.evaluate(
-        (element) => getComputedStyle(element).backgroundColor
-      );
       await page.keyboard.press('Tab');
       await expect(restore).toBeFocused();
-      expect(
-        await restore.evaluate((element) => getComputedStyle(element).backgroundColor)
-      ).not.toBe(restingBackground);
-      expect(await restore.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe(
-        'none'
-      );
+      const focus = await restore.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { outline: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+      });
+      expect(focus.outline).not.toBe('none');
+      expect(focus.width).toBeGreaterThanOrEqual(2);
       await firstRow.click();
       await expect(firstRow).toHaveAttribute('aria-selected', 'true');
       const selection = await firstRow.evaluate((element) => {

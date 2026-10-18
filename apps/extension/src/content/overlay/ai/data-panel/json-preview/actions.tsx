@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { JsonPreviewProps } from '../preview/types';
 import { translate } from '../../../../../platform/i18n';
 import { CheckIcon, CodeBracketsIcon, CopyIcon } from '../preview/icons';
@@ -22,11 +23,14 @@ export function JsonPreviewActions({
 }: JsonPreviewActionsProps) {
   return (
     <div className="sniptale-ai-json-actions">
-      <button
+      <ProductActionButton
+        type="button"
         onClick={() => setShowDataPreview((prev) => !prev)}
         disabled={isLoading}
         className="sniptale-toggle-btn sniptale-ai-data-preview-toggle"
         aria-pressed={showDataPreview}
+        active={showDataPreview}
+        tone="toggle"
         title={
           showDataPreview ? translate('aiModal.hideJsonTitle') : translate('aiModal.showJsonTitle')
         }
@@ -35,11 +39,14 @@ export function JsonPreviewActions({
         {showDataPreview
           ? translate('aiModal.hideJsonButton')
           : translate('aiModal.showJsonButton')}
-      </button>
+      </ProductActionButton>
       {showDataPreview && formattedJSON ? (
-        <button
+        <ProductActionButton
+          tone="secondary"
+          type="button"
           onClick={copyFormattedJson}
           className={`sniptale-copy-btn ${copied ? 'copied' : ''}`}
+          title={translate(copied ? 'aiModal.copied' : 'aiModal.copyButton')}
         >
           {copied ? (
             <>
@@ -52,7 +59,7 @@ export function JsonPreviewActions({
               {translate('aiModal.copyButton')}
             </>
           )}
-        </button>
+        </ProductActionButton>
       ) : null}
     </div>
   );

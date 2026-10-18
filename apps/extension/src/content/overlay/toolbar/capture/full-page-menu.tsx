@@ -1,3 +1,5 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import React, { useCallback, useRef } from 'react';
 import {
   ChevronDown,
@@ -129,6 +131,7 @@ function FullPagePreferencesMenu(
     triggerRef: React.RefObject<HTMLButtonElement | null>;
   }
 ) {
+  const adopted = React.useContext(CommandPressScope);
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.triggerRef,
     displayMode: props.displayMode,
@@ -148,7 +151,9 @@ function FullPagePreferencesMenu(
   return (
     <ToolbarMenuDropdown dataUi="content.toolbar.full-page-menu" menuRef={props.menuRef}>
       <ProductToolbarMenu
-        className="sniptale-full-page-menu"
+        className={['sniptale-full-page-menu', adopted ? 'sniptale-content-menu-adopted' : ''].join(
+          ' '
+        )}
         compact={props.compactMenus}
         placement={menuPlacement}
         style={style}
@@ -213,23 +218,27 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
 
   return (
     <div className="sniptale-split-action sniptale-full-page-wrapper">
-      <button
-        className="sniptale-btn sniptale-split-action-start sniptale-full-page-primary"
+      <ContentToolbarButton
+        type="button"
+        data-content-command="true"
+        className="sniptale-split-action-start sniptale-full-page-primary"
         data-sniptale-activation-bridge="defer"
-        data-ui="content.toolbar.capture-full-button"
+        dataUi="content.toolbar.capture-full-button"
         disabled={props.disabled}
         onClick={props.onPrimaryClick}
         title={translate('content.toolbar.fullPage')}
       >
         <UnfoldVertical size={20} strokeWidth={2} />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        data-content-command="true"
         ref={triggerRef}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="sniptale-btn sniptale-split-action-end sniptale-full-page-chevron"
+        className="sniptale-split-action-end sniptale-full-page-chevron"
         data-menu-open={open ? 'true' : 'false'}
-        data-ui="content.toolbar.capture-full-settings-button"
+        dataUi="content.toolbar.capture-full-settings-button"
         disabled={props.disabled}
         onClick={(event) => {
           event.stopPropagation();
@@ -238,7 +247,7 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
         title={translate('content.toolbar.fullPageSettingsTitle')}
       >
         <ChevronDown size={14} strokeWidth={2} />
-      </button>
+      </ContentToolbarButton>
       {open ? (
         <FullPagePreferencesMenu {...props} menuRef={menuRef} triggerRef={triggerRef} />
       ) : null}

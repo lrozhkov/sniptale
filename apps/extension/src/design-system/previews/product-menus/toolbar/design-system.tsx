@@ -24,7 +24,7 @@ function renderViewportToolbarMenu(copy: ReturnType<typeof getProductPreviewCopy
       <ProductToolbarMenu
         title={copy.viewport}
         variant="viewport"
-        className="block !w-[280px]"
+        className="sniptale-content-menu-adopted block !w-[280px]"
         style={FLOATING_PREVIEW_STYLE}
       >
         <ProductToolbarMenuItem>
@@ -47,7 +47,7 @@ function renderCompactToolbarMenu(copy: ReturnType<typeof getProductPreviewCopy>
         title={copy.capture}
         variant="capture"
         compact
-        className="block !w-[250px]"
+        className="sniptale-content-menu-adopted block !w-[250px]"
         style={FLOATING_PREVIEW_STYLE}
       >
         <ProductToolbarMenuItem>
@@ -64,7 +64,7 @@ function renderSelectedToolbarMenu(copy: ReturnType<typeof getProductPreviewCopy
     <DesignSystemFloatingPreviewFrame minHeight={132}>
       <ProductToolbarMenu
         variant="viewport"
-        className="block !w-[280px]"
+        className="sniptale-content-menu-adopted block !w-[280px]"
         style={FLOATING_PREVIEW_STYLE}
       >
         <ProductToolbarMenuItem selected>

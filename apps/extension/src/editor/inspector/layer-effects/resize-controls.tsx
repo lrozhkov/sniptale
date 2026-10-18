@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React from 'react';
 import { Link2 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -53,7 +54,7 @@ function AspectRatioButton(props: {
     <EditorIconButton
       title={translate('editor.compact.keepAspectRatio')}
       active={props.layerSizeLocked}
-      className={cx('h-10 w-10 shrink-0', props.layerSizeLocked && 'shadow-none')}
+      className={cx('h-8 w-8 shrink-0', props.layerSizeLocked && 'shadow-none')}
       onClick={() => props.setLayerSizeLocked((state) => !state)}
     >
       <Link2 size={15} strokeWidth={2} />
@@ -103,7 +104,7 @@ function ResizeApplyButton(props: {
   onResizeLayer: EditorInspectorLayerEffectsProps['onResizeLayer'];
 }) {
   return (
-    <button
+    <ProductActionButton
       type="button"
       className={props.className}
       onClick={() =>
@@ -111,7 +112,7 @@ function ResizeApplyButton(props: {
       }
     >
       {translateLayerEffects('editor.toolbar.layerEffectsApplyResize')}
-    </button>
+    </ProductActionButton>
   );
 }
 
@@ -133,7 +134,7 @@ export function ResizeTransformationControls(
       label={translateLayerEffects('editor.toolbar.layerEffectsResize')}
       value={props.layerSizeText}
     >
-      <div className="space-y-3">
+      <div className="space-y-1">
         <SizeInputRow
           layerAspectRatio={props.layerAspectRatio}
           layerSizeDraft={props.layerSizeDraft}

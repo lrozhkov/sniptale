@@ -109,6 +109,13 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
     throw new Error('Expected compact grid controls');
   }
 
+  expect(selectionButtons[0]?.closest('[data-ui="gallery.compact.details"]')).not.toBeNull();
+  expect(container?.querySelector('button button')).toBeNull();
+  expect(
+    previewButton
+      .closest('[data-ui="gallery.grid.thumbnail-viewport"]')
+      ?.querySelector('[aria-pressed]')
+  ).toBeNull();
   act(() => {
     selectionButtons[0]?.click();
     previewButton.click();
@@ -117,9 +124,7 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
   expect(onToggleSelection).toHaveBeenCalledWith('asset-1', { shiftKey: false });
   expect(onPreviewOpen).toHaveBeenCalledWith(firstItem);
   expectCompactGridPointerCursors(previewButton, selectionButtons[0]);
-  expect(previewButton.closest('article')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
-  );
+  expect(previewButton.closest('article')?.className).toContain('rounded-[4px]');
   expect(previewButton.closest('article')?.textContent).not.toContain('capture.png');
   expect(previewButton.getAttribute('title')).toBe('capture.png');
   const compactMetadata = previewButton
@@ -193,8 +198,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
   expect(cards?.[0]?.className).toContain('flex flex-col');
   expect(details?.className).toContain('h-[72px]');
-  expect(details?.className).toContain('grid-rows-[20px_16px]');
-  expect(details?.className).not.toContain('minmax(0,1fr)');
+  expect(details?.className).toContain('content-center');
   expect(details?.className).toContain('shrink-0');
   expect(metadata?.className).not.toContain('mt-auto');
   expect(
@@ -226,7 +230,9 @@ it('keeps the distinguishing filename tail and extension visible in constrained 
 
   const label = container?.querySelector<HTMLElement>('[data-ui="gallery.filename"]');
   const segments = Array.from(label?.querySelectorAll('span') ?? []);
-  const previewButton = label?.closest('button');
+  const previewButton = label
+    ?.closest('[data-ui="gallery.large.details"]')
+    ?.querySelector('button');
 
   expect(label?.textContent).toBe(filename);
   expect(label?.getAttribute('aria-hidden')).toBe('true');
@@ -346,53 +352,72 @@ it('renders one composite grid card for raw recording tracks without a project',
   expect(selectedCard?.className).not.toContain('border-[var(--sniptale-color-border-soft)]');
 });
 
-it('renders one unduplicated recording-group title in large grid', () => {
-  const items = ['display', 'webcam'].map((role, order) =>
-    createMediaItem({
-      id: `recording:${role}`,
-      kind: 'recording',
-      recordingGroupView: {
-        groupId: 'capture-1',
-        memberCount: 2,
-        order,
-        projectId: null,
-        projectName: null,
-        role: role === 'webcam' ? 'webcam' : 'display',
-        sourceLabel: role,
-      },
-    })
-  );
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={items}
-        gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[items[0]!]}
-      />
+it.each([null, 'Длинное пользовательское название проекта группы записи'])(
+  'renders one unduplicated recording-group title in large grid: %s',
+  (projectName) => {
+    const items = ['display', 'webcam'].map((role, order) =>
+      createMediaItem({
+        id: `recording:${role}`,
+        kind: 'recording',
+        recordingGroupView: {
+          groupId: 'capture-1',
+          memberCount: 2,
+          order,
+          projectId: projectName ? 'project-1' : null,
+          projectName,
+          role: role === 'webcam' ? 'webcam' : 'display',
+          sourceLabel: role,
+        },
+      })
     );
-  });
 
-  expect(container?.textContent?.match(/Запись из нескольких источников/g)).toHaveLength(1);
-  expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
-  expect(
-    container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
-  ).toContain('h-[72px]');
-  expect(
-    container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
-  ).not.toContain('mt-auto');
-  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
-    'contain'
-  );
-});
+    const onOpen = vi.fn();
+    const onPreview = vi.fn();
+    act(() => {
+      root?.render(
+        <GalleryGridCanvas
+          filteredItems={items}
+          gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
+          gridWidth={400}
+          onPreviewOpen={onPreview}
+          onRecordingGroupOpen={onOpen}
+          onToggleSelection={vi.fn()}
+          selectedIds={new Set()}
+          viewMode="large-grid"
+          visibleItems={[items[0]!]}
+        />
+      );
+    });
+
+    expect(
+      container?.textContent?.split(projectName ?? 'Запись из нескольких источников')
+    ).toHaveLength(2);
+    expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
+    expect(
+      container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
+    ).toContain('h-[72px]');
+    expect(
+      container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
+    ).not.toContain('mt-auto');
+    expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+      'contain'
+    );
+    if (projectName) {
+      const footer = container?.querySelector('[data-ui="gallery.large.group-details"]');
+      expect(footer?.querySelector('.truncate[title]')?.getAttribute('title')).toBe(projectName);
+      const open = [...(footer?.querySelectorAll('button') ?? [])].find((button) =>
+        button.textContent?.includes(translate('gallery.preview.openRecordingGroupShort'))
+      );
+      expect(open).toBeDefined();
+      act(() => open?.click());
+      expect(onOpen).toHaveBeenCalledWith(items[0]);
+      expect(onPreview).not.toHaveBeenCalled();
+    }
+  }
+);
 
 it.each(['compact-grid', 'large-grid'] as const)(
-  'shows the deletion date for draft recording groups in %s',
+  'keeps creation primary and expiry in the group badge in %s',
   (viewMode) => {
     const items = ['display', 'webcam'].map((role, order) => ({
       ...createMediaItem({
@@ -431,14 +456,17 @@ it.each(['compact-grid', 'large-grid'] as const)(
     const metadata = container?.querySelector<HTMLElement>(
       `[data-ui="gallery.${viewMode === 'compact-grid' ? 'compact' : 'large'}.group-metadata"]`
     );
-    expect(metadata?.textContent).toContain('date:99');
-    expect(metadata?.textContent).not.toContain('date:1');
-    expect(metadata?.querySelector('[title]')?.getAttribute('title')).toBe(
-      `${translate('gallery.app.draftExpires')} date:99`
-    );
-    expect(metadata?.querySelector('svg')?.classList.toString()).toContain(
-      viewMode === 'compact-grid' ? 'lucide-trash' : 'lucide-clock'
-    );
+    expect(metadata?.textContent).toContain('date:1');
+    expect(metadata?.textContent).not.toContain('date:99');
+    expect(
+      container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
+    ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
+    expect(metadata?.querySelector('svg.lucide-trash-2')).toBeNull();
+    expect(
+      metadata
+        ?.closest('[data-ui$="group-details"]')
+        ?.querySelector('[data-ui="gallery.card.kind"]')
+    ).not.toBeNull();
   }
 );
 
@@ -546,7 +574,7 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   expect(thumbnail?.getAttribute('data-deferred')).toBe('false');
 });
 
-it('keeps the Created table column limited to the creation date', () => {
+it('keeps creation first and expiry second in the Created table column', () => {
   const draft = {
     ...createMediaItem({
       id: 'draft-1',
@@ -571,12 +599,12 @@ it('keeps the Created table column limited to the creation date', () => {
 
   expect(container?.textContent).toContain('date:1');
   expect(container?.textContent).not.toContain('date:22');
-  expect(container?.textContent).not.toContain('date:99');
-  expect(container?.textContent).not.toContain(translate('gallery.app.draftExpires'));
+  expect(container?.textContent).toContain('date:99');
+  expect(container?.textContent).toContain(translate('gallery.app.draftExpires'));
   expect(container?.textContent).not.toContain(translate('gallery.app.updatingPreview'));
 });
 
-it('shows only the deletion date for drafts in grid cards', () => {
+it('keeps creation visible and expiry in the native badge hint', () => {
   const draft = {
     ...createMediaItem({
       id: 'draft-1',
@@ -601,17 +629,17 @@ it('shows only the deletion date for drafts in grid cards', () => {
     );
   });
 
-  expect(container?.textContent).not.toContain('date:1');
-  expect(container?.textContent).toContain('date:99');
+  expect(container?.textContent).toContain('date:1');
+  expect(container?.textContent).not.toContain('date:99');
   expect(container?.textContent).not.toContain(translate('gallery.app.draftExpires'));
   expect(container?.textContent).not.toContain('date:22');
   const compactMetadata = container?.querySelector('[data-ui="gallery.compact.metadata"]');
   expect(compactMetadata?.className).toContain('whitespace-nowrap');
-  expect(compactMetadata?.textContent).toContain('date:99');
-  expect(compactMetadata?.querySelector('[title]')?.getAttribute('title')).toBe(
-    `${translate('gallery.app.draftExpires')} date:99`
-  );
-  expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
+  expect(compactMetadata?.textContent).toContain('date:1');
+  expect(
+    container?.querySelector('[data-ui="gallery.card.expiration"]')?.getAttribute('title')
+  ).toBe(`${translate('gallery.app.draftExpires')} date:99`);
+  expect(compactMetadata?.querySelector('svg.lucide-trash-2')).toBeNull();
 });
 
 it('shows grouped recording role and member count outside the thumbnail', () => {

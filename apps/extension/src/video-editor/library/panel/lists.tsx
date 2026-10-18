@@ -52,7 +52,7 @@ export function LibraryMediaSection(props: {
                 onClick={() => setSelectedId(item.id)}
                 aria-pressed={selected?.id === item.id}
                 className={[
-                  'relative flex w-full items-center gap-3 rounded-lg border p-2 pr-10 text-left',
+                  'relative flex w-full items-center gap-3 rounded-[4px] border p-2 pr-10 text-left',
                   'border-[var(--sniptale-color-border-soft)]',
                   'hover:bg-[var(--sniptale-color-surface-hover)]',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
@@ -69,7 +69,7 @@ export function LibraryMediaSection(props: {
                 ) : null}
                 <span
                   className={[
-                    'flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md',
+                    'flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[4px]',
                     'bg-[var(--sniptale-color-surface-panel)]',
                   ].join(' ')}
                 >
@@ -81,12 +81,12 @@ export function LibraryMediaSection(props: {
                 </span>
                 <span className="min-w-0 flex-1">
                   <span
-                    className="block truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]"
+                    className="block break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]"
                     title={item.filename}
                   >
                     {item.filename}
                   </span>
-                  <span className="block truncate text-xs text-[var(--sniptale-color-text-muted)]">
+                  <span className="block break-words text-xs text-[var(--sniptale-color-text-muted)]">
                     {[
                       !isImage && item.duration !== null ? formatDuration(item.duration) : null,
                       formatDimensions(item.width, item.height),

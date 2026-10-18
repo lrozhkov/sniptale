@@ -32,7 +32,7 @@ export type { NumericRowProps, NumericValueFieldProps } from './numeric';
 export { MiniScrubber } from './scrubber';
 export type { MiniScrubberProps } from './scrubber';
 export { ToggleGrid } from './toggle-grid';
-export { ColorField, SegmentedRow, SelectField } from './controls';
+export { CheckboxField, ColorField, SegmentedRow, SelectField, ToggleField } from './controls';
 export { OptionRow, SearchField, StatusRow } from './row-controls';
 export { TextareaField } from './textarea-field';
 export { TextField } from './text-field';

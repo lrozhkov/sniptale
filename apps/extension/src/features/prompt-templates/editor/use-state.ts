@@ -100,7 +100,7 @@ export function usePromptTemplateEditorState({
     }
 
     resetPromptTemplateEditorState(setName, setContent, setErrors, template);
-    setTimeout(() => nameInputRef.current?.focus(), 100);
+    nameInputRef.current?.focus();
   }, [isOpen, template]);
 
   const handleSubmit = async (event?: React.FormEvent) => {

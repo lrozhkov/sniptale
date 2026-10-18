@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -11,17 +13,23 @@ it('keeps collection controls and the add action in one toolbar', () => {
   const onInvoke = vi.fn();
   act(() =>
     root.render(
-      <SettingsCollectionHeader
-        addAction={{ label: 'Добавить', onInvoke }}
-        toolbarControls={<input aria-label="Поиск" />}
-      />
+      <CommandPressScope value={true}>
+        <SettingsCollectionHeader
+          addAction={{ label: 'Добавить', onInvoke }}
+          toolbarControls={<input aria-label="Поиск" />}
+        />
+      </CommandPressScope>
     )
   );
 
   const toolbar = container.querySelector('[data-ui="settings.collection.toolbar"]');
   expect(toolbar?.querySelector('[aria-label="Поиск"]')).not.toBeNull();
   expect(toolbar?.textContent).toContain('Добавить');
-  act(() => toolbar?.querySelector<HTMLButtonElement>('button')?.click());
+  const button = toolbar?.querySelector<HTMLButtonElement>('button');
+  expect(button?.title).toBe('Добавить');
+  expect(button?.getAttribute('data-command-tone')).toBe('secondary');
+  expect(button?.hasAttribute('data-command-press')).toBe(true);
+  act(() => button?.click());
   expect(onInvoke).toHaveBeenCalledOnce();
   act(() => root.unmount());
 });

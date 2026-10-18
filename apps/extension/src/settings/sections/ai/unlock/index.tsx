@@ -172,7 +172,8 @@ export function AISecretUnlockPage() {
   return (
     <div
       className={
-        'sniptale-extension-surface flex h-[100dvh] min-h-0 w-full items-center justify-center ' +
+        'sniptale-extension-surface sniptale-compact-workspace sniptale-settings-workspace ' +
+        'flex h-[100dvh] min-h-0 w-full items-center justify-center ' +
         'bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]'
       }
       data-ui="settings.ai-unlock.root"

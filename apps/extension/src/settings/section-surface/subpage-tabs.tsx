@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { Ref } from 'react';
 
 export function SettingsSubpageTabs(props: {
@@ -17,7 +18,7 @@ export function SettingsSubpageTabs(props: {
       data-ui="settings.subpage-tabs"
       data-sticky={sticky ? 'true' : undefined}
       className={[
-        'flex flex-wrap gap-x-6 gap-y-1',
+        'flex flex-nowrap gap-1 overflow-x-auto',
         sticky
           ? [
               'sticky z-20 border-b border-[var(--sniptale-color-border-soft)]',
@@ -42,21 +43,26 @@ export function SettingsSubpageTabs(props: {
       {props.items.map((item) => {
         const active = props.activeId === item.id;
         return (
-          <button
+          <ContentToolbarButton
+            tone="outline"
+            active={active}
+            title={item.label}
             key={item.id}
             type="button"
             disabled={props.disabled}
             aria-current={active ? 'page' : undefined}
             onClick={() => props.onChange?.(item.id)}
             className={[
-              'relative min-h-11 min-w-28 px-2 py-3 text-sm font-medium',
+              'relative !h-8 min-h-8 !w-auto flex-none whitespace-nowrap rounded-[4px] !px-3 !py-1',
+              '!border-transparent !bg-transparent text-[13px] leading-[18px] font-normal',
               'transition-colors',
               'focus-visible:outline-none focus-visible:text-[var(--sniptale-color-text-primary)]',
-              'focus-visible:after:absolute focus-visible:after:inset-x-0 focus-visible:after:bottom-0',
-              'focus-visible:after:h-0.5 focus-visible:after:bg-[var(--sniptale-color-focus-ring)]',
               active
                 ? [
-                    'font-semibold text-[var(--sniptale-color-text-primary)]',
+                    'font-medium text-[var(--sniptale-color-text-primary)]',
+                    '[--sniptale-control-font-weight:var(--sniptale-control-font-weight-active)]',
+                    '[--sniptale-control-font-weight-hover:var(--sniptale-control-font-weight-active)]',
+                    "after:!block after:!content-[''] after:pointer-events-none",
                     'after:absolute after:inset-x-0 after:bottom-0 after:h-0.5',
                     'after:bg-[var(--sniptale-color-accent)]',
                   ].join(' ')
@@ -67,7 +73,7 @@ export function SettingsSubpageTabs(props: {
             ].join(' ')}
           >
             {item.label}
-          </button>
+          </ContentToolbarButton>
         );
       })}
     </nav>

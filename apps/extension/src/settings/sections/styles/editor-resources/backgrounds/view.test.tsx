@@ -104,6 +104,8 @@ it('renames, reorders, removes and adds custom presets, reporting failed writes'
     );
     await act(async () => io.props!.onAction?.({ type: 'edit', itemId: 'user:one' }));
     const input = host.querySelector('input')!;
+    expect(input.classList.contains('sniptale-input')).toBe(true);
+    expect(input.placeholder).toBe(translate('settings.editor.backgrounds.name'));
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
         input,

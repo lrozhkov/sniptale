@@ -15,6 +15,7 @@ export function ToolbarTimerToggle(props: {
 
   return (
     <ContentToolbarButton
+      tone="property"
       ref={buttonRef as React.Ref<HTMLButtonElement>}
       type="button"
       onClick={(event) => {
@@ -27,6 +28,8 @@ export function ToolbarTimerToggle(props: {
       menuIndicator
       title={translate('content.toolbar.screenshotDelayTooltip')}
       data-menu-open={showTimerMenu ? 'true' : 'false'}
+      aria-haspopup="menu"
+      aria-expanded={showTimerMenu}
     >
       {timerDelay > 0 ? (
         <span className="sniptale-timer-badge">

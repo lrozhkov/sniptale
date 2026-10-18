@@ -49,7 +49,7 @@ for (const locale of ['ru', 'en'] as const) {
       const headings = categories.locator(
         '[data-ui="shared.categorized-inspector.section-heading"]'
       );
-      await expect(headings).toHaveCSS('font-size', '13px');
+      await expect(headings).toHaveCSS('font-size', '14px');
       await expect(headings).toHaveCSS('text-transform', 'none');
       const top = (await headings.boundingBox())!.y;
       for (const button of await categories.locator('nav button').all()) {
@@ -59,25 +59,34 @@ for (const locale of ['ru', 'en'] as const) {
       }
       await checkInspectorUtility(
         page,
-        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]')
+        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'),
+        '4px',
+        'secondary'
       );
       await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
       await expect(panel.locator('[data-presentation="all"]')).toBeVisible();
       await checkInspectorUtility(
         page,
-        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]')
+        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'),
+        '4px',
+        'secondary'
       );
-      await checkInspectorUtility(page, page.locator('[data-ui="video-editor.inspector.close"]'));
+      await checkInspectorUtility(
+        page,
+        page.locator('[data-ui="video-editor.inspector.close"]'),
+        '4px',
+        'secondary'
+      );
       const height = page.locator('[data-ui="video-editor.inspector.dock-toggle"]');
       await height.click();
-      await checkInspectorUtility(page, height);
+      await checkInspectorUtility(page, height, '4px', 'secondary');
       await height.click();
       await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
       const section = panel.locator('[data-presentation="all"] > section').first();
       const disclosure = section.locator(':scope > details');
       const summary = disclosure.locator(':scope > summary');
       await expect(disclosure).toHaveAttribute('open', '');
-      await expect(summary).toHaveCSS('font-size', '13px');
+      await expect(summary).toHaveCSS('font-size', '14px');
       await expect(summary).toHaveCSS('font-weight', '600');
       await expect(disclosure).toHaveCSS('border-top-width', '0px');
       await expect(summary).toHaveCSS('min-height', '32px');
@@ -140,8 +149,12 @@ for (const locale of ['ru', 'en'] as const) {
       const paint = panel.locator('[data-ui="shared.ui.paint-selector"]').first();
       await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
       const paintButton = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
-      await expect(paintButton).toContainText('#');
-      await expect(paintButton.locator('.lucide-palette')).toHaveCount(1);
+      await expect(
+        paint.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
+      ).toContainText('#');
+      await expect(paintButton.locator('[data-ui="shared.ui.paint-selector.preview"]')).toHaveCount(
+        1
+      );
       await expect(paintButton).toHaveCSS('border-top-width', '0px');
       await paintButton.click();
       await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
@@ -153,7 +166,7 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(remove).toHaveCSS('justify-content', 'flex-start');
       await remove.hover();
-      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await info.attach('motion-inspector', {
         body: await panel.screenshot(),
         contentType: 'image/png',
@@ -243,7 +256,10 @@ for (const locale of ['ru', 'en'] as const) {
       const nestedHeading = nested.locator(':scope > summary');
       await expect(nested).not.toHaveAttribute('open', '');
       await expect(nestedHeading).toHaveCSS('font-weight', '500');
-      await expect(nestedHeading).toHaveCSS('font-size', '12px');
+      await expect(nestedHeading).toHaveCSS('font-size', '13px');
+      await expect(nestedHeading).toHaveCSS('min-height', '32px');
+      await expect(nestedHeading).toHaveCSS('padding-inline-start', '8px');
+      await expect(nestedHeading).toHaveCSS('padding-inline-end', '8px');
       await expect(nested).toHaveCSS('border-top-width', '0px');
       await nestedHeading.hover();
       await expect(nestedHeading).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -364,11 +380,25 @@ for (const viewport of [
     await page.locator(`[data-project-timeline-clip="${first.id}"]`).click();
     const settings = page.locator('[data-ui="window-header-settings"]');
     await expect(settings).toBeVisible();
-    await expect(settings.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
-    await settings.getByRole('button', { name: 'Browser', exact: true }).click();
+    const expectHeaderValue = async (label: string, value: string) => {
+      const select = settings.getByRole('button', { name: label, exact: true });
+      if (await select.count()) await expect(select).toHaveText(value);
+      else
+        await expect(settings.getByRole('button', { name: value, exact: true })).toHaveAttribute(
+          'aria-pressed',
+          'true'
+        );
+    };
+    const chooseHeaderValue = async (label: string, value: string) => {
+      const select = settings.getByRole('button', { name: label, exact: true });
+      if (await select.count()) {
+        await select.click();
+        await page.getByRole('option', { name: value, exact: true }).click();
+      } else await settings.getByRole('button', { name: value, exact: true }).click();
+      await expectHeaderValue(label, value);
+    };
+    await expectHeaderValue('Type', 'Off');
+    await chooseHeaderValue('Type', 'Browser');
     const segmentGeometry = await settings.getByRole('button').evaluateAll((buttons) =>
       buttons
         .filter((button) =>
@@ -378,6 +408,7 @@ for (const viewport of [
           const css = getComputedStyle(button);
           return {
             label: button.textContent,
+            dropdown: button.getAttribute('aria-haspopup') === 'listbox',
             height: button.getBoundingClientRect().height,
             paddingTop: css.paddingTop,
             paddingBottom: css.paddingBottom,
@@ -391,12 +422,14 @@ for (const viewport of [
       info.outputPath('window-header-segment-geometry.json'),
       JSON.stringify(segmentGeometry, null, 2)
     );
-    expect(segmentGeometry).toHaveLength(5);
+    const styleDropdown = settings.getByRole('button', { name: 'Style', exact: true });
+    expect(segmentGeometry).toHaveLength((await styleDropdown.count()) ? 3 : 5);
     for (const geometry of segmentGeometry) {
-      expect(geometry.height).toBe(segmentGeometry[0]!.height);
-      expect(geometry.paddingTop).toBe(segmentGeometry[0]!.paddingTop);
-      expect(geometry.paddingBottom).toBe(segmentGeometry[0]!.paddingBottom);
-      expect(geometry.lineHeight).toBe(segmentGeometry[0]!.lineHeight);
+      expect(geometry.height).toBe(geometry.dropdown ? 32 : 28);
+      expect(geometry.minHeight).toBe(geometry.dropdown ? '32px' : '28px');
+      expect(geometry.lineHeight).toBe('18px');
+      expect(geometry.fontSize).toBe('13px');
+      expect(geometry.paddingTop).toBe(geometry.paddingBottom);
     }
 
     await settings
@@ -408,7 +441,7 @@ for (const viewport of [
     await expect(
       settings.getByRole('button', { name: 'Use website icon', exact: true })
     ).toHaveAttribute('aria-pressed', 'false');
-    await settings.getByRole('button', { name: 'macOS', exact: true }).click();
+    await chooseHeaderValue('Style', 'macOS');
     await settings.getByRole('button', { name: 'Light', exact: true }).click();
     await expect(settings.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute(
       'aria-pressed',
@@ -426,10 +459,7 @@ for (const viewport of [
     );
     await page.screenshot({ path: info.outputPath('window-header-browser.png'), fullPage: false });
     await page.locator(`[data-project-timeline-clip="${second.id}"]`).click();
-    await expect(settings.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await expectHeaderValue('Type', 'Off');
     await page.locator(`[data-project-timeline-clip="${first.id}"]`).click();
     await expect(settings.getByRole('textbox', { name: 'Tab title', exact: true })).toHaveValue(
       'Full editor browser'
@@ -437,7 +467,7 @@ for (const viewport of [
     await expect(
       settings.getByRole('button', { name: 'Upload icon from computer', exact: true })
     ).toHaveAttribute('aria-pressed', 'true');
-    await settings.getByRole('button', { name: 'Application', exact: true }).click();
+    await chooseHeaderValue('Type', 'Application');
     await expect(
       settings.getByRole('textbox', { name: 'Website address', exact: true })
     ).toHaveCount(0);
@@ -447,7 +477,7 @@ for (const viewport of [
     await settings
       .getByRole('textbox', { name: 'Window title', exact: true })
       .fill('Full editor application');
-    await settings.getByRole('button', { name: 'Linux', exact: true }).click();
+    await chooseHeaderValue('Style', 'Linux');
     await settings.getByRole('button', { name: 'Dark', exact: true }).click();
     await settings
       .getByRole('textbox', { name: 'Window title', exact: true })
@@ -473,7 +503,7 @@ for (const viewport of [
         fullPage: false,
       });
     }
-    await settings.getByRole('button', { name: 'Off', exact: true }).click();
+    await chooseHeaderValue('Type', 'Off');
     await expect(settings.getByRole('textbox')).toHaveCount(0);
   });
 }

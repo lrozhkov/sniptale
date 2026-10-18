@@ -1,5 +1,11 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type { useReviewWorkspaceColor } from './workspace-color';
-import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
+import {
+  ColorField,
+  CompactSelect,
+  SelectField,
+  ToggleField,
+} from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   QUICK_PREVIEW_RASTER_PRESETS,
@@ -30,26 +36,37 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
     key: 'previewResolution' | 'previewFrameRate' | 'previewPaused' | 'previewShowFrameRate'
   ) => translate(`gallery.videoReview.${key}`);
   return (
-    <div className="min-w-0 space-y-3" title={translate('gallery.videoReview.previewOnly')}>
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={label('previewResolution')}
-        disabled={props.disabled}
-        value={props.preferences.rasterPreset}
-        options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
-          value,
-          label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
-        }))}
-        onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
-          props.onChange({ rasterPreset })
-        }
-      />
-      <p
-        className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]"
-        aria-label={translate('gallery.videoReview.previewActualRaster')}
-      >
-        {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
-      </p>
+    <div
+      className="min-w-0 sniptale-parameter-stack"
+      title={translate('gallery.videoReview.previewOnly')}
+    >
+      <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
+        <output
+          className="block w-full whitespace-nowrap px-2 text-right text-[13px] font-normal tabular-nums
+          text-[var(--sniptale-color-text-primary)]"
+          aria-label={translate('gallery.videoReview.previewActualRaster')}
+        >
+          {props.actualRaster ? `${props.actualRaster.width} × ${props.actualRaster.height}` : '—'}
+        </output>
+      </InspectorParameterRow>
+      <InspectorParameterRow label={label('previewResolution')}>
+        <div className="min-w-0 w-full">
+          <CompactSelect
+            appearance="plain"
+            aria-label={label('previewResolution')}
+            disabled={props.disabled}
+            value={props.preferences.rasterPreset}
+            options={QUICK_PREVIEW_RASTER_PRESETS.map((value) => ({
+              value,
+              label: value === 'current' ? translate('gallery.videoReview.previewCurrent') : value,
+            }))}
+            onChange={(rasterPreset: QuickPreviewPreferences['rasterPreset']) =>
+              props.onChange({ rasterPreset })
+            }
+          />
+        </div>
+      </InspectorParameterRow>
+
       <div title={translate('gallery.videoReview.previewFrameRateLimit')}>
         <SelectField
           className={reviewSelectFieldClassName}
@@ -81,16 +98,11 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           props.onChange({ pausedQuality })
         }
       />
-      <SelectField
-        className={reviewSelectFieldClassName}
+      <ToggleField
         label={label('previewShowFrameRate')}
         disabled={props.disabled}
-        value={props.preferences.showFrameRate ? 'on' : 'off'}
-        options={[
-          { value: 'off', label: translate('gallery.videoReview.previewOff') },
-          { value: 'on', label: translate('gallery.videoReview.previewOn') },
-        ]}
-        onChange={(value: 'on' | 'off') => props.onChange({ showFrameRate: value === 'on' })}
+        value={props.preferences.showFrameRate}
+        onChange={(showFrameRate) => props.onChange({ showFrameRate })}
       />
       {props.workspaceColor?.value ? (
         <ColorField
@@ -107,13 +119,6 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           onPreviewReset={props.workspaceColor.cancel}
         />
       ) : null}
-      {props.workspaceColor ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.workspaceColorAutomatic')}
-          disabled={props.disabled}
-          onClick={props.workspaceColor.reset}
-        />
-      ) : null}
       {props.projectFailed ? (
         <div role="alert" className="space-y-1 text-xs">
           <span>{translate('gallery.videoReview.saveFailed')}</span>
@@ -123,11 +128,20 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
           />
         </div>
       ) : null}
-      <ReviewButton
-        label={translate('gallery.videoReview.previewReset')}
-        disabled={props.disabled}
-        onClick={props.onReset}
-      />
+      <div className="review-recognition-commands" data-ui="gallery.videoReview.previewActions">
+        {props.workspaceColor ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.workspaceColorAutomatic')}
+            disabled={props.disabled}
+            onClick={props.workspaceColor.reset}
+          />
+        ) : null}
+        <ReviewButton
+          label={translate('gallery.videoReview.previewReset')}
+          disabled={props.disabled}
+          onClick={props.onReset}
+        />
+      </div>
       {props.status === 'session-only' ? (
         <div role="status" className="space-y-1 text-xs text-[var(--sniptale-color-text-muted)]">
           <span>{translate('gallery.videoReview.previewSessionOnly')}</span>

@@ -300,6 +300,7 @@ for (const name of [
 const dockerArgs = [
   'run',
   '--rm',
+  '--init',
   '--platform',
   'linux/amd64',
   '--cap-drop=ALL',

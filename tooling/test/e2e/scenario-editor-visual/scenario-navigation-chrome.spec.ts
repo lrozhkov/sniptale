@@ -268,3 +268,43 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of [
+    { width: 1280, height: 560 },
+    { width: 1920, height: 900 },
+  ]) {
+    test(`scenario autosave drawing ${theme} ${viewport.width}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      const t = createTranslator('ru');
+      await openVisualHarness(page, hostOrigin, theme, 'ru', viewport, 'compare', {
+        tourFixture: '1',
+      });
+      const trigger = page.locator('[data-ui="autosave-control"] button');
+      await trigger.click();
+      const toggle = page.getByRole('switch', {
+        name: t('editor.documentActions.autosaveSwitch'),
+        exact: true,
+      });
+      const drawing = toggle.locator('xpath=following-sibling::span');
+      await expect.poll(async () => (await drawing.boundingBox())!.width).toBe(40);
+      await expect(drawing).toHaveCSS('height', '28px');
+      expect(await drawing.evaluate((node) => getComputedStyle(node, '::before').height)).toBe(
+        '2px'
+      );
+      expect(await drawing.evaluate((node) => getComputedStyle(node, '::after').width)).toBe(
+        '16px'
+      );
+      await page.screenshot({ path: info.outputPath('autosave-compact.png'), fullPage: false });
+      const enabled = await toggle.isChecked();
+      await toggle.press('Space');
+      await expect(toggle).toBeChecked({ checked: !enabled });
+      await toggle.press('Space');
+      await expect(toggle).toBeChecked({ checked: enabled });
+      await toggle.press('Escape');
+      await expect(trigger).toBeFocused();
+    });
+  }
+}

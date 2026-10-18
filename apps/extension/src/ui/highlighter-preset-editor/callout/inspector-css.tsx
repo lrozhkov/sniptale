@@ -1,3 +1,4 @@
+import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { useEffect, useMemo, useState } from 'react';
 import { resolveCalloutCustomCss } from '../../../features/highlighter/callout-custom-css';
 import { translate } from '../../../platform/i18n';
@@ -23,23 +24,18 @@ export function CalloutCssSettings(props: ManualContentProps) {
   return (
     <div className="grid gap-2">
       <label
-        className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
+        className="text-[13px] leading-[18px] font-normal text-[var(--sniptale-color-text-secondary)]"
         htmlFor="sniptale-callout-custom-css"
       >
         {translate('content.callout.cssLabel')}
       </label>
-      <textarea
+      <ProductTextarea
+        invalid={Boolean(error)}
+        title={translate('content.callout.cssHint')}
         id="sniptale-callout-custom-css"
         aria-describedby="sniptale-callout-custom-css-help"
         aria-invalid={Boolean(error)}
-        className={[
-          'min-h-44 w-full resize-y rounded-[8px] border bg-[var(--sniptale-color-surface-input)]',
-          'px-2.5 py-2 font-mono text-[11px] leading-5 text-[var(--sniptale-color-text-primary)]',
-          'outline-none focus:border-[var(--sniptale-color-accent)]',
-          error
-            ? 'border-[var(--sniptale-color-danger)]'
-            : 'border-[var(--sniptale-color-border-soft)]',
-        ].join(' ')}
+        className="min-h-44 w-full resize-y font-mono text-[12px] leading-5"
         maxLength={4_000}
         placeholder={translate('content.callout.cssPlaceholder')}
         spellCheck={false}
@@ -55,9 +51,7 @@ export function CalloutCssSettings(props: ManualContentProps) {
       <div
         id="sniptale-callout-custom-css-help"
         className={
-          error
-            ? 'text-[10px] leading-4 text-[var(--sniptale-color-danger)]'
-            : 'text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]'
+          error ? 'text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]' : 'sr-only'
         }
       >
         {error ?? translate('content.callout.cssHint')}

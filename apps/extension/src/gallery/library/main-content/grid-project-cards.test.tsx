@@ -201,7 +201,9 @@ it.each(['compact-grid', 'large-grid', 'list'] as const)(
     expect(onProjectOpen.mock.calls).toEqual([[video], [scenario]]);
     expect(container!.textContent).toContain(video.filename);
     expect(container!.textContent).toContain(scenario.filename);
-    expect(container!.textContent).toContain(translate('gallery.preview.clips'));
+    if (viewMode === 'list')
+      expect(container!.textContent).toContain(translate('gallery.preview.clips'));
+    else expect(container!.textContent).not.toContain(translate('gallery.preview.editableProject'));
   }
 );
 
@@ -234,7 +236,9 @@ it.each(['compact-grid', 'large-grid'] as const)(
       `button[aria-label="${translate('gallery.preview.openInEditor')}"]`
     );
     expect(name?.className).toContain('truncate');
-    expect(name?.parentElement?.className).toContain('min-w-0');
+    expect(viewMode === 'large-grid' ? name?.className : name?.parentElement?.className).toContain(
+      'min-w-0'
+    );
     expect(editor?.className).toContain('shrink-0');
     expect(editor?.disabled).toBe(true);
     expect(editor?.title).toBe(translate('gallery.preview.projectUnavailable'));

@@ -149,9 +149,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
 
   expect(container?.querySelector('header')?.className).toContain('min-h-12');
   expect(container?.querySelector('header')?.className).toContain('h-12');
-  expect(container?.querySelector('header')?.className).toContain(
-    'rounded-[var(--sniptale-radius-lg)]'
-  );
+  expect(container?.querySelector('header')?.className).toContain('rounded-[4px]');
   expect(container?.querySelector('header')?.className).toContain('z-30');
   expect(container?.querySelector('header')?.className).not.toContain('px-3');
   expect(segment?.className).toContain('lg:w-[19rem]');
@@ -167,7 +165,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
     'transition-[width,border-color,background-color]'
   );
   expect(input.parentElement?.className).toContain('w-36');
-  expect(listModeButton.className).toContain('h-full');
+  expect(listModeButton.className).toContain('h-8');
   expect(listModeButton.querySelector('svg')?.classList.contains('block')).toBe(true);
 
   act(() => {
@@ -237,12 +235,12 @@ it('keeps browsing controls on the right and adds selection actions on the left'
   expect(container?.textContent).toContain('gallery.app.selectedPrefix 1');
   expect(container?.querySelector('[data-ui="test.sort"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="gallery.header.workspace"]')).not.toBeNull();
-  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  expect(container?.querySelector('header')?.className).toContain('h-auto');
   expect(container?.querySelector('[data-ui="gallery.header.workspace"]')?.className).toContain(
-    'max-2xl:grid-rows-[2rem_2rem]'
+    'flex-wrap-reverse'
   );
   expect(container?.querySelector('[data-ui="gallery.header.controls"]')?.className).toContain(
-    'max-2xl:row-start-1'
+    'shrink-0'
   );
 });
 
@@ -361,7 +359,7 @@ it('replaces Found with selection actions and restores it after deselection', ()
   renderHeader({ resultActions });
   const results = container?.querySelector('[data-ui="gallery.results.toolbar"]');
   expect(results?.textContent).toContain('gallery.app.facetResults: 7');
-  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  expect(container?.querySelector('header')?.className).toContain('h-auto');
   clickButton(results?.querySelector('button'));
   expect(resultActions.onSelectAll).toHaveBeenCalledOnce();
   const selectedItems = [createMediaItem({ id: 'selected' })];

@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { ResourcePresetNameField } from '../preset-name-field';
+import { ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { useEffect, useRef, useState } from 'react';
 import {
   ProductModal,
   ProductModalBody,
@@ -20,6 +22,7 @@ export function SurfaceStylePresetEditor(props: {
   preset: ManagedSurfaceStylePreset | null;
 }) {
   const [name, setName] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
   const [style, setStyle] = useState<SurfaceStyle | null>(null);
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -65,17 +68,13 @@ export function SurfaceStylePresetEditor(props: {
         )}
       />
       <ProductModalBody compact>
-        <div className="grid gap-4">
-          <label className="grid gap-1 text-xs">
-            {translate('settings.editor.presetName')}
-            <input
-              aria-label={translate('settings.editor.presetName')}
-              disabled={saving}
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-          </label>
+        <div className="grid gap-3">
+          <ResourcePresetNameField
+            inputRef={nameRef}
+            value={name}
+            disabled={saving}
+            onChange={setName}
+          />
           <CompactPaintSelector
             disabled={saving}
             label={translate('content.callout.surfaceStyle.paint')}
@@ -83,11 +82,17 @@ export function SurfaceStylePresetEditor(props: {
             title={translate('content.callout.surfaceStyle.paint')}
             value={style.fillPaint}
           />
-          <label className="grid gap-1 text-xs">
+          <label
+            className={[
+              'grid gap-1 text-[13px] leading-[18px] font-medium',
+              'text-[var(--sniptale-color-text-secondary)]',
+            ].join(' ')}
+          >
             {translate('content.callout.surfaceStyle.advancedCss')}
-            <textarea
+            <ProductTextarea
               disabled={saving}
               maxLength={4000}
+              placeholder={translate('content.callout.surfaceStyle.advancedCss')}
               onChange={(event) =>
                 setStyle((current) => ({ ...current!, surfaceCss: event.target.value }))
               }
@@ -103,7 +108,7 @@ export function SurfaceStylePresetEditor(props: {
         </div>
       </ProductModalBody>
       <ProductModalFooter compact>
-        <ProductActionButton disabled={saving} onClick={props.onClose}>
+        <ProductActionButton disabled={saving} onClick={props.onClose} tone="secondary">
           {translate('common.actions.cancel')}
         </ProductActionButton>
         <ProductActionButton

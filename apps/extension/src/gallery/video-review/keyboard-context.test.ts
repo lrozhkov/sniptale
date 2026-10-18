@@ -90,6 +90,9 @@ it('reserves playback Space for command surfaces while preserving editing and op
     input.type = type;
     expect(reviewOwnsPlaybackKeys(input)).toBe(true);
   }
+  const toggle = document.createElement('button');
+  toggle.setAttribute('role', 'switch');
+  expect(reviewOwnsPlaybackKeys(toggle)).toBe(true);
   const slider = document.createElement('input');
   slider.type = 'range';
   expect(reviewOwnsPlaybackKeys(slider)).toBe(false);

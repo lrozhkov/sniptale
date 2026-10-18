@@ -126,3 +126,139 @@
   color: var(--sniptale-color-text-primary);
   background: var(--sniptale-color-surface-input);
 }
+
+/* Embedded annotation chrome opts in without changing the rendered page annotation. */
+.sniptale-content-appearance-surface.sniptale-content-popover {
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.sniptale-content-appearance-surface .sniptale-content-popover-body {
+  gap: 8px;
+}
+
+.sniptale-content-appearance-surface .sniptale-content-popover-section {
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.sniptale-content-appearance-surface .sniptale-content-popover-section:first-child {
+  padding-top: 0;
+}
+
+.sniptale-content-appearance-surface .sniptale-content-popover-section-label {
+  color: var(--sniptale-color-text-secondary);
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-content-appearance-surface .sniptale-toolbar-menu-title {
+  color: var(--sniptale-color-text-secondary);
+  font: 500 12px / 16px var(--sniptale-font-interface);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-header {
+  flex-wrap: wrap;
+  min-height: 32px;
+  gap: 8px;
+  padding-bottom: 0;
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions {
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action {
+  max-width: none;
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions > button {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 4px;
+  color: var(--sniptale-color-text-secondary);
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action:hover,
+.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action:focus-visible {
+  border-color: var(--sniptale-color-border-soft);
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-content-appearance-surface .sniptale-glass-preset-name {
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+
+.sniptale-content-appearance-surface .sniptale-glass-preset-item--active,
+.sniptale-content-appearance-surface .sniptale-glass-preset-item--active:hover {
+  border-color: var(--sniptale-color-border-strong);
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-hover);
+}
+
+.sniptale-content-appearance-surface .sniptale-glass-preset-check {
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-content-appearance-surface .sniptale-content-annotation-preview {
+  display: contents;
+  --sniptale-font-sans: var(--sniptale-font-interface);
+  font-family: var(--sniptale-font-interface);
+  font-weight: 400;
+}
+
+.sniptale-content-appearance-surface.sniptale-content-popover .sniptale-glass-bold-button {
+  width: 32px;
+  height: 32px;
+  margin-left: 0;
+  border-radius: 4px;
+}
+
+.sniptale-content-appearance-surface.sniptale-content-popover
+  :is(
+    .sniptale-glass-icon-button--active,
+    .sniptale-glass-chip--active,
+    .sniptale-glass-mini-button--active,
+    .sniptale-glass-bold-button--active
+  ) {
+  border-color: var(--sniptale-color-border-strong);
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-glass-preset-list--menu
+  .sniptale-glass-preset-item--active,
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-glass-preset-list--menu
+  .sniptale-glass-preset-item--active:hover {
+  border-color: var(--sniptale-color-border-strong);
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+
+/* Main-toolbar no-fit menus keep their trigger outside the scrollable surface. */
+.sniptale-main-toolbar-popover.sniptale-content-appearance-surface {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-height: var(--sniptale-main-toolbar-popover-max-height, none);
+}
+
+.sniptale-main-toolbar-popover.sniptale-content-appearance-surface
+  > .sniptale-content-popover-body {
+  min-height: 0;
+  overflow-y: auto;
+}

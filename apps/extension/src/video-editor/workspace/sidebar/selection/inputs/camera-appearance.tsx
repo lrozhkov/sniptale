@@ -34,7 +34,7 @@ export function CameraAppearanceControls(props: {
   const change = (appearance: CameraAppearance) =>
     props.onEdit?.(props.clip.id, { kind: 'appearance', appearance });
   return (
-    <div className="space-y-2" data-ui="video-editor.camera-appearance">
+    <div className="sniptale-parameter-stack space-y-2" data-ui="video-editor.camera-appearance">
       <SelectInput
         label={translate('videoEditor.sidebar.cameraShape')}
         value={value.shape}

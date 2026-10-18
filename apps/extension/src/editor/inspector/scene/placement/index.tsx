@@ -15,7 +15,7 @@ export function EditorInspectorFramePlacementSection(
       label={translate('editor.scene.placementSection')}
       {...(props.hideHeader === undefined ? {} : { hideHeader: props.hideHeader })}
     >
-      <div className="space-y-3">
+      <div className="sniptale-parameter-stack">
         <EditorInspectorSelectInput
           label={translate('editor.scene.placementSection')}
           value={props.frameDraft.layoutMode}

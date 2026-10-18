@@ -19,7 +19,7 @@ export function ReviewBorderInspector(props: {
 }) {
   const { value, onChange } = props;
   return (
-    <div className="space-y-3">
+    <div className="sniptale-parameter-stack">
       <ColorField
         label={translate('gallery.videoReview.borderColor')}
         title={translate('gallery.videoReview.borderColor')}
@@ -109,7 +109,10 @@ export function ReviewBorderAnimation(props: {
               label={label}
               initiallyOpen
             >
-              <fieldset aria-label={label} className="review-inspector-phase min-w-0 space-y-2">
+              <fieldset
+                aria-label={label}
+                className="review-inspector-phase min-w-0 sniptale-parameter-stack"
+              >
                 <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
               </fieldset>
             </ReviewDetails>
@@ -123,7 +126,10 @@ export function ReviewBorderAnimation(props: {
             label={label}
             initiallyOpen
           >
-            <fieldset aria-label={label} className="review-inspector-phase min-w-0 space-y-2">
+            <fieldset
+              aria-label={label}
+              className="review-inspector-phase min-w-0 sniptale-parameter-stack"
+            >
               <SegmentedRow<'none' | 'fade' | 'draw'>
                 columns={3}
                 layout="stacked"

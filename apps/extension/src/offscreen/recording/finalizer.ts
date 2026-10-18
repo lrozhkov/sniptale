@@ -133,7 +133,7 @@ export async function finalizeRecording(
   let terminal = false;
   try {
     if (input.discard) {
-      await staging.abort();
+      await (staging.discard?.() ?? staging.abort());
       if (shouldNotifyStopped) {
         notifyRecordingStoppedBestEffort('recording-discarded', input.primaryRecordingId);
       }
@@ -148,6 +148,7 @@ export async function finalizeRecording(
           filename: artifact.filename,
           id: artifact.artifactId,
           preparedAsset: artifact.asset,
+          ...(artifact.recoverySource ? { recoverySource: artifact.recoverySource } : {}),
           ...(input.recordingGroups?.[artifact.artifactId]
             ? { recordingGroup: input.recordingGroups[artifact.artifactId] }
             : {}),

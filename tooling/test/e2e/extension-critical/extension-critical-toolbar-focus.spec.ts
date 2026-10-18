@@ -112,6 +112,7 @@ test('page editing menus preserve opening focus paint and AutoBlur transitions a
         .poll(() => trigger.evaluate((element) => element.matches(':focus-visible')))
         .toBe(true);
       await trigger.click();
+      await expect(toolbar).toHaveAttribute('data-menu-open', 'true');
       await page.keyboard.press('Escape');
       await expect.poll(() => trigger.evaluate(readFocusPaint)).toEqual(pointerPaint);
     }

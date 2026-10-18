@@ -46,6 +46,7 @@ export function useFrameSettingsPopoverController(args: {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useFrameSettingsPopoverOutsideClose({
+    anchorEl: args.anchorEl,
     isOpen: dismissal.isDismissalEnabled,
     onClose: args.onClose,
     popoverRef,

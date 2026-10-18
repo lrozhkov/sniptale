@@ -1,6 +1,7 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import React, { useMemo } from 'react';
-import { Calendar, Link, Monitor } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import {
@@ -8,7 +9,7 @@ import {
   type EditorTechnicalDataLayout,
   type EditorTechnicalDataKind,
 } from '../../features/editor/document/technical-data';
-import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME, INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
+import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from './chrome';
 import { cx } from '../chrome/ui';
 import { useTechnicalDataPreference } from './technical-data-preference';
 import { EditorInspectorDetails } from './grouped';
@@ -18,24 +19,20 @@ type TechnicalDataPickerVariant = 'compact' | 'expanded';
 
 type TechnicalDataOption = {
   kind: EditorTechnicalDataKind;
-  icon: React.ReactNode;
   labelKey: 'editor.compact.pageUrl' | 'editor.compact.dateTime' | 'editor.compact.browser';
 };
 
 const technicalDataOptions: readonly TechnicalDataOption[] = [
   {
     kind: 'url',
-    icon: <Link size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.pageUrl',
   },
   {
     kind: 'date',
-    icon: <Calendar size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.dateTime',
   },
   {
     kind: 'browser',
-    icon: <Monitor size={15} strokeWidth={2} />,
     labelKey: 'editor.compact.browser',
   },
 ];
@@ -74,10 +71,10 @@ function TechnicalDataLayoutToggle(props: {
   onSelectLayout: (layout: EditorTechnicalDataLayout) => void;
 }) {
   return (
-    <section className="space-y-2.5">
-      <h3 className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-        {translate('editor.compact.technicalDataLayout')}
-      </h3>
+    <InspectorParameterRow
+      label={translate('editor.compact.technicalDataLayout')}
+      valueOptions={(['column', 'row'] as const).map(getTechnicalDataLayoutLabel)}
+    >
       <SegmentedRow
         ariaLabel={translate('editor.compact.technicalDataLayout')}
         value={props.layout}
@@ -88,7 +85,7 @@ function TechnicalDataLayoutToggle(props: {
           label: getTechnicalDataLayoutLabel(value),
         }))}
       />
-    </section>
+    </InspectorParameterRow>
   );
 }
 
@@ -96,7 +93,7 @@ function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOpti
   return (
     <label
       className={cx(
-        'flex min-h-8 cursor-pointer items-center gap-2.5 rounded-md px-1 text-xs',
+        'flex min-h-8 cursor-pointer items-center gap-2.5 rounded-[4px] px-2 text-[13px] font-medium leading-[18px]',
         'text-[color:var(--sniptale-color-text-secondary)]',
         'hover:bg-[var(--sniptale-color-surface-hover)]'
       )}
@@ -105,10 +102,9 @@ function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOpti
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        className="sniptale-checkbox sniptale-checkbox-sm shrink-0"
+        className="sniptale-parameter-check m-0! shrink-0"
         data-ui={`editor.technical-data.field-${option.kind}`}
       />
-      {option.icon}
       <span>{translate(option.labelKey)}</span>
     </label>
   );
@@ -119,7 +115,7 @@ function TechnicalDataOptionList({ selectedKinds, onToggleKind }: TechnicalDataO
     <div
       role="group"
       aria-label={translate('editor.compact.technicalDataFields')}
-      className="space-y-1"
+      className="sniptale-parameter-stack"
     >
       {technicalDataOptions.map((option) => {
         const checked = selectedKinds.includes(option.kind);
@@ -159,7 +155,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
 
   return (
     <InspectorDisclosurePreferences scope="editor:technical-data">
-      <div className="space-y-3">
+      <div className="space-y-2">
         <EditorInspectorDetails
           label={translate('editor.compact.technicalDataTextSettings')}
           preferenceId="text-settings"
@@ -174,7 +170,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
           initiallyOpen
           level="section"
         >
-          <div className="space-y-2.5">
+          <div className="sniptale-parameter-stack">
             <TechnicalDataOptionList selectedKinds={selectedKinds} onToggleKind={toggleKind} />
             {orderedKinds.length > 1 ? (
               <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
@@ -191,7 +187,9 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
             {translate('editor.compact.technicalDataPreviewEmpty')}
           </p>
         ) : null}
-        <button
+        <ProductActionButton
+          compact
+          tone="secondary"
           type="button"
           disabled={!canInsert}
           onClick={handleInsert}
@@ -202,7 +200,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
           )}
         >
           {translate('editor.compact.technicalDataInsert')}
-        </button>
+        </ProductActionButton>
       </div>
     </InspectorDisclosurePreferences>
   );

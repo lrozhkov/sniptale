@@ -229,7 +229,9 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.draft).toBeNull();
-    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+    );
     expect(host.textContent).toContain('Keep this text');
   } finally {
     await fixture.cleanup();
@@ -728,17 +730,20 @@ it('imports a file dropped on the music lane at the drop point', async () => {
   }
 });
 
-it('isolates quick-review controls while the lower voiceover strip is open and restores them on close', async () => {
+it('isolates editing controls while the voiceover tab is open and restores them on close', async () => {
   const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
     await click('recordVoiceover');
-    const modal = host.querySelector('[role="dialog"]');
+    const modal = host.querySelector('[data-ui="gallery.videoReview.voiceoverInspector"]');
     expect(modal).not.toBeNull();
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
-    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).toBeNull();
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')?.textContent
+    ).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>
       modal!.querySelector<HTMLButtonElement>('[aria-label="common.actions.close"]')!.click()
@@ -779,18 +784,25 @@ it('connects Scene presentation controls to the real session and suppresses them
     );
     expect(inspector()).toBeNull();
     await fixture.click('advancedEditing');
-    await act(async () =>
-      inspector()!
-        .querySelector<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.presentationIntro"] button:nth-child(2)'
-        )!
-        .click()
+    const fade = inspector()!.querySelector<HTMLButtonElement>(
+      'button[aria-label="gallery.videoReview.presentationFadeIn"]'
     );
+    if (fade) await act(async () => fade.click());
+    else {
+      await act(async () =>
+        inspector()!
+          .querySelector<HTMLButtonElement>(
+            'button[aria-label="gallery.videoReview.presentationIntro"][aria-haspopup="listbox"]'
+          )!
+          .click()
+      );
+      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (node) => node.textContent === 'gallery.videoReview.presentationFadeIn'
+      );
+      expect(option).toBeDefined();
+      await act(async () => option!.click());
+    }
     await fixture.click('presentationAudioFade');
-    const on = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
-      (node) => node.textContent === 'gallery.videoReview.presentationOn'
-    )!;
-    await act(async () => on.click());
     await act(async () => vi.waitFor(() => expect(audioFade()).toBe(true), { timeout: 2500 }));
     await fixture.click('advancedEditing');
     expect(inspector()).toBeNull();
@@ -849,7 +861,7 @@ it.each(['basic', 'advanced'] as const)(
   }
 );
 
-it('lists every lane in settings, retains unavailable streams off, and preserves Notes under source lock', async () => {
+it('lists every lane with aligned settings, retains unavailable streams off, and preserves Notes', async () => {
   const fixture = createEditorFixture(integration);
   try {
     await act(async () =>
@@ -875,19 +887,18 @@ it('lists every lane in settings, retains unavailable streams off, and preserves
     const webcam = row('webcam')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
     expect(webcam.disabled).toBe(true);
     expect(webcam.getAttribute('aria-checked')).toBe('false');
-    expect(row('source')!.querySelector('[role="switch"]')).toBeNull();
-    const sourceLock = row('source')!.querySelector<HTMLButtonElement>(
-      '[aria-label^="gallery.videoReview.trackLock:"]'
-    )!;
-    await act(async () => sourceLock.click());
-    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
+    const source = row('source')!.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(source.disabled).toBe(true);
+    expect(source.getAttribute('aria-checked')).toBe('true');
+    expect(fixture.host.querySelector('[aria-label^="gallery.videoReview.trackLock:"]')).toBeNull();
     await fixture.click('trackSettings');
     expect(row('webcam')).toBeNull();
     await fixture.click('addComment');
-    await fixture.fill('Note on a locked source');
+    await fixture.fill('Note after track configuration');
     await fixture.click('save');
-    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
-    expect(fixture.snapshot.workspace.advanced.ui.lockedTracks?.source).toBe(true);
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation'))
+    );
   } finally {
     await fixture.cleanup();
   }

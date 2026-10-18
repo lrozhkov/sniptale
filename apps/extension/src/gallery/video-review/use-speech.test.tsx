@@ -7,6 +7,7 @@ import type { ReviewSpeechTranscript } from '../../features/video/review/speech-
 import type { ReviewSpeechSession } from '../../workflows/video-review/speech-publication';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 const mocks = vi.hoisted(() => ({
+  catalog: vi.fn(),
   save: vi.fn(),
   generate: vi.fn(),
   cleanup: vi.fn(),
@@ -14,13 +15,7 @@ const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: async () => ({
-    models: [],
-    providers: [],
-    defaultModelId: null,
-    chromeAiEnabled: false,
-    globalSystemPrompt: '',
-  }),
+  requestAIModelSelectionBootstrap: mocks.catalog,
 }));
 vi.mock('../../workflows/video-review/asset-bytes', () => ({
   resolveReviewAssetBytes: async () => null,
@@ -163,6 +158,13 @@ function fixture(clips = 1) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.catalog.mockReset().mockResolvedValue({
+    models: [],
+    providers: [],
+    defaultModelId: null,
+    chromeAiEnabled: false,
+    globalSystemPrompt: '',
+  });
   mocks.cleanup.mockResolvedValue(undefined);
   host = document.createElement('div');
   document.body.append(host);
@@ -621,4 +623,25 @@ it('dispatches original source selection explicitly and keeps next-apply gain di
   expect(revoke).toHaveBeenCalledWith('blob:source');
   create.mockRestore();
   revoke.mockRestore();
+});
+
+it('retains the known audio catalog through a delayed refresh and a failed read', async () => {
+  const { Harness } = fixture();
+  await act(async () => root?.render(<Harness />));
+  const previous = current.catalogs!;
+  let resolve!: (value: typeof previous.transcription) => void;
+  const pending = new Promise<typeof previous.transcription>((done) => {
+    resolve = done;
+  });
+  mocks.catalog.mockReturnValueOnce(pending).mockResolvedValueOnce(previous.speech);
+  await act(async () => current.reloadModels());
+  expect(current.catalogs).toBe(previous);
+  await act(async () => resolve({ ...previous.transcription }));
+  const known = current.catalogs;
+  mocks.catalog.mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => current.reloadModels());
+  expect(current.catalogs).toBe(known);
+  expect(current.error).toBe('failed');
+  expect(mocks.transcribe).not.toHaveBeenCalled();
+  expect(mocks.generate).not.toHaveBeenCalled();
 });

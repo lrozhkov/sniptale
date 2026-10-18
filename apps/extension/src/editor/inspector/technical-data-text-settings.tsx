@@ -1,5 +1,6 @@
 import { Type } from 'lucide-react';
-import { useRef } from 'react';
+import { useContext, useRef } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   DEFAULT_DRAWING_COLORS,
@@ -11,7 +12,7 @@ import {
 import { translate } from '../../platform/i18n';
 import { DrawingColorOptions, DrawingTextBackgroundOptions } from '../../ui/drawing-tools/options';
 import { useEditorStore } from '../state/useEditorStore';
-import { INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 
 const fontLabels: Record<DrawingFontFamily, Parameters<typeof translate>[0]> = {
   sans: 'content.toolbar.drawingTextFontSans',
@@ -20,15 +21,17 @@ const fontLabels: Record<DrawingFontFamily, Parameters<typeof translate>[0]> = {
   handwritten: 'content.toolbar.drawingTextFontHandwritten',
 };
 
-const optionClassName = '!h-8 !min-h-8 !min-w-8 rounded-md px-2 text-xs';
+const optionClassName =
+  '!h-8 !min-h-8 !min-w-8 rounded-[4px] px-2 text-[13px] font-medium leading-[18px]';
 const fontPreview = 'Aa';
 const quietPickerClassName = [
-  'space-y-3 pb-1',
+  'sniptale-parameter-stack pb-1',
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-transparent",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!shadow-none",
 ].join(' ');
 
 export function EditorTechnicalDataTextSettings() {
+  const scoped = useContext(CommandPressScope);
   const boundaryRef = useRef<HTMLDivElement>(null);
   const settings = useEditorStore((state) => state.technicalDataTextSettings);
   const updateSettings = useEditorStore((state) => state.updateTechnicalDataTextSettings);
@@ -39,11 +42,11 @@ export function EditorTechnicalDataTextSettings() {
       className={quietPickerClassName}
       data-ui="editor.technical-data.text-settings"
     >
-      <div
-        className="flex items-center justify-between gap-2"
-        data-ui="editor.technical-data.font-row"
+      <InspectorParameterRow
+        label={translate('editor.compact.font')}
+        valueMinimum={148}
+        dataUi="editor.technical-data.font-row"
       >
-        <p className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>{translate('editor.compact.font')}</p>
         <div
           className="flex shrink-0 items-center gap-1"
           data-ui="editor.technical-data.font-options"
@@ -51,6 +54,7 @@ export function EditorTechnicalDataTextSettings() {
           {DRAWING_TEXT_FONT_FAMILIES.map((fontFamily) => (
             <ContentToolbarButton
               key={fontFamily}
+              tone={scoped ? 'property' : 'default'}
               type="button"
               active={settings.fontFamily === fontFamily}
               aria-label={translate(fontLabels[fontFamily])}
@@ -69,43 +73,39 @@ export function EditorTechnicalDataTextSettings() {
             </ContentToolbarButton>
           ))}
         </div>
-      </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <p className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-            {translate('content.toolbar.drawingTextColor')}
-          </p>
-          <DrawingColorOptions
-            colors={DEFAULT_DRAWING_COLORS}
-            floatingBoundaryRef={boundaryRef}
-            floatingPlacement="auto"
-            label={translate('content.toolbar.drawingTextColor')}
-            value={settings.color}
-            onSelect={(color) => updateSettings({ color })}
-            icon={Type}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <p className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-            {translate('content.toolbar.drawingTextBackground')}
-          </p>
-          <DrawingTextBackgroundOptions
-            colors={DEFAULT_DRAWING_COLORS}
-            floatingBoundaryRef={boundaryRef}
-            floatingPlacement="auto"
-            value={settings.backgroundColor}
-            vertical={false}
-            onChange={(backgroundColor) => updateSettings({ backgroundColor })}
-          />
-        </div>
-      </div>
-      <div
-        className="flex items-center justify-between gap-2"
-        data-ui="editor.technical-data.size-row"
+      </InspectorParameterRow>
+      <InspectorParameterRow
+        label={translate('content.toolbar.drawingTextColor')}
+        valueMinimum={184}
       >
-        <p className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-          {translate('content.toolbar.drawingTextSize')}
-        </p>
+        <DrawingColorOptions
+          colors={DEFAULT_DRAWING_COLORS}
+          floatingBoundaryRef={boundaryRef}
+          floatingPlacement="auto"
+          label={translate('content.toolbar.drawingTextColor')}
+          value={settings.color}
+          onSelect={(color) => updateSettings({ color })}
+          icon={Type}
+        />
+      </InspectorParameterRow>
+      <InspectorParameterRow
+        label={translate('content.toolbar.drawingTextBackground')}
+        valueMinimum={220}
+      >
+        <DrawingTextBackgroundOptions
+          colors={DEFAULT_DRAWING_COLORS}
+          floatingBoundaryRef={boundaryRef}
+          floatingPlacement="auto"
+          value={settings.backgroundColor}
+          vertical={false}
+          onChange={(backgroundColor) => updateSettings({ backgroundColor })}
+        />
+      </InspectorParameterRow>
+      <InspectorParameterRow
+        label={translate('content.toolbar.drawingTextSize')}
+        valueMinimum={112}
+        dataUi="editor.technical-data.size-row"
+      >
         <div
           className="flex shrink-0 items-center gap-1"
           data-ui="editor.technical-data.size-options"
@@ -113,6 +113,7 @@ export function EditorTechnicalDataTextSettings() {
           {DRAWING_TEXT_SIZES.map((fontSize) => (
             <ContentToolbarButton
               key={fontSize}
+              tone={scoped ? 'property' : 'default'}
               type="button"
               active={settings.fontSize === fontSize}
               aria-label={`${translate('content.toolbar.drawingTextSize')}: ${fontSize}px`}
@@ -126,7 +127,7 @@ export function EditorTechnicalDataTextSettings() {
             </ContentToolbarButton>
           ))}
         </div>
-      </div>
+      </InspectorParameterRow>
     </div>
   );
 }

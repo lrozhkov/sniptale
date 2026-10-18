@@ -84,22 +84,23 @@ export async function createLegalFixture({
   return root;
 }
 
-export const TEST_MANROPE = {
+export const TEST_INTERFACE_FONT = {
   artifacts: [
     {
-      path: 'fonts/manrope-latin.woff2',
+      path: 'fonts/golos-ui-latin.woff2',
       sha256: 'a'.repeat(64),
-      sourcePath: 'node_modules/@fontsource-variable/manrope/files/manrope-latin.woff2',
+      sourcePath: 'packages/ui/src/styles/golos-ui/golos-ui-latin.woff2',
     },
     {
-      path: 'fonts/manrope-cyrillic.woff2',
+      path: 'fonts/golos-ui-cyrillic.woff2',
       sha256: 'b'.repeat(64),
-      sourcePath: 'node_modules/@fontsource-variable/manrope/files/manrope-cyrillic.woff2',
+      sourcePath: 'packages/ui/src/styles/golos-ui/golos-ui-cyrillic.woff2',
     },
   ],
-  copyright: 'Copyright 2019 The Manrope Project Authors',
+  copyright:
+    'Copyright (c) 2018, Paratype Inc (https://paratype.com), Copyright (c) 2018, Paratype Ltd, with Reserved Font Name "Golos UI".',
   license: 'OFL-1.1',
-  licensePath: 'LICENSES/OFL-1.1.txt',
-  sourcePackage: '@fontsource-variable/manrope',
-  version: '5.2.8',
+  licensePath: 'packages/ui/src/styles/golos-ui/LICENSE.txt',
+  sourcePackage: '@sniptale/ui',
+  version: '2.000',
 };

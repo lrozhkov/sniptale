@@ -74,20 +74,20 @@ export function TemplateForkReturnGuard(props: {
 }) {
   return (
     <div
-      className="grid gap-3 p-3"
+      className="grid gap-2 p-2"
       data-ui="content.template-fork.return-guard"
       role="region"
       aria-label={translate('content.templateFork.unsavedTitle')}
     >
       <div className="grid gap-1">
-        <div className="text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
           {translate('content.templateFork.unsavedTitle')}
         </div>
-        <div className="text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+        <div className="text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
           {translate('content.templateFork.unsavedDescription')}
         </div>
       </div>
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         <ProductActionButton compact onClick={props.onGoToSave}>
           {translate('content.templateFork.goToSave')}
         </ProductActionButton>

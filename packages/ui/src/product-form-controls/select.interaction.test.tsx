@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '../control-language/press';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -89,6 +91,7 @@ it('renders a custom listbox and marks the selected option', () => {
   expect(menu).toBeTruthy();
   expect(container?.contains(menu ?? null)).toBe(false);
   expect(menu?.className).toContain('sniptale-select-menu-portal');
+  expect(menu?.classList.contains('sniptale-compact-workspace')).toBe(false);
   expect((menu as HTMLElement | null)?.style.zIndex).toBe('2147483647');
   expect(trigger?.className).toContain('sniptale-select-open');
   expect(selectedOption?.className).toContain('sniptale-select-option-selected');
@@ -249,4 +252,31 @@ it('groups nested options without changing keyboard order or selected identity',
   act(() => options[3]!.click());
   expect(onChange).toHaveBeenCalledExactlyOnceWith('saved-images');
   expect(getRenderedMenu()).toBeNull();
+});
+
+it('carries adoption into its portaled menu while preserving selection and trigger focus', async () => {
+  const onChange = vi.fn();
+  renderElement(
+    <CommandPressScope value={true}>
+      <ProductSelect
+        value="ru"
+        onChange={onChange}
+        options={[
+          { value: 'ru', label: 'Русский' },
+          { value: 'en', label: 'English' },
+        ]}
+      />
+    </CommandPressScope>
+  );
+  const trigger = container!.querySelector('button')!;
+  openRenderedSelect();
+  const menu = getRenderedMenu()!;
+  expect(container!.contains(menu)).toBe(false);
+  expect(menu.classList.contains('sniptale-compact-workspace')).toBe(true);
+  const english = getRenderedOptions().find((option) => option.textContent?.includes('English'))!;
+  act(() => english.click());
+  await flushMicrotasks();
+  expect(onChange).toHaveBeenCalledExactlyOnceWith('en');
+  expect(getRenderedMenu()).toBeNull();
+  expect(document.activeElement).toBe(trigger);
 });

@@ -48,7 +48,7 @@ export function EditorInspectorDetails(props: {
         ) : null}
         <ChevronDown size={props.level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>
-      <div className="space-y-2 pt-2">{props.children}</div>
+      <div className="sniptale-parameter-stack px-2 pt-2">{props.children}</div>
     </details>
   );
 }

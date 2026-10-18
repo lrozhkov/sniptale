@@ -1,11 +1,14 @@
+import { ChevronDown, Info } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductSelect, ProductToggle } from '@sniptale/ui/product-form-controls';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { LOCAL_STORAGE_RETENTION_DAY_OPTIONS } from '../../../composition/persistence/library-lifecycle';
 import { translate } from '../../../platform/i18n';
 import type { GalleryTrashRetentionProps } from './types';
 
 const detailsTriggerClassName = [
-  'cursor-pointer rounded-sm focus-visible:outline-2',
+  'flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-[4px] px-2',
+  '[&::-webkit-details-marker]:hidden hover:text-[var(--sniptale-color-text-primary)]',
+  'focus-visible:outline-2',
   'focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
@@ -21,8 +24,11 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor="gallery-trash-retention-enabled" className="min-w-0 text-xs">
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <label
+          htmlFor="gallery-trash-retention-enabled"
+          className="min-w-0 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]"
+        >
           {translate('gallery.app.trashRetentionEnabled')}
         </label>
         <ProductToggle
@@ -39,10 +45,10 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
       </div>
       {enabled ? (
         <>
-          <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="flex min-h-8 min-w-0 items-center justify-between gap-2">
             <label
               htmlFor="gallery-trash-retention-days"
-              className="shrink-0 whitespace-nowrap text-xs"
+              className="min-w-0 text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-text-secondary)]"
             >
               {translate('gallery.app.trashRetentionDays')}
             </label>
@@ -50,6 +56,8 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
               id="gallery-trash-retention-days"
               aria-label={translate('gallery.app.trashRetentionDays')}
               controlSize="sm"
+              menuClassName="gallery-trash-retention-menu"
+              menuWidth={144}
               containerClassName="!w-auto min-w-0 shrink-0"
               disabled={disabled}
               options={dayOptions}
@@ -57,11 +65,21 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
               onChange={(days) => props.onChange({ trashRetentionDays: Number(days) })}
             />
           </div>
-          <details className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          <details className="group/retention text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             <summary className={detailsTriggerClassName}>
-              {translate('gallery.app.trashRetentionDetails')}
+              <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 font-medium">
+                {translate('gallery.app.trashRetentionDetails')}
+              </span>
+              <ChevronDown
+                className="h-3.5 w-3.5 shrink-0 transition-transform group-open/retention:rotate-180
+                  motion-reduce:transition-none"
+                aria-hidden="true"
+              />
             </summary>
-            <p className="pt-2 leading-5">{translate('gallery.app.trashRetentionExplanation')}</p>
+            <p className="pl-[30px] pr-2 pt-2 text-sm leading-5 font-normal">
+              {translate('gallery.app.trashRetentionExplanation')}
+            </p>
           </details>
         </>
       ) : null}
@@ -74,47 +92,45 @@ export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
     <section
       data-ui="gallery.trash.retention"
       aria-label={translate('gallery.app.trashRetentionTitle')}
-      className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      className="sniptale-compact-switches space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
     >
-      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <h3 className="text-sm leading-5 font-semibold text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.app.trashRetentionTitle')}
       </h3>
       {props.status === 'loading' ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <p
+          role="status"
+          className="text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]"
+        >
           {translate('gallery.app.trashRetentionLoading')}
         </p>
       ) : null}
       {props.status === 'unavailable' ? (
         <div className="space-y-2">
-          <p role="alert" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          <p role="alert" className="text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
             {translate('gallery.app.trashRetentionUnavailable')}
           </p>
-          <button
-            type="button"
-            className={getControlSecondaryButtonClassName({ density: 'compact' })}
-            onClick={props.onRetry}
-          >
+          <ProductActionButton tone="secondary" compact type="button" onClick={props.onRetry}>
             {translate('gallery.app.trashRetentionRetry')}
-          </button>
+          </ProductActionButton>
         </div>
       ) : null}
       <TrashRetentionSettings {...props} />
       {props.saving ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <p
+          role="status"
+          className="text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]"
+        >
           {translate('gallery.app.trashRetentionSaving')}
         </p>
       ) : props.feedback === 'error' ? (
         <div className="space-y-2">
-          <p role="alert" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          <p role="alert" className="text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
             {translate('gallery.app.trashRetentionSaveFailed')}
           </p>
-          <button
-            type="button"
-            className={getControlSecondaryButtonClassName({ density: 'compact' })}
-            onClick={props.onRetry}
-          >
+          <ProductActionButton tone="secondary" compact type="button" onClick={props.onRetry}>
             {translate('gallery.app.trashRetentionRetry')}
-          </button>
+          </ProductActionButton>
         </div>
       ) : null}
     </section>

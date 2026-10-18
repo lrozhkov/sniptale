@@ -17,7 +17,9 @@ export function GalleryModalFrame(props: GalleryModalFrameProps) {
       onClose={props.onClose}
       maxHeight="calc(100vh - 40px)"
       scrollable
-      dialogClassName={[props.maxWidthClassName, props.panelClassName].filter(Boolean).join(' ')}
+      dialogClassName={['sniptale-compact-workspace', props.maxWidthClassName, props.panelClassName]
+        .filter(Boolean)
+        .join(' ')}
     >
       <ProductModalHeader
         compact
@@ -26,7 +28,7 @@ export function GalleryModalFrame(props: GalleryModalFrameProps) {
         closeTitle={translate('common.actions.close')}
       />
       <ProductModalBody compact className="sniptale-modal-scroll overflow-y-auto">
-        <p className="text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+        <p className="text-sm leading-5 font-normal text-[var(--sniptale-color-text-secondary)]">
           {props.description}
         </p>
         {props.children}

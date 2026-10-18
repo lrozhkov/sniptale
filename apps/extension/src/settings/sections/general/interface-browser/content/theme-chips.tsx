@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { Monitor, MoonStar, SunMedium } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
@@ -16,7 +17,7 @@ export function ThemeChips({ state }: { state: AppearanceSectionState }) {
       role="group"
       aria-label={translate('settings.appearance.themeModeLabel', state.locale)}
       className={[
-        'inline-flex w-full min-w-0 gap-1 rounded-lg p-1 sm:w-auto',
+        'flex w-full min-w-0 gap-1 rounded-[4px]',
         'bg-[var(--sniptale-color-surface-hover)]',
       ].join(' ')}
     >
@@ -27,19 +28,22 @@ export function ThemeChips({ state }: { state: AppearanceSectionState }) {
             : state.preference === option.value && state.resolvedTheme === option.value;
 
         return (
-          <button
+          <ProductActionButton
+            tone="toggle"
+            compact
+            active={active}
             key={option.value}
             type="button"
             aria-pressed={active}
             title={option.label}
             onClick={() => state.setPreference(option.value)}
             className={[
-              'inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-3',
-              'text-xs transition-colors sm:flex-none',
+              'min-w-0 flex-1 justify-center gap-1.5 px-2',
+              'text-[13px] transition-colors',
               'focus-visible:outline-none focus-visible:ring-2',
               'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
               active
-                ? 'bg-[var(--sniptale-color-surface-panel)] font-semibold text-[var(--sniptale-color-text-primary)]'
+                ? 'bg-[var(--sniptale-color-surface-panel)] font-medium text-[var(--sniptale-color-text-primary)]'
                 : [
                     'font-medium text-[var(--sniptale-color-text-muted)]',
                     'hover:text-[var(--sniptale-color-text-primary)]',
@@ -47,8 +51,8 @@ export function ThemeChips({ state }: { state: AppearanceSectionState }) {
             ].join(' ')}
           >
             {themeIcons[option.value]}
-            <span className="truncate">{option.label}</span>
-          </button>
+            <span className="whitespace-normal">{option.label}</span>
+          </ProductActionButton>
         );
       })}
     </div>

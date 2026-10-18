@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, useRef, useState } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommandPaletteAction, LocalizedCommandPaletteGroup } from './types';
@@ -143,6 +144,57 @@ describe('CommandPaletteHeader', () => {
     expect(onQueryChange).toHaveBeenCalledWith('gallery');
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(inputRef.current).toBe(input);
+  });
+});
+
+describe('scoped palette header commands', () => {
+  it('clears the query without dismissal and returns focus to the query', () => {
+    const onClose = vi.fn();
+    function Header() {
+      const [query, setQuery] = useState('gallery');
+      const inputRef = useRef<HTMLInputElement>(null);
+      return (
+        <CommandPressScope value={true}>
+          <CommandPaletteHeader
+            query={query}
+            inputRef={inputRef}
+            onClose={onClose}
+            onQueryChange={setQuery}
+          />
+        </CommandPressScope>
+      );
+    }
+    renderNode(<Header />);
+    const clear = container?.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+    expect(clear).not.toBeNull();
+    act(() => clear?.click());
+    expect(container?.querySelector('input')?.value).toBe('');
+    expect(document.activeElement).toBe(container?.querySelector('input'));
+    expect(container?.querySelector('.sniptale-field-clear')).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('provides a pressure target and cancels keyboard hold without closing', () => {
+    const onClose = vi.fn();
+    renderNode(
+      <CommandPressScope value={true}>
+        <CommandPaletteHeader
+          query=""
+          inputRef={{ current: null }}
+          onClose={onClose}
+          onQueryChange={() => undefined}
+        />
+      </CommandPressScope>
+    );
+    const close = container?.querySelector<HTMLButtonElement>('button');
+    expect(close?.querySelector(':scope > .sniptale-command-content > svg')).not.toBeNull();
+    act(() => close?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })));
+    expect(close?.dataset['pressing']).toBe('true');
+    act(() => close?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(close?.dataset['pressing']).toBeUndefined();
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => close?.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -62,12 +62,16 @@
     /* Size transitions feed intermediate widths back into the responsive layout observer. */
     transition-property: color, background-color, border-color, box-shadow, opacity;
   }
-  .review-timeline-toolbar [data-review-toolbar-button] > svg {
+  .review-timeline-toolbar [data-review-toolbar-button] > .review-command-content > svg {
     flex-shrink: 0;
     width: var(--review-toolbar-icon) !important;
     height: var(--review-toolbar-icon) !important;
   }
-  .review-timeline-toolbar [data-toolbar-transport] [data-review-toolbar-button] > svg {
+  .review-timeline-toolbar
+    [data-toolbar-transport]
+    [data-review-toolbar-button]
+    > .review-command-content
+    > svg {
     width: 16px !important;
     height: 16px !important;
   }
@@ -101,5 +105,33 @@
     grid-row: 1;
     justify-content: flex-start;
     overflow-x: auto;
+  }
+}
+
+@layer utilities {
+  .sniptale-compact-workspace button.review-command:focus-visible {
+    outline: 2px solid var(--sniptale-color-accent) !important;
+    outline-offset: -2px;
+  }
+}
+
+@layer utilities {
+  .sniptale-compact-workspace .review-command {
+    font: var(--sniptale-control-font-weight) 13px / 18px var(--sniptale-font-sans) !important;
+  }
+}
+
+@layer utilities {
+  .sniptale-compact-workspace .review-command[data-command-primary='true'] {
+    background: var(--sniptale-color-surface-hover) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+  .sniptale-compact-workspace .review-command[data-command-primary='true']:enabled:hover {
+    background: color-mix(
+      in srgb,
+      var(--sniptale-color-text-secondary) 18%,
+      var(--sniptale-color-surface-panel)
+    ) !important;
+    color: var(--sniptale-color-text-primary-strong) !important;
   }
 }

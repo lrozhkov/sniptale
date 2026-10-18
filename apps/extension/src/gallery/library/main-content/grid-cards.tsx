@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { GalleryCardNavigation } from './keyboard-navigation';
 import {
   buildGalleryListUnits,
@@ -24,21 +25,20 @@ import {
 import type { GalleryMainContentProps } from './types';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { GalleryListHeader, GALLERY_LIST_LAYOUT_STYLE } from './list-header';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { useCardActions } from './use-card-actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
-import { getGallerySelectionButtonClassName } from './selection-button-style';
-import { GalleryGridCardDate } from './grid-card-date';
+import { GallerySelectionButton } from './selection-button';
+import { GalleryGridCardDate, GalleryCardExpiration } from './grid-card-date';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
 
 const GALLERY_LIST_ROW_CLASS_NAME = [
-  'grid min-w-[1120px] items-center gap-3 px-3 py-2.5',
+  'relative grid min-w-[1120px] items-center gap-3 px-3 py-2.5',
   'border border-[var(--sniptale-color-border-soft)]',
   'data-[selected=true]:border-[var(--sniptale-color-border-accent-strong)]',
-  'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
 const galleryMaterialFocusClassName = [
@@ -74,10 +74,7 @@ function getGalleryGridCardClassName(
       ? GALLERY_LIST_ROW_CLASS_NAME
       : [
           'flex flex-col [contain:layout_paint]',
-          'rounded-[var(--sniptale-radius-lg)] border',
-          'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
-          'color-mix(in_srgb,var(--sniptale-color-surface-canvas)_84%,transparent))]',
-          'shadow-sm',
+          'rounded-[4px] border bg-[var(--sniptale-color-surface-panel)]',
         ].join(' '),
     selected
       ? 'border-[var(--sniptale-color-border-accent-strong)]'
@@ -85,9 +82,13 @@ function getGalleryGridCardClassName(
   );
 }
 
-function GalleryGridCardMedia(props: GalleryGridCardProps) {
+function GalleryGridCardMedia(
+  props: Pick<
+    GalleryGridCardProps,
+    'viewMode' | 'item' | 'onPreviewOpen' | 'onProjectOpen' | 'previewRecoveryAllowed'
+  >
+) {
   const isList = props.viewMode === 'list';
-  const canSelect = isGallerySelectableItem(props.item);
 
   return (
     <div
@@ -130,53 +131,33 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
       ) : null}
       {!isList && props.item.tags.length > 0 ? (
         <div
-          className="pointer-events-none absolute inset-x-2 bottom-2 z-10 truncate rounded-[6px]
+          className="pointer-events-none absolute inset-x-2 bottom-2 z-10 truncate rounded-[4px]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_82%,transparent)]
-            px-2 py-1 text-[10px] font-medium text-[var(--sniptale-color-text-primary)]"
+            px-2 py-1 text-[12px] font-medium text-[var(--sniptale-color-text-primary)]"
           title={props.item.tags.join(', ')}
         >
           {props.item.tags.join(', ')}
         </div>
       ) : null}
-      <GalleryGridCardSelectionControl
-        canSelect={canSelect}
-        isList={isList}
-        itemId={props.item.id}
-        onToggleSelection={props.onToggleSelection}
-        selected={props.selected}
-      />
-      {!isList ? <GalleryGridCardKindBadge kind={props.item.kind} /> : null}
+      {!isList ? <GalleryCardExpiration items={[props.item]} /> : null}
     </div>
   );
 }
 
 function GalleryGridCardSelectionControl(props: {
-  canSelect: boolean;
-  isList: boolean;
-  itemId: string;
+  item: GalleryItem;
   onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
 }) {
-  if (!props.canSelect || props.isList) {
-    return null;
-  }
-
+  const icon = <GalleryGridCardKindBadge kind={props.item.kind} />;
+  if (!isGallerySelectableItem(props.item)) return icon;
   return (
-    <div className="absolute left-3 top-3 z-10">
-      <button
-        type="button"
-        aria-label={translate('gallery.app.selectItem')}
-        aria-pressed={props.selected}
-        onClick={(event) =>
-          props.onToggleSelection(props.itemId, {
-            shiftKey: event.shiftKey,
-          })
-        }
-        className={getGallerySelectionButtonClassName(props.selected)}
-      >
-        {props.selected ? '✓' : ''}
-      </button>
-    </div>
+    <GallerySelectionButton
+      selected={props.selected}
+      idleIcon={icon}
+      label={translate('gallery.app.selectItem')}
+      onClick={(event) => props.onToggleSelection(props.item.id, { shiftKey: event.shiftKey })}
+    />
   );
 }
 
@@ -184,17 +165,13 @@ function GalleryGridCardKindBadge(props: { kind: GalleryItem['kind'] }) {
   const Icon = getKindIcon(props.kind);
 
   return (
-    <div
-      className={cx(
-        'absolute z-10 inline-flex items-center justify-center rounded-full border',
-        'border-[var(--sniptale-color-border-soft)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]',
-        'text-[var(--sniptale-color-text-secondary)]',
-        'right-3 top-3 h-8 w-8'
-      )}
+    <span
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[var(--sniptale-color-text-secondary)]"
+      data-ui="gallery.card.kind"
+      title={getGalleryItemKindLabel(props.kind)}
     >
-      <Icon className="h-4 w-4" />
-    </div>
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </span>
   );
 }
 
@@ -218,6 +195,22 @@ const GalleryGridCard = memo(
   function GalleryGridCard(props: GalleryGridCardProps) {
     useAppLocale();
     const isList = props.viewMode === 'list';
+    const leading = (
+      <GalleryGridCardSelectionControl
+        item={props.item}
+        selected={props.selected}
+        onToggleSelection={props.onToggleSelection}
+      />
+    );
+    const media = (
+      <GalleryGridCardMedia
+        item={props.item}
+        onPreviewOpen={props.onPreviewOpen}
+        {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+        previewRecoveryAllowed={props.previewRecoveryAllowed}
+        viewMode={props.viewMode}
+      />
+    );
 
     return (
       <article
@@ -246,33 +239,22 @@ const GalleryGridCard = memo(
           <>
             <div className="flex items-center justify-center" role="cell">
               {isGallerySelectableItem(props.item) ? (
-                <button
-                  type="button"
-                  aria-label={translate('gallery.app.selectItem')}
-                  aria-pressed={props.selected}
+                <GallerySelectionButton
+                  alwaysVisible
+                  selected={props.selected}
+                  label={translate('gallery.app.selectItem')}
                   onClick={(event) =>
                     props.onToggleSelection(props.item.id, {
                       shiftKey: event.shiftKey,
                     })
                   }
-                  className={getGallerySelectionButtonClassName(props.selected, true)}
-                >
-                  {props.selected ? '✓' : ''}
-                </button>
+                />
               ) : (
                 <div className="h-8 w-8 shrink-0" />
               )}
             </div>
             <GalleryListKindCell item={props.item} />
-            <GalleryGridCardMedia
-              item={props.item}
-              onPreviewOpen={props.onPreviewOpen}
-              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-              previewRecoveryAllowed={props.previewRecoveryAllowed}
-              onToggleSelection={props.onToggleSelection}
-              selected={props.selected}
-              viewMode={props.viewMode}
-            />
+            {media}
             <GalleryListDetails
               item={props.item}
               onPreviewOpen={props.onPreviewOpen}
@@ -287,19 +269,12 @@ const GalleryGridCard = memo(
           </>
         ) : (
           <>
-            <GalleryGridCardMedia
-              item={props.item}
-              onPreviewOpen={props.onPreviewOpen}
-              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-              previewRecoveryAllowed={props.previewRecoveryAllowed}
-              onToggleSelection={props.onToggleSelection}
-              selected={props.selected}
-              viewMode={props.viewMode}
-            />
+            {media}
             {props.item.type !== 'scenario' &&
             props.item.type !== 'video-project' &&
             props.item.type !== 'quick-edit-project' ? (
               <GalleryGridDetails
+                leading={leading}
                 compact={props.viewMode === 'compact-grid'}
                 item={props.item}
                 onPreviewOpen={props.onPreviewOpen}
@@ -309,6 +284,7 @@ const GalleryGridCard = memo(
         )}
         {!isList ? (
           <GalleryProjectDetails
+            leading={leading}
             item={props.item}
             viewMode={props.viewMode}
             onPreviewOpen={props.onPreviewOpen}
@@ -343,7 +319,16 @@ function sameCardStyle(left: GalleryGridCardProps['style'], right: GalleryGridCa
   );
 }
 
+function GalleryRecordingGroupOpenCommand(props: { onOpen: () => void }) {
+  return (
+    <ProductActionButton tone="secondary" compact onClick={props.onOpen} className="shrink-0">
+      {translate('gallery.preview.openRecordingGroupShort')}
+    </ProductActionButton>
+  );
+}
+
 function GalleryRecordingGroupDetails(props: {
+  leading: ReactNode;
   items: GalleryItem[];
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   viewMode: GalleryGridCardProps['viewMode'];
@@ -362,40 +347,39 @@ function GalleryRecordingGroupDetails(props: {
     <div
       className={
         isCompact
-          ? `h-10 shrink-0 border-t border-[var(--sniptale-color-border-soft)]
-            px-3 py-3`
-          : `flex h-[72px] shrink-0 flex-col justify-between
-            border-t border-[var(--sniptale-color-border-soft)] px-4 py-2`
+          ? `group/gallery-caption relative flex h-10 shrink-0 items-center border-t
+          border-[var(--sniptale-color-border-soft)] px-2 py-2`
+          : `group/gallery-caption relative grid h-[72px] shrink-0 content-center
+          grid-cols-[32px_minmax(0,1fr)_auto] grid-rows-[24px_16px] gap-x-2 gap-y-1
+          border-t border-[var(--sniptale-color-border-soft)] px-3`
       }
       data-ui={isCompact ? 'gallery.compact.group-details' : 'gallery.large.group-details'}
     >
-      {!isCompact ? (
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div
-            className="truncate text-sm font-semibold
-              text-[var(--sniptale-color-text-primary)]"
-          >
-            {projectName ?? translate('gallery.preview.multiTrackRecording')}
-          </div>
-          {props.onRecordingGroupOpen && editorItem ? (
-            <button
-              type="button"
-              onClick={() => props.onRecordingGroupOpen?.(editorItem)}
-              className="shrink-0 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-                px-2.5 py-1.5 text-xs font-semibold text-[var(--sniptale-color-accent-emphasis)]
-                hover:border-[var(--sniptale-color-border-strong)]"
-            >
-              {translate('gallery.preview.openRecordingGroupShort')}
-            </button>
-          ) : null}
+      <span
+        className={`z-10 flex h-8 w-8 items-center justify-center
+        ${isCompact ? 'absolute bottom-1 left-1' : 'relative col-start-1 row-start-1 self-center'}`}
+      >
+        {props.leading}
+      </span>
+      {!isCompact && (
+        <div
+          className={`col-start-2 row-start-1 h-6 min-w-0 truncate text-[13px] leading-6 font-medium
+          text-[var(--sniptale-color-text-primary)] ${props.onRecordingGroupOpen && editorItem ? '' : 'col-span-2'}`}
+          title={projectName ?? translate('gallery.preview.multiTrackRecording')}
+        >
+          {projectName ?? translate('gallery.preview.multiTrackRecording')}
         </div>
-      ) : null}
+      )}
       <div
         data-ui={isCompact ? 'gallery.compact.group-metadata' : 'gallery.large.group-metadata'}
-        className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
-          text-[var(--sniptale-color-text-muted)]"
+        className={`flex min-w-0 w-full items-center justify-between gap-2 whitespace-nowrap text-xs
+          ${
+            isCompact
+              ? 'pl-9 text-[var(--sniptale-color-text-muted)]'
+              : 'col-start-2 col-span-2 row-start-2 text-[var(--sniptale-color-text-secondary)]'
+          }`}
       >
-        <GalleryGridCardDate items={props.items} compact={isCompact} />
+        <GalleryGridCardDate items={props.items} />
         <span className="shrink-0">
           {totalSize > 0
             ? isCompact
@@ -404,6 +388,13 @@ function GalleryRecordingGroupDetails(props: {
             : '—'}
         </span>
       </div>
+      {!isCompact && props.onRecordingGroupOpen && editorItem ? (
+        <div className="col-start-3 row-start-1 flex items-center justify-end">
+          <GalleryRecordingGroupOpenCommand
+            onOpen={() => props.onRecordingGroupOpen?.(editorItem)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -481,9 +472,9 @@ const GalleryRecordingGroupGridCard = memo(
               >
                 <MediaThumb item={item} fit="contain" />
                 <span
-                  className="absolute inset-x-1.5 bottom-1.5 rounded-[6px]
+                  className="absolute inset-x-1.5 bottom-1.5 rounded-[4px]
                   bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_82%,transparent)]
-                  px-2 py-1 text-left text-[10px] leading-tight text-[var(--sniptale-color-text-primary)]"
+                  px-2 py-1 text-left text-[12px] leading-tight text-[var(--sniptale-color-text-primary)]"
                 >
                   <span className="block truncate font-semibold">{role}</span>
                   {sourceLabel ? (
@@ -495,11 +486,14 @@ const GalleryRecordingGroupGridCard = memo(
               </button>
             );
           })}
-          <div className="absolute left-3 top-3 z-10">
-            <button
-              type="button"
-              aria-label={translate('gallery.app.selectRecordingGroup')}
-              aria-pressed={allSelected}
+          <GalleryCardExpiration items={props.items} />
+        </div>
+        <GalleryRecordingGroupDetails
+          leading={
+            <GallerySelectionButton
+              selected={allSelected}
+              idleIcon={<GalleryGridCardKindBadge kind={firstItem.kind} />}
+              label={translate('gallery.app.selectRecordingGroup')}
               onClick={(event) => {
                 selectableItems.forEach((item) => {
                   if (event.shiftKey || allSelected || !props.selectedIds.has(item.id)) {
@@ -508,13 +502,8 @@ const GalleryRecordingGroupGridCard = memo(
                   }
                 });
               }}
-              className={getGallerySelectionButtonClassName(allSelected)}
-            >
-              {allSelected ? '✓' : ''}
-            </button>
-          </div>
-        </div>
-        <GalleryRecordingGroupDetails
+            />
+          }
           items={props.items}
           {...(props.onRecordingGroupOpen
             ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
@@ -614,7 +603,7 @@ export function GalleryMediaList(
                 width: '100%',
               }}
               className={cx(
-                'overflow-hidden rounded-[8px] border',
+                'overflow-hidden rounded-[4px] border',
                 'bg-[var(--sniptale-color-surface-panel)]',
                 allSelected
                   ? 'border-[var(--sniptale-color-border-accent-strong)]'
@@ -624,7 +613,7 @@ export function GalleryMediaList(
             >
               <div
                 style={GALLERY_LIST_LAYOUT_STYLE}
-                className={cx('grid h-8 min-w-[1120px] items-center gap-3 px-3 py-2')}
+                className={cx('grid h-8 min-w-[1120px] items-center gap-3 px-3')}
                 aria-rowindex={headerIndex}
                 role="row"
               >
@@ -642,15 +631,9 @@ export function GalleryMediaList(
                     </span>
                   </div>
                   {!props.trashMode && props.onRecordingGroupOpen && editorItem ? (
-                    <button
-                      type="button"
-                      className="shrink-0 font-semibold text-[var(--sniptale-color-accent-emphasis)]
-                      hover:underline focus-visible:outline-none focus-visible:ring-2
-                      focus-visible:ring-[var(--sniptale-color-focus-ring)]"
-                      onClick={() => props.onRecordingGroupOpen?.(editorItem)}
-                    >
-                      {translate('gallery.preview.openRecordingGroupShort')}
-                    </button>
+                    <GalleryRecordingGroupOpenCommand
+                      onOpen={() => props.onRecordingGroupOpen?.(editorItem)}
+                    />
                   ) : null}
                 </div>
               </div>

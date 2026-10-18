@@ -186,6 +186,32 @@ describe('recording staging coordinator', () => {
     await expect(openArtifact(coordinator, 'late')).rejects.toThrow('generation is stale');
   });
 
+  it('releases privacy invalidation without waiting for a queued append admission', async () => {
+    const waiting = deferred();
+    const entered = deferred();
+    let calls = 0;
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      createWriter: factory.createWriter,
+      admitBytes: async () => {
+        calls += 1;
+        if (calls > 1) {
+          entered.resolve();
+          await waiting.promise;
+        }
+      },
+    });
+    const writer = await openArtifact(coordinator);
+    const append = writer.append(new Blob(['x']));
+    const outcome = expect(append).rejects.toThrow('generation is stale');
+    await entered.promise;
+    await invalidateAndAbortActiveRecordingStaging();
+    expect(factory.writers[0]?.abort).toHaveBeenCalledOnce();
+    waiting.resolve();
+    await outcome;
+    expect(factory.writers[0]?.chunks).toEqual([]);
+  });
+
   it('discards a finalized object when no ready journal protects it', async () => {
     const factory = createWriterFactory();
     const coordinator = await createRecordingStagingCoordinator({
@@ -214,5 +240,77 @@ describe('recording staging coordinator', () => {
 
     expect(factory.writers[0]?.abort).not.toHaveBeenCalled();
     protection.mockRestore();
+  });
+  it.each([false, true])(
+    'refuses delayed opening across privacy erasure and releases opened resources (cleanup failure: %s)',
+    async (cleanupFailure) => {
+      const gate = deferred();
+      const entered = deferred();
+      const factory = createWriterFactory();
+      const coordinator = await createRecordingStagingCoordinator({
+        admitBytes: async () => undefined,
+        createWriter: async (input) => {
+          const writer = await factory.createWriter(input);
+          if (cleanupFailure)
+            factory.writers[0]!.abort.mockRejectedValueOnce(new Error('Cleanup failed'));
+          entered.resolve();
+          await gate.promise;
+          return writer;
+        },
+      });
+      const opening = openArtifact(coordinator);
+      const result = expect(opening).rejects.toThrow(
+        cleanupFailure ? 'became unavailable' : 'generation is stale'
+      );
+      await entered.promise;
+      await invalidateAndAbortActiveRecordingStaging();
+      gate.resolve();
+      await result;
+      expect(factory.writers[0]?.abort).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('reports abort cleanup failure once and keeps the coordinator closed', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      createWriter: factory.createWriter,
+      admitBytes: async () => undefined,
+    });
+    await openArtifact(coordinator);
+    factory.writers[0]!.abort.mockRejectedValueOnce(new Error('Cleanup failed'));
+    await expect(coordinator.abort()).rejects.toThrow('Failed to abort');
+    await expect(coordinator.abort()).rejects.toThrow('Failed to abort');
+    expect(factory.writers[0]?.abort).toHaveBeenCalledOnce();
+    await expect(openArtifact(coordinator, 'late')).rejects.toThrow('aborted');
+  });
+
+  it('reports release failure after successful finalization and closes the coordinator', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      createWriter: factory.createWriter,
+      admitBytes: async () => undefined,
+    });
+    const writer = await openArtifact(coordinator);
+    await writer.finalize();
+    const release = vi
+      .spyOn(assets, 'releaseAssetReadyProtection')
+      .mockRejectedValueOnce(new Error('Release failed'));
+    await expect(coordinator.delete()).rejects.toThrow('Failed to release');
+    await expect(openArtifact(coordinator, 'late')).rejects.toThrow('deleted');
+    release.mockRestore();
+  });
+
+  it('reports privacy teardown failure after invalidating the writer generation', async () => {
+    const factory = createWriterFactory();
+    const coordinator = await createRecordingStagingCoordinator({
+      createWriter: factory.createWriter,
+      admitBytes: async () => undefined,
+    });
+    await openArtifact(coordinator);
+    factory.writers[0]!.abort.mockRejectedValueOnce(new Error('Cleanup failed'));
+    await expect(invalidateAndAbortActiveRecordingStaging()).rejects.toThrow(
+      'Failed to invalidate'
+    );
+    await expect(openArtifact(coordinator, 'late')).rejects.toThrow('generation is stale');
   });
 });

@@ -91,6 +91,7 @@ export function EditorFloatingDocumentQuickActions({
           ref={saveToFolderButtonRef}
           title={translate('editor.documentActions.saveToFolder')}
           disabled={!hasImage}
+          tone="outline"
           active={saveDialogOpen}
           aria-expanded={saveDialogOpen}
           aria-haspopup="dialog"

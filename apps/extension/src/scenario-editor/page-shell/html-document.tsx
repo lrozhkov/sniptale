@@ -1,9 +1,10 @@
 import { Search, X } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server.browser';
 import tokens from '@sniptale/ui/styles/design-tokens?raw';
-import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
-import cyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?inline';
-import extended from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?inline';
+import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
+import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
+import documentFont from '@sniptale/ui/styles/document-font?inline';
+import documentLicense from '@sniptale/ui/styles/document-font-license?raw';
 import viewerScript from './html-viewer.js?raw';
 import navigationCss from './reader-navigation.css?raw';
 import { GuideReadingNavigation } from './reader-navigation';
@@ -39,18 +40,19 @@ export async function buildGuideHtml(
     ...project,
     items: project.items.map((item) => ({ ...item, id: `guide-item-${item.id}` })),
   };
-  const fonts = [latin, cyrillic, extended]
-    .map(
-      (url, index) =>
-        `@font-face{font-family:Guide${index};font-style:normal;font-weight:200 800;src:url("${url}") format("woff2");}`
-    )
-    .join('');
+  const fonts =
+    `@font-face{font-family:"Sniptale Interface";font-style:normal;font-weight:400 700;` +
+    `src:url("${interfaceFont}") format("woff2");}` +
+    `@font-face{font-family:"Sniptale Text";font-style:normal;font-weight:400 900;` +
+    `src:url("${documentFont}") format("woff2");}`;
   const base =
-    ':root{--sniptale-font-sans:Guide0,Guide1,Guide2,sans-serif}*{box-sizing:border-box}' +
-    'body{margin:0;padding:24px;font-family:var(--sniptale-font-sans);' +
+    '*{box-sizing:border-box}' +
+    'body{margin:0;padding:24px;font-family:var(--sniptale-font-document-sans);' +
     'background:var(--sniptale-color-surface-canvas);' +
     'color:var(--sniptale-color-text-primary)}' +
-    'main>h1{max-width:1200px;margin:0 auto 24px;overflow-wrap:anywhere}';
+    'main>h1{max-width:1200px;margin:0 auto 24px;overflow-wrap:anywhere}' +
+    '[data-guide-pagination],[data-guide-viewer] header,' +
+    '.guide-reading-nav{font-family:var(--sniptale-font-interface)}';
   const policy = [
     "default-src 'none'",
     `script-src 'sha256-${hash}'`,
@@ -72,6 +74,12 @@ export async function buildGuideHtml(
           <style>{tokens + fonts + base + documentCss + viewerCss + navigationCss}</style>
         </head>
         <body>
+          <pre hidden data-guide-interface-font-license="">
+            {interfaceLicense}
+          </pre>
+          <pre hidden data-guide-document-font-license="">
+            {documentLicense}
+          </pre>
           <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
             <defs>
               {media.rasters.map((raster, index) => (

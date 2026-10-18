@@ -1,0 +1,106 @@
+/* The library owns its shell geometry; pending editors retain their surface contracts. */
+.sniptale-library-workspace {
+  --sniptale-radius-lg: 4px;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.sniptale-library-workspace [data-ui='gallery.page.root'] {
+  min-width: 1280px;
+}
+.sniptale-library-workspace [data-ui='gallery.header.storage-menu'] {
+  padding: 5px;
+  border-radius: 4px;
+  font: 500 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-library-workspace [data-ui='gallery.header.storage-menu'] [role='menuitem'] {
+  height: auto !important;
+  min-height: 36px !important;
+  border-radius: 4px;
+  white-space: normal;
+  text-align: start;
+}
+.sniptale-library-workspace [data-ui='gallery.header.storage-menu'] [role='menuitem'] > span {
+  width: 100%;
+  justify-content: flex-start;
+}
+.sniptale-library-workspace [data-ui='gallery.header.view-mode'] {
+  gap: 2px;
+}
+.sniptale-library-workspace .sniptale-library-utility {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+}
+.sniptale-library-workspace .sniptale-library-utility:hover {
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+}
+/* Shared preview chrome has another editor consumer. Scope its utility treatment here. */
+.sniptale-library-workspace [data-ui='gallery.preview.windowControls'] button {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: transparent;
+}
+.sniptale-library-workspace [data-ui='gallery.preview.windowControls'] button:hover {
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-library-workspace .gallery-project-open {
+  height: auto !important;
+  min-height: 32px !important;
+  white-space: normal;
+}
+
+/* Adjacent object rows retain continuous hit targets and separate painted states. */
+.sniptale-library-workspace [data-ui='gallery.list.row']::before {
+  content: '';
+  position: absolute;
+  inset: 1px 0;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.sniptale-library-workspace
+  [data-ui='gallery.list.row']:is(:hover, [data-selected='true'])::before {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-library-workspace [data-ui='gallery.list.row'] > * {
+  position: relative;
+}
+
+@layer utilities {
+  .sniptale-library-workspace
+    button:is(
+      .sniptale-library-view-mode,
+      .gallery-saved-view-action
+    )[data-command-press][data-command-tone][data-command-chrome] {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+  .sniptale-library-workspace
+    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true'] {
+    color: var(--sniptale-color-accent) !important;
+  }
+  .sniptale-library-workspace
+    button.sniptale-library-view-mode[data-command-press][data-command-chrome][aria-pressed='true']:hover {
+    color: var(--sniptale-color-accent-emphasis) !important;
+  }
+  .sniptale-library-workspace
+    button.gallery-saved-view-action[data-danger='true']:hover:not(:disabled) {
+    color: var(--sniptale-color-danger) !important;
+  }
+}
+
+.sniptale-library-workspace .gallery-trash-danger {
+  color: var(--sniptale-color-danger) !important;
+}
+.gallery-trash-retention-menu .sniptale-select-value-label {
+  white-space: nowrap;
+}

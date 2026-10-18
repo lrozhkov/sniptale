@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../../platform/i18n';
-import { TourNarrationRecording } from './narration-recording';
+import { TourNarrationPlacement, TourNarrationRecording } from './narration-recording';
 vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
@@ -67,7 +67,9 @@ afterEach(() => {
 const render = () =>
   act(async () =>
     root.render(
-      <TourNarrationRecording t={createTranslator('en')} onClose={close} onApply={apply} />
+      <TourNarrationPlacement.Provider value={{ host, setActive: vi.fn() }}>
+        <TourNarrationRecording t={createTranslator('en')} onClose={close} onApply={apply} />
+      </TourNarrationPlacement.Provider>
     )
   );
 const button = (text: string) =>
@@ -126,7 +128,7 @@ it('requires explicit dismissal and keeps Escape from discarding a draft', async
   await render();
   act(() =>
     document
-      .querySelector('[role="dialog"]')!
+      .querySelector('[data-ui="audio-recording.inspector"]')!
       .dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
       )
@@ -138,14 +140,14 @@ it('requires explicit dismissal and keeps Escape from discarding a draft', async
   expect(close).toHaveBeenCalledOnce();
 });
 
-it('starts and stops capture, shows permission failure, and renders outside the inspector', async () => {
+it('starts and stops capture, shows permission failure inside the inspector', async () => {
   const state = io.session();
   state.trim = null;
   state.save.audioBlob = null;
   state.transport.status = 'idle';
   await render();
   expect(host.querySelector('[role="dialog"]')).toBeNull();
-  expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="audio-recording.inspector"]')).not.toBeNull();
   await act(async () => button('Start recording').click());
   expect(state.transport.startRecording).toHaveBeenCalledOnce();
   state.transport.status = 'recording';
@@ -157,4 +159,13 @@ it('starts and stops capture, shows permission failure, and renders outside the 
   await render();
   expect(document.querySelector('[role="alert"]')?.textContent).toBe('Permission denied');
   expect(button('Apply narration').disabled).toBe(true);
+});
+
+it('places narration controls in the inspector without a modal surface or duplicate title', async () => {
+  await render();
+  expect(host.querySelector('[data-ui="audio-recording.inspector"]')).not.toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(
+    [...host.querySelectorAll('span')].filter((node) => node.textContent === 'Record narration')
+  ).toHaveLength(1);
 });

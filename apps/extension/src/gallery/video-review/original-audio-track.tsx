@@ -1,10 +1,6 @@
+import { ReviewTrackVisibilityButton } from './track-row';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
-import {
-  reviewTrackMetrics,
-  reviewTrackGestureLocked,
-  ReviewTrackRow,
-  ReviewTrackCuts,
-} from './track-row';
+import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
@@ -200,7 +196,8 @@ function OriginalAudioControls(props: {
           <Captions size={14} aria-hidden="true" />
         </ReviewButton>
       ) : null}
-      <ReviewButton
+      <ReviewTrackVisibilityButton
+        track="originalAudio"
         label={translate(
           muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
         )}
@@ -212,7 +209,7 @@ function OriginalAudioControls(props: {
         }
       >
         {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-      </ReviewButton>
+      </ReviewTrackVisibilityButton>
     </>
   );
 }
@@ -344,10 +341,6 @@ function useOriginalAudioGesture(
         event.preventDefault();
         const at = originalAudioPointerTime(event, duration, props, drag.current);
         const id = item?.dataset['audioId'];
-        if (reviewTrackGestureLocked(event.currentTarget)) {
-          if (id) props.editor.selectOriginal(id);
-          return;
-        }
         const edge = item?.dataset['audioEdge'];
         const range =
           props.editor.originalRanges?.find((item) => item.id === id) ??

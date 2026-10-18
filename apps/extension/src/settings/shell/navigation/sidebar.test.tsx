@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -42,7 +44,11 @@ function renderSidebar(
   }
 
   act(() => {
-    root?.render(<SettingsSidebar activeTab={activeTab} onTabChange={onTabChange} />);
+    root?.render(
+      <CommandPressScope value={true}>
+        <SettingsSidebar activeTab={activeTab} onTabChange={onTabChange} />
+      </CommandPressScope>
+    );
   });
 
   return onTabChange;
@@ -74,9 +80,9 @@ describe('SettingsSidebar', () => {
       'Sniptale v0.0.0-test alpha'
     );
     expect(container?.querySelectorAll('button')).toHaveLength(SETTINGS_NAV_ITEMS.length);
-    expect(container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className).toContain(
-      'lg:overflow-y-hidden'
-    );
+    expect(
+      container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className
+    ).not.toContain('overflow-y-hidden');
     expect(container?.querySelector('[data-ui="settings.sidebar.nav-list"]')?.className).toContain(
       'overflow-y-auto'
     );
@@ -85,13 +91,14 @@ describe('SettingsSidebar', () => {
       button.textContent?.includes('settings.navigation.interfaceBrowser')
     );
 
-    expect(activeButton?.className).toContain(
-      'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_20%,var(--sniptale-color-border-soft)_80%)]'
-    );
-    const activeMarker = activeButton?.querySelector('div');
-    expect(activeMarker?.className).toContain('left-1');
-    expect(activeMarker?.className).toContain('translate-x-0');
-    expect(activeMarker?.className).not.toContain('left-3');
+    expect(activeButton?.getAttribute('aria-current')).toBe('page');
+    expect(activeButton?.getAttribute('title')).toBe('settings.navigation.interfaceBrowser');
+    expect(activeButton?.hasAttribute('data-command-press')).toBe(true);
+    expect(activeButton?.getAttribute('aria-pressed')).toBeNull();
+    expect(activeButton?.className).not.toContain('color-accent');
+    const activeMarker = container?.querySelector('[data-ui="settings.sidebar.active-marker"]');
+    expect(activeMarker).not.toBeNull();
+    expect(activeMarker?.closest('button')).toBeNull();
     expect(container?.querySelector('[data-ui="settings.sidebar.header"]')?.className).toContain(
       'border-solid'
     );

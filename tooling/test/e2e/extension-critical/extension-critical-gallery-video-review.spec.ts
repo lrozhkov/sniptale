@@ -20,7 +20,14 @@ import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critic
 
 async function timelineGesture(page: Page, start: number, end?: number) {
   const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
-  const box = (await plane.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox())!;
+  const placement =
+    end !== undefined && (await plane.getAttribute('data-active-tool-lane')) === 'source';
+  const target = plane.locator(
+    placement
+      ? '[data-ui="gallery.videoReview.sourceLane"]'
+      : '[data-ui="gallery.videoReview.ruler"]'
+  );
+  const box = (await target.boundingBox())!;
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const x = (time: number) => box.x + (box.width * time) / duration;
   await page.mouse.move(x(start), box.y + 12);
@@ -148,8 +155,7 @@ for (const variant of [
         )
         .toBe(true);
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(dialog).toBeVisible();
       await expect(field).toHaveValue('Recovered unfinished comment');
       await expect(button('gallery.videoReview.undo')).toBeDisabled();
       await field.fill('Original comment');
@@ -172,7 +178,13 @@ for (const variant of [
       await field.fill('Edited comment');
       await button('gallery.videoReview.save').click();
       await expect(dialog.locator('ol').getByText('Edited comment', { exact: true })).toBeVisible();
-      await button('gallery.videoReview.deleteComment').click();
+      const editedNote = dialog
+        .locator('.review-inspector-list > li')
+        .filter({ hasText: 'Edited comment' });
+      await editedNote.hover();
+      await editedNote
+        .getByRole('button', { name: label('gallery.videoReview.deleteSelected'), exact: true })
+        .click();
       await expect(dialog.locator('ol').getByText('Edited comment', { exact: true })).toHaveCount(
         0
       );
@@ -192,6 +204,7 @@ for (const variant of [
       await expect(
         dialog.locator('ol').getByText('Interval with region', { exact: true })
       ).toBeVisible();
+      await button('gallery.videoReview.clearPlaybackRange').click();
       await button('gallery.videoReview.fit').click();
       await page.keyboard.press('Space');
       await expect(video).toHaveJSProperty('paused', false);
@@ -233,10 +246,23 @@ for (const variant of [
       expect(payload.telemetry.cursorTrack).not.toHaveProperty('samples');
       expect(Buffer.byteLength(report)).toBeLessThan(128 * 1024);
       await button('common.actions.close').click();
-      await expect(page.locator('[data-ui="gallery.preview.surface"] video')).toHaveJSProperty(
-        'controls',
-        true
-      );
+      const preview = page.locator('[data-ui="gallery.preview.surface"]');
+      const previewVideo = preview.locator('video');
+      await expect(previewVideo).toBeVisible();
+      await preview
+        .getByRole('button', {
+          name: label('gallery.preview.player.playVideo'),
+          exact: true,
+        })
+        .click();
+      await expect(previewVideo).toHaveJSProperty('paused', false);
+      await preview
+        .getByRole('button', {
+          name: label('gallery.preview.player.pause'),
+          exact: true,
+        })
+        .click();
+      await expect(previewVideo).toHaveJSProperty('paused', true);
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
         dialog.locator('ol').getByText('Interval with region', { exact: true })
@@ -312,7 +338,19 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await expect(
       dialog.getByRole('button', { name: 'Cut · 2.0 – 6.0', exact: true })
     ).toBeVisible();
+    const { readNativeReviewWorkspace } = await import('../support/native-review-workspace');
+    const aggregateId = `recording:${betaV1Fixture.records.recordings[0].id}`;
+    const beforeUndo = await readNativeReviewWorkspace(page, aggregateId);
+    expect(
+      await page.evaluate(
+        () => !!document.activeElement?.closest('[data-ui="gallery.videoReview.dialog"]')
+      )
+    ).toBe(true);
+    expect(beforeUndo).not.toBeNull();
     await page.keyboard.press('Control+z');
+    await expect
+      .poll(async () => (await readNativeReviewWorkspace(page, aggregateId))?.cursor)
+      .toBe(beforeUndo!.cursor - 1);
     await expect(cut).toBeVisible();
     await button('gallery.videoReview.pointerTool').click();
     await timelineGesture(page, 4.1, 8.1);
@@ -361,8 +399,7 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
         .digest('hex')
     );
     await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await expect(dialog).toBeVisible();
     await expect(cut).toBeVisible();
     await button('gallery.videoReview.redo').click();
     await expect(
@@ -513,6 +550,7 @@ for (const { container, gaps } of [
           }
           if (audio === 'mute') expect(measured.during.rms).toBeLessThan(0.001);
           else expect(Math.abs(measured.during.frequency - 440)).toBeLessThan(20);
+          await button('gallery.videoReview.comments').click();
           const reportDownload = page.waitForEvent('download');
           await button('gallery.videoReview.downloadReport').click();
           const report = await readFile(await (await reportDownload).path(), 'utf8');
@@ -520,10 +558,13 @@ for (const { container, gaps } of [
           expect(report).toContain('"videoReencoded": false');
           await button('common.actions.close').click();
           await page.keyboard.press('Escape');
-          await page
-            .getByRole('button', { name: `beta-v1-edited.${container}`, exact: true })
-            .first()
-            .click();
+          const exportedName =
+            container === 'webm'
+              ? /^Sniptale_video-review_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_edited\.webm$/
+              : /^Sniptale_video-review_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_edited\.mp4$/;
+          const exportedCard = page.getByRole('group', { name: exportedName });
+          await expect(exportedCard).toHaveCount(1);
+          await exportedCard.getByRole('button', { name: exportedName }).first().click();
           await page.locator('[data-ui="gallery.videoReview.enter"]').click();
           const provenanceDownload = page.waitForEvent('download');
           await button('gallery.videoReview.downloadReport').click();
@@ -2672,7 +2713,7 @@ for (const variant of [
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
   const testName =
-    `quick editor voiceover strip supports pause and optional cap at desktop sizes ` +
+    `quick editor voiceover inspector supports pause and optional cap at desktop sizes ` +
     `in ${variant.locale}/${variant.theme}`;
   test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
@@ -2699,7 +2740,7 @@ for (const variant of [
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 3);
       await button('gallery.videoReview.recordVoiceover').click();
-      const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
+      const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverInspector"]');
       await expect(strip).toBeVisible();
       await expect(
         strip.getByRole('switch', {
@@ -2757,7 +2798,7 @@ for (const variant of [
       await expect(startCapture).toBeEnabled();
       await expect(numericLimit).toBeInViewport();
       await expect(startCapture).toBeInViewport();
-      await expect(dialog.locator('[inert]')).toHaveCount(1);
+      await expect(dialog.locator('[inert]')).toHaveCount(5);
       await page.screenshot({
         fullPage: false,
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
@@ -2825,7 +2866,14 @@ for (const variant of [
             .evaluate((video) => video.muted)
         )
         .toBe(true);
-      const playback = dialog.locator('[data-toolbar-transport] button[aria-pressed]');
+      const playback = dialog
+        .locator('[data-toolbar-transport]')
+        .locator(
+          [
+            `button[aria-label=${JSON.stringify(translate('gallery.videoReview.play', variant.locale))}]`,
+            `button[aria-label=${JSON.stringify(translate('gallery.videoReview.pause', variant.locale))}]`,
+          ].join(', ')
+        );
       await expect(playback).toHaveAttribute(
         'aria-label',
         translate(
@@ -2834,7 +2882,7 @@ for (const variant of [
         )
       );
       await expect(
-        playback.locator(variant.locale === 'ru' ? 'svg.lucide-pause' : 'svg.lucide-play')
+        playback.locator(variant.locale === 'ru' ? 'svg:has(rect)' : 'svg.lucide-play')
       ).toHaveCount(1);
       await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
       await page.screenshot({
@@ -3380,7 +3428,7 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.scene').click();
       await button('windowHeader.browser').click();
-      await button('gallery.videoReview.backgroundGradient').click();
+      await button('gallery.videoReview.backgroundSolid').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
         .first()

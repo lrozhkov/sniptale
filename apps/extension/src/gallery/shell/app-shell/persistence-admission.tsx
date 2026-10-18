@@ -1,10 +1,7 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GalleryLoadingPanel } from './loading';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import {
   prepareDatabaseForRecovery,
@@ -68,59 +65,64 @@ function AdmissionPanel(props: {
   const canReset =
     props.status.status === 'corrupt' || props.status.status === 'unsupported-version';
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--sniptale-color-surface-canvas)] p-6">
+    <main
+      className="sniptale-compact-workspace flex min-h-screen items-center justify-center
+      bg-[var(--sniptale-color-surface-canvas)] p-6"
+    >
       <section
         aria-labelledby="gallery-persistence-recovery-title"
-        className="w-full max-w-xl rounded-[20px] border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-panel)] p-8 text-[var(--sniptale-color-text-primary)]
+        className="w-full max-w-xl rounded-[4px] border border-[var(--sniptale-color-border-soft)]
+          bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]
           shadow-[var(--sniptale-shadow-panel)]"
       >
         <AlertTriangle className="mb-4 h-8 w-8 text-[var(--sniptale-color-danger)]" aria-hidden />
-        <h1 id="gallery-persistence-recovery-title" className="text-xl font-semibold">
+        <h1 id="gallery-persistence-recovery-title" className="text-sm leading-5 font-semibold">
           {copy.title}
         </h1>
-        <p role="alert" className="mt-3 text-sm leading-6 text-[var(--sniptale-color-text-muted)]">
+        <p
+          role="alert"
+          className="mt-3 select-text text-sm leading-5 font-normal text-[var(--sniptale-color-text-muted)]"
+        >
           {copy.body}
         </p>
         {props.errorMessage ? (
-          <p className="mt-3 text-sm leading-6 text-[var(--sniptale-color-danger)]" role="alert">
+          <p
+            className="mt-3 select-text text-sm leading-5 font-normal text-[var(--sniptale-color-danger)]"
+            role="alert"
+          >
             {props.errorMessage}
           </p>
         ) : null}
         {props.status.status === 'insufficient-space' ? (
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] leading-[18px] font-medium">
             <div>
               <dt className="text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.recovery.requiredSpace')}
               </dt>
-              <dd className="mt-1 font-semibold">{formatBytes(props.status.requiredBytes)}</dd>
+              <dd className="mt-1 font-medium">{formatBytes(props.status.requiredBytes)}</dd>
             </div>
             <div>
               <dt className="text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.recovery.availableSpace')}
               </dt>
-              <dd className="mt-1 font-semibold">{formatBytes(props.status.availableBytes)}</dd>
+              <dd className="mt-1 font-medium">{formatBytes(props.status.availableBytes)}</dd>
             </div>
           </dl>
         ) : null}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            disabled={props.busy}
-            onClick={props.onRetry}
-            className={getControlPrimaryButtonClassName()}
-          >
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ProductActionButton compact type="button" disabled={props.busy} onClick={props.onRetry}>
             {translate('gallery.recovery.retry')}
-          </button>
+          </ProductActionButton>
           {canReset ? (
-            <button
+            <ProductActionButton
+              compact
               type="button"
               disabled={props.busy}
               onClick={props.onReset}
-              className={getControlSecondaryButtonClassName({ tone: 'danger' })}
+              tone="danger"
             >
               {translate('gallery.recovery.reset')}
-            </button>
+            </ProductActionButton>
           ) : null}
         </div>
       </section>
@@ -166,6 +168,7 @@ export function GalleryPersistenceAdmission({
         status={status}
       />
       <ProductConfirmDialog
+        dialogClassName="sniptale-compact-workspace"
         cancelText={translate('gallery.recovery.cancel')}
         confirmText={translate('gallery.recovery.reset')}
         isLoading={busy}

@@ -1,3 +1,4 @@
+import { TextareaField } from '../../ui/compact-inspector-controls';
 import { useEffect, useRef } from 'react';
 import { SquareDashed } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -43,27 +44,30 @@ export function ReviewComposer(props: {
         props.onLeave?.();
       }}
       data-ui="gallery.videoReview.commentComposer"
-      className="space-y-2 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
+      className="sniptale-parameter-stack rounded-[var(--sniptale-radius-sm)] border
+        border-[var(--sniptale-color-border-soft)] p-3"
     >
       <ReviewInterval
         start={anchor.kind === 'point' ? anchor.time : anchor.start}
         end={anchor.kind === 'point' ? anchor.time : anchor.end}
       />
-      <div>
-        <textarea
+      <div className="grid min-w-0 gap-2">
+        <TextareaField
           ref={textarea}
-          aria-label={translate('gallery.videoReview.commentText')}
+          label={translate('gallery.videoReview.commentText')}
           placeholder={translate('gallery.videoReview.commentPlaceholder')}
           title={translate('gallery.videoReview.commentRegionHint')}
           value={props.annotation.text}
           disabled={props.busy}
           rows={4}
           maxLength={100_000}
-          className="block w-full resize-y bg-transparent py-2 text-sm outline-none"
-          onChange={(event) => props.onChange({ ...props.annotation, text: event.target.value })}
+          onChange={(text) => {
+            voice.stop();
+            props.onChange({ ...props.annotation, text });
+          }}
           onSelect={voice.moveCaret}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-2">
           <VoiceInputButton
             dataUi="gallery.videoReview.voice"
             disabled={props.busy}
@@ -80,7 +84,6 @@ export function ReviewComposer(props: {
             <ReviewButton
               label={translate('gallery.videoReview.discard')}
               disabled={props.busy}
-              className={reviewTextButtonClassName}
               onClick={() => {
                 voice.stop();
                 props.onDiscard();
@@ -88,7 +91,7 @@ export function ReviewComposer(props: {
             />
             <ReviewButton
               label={translate('gallery.videoReview.save')}
-              className={reviewTextButtonClassName}
+              primary
               disabled={props.busy || !props.annotation.text.trim()}
               onClick={() => {
                 voice.stop();

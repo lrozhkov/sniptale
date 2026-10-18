@@ -54,7 +54,7 @@ describe('SettingsLoadingState', () => {
   it('renders the panel loading state with the full matte card skeleton set', () => {
     renderElement(<SettingsCardLoadingState />);
 
-    expect(container?.firstElementChild?.className).toContain('rounded-[18px]');
+    expect(container?.firstElementChild?.className).toContain('rounded-[4px]');
     expect(container?.querySelectorAll('.animate-pulse')).toHaveLength(4);
   });
 

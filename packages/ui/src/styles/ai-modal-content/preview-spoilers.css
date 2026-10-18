@@ -127,3 +127,117 @@
   gap: 5px;
   flex-shrink: 0;
 }
+
+.sniptale-ai-modal-adopted .sniptale-spoiler-header {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-spoiler-toggle {
+  flex: 1 1 280px;
+  max-width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-spoiler-label {
+  font: 500 12px / 16px var(--sniptale-font-interface);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-spoiler-summary {
+  min-width: 0;
+  font: 400 12px / 16px var(--sniptale-font-interface);
+  text-align: right;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-summary--info {
+  color: var(--sniptale-color-text-secondary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-spoiler-header-tools {
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search {
+  width: 156px;
+  height: 28px;
+  gap: 6px;
+  padding: 0 8px;
+  border-color: var(--sniptale-color-border-soft);
+  border-radius: 4px;
+  background: var(--sniptale-color-surface-input);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input {
+  font: 400 13px / 18px var(--sniptale-font-document-sans);
+  user-select: text;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input::placeholder {
+  color: var(--sniptale-color-text-secondary);
+  font: inherit;
+  opacity: 1;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input:focus::placeholder {
+  color: transparent;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search:focus-within {
+  border-color: var(--sniptale-color-border-accent-strong);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  padding: 0;
+}
+
+.sniptale-ai-modal-adopted
+  :is(.sniptale-expand-btn, .sniptale-ai-column-toggle, .sniptale-ai-spoiler-toggle):focus-visible {
+  outline: 2px solid var(--sniptale-color-border-accent-strong);
+  outline-offset: 1px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-spoiler-actions {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-selected-filter.active {
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear:hover:not(:disabled) {
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+}
+
+@layer utilities {
+  .sniptale-ai-modal-adopted button.sniptale-ai-data-search-clear[data-command-press] {
+    width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 !important;
+  }
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear {
+  opacity: 0;
+  pointer-events: none;
+}
+.sniptale-ai-modal-adopted .sniptale-ai-data-search:focus-within .sniptale-ai-data-search-clear,
+.sniptale-ai-modal-adopted .sniptale-ai-data-search input:hover ~ .sniptale-ai-data-search-clear,
+.sniptale-ai-modal-adopted .sniptale-ai-data-search-clear:hover {
+  opacity: 1;
+  pointer-events: auto;
+}

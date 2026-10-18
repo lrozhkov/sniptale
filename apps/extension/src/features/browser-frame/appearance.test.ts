@@ -11,7 +11,9 @@ describe('window artwork', () => {
     );
     expect(svg).not.toContain('<script>');
     expect(svg).toContain('&lt;script&gt;');
-    expect(svg).toContain('@font-face');
+    expect(svg).toContain('@font-face{font-family:"Sniptale Interface"');
+    expect(svg).toContain('font-weight:400 700;');
+    expect(svg).toContain('data:font/woff2;base64,');
     expect(svg).not.toMatch(/(?:href|src)="https?:/);
   });
   it('uses a single contiguous tab and toolbar surface and equal menu dot pixel phases', () => {

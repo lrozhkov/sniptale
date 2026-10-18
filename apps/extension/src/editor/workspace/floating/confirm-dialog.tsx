@@ -15,6 +15,7 @@ export function EditorFloatingConfirmDialog({
   if (!confirmDialog) return null;
   return (
     <ProductConfirmDialog
+      dialogClassName="sniptale-compact-workspace sniptale-image-dialog"
       title={confirmDialog.title}
       message={confirmDialog.message}
       confirmText={confirmDialog.confirmText}

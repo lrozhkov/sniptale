@@ -11,7 +11,7 @@ export function GridSettingsPanel(props: {
 }) {
   return (
     <div className="space-y-3" data-ui="video-editor.scene.grid-settings">
-      <div className="grid gap-3">
+      <div className="sniptale-parameter-stack grid gap-3">
         <ToggleField
           checked={props.grid.enabled}
           label={translate('videoEditor.app.gridVisibleToggle')}

@@ -194,7 +194,7 @@ function SideLengthStepper(props: {
   return (
     <div
       className={[
-        'absolute right-1 top-1/2 grid h-6 w-4 translate-x-0 -translate-y-1/2 overflow-hidden rounded-[6px]',
+        'absolute right-1 top-1/2 grid h-6 w-4 translate-x-0 -translate-y-1/2 overflow-hidden rounded-[4px]',
         'border border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
         'opacity-0 transition-opacity',
         'group-hover/side-number:opacity-100 group-focus-within/side-number:opacity-100',

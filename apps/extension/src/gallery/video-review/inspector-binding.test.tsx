@@ -11,14 +11,17 @@ import { ReviewInspectorBinding } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
-const sceneProbe = vi.hoisted(() => ({ enabled: false }));
+const sceneProbe = vi.hoisted(() => ({ enabled: false, captionsLocked: false }));
 const backupExport = vi.hoisted(() => vi.fn());
 vi.mock('../../workflows/media-hub-backup', async (original) => ({
   ...(await original<typeof import('../../workflows/media-hub-backup')>()),
   exportMediaHubBackup: backupExport,
 }));
 vi.mock('./advanced-panels', () => ({
-  ReviewSceneProperties: (props: { cursorPath: ReactNode }) => <div>{props.cursorPath}</div>,
+  ReviewSceneProperties: (props: { cursorPath: ReactNode; captionsLocked?: boolean }) => {
+    sceneProbe.captionsLocked = props.captionsLocked ?? false;
+    return <div>{props.cursorPath}</div>;
+  },
   ReviewAdvancedPanels: () => null,
 }));
 vi.mock('./inspector', () => ({
@@ -74,6 +77,30 @@ vi.mock('./selected-properties', () => ({
   ),
   ReviewSelectedTextProperties: () => null,
 }));
+
+async function checkCaptionLockAdmission(
+  root: ReturnType<typeof createRoot>,
+  sceneProps: ComponentProps<typeof ReviewInspectorBinding>
+) {
+  expect(sceneProbe.captionsLocked).toBe(false);
+  await act(async () =>
+    root.render(
+      <ReviewInspectorBinding
+        {...sceneProps}
+        state={{
+          ...sceneProps.state,
+          advanced: {
+            ...sceneProps.state.advanced,
+            ui: { ...sceneProps.state.advanced.ui, lockedTracks: { text: true } },
+          },
+        }}
+      />
+    )
+  );
+  expect(sceneProbe.captionsLocked).toBe(false);
+  await act(async () => root.render(<ReviewInspectorBinding {...sceneProps} />));
+  expect(sceneProbe.captionsLocked).toBe(false);
+}
 
 it('joins every editor buffer for either recognition source and guards related-text navigation', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -299,6 +326,7 @@ it('joins every editor buffer for either recognition source and guards related-t
       },
     } as unknown as ComponentProps<typeof ReviewInspectorBinding>;
     await act(async () => root.render(<ReviewInspectorBinding {...sceneProps} />));
+    await checkCaptionLockAdmission(root, sceneProps);
     const scene = host.querySelector('[data-ui="cursorFocusPath.settings"]')!;
     const fast = Array.from(scene.querySelectorAll('button')).find(
       (node) => node.textContent === translate('videoEditor.sidebar.cameraFast')

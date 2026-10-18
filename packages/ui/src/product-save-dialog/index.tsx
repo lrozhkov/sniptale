@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { CommandPressScope } from '../control-language/press';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '../product-modal';
 import {
   ProductSaveDialogFilenameSection,
@@ -27,7 +29,12 @@ function ProductSaveDialogContent(props: ProductSaveDialogProps) {
 
   return (
     <ProductModalBody className="sniptale-modal-scroll">
-      <ProductSaveDialogFilenameSection {...filenameProps} />
+      <ProductSaveDialogFilenameSection
+        {...filenameProps}
+        {...(props.filenameClearLabel === undefined
+          ? {}
+          : { filenameClearLabel: props.filenameClearLabel })}
+      />
       <ProductSaveDialogPresetSection
         presetLabel={props.presetLabel}
         presetCount={props.presetCount}
@@ -75,6 +82,7 @@ export function ProductSaveDialog({
   filename,
   disabled,
   filenamePlaceholder,
+  filenameClearLabel,
   onFilenameChange,
   presetLabel,
   presetCount,
@@ -87,12 +95,13 @@ export function ProductSaveDialog({
   onClose,
   footer,
 }: ProductSaveDialogProps) {
+  const adopted = useContext(CommandPressScope);
   return (
     <ProductModal
       onClose={onClose}
       role="dialog"
       labelledBy="save-dialog-title"
-      dialogClassName="sniptale-save-dialog"
+      dialogClassName={`sniptale-save-dialog${adopted ? ' sniptale-save-dialog-adopted' : ''}`}
     >
       <ProductSaveDialogSurface
         title={title}
@@ -111,6 +120,7 @@ export function ProductSaveDialog({
         onChoosePreset={onChoosePreset}
         onChooseSystemFolder={onChooseSystemFolder}
         onClose={onClose}
+        {...(filenameClearLabel === undefined ? {} : { filenameClearLabel })}
         {...(filenamePlaceholder === undefined ? {} : { filenamePlaceholder })}
         {...(footer === undefined ? {} : { footer })}
       />

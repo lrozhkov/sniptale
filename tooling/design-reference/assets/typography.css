@@ -1,0 +1,75 @@
+@font-face {
+  font-family: 'Sniptale Interface';
+  src: url('./golos-ui-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+:root {
+  --font-ui: 'Sniptale Interface', 'Segoe UI', sans-serif;
+  --font-control-size: 13px;
+  --font-control-line: 18px;
+  --font-control-weight: var(--sniptale-font-weight-interface, 400);
+  --font-control-hover-weight: var(--sniptale-control-font-weight-hover, 450);
+  --font-control-selected-weight: var(--sniptale-control-font-weight-active, 500);
+  --font-control-stroke: var(--sniptale-control-icon-stroke, 1.75);
+  --font-control-hover-stroke: var(--sniptale-control-icon-stroke-hover, 1.875);
+  --font-control-selected-stroke: var(--sniptale-control-icon-stroke-active, 2);
+  --font-heading-weight: var(--sniptale-font-weight-interface-heading, 500);
+  --font-caption-size: 12px;
+  --font-caption-line: 16px;
+  --font-copy-size: 14px;
+  --font-copy-line: 20px;
+}
+
+:root,
+[data-theme] {
+  --sniptale-font-sans: var(--font-ui);
+}
+
+/* Parameter names have one owner across ordinary control constructions. */
+.theme
+  :is(
+    .param-name,
+    .parameter-name,
+    .number-label,
+    .field-label,
+    .text-label,
+    .color-name,
+    .resource-label,
+    .selection-setting > span,
+    .selection-option[data-layout='parameter'] .option-label,
+    .selection-group legend,
+    .property-group legend
+  ) {
+  font: var(--font-control-weight) var(--font-control-size)/var(--font-control-line) var(--font-ui);
+  color: var(--secondary);
+}
+
+.theme {
+  --text: var(--sniptale-color-text-interface, #3f3f46);
+}
+.theme[data-theme='dark'] {
+  --text: var(--sniptale-color-text-interface, #dedee3);
+}
+
+@font-face {
+  font-family: 'Sniptale Text';
+  src: url('./golos-text-vf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+}
+:root {
+  --sniptale-font-document-sans: 'Sniptale Text', 'Segoe UI', sans-serif;
+}
+.theme
+  :is(input[type='text'], input[type='search'], input[type='url'], input:not([type]), textarea):not(
+    .font-mono
+  ):not([inputmode='decimal']):not([inputmode='numeric']) {
+  font-family: var(--sniptale-font-document-sans);
+}
+
+.theme :is(input, textarea):focus::placeholder {
+  opacity: 0;
+}

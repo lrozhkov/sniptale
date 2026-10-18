@@ -61,7 +61,10 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(cards[1]?.className).toContain('hover:border-[var(--sniptale-color-border-strong)]');
     const selection = cards[1]?.querySelector<HTMLButtonElement>('button[aria-pressed]');
     expect(selection?.getAttribute('aria-pressed')).toBe('false');
-    expect(selection?.className).toContain('group-focus-within:opacity-100');
+    expect(selection?.querySelector('[data-ui="gallery.selection.idle"]')).not.toBeNull();
+    const mark = selection?.querySelector('[data-ui="gallery.selection.mark"]');
+    expect(mark?.className).toContain('group-hover/gallery-caption:opacity-100');
+    expect(mark?.className).toContain('group-focus-within/gallery-caption:opacity-100');
     expect(selection?.className).toContain('focus-visible:ring-[var(--sniptale-color-focus-ring)]');
 
     render(<GalleryGridCanvas {...baseProps} trashMode />);

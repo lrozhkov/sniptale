@@ -22,7 +22,7 @@ function AutoBlurCheckbox(props: {
     <input
       ref={ref}
       type="checkbox"
-      className="sniptale-checkbox"
+      className="sniptale-parameter-check"
       checked={props.checked}
       aria-label={props.label}
       onChange={props.onChange}
@@ -67,10 +67,13 @@ function AutoBlurChildRow(props: {
         label={props.match.value}
         onChange={() => props.toggleMatch(props.match.id)}
       />
-      <div role="cell" className="w-36 shrink-0 text-xs text-[var(--sniptale-color-text-dim)]">
+      <div
+        role="cell"
+        className="w-36 shrink-0 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]"
+      >
         {getAutoBlurCategoryLabel(props.match.category)}
       </div>
-      <div role="cell" className="min-w-0 flex-1 break-words text-sm leading-5">
+      <div role="cell" className="min-w-0 flex-1 break-words text-[13px] leading-[18px]">
         {props.match.value}
       </div>
       <div role="cell" className="w-40 shrink-0">
@@ -84,7 +87,7 @@ function getChildRowClassName(props: { match: AutoBlurMatch; selected: boolean }
   return [
     'sniptale-tree-row sniptale-tree-row-field min-h-9 items-start border-b',
     'border-[var(--sniptale-color-border-subtle)] pl-10',
-    props.selected && 'sniptale-tree-row-field-selected',
+    props.selected && 'bg-[var(--sniptale-color-surface-hover)]',
     props.match.alreadyBlurred && 'opacity-75',
   ]
     .filter(Boolean)
@@ -195,7 +198,7 @@ function AutoBlurCategoryRow(props: {
 function getCategoryRowClassName(selected: boolean) {
   return [
     'sniptale-tree-row min-h-10 border-b border-[var(--sniptale-color-border-subtle)]',
-    selected && 'sniptale-tree-row-selected',
+    selected && 'bg-[var(--sniptale-color-surface-hover)]',
   ]
     .filter(Boolean)
     .join(' ');

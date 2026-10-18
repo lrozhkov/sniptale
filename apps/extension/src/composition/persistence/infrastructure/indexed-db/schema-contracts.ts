@@ -22,6 +22,8 @@ import {
   PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_EXPORTS_STORE,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -59,10 +61,12 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'recordings',
-    schemaVersion: 2,
+    schemaVersion: 3,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
+      { storeName: RECORDING_RECOVERY_SESSIONS_STORE, dataClass: 'durable-authority' },
+      { storeName: RECORDING_RECOVERY_BLOCKS_STORE, dataClass: 'durable-authority' },
     ],
   },
   {

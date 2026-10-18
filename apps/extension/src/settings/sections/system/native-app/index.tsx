@@ -1,5 +1,5 @@
 import { Cable, ShieldAlert } from 'lucide-react';
-import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../../platform/i18n';
 import {
@@ -12,13 +12,13 @@ import { NativeConnectionView } from './connection';
 import { NativeSettingsView } from './views';
 
 const permissionGateClassName = [
-  'rounded-[18px] border p-5',
+  'rounded-[4px] border p-3',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_88%,var(--sniptale-color-surface-canvas)_12%)]',
 ].join(' ');
 
 const permissionIconClassName = [
-  'flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]',
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]',
   'text-[var(--sniptale-color-accent)]',
 ].join(' ');
@@ -31,7 +31,7 @@ function NativeAppErrorPanel({ error }: { error: string | null }) {
     <div
       className={[
         settingsPanelClassName,
-        'flex gap-3 text-sm text-[var(--sniptale-color-danger)]',
+        'flex gap-3 text-[13px] leading-[18px] text-[var(--sniptale-color-danger)]',
       ].join(' ')}
     >
       <ShieldAlert className="h-5 w-5 shrink-0" />
@@ -54,17 +54,19 @@ function NativeAppPermissionGate(props: { loading: boolean; onEnable: () => void
           <Cable size={20} aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+          <h2 className="text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('settings.nativeApp.permissionRequiredTitle')}
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
+          <p className="mt-1 max-w-2xl text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             {translate('settings.nativeApp.permissionRequiredDescription')}
           </p>
         </div>
       </div>
-      <button
+      <ProductActionButton
         type="button"
-        className={`${getControlPrimaryButtonClassName({ density: 'default' })} mt-4`}
+        compact
+        tone="primary"
+        className="mt-3"
         disabled={props.loading}
         onClick={props.onEnable}
       >
@@ -73,7 +75,7 @@ function NativeAppPermissionGate(props: { loading: boolean; onEnable: () => void
             ? 'settings.nativeApp.permissionChecking'
             : 'settings.nativeApp.permissionEnable'
         )}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -128,7 +130,7 @@ export function NativeAppSection(props: { onViewChange?: (view: string) => void;
           }}
         />
       )}
-      <p className="text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+      <p className="text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
         {translate('settings.nativeApp.privacyCopy')}
       </p>
     </section>

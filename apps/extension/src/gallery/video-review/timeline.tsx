@@ -1,8 +1,10 @@
+import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
-import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { REVIEW_TRACK_ORDER } from './track-order';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
   ReviewButton,
   reviewIconButtonClassName,
@@ -20,7 +22,7 @@ import type { ReactNode, CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { ReviewTelemetryStrip } from './timeline-telemetry';
+import { ReviewTelemetryStrip, type ReviewCursorTimelineInteractions } from './timeline-telemetry';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
 import { useReviewTimelineHover, type ReviewPlacementHints } from './timeline-hover';
 import {
@@ -31,7 +33,7 @@ import {
 import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
-type TimelineProps = {
+type TimelineProps = ReviewCursorTimelineInteractions & {
   sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
@@ -66,10 +68,12 @@ type TimelineProps = {
   expandedTools?: boolean;
   zoomTrack?: ReactNode;
   webcamTrack?: ReactNode;
-  audioTrack?: ReactNode;
+  audioTracks?: Partial<Record<'originalAudio' | 'voiceover' | 'music', ReactNode>>;
+  trackOrder?: readonly QuickEditTrack[];
   textTrack?: ReactNode;
   annotationEffectsTrack?: ReactNode;
   boundaries?: readonly number[];
+  snapTimes?: readonly number[] | undefined;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
@@ -86,12 +90,7 @@ type TimelineProps = {
   onPlay(): void;
   onOpenExport?: (() => void) | undefined;
   exportActive?: boolean | undefined;
-  cursorFocusKeys?: readonly CursorFocusTimelineKey[];
-  selectedCursorFocusId?: string;
-  onCursorFocusKey?(key: CursorFocusTimelineKey): void;
-  onNavigateCursorFocus?(time: number, key?: CursorFocusTimelineKey): void;
-  onMoveCursorFocus?(key: CursorFocusTimelineKey, time: number): void;
-  onAddCursorFocusKey?(time: number): void;
+
   actionsTrackVisible?: boolean;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
@@ -135,6 +134,23 @@ export function ReviewTimeline(props: TimelineProps) {
     snapRangePreview: !!props.snapRangePreview,
     boundaries: props.boundaries,
   });
+  const rows: Partial<Record<QuickEditTrack, ReactNode>> = {
+    actions: <ReviewTimelineEvents {...props} width={width} zoom={zoom} />,
+    source: (
+      <ReviewSourceLane
+        {...props}
+        drawingRange={plane.sourcePreview}
+        drawingKind={props.sourceRangeKind}
+        rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
+        snapToKeyframes={!!props.boundaries}
+      />
+    ),
+    webcam: props.webcamTrack,
+    zoom: props.zoomTrack,
+    text: props.textTrack,
+    annotationEffects: props.annotationEffectsTrack,
+    ...props.audioTracks,
+  };
   return (
     <section
       ref={wheelTarget}
@@ -200,6 +216,15 @@ export function ReviewTimeline(props: TimelineProps) {
               else hover.clear();
             }}
             onPointerMove={plane.onPointerMove}
+            onBlurCapture={(event) => {
+              // A pending commit makes its row inert after pointer release.
+              if (
+                event.relatedTarget === null &&
+                event.target.closest('[inert]') &&
+                document.activeElement === document.body
+              )
+                event.currentTarget.focus({ preventScroll: true });
+            }}
             onPointerUp={(event) => {
               plane.onPointerUp(event);
               hover.clear();
@@ -232,16 +257,6 @@ export function ReviewTimeline(props: TimelineProps) {
                 gutter={gutter}
                 width={Math.max(1, width * zoom)}
               />
-              <div inert={props.busy}>
-                <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
-                <ReviewSourceLane
-                  {...props}
-                  drawingRange={plane.sourcePreview}
-                  drawingKind={props.sourceRangeKind}
-                  rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
-                  snapToKeyframes={!!props.boundaries}
-                />
-              </div>
               <ReviewPlayhead
                 time={props.time}
                 duration={props.duration}
@@ -249,11 +264,9 @@ export function ReviewTimeline(props: TimelineProps) {
                 width={Math.max(1, width * zoom)}
               />
               <div inert={props.busy}>
-                {props.zoomTrack}
-                {props.webcamTrack}
-                {props.textTrack}
-                {props.annotationEffectsTrack}
-                {props.audioTrack}
+                {(props.trackOrder ?? REVIEW_TRACK_ORDER).map((track) => (
+                  <Fragment key={track}>{rows[track]}</Fragment>
+                ))}
               </div>
             </ReviewTimelineResizeGuide>
           </div>
@@ -334,14 +347,15 @@ function ReviewTimelineEvents(
             <Filter size={14} aria-hidden="true" />
           </ReviewButton>
           {props.onToggleActions ? (
-            <ReviewButton
+            <ReviewTrackVisibilityButton
+              track={'actions'}
               label={translate('gallery.videoReview.historyEffectsEnabled')}
               className={reviewTrackStatusButtonClassName}
               aria-pressed={props.actionsEnabled !== false}
               onClick={props.onToggleActions}
             >
               {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewButton>
+            </ReviewTrackVisibilityButton>
           ) : null}
         </>
       }

@@ -40,7 +40,7 @@ type RowActions = {
 };
 
 export const treeIconButton = [
-  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg',
+  'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
   'text-[var(--sniptale-color-text-muted)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
@@ -64,7 +64,7 @@ function CommandIcon({ command }: { command: string }) {
 
 function rowClass(selected: boolean, dropEdge?: DropEdge): string {
   return [
-    'context-menu-tree-row relative min-w-0 rounded-md border pr-1 transition-colors',
+    'context-menu-tree-row relative min-w-0 rounded-[4px] border pr-1 transition-colors',
     'focus-visible:outline-none',
     selected
       ? 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]'
@@ -164,8 +164,8 @@ export function ContextMenuTreeRow(props: {
             ref={props.inputRef}
             aria-label={t('settings.appearance.contextMenuSectionName')}
             className={[
-              'min-w-0 flex-1 rounded-md border border-[var(--sniptale-color-border-soft)]',
-              'bg-[var(--sniptale-color-surface-canvas)] px-2 py-1 text-sm',
+              'min-w-0 flex-1 rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
+              'bg-[var(--sniptale-color-surface-canvas)] px-2 py-1 text-[13px]',
             ].join(' ')}
             maxLength={40}
             value={props.editingValue}
@@ -184,7 +184,7 @@ export function ContextMenuTreeRow(props: {
           />
         ) : (
           <span
-            className="min-w-0 flex-1 truncate text-sm"
+            className="min-w-0 flex-1 truncate text-[13px]"
             title={label}
             onDoubleClick={() => actions.edit(key, node.title ?? '')}
           >

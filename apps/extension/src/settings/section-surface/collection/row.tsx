@@ -12,10 +12,7 @@ import type {
 type RowProps = {
   activeKeyboardItemId: string | null;
   dragInstructionsId: string;
-  dragOffsetY: number;
   dragging: boolean;
-  dropAfter: boolean;
-  dropBefore: boolean;
   groups: readonly SettingsCollectionResolvedGroup[];
   item: SettingsCollectionItem;
   menuOpen: boolean;
@@ -37,25 +34,14 @@ type RowProps = {
 };
 
 const rowClassName = [
-  'group relative flex min-h-[52px] items-center gap-3 border-b px-3 py-2 last:border-b-0',
-  'border-[var(--sniptale-color-border-subtle)]',
+  'group relative flex min-h-14 items-center gap-3 border-b px-3 py-2 last:border-b-0',
+  'border-[var(--sniptale-color-border-subtle)] bg-[var(--sniptale-color-surface-panel)]',
   'transition-[background-color,box-shadow] duration-150 motion-reduce:transition-none',
 ].join(' ');
 
 const draggingRowClassName = [
-  'z-20 cursor-grabbing shadow-lg ring-1 transition-none',
-  'bg-[var(--sniptale-color-surface-elevated)]',
-  'ring-[var(--sniptale-color-accent)]',
-].join(' ');
-
-const dropBeforeClassName = [
-  'before:pointer-events-none before:absolute before:inset-x-2 before:-top-px before:z-30',
-  'before:h-0.5 before:rounded-full before:bg-[var(--sniptale-color-accent)]',
-].join(' ');
-
-const dropAfterClassName = [
-  'after:pointer-events-none after:absolute after:inset-x-2 after:-bottom-px after:z-30',
-  'after:h-0.5 after:rounded-full after:bg-[var(--sniptale-color-accent)]',
+  'z-20 cursor-grabbing ring-1 ring-inset',
+  'bg-[var(--sniptale-color-surface-hover)] ring-[var(--sniptale-color-border-strong)]',
 ].join(' ');
 
 export function SettingsCollectionRow(props: RowProps) {
@@ -81,13 +67,6 @@ export function SettingsCollectionRow(props: RowProps) {
     <div
       data-settings-collection-item={props.item.id}
       data-settings-collection-dragging={props.dragging || undefined}
-      data-settings-collection-drop-after={props.dropAfter || undefined}
-      data-settings-collection-drop-before={props.dropBefore || undefined}
-      style={
-        props.dragging
-          ? { transform: `translate3d(0, ${String(props.dragOffsetY)}px, 0)` }
-          : undefined
-      }
       className={[
         rowClassName,
         props.pointerDragging
@@ -96,8 +75,6 @@ export function SettingsCollectionRow(props: RowProps) {
         props.item.enabled === false ? 'opacity-60' : '',
         props.item.busy ? 'cursor-wait' : '',
         props.dragging ? draggingRowClassName : '',
-        props.dropBefore ? dropBeforeClassName : '',
-        props.dropAfter ? dropAfterClassName : '',
       ].join(' ')}
     >
       {reorder ? (

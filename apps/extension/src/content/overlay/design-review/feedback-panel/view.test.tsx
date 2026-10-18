@@ -240,6 +240,15 @@ it('searches feedback and drags the panel by its header', () => {
   });
   expect(container.textContent).toContain('content.designReview.panelNoResults');
 
+  const clear = container.querySelector<HTMLButtonElement>('.sniptale-field-clear');
+  expect(clear).not.toBeNull();
+  act(() => clear?.click());
+  expect(input?.value).toBe('');
+  expect(document.activeElement).toBe(input);
+  expect(container.querySelector('.sniptale-field-clear')).toBeNull();
+  expect(container.textContent).toContain('Improve card spacing');
+  expect(browserAnnotationSession.getState().domRecords[0]?.comment).toBe('Improve card spacing');
+
   const panel = container.querySelector<HTMLElement>(
     '[data-ui="content.design-review.feedback-panel"]'
   );
@@ -257,4 +266,15 @@ it('searches feedback and drags the panel by its header', () => {
   });
   expect(panel?.style.left).toBe('84px');
   expect(panel?.style.top).toBe('132px');
+});
+
+it('keeps closed feedback chrome unmounted until the panel is opened', () => {
+  const props = { onClose: vi.fn(), onOpenRecord: vi.fn(() => true) };
+  act(() => root.render(<DesignReviewFeedbackPanel {...props} open={false} />));
+  expect(container.querySelector('[data-ui="content.design-review.feedback-panel"]')).toBeNull();
+  act(() => root.render(<DesignReviewFeedbackPanel {...props} open />));
+  expect(
+    container.querySelector('[data-ui="content.design-review.feedback-panel"]')
+  ).not.toBeNull();
+  expect(props.onClose).not.toHaveBeenCalled();
 });

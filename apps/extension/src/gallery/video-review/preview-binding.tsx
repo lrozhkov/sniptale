@@ -346,7 +346,7 @@ function ReviewPreviewStage({
           );
         state.setPlaying(playing);
       }}
-      onEnded={() => state.beforeAction(state.onEnded)}
+      onEnded={state.onEnded}
       onError={state.onMediaError}
     />
   );

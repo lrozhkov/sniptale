@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { translate } from '../../../../platform/i18n';
 import { FeedbackFilter, type FeedbackActionFilter } from './filter';
 
@@ -14,14 +15,17 @@ export function FeedbackPanelControls(props: {
   onQueryChange: (query: string) => void;
   query: string;
 }) {
+  const input = useRef<HTMLInputElement>(null);
   return (
     <div className="flex gap-2 border-b border-solid border-[color:var(--sniptale-color-border-soft)] px-3 pb-3">
       <label className="relative min-w-0 flex-1">
-        <Search className="absolute left-3 top-3 text-[var(--sniptale-color-text-dim)]" size={16} />
+        <Search className="absolute left-2 top-2 text-[var(--sniptale-color-text-dim)]" size={16} />
         <span className="sr-only">{translate('content.designReview.panelSearch')}</span>
         <input
+          ref={input}
           className={[
-            'h-10 w-full rounded-[9px] border bg-transparent pl-9 pr-3 text-xs outline-none',
+            'h-8 w-full rounded-[4px] border bg-transparent pl-8 pr-8 outline-none',
+            'text-[13px] leading-[18px] font-medium',
             'border-[color:var(--sniptale-color-border-soft)]',
             'focus:border-[color:var(--sniptale-color-accent)]',
           ].join(' ')}
@@ -29,6 +33,12 @@ export function FeedbackPanelControls(props: {
           value={props.query}
           onChange={(event) => props.onQueryChange(event.target.value)}
         />
+        {props.query ? (
+          <InspectorFieldClear
+            label={translate('content.designReview.panelSearch')}
+            target={input}
+          />
+        ) : null}
       </label>
       <FeedbackFilter
         filter={props.filter}

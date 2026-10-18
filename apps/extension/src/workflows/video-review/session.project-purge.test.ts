@@ -113,7 +113,7 @@ it.each(['text', 'crop', 'workspace color', 'track controls'] as const)(
         : kind === 'crop'
           ? oldEditor.commit(cropOperation)
           : kind === 'track controls'
-            ? oldEditor.setTrackControl('source', { locked: true })
+            ? oldEditor.setTrackControl('zoom', { enabled: false })
             : oldEditor.saveAdvanced({
                 ...initial.workspace.advanced,
                 ui: { ...initial.workspace.advanced.ui, workspaceColors: { dark: '#123456ff' } },

@@ -45,7 +45,7 @@ it('offers step and section operations from one visible insertion trigger', asyn
   await act(async () => vi.advanceTimersByTimeAsync(180));
   const section = [
     ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
-  ].find((button) => button.textContent?.includes('Add section'))!;
+  ].find((button) => button.getAttribute('title') === 'Add section')!;
   await act(async () => section.click());
   expect(onOperate).toHaveBeenCalledWith({ kind: 'add-section', beforeItemId: 'next' });
 });

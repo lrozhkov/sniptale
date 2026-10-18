@@ -19,7 +19,6 @@ function PlaybackToggleButton(props: {
     <ContentToolbarButton
       type="button"
       onClick={props.onTogglePlay}
-      active={props.isPlaying}
       className={toolbarIconButtonClassName}
       aria-label={
         props.isPlaying || props.isPreparingPlayback

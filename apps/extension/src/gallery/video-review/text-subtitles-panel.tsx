@@ -1,7 +1,7 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Download } from 'lucide-react';
-import { ProductField, ProductSelect } from '@sniptale/ui/product-form-controls';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { ToggleField, SelectField } from '../../ui/compact-inspector-controls';
 import { exportReviewSubtitles } from '../../features/video/review/subtitle-export';
 import type { ReviewTextDocument } from '../../features/video/review/text-types';
 import { downloadGalleryBlob } from '../shared/download';
@@ -109,7 +109,7 @@ export function ReviewTextSubtitlesForm(props: SubtitlesProps) {
   return (
     <section
       data-ui="gallery.videoReview.textSubtitles"
-      className="min-w-0 space-y-2"
+      className="min-w-0 sniptale-parameter-stack"
       onKeyDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-2">
@@ -125,19 +125,23 @@ export function ReviewTextSubtitlesForm(props: SubtitlesProps) {
           {translate('gallery.videoReview.subtitlesTitle')}
         </span>
       </div>
-      <ProductField label={translate('gallery.videoReview.subtitlesScope')}>
-        <span className="text-xs">
-          {translate(
-            props.wholeDocument
-              ? 'gallery.videoReview.textRewriteAllScope'
-              : 'gallery.videoReview.textRewriteSelectedScope'
-          ).replace('{count}', String(ids.length))}
-        </span>
-      </ProductField>
-      <fieldset disabled={props.disabled || download === 'started'} className="min-w-0 space-y-2">
+      {props.wholeDocument || ids.length > 1 ? (
+        <InspectorParameterRow stacked label={translate('gallery.videoReview.subtitlesScope')}>
+          <span className="text-xs">
+            {translate(
+              props.wholeDocument
+                ? 'gallery.videoReview.textRewriteAllScope'
+                : 'gallery.videoReview.textRewriteSelectedScope'
+            ).replace('{count}', String(ids.length))}
+          </span>
+        </InspectorParameterRow>
+      ) : null}
+      <fieldset
+        disabled={props.disabled || download === 'started'}
+        className="min-w-0 sniptale-parameter-stack"
+      >
         <SubtitleFileSettings file={file} />
       </fieldset>
-      <p className="text-xs">{translate('gallery.videoReview.subtitlesClock')}</p>
       <SubtitleFilePreview result={result} format={file.format} />
       {download === 'failed' && (
         <p role="alert" className="text-xs">
@@ -169,40 +173,36 @@ export function ReviewTextSubtitlesForm(props: SubtitlesProps) {
 function SubtitleFileSettings({ file }: { file: ReturnType<typeof useReviewSubtitleFile> }) {
   return (
     <>
-      <ProductField label={translate('gallery.videoReview.subtitlesFormat')}>
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.subtitlesFormat')}
-          value={file.format}
-          options={[
-            { value: 'vtt', label: translate('gallery.videoReview.subtitlesWebVtt') },
-            { value: 'srt', label: translate('gallery.videoReview.subtitlesSrt') },
-          ]}
-          onChange={(value) => {
-            file.setFormat(value);
-            file.setDownload('idle');
-          }}
-        />
-      </ProductField>
-      <ProductField label={translate('gallery.videoReview.subtitlesLanguage')}>
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.subtitlesLanguage')}
-          value={file.language === null ? 'all' : `language:${file.language}`}
-          options={[
-            { value: 'all', label: translate('gallery.videoReview.subtitlesAllLanguages') },
-            ...file.languages.map((value) => ({
-              value: `language:${value}`,
-              label: value || translate('gallery.videoReview.subtitlesUnspecifiedLanguage'),
-            })),
-          ]}
-          onChange={(value) => {
-            file.setLanguage(value === 'all' ? null : value.slice('language:'.length));
-            file.setDownload('idle');
-          }}
-        />
-      </ProductField>
-      <SubtitleSwitch
+      <SelectField
+        label={translate('gallery.videoReview.subtitlesFormat')}
+        value={file.format}
+        options={[
+          { value: 'vtt', label: translate('gallery.videoReview.subtitlesWebVtt') },
+          { value: 'srt', label: translate('gallery.videoReview.subtitlesSrt') },
+        ]}
+        onChange={(value) => {
+          file.setFormat(value);
+          file.setDownload('idle');
+        }}
+      />
+      <SelectField
+        label={translate('gallery.videoReview.subtitlesLanguage')}
+        value={file.language === null ? 'all' : `language:${file.language}`}
+        options={[
+          { value: 'all', label: translate('gallery.videoReview.subtitlesAllLanguages') },
+          ...file.languages.map((value) => ({
+            value: `language:${value}`,
+            label: value || translate('gallery.videoReview.subtitlesUnspecifiedLanguage'),
+          })),
+        ]}
+        onChange={(value) => {
+          file.setLanguage(value === 'all' ? null : value.slice('language:'.length));
+          file.setDownload('idle');
+        }}
+      />
+      <ToggleField
         label={translate('gallery.videoReview.subtitlesOnlyShown')}
-        on={file.onlyShown}
+        value={file.onlyShown}
         onChange={() => {
           file.setOnlyShown((value) => !value);
           file.setDownload('idle');
@@ -210,9 +210,9 @@ function SubtitleFileSettings({ file }: { file: ReturnType<typeof useReviewSubti
       />
       {file.format === 'srt' &&
         (file.normalizeOverlaps || (file.result?.ok && file.result.overlaps)) && (
-          <SubtitleSwitch
+          <ToggleField
             label={translate('gallery.videoReview.subtitlesNormalize')}
-            on={file.normalizeOverlaps}
+            value={file.normalizeOverlaps}
             onChange={() => {
               file.setNormalizeOverlaps((value) => !value);
               file.setDownload('idle');
@@ -268,6 +268,7 @@ function SubtitleFilePreview({
             preferenceId="text-subtitles-preview"
             label={translate('gallery.videoReview.subtitlesPreview')}
           >
+            <p className="text-xs">{translate('gallery.videoReview.subtitlesClock')}</p>
             <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs">
               {result.text.slice(0, 4000)}
             </pre>
@@ -278,20 +279,5 @@ function SubtitleFilePreview({
         </>
       )}
     </>
-  );
-}
-
-function SubtitleSwitch(props: { label: string; on: boolean; onChange(): void }) {
-  return (
-    <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-      <span>{props.label}</span>
-      <ProductGlassSwitch
-        role="switch"
-        aria-label={props.label}
-        aria-checked={props.on}
-        on={props.on}
-        onClick={props.onChange}
-      />
-    </div>
   );
 }

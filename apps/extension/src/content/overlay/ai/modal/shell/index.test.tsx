@@ -103,18 +103,6 @@ vi.mock('@sniptale/ui/product-modal', async (importOriginal) => {
     ProductModalHeader: mock.ProductModalHeader,
   };
 });
-vi.mock('@sniptale/ui/product-modal/actions', async (importOriginal) => {
-  const mock = createSharedUiTestMock(aiModelSelectorMock);
-  return {
-    ...(await importOriginal<typeof import('@sniptale/ui/product-modal/actions')>()),
-    ProductActionButton: mock.ProductActionButton,
-  };
-});
-
-vi.mock('../../template-list', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../template-list')>()),
-  TemplateList: () => <div data-ui="template-list" />,
-}));
 
 vi.mock('../../../../../features/prompt-templates/editor', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../features/prompt-templates/editor')>()),

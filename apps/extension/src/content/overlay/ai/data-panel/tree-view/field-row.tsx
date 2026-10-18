@@ -21,6 +21,7 @@ export function FieldRow({ field, state, toggleSelected }: FieldRowProps) {
         type="checkbox"
         className="sniptale-checkbox"
         checked={state.selected}
+        aria-label={field.label}
         onChange={() => toggleSelected(field.id)}
         style={{ marginTop: '2px' }}
       />

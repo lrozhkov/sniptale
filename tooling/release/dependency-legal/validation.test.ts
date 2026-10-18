@@ -5,7 +5,7 @@ import path from 'node:path';
 import { expect, it } from 'vitest';
 
 import { generateDependencyLegalClosure } from './index.mjs';
-import { createLegalFixture, TEST_MANROPE } from './test-support';
+import { createLegalFixture, TEST_INTERFACE_FONT } from './test-support';
 import { writeDependencyLegalClosure } from './output.mjs';
 import { validateDependencyLegalClosure } from './validation.mjs';
 
@@ -17,6 +17,7 @@ async function seedBaseLegalFiles(repoRoot: string) {
   const baseLegal = new Map([
     ['LICENSE', 'AGPL fixture\n'],
     ['LICENSES/OFL-1.1.txt', 'OFL fixture\n'],
+    ['packages/ui/src/styles/golos-ui/LICENSE.txt', 'Golos OFL fixture\n'],
     ['NOTICE', 'Notice fixture\n'],
     ['THIRD_PARTY_NOTICES.md', 'generated below'],
   ]);
@@ -43,7 +44,11 @@ async function seedValidationFixture() {
   });
   const baseLegal = await seedBaseLegalFiles(repoRoot);
   const closure = await generateDependencyLegalClosure({ repoRoot, reviewedSelections: [] });
-  await writeDependencyLegalClosure({ closure, manrope: TEST_MANROPE, outputRoot: repoRoot });
+  await writeDependencyLegalClosure({
+    closure,
+    interfaceFont: TEST_INTERFACE_FONT,
+    outputRoot: repoRoot,
+  });
   const legalPaths = [
     ...baseLegal.keys(),
     'THIRD_PARTY_DEPENDENCIES.json',
@@ -60,7 +65,7 @@ async function seedValidationFixture() {
   await fs.writeFile(
     path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json'),
     JSON.stringify({
-      bundledAssets: [{ ...TEST_MANROPE, id: 'manrope' }],
+      bundledAssets: [{ ...TEST_INTERFACE_FONT, id: 'golos-ui' }],
       dependencyLegal: {
         canonicalLicenseAliases: [],
         licenseDirectory: 'LICENSES/dependencies',
@@ -102,4 +107,33 @@ it('rejects a stale manifest and missing MPL corresponding-source URL', async ()
       'MPL corresponding-source URL is missing: mediabunny@1.46.0',
     ])
   );
+});
+
+it('requires Text provenance in generated notices when the policy declares Text', async () => {
+  const { closure, repoRoot } = await seedValidationFixture();
+  const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
+  const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
+  const repositoryPolicy = JSON.parse(
+    await fs.readFile('tooling/configs/qa/oss-release.data.json', 'utf8')
+  );
+  const documentFont = repositoryPolicy.bundledAssets.find(
+    (entry: { id: string }) => entry.id === 'golos-text'
+  );
+  policy.bundledAssets.push(documentFont);
+  policy.legalFiles.push({
+    archivePath: documentFont.licensePath,
+    source: documentFont.licensePath,
+    sha256: 'a'.repeat(64),
+  });
+  await fs.writeFile(policyPath, JSON.stringify(policy));
+  expect(await validateDependencyLegalClosure(repoRoot)).toContain(
+    'THIRD_PARTY_NOTICES.md is incomplete or stale'
+  );
+  await writeDependencyLegalClosure({
+    closure,
+    interfaceFont: TEST_INTERFACE_FONT,
+    documentFont,
+    outputRoot: repoRoot,
+  });
+  expect(await validateDependencyLegalClosure(repoRoot)).toEqual([]);
 });

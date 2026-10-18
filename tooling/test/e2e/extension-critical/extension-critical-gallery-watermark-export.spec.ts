@@ -106,7 +106,13 @@ for (const kind of ['text', 'image'] as const) {
       await page.reload();
       await open();
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.webcam').click();
+      await button('gallery.videoReview.trackSettings').click();
+      await dialog
+        .getByRole('switch', {
+          name: `${label('gallery.videoReview.trackEnabled')}: ${label('gallery.videoReview.webcam')}`,
+          exact: true,
+        })
+        .click();
       await expect
         .poll(async () => {
           const saved = await readWebcamWorkspace(page);
@@ -120,9 +126,10 @@ for (const kind of ['text', 'image'] as const) {
             : false;
         })
         .toBe(true);
+      await button('gallery.videoReview.trackSettings').click();
       await seedWebcamComposition(page);
       await page.reload();
-      await open();
+      await expect(dialog).toBeVisible();
       if (kind === 'image') {
         await button('gallery.videoReview.scene').click();
         const inspector = dialog.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
@@ -152,7 +159,7 @@ for (const kind of ['text', 'image'] as const) {
       }
       await seedWatermarkComposition(page, kind);
       await page.reload();
-      await open();
+      await expect(dialog).toBeVisible();
       const canvas = dialog.locator('[data-ui="gallery.videoReview.watermark"] canvas');
       const video = dialog.locator('video').first();
       await expect

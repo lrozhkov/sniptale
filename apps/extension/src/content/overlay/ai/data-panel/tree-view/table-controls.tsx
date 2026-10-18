@@ -24,7 +24,9 @@ export function TableSectionControls({
       style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}
     >
       <button
+        type="button"
         className="sniptale-ai-column-toggle"
+        aria-expanded={expanded}
         onClick={() => toggleExpanded(table.id)}
         title={
           expanded ? translate('aiModal.collapseRowsTitle') : translate('aiModal.expandRowsTitle')
