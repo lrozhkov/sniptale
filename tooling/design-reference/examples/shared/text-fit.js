@@ -1,5 +1,5 @@
 import { ActionButton } from './buttons.js';
-import { NativeHint } from './layers.js';
+import { NativeHint } from './native-hint.js';
 export function TextFit({ text, policy = 'end', onClick }) {
   const button = ActionButton({ label: text, onClick }),
     copy = button.querySelector('span');

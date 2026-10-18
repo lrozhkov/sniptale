@@ -1,4 +1,4 @@
-import { NativeHint } from './layers.js';
+import { NativeHint } from './native-hint.js';
 import { el } from './dom.js';
 import { icon } from './buttons.js';
 let serial = 0;

@@ -2,7 +2,10 @@ import { el, exampleCase, paramRow } from '../shared/dom.js';
 import { ActionButton } from '../shared/buttons.js';
 import { TextField } from '../shared/fields.js';
 import { createDropdown } from '../shared/choices.js';
-import { AnchoredLayer, CommandMenu, ModalDialog, NativeHint } from '../shared/layers.js';
+import { AnchoredLayer } from '../shared/layers.js';
+import { CommandMenu } from '../shared/command-menu.js';
+import { ModalDialog } from '../shared/modal-dialog.js';
+import { NativeHint } from '../shared/native-hint.js';
 import { ColorEditor } from '../shared/color-editor.js';
 export function render(root, { manifest }) {
   const add = (key) => {

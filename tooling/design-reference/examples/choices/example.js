@@ -1,5 +1,6 @@
 import { el, exampleCase } from '../shared/dom.js';
-import { createDropdown, PropertyChoice } from '../shared/choices.js';
+import { createDropdown } from '../shared/choices.js';
+import { PropertyChoice } from '../shared/property-choice.js';
 export function render(root, { manifest }) {
   const add = (key) => {
     const stage = el('div', { class: 'case-stage' });

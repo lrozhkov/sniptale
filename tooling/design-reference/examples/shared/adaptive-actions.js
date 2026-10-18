@@ -1,6 +1,6 @@
 import { el } from './dom.js';
 import { ActionButton } from './buttons.js';
-import { NativeHint } from './layers.js';
+import { NativeHint } from './native-hint.js';
 export function AdaptiveActions() {
   const status = el('p', {
       class: 'reference-status',

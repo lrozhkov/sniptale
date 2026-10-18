@@ -1,7 +1,10 @@
 import { el, exampleCase } from '../shared/dom.js';
 import { ActionButton, PressedButton, AsyncCommand, ButtonToolbar } from '../shared/buttons.js';
-import { CommandMenu, ModalDialog, AnchoredLayer } from '../shared/layers.js';
-import { createDropdown, PropertyChoice } from '../shared/choices.js';
+import { CommandMenu } from '../shared/command-menu.js';
+import { ModalDialog } from '../shared/modal-dialog.js';
+import { AnchoredLayer } from '../shared/layers.js';
+import { createDropdown } from '../shared/choices.js';
+import { PropertyChoice } from '../shared/property-choice.js';
 import { TextField } from '../shared/fields.js';
 import { NumericField } from '../shared/numbers.js';
 export function render(root, { manifest }) {

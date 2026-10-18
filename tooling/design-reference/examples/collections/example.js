@@ -1,5 +1,7 @@
 import { el, addCaseStage } from '../shared/dom.js';
-import { ObjectCollection, InlineNotes, ResourceField } from '../shared/collections.js';
+import { ObjectCollection } from '../shared/collections.js';
+import { InlineNotes } from '../shared/inline-notes.js';
+import { ResourceField } from '../shared/resource-field.js';
 import { Checkbox } from '../shared/selection.js';
 import { Disclosure } from '../shared/navigation.js';
 import { ActionButton } from '../shared/buttons.js';
