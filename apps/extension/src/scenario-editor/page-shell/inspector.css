@@ -299,7 +299,7 @@
   background: var(--sniptale-color-surface-hover);
 }
 .guide-inspector-disclosure:focus-visible {
-  outline: 2px solid var(--sniptale-color-accent);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: 2px;
   border-radius: var(--sniptale-radius-sm);
 }
@@ -493,7 +493,7 @@
 }
 
 .guide-inspector-panel [data-ui='shared.ui.color-selector.trigger']:focus-within {
-  border-color: var(--sniptale-color-border-accent-strong);
+  border-color: var(--sniptale-color-border-strong);
 }
 .guide-page
   .guide-inspector-panel
@@ -713,7 +713,7 @@
   .guide-inspector-panel
   [data-ui='shared.ui.compact-select']
   > button:is([aria-expanded='true'], :focus) {
-  border-color: var(--sniptale-color-border-accent-strong);
+  border-color: var(--sniptale-color-border-strong);
 }
 
 .guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] {
@@ -723,7 +723,7 @@
 }
 .guide-inspector-panel
   [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch']:has(button:focus-visible) {
-  outline: 2px solid var(--sniptale-color-accent);
+  outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: 2px;
 }
 

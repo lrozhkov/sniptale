@@ -53,10 +53,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await panel.getByRole('button', { name: 'Точка действия', exact: true }).click();
       const back = panel.getByRole('button', { name: 'К настройкам слайда', exact: true });
       await back.hover();
-      await expect(back).toHaveCSS('font-size', '13px');
-      await expect(back).toHaveCSS('line-height', '18px');
-      await expect(back).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await expect(back).toHaveCSS('box-shadow', 'none');
+      await expect(
+        panel
+          .locator(':scope > .guide-panel-heading')
+          .getByRole('button', { name: 'К настройкам слайда', exact: true })
+      ).toBeVisible();
+      await expect(back.locator('.lucide-arrow-left')).toHaveCount(1);
+      await expect(back).toHaveCSS('width', '32px');
       await page.screenshot({ path: info.outputPath('object-settings.png'), fullPage: false });
       await back.click();
       await page

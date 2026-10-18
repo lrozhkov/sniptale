@@ -1,3 +1,5 @@
+import { InspectorDisclosureView } from '../../../ui/compact-inspector-controls/disclosure';
+import { useInspectorDisclosure } from '../../../composition/inspector-disclosures/state';
 import { TourHighlightAnimationFields } from './mask-settings';
 import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import {
@@ -21,6 +23,7 @@ import {
   Timer,
   ScanSearch,
   Palette,
+  Type,
 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -81,11 +84,6 @@ export function TourHotspotSettings({
               disabled={disabled}
               onChange={(text) => onChange({ ...value, text })}
             />
-            <TourPointFields
-              point={value.point}
-              disabled={disabled}
-              onChange={(point) => onChange({ ...value, point })}
-            />
           </GuideInspectorGroup>
         </>
       ),
@@ -98,26 +96,53 @@ export function TourHotspotSettings({
       content: (
         <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
           <TourHotspotVisualSettings value={value} disabled={disabled} t={t} onChange={onChange} />
-          <ToggleField
-            disabled={disabled}
-            value={!value.markerAppearance}
-            label={t('scenario.editor.tourMarkerInherit')}
-            onChange={() =>
-              onChange({
-                ...value,
-                markerAppearance: value.markerAppearance
-                  ? null
-                  : resolveTourMarkerAppearance(tour.style),
-              })
-            }
-          />
-          <TourMarkerFields
-            value={resolveTourMarkerAppearance(tour.style, value)}
-            accent={tour.style.accent}
-            disabled={disabled || !value.markerAppearance}
-            t={t}
-            onChange={(markerAppearance) => onChange({ ...value, markerAppearance })}
-          />
+          {value.visual.kind === 'point' && (
+            <TourPointFields
+              point={value.point}
+              disabled={disabled}
+              onChange={(point) => onChange({ ...value, point })}
+            />
+          )}
+          {value.visual.kind === 'point' && (
+            <>
+              <ToggleField
+                disabled={disabled}
+                value={!value.markerAppearance}
+                label={t('scenario.editor.tourMarkerInherit')}
+                onChange={() =>
+                  onChange({
+                    ...value,
+                    markerAppearance: value.markerAppearance
+                      ? null
+                      : resolveTourMarkerAppearance(tour.style),
+                  })
+                }
+              />
+              {value.markerAppearance && (
+                <TourMarkerFields
+                  value={resolveTourMarkerAppearance(tour.style, value)}
+                  accent={tour.style.accent}
+                  disabled={disabled || !value.markerAppearance}
+                  t={t}
+                  onChange={(markerAppearance) => onChange({ ...value, markerAppearance })}
+                />
+              )}
+            </>
+          )}
+        </GuideInspectorGroup>
+      ),
+    },
+    {
+      id: 'textAppearance',
+      icon: Type,
+      label: t('scenario.editor.tourTextAppearance'),
+      categorized: true,
+      content: (
+        <GuideInspectorGroup
+          id="textAppearance"
+          icon={Type}
+          title={t('scenario.editor.tourTextAppearance')}
+        >
           <TourTextPresentation
             kind="hotspot"
             value={value.appearance}
@@ -256,6 +281,8 @@ function TourHotspotVisualSettings({
             }
           />
           <ColorField
+            triggerVariant="swatch"
+            floatingPlacement="side"
             title={t('scenario.editor.color')}
             label={t('scenario.editor.color')}
             value={visual.color}
@@ -358,12 +385,16 @@ export function TourAnnotationSettings({
       ),
     },
     {
-      id: 'appearance',
-      icon: Palette,
-      label: t('scenario.editor.appearance'),
+      id: 'textAppearance',
+      icon: Type,
+      label: t('scenario.editor.tourTextAppearance'),
       categorized: true,
       content: (
-        <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
+        <GuideInspectorGroup
+          id="textAppearance"
+          icon={Type}
+          title={t('scenario.editor.tourTextAppearance')}
+        >
           <TourTextPresentation
             kind="annotation"
             value={value.appearance}
@@ -431,12 +462,12 @@ export function TourMarkerFields({
   onChange: (value: TourMarkerAppearance) => void;
   t: Translate;
 }) {
+  const [expanded, setExpanded] = useInspectorDisclosure('marker-pulse-details', false);
   return (
     <div className="tour-text-field">
       <ColorField
         triggerVariant="swatch"
         floatingPlacement="side"
-        layout="stacked"
         label={t('scenario.editor.tourMarkerColor')}
         title={t('scenario.editor.tourMarkerColor')}
         value={value.color ?? 'transparent'}
@@ -446,30 +477,7 @@ export function TourMarkerFields({
         allowTransparent
         onChange={(color) => onChange({ ...value, color: color === 'transparent' ? null : color })}
       />
-      <div className="flex items-end gap-2">
-        <ColorField
-          className="min-w-0 flex-1"
-          triggerVariant="swatch"
-          floatingPlacement="side"
-          layout="stacked"
-          label={t('scenario.editor.tourMarkerPulseColor')}
-          title={t('scenario.editor.tourMarkerPulseColor')}
-          value={value.pulseColor ?? accent}
-          palette={['#ffffff', '#111827', '#f97316', '#2563eb']}
-          disabled={disabled}
-          allowAlpha={false}
-          allowTransparent={false}
-          onChange={(pulseColor) => onChange({ ...value, pulseColor })}
-        />
-        <ContentToolbarButton
-          className="shrink-0"
-          title={t('scenario.editor.tourMarkerPulseReset')}
-          disabled={disabled || value.pulseColor === null}
-          onClick={() => onChange({ ...value, pulseColor: null })}
-        >
-          <RotateCcw size={15} aria-hidden="true" />
-        </ContentToolbarButton>
-      </div>
+
       <TourInspectorNumericRow
         label={t('scenario.editor.tourMarkerSize')}
         value={value.size}
@@ -479,6 +487,38 @@ export function TourMarkerFields({
         disabled={disabled}
         onChange={(size) => onChange({ ...value, size })}
       />
+      <InspectorDisclosureView
+        dataUi="scenario-editor.marker-pulse-details"
+        variant="structural"
+        label={t('scenario.editor.tourMarkerPulseDetails')}
+        open={expanded}
+        onOpenChange={setExpanded}
+        bodyClassName="sniptale-parameter-stack"
+      >
+        <div className="flex items-end gap-2">
+          <ColorField
+            className="min-w-0 flex-1"
+            triggerVariant="swatch"
+            floatingPlacement="side"
+            label={t('scenario.editor.tourMarkerPulseColor')}
+            title={t('scenario.editor.tourMarkerPulseColor')}
+            value={value.pulseColor ?? accent}
+            palette={['#ffffff', '#111827', '#f97316', '#2563eb']}
+            disabled={disabled}
+            allowAlpha={false}
+            allowTransparent={false}
+            onChange={(pulseColor) => onChange({ ...value, pulseColor })}
+          />
+          <ContentToolbarButton
+            className="shrink-0"
+            title={t('scenario.editor.tourMarkerPulseReset')}
+            disabled={disabled || value.pulseColor === null}
+            onClick={() => onChange({ ...value, pulseColor: null })}
+          >
+            <RotateCcw size={15} aria-hidden="true" />
+          </ContentToolbarButton>
+        </div>
+      </InspectorDisclosureView>
     </div>
   );
 }

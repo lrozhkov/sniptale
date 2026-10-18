@@ -298,7 +298,8 @@ it.each(['point', 'highlight'] as const)(
     if (hotspot.visual.kind !== 'point') expect(hotspot.visual.rect.width).toBeGreaterThan(0.2);
     expect(result.masks).toEqual(slide.masks);
     expect(result.actions[1]).toEqual(slide.actions[1]);
-    expect(host.textContent).toContain('Back to slide settings');
+    const header = host.querySelector('#guide-inspector-panel > .guide-panel-heading')!;
+    expect(header.querySelector('[title="Back to slide settings"]')).not.toBeNull();
   }
 );
 it('keeps explanations slide-level: no canvas point marker and a preserved legacy anchor', async () => {

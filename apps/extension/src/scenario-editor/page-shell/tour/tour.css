@@ -512,9 +512,7 @@ html[data-tour-reordering] * {
 .tour-hint-style-settings {
   display: grid;
   gap: 4px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--sniptale-color-border-soft);
+  min-width: 0;
 }
 
 .tour-camera-editor {

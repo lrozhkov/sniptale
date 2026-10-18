@@ -1,5 +1,5 @@
 import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { TourChoiceField } from './fields';
 import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Layers } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
@@ -30,7 +30,7 @@ export function TourTransitionSettings({
       title={t('scenario.editor.tourTransitions')}
     >
       <div className="tour-text-field">
-        <SelectField
+        <TourChoiceField
           label={t('scenario.editor.tourTransitionKind')}
           value={transition.kind}
           disabled={disabled}
@@ -45,24 +45,28 @@ export function TourTransitionSettings({
       {transition.kind !== 'none' && (
         <TourInspectorNumericRow
           label={t('scenario.editor.tourSwitchMs')}
-          value={transition.durationMs}
+          value={transition.durationMs / 1000}
           min={0}
-          max={2000}
-          step={50}
+          max={2}
+          unit="s"
+          precision={3}
+          step={0.05}
           disabled={disabled}
-          onPreview={changeSwitch}
-          onChange={changeSwitch}
+          onPreview={(seconds) => changeSwitch(Math.round(seconds * 1000))}
+          onChange={(seconds) => changeSwitch(Math.round(seconds * 1000))}
         />
       )}
       <TourInspectorNumericRow
         label={t('scenario.editor.tourTravelMs')}
-        value={transition.hotspotTravelMs}
+        value={transition.hotspotTravelMs / 1000}
         min={0}
-        max={2000}
-        step={50}
+        max={2}
+        unit="s"
+        precision={3}
+        step={0.05}
         disabled={disabled}
-        onPreview={changeTravel}
-        onChange={changeTravel}
+        onPreview={(seconds) => changeTravel(Math.round(seconds * 1000))}
+        onChange={(seconds) => changeTravel(Math.round(seconds * 1000))}
       />
       <InformationDisclosure label={t('common.actions.details')}>
         <p>{t('scenario.editor.tourTransitionHint')}</p>

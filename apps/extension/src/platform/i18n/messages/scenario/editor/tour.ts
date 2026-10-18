@@ -1,4 +1,7 @@
 export const scenarioTourMessages = {
+  tourMarkerPulseDetails: { ru: 'Пульсация', en: 'Pulse details' },
+  tourTextAppearance: { ru: 'Стиль пояснения', en: 'Explanation style' },
+  tourAdvancedAppearance: { ru: 'Дополнительное оформление', en: 'Advanced appearance' },
   tourUseCentralStyle: { ru: 'Использовать стиль тура', en: 'Use tour style' },
   tourEffectType: { ru: 'Тип выделения', en: 'Effect type' },
 
@@ -158,8 +161,8 @@ export const scenarioTourMessages = {
   tourTransitionNone: { ru: 'Без анимации смены', en: 'No image animation' },
   tourTransitionFade: { ru: 'Растворение', en: 'Fade' },
   tourTransitionSlide: { ru: 'Сдвиг', en: 'Slide' },
-  tourSwitchMs: { ru: 'Смена, мс', en: 'Switch, ms' },
-  tourTravelMs: { ru: 'Точка, мс', en: 'Hotspot, ms' },
+  tourSwitchMs: { ru: 'Смена', en: 'Switch' },
+  tourTravelMs: { ru: 'Переход к точке', en: 'Hotspot travel' },
   tourTransitionHint: {
     ru: 'Изображение меняется первым, затем точка перемещается. Для нескольких точек — плавное появление. Системное уменьшение движения отключает анимацию.',
     en: 'The image changes first, then the hotspot moves. Multiple hotspots fade together. System reduced motion disables animation.',
@@ -190,7 +193,7 @@ export const scenarioTourMessages = {
   tourPlayback: { ru: 'Воспроизведение', en: 'Playback' },
   tourAutoplay: { ru: 'Запускать автоматически', en: 'Start automatically' },
   tourLoop: { ru: 'Повторять тур', en: 'Loop tour' },
-  tourMinimumHold: { ru: 'Минимум, с', en: 'Minimum, s' },
+  tourMinimumHold: { ru: 'Минимум', en: 'Minimum' },
   tourAutoplayHint: {
     ru: 'Показ ждёт загрузки изображения. В оглавлении выберите действие или продолжите по порядку.',
     en: 'Playback waits for the image. In contents, choose an action or continue in order.',
@@ -199,7 +202,7 @@ export const scenarioTourMessages = {
   tourDurationMode: { ru: 'Длительность', en: 'Duration' },
   tourDurationAuto: { ru: 'По тексту и озвучке', en: 'From text and narration' },
   tourDurationManual: { ru: 'Задать время', en: 'Set duration' },
-  tourHoldSeconds: { ru: 'Показ, с', en: 'Hold, s' },
+  tourHoldSeconds: { ru: 'Показ', en: 'Hold' },
   tourTruncateNarration: { ru: 'Обрезать озвучку по времени', en: 'Cut narration at duration' },
   tourFollowActions: { ru: 'По действиям слайда', en: 'Follow slide actions' },
   tourTimingHint: {

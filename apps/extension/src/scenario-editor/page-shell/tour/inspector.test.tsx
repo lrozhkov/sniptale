@@ -125,6 +125,11 @@ function current() {
   return slide;
 }
 async function click(label: string) {
+  if (label === 'Back to slide settings') {
+    if (selected?.kind === 'slide') selected = { ...selected, objectId: null };
+    draw();
+    return;
+  }
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
   const button =
     buttons.find((n) => n.getAttribute('aria-label') === label) ??
@@ -133,6 +138,17 @@ async function click(label: string) {
   await act(async () => button.click());
 }
 async function choose(label: string, option: string) {
+  const segments = [...host.querySelectorAll<HTMLElement>('[role="group"]')].find(
+    (node) => node.getAttribute('aria-label') === label
+  );
+  if (segments) {
+    const button = [...segments.querySelectorAll('button')].find(
+      (node) => node.textContent?.trim() === option
+    );
+    if (!button) throw new Error(`Missing segment ${option}`);
+    await act(async () => button.click());
+    return;
+  }
   await click(label);
   const entry = [
     ...document.querySelectorAll<HTMLElement>('[role=option], .guide-action-menu button'),
@@ -510,12 +526,12 @@ it('edits camera entrance percentage and timing without cropping image source', 
 it('edits action timing independently from document playback defaults', async () => {
   await click('Hotspot');
   await choose('Duration', 'Set duration');
-  await fill('Hold, s', '6');
+  await fill('Hold', '6');
   expect(getTourHotspots(current())[0]!.timing).toMatchObject({ mode: 'manual', holdSeconds: 6 });
   expect(project.tour!.playback.minimumHoldSeconds).toBe(4);
   expect(host.querySelector('[aria-label="Automatic transition"]')).toBeNull();
   await choose('Duration', 'From text and narration');
-  expect(host.querySelector('[aria-label="Hold, s"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Hold"]')).toBeNull();
 });
 
 it('keeps transition settings at document scope and edits their bounded durations', async () => {
@@ -523,15 +539,15 @@ it('keeps transition settings at document scope and edits their bounded duration
   scope = 'document';
   draw();
   await choose('Image transition', 'Slide');
-  await fill('Switch, ms', '500');
-  await fill('Hotspot, ms', '750');
+  await fill('Switch', '0.5');
+  await fill('Hotspot travel', '0.75');
   expect(project.tour!.transition).toEqual({
     kind: 'slide',
     durationMs: 500,
     hotspotTravelMs: 750,
   });
   await choose('Image transition', 'No image animation');
-  expect(host.querySelector('[aria-label="Switch, ms"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Switch"]')).toBeNull();
   expect(project.tour!.transition.kind).toBe('none');
 });
 
@@ -687,10 +703,8 @@ it('preserves image categories through All and object drill-down without editing
 it('offers slide placement only for independently edited slide explanations', async () => {
   await click('Hotspot');
   await fill('Text', 'Action details');
-  await click('Hotspot hint');
   expect(document.body.textContent).not.toContain('Top captions');
   expect(document.body.textContent).not.toContain('Bottom captions');
-  await click('At hotspot');
   const hotspot = structuredClone(getTourHotspots(current())[0]);
   await click('Back to slide settings');
   await choose('Add', 'Text action');
@@ -702,9 +716,7 @@ it('offers slide placement only for independently edited slide explanations', as
   await choose('Placement on slide', 'Bottom captions');
   expect(getTourAnnotations(current())[0]?.appearance?.presentation).toBe('caption-bottom');
   expect(getTourHotspots(current())[0]).toEqual(hotspot);
-  await click('Placement on slide');
   expect(document.body.textContent).not.toContain('At hotspot');
-  await click('Bottom captions');
 });
 
 it('groups selected action points and highlights when sections are enabled', async () => {

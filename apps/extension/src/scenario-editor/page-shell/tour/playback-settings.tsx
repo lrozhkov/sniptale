@@ -45,6 +45,8 @@ export function TourPlaybackSettings({
         value={tour.playback.minimumHoldSeconds}
         min={0.1}
         max={3600}
+        unit="s"
+        scrub={{ min: 0.1, max: 10, step: 0.1 }}
         step={0.5}
         precision={1}
         disabled={disabled}
@@ -98,6 +100,8 @@ export function TourTimingSettings({
             value={timing.holdSeconds}
             min={0.1}
             max={3600}
+            unit="s"
+            scrub={{ min: 0.1, max: 10, step: 0.1 }}
             step={0.5}
             precision={1}
             disabled={disabled}

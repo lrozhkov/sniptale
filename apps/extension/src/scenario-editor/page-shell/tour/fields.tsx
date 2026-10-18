@@ -1,7 +1,7 @@
 import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { SelectField, SegmentedRow } from '../../../ui/compact-inspector-controls/controls';
 import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -20,6 +20,32 @@ import { GuideVoiceField } from '../voice-field';
 import { TourInspectorNumericRow } from './numeric-row';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { Translate } from '../../../platform/i18n';
+
+/** Short exclusive choices retain the shared fitting and keyboard owners. */
+export function TourChoiceField<T extends string>({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <SegmentedRow
+      label={label}
+      ariaLabel={label}
+      value={value}
+      columns={options.length === 2 ? 2 : 3}
+      options={options.map((option) => ({ ...option, disabled }))}
+      onChange={onChange}
+    />
+  );
+}
 
 export function TourTextField({
   label,
@@ -120,40 +146,27 @@ export function TourTextPresentation({
           }
         />
       )}
-      <SelectField
-        label={presentationLabel}
-        disabled={disabled}
-        value={value ? effective.presentation : 'inherit'}
-        options={[
-          ...(inherit
-            ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
-            : []),
-          ...(kind !== 'annotation'
-            ? [
-                {
-                  value: 'callout' as const,
-                  label: t('scenario.editor.tourCallout'),
-                },
-              ]
-            : []),
-          ...(kind !== 'hotspot'
-            ? [
-                { value: 'caption-top' as const, label: t('scenario.editor.tourCaptionTop') },
-                { value: 'caption-bottom' as const, label: t('scenario.editor.tourCaptionBottom') },
-              ]
-            : []),
-        ]}
-        onChange={(presentation) =>
-          onChange(
-            presentation === 'inherit'
-              ? null
-              : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, presentation }
-          )
-        }
-      />
+      {kind !== 'hotspot' && (
+        <TourChoiceField
+          label={presentationLabel}
+          disabled={disabled}
+          value={effective.presentation}
+          options={[
+            { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
+            { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
+          ]}
+          onChange={(presentation) =>
+            onChange({
+              ...effective,
+              surface: effective.surface ?? TOUR_HINT_SURFACE,
+              presentation,
+            })
+          }
+        />
+      )}
       {value && (
         <>
-          <SelectField
+          <TourChoiceField
             label={t('scenario.editor.tourTextAlignment')}
             value={value.alignment}
             disabled={disabled}

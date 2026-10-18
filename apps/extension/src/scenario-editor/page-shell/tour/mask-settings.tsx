@@ -1,4 +1,5 @@
-import { ToggleField, SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { TourChoiceField } from './fields';
+import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import type { TourHighlightAnimation } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
@@ -32,7 +33,7 @@ export function TourHighlightAnimationFields({
       {(['enter', 'exit'] as const).map((phase) => (
         <div key={phase}>
           <div className="tour-text-field">
-            <SelectField
+            <TourChoiceField
               label={t(
                 phase === 'enter'
                   ? 'scenario.editor.tourHighlightEnter'

@@ -897,7 +897,7 @@ for (const [locale, theme] of [
     };
     await visit(4, 'image-slide');
     for (const [key, count] of [
-      ['tourHotspot', 6],
+      ['tourHotspot', 7],
       ['tourAnnotation', 5],
     ] as const) {
       await category(t('scenario.editor.tourObjects')).click();
@@ -939,13 +939,11 @@ for (const [locale, theme] of [
       await expect(category(t('scenario.editor.tourTiming'))).toBeVisible();
       await expect(category(t('scenario.editor.tourCamera'))).toBeVisible();
       if (key === 'tourAnnotation') {
-        await category(t('scenario.editor.appearance')).click();
+        await category(t('scenario.editor.tourTextAppearance')).click();
         for (const placement of ['tourCaptionTop', 'tourCaptionBottom'] as const) {
           await panel
-            .getByRole('button', { name: t('scenario.editor.tourSlidePlacement'), exact: true })
-            .click();
-          await page
-            .getByRole('option', { name: t(`scenario.editor.${placement}`), exact: true })
+            .getByRole('group', { name: t('scenario.editor.tourSlidePlacement'), exact: true })
+            .getByRole('button', { name: t(`scenario.editor.${placement}`), exact: true })
             .click();
           await checkTourObjectActions(panel, t);
           await expect
@@ -966,14 +964,13 @@ for (const [locale, theme] of [
           exact: true,
         });
         await expect(markerInheritance).toBeChecked();
-        await expect(markerSize).toBeDisabled();
+        await expect(markerSize).toHaveCount(0);
         await markerInheritance.uncheck();
         await markerSize.fill('48');
         await markerSize.press('Enter');
         await expect(markerSize).toHaveValue('48');
         await markerInheritance.check();
-        await expect(markerSize).toHaveValue('30');
-        await expect(markerSize).toBeDisabled();
+        await expect(markerSize).toHaveCount(0);
         await category(t('scenario.editor.tourNarration')).click();
         await expect(panel).not.toContainText('review-voice-speech.wav');
         await panel
@@ -1134,7 +1131,7 @@ async function checkTourObjectActions(panel: Locator, t: ReturnType<typeof creat
   });
   const geometry = await back.evaluate((node) => {
     const rect = node.getBoundingClientRect();
-    const scroll = node.closest('.guide-panel-scroll')!.getBoundingClientRect();
+    const scroll = node.closest('.guide-panel-heading')!.getBoundingClientRect();
     return {
       inset: rect.top - scroll.top,
       left: rect.left - scroll.left,
@@ -1142,7 +1139,7 @@ async function checkTourObjectActions(panel: Locator, t: ReturnType<typeof creat
       height: rect.height,
     };
   });
-  expect.soft(geometry.inset).toBeGreaterThanOrEqual(8);
+  expect.soft(geometry.inset).toBeGreaterThanOrEqual(0);
   expect.soft(geometry.left).toBeGreaterThanOrEqual(0);
   expect.soft(geometry.right).toBeGreaterThanOrEqual(0);
   expect.soft(geometry.height).toBeGreaterThanOrEqual(32);

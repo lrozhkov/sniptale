@@ -129,6 +129,11 @@ function current() {
   return slide;
 }
 async function click(label: string) {
+  if (label === 'Back to slide settings') {
+    if (selected?.kind === 'slide') selected = { ...selected, objectId: null };
+    draw();
+    return;
+  }
   const buttons = [...document.querySelectorAll<HTMLButtonElement>('button')];
   const button =
     buttons.find((n) => n.getAttribute('aria-label') === label) ??
@@ -137,6 +142,17 @@ async function click(label: string) {
   await act(async () => button.click());
 }
 async function choose(label: string, option: string) {
+  const segments = [...host.querySelectorAll<HTMLElement>('[role="group"]')].find(
+    (node) => node.getAttribute('aria-label') === label
+  );
+  if (segments) {
+    const button = [...segments.querySelectorAll('button')].find(
+      (node) => node.textContent?.trim() === option
+    );
+    if (!button) throw new Error(`Missing segment ${option}`);
+    await act(async () => button.click());
+    return;
+  }
   await click(label);
   const entry = [
     ...document.querySelectorAll<HTMLElement>('[role=option], .guide-action-menu button'),
@@ -420,8 +436,9 @@ it('exposes hotspot coordinates in Text and annotation categories without mutati
   await click('Hotspot');
   presentation = 'sections';
   draw();
+  expect(host.querySelector('input[aria-label="X"]')).toBeNull();
+  await click('Appearance');
   expect(host.querySelector('input[aria-label="X"]')).not.toBeNull();
-  expect(host.querySelector('details')).toBeNull();
   await click('Back to slide settings');
   presentation = 'all';
   draw();
@@ -431,7 +448,7 @@ it('exposes hotspot coordinates in Text and annotation categories without mutati
   draw();
   const before = structuredClone(project);
   expect(host.querySelector('textarea[aria-label="Text"]')).not.toBeNull();
-  await click('Appearance');
+  await click('Explanation style');
   expect(host.querySelector('[aria-label="Placement on slide"]')).not.toBeNull();
   await click('Text');
   expect(host.querySelector('textarea[aria-label="Text"]')).not.toBeNull();
@@ -636,7 +653,11 @@ it('edits hotspot highlight animation independently from color and opacity', asy
   });
   disabled = true;
   draw();
-  expect(host.querySelector<HTMLButtonElement>('[aria-label="Entry"]')?.disabled).toBe(true);
+  expect(
+    [
+      ...host.querySelectorAll<HTMLButtonElement>('[role="group"][aria-label="Entry"] button'),
+    ].every((button) => button.disabled)
+  ).toBe(true);
 });
 
 it('keeps optional timing and playback explanations inside the shared information disclosure', () => {
@@ -686,7 +707,7 @@ it('preserves playback and transition edits while their optional explanations st
   await click('Start automatically');
   await click('Loop tour');
   await click('Auto Zoom to hotspot');
-  await fill('Minimum, s', '5');
+  await fill('Minimum', '5');
   expect(project.tour!.playback).toEqual({
     autoplay: !before.autoplay,
     loop: !before.loop,
@@ -694,16 +715,16 @@ it('preserves playback and transition edits while their optional explanations st
     minimumHoldSeconds: 5,
   });
   await choose('Image transition', 'Slide');
-  await fill('Switch, ms', '450');
-  await fill('Hotspot, ms', '600');
+  await fill('Switch', '0.451');
+  await fill('Hotspot travel', '0.6');
   expect(project.tour!.transition).toMatchObject({
     kind: 'slide',
-    durationMs: 450,
+    durationMs: 451,
     hotspotTravelMs: 600,
   });
   await choose('Image transition', 'No image animation');
-  expect(host.querySelector('[aria-label="Switch, ms"]')).toBeNull();
-  expect(project.tour!.transition.durationMs).toBe(450);
+  expect(host.querySelector('[aria-label="Switch"]')).toBeNull();
+  expect(project.tour!.transition.durationMs).toBe(451);
   expect(
     [...host.querySelectorAll('details[data-ui="shared.information-disclosure"]')].every(
       (node) => !(node as HTMLDetailsElement).open
@@ -714,9 +735,37 @@ it('preserves playback and transition edits while their optional explanations st
 it('edits an action hold without exposing a branch destination', async () => {
   await click('Hotspot');
   await choose('Duration', 'Set duration');
-  await fill('Hold, s', '6');
+  await fill('Hold', '6');
   expect(getTourHotspots(current())[0]!.timing).toMatchObject({ mode: 'manual', holdSeconds: 6 });
   expect(host.querySelector('[aria-label="Automatic transition"]')).toBeNull();
   await choose('Duration', 'From text and narration');
-  expect(host.querySelector('[aria-label="Hold, s"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Hold"]')).toBeNull();
+});
+
+it('exposes region coordinates only in appearance and moves the visible region with its center', async () => {
+  await click('Hotspot');
+  await choose('Focus style', 'Highlight');
+  const content = host.querySelector('section[aria-label="Hotspot"]')!;
+  expect(content.querySelector('input[aria-label="X"]')).toBeNull();
+  expect(host.querySelectorAll('input[aria-label="X"]')).toHaveLength(1);
+  await fill('X', '25');
+  const hotspot = getTourHotspots(current())[0]!;
+  expect(hotspot.visual.kind).toBe('highlight');
+  if (hotspot.visual.kind === 'point') throw new Error('Expected region');
+  expect(hotspot.visual.rect.x).toBe(0.25);
+  expect(hotspot.point.x).toBe(hotspot.visual.rect.x + hotspot.visual.rect.width / 2);
+});
+
+it('keeps exact hold values beyond the useful slider scale when the range only receives focus', async () => {
+  scope = 'document';
+  draw();
+  await fill('Minimum', '120.3');
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Minimum"]')!;
+  const range = host.querySelector<HTMLInputElement>('input[aria-label="Minimum range"]')!;
+  expect(range.max).toBe('10');
+  expect(field.value).toBe('120.3');
+  await act(async () => range.focus());
+  await act(async () => range.blur());
+  expect(project.tour!.playback.minimumHoldSeconds).toBe(120.3);
+  expect(field.value).toBe('120.3');
 });

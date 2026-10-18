@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
-import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from '../inspector-actions';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourTextField } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
 import { TourNavigationSettings, TourAddButtonControl } from './navigation-settings';
@@ -267,10 +267,6 @@ function TourInspectorContent(props: InspectorProps) {
   if (objectId)
     return (
       <div className="tour-object-inspector">
-        <ScenarioInspectorBackButton
-          label={t('scenario.editor.tourBackToSlide')}
-          onBack={() => onSelectObject(null)}
-        />
         {slide.kind === 'navigation'
           ? renderSections('navigation-button', [
               {

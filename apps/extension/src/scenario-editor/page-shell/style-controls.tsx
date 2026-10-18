@@ -150,6 +150,7 @@ export function GuideStyleFields({
           label={t('scenario.editor.appearanceDensity')}
           value={style.density}
           options={choices.density}
+          segmented
           onChange={(density) => onChange({ density })}
           t={t}
         />
@@ -157,6 +158,7 @@ export function GuideStyleFields({
           label={t('scenario.editor.appearanceWidth')}
           value={style.contentWidth}
           options={choices.contentWidth}
+          segmented
           onChange={(contentWidth) => onChange({ contentWidth })}
           t={t}
         />
@@ -171,6 +173,7 @@ export function GuideStyleFields({
           label={t('scenario.editor.appearanceBorder')}
           value={style.imageBorder}
           options={choices.imageBorder}
+          segmented
           onChange={(imageBorder) => onChange({ imageBorder })}
           t={t}
         />

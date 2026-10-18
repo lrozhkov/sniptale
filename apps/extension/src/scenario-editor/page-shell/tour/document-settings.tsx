@@ -1,4 +1,3 @@
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
 import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { GuideImageUpload } from '../image-upload';
@@ -13,7 +12,7 @@ import { Palette, MessageSquare, Trash2 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourMarkerFields } from './object-settings';
-import { TourTextPresentation } from './fields';
+import { TourTextPresentation, TourChoiceField } from './fields';
 import type { Translate } from '../../../platform/i18n';
 
 /** Central appearance edits freeze the legacy hotspot fallback before separating categories. */
@@ -49,7 +48,7 @@ export function TourDocumentSettings({
       {section === 'appearance' && (
         <>
           <div className="tour-text-field">
-            <SelectField
+            <TourChoiceField
               label={t('scenario.editor.tourAspect')}
               value={tour.stage.aspect}
               disabled={disabled}
@@ -78,7 +77,6 @@ export function TourDocumentSettings({
             <ColorField
               triggerVariant="swatch"
               floatingPlacement="side"
-              layout="stacked"
               palette={DEFAULT_DRAWING_COLORS}
               key={key}
               label={label}
@@ -173,7 +171,7 @@ function TourStageBackgroundSettings({
       )}
       {stage.image && (
         <>
-          <SelectField
+          <TourChoiceField
             label={t('scenario.editor.tourFit')}
             value={stage.imageFit ?? 'cover'}
             disabled={disabled}

@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { X, Settings2, SquarePen, Image } from 'lucide-react';
+import { X, Settings2, SquarePen, Image, ArrowLeft } from 'lucide-react';
 import { GuideInspectorPresentationToggle, ScenarioWorkspaceFrame } from '../workspace';
 import { GuideResourceDrawer, useGuideResourceRequest } from '../resource-drawer';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
@@ -183,6 +183,10 @@ function TourSettingsPanel({
             state.selection?.kind === 'slide' ? state.selection.objectId : null,
             t
           );
+  const nested =
+    panels.rightScope === 'selection' &&
+    state.selection?.kind === 'slide' &&
+    Boolean(state.selection.objectId);
   const grouped = panels.rightScope === 'document' || state.selection?.kind === 'slide';
   return (
     <FloatingChromePanel
@@ -193,7 +197,18 @@ function TourSettingsPanel({
       aria-label={inspectorTitle}
     >
       <div className="guide-panel-heading">
-        <Settings2 size={16} />
+        {nested ? (
+          <ContentToolbarButton
+            className="tour-inspector-back"
+            size="compact"
+            title={t('scenario.editor.tourBackToSlide')}
+            onClick={() => selectObject(null)}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+          </ContentToolbarButton>
+        ) : (
+          <Settings2 size={16} />
+        )}
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
         {grouped && (
           <GuideInspectorPresentationToggle

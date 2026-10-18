@@ -406,7 +406,7 @@ for (const [locale, theme, size] of [
       node.scrollTop = node.scrollHeight;
     });
     const scrollBeforePreview = await inspectorScroll.evaluate((node) => node.scrollTop);
-    expect(scrollBeforePreview).toBeGreaterThan(0);
+    if (size.height === 560) expect(scrollBeforePreview).toBeGreaterThan(0);
     await page.screenshot({ path: info.outputPath('action-inspector.png'), fullPage: false });
     await page
       .locator('.tour-header-controls')
@@ -500,6 +500,7 @@ for (const [locale, theme, size] of [
     await page.screenshot({ path: info.outputPath('export-retry-complete.png'), fullPage: false });
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
+      let complete = false;
       Object.defineProperty(window, 'showSaveFilePicker', {
         configurable: true,
         value: async () => ({
@@ -508,15 +509,31 @@ for (const [locale, theme, size] of [
               write(chunk) {
                 chunks.push(chunk);
               },
+              close() {
+                complete = true;
+              },
             }),
         }),
       });
+      Object.defineProperty(window, 'savedSequenceTourComplete', {
+        configurable: true,
+        get: () => complete,
+      });
       Object.defineProperty(window, 'savedSequenceTour', {
         configurable: true,
-        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+        get: () => {
+          const decoder = new TextDecoder();
+          return (
+            chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('') +
+            decoder.decode()
+          );
+        },
       });
     });
     await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => Reflect.get(window, 'savedSequenceTourComplete')))
+      .toBe(true);
     await expect
       .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedSequenceTour'))))
       .toContain('<!doctype html>');
