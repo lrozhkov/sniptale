@@ -7,6 +7,11 @@ on:
         description: Check mode
         required: true
         type: string
+      runner_backend:
+        description: Runner provider for the locked QA container
+        required: false
+        default: selectel
+        type: string
       force_rebuild:
         description: Build separate forced candidate images
         required: false
@@ -46,6 +51,7 @@ env:
   BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
   TRUSTED_CONTROL_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
   GATE_MODE: ${{ inputs.gate }}
+  RUNNER_BACKEND: ${{ inputs.runner_backend || 'selectel' }}
   PROOF_LANE: ${{ inputs.gate == 'release-provenance' && 'release' || 'proof' }}
   PROOF_KIND: ${{ inputs.gate == 'release-provenance' && 'release-provenance' || 'fast-proof' }}
   SNIPTALE_CI_FULL_HARNESS: ${{ github.event_name == 'schedule' && '1' || '0' }}
@@ -184,6 +190,18 @@ jobs:
       QA_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-qa,ignore-error=true
       CONTROLLER_CACHE_EXPORT: type=gha,mode=min,scope=sniptale-controller,ignore-error=true
     steps:
+      - name: Validate runner selection
+        run: |
+          case "$RUNNER_BACKEND" in
+            selectel) ;;
+            github)
+              if [ "$GATE_MODE" = selectel-smoke ]; then
+                echo 'Selectel smoke requires the Selectel runner backend.' >&2
+                exit 1
+              fi
+              ;;
+            *) echo 'Unknown runner backend.' >&2; exit 1 ;;
+          esac
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           {
@@ -311,7 +329,7 @@ jobs:
   provision:
     name: Start runner
     needs: qa-image
-    if: ${{ !cancelled() && needs.qa-image.result == 'success' }}
+    if: ${{ !cancelled() && needs.qa-image.result == 'success' && inputs.runner_backend != 'github' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: selectel-runner-controller
@@ -408,12 +426,26 @@ jobs:
     needs: [qa-image, provision]
     if: >-
       !cancelled() &&
-      needs.provision.result == 'success' &&
+      needs.qa-image.result == 'success' &&
+      ((inputs.runner_backend == 'github' && needs.provision.result == 'skipped') ||
+      (inputs.runner_backend != 'github' && needs.provision.result == 'success')) &&
       (github.event_name != 'workflow_dispatch' || inputs.gate != 'selectel-smoke')
-    runs-on: ${{ fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
+    runs-on: ${{ inputs.runner_backend == 'github' && 'ubuntu-24.04' || fromJSON(format('["self-hosted","{0}"]', needs.provision.outputs.label)) }}
     timeout-minutes: 240
     permissions: { actions: read, contents: read }
+    env:
+      SNIPTALE_QA_CPU_TOKENS: ${{ inputs.runner_backend == 'github' && '4' || needs.provision.outputs.cpu-tokens }}
+      SNIPTALE_QA_MEMORY_MIB: ${{ inputs.runner_backend == 'github' && '12288' || needs.provision.outputs.memory-mib }}
+      SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ inputs.runner_backend == 'github' && '4' || needs.provision.outputs.vitest-workers }}
+      SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ inputs.runner_backend == 'github' && '2' || needs.provision.outputs.playwright-workers }}
+      SNIPTALE_QA_SECURITY_WORKERS: ${{ inputs.runner_backend == 'github' && '2' || needs.provision.outputs.security-workers }}
     steps:
+      - name: Report runner capacity
+        if: inputs.runner_backend == 'github'
+        run: |
+          nproc
+          free -m
+          df -h "$GITHUB_WORKSPACE"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           {
@@ -473,11 +505,6 @@ jobs:
           SNIPTALE_SELECTEL_PROFILES_DIGEST: ${{ needs.provision.outputs.profiles-digest }}
           SNIPTALE_SELECTEL_SERVER_ID: ${{ needs.provision.outputs.server-id }}
           SNIPTALE_SELECTEL_AVAILABILITY_ZONE: ${{ needs.provision.outputs.availability-zone }}
-          SNIPTALE_QA_CPU_TOKENS: ${{ needs.provision.outputs.cpu-tokens }}
-          SNIPTALE_QA_MEMORY_MIB: ${{ needs.provision.outputs.memory-mib }}
-          SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ needs.provision.outputs.vitest-workers }}
-          SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ needs.provision.outputs.playwright-workers }}
-          SNIPTALE_QA_SECURITY_WORKERS: ${{ needs.provision.outputs.security-workers }}
         run: |
           if [ "$PROOF_LANE" = release ]; then
             node ../trusted-control/tooling/ci/container.mjs proof
@@ -553,7 +580,8 @@ jobs:
             echo "Control disposition: $control_disposition"
             echo "Candidate control digest: $candidate_control_digest"
             echo "Trusted control digest: $trusted_control_digest"
-            echo "Resource profile: cpu=${{ needs.provision.outputs.cpu-tokens }}, memoryMiB=${{ needs.provision.outputs.memory-mib }}, vitest=${{ needs.provision.outputs.vitest-workers }}, playwright=${{ needs.provision.outputs.playwright-workers }}, security=${{ needs.provision.outputs.security-workers }}"
+            echo "Runner backend: $RUNNER_BACKEND"
+            echo "Resource profile: cpu=$SNIPTALE_QA_CPU_TOKENS, memoryMiB=$SNIPTALE_QA_MEMORY_MIB, vitest=$SNIPTALE_QA_VITEST_MAX_WORKERS, playwright=$SNIPTALE_QA_PLAYWRIGHT_WORKERS, security=$SNIPTALE_QA_SECURITY_WORKERS"
             echo "Failed phase: ${failed_phase:-none}"
             if [ -n "$BYPASS_REASON" ]; then echo "Operator note: $BYPASS_REASON"; fi
             if [ -n "$ARTIFACT_URL" ]; then
@@ -700,6 +728,7 @@ jobs:
           execution_path=derived
           if [ "$DERIVED" != true ]; then
             execution_path=vm
+            if [ "$RUNNER_BACKEND" = github ]; then execution_path=github; fi
             expected_digest="${QA_IMAGE##*@}"
           fi
           mkdir -p "$GITHUB_WORKSPACE/build/trusted-admission"

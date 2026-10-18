@@ -24,8 +24,15 @@ const vm = {
   reuse: false,
 };
 
+const github = {
+  ...vm,
+  executionPath: 'github',
+  provisionResult: 'skipped',
+  cleanupResult: 'skipped',
+};
+
 const RESULTS = ['success', 'failure', 'cancelled', 'skipped'] as const;
-const PATHS = ['derived', 'vm', 'unknown'] as const;
+const PATHS = ['derived', 'vm', 'github', 'unknown'] as const;
 
 function valueAt<T>(values: readonly T[], index: number, stride: number): T {
   return values[Math.floor(index / stride) % values.length];
@@ -69,7 +76,28 @@ it('admits only the declared derived and VM graphs across the complete GitHub re
       return false;
     }
   });
-  const expected = [derived, vm, { ...vm, classifierResult: 'skipped' }];
+  const expected = [
+    derived,
+    vm,
+    { ...vm, classifierResult: 'skipped' },
+    github,
+    { ...github, classifierResult: 'skipped' },
+  ];
   expect(admitted).toHaveLength(expected.length);
   expect(admitted).toEqual(expect.arrayContaining(expected));
+});
+
+it('admits GitHub-hosted execution only after canonical and trusted proof succeed', () => {
+  expect(admitGateGraph(github)).toMatchObject({ outcome: 'passed', executionPath: 'github' });
+});
+
+it.each([
+  { ...github, admissionResult: 'skipped' },
+  { ...github, canonicalResult: 'failure' },
+  { ...github, canonicalResult: 'cancelled' },
+  { ...github, provisionResult: 'success' },
+  { ...github, cleanupResult: 'failure' },
+  { ...github, reuse: true },
+])('rejects an incomplete or mixed GitHub execution graph %#', (graph) => {
+  expect(() => admitGateGraph(graph)).toThrow(/explicitly admitted/u);
 });

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 import YAML from 'yaml';
@@ -15,6 +16,7 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  'runs-on'?: string | string[];
   environment?: string;
   if?: string;
   name?: string;
@@ -568,4 +570,48 @@ it('keeps readable pipeline labels aligned with exact release admission checks',
   );
   expect(readSource(RELEASE)).toContain(`.name == "${readWorkflow(FINALIZE).jobs.finalize.name}"`);
   expect(readSource(RELEASE)).toContain('.display_title == "Prepare release"');
+});
+
+describe('optional GitHub-hosted canonical execution', () => {
+  it('keeps Selectel as the default and exposes an explicit release runner choice', () => {
+    const provenance = readWorkflow(PROVENANCE);
+    const inputs = (provenance.on.workflow_dispatch as { inputs: Record<string, unknown> }).inputs;
+    expect(inputs.runner_backend).toMatchObject({
+      type: 'choice',
+      default: 'selectel',
+      options: ['selectel', 'github'],
+    });
+    expect(provenance.jobs['canonical-proof'].with?.runner_backend).toBe(
+      "${{ inputs.runner_backend || 'selectel' }}"
+    );
+    const reusable = readWorkflow(CANONICAL);
+    const call = reusable.on.workflow_call as { inputs: Record<string, unknown> };
+    expect(call.inputs.runner_backend).toMatchObject({ type: 'string', default: 'selectel' });
+    expect(reusable.jobs.provision.if).toContain("inputs.runner_backend != 'github'");
+    expect(reusable.jobs['canonical-qa']['runs-on']).toContain("inputs.runner_backend == 'github'");
+    expect(reusable.jobs['canonical-qa']['runs-on']).toContain('ubuntu-24.04');
+    expect(reusable.jobs['canonical-qa'].if).toContain("needs.provision.result == 'skipped'");
+    expect(reusable.jobs.cleanup.if).toContain("needs.provision.result != 'skipped'");
+  });
+
+  it.each([
+    ['selectel', 'release-provenance', true],
+    ['github', 'release-provenance', true],
+    ['selectel', 'selectel-smoke', true],
+    ['github', 'selectel-smoke', false],
+    ['unrecognized', 'release-provenance', false],
+  ])(
+    'validates the actual runner selector before resource acquisition: %s / %s',
+    (backend, gate, accepted) => {
+      const validation = readWorkflow(CANONICAL).jobs['qa-image'].steps?.find(
+        (step) => step.name === 'Validate runner selection'
+      );
+      expect(validation).toBeDefined();
+      const result = spawnSync('bash', ['-c', validation?.run ?? 'exit 99'], {
+        encoding: 'utf8',
+        env: { ...process.env, RUNNER_BACKEND: backend, GATE_MODE: gate },
+      });
+      expect(result.status === 0).toBe(accepted);
+    }
+  );
 });

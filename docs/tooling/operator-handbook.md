@@ -35,9 +35,17 @@ On WSL/Linux, blocking wrappers in different directories wait for the same user'
 
 ## GitHub operations
 
-Ready pull requests run **Continuous Integration**. A merge to `main` does not repeat this gate for the squash commit.
+Ready pull requests run **Pull request checks**. A merge to `main` does not repeat this gate for the squash commit.
 
-Run **Release provenance** from `main` to create canonical release proof. If a consumer job fails after proof upload, rerun the failed jobs. The workflow selects the latest live producer attempt.
+Run **Release checks** from `main` to create canonical release proof. If a consumer job fails after proof upload, rerun the failed jobs. The workflow selects the latest live producer attempt.
+
+Select `runner_backend=github` to use a standard GitHub-hosted runner when Selectel capacity is unavailable. That mode does not require Selectel credentials or provisioning. Selectel remains the default. Both choices run the same mandatory checks in the pinned container.
+
+```sh
+gh workflow run provenance.yml --ref main -f runner_backend=github -f force_rebuild=false -f diagnostic=false
+```
+
+Use `runner_backend=selectel` to select the disposable Selectel runner explicitly. A runner choice does not replace proof or permit publication after failed checks.
 
 Treat a Selectel run as complete only when its cleanup receipt covers every attempt-owned resource. To recover an interrupted attempt, run **Selectel maintenance**. Select `recover` for that recovery. Provide its run ID and attempt. Do not substitute the daily sweep for exact recovery.
 
