@@ -527,3 +527,30 @@ it('does not return WAV when cancellation arrives while PCM is being read', asyn
     requestAudio({ request: pcmRequest, config: pcmConfig, signal: abort.signal, onReceiving() {} })
   ).rejects.toThrow();
 });
+
+it('refuses project transport without the coordinator admission callback', async () => {
+  const post = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', post);
+  await expect(
+    requestAudio({
+      request: {
+        ...transcription,
+        approvedProviderId: 'provider',
+        scope: {
+          projectId: 'project',
+          projectRevision: 3,
+          projectUpdatedAt: 10,
+          target: { kind: 'project-clip', clipId: 'clip' },
+          assetId: 'asset',
+          nativeStart: 0,
+          nativeEnd: 1,
+        },
+      },
+      config: transcriptionConfig,
+      input,
+      signal: new AbortController().signal,
+      onReceiving() {},
+    })
+  ).rejects.toThrow('unauthorized');
+  expect(post).not.toHaveBeenCalled();
+});

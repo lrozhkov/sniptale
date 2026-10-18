@@ -22,6 +22,13 @@ export async function getScenarioAsset(
   id: string
 ): Promise<HydratedScenarioAssetEntry | undefined> {
   await recoverScenarioAssetPublications();
+  return readCommittedScenarioAsset(id);
+}
+
+/** Reads committed source bytes without recovering or publishing pending Scenario operations. */
+export async function readCommittedScenarioAsset(
+  id: string
+): Promise<HydratedScenarioAssetEntry | undefined> {
   const db = await initDB();
   const entry = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, id));
   if (!entry) return undefined;

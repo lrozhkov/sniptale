@@ -2,7 +2,13 @@ import { sameReviewSourceIdentity } from '../../../features/video/review/source-
 import { readLibrarySceneSource } from '../../../composition/persistence/projects/library-scene-source';
 import { readAssetFile } from '../../../composition/persistence/assets/opfs-store';
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
-import { isAudioSourceJobScope, type AudioSourceJobScope } from '../../../contracts/ai/audio';
+import {
+  isAudioSourceJobScope,
+  isProjectAudioSourceJobScope,
+  type AudioJobScope,
+  type AudioSourceJobScope,
+} from '../../../contracts/ai/audio';
+import { readVideoProjectAudioSource } from '../../../composition/persistence/projects/audio-source';
 import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
@@ -15,13 +21,17 @@ import type { AudioJobStart } from '../../../contracts/ai/audio';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { isOwnedExtensionPagePath } from '../../../platform/navigation/extension-pages/sender-url';
 
-export function isAudioJobSender(sender: chrome.runtime.MessageSender | undefined): boolean {
-  return (
-    !!sender?.documentId &&
-    sender.id === chrome.runtime.id &&
-    sender.frameId === 0 &&
-    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html')
+export function isAudioJobSender(
+  sender: chrome.runtime.MessageSender | undefined,
+  scope?: AudioJobScope
+): boolean {
+  if (!sender?.documentId || sender.id !== chrome.runtime.id || sender.frameId !== 0) return false;
+  const gallery = isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html');
+  const project = isOwnedExtensionPagePath(
+    sender.url,
+    'apps/extension/src/video-editor/index.html'
   );
+  return scope ? (isProjectAudioSourceJobScope(scope) ? project : gallery) : gallery || project;
 }
 
 async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSourceJobScope) {
@@ -39,6 +49,12 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
 
 /** Sender identity alone never authorizes an asset: durable selection is rechecked before POST. */
 export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
+  if (isProjectAudioSourceJobScope(request.scope)) {
+    if (request.operation !== 'transcription' || !request.approvedProviderId)
+      throw new Error('unauthorized');
+    await readVideoProjectAudioSource(request.scope);
+    return;
+  }
   const snapshot = await readVideoWorkspace(request.scope.workspaceId);
   const workspace = snapshot?.workspace;
   if (!workspace || workspace.revision !== request.scope.workspaceRevision)

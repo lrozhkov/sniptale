@@ -33,6 +33,7 @@ import {
   deletePendingScenarioAsset,
   getPendingScenarioAsset,
   getScenarioAsset,
+  readCommittedScenarioAsset,
   listPendingScenarioAssets,
   listScenarioAssets,
   savePendingScenarioAsset,
@@ -238,4 +239,18 @@ it('filters malformed pending scenario asset rows before recovery cleanup', asyn
   await expect(listPendingScenarioAssets()).resolves.toEqual([
     expect.objectContaining({ id: 'pending-1', tabId: 9 }),
   ]);
+});
+
+it('reads a committed asset without recovery and preserves the legacy getter recovery policy', async () => {
+  dbGetMock
+    .mockResolvedValueOnce(createScenarioAssetRow())
+    .mockResolvedValueOnce({ assetId: 'opfs-asset-1' });
+  await expect(readCommittedScenarioAsset('asset-1')).resolves.toMatchObject({ id: 'asset-1' });
+  const assetMocks = await import('../../assets');
+  expect(assetMocks.recoverStandaloneAssetPublications).not.toHaveBeenCalled();
+  dbGetMock
+    .mockResolvedValueOnce(createScenarioAssetRow())
+    .mockResolvedValueOnce({ assetId: 'opfs-asset-1' });
+  await expect(getScenarioAsset('asset-1')).resolves.toMatchObject({ id: 'asset-1' });
+  expect(assetMocks.recoverStandaloneAssetPublications).toHaveBeenCalledOnce();
 });

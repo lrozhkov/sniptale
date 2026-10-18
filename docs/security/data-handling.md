@@ -114,13 +114,17 @@ Background preset metadata is local-only under `sniptale_background_presets`. It
 
 Local-data erasure removes it even if preferences remain preserved. Custom images are explicitly retained in Library through the existing asset publication owner. Removing a catalog entry does not remove its Library material. Missing or trashed materials cannot be selected. Editor insertion keeps its existing frozen bytes and source provenance without publishing a second Library card.
 
-### Explicit Gallery speech editing
+### Explicit video speech editing
 
 Gallery speech editing is distinct from session-only browser voice input. Explicitly accepted transcripts and phrase edits become project content through review history. Accepted generated audio uses the existing private project-asset publication and reference-retention rules. Project backup includes those accepted references and text. It excludes jobs, secrets and temporary previews.
 
 `background/ai/audio/request.ts` alone assembles audio provider bearer headers. It sends only the authorized extracted interval or saved phrase to the selected provider. It rejects redirects. It omits ambient credentials and referrers. It bounds response bytes and elapsed time.
 
 Provider error bodies never enter UI, logs or diagnostics. There is no hidden retry after an ambiguous paid POST.
+
+Full video editor transcription uses the same audio job, ticket, staging and transport owners. It requires a separate project clip scope. The top-level editor document must match the scope owner. The saved project revision, snapshot timestamp, clip membership and native source interval must agree. A missing, changed or trashed project refuses admission. Source bytes resolve only through canonical project, Library, recording or scenario readers.
+
+Recheck project authority before POST and temporary input publication. Staging checks project scope under its ticket lock and after upload. A stale project cannot read staged input. Exact scoped cleanup remains available after source deletion. This project scope authorizes transcription only. It requires an explicitly approved provider. It does not authorize speech or the combined montage mix.
 
 Gallery text editing uses the one-shot `review-text` LLM session purpose and typed `sniptale-gallery-review-text` Port. The exact top-level Gallery document, capability purpose, context hash and committed workspace scope must agree. The selector exposes only an opaque SHA256 provider-destination binding. Background compares provider identity, destination and model code before permission or secret activation and again before POST. Provider payload contains the disclosed prompt, texts, language and numeric result-video intervals plus fixed output-contract instructions.
 

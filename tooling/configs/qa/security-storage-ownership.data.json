@@ -313,8 +313,8 @@
     {
       "file": "apps/extension/src/composition/persistence/assets/audio-staging.ts",
       "owner": "gallery-audio-job-staging",
-      "justification": "Temporarily retains explicitly requested Gallery transcription input and generated audio preview under the existing asset OPFS root.",
-      "reviewNote": "Random operation-scoped identifiers, 32 MiB per object (24 MiB STT input), ten-minute read expiry and bounded expired-object collection on subsequent writes. Input discarded on job completion, output discarded by preview consumer. Crashed objects remain inaccessible until next-write cleanup or full erasure. No sync, backup, logs or diagnostics. Fresh workspace admission inside the existing mutation transition prevents post-erasure recreation.",
+      "justification": "Retains explicit Gallery transcription input and generated audio previews temporarily. Also retains authorized full video editor transcription input under the same asset OPFS root.",
+      "reviewNote": "Use random operation identifiers and exact scope metadata. Limit each object to 32 MiB and transcription input to 24 MiB. Reads expire after ten minutes. Collect expired objects within the existing bounded subsequent-write pass. Discard input on job completion and output when its preview consumer releases it. Crashed objects remain inaccessible until subsequent-write cleanup or full erasure. Exclude sync, backup, logs and diagnostics. Recheck Gallery workspace or project membership inside the existing mutation transition. Recheck project scope under the ticket lock and after upload. Refuse stale project reads. Scoped cleanup remains available after source deletion.",
       "storageWrites": [
         {
           "sink": "writable.write",

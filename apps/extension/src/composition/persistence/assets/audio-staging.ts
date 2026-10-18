@@ -10,12 +10,14 @@ import {
   AUDIO_STAGING_TTL_MS,
   isAudioStagingId,
   isAudioSourceJobScope,
+  isProjectAudioSourceJobScope,
   parseAudioJobScope,
   sameAudioJobScope,
   type AudioJobScope,
   type AudioStagedHandle,
 } from '../../../contracts/ai/audio';
 import { matchesReviewTextScope } from '../../../features/video/review/text-document';
+import { readVideoProjectAudioTarget } from '../projects/audio-source';
 import { runWithPersistenceMutationTransition } from '../infrastructure/mutation-barrier';
 import { ASSET_ROOT_DIRECTORY_NAME } from './opfs-store';
 
@@ -73,6 +75,10 @@ async function collectExpired(root: FileSystemDirectoryHandle): Promise<void> {
 }
 
 async function assertScopeExists(scope: AudioJobScope): Promise<void> {
+  if (isProjectAudioSourceJobScope(scope)) {
+    await readVideoProjectAudioTarget(scope);
+    return;
+  }
   const snapshot = await readVideoWorkspace(scope.workspaceId);
   const workspace = snapshot?.workspace;
   if (!workspace || workspace.revision !== scope.workspaceRevision)
@@ -132,6 +138,7 @@ export async function writeAudioStaging(args: {
     await collectExpired(root);
     return navigator.locks.request(`sniptale:audio-staging:${args.id}`, async () => {
       args.signal?.throwIfAborted();
+      if (isProjectAudioSourceJobScope(args.scope)) await assertScopeExists(args.scope);
       let ownsFiles = false;
       let writable: FileSystemWritableFileStream | undefined;
       try {
@@ -168,6 +175,7 @@ export async function writeAudioStaging(args: {
         }
         args.signal?.throwIfAborted();
         await writable.close();
+        if (isProjectAudioSourceJobScope(args.scope)) await assertScopeExists(args.scope);
         return { id: args.id, mimeType, size: args.blob.size };
       } catch (error) {
         await writable?.abort().catch(() => undefined);
@@ -189,6 +197,7 @@ export async function readAudioStaging(
   validateId(handle.id);
   const root = await directory(false);
   return navigator.locks.request(`sniptale:audio-staging:${handle.id}`, async () => {
+    if (isProjectAudioSourceJobScope(scope)) await assertScopeExists(scope);
     const metadataFile = await (await root.getFileHandle(`${handle.id}.json`)).getFile();
     if (metadataFile.size > 4096) throw new Error('Invalid audio staging metadata.');
     const metadata: unknown = JSON.parse(await metadataFile.text());

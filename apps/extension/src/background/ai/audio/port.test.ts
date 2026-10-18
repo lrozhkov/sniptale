@@ -38,12 +38,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function connectedPort() {
+function connectedPort(owner = sender) {
   const service = createAudioJobService();
   const connection = { receive: vi.fn(), disconnect: vi.fn(async () => undefined) };
   const connect = vi.spyOn(service, 'connect').mockReturnValue(connection);
   const stop = registerAudioJobPorts(service);
-  const fixture = createRuntimePortFixture({ name: AUDIO_JOB_PORT_NAME, sender });
+  const fixture = createRuntimePortFixture({ name: AUDIO_JOB_PORT_NAME, sender: owner });
   browser.listener?.(fixture.port);
   return { ...fixture, connection, connect, stop };
 }
@@ -144,4 +144,52 @@ it('admits original targets but refuses legacy and mixed target payloads at the 
   });
   expect(fixture.connection.receive).toHaveBeenCalledTimes(1);
   fixture.stop();
+});
+
+it('binds project and Gallery scopes to their own top-level editor documents', () => {
+  const projectSender = {
+    ...sender,
+    url: 'chrome-extension://extension/apps/extension/src/video-editor/index.html',
+  };
+  const projectScope = {
+    projectId: 'project',
+    projectRevision: 3,
+    projectUpdatedAt: 10,
+    target: { kind: 'project-clip' as const, clipId: 'clip' },
+    assetId: 'asset',
+    nativeStart: 1,
+    nativeEnd: 3,
+  };
+  const start = {
+    type: 'start',
+    operation: 'transcription',
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    scope: projectScope,
+  };
+  expect(isAudioJobSender(projectSender)).toBe(true);
+  expect(isAudioJobSender(projectSender, projectScope)).toBe(true);
+  expect(isAudioJobSender(sender, projectScope)).toBe(false);
+  const galleryScope = {
+    workspaceId: 'w',
+    workspaceRevision: 1,
+    target: { kind: 'original' as const },
+    assetId: 'source',
+    nativeStart: 0,
+    nativeEnd: 1,
+  };
+  expect(isAudioJobSender(projectSender, galleryScope)).toBe(false);
+  expect(isAudioJobSender(sender, galleryScope)).toBe(true);
+  const accepted = connectedPort(projectSender);
+  accepted.onMessage.emit(start);
+  expect(accepted.connection.receive).toHaveBeenCalledExactlyOnceWith(start);
+  const wrongGallery = connectedPort();
+  wrongGallery.onMessage.emit(start);
+  expect(wrongGallery.disconnect).toHaveBeenCalledOnce();
+  expect(wrongGallery.connection.receive).not.toHaveBeenCalled();
+  const wrongProject = connectedPort(projectSender);
+  wrongProject.onMessage.emit({ ...start, scope: galleryScope });
+  expect(wrongProject.disconnect).toHaveBeenCalledOnce();
+  expect(wrongProject.connection.receive).not.toHaveBeenCalled();
 });

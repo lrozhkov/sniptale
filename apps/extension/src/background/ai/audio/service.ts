@@ -129,6 +129,15 @@ class AudioJobCoordinator {
         request: job.request,
         ...prepared,
         signal: job.controller.signal,
+        beforeSend: async () => {
+          job.controller.signal.throwIfAborted();
+          const config = await this.deps.resolveModel(job.request);
+          if (!job.config || JSON.stringify(config) !== JSON.stringify(job.config))
+            throw new Error('stale');
+          job.controller.signal.throwIfAborted();
+          await this.deps.authorize(job.request);
+          job.controller.signal.throwIfAborted();
+        },
         onReceiving: () =>
           job.send({ type: 'progress', requestId: job.request.requestId, phase: 'receiving' }),
       });

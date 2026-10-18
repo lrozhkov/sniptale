@@ -3,7 +3,7 @@ import { AUDIO_JOB_PORT_NAME, parseAudioJobClientMessage } from '../../../contra
 import { isAudioJobSender } from './authorization';
 import type { AudioJobService } from './service';
 
-/** Gallery-only one-shot Port. Disconnect is cancellation, including worker termination. */
+/** Each editor can start only its own scoped jobs. Disconnect cancels the one-shot operation. */
 export function registerAudioJobPorts(service: AudioJobService): () => void {
   return browserRuntime.subscribeToConnections((port) => {
     if (port.name !== AUDIO_JOB_PORT_NAME) return;
@@ -20,7 +20,7 @@ export function registerAudioJobPorts(service: AudioJobService): () => void {
     });
     const onMessage = (raw: unknown) => {
       const message = parseAudioJobClientMessage(raw);
-      if (!message) {
+      if (!message || (message.type === 'start' && !isAudioJobSender(port.sender, message.scope))) {
         port.disconnect();
         void connection.disconnect().catch(() => undefined);
         return;

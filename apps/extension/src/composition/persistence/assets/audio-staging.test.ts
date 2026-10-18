@@ -1,5 +1,10 @@
 import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
 const stagingSource = vi.hoisted(() => ({ database: vi.fn() }));
+const projectSource = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock('../projects/index', async (original) => ({
+  ...(await original<typeof import('../projects/index')>()),
+  getVideoProject: projectSource.read,
+}));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: stagingSource.database,
@@ -7,6 +12,12 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
 import { afterEach, expect, it, vi } from 'vitest';
 import { writeAudioStaging, readAudioStaging, discardAudioStaging } from './audio-staging';
 import { readVideoWorkspace } from '../review-workspaces/store';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
+import { createVideoProjectAudioScope } from '../../../features/video/project/text/audio-scope';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import {
   addReviewTextFragment,
@@ -162,6 +173,9 @@ function memoryStaging() {
     getDirectory,
     failWrites: () => {
       failWrite = true;
+    },
+    allowWrites: () => {
+      failWrite = false;
     },
   };
 }
@@ -413,5 +427,156 @@ it('roundtrips original scopes without allowing a voiceover discriminator to rea
   await expect(
     writeAudioStaging({ id: stagingId, scope: original, blob: audioBlob() })
   ).rejects.toThrow();
+  expect(memory.files.size).toBe(0);
+});
+
+function projectStagingScope() {
+  const project = createEmptyVideoProject('Project audio');
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 640,
+      height: 360,
+      duration: 10,
+      hasAudio: true,
+      mimeType: 'video/webm',
+      size: 5,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 640, 360, 0);
+  project.assets = [asset];
+  project.clips = [clip];
+  const selected = createVideoProjectAudioScope(project, 3, clip.id, 0, 1);
+  if (!selected) throw new Error('Missing scope');
+  const saved = { status: 'ready', project, workspaceRevision: 3 };
+  projectSource.read.mockResolvedValue(saved);
+  return { selected, saved };
+}
+
+function pausedAudio() {
+  let release!: () => void;
+  let start!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const bytes = new Uint8Array([1, 2, 3, 4]);
+  class PausedAudio extends Blob {
+    override stream() {
+      return new ReadableStream<Uint8Array<ArrayBuffer>>({
+        async start(controller) {
+          start();
+          await gate;
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      });
+    }
+  }
+  return { entered, release, blob: new PausedAudio([bytes], { type: 'audio/wav' }) };
+}
+
+it('writes independent project tickets concurrently without crossing scopes', async () => {
+  const memory = memoryStaging();
+  const { selected } = projectStagingScope();
+  const paused = pausedAudio();
+  const first = writeAudioStaging({ id: stagingId, scope: selected, blob: paused.blob });
+  await paused.entered;
+  const other = { ...selected, nativeStart: 1, nativeEnd: 2 };
+  const second = await writeAudioStaging({
+    id: '12345678-1234-4234-8234-123456789abd',
+    scope: other,
+    blob: audioBlob(),
+  });
+  expect(memory.files.get(stagingId)?.size).toBe(0);
+  await expect((await readAudioStaging(second, other)).text()).resolves.toBe('audio');
+  await expect(readAudioStaging(second, selected)).rejects.toThrow('Stale audio staging');
+  paused.release();
+  const completed = await first;
+  expect(new Uint8Array(await (await readAudioStaging(completed, selected)).arrayBuffer())).toEqual(
+    new Uint8Array([1, 2, 3, 4])
+  );
+  expect(readVideoWorkspace).not.toHaveBeenCalled();
+});
+
+it('refuses a delayed project write after deletion before physical staging', async () => {
+  const memory = memoryStaging();
+  const { selected, saved } = projectStagingScope();
+  let release!: () => void;
+  let start!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  projectSource.read.mockImplementationOnce(async () => {
+    start();
+    await gate;
+    return saved;
+  });
+  const pending = writeAudioStaging({ id: stagingId, scope: selected, blob: audioBlob() });
+  const refusal = expect(pending).rejects.toThrow('stale');
+  await entered;
+  projectSource.read.mockResolvedValue({ status: 'notFound' });
+  release();
+  await refusal;
+  expect(memory.getDirectory).not.toHaveBeenCalled();
+  expect(memory.files.size).toBe(0);
+});
+
+it('removes incomplete project bytes when the target disappears during upload', async () => {
+  const memory = memoryStaging();
+  const { selected } = projectStagingScope();
+  const paused = pausedAudio();
+  const pending = writeAudioStaging({ id: stagingId, scope: selected, blob: paused.blob });
+  const refusal = expect(pending).rejects.toThrow('stale');
+  await paused.entered;
+  projectSource.read.mockResolvedValue({ status: 'notFound' });
+  paused.release();
+  await refusal;
+  expect(memory.files.size).toBe(0);
+});
+
+it('retries a failed project staging write only with an explicit current scope', async () => {
+  const memory = memoryStaging();
+  const { selected } = projectStagingScope();
+  memory.failWrites();
+  await expect(
+    writeAudioStaging({ id: stagingId, scope: selected, blob: audioBlob() })
+  ).rejects.toThrow('disk full');
+  expect(memory.files.size).toBe(0);
+  memory.allowWrites();
+  await expect(
+    writeAudioStaging({
+      id: stagingId,
+      scope: { ...selected, projectRevision: 2 },
+      blob: audioBlob(),
+    })
+  ).rejects.toThrow('stale');
+  const handle = await writeAudioStaging({
+    id: '12345678-1234-4234-8234-123456789abd',
+    scope: selected,
+    blob: audioBlob(),
+  });
+  await expect((await readAudioStaging(handle, selected)).text()).resolves.toBe('audio');
+});
+
+it('discards a project ticket after deletion without admitting another scope', async () => {
+  const memory = memoryStaging();
+  const { selected } = projectStagingScope();
+  const handle = await writeAudioStaging({ id: stagingId, scope: selected, blob: audioBlob() });
+  projectSource.read.mockResolvedValue({ status: 'notFound' });
+  await expect(readAudioStaging(handle, selected)).rejects.toThrow('stale');
+  await expect(discardAudioStaging(handle, { ...selected, projectId: 'other' })).rejects.toThrow(
+    'scope mismatch'
+  );
+  expect(memory.files.size).toBe(2);
+  await discardAudioStaging(handle, selected);
   expect(memory.files.size).toBe(0);
 });

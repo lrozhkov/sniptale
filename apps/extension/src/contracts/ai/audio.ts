@@ -37,9 +37,29 @@ export interface AudioTextJobScope {
   timeDomain: 'source' | 'result';
 }
 
-export type AudioJobScope = AudioSourceJobScope | AudioTextJobScope;
+/** A saved montage clip authorizes its native source interval, never the complete project mix. */
+export interface ProjectAudioSourceJobScope {
+  projectId: string;
+  projectRevision: number;
+  projectUpdatedAt: number;
+  target: { kind: 'project-clip'; clipId: string };
+  assetId: string;
+  nativeStart: number;
+  nativeEnd: number;
+}
 
-export function isAudioSourceJobScope(scope: AudioJobScope): scope is AudioSourceJobScope {
+export type AudioJobScope = AudioSourceJobScope | AudioTextJobScope | ProjectAudioSourceJobScope;
+
+/** Distinguishes montage admission from Gallery workspace authority. */
+export function isProjectAudioSourceJobScope(
+  scope: AudioJobScope
+): scope is ProjectAudioSourceJobScope {
+  return scope.target.kind === 'project-clip';
+}
+
+export function isAudioSourceJobScope(
+  scope: AudioJobScope
+): scope is AudioSourceJobScope | ProjectAudioSourceJobScope {
   return scope.target.kind !== 'text';
 }
 
@@ -182,7 +202,59 @@ export function sameReviewSpeechTarget(
     ? right.kind === 'original'
     : right.kind === 'voiceover' && left.clipId === right.clipId;
 }
+function parseProjectAudioJobScope(
+  value: Record<string, unknown>,
+  target: Record<string, unknown>
+): ProjectAudioSourceJobScope | null {
+  if (
+    Object.keys(value).some(
+      (key) =>
+        ![
+          'projectId',
+          'projectRevision',
+          'projectUpdatedAt',
+          'target',
+          'assetId',
+          'nativeStart',
+          'nativeEnd',
+        ].includes(key)
+    ) ||
+    !identifier(value['projectId']) ||
+    !revision(value['projectRevision']) ||
+    typeof value['projectUpdatedAt'] !== 'number' ||
+    !Number.isFinite(value['projectUpdatedAt']) ||
+    value['projectUpdatedAt'] < 0 ||
+    Object.keys(target).length !== 2 ||
+    !identifier(target['clipId']) ||
+    !identifier(value['assetId']) ||
+    typeof value['nativeStart'] !== 'number' ||
+    !Number.isFinite(value['nativeStart']) ||
+    value['nativeStart'] < 0 ||
+    typeof value['nativeEnd'] !== 'number' ||
+    !Number.isFinite(value['nativeEnd']) ||
+    value['nativeEnd'] <= value['nativeStart'] ||
+    value['nativeEnd'] - value['nativeStart'] > AUDIO_INPUT_MAX_SECONDS
+  )
+    return null;
+  return {
+    projectId: value['projectId'],
+    projectRevision: value['projectRevision'],
+    projectUpdatedAt: value['projectUpdatedAt'],
+    target: { kind: 'project-clip', clipId: target['clipId'] },
+    assetId: value['assetId'],
+    nativeStart: value['nativeStart'],
+    nativeEnd: value['nativeEnd'],
+  };
+}
+
 export function parseAudioJobScope(value: unknown): AudioJobScope | null {
+  if (record(value) && record(value['target']) && value['target']['kind'] === 'project-clip')
+    return parseProjectAudioJobScope(value, value['target']);
+  if (
+    record(value) &&
+    ['projectId', 'projectRevision', 'projectUpdatedAt'].some((key) => key in value)
+  )
+    return null;
   if (record(value) && record(value['target']) && value['target']['kind'] === 'text') {
     const target = value['target'];
     if (
@@ -260,7 +332,8 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   const approvedProviderId = value['approvedProviderId'];
   if (
     (approvedProviderId !== undefined && !identifier(approvedProviderId)) ||
-    (!isAudioSourceJobScope(scope) && !identifier(approvedProviderId))
+    ((!isAudioSourceJobScope(scope) || isProjectAudioSourceJobScope(scope)) &&
+      !identifier(approvedProviderId))
   )
     return null;
   const base = {
@@ -284,6 +357,7 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
     return { ...base, operation: 'transcription', scope, ...(recognition ? { recognition } : {}) };
   }
   if ('recognition' in value) return null;
+  if (isProjectAudioSourceJobScope(scope)) return null;
   if (
     value['operation'] !== 'speech' ||
     !identifier(value['phraseId']) ||
@@ -310,6 +384,18 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   };
 }
 export function sameAudioJobScope(left: AudioJobScope, right: AudioJobScope): boolean {
+  if (isProjectAudioSourceJobScope(left) || isProjectAudioSourceJobScope(right))
+    return (
+      isProjectAudioSourceJobScope(left) &&
+      isProjectAudioSourceJobScope(right) &&
+      left.projectId === right.projectId &&
+      left.projectRevision === right.projectRevision &&
+      left.projectUpdatedAt === right.projectUpdatedAt &&
+      left.target.clipId === right.target.clipId &&
+      left.assetId === right.assetId &&
+      left.nativeStart === right.nativeStart &&
+      left.nativeEnd === right.nativeEnd
+    );
   if (left.workspaceId !== right.workspaceId || left.workspaceRevision !== right.workspaceRevision)
     return false;
   if (!isAudioSourceJobScope(left))

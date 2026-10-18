@@ -73,7 +73,7 @@ it('propagates cancellation to the worker and rejects instead of publishing a la
 });
 
 const staging = vi.hoisted(() => ({ write: vi.fn(), discard: vi.fn(async () => undefined) }));
-function connectedJob() {
+function connectedJob(project = false) {
   let receive!: (message: unknown) => void;
   let disconnect!: () => void;
   const postMessage = vi.fn();
@@ -95,19 +95,30 @@ function connectedJob() {
       }),
     },
   });
-  const scope = {
-    workspaceId: 'workspace',
-    workspaceRevision: 1,
-    target: { kind: 'voiceover' as const, clipId: 'clip' },
-    assetId: 'asset',
-    nativeStart: 0,
-    nativeEnd: 2,
-  };
+  const scope = project
+    ? {
+        projectId: 'project',
+        projectRevision: 3,
+        projectUpdatedAt: 10,
+        target: { kind: 'project-clip' as const, clipId: 'clip' },
+        assetId: 'asset',
+        nativeStart: 0,
+        nativeEnd: 2,
+      }
+    : {
+        workspaceId: 'workspace',
+        workspaceRevision: 1,
+        target: { kind: 'voiceover' as const, clipId: 'clip' },
+        assetId: 'asset',
+        nativeStart: 0,
+        nativeEnd: 2,
+      };
   const start = {
     type: 'start' as const,
     requestId: 'r',
     modelId: 'm',
     operation: 'transcription' as const,
+    ...(project ? { approvedProviderId: 'provider' } : {}),
     scope,
   };
   return {
@@ -285,4 +296,80 @@ it('releases keepalive on a terminal response and failed initial delivery', asyn
   } finally {
     vi.useRealTimers();
   }
+});
+
+it('uses the same scoped staging protocol for an authorized project transcript', async () => {
+  staging.write.mockReset();
+  const job = connectedJob(true);
+  const ticket = '11111111-1111-4111-8111-111111111111';
+  const blob = new Blob(['audio'], { type: 'audio/wav' });
+  staging.write.mockResolvedValue({ id: ticket, mimeType: 'audio/wav', size: blob.size });
+  const pending = runReviewSpeechJob(job.start, {
+    signal: new AbortController().signal,
+    prepareInput: async () => blob,
+  });
+  const result = expect(pending).resolves.toMatchObject({
+    type: 'transcript',
+    result: { text: 'Project speech' },
+  });
+  job.receive({ type: 'authorized', requestId: 'r', ticket, scope: job.start.scope });
+  await vi.waitFor(() =>
+    expect(job.postMessage).toHaveBeenLastCalledWith({
+      type: 'execute',
+      requestId: 'r',
+      ticket,
+      staged: { id: ticket, mimeType: 'audio/wav', size: blob.size },
+    })
+  );
+  expect(staging.write).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ id: ticket, scope: job.start.scope, blob })
+  );
+  job.receive({ type: 'transcript', requestId: 'r', result: { text: 'Project speech' } });
+  await result;
+});
+
+it('refuses a different project revision in the authorization echo before extraction', async () => {
+  staging.write.mockReset();
+  const job = connectedJob(true);
+  const prepareInput = vi.fn(async () => new Blob(['audio'], { type: 'audio/wav' }));
+  const pending = runReviewSpeechJob(job.start, {
+    signal: new AbortController().signal,
+    prepareInput,
+  });
+  const refused = expect(pending).rejects.toThrow('invalid-response');
+  job.receive({
+    type: 'authorized',
+    requestId: 'r',
+    ticket: '11111111-1111-4111-8111-111111111111',
+    scope: { ...job.start.scope, projectRevision: 4 },
+  });
+  await refused;
+  expect(prepareInput).not.toHaveBeenCalled();
+  expect(staging.write).not.toHaveBeenCalled();
+});
+
+it('cancels a project upload while extraction is pending without staging its late bytes', async () => {
+  staging.write.mockReset();
+  const job = connectedJob(true);
+  const controller = new AbortController();
+  let release!: (blob: Blob) => void;
+  const bytes = new Promise<Blob>((resolve) => {
+    release = resolve;
+  });
+  const prepareInput = vi.fn(() => bytes);
+  const pending = runReviewSpeechJob(job.start, { signal: controller.signal, prepareInput });
+  const refused = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  job.receive({
+    type: 'authorized',
+    requestId: 'r',
+    ticket: '11111111-1111-4111-8111-111111111111',
+    scope: job.start.scope,
+  });
+  expect(prepareInput).toHaveBeenCalledOnce();
+  controller.abort();
+  release(new Blob(['audio'], { type: 'audio/wav' }));
+  await refused;
+  await bytes;
+  expect(staging.write).not.toHaveBeenCalled();
+  expect(job.postMessage).toHaveBeenLastCalledWith({ type: 'cancel', requestId: 'r' });
 });

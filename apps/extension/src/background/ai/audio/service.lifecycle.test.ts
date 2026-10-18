@@ -393,3 +393,83 @@ it('binds keepalive to the active request and never extends authorization or the
   expect(job.deps.authorize).toHaveBeenCalledOnce();
   await Promise.all([idle.connection.disconnect(), job.connection.disconnect()]);
 });
+
+it('project tickets refuse stale uploads before POST and cannot replay', async () => {
+  const projectRequest: AudioJobStart = {
+    ...transcription,
+    approvedProviderId: 'provider',
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-clip', clipId: 'clip' },
+      assetId: 'asset',
+      nativeStart: 0,
+      nativeEnd: 1,
+    },
+  };
+  const job = setup();
+  job.connection.receive(projectRequest);
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({
+      type: 'authorized',
+      requestId: 'r',
+      ticket,
+      scope: projectRequest.scope,
+    })
+  );
+  job.deps.read.mockImplementationOnce(async () => {
+    job.deps.authorize.mockRejectedValue(new Error('stale'));
+    return wav();
+  });
+  execute(job);
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({ type: 'failure', requestId: 'r', code: 'stale' })
+  );
+  expect(job.deps.read).toHaveBeenCalledWith(expect.anything(), projectRequest.scope);
+  expect(job.deps.discard).toHaveBeenCalledWith(expect.anything(), projectRequest.scope);
+  expect(job.deps.request).not.toHaveBeenCalled();
+  execute(job);
+  expect(job.deps.request).not.toHaveBeenCalled();
+  await job.connection.disconnect();
+});
+
+it('runs project transcription through the existing upload and cleanup lifecycle', async () => {
+  const projectRequest: AudioJobStart = {
+    ...transcription,
+    approvedProviderId: 'provider',
+    scope: {
+      projectId: 'project',
+      projectRevision: 3,
+      projectUpdatedAt: 10,
+      target: { kind: 'project-clip', clipId: 'clip' },
+      assetId: 'asset',
+      nativeStart: 0,
+      nativeEnd: 1,
+    },
+  };
+  const job = setup();
+  job.deps.request.mockResolvedValueOnce({
+    kind: 'transcript',
+    result: { text: 'Project speech' },
+  });
+  job.connection.receive(projectRequest);
+  await vi.waitFor(() =>
+    expect(job.messages.some((message) => message.type === 'authorized')).toBe(true)
+  );
+  execute(job);
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({
+      type: 'transcript',
+      requestId: 'r',
+      result: { text: 'Project speech' },
+    })
+  );
+  expect(job.deps.request).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ request: projectRequest, input: expect.any(File) })
+  );
+  expect(job.deps.discard).toHaveBeenCalledOnce();
+  execute(job);
+  expect(job.deps.request).toHaveBeenCalledOnce();
+  await job.connection.disconnect();
+});
