@@ -109,6 +109,11 @@ for (const variant of [
     const button = (key: Parameters<typeof translate>[0]) =>
       dialog.getByRole('button', { name: label(key), exact: true });
     const open = async () => {
+      const route = new URL(page.url()).searchParams;
+      if (route.get('mode') === 'edit' && route.has('mediaId')) {
+        await expect(dialog).toBeVisible();
+        return;
+      }
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     };

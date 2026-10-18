@@ -1,3 +1,4 @@
+import { InspectProjectTextPanel } from './text';
 import { InspectCursorPathSettings } from './cursor-path';
 import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
@@ -65,6 +66,12 @@ function createSceneGroups(
           sceneBackground={sceneBackground}
         />
       ),
+    },
+    {
+      id: 'text',
+      semantic: 'content' as const,
+      label: translate('gallery.videoReview.textTrackDocument'),
+      content: <InspectProjectTextPanel key={props.project.id} project={props.project} />,
     },
     {
       id: 'grid',

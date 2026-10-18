@@ -2,7 +2,9 @@ export type VideoEditorProjectHistoryError = 'projectMismatch' | 'snapshotFailed
 export type VideoEditorProjectHistoryTransactionLease = symbol;
 
 export interface VideoEditorProjectHistoryActions {
-  beginProjectHistoryTransaction: () => VideoEditorProjectHistoryTransactionLease | null;
+  beginProjectHistoryTransaction: (options?: {
+    onlyIfIdle?: boolean;
+  }) => VideoEditorProjectHistoryTransactionLease | null;
   endProjectHistoryTransaction: (lease: VideoEditorProjectHistoryTransactionLease) => void;
   isProjectHistoryTransactionCurrent: (lease: VideoEditorProjectHistoryTransactionLease) => boolean;
   undoProject: () => void;
