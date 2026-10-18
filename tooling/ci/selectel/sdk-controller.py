@@ -305,7 +305,7 @@ def select_resources(connection, policy: dict[str, Any], placement: dict[str, An
         if item.name == placement["volumeType"]
     ]
     if len(volume_types) != 1:
-        raise RuntimeError("Configured Selectel boot volume type is unavailable.")
+        raise RuntimeError("Configured Selectel boot volume type is unavailable or ambiguous.")
     return {
         "zone": zone,
         "flavor": flavor,

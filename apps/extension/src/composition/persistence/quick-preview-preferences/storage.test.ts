@@ -11,8 +11,12 @@ import {
   type PersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 
+const hostLocks = navigator.locks;
+
 beforeEach(() => {
   vi.stubGlobal('chrome', undefined);
+  // Node native locks span worker threads; this fixture proves local fallback ordering.
+  vi.stubGlobal('navigator', {});
   installPersistenceLockManagerForTests(null);
 });
 afterEach(() => {
@@ -45,6 +49,20 @@ function fixture(value: unknown = undefined) {
   };
 }
 
+it('keeps fixture saves independent from host lock admission failures', async () => {
+  const request = vi
+    .spyOn(hostLocks, 'request')
+    .mockRejectedValue(new Error('unrelated host lock admission failed'));
+  try {
+    const f = fixture();
+    await f.store.save(DEFAULT_QUICK_PREVIEW_PREFERENCES);
+    expect(f.read()).toEqual(DEFAULT_QUICK_PREVIEW_PREFERENCES);
+    expect(request).not.toHaveBeenCalled();
+  } finally {
+    request.mockRestore();
+  }
+});
+
 it('loads and normalizes only its isolated key without repair writes', async () => {
   const f = fixture({ frameRate: '24', showFrameRate: 'invalid', content: 'not retained' });
   expect(await f.store.load()).toEqual({
@@ -72,7 +90,9 @@ it('rejects incomplete or unknown fields before storage or permit acquisition', 
 it('captures snapshots, orders writes and recovers the queue after a failed write', async () => {
   const f = fixture();
   const gate = deferred();
+  const entered = deferred();
   f.set.mockImplementationOnce(async () => {
+    entered.resolve();
     await gate.promise;
     throw new Error('disk failure');
   });
@@ -81,7 +101,8 @@ it('captures snapshots, orders writes and recovers the queue after a failed writ
   const next = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, showFrameRate: true };
   const second = f.store.save(next);
   next.showFrameRate = false;
-  await vi.waitFor(() => expect(f.set).toHaveBeenCalledTimes(1));
+  await entered.promise;
+  expect(f.set).toHaveBeenCalledTimes(1);
   gate.resolve();
   await failure;
   await second;
@@ -92,12 +113,14 @@ it('captures snapshots, orders writes and recovers the queue after a failed writ
 it('drains admitted queued saves before erasure and refuses saves during erasure', async () => {
   const f = fixture();
   const writeGate = deferred(),
+    writeEntered = deferred(),
     eraseGate = deferred(),
     eraseEntered = deferred();
   const events: string[] = [];
   f.set.mockImplementationOnce(async (items, permit) => {
     expect(isActivePersistenceMutationPermit(permit)).toBe(true);
     events.push('first-start');
+    writeEntered.resolve();
     await writeGate.promise;
     events.push('first-end');
     // The second admitted snapshot is the one that would resurrect after erasure if admitted late.
@@ -105,7 +128,8 @@ it('drains admitted queued saves before erasure and refuses saves during erasure
   });
   const first = f.store.save(DEFAULT_QUICK_PREVIEW_PREFERENCES);
   const second = f.store.save({ ...DEFAULT_QUICK_PREVIEW_PREFERENCES, frameRate: '15' });
-  await vi.waitFor(() => expect(events).toEqual(['first-start']));
+  await writeEntered.promise;
+  expect(events).toEqual(['first-start']);
   const erase = runWithPersistentDataErasureBarrier(async () => {
     expect(f.read()).toEqual({ ...DEFAULT_QUICK_PREVIEW_PREFERENCES, frameRate: '15' });
     events.push('erase');

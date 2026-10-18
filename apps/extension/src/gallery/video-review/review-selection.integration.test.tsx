@@ -213,7 +213,7 @@ it('selects captured actions without creating notes and clears the selection on 
   }
 });
 
-it('edits a selected speed range from its inspector through the same reversible history', async () => {
+it('preserves a selected speed range when toolbar preferences and tools change', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -230,7 +230,6 @@ it('edits a selected speed range from its inspector through the same reversible 
     await fixture.click('advancedEditing');
     await fixture.click('speedMode');
     await dragRange(fixture.host);
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     const input = fixture.host.querySelector<HTMLInputElement>(
       'aside input[aria-label="gallery.videoReview.rangeEnd"]'
     )!;
@@ -264,6 +263,36 @@ it('edits a selected speed range from its inspector through the same reversible 
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
     expect(input.isConnected).toBe(true);
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('cutMode');
+    expect(input.isConnected).toBe(true);
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('edits a selected speed range from its inspector through the same reversible history', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('speedMode');
+    await dragRange(fixture.host);
+    const input = fixture.host.querySelector<HTMLInputElement>(
+      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    )!;
+    expect(input).not.toBeNull();
+    const historyLength = fixture.snapshot.workspace.history.length;
     await fixture.click('cutMode');
     await act(async () => input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
     await act(async () => {

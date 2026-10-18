@@ -649,6 +649,91 @@ def server_create_reconciliation():
     )
 
 
+def volume_admission_fallback(case):
+    events = []
+
+    class SDKException(Exception):
+        pass
+
+    policy = controller["read_policy"]()
+    profile = {
+        "zone": "test-zone", "flavor": "test-flavor", "volumeType": "missing",
+        "volumeGiB": 80, "qa": {"cpuTokens": 1, "memoryMiB": 1024},
+    }
+    profiles = [profile, {**profile, "volumeType": "available"}]
+    flavor = types.SimpleNamespace(
+        name="test-flavor", vcpus=1,
+        ram=512 if case == "resource-admission-refusal" else 2048, disk=0,
+    )
+    volume_types = [types.SimpleNamespace(name="available")]
+    if case == "ambiguous-volume-fallback":
+        volume_types += [types.SimpleNamespace(name="missing") for _ in range(2)]
+    connection = types.SimpleNamespace(
+        compute=types.SimpleNamespace(
+            availability_zones=lambda **_: [
+                types.SimpleNamespace(name="test-zone", state={"available": True})
+            ],
+            flavors=lambda **_: [flavor], servers=lambda **_: [],
+        ),
+        image=types.SimpleNamespace(images=lambda **_: [types.SimpleNamespace(
+            id="image", name=policy["imageSelector"]["name"], min_disk=0, created_at="2026",
+        )]),
+        network=types.SimpleNamespace(networks=lambda **_: [object()]),
+        block_storage=types.SimpleNamespace(types=lambda: volume_types),
+    )
+
+    def cleanup_attempt(unused_policy, unused_token, record, unused_connection):
+        events.append(f"cleanup:{record['profileIndex']}")
+        if case == "volume-cleanup-refusal":
+            raise RuntimeError("cleanup refused")
+        return {"status": "absent"}, 1
+
+    def stop_after_selection(*unused):
+        events.append("second-profile-admitted")
+        raise RuntimeError("stop after selection")
+
+    globals_ = controller["provision"].__globals__
+    globals_["exceptions"] = types.SimpleNamespace(SDKException=SDKException)
+    globals_["read_profiles"] = lambda _: (profiles, "test-digest")
+    globals_["connect"] = lambda _: (connection, None, "test-project")
+    globals_["cleanup_with_retries"] = cleanup_attempt
+    globals_["create_run_network"] = stop_after_selection
+    os.environ.update({
+        "GITHUB_RUN_ID": "1", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_WORKFLOW": "test",
+        "SNIPTALE_CANDIDATE_SHA": "a" * 40, "SNIPTALE_BASE_SHA": "b" * 40,
+        "SNIPTALE_TRUSTED_CONTROL_SHA": "b" * 40,
+        "SNIPTALE_QA_IMAGE": "ghcr.io/lrozhkov/sniptale-qa@sha256:" + "a" * 64,
+        "RUNNER_CONTROLLER_TOKEN": "test-controller-token",
+    })
+    with tempfile.TemporaryDirectory() as directory:
+        destination = controller["Path"](directory) / "provision.json"
+        globals_["record_path"] = lambda: destination
+        try:
+            controller["provision"](policy)
+        except RuntimeError as failure:
+            failure_message = str(failure)
+        else:
+            raise AssertionError("proof unexpectedly provisioned a runner")
+        record = json.loads(destination.read_text())
+    if case == "volume-cleanup-refusal":
+        assert failure_message == "cleanup refused"
+        assert record["status"] == "cleanup-failed"
+        assert len(record["attempts"]) == 1
+        assert events == ["cleanup:0"]
+    elif case == "resource-admission-refusal":
+        assert "cannot satisfy" in failure_message
+        assert record["status"] == "admission-failed"
+        assert len(record["attempts"]) == 1
+        assert events == ["cleanup:0"]
+    else:
+        assert events == ["cleanup:0", "second-profile-admitted", "cleanup:1"], events
+        assert failure_message == "stop after selection"
+        assert len(record["attempts"]) == 2
+        assert record["attempts"][0]["status"] == "cleaned-after-provision-failure"
+        assert record["status"] == "admission-failed"
+    print(json.dumps({"events": events, "status": record["status"]}))
+
+
 if sys.argv[1:] == ["runner-api-failure"]:
     runner_api_failure()
 elif sys.argv[1:] == ["receipt-failure"]:
@@ -661,5 +746,10 @@ elif sys.argv[1:] == ["identity-recovery"]:
     identity_recovery()
 elif sys.argv[1:] == ["server-create-reconciliation"]:
     server_create_reconciliation()
+elif sys.argv[1:] in ([case] for case in (
+    "missing-volume-fallback", "ambiguous-volume-fallback",
+    "volume-cleanup-refusal", "resource-admission-refusal",
+)):
+    volume_admission_fallback(sys.argv[1])
 else:
     raise RuntimeError("Unknown cleanup proof case.")
