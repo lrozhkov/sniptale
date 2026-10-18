@@ -12,7 +12,7 @@ it.each([null, 'left'] as const)(
       <ToolbarDockingGuides activeEdge={activeEdge} uiScale={1.25} />
     );
     const guides = root.querySelectorAll<HTMLElement>('[data-active]');
-    expect(guides).toHaveLength(4);
+    expect(guides).toHaveLength(8);
     for (const guide of guides) {
       expect(Number(guide.style.opacity || '1')).toBe(1);
       expect(guide.style.pointerEvents).toBe('none');

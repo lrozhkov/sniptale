@@ -2,29 +2,39 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseStoredSettings } from './guards';
 
 describe('toolbar placement preferences', () => {
-  it.each(['top', 'bottom', 'left', 'right'])(
-    'restores the %s dock and free placement preference',
-    (dockEdge) => {
-      expect(
-        parseStoredSettings({
-          contentToolbar: {
-            freePlacement: true,
-            dockEdge,
-            displayMode: 'vertical',
-            compactMenus: true,
-            position: { x: 20, y: 30 },
-          },
-        }).value
-      ).toMatchObject({
+  it.each([
+    'top',
+    'bottom',
+    'left',
+    'right',
+    'top-left',
+    'top-right',
+    'bottom-left',
+    'bottom-right',
+    'left-top',
+    'left-bottom',
+    'right-top',
+    'right-bottom',
+  ])('restores the %s dock and free placement preference', (dockEdge) => {
+    expect(
+      parseStoredSettings({
         contentToolbar: {
           freePlacement: true,
           dockEdge,
           displayMode: 'vertical',
+          compactMenus: true,
           position: { x: 20, y: 30 },
         },
-      });
-    }
-  );
+      }).value
+    ).toMatchObject({
+      contentToolbar: {
+        freePlacement: true,
+        dockEdge,
+        displayMode: 'vertical',
+        position: { x: 20, y: 30 },
+      },
+    });
+  });
   it('keeps legacy preferences readable without inventing a free-placement opt-in', () => {
     expect(
       parseStoredSettings({

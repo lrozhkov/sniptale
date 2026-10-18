@@ -1,3 +1,4 @@
+import { CONTENT_TOOLBAR_DOCK_EDGES } from '../../../contracts/settings';
 import type {
   CaptureActionType,
   ContentToolbarDisplayMode,
@@ -112,16 +113,10 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   }
 
   const freePlacement = value['freePlacement'];
-  const dockEdge = value['dockEdge'];
+  const rawDockEdge = value['dockEdge'];
+  const dockEdge = CONTENT_TOOLBAR_DOCK_EDGES.find((edge) => edge === rawDockEdge);
   if (freePlacement !== undefined && !isBoolean(freePlacement)) return INVALID_FIELD;
-  if (
-    dockEdge !== undefined &&
-    dockEdge !== 'top' &&
-    dockEdge !== 'bottom' &&
-    dockEdge !== 'left' &&
-    dockEdge !== 'right'
-  )
-    return INVALID_FIELD;
+  if (rawDockEdge !== undefined && dockEdge === undefined) return INVALID_FIELD;
 
   const position = value['position'];
   if (position !== undefined && position !== null) {

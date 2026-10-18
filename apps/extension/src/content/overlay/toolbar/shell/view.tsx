@@ -50,6 +50,19 @@ export function ToolbarShellContent(props: {
 }) {
   const { toolbarProps, viewModel, onHoverCapture, onViewportChange } = props;
   const { derivedState } = viewModel;
+  const [hasDragged, setHasDragged] = React.useState(false);
+  const dragFocus = React.useRef<{ positioner: HTMLElement; previous: HTMLElement | null } | null>(
+    null
+  );
+  React.useEffect(() => {
+    if (derivedState.isDragging || !dragFocus.current) return;
+    const { positioner, previous } = dragFocus.current;
+    dragFocus.current = null;
+    if (!positioner.matches(':focus')) return;
+    positioner.blur();
+    if (previous?.isConnected && !previous.closest('[inert]'))
+      previous.focus({ preventScroll: true });
+  }, [derivedState.isDragging]);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
@@ -62,6 +75,9 @@ export function ToolbarShellContent(props: {
       {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
       <div
         className="sniptale-toolbar-positioner"
+        tabIndex={-1}
+        data-dragging={derivedState.isDragging ? 'true' : 'false'}
+        data-drag-started={hasDragged ? 'true' : undefined}
         style={getToolbarVisibilityStyle(
           derivedState.positionReady,
           derivedState.position,
@@ -75,13 +91,38 @@ export function ToolbarShellContent(props: {
             dragging={derivedState.isDragging}
             dataUi="content.toolbar.root"
             data-display-mode={derivedState.displayMode}
+            data-dock-dragging={
+              derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
+            }
+            inert={derivedState.isDragging && !derivedState.freePlacement}
             data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
             data-menu-open={menuOpen ? 'true' : undefined}
             onPointerDownCapture={blurPointerActivatedToolbarFocus}
             onMouseDownCapture={preventPointerActivatedToolbarFocus}
             onMouseOverCapture={onHoverCapture}
           >
-            <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>
+            <ContentToolbarDragHandle
+              onPointerDown={(event) => {
+                if (!derivedState.freePlacement) {
+                  const positioner = event.currentTarget.closest<HTMLElement>(
+                    '.sniptale-toolbar-positioner'
+                  );
+                  if (positioner) {
+                    const root = positioner.getRootNode();
+                    const focused =
+                      root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+                    dragFocus.current = {
+                      positioner,
+                      previous:
+                        focused instanceof HTMLElement && focused !== positioner ? focused : null,
+                    };
+                    positioner.focus({ preventScroll: true });
+                  }
+                }
+                setHasDragged(true);
+                derivedState.handleMouseDown(event);
+              }}
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
                 <circle cx="9" cy="12" r="1" />
                 <circle cx="9" cy="5" r="1" />

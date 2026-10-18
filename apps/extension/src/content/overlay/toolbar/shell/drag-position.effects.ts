@@ -13,9 +13,12 @@ import type {
 } from '../../../../contracts/settings';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
-import { resolveContentUiViewport } from '@sniptale/ui/floating-interactions/scale';
 
-import { resolveToolbarDockEdge, resolveToolbarDockPosition } from './docking';
+import {
+  resolveToolbarDockEdge,
+  resolveToolbarDockPosition,
+  resolveToolbarDockViewport,
+} from './docking';
 
 const DEFAULT_TOOLBAR_TOP = 5;
 const TOOLBAR_POSITION_PERSIST_DELAY_MS = 150;
@@ -27,11 +30,7 @@ function resolveDefaultToolbarPosition(
   toolbarEl: HTMLElement,
   uiScale: number
 ): ContentToolbarPosition {
-  const viewport = resolveContentUiViewport({
-    clientHeight: window.innerHeight,
-    clientWidth: window.innerWidth,
-    scale: uiScale,
-  });
+  const viewport = resolveToolbarDockViewport(uiScale);
   return {
     x: Math.max(0, (viewport.width - toolbarEl.offsetWidth) / 2),
     y: DEFAULT_TOOLBAR_TOP,
@@ -44,11 +43,7 @@ function clampToolbarPosition(
   uiScale: number,
   dockEdge?: ContentToolbarDockEdge
 ): ContentToolbarPosition {
-  const viewport = resolveContentUiViewport({
-    clientHeight: window.innerHeight,
-    clientWidth: window.innerWidth,
-    scale: uiScale,
-  });
+  const viewport = resolveToolbarDockViewport(uiScale);
   if (dockEdge)
     return resolveToolbarDockPosition(
       dockEdge,
@@ -155,7 +150,7 @@ function fitVerticalToolbar(toolbar: HTMLElement, uiScale: number): void {
   toolbar.style.removeProperty(sizeProperty);
   toolbar.style.removeProperty(gapProperty);
   if (toolbar.dataset['displayMode'] !== 'vertical') return;
-  const availableHeight = window.innerHeight / uiScale - 16;
+  const availableHeight = resolveToolbarDockViewport(uiScale).height - 16;
   if (toolbar.offsetHeight <= availableHeight) return;
   const buttons = [...toolbar.querySelectorAll('.sniptale-btn')].filter(
     (button) => !button.closest('.sniptale-popover-menu, .sniptale-drawing-options-popover')
@@ -213,9 +208,15 @@ export function useToolbarViewportClamping(params: {
       }
 
       fitVerticalToolbar(toolbarRef.current, params.uiScale);
-      setPosition((previous) =>
-        clampToolbarPosition(previous, toolbarRef.current!, params.uiScale, params.dockEdge)
-      );
+      setPosition((previous) => {
+        const next = clampToolbarPosition(
+          previous,
+          toolbarRef.current!,
+          params.uiScale,
+          params.dockEdge
+        );
+        return next.x === previous.x && next.y === previous.y ? previous : next;
+      });
     };
 
     window.addEventListener('resize', syncClampedPosition);
@@ -228,6 +229,7 @@ export function useToolbarViewportClamping(params: {
           });
 
     resizeObserver?.observe(toolbarRef.current);
+    resizeObserver?.observe(document.documentElement);
 
     return () => {
       window.removeEventListener('resize', syncClampedPosition);
@@ -311,26 +313,31 @@ export function useToolbarDragListeners(params: {
     }
 
     let candidate: ContentToolbarDockEdge | null = null;
+    let ended = false;
     const finish = () => {
+      if (ended) return;
       if (!freePlacement && candidate) setDockEdge(candidate);
       cancel();
     };
     const cancel = () => {
+      ended = true;
+      candidate = null;
       setPreviewEdge(null);
       stopDragging();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') cancel();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        cancel();
+      }
     };
     const handlePointerMove = (event: PointerEvent) => {
+      if (ended) return;
       if (!freePlacement) {
         candidate = resolveToolbarDockEdge(
           { x: event.clientX / uiScale, y: event.clientY / uiScale },
-          resolveContentUiViewport({
-            clientWidth: window.innerWidth,
-            clientHeight: window.innerHeight,
-            scale: uiScale,
-          })
+          resolveToolbarDockViewport(uiScale)
         );
         setPreviewEdge(candidate);
       }

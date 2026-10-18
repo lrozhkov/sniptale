@@ -53,14 +53,24 @@ it('serializes independent page instances and preserves disjoint settings patche
   vi.resetModules();
   const secondPage = await import('./index');
 
-  const imagePatch = firstPage.patchSettings({ imageFormat: 'webp' });
+  const imagePatch = firstPage.patchSettings({
+    imageFormat: 'webp',
+    contentToolbar: { dockEdge: 'right-bottom' },
+  });
   await vi.waitFor(() => expect(storage.set).toHaveBeenCalledTimes(1));
-  const qualityPatch = secondPage.patchSettings({ imageQuality: 85 });
+  const qualityPatch = secondPage.patchSettings({
+    imageQuality: 85,
+    contentToolbar: { compactMenus: true },
+  });
   await Promise.resolve();
   expect(storage.get).toHaveBeenCalledTimes(2);
   releaseFirstWrite?.();
   await Promise.all([imagePatch, qualityPatch]);
-  expect(persisted).toMatchObject({ imageFormat: 'webp', imageQuality: 85 });
+  expect(persisted).toMatchObject({
+    imageFormat: 'webp',
+    imageQuality: 85,
+    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true },
+  });
 });
 
 it('rejects an obsolete policy edit after a conflicting page commit', async () => {
@@ -144,4 +154,79 @@ it('observes only the settings sync key and normalizes removal', async () => {
   );
   unsubscribe();
   expect(observer.notify).toBeUndefined();
+});
+
+function controlledGate() {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+it('completes an in-flight corner write before a queued reset', async () => {
+  let persisted: Record<string, unknown> = {};
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const write = page.patchSettings({ contentToolbar: { dockEdge: 'top-right' } });
+  await entered.promise;
+  const reset = page.resetSettingsToDefaults();
+  releaseWrite.release();
+  await Promise.all([write, reset]);
+  expect((await page.loadSettings()).contentToolbar).toEqual(
+    page.createDefaultSettings().contentToolbar
+  );
+});
+
+it('recreates the settings key only with a new accepted dock after deletion', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true },
+  };
+  const entered = controlledGate();
+  const releaseDelete = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.remove.mockImplementation(async () => {
+    entered.release();
+    await releaseDelete.promise;
+    persisted = {};
+  });
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const deletion = page.clearSettings();
+  await entered.promise;
+  const recreation = page.patchSettings({ contentToolbar: { dockEdge: 'left-top' } });
+  releaseDelete.release();
+  await Promise.all([deletion, recreation]);
+  expect((await page.loadSettings()).contentToolbar).toMatchObject({
+    dockEdge: 'left-top',
+    compactMenus: false,
+  });
+});
+
+it('retains the accepted dock after failure and permits retry', async () => {
+  let persisted: Record<string, unknown> = { contentToolbar: { dockEdge: 'left-top' } };
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set
+    .mockRejectedValueOnce(new Error('write refused'))
+    .mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+      persisted = items.sniptale_settings;
+    });
+  const page = await import('./index');
+  await expect(
+    page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom' } })
+  ).rejects.toThrow('write refused');
+  expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('left-top');
+  await page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom' } });
+  expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('right-bottom');
 });
