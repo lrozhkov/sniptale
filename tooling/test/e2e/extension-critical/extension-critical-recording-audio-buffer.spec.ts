@@ -145,3 +145,54 @@ for (const overflow of [false, true])
       );
     }
   });
+
+for (const codec of ['opus', 'aac'] as const)
+  for (const genuineGap of [false, true])
+    test(`audio timestamp replay preserves PCM codec=${codec} genuineGap=${genuineGap}`, async ({
+      page,
+    }) => {
+      const bundled = await build({
+        entryPoints: [resolve('tooling/test/e2e/support/recording-audio-buffer-probe.ts')],
+        bundle: true,
+        format: 'iife',
+        globalName: 'recordingAudioProbe',
+        write: false,
+        platform: 'browser',
+      });
+      const server = http.createServer((_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<!doctype html><title>Audio timestamp replay</title>');
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      try {
+        const address = server.address();
+        if (!address || typeof address === 'string')
+          throw new Error('Audio replay server has no port');
+        await page.goto(`http://127.0.0.1:${address.port}/`);
+        await page.addScriptTag({ content: bundled.outputFiles[0]!.text });
+        const result = await page.evaluate(
+          async ({ codec, genuineGap }) => {
+            const host = window as typeof window & { recordingAudioProbe: typeof AudioProbe };
+            return host.recordingAudioProbe.recordAudioTimestampJitter(codec, genuineGap);
+          },
+          { codec, genuineGap }
+        );
+        if (codec === 'opus') expect(result.supported).toBe(true);
+        test.skip(!result.supported, `Native ${codec} encoder is unavailable`);
+        if (!result.supported) return;
+        expect(result.bytes).toBeGreaterThan(0);
+        expect(result.blocks[0]!.timestamp).toBeCloseTo(0.37, 8);
+        expect(result.blocks.reduce((sum, block) => sum + block.frames, 0)).toBe(
+          288000 + (genuineGap ? 480 : 0)
+        );
+        expect(result.blocks.reduce((sum, block) => sum + block.zeros, 0)).toBe(
+          genuineGap ? 480 : 0
+        );
+        expect(result.blocks.reduce((sum, block) => sum + block.changed, 0)).toBe(0);
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
