@@ -11,6 +11,7 @@ const {
   handleReleaseViewportPresetMock,
   openVideoRecordingSurfaceFromPopupMock,
   getVideoRecordingTabIdMock,
+  getVideoRecordingCaptureModeMock,
   hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgressMock,
   isVideoRecordingStopInProgressMock,
@@ -25,6 +26,7 @@ const {
   handleReleaseViewportPresetMock: vi.fn(),
   openVideoRecordingSurfaceFromPopupMock: vi.fn(),
   getVideoRecordingTabIdMock: vi.fn(),
+  getVideoRecordingCaptureModeMock: vi.fn(),
   hasActiveVideoRecordingSessionMock: vi.fn(),
   isVideoRecordingPreparationInProgressMock: vi.fn(),
   isVideoRecordingStopInProgressMock: vi.fn(),
@@ -49,12 +51,14 @@ vi.mock('../../media/video/content-surface/start', async (importOriginal) => ({
 vi.mock('../../media/video/session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../media/video/session-state')>()),
   getVideoRecordingTabId: getVideoRecordingTabIdMock,
+  getVideoRecordingCaptureMode: getVideoRecordingCaptureModeMock,
   hasActiveVideoRecordingSession: hasActiveVideoRecordingSessionMock,
   isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   isVideoRecordingStopInProgress: isVideoRecordingStopInProgressMock,
 }));
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { routeScreenshotModeMessage, routeViewportMessage } from './screenshot';
 import type { TabModeContext } from './shared';
 
@@ -93,6 +97,7 @@ beforeEach(() => {
   handleReleaseViewportPresetMock.mockResolvedValue(undefined);
   openVideoRecordingSurfaceFromPopupMock.mockResolvedValue(undefined);
   getVideoRecordingTabIdMock.mockReturnValue(null);
+  getVideoRecordingCaptureModeMock.mockReturnValue(CaptureMode.TAB);
   hasActiveVideoRecordingSessionMock.mockReturnValue(false);
   isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
   isVideoRecordingStopInProgressMock.mockReturnValue(false);
@@ -181,24 +186,28 @@ it('forwards a requested working mode and synchronizes persisted mode flags', as
   expect(context.quickEditModeState.has(7)).toBe(false);
 });
 
-it('rejects popup tool mode changes while video recording owns the tab', () => {
-  const context = createContext();
-  getVideoRecordingTabIdMock.mockReturnValue(7);
-  hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'rejects popup tool mode changes while %s recording owns the tab',
+  (captureMode) => {
+    getVideoRecordingCaptureModeMock.mockReturnValue(captureMode);
+    const context = createContext();
+    getVideoRecordingTabIdMock.mockReturnValue(7);
+    hasActiveVideoRecordingSessionMock.mockReturnValue(true);
 
-  expect(
-    routeScreenshotModeMessage(
-      { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'design-review' },
-      context
-    )
-  ).toBe(true);
+    expect(
+      routeScreenshotModeMessage(
+        { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode: 'design-review' },
+        context
+      )
+    ).toBe(true);
 
-  expect(enableScreenshotModeMock).not.toHaveBeenCalled();
-  expect(context.sendResponse).toHaveBeenCalledWith({
-    success: false,
-    error: expect.stringContaining('Stop the active video recording'),
-  });
-});
+    expect(enableScreenshotModeMock).not.toHaveBeenCalled();
+    expect(context.sendResponse).toHaveBeenCalledWith({
+      success: false,
+      error: expect.stringContaining('Stop the active video recording'),
+    });
+  }
+);
 
 it('rolls back a popup tool mode when recording starts before screenshot commit', async () => {
   const context = createContext();
@@ -422,3 +431,27 @@ it('routes get viewport status and rejects unsupported screenshot messages', () 
     false
   );
 });
+
+for (const lifecycle of ['recording', 'preparing', 'stopping'] as const)
+  it.each(['drawing', 'highlighter', 'quick-edit', 'design-review'] as const)(
+    `opens popup %s tools while screen recording is ${lifecycle} on the same host tab`,
+    async (workingMode) => {
+      const context = createContext();
+      getVideoRecordingTabIdMock.mockReturnValue(7);
+      getVideoRecordingCaptureModeMock.mockReturnValue(CaptureMode.SCREEN);
+      hasActiveVideoRecordingSessionMock.mockReturnValue(lifecycle === 'recording');
+      isVideoRecordingPreparationInProgressMock.mockReturnValue(lifecycle === 'preparing');
+      isVideoRecordingStopInProgressMock.mockReturnValue(lifecycle === 'stopping');
+      routeScreenshotModeMessage(
+        { type: MessageType.ENABLE_SCREENSHOT_MODE, workingMode },
+        context
+      );
+      await flushPromises();
+      expect(enableScreenshotModeMock).toHaveBeenCalledOnce();
+      expect(context.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+      const options = enableScreenshotModeMock.mock.calls[0]!.at(-1) as {
+        commitGuard: () => boolean;
+      };
+      expect(options.commitGuard()).toBe(true);
+    }
+  );

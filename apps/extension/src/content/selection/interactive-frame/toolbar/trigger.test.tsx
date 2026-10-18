@@ -211,33 +211,36 @@ describe('InteractiveFrameToolbarTrigger', () => {
   });
 
   it.each([
-    ['border', 'lucide-square'],
-    ['blur', 'lucide-droplet'],
-    ['focus', 'lucide-focus'],
-  ] as const)('opens quick frame settings with the dynamic %s icon', (effectMode, iconClass) => {
-    const handlers = createTriggerProps();
-    act(() => {
-      root.render(
-        <InteractiveFrameToolbarTrigger
-          frame={{ effectMode, height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
-          isVisible
-          {...handlers}
-        />
+    ['border', 'lucide-settings'],
+    ['blur', 'lucide-settings'],
+    ['focus', 'lucide-settings'],
+  ] as const)(
+    'opens quick frame settings with the settings icon in %s mode',
+    (effectMode, iconClass) => {
+      const handlers = createTriggerProps();
+      act(() => {
+        root.render(
+          <InteractiveFrameToolbarTrigger
+            frame={{ effectMode, height: 80, id: 'frame-1', width: 240, x: 100, y: 100 }}
+            isVisible
+            {...handlers}
+          />
+        );
+      });
+
+      const settingsButton = document.querySelector<HTMLButtonElement>(
+        '[data-quick-action="settings"]'
       );
-    });
+      expect(settingsButton?.querySelector(`.${iconClass}`)).not.toBeNull();
+      act(() => settingsButton?.click());
 
-    const settingsButton = document.querySelector<HTMLButtonElement>(
-      '[data-quick-action="settings"]'
-    );
-    expect(settingsButton?.querySelector(`.${iconClass}`)).not.toBeNull();
-    act(() => settingsButton?.click());
-
-    expect(handlers.popoverAnchorRef.current).toBe(settingsButton);
-    expect(useFrameUIStore.getState()).toMatchObject({
-      activePopover: { frameId: 'frame-1', kind: 'frame-settings' },
-      selectedFrameId: null,
-    });
-  });
+      expect(handlers.popoverAnchorRef.current).toBe(settingsButton);
+      expect(useFrameUIStore.getState()).toMatchObject({
+        activePopover: { frameId: 'frame-1', kind: 'frame-settings' },
+        selectedFrameId: null,
+      });
+    }
+  );
 
   it('keeps capture visibility beside the ellipsis when the frame cannot contain optional actions', () => {
     act(() => {
@@ -427,4 +430,18 @@ describe('InteractiveFrameToolbarTrigger capture visibility', () => {
 
     expect(handlers.captureVisibility.toggle).toHaveBeenCalledOnce();
   });
+});
+
+it('uses settings and dimension icons in frame quick actions', () => {
+  act(() =>
+    root.render(
+      <InteractiveFrameToolbarTrigger
+        frame={{ effectMode: 'border', height: 80, id: 'frame-icons', width: 300, x: 100, y: 100 }}
+        isVisible
+        {...createTriggerProps()}
+      />
+    )
+  );
+  expect(document.querySelector('[data-quick-action="settings"] .lucide-settings')).not.toBeNull();
+  expect(document.querySelector('[data-quick-action="edit"] .lucide-scaling')).not.toBeNull();
 });

@@ -82,9 +82,12 @@ it('shows one compact value while all sides are linked', () => {
     container.querySelector('[data-ui="content.design-review.side-values-compact"]')
   ).not.toBeNull();
   expect(container.querySelectorAll('input')).toHaveLength(1);
+  const compact = container.querySelector('[data-ui="content.design-review.side-values-compact"]');
+  expect(compact?.parentElement?.className).not.toContain('col-span-2');
   expect(container.querySelector('input')?.value).toBe('8');
   const unlink = container.querySelector<HTMLButtonElement>('button[data-side-link="all"]');
   expect(unlink?.getAttribute('aria-pressed')).toBe('true');
+  expect(unlink?.className).not.toContain('text-[var(--sniptale-color-accent)]');
   expect(unlink?.className).toContain('border-0');
   expect(unlink?.className).toContain('bg-transparent');
   expect(unlink?.className).not.toContain('sniptale-glass-icon-button');

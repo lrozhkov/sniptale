@@ -18,6 +18,7 @@ export function ToolbarDockingGuides(props: {
       {TOOLBAR_DOCK_EDGES.map((edge) => {
         const horizontal = edge === 'top' || edge === 'bottom';
         const active = props.activeEdge === edge;
+        const color = active ? '--sniptale-color-accent' : '--sniptale-color-surface-contrast';
         const style: CSSProperties = {
           position: 'absolute',
           pointerEvents: 'none',
@@ -27,9 +28,10 @@ export function ToolbarDockingGuides(props: {
             ? { left: '33.333333%', width: '33.333333%', height: thickness }
             : { top: '33.333333%', height: '33.333333%', width: thickness }),
           borderRadius: 'var(--sniptale-radius-lg)',
-          border: `${active ? 2 : 1}px ${active ? 'solid' : 'dashed'} var(--sniptale-color-surface-contrast-hover)`,
-          background: 'var(--sniptale-color-surface-contrast)',
-          opacity: active ? 0.18 : 0.06,
+          border: `2px ${active ? 'solid' : 'dashed'} var(${color})`,
+          outline: '1px solid var(--sniptale-color-text-inverse)',
+          outlineOffset: 0,
+          background: `color-mix(in srgb, var(${color}) ${active ? 18 : 8}%, transparent)`,
         };
         return (
           <div

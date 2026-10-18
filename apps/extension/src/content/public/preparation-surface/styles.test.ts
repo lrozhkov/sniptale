@@ -223,3 +223,13 @@ it('does not resolve removed Manrope resources', () => {
   expect(resolveContentEntrypointStyleUrls(source)).toBe(source);
   expect(runtimeInfoGetUrlMock).not.toHaveBeenCalled();
 });
+
+it('keeps embedded settings header commands neutral and aligned', () => {
+  const styles = readFileSync(SETTINGS_POPOVER_STYLES_PATH, 'utf8');
+  const selector =
+    '.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions > button {';
+  const block = styles.slice(styles.indexOf(selector)).split('}')[0];
+  expect(block).toContain('background: transparent');
+  expect(block).toContain('border-color: transparent');
+  expect(styles).toContain('align-self: flex-start');
+});

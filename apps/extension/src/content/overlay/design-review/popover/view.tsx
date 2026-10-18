@@ -149,6 +149,7 @@ export function DesignReviewPopover(props: {
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       style={{
+        backgroundColor: 'rgb(from var(--sniptale-color-surface-panel) r g b / 1)',
         left: view.drag.position.left * view.uiScale,
         top: view.drag.position.top * view.uiScale,
         width: view.basePosition.width,
@@ -162,7 +163,7 @@ export function DesignReviewPopover(props: {
         type="button"
         className={[
           'sniptale-dismiss-button',
-          'pointer-events-auto absolute -right-3 -top-3 z-50 inline-flex h-8 w-8',
+          'pointer-events-auto absolute right-1 top-1 z-50 inline-flex h-8 w-8',
           'cursor-pointer items-center justify-center',
           'rounded-full border',
           'border-[color:var(--sniptale-color-border-strong)]',
@@ -180,9 +181,9 @@ export function DesignReviewPopover(props: {
         data-ui="content.design-review.popover-layout"
         style={{ maxHeight: view.basePosition.maxHeight }}
       >
-        <div className="relative z-20 p-3 pb-2 pt-4" data-ui="content.design-review.comment-layer">
+        <div className="relative z-20 p-3 pb-2 pt-10" data-ui="content.design-review.comment-layer">
           <div
-            className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
+            className="absolute left-0 right-10 top-0 z-10 h-9 touch-none cursor-grab active:cursor-grabbing"
             data-ui="content.design-review.popover-drag-handle"
             title={translate('content.designReview.movePopover')}
             onPointerDown={view.drag.onPointerDown}

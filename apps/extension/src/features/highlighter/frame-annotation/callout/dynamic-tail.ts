@@ -254,7 +254,49 @@ function getRoundedTriangleTip(args: {
   };
 }
 
+function getVisibleBaseRange(args: {
+  baseOverlap: number;
+  borderRadius: number;
+  bubbleRect: Rect;
+  bubbleSide: ConnectorSide;
+  end: number;
+  roundingRatio: number;
+  start: number;
+  tipPoint: Point;
+}) {
+  const center = (args.start + args.end) / 2;
+  // Final curve endpoints blend toward the inward base; reserve that normal distance.
+  const clearance = (args.baseOverlap * args.roundingRatio) / (1 - args.roundingRatio);
+  const visible = (axis: number) => {
+    const edge = getRoundedSidePoint({
+      axis,
+      radius: args.borderRadius,
+      rect: args.bubbleRect,
+      side: args.bubbleSide,
+    });
+    return (
+      (edge.point.x - args.tipPoint.x) * edge.interiorNormal.x +
+        (edge.point.y - args.tipPoint.y) * edge.interiorNormal.y >=
+      clearance
+    );
+  };
+  const boundary = (axis: number) => {
+    if (visible(axis)) return axis;
+    let outside = axis;
+    let inside = center;
+    // Keep the returned endpoint inside the visible interval, including at a tangent.
+    for (let iteration = 0; iteration < 32; iteration += 1) {
+      const middle = (outside + inside) / 2;
+      if (visible(middle)) inside = middle;
+      else outside = middle;
+    }
+    return inside;
+  };
+  return { start: boundary(args.start), end: boundary(args.end) };
+}
+
 function getBubbleBase(args: {
+  automaticTip?: { point: Point; roundingRatio: number };
   baseOverlap: number;
   borderRadius: number;
   bubbleRect: Rect;
@@ -268,7 +310,16 @@ function getBubbleBase(args: {
   const edgeStart = horizontal ? args.bubbleRect.x : args.bubbleRect.y;
   const edgeLength = horizontal ? args.bubbleRect.width : args.bubbleRect.height;
   const edgeInset = Math.min(BUBBLE_EDGE_MARGIN, edgeLength / 2);
-  const availableSpan = Math.max(0, edgeLength - 2 * edgeInset);
+  const edgeRange = { start: edgeStart + edgeInset, end: edgeStart + edgeLength - edgeInset };
+  const baseRange = args.automaticTip
+    ? getVisibleBaseRange({
+        ...args,
+        ...edgeRange,
+        roundingRatio: args.automaticTip.roundingRatio,
+        tipPoint: args.automaticTip.point,
+      })
+    : edgeRange;
+  const availableSpan = Math.max(0, baseRange.end - baseRange.start);
   const requestedSpan =
     args.width === undefined ? args.desiredSpan : edgeLength * clamp(args.width, 0, 1);
   const baseSpan = clamp(requestedSpan, Math.min(4, availableSpan), availableSpan);
@@ -280,8 +331,8 @@ function getBubbleBase(args: {
       : edgeStart + edgeLength * clamp(args.position, 0, 1);
   const baseCenterAxis = clamp(
     candidateAxis,
-    edgeStart + edgeInset + baseSpan / 2,
-    edgeStart + edgeLength - edgeInset - baseSpan / 2
+    baseRange.start + baseSpan / 2,
+    baseRange.end - baseSpan / 2
   );
   const baseEdgeAState = getRoundedSidePoint({
     axis: baseCenterAxis - baseSpan / 2,
@@ -365,8 +416,23 @@ function getConnectorPoints(args: {
           side: args.side,
         })
       : baseSpan;
+  const baseOverlap = Math.max(2, (args.borderWidth ?? 0) + 1);
+  const tipPoint = offsetPoint(framePoint, getOutwardNormal(args.side), args.tipGap ?? CALLOUT_GAP);
+  const bubbleSidePoint = getPointOnSide(args.bubbleRect, bubbleCenter, tipPoint, bubbleSide);
+  const normal = getOutwardNormal(bubbleSide);
+  const normalGap =
+    (tipPoint.x - bubbleSidePoint.x) * normal.x + (tipPoint.y - bubbleSidePoint.y) * normal.y;
+  const automaticBase = args.tailBasePosition === undefined && args.tailBaseWidth === undefined;
+  // At near contact, keep rounding clearance below half the gap so a visible base exists.
+  const automaticRounding =
+    automaticBase && normalGap >= 0
+      ? Math.min(TIP_ROUNDING_RATIO, normalGap / (normalGap + 2 * baseOverlap))
+      : TIP_ROUNDING_RATIO;
   const base = getBubbleBase({
-    baseOverlap: Math.max(2, (args.borderWidth ?? 0) + 1),
+    ...(automaticBase && normalGap >= 0
+      ? { automaticTip: { point: tipPoint, roundingRatio: automaticRounding } }
+      : {}),
+    baseOverlap,
     borderRadius: Math.max(0, args.borderRadius ?? 0),
     bubbleRect: args.bubbleRect,
     bubbleSide,
@@ -378,10 +444,7 @@ function getConnectorPoints(args: {
   const renderedBaseSpan = Math.hypot(base.baseB.x - base.baseA.x, base.baseB.y - base.baseA.y);
   const roundingRatio =
     args.tailBaseWidth === undefined
-      ? Math.min(
-          TIP_ROUNDING_RATIO,
-          (baseSpan * TIP_ROUNDING_RATIO) / Math.max(1, renderedBaseSpan)
-        )
+      ? Math.min(automaticRounding, (baseSpan * TIP_ROUNDING_RATIO) / Math.max(1, renderedBaseSpan))
       : TIP_ROUNDING_RATIO;
   return {
     ...base,

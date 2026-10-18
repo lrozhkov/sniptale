@@ -1,5 +1,16 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'content-ai-preview-icons',
+    productionFile: 'apps/extension/src/content/overlay/ai/data-panel/preview/icons.tsx',
+    reason:
+      'JSON and selection preview controls render these icons through their existing consumer suites.',
+    testFiles: [
+      'apps/extension/src/content/overlay/ai/data-panel/json-preview/actions.test.tsx',
+      'apps/extension/src/content/overlay/ai/data-panel/selection-preview/actions.test.tsx',
+      'apps/extension/src/content/overlay/ai/data-panel/selection-preview/header.test.tsx',
+    ],
+  },
+  {
     owner: 'background-ai-public-routes',
     productionFile: 'apps/extension/src/background/ai/routes.ts',
     reason:

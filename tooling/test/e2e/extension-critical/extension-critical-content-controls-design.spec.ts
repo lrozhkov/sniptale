@@ -742,3 +742,266 @@ for (const composition of compositions) {
     }
   });
 }
+
+for (const width of [1280, 1920]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`video feedback toolbar ${width} ${theme}`, async ({ context, extensionId }, info) => {
+      const origin = 'https://sniptale-toolbar-feedback.test';
+      const composition: Composition = {
+        locale: 'ru',
+        theme,
+        viewport: { width, height: width === 1280 ? 560 : 900 },
+      };
+      await context.route(`${origin}/**`, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body:
+            '<!doctype html><html><body style="margin:0;background:#808080">' +
+            '<div style="font:32px sans-serif;line-height:40px">' +
+            'HOST BACKDROP '.repeat(200) +
+            '</div></body></html>',
+        })
+      );
+      const { page, popup } = await activateHost(context, extensionId, origin, composition);
+      try {
+        const toolbar = ui(page, 'content.toolbar.root');
+        const trigger = ui(page, 'content.toolbar.mode-selector-button');
+        await ui(page, 'content.toolbar.settings-button').click();
+        const initialFreePlacement = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение панели/u,
+        });
+        if (
+          await initialFreePlacement.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          )
+        )
+          await initialFreePlacement.click();
+        const compactMenuView = page.getByRole('button', {
+          name: tr(composition, 'content.toolbar.compactMenus'),
+          exact: false,
+        });
+        if (
+          !(await compactMenuView.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          ))
+        )
+          await compactMenuView.click();
+        await page.keyboard.press('Escape');
+        await trigger.click();
+        const menu = page.locator('.sniptale-content-menu-adopted.sniptale-toolbar-menu');
+        await expect(menu).toHaveClass(/sniptale-toolbar-menu--compact/u);
+        await expect(menu).toBeVisible();
+        const appearance = await menu.evaluate((element) => {
+          const surface = element as HTMLElement;
+          const previousAnimation = surface.style.animation;
+          surface.style.animation = 'none';
+          void surface.offsetWidth;
+          surface.style.animation = previousAnimation;
+          const animation = element.getAnimations()[0];
+          const positions: number[] = [];
+          if (animation) {
+            animation.pause();
+            for (const time of [0, 100, 200]) {
+              animation.currentTime = time;
+              positions.push(
+                element.querySelector('.sniptale-toolbar-menu-title')!.getBoundingClientRect().x
+              );
+            }
+            animation.finish();
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = getComputedStyle(element).backgroundColor;
+          context.fillRect(0, 0, 1, 1);
+          return {
+            alpha: context.getImageData(0, 0, 1, 1).data[3],
+            drift: positions.length ? Math.max(...positions) - Math.min(...positions) : 0,
+            weights: Array.from(element.querySelectorAll('.sniptale-toolbar-menu-item')).map(
+              (row) => getComputedStyle(row).fontWeight
+            ),
+            strokes: Array.from(
+              element.querySelectorAll('.sniptale-toolbar-menu-item svg.lucide')
+            ).map((icon) => getComputedStyle(icon).strokeWidth),
+          };
+        });
+        expect.soft(appearance.alpha, 'Page content cannot show through the menu').toBe(255);
+        expect
+          .soft(appearance.drift, 'Menu text keeps its horizontal position while opening')
+          .toBeLessThanOrEqual(0.5);
+        expect.soft(appearance.weights.every((weight) => weight === '400')).toBe(true);
+        expect
+          .soft(appearance.strokes.every((stroke) => Number.parseFloat(stroke) === 1.75))
+          .toBe(true);
+        await capture(page, info, 'feedback-menu');
+        await page.keyboard.press('Escape');
+        await ui(page, 'content.toolbar.capture-full-settings-button').click();
+        const fullPageMenu = ui(page, 'content.toolbar.full-page-menu').locator(
+          '.sniptale-toolbar-menu'
+        );
+        await expect(fullPageMenu).toBeVisible();
+        const retainedMenu = await fullPageMenu.elementHandle();
+        for (const mode of ['hide', 'repeat', 'once']) {
+          const option = ui(page, `content.toolbar.full-page-floating.${mode}`);
+          await option.click();
+          await expect(option).toBeEnabled();
+          await expect(option).toHaveClass(/sniptale-popover-item-selected/u);
+          expect(await retainedMenu!.evaluate((element) => element.isConnected)).toBe(true);
+          await expect(fullPageMenu).toHaveCount(1);
+        }
+        await capture(page, info, 'feedback-full-page-preferences');
+        await page.keyboard.press('Escape');
+        for (const size of [24, 32]) {
+          const overlap = await toolbar.evaluate((element, buttonSize) => {
+            const previous = element.getAttribute('style');
+            (element as HTMLElement).style.setProperty(
+              '--sniptale-toolbar-button-size',
+              `${buttonSize}px`
+            );
+            const intersections = Array.from(
+              element.querySelectorAll<HTMLElement>('[data-menu-indicator="true"]')
+            ).map((button) => {
+              const box = button.getBoundingClientRect();
+              const icon = button.querySelector('svg')?.getBoundingClientRect();
+              if (!icon) return 0;
+              const css = getComputedStyle(button, '::before');
+              const triangleWidth =
+                parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
+              const triangleHeight =
+                parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+              const right =
+                box.right -
+                parseFloat(css.right) -
+                parseFloat(getComputedStyle(button).borderRightWidth);
+              const bottom =
+                box.bottom -
+                parseFloat(css.bottom) -
+                parseFloat(getComputedStyle(button).borderBottomWidth);
+              return (
+                Math.max(
+                  0,
+                  Math.min(right, icon.right) - Math.max(right - triangleWidth, icon.left)
+                ) *
+                Math.max(
+                  0,
+                  Math.min(bottom, icon.bottom) - Math.max(bottom - triangleHeight, icon.top)
+                )
+              );
+            });
+            if (previous === null) element.removeAttribute('style');
+            else element.setAttribute('style', previous);
+            return Math.max(0, ...intersections);
+          }, size);
+          expect.soft(overlap, `Menu indicators clear icons at ${size}px targets`).toBe(0);
+        }
+        await capture(page, info, 'feedback-fitted-indicators');
+        const handle = ui(page, 'shared.ui.content-toolbar-drag-handle');
+        const box = (await handle.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(width / 2, 90, { steps: 5 });
+        const guides = ui(page, 'content.toolbar.dock-guides');
+        await expect(guides).toBeVisible();
+        const guideAppearance = await ui(page, 'content.toolbar.dock-zone.left').evaluate(
+          (element) => ({
+            opacity: getComputedStyle(element).opacity,
+            border: getComputedStyle(element).borderLeftColor,
+            outline: getComputedStyle(element).outlineWidth,
+          })
+        );
+        expect
+          .soft(guideAppearance.opacity, 'Guide borders are not faded with their fill')
+          .toBe('1');
+        expect
+          .soft(
+            parseFloat(guideAppearance.outline),
+            'A contrasting outer boundary survives gray backdrops'
+          )
+          .toBeGreaterThanOrEqual(1);
+        await capture(page, info, 'feedback-docking-guides');
+        await page.mouse.move(width / 2, 20, { steps: 4 });
+        await expect(ui(page, 'content.toolbar.dock-zone.top')).toHaveAttribute(
+          'data-active',
+          'true'
+        );
+        await capture(page, info, 'feedback-docking-active');
+        await page.mouse.up();
+        await expect(guides).toHaveCount(0);
+        await ui(page, 'content.toolbar.settings-button').click();
+        const free = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение панели/u,
+        });
+        if (
+          !(await free.evaluate((node) =>
+            node.classList.contains('sniptale-popover-item-selected')
+          ))
+        )
+          await free.click();
+        await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+        const direction = await trigger.evaluate((element) => {
+          const css = getComputedStyle(element, '::before');
+          return {
+            top: parseFloat(css.borderTopWidth),
+            right: parseFloat(css.borderRightWidth),
+            left: parseFloat(css.borderLeftWidth),
+            bottom: parseFloat(css.borderBottomWidth),
+          };
+        });
+        expect
+          .soft(direction.left, 'Vertical disclosure points toward the side menu')
+          .toBeGreaterThan(direction.top);
+        expect.soft(direction.left).toBeGreaterThan(direction.bottom);
+        await trigger.click();
+        await capture(page, info, 'feedback-vertical-menu');
+        await page.keyboard.press('Escape');
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        await expect(menu).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(menu).toHaveCount(0);
+        await trigger.click();
+        await ui(page, 'content.toolbar.mode-option.drawing').click();
+        await ui(page, 'content.toolbar.drawing.shape').click();
+        await page.mouse.move(450, 280);
+        await page.mouse.down();
+        await page.mouse.move(620, 400, { steps: 8 });
+        await page.mouse.up();
+        await ui(page, 'content.toolbar.drawing.select').click();
+        await page.mouse.click(500, 300);
+        const deleteSelection = ui(page, 'drawing.selection.actions.delete');
+        await expect(deleteSelection).toBeEnabled();
+        await deleteSelection.hover();
+        await expect
+          .soft(deleteSelection)
+          .toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+        await expect
+          .soft(deleteSelection)
+          .toHaveCSS('border-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
+        await expect.soft(deleteSelection).toHaveCSS('box-shadow', 'none', { timeout: 500 });
+        await capture(page, info, 'feedback-drawing-delete-hover');
+        await deleteSelection.focus();
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Shift+Tab');
+        await expect(deleteSelection).toBeFocused();
+        await expect(deleteSelection).toHaveCSS('outline-style', 'solid');
+        await deleteSelection.click();
+        await expect(deleteSelection).toHaveCount(0);
+        if (width === 1280 && theme === 'light') {
+          await page.setViewportSize({ width: 960, height: 560 });
+          await withinViewport(toolbar);
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+          ).toBe(true);
+          await trigger.click();
+          await withinViewport(menu);
+          await capture(page, info, 'feedback-below-minimum-menu');
+          await page.keyboard.press('Escape');
+        }
+      } finally {
+        await page.close();
+        await popup.close();
+        await context.unroute(`${origin}/**`);
+      }
+    });
+  }
+}

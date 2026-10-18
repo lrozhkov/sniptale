@@ -17,6 +17,7 @@ let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
 function Harness(props: {
+  saving?: boolean;
   compactMenus?: boolean;
   currentViewport?: { height: number; width: number } | null;
   displayMode?: 'horizontal' | 'vertical';
@@ -50,7 +51,7 @@ function Harness(props: {
           setPreferences((current) => ({ ...current, ...patch }));
         }}
         preferences={preferences}
-        saving={false}
+        saving={props.saving ?? false}
         toolbarMenuState={menu}
       />
     </div>
@@ -261,4 +262,43 @@ it('stays open near the popover and closes when the pointer moves far away', () 
     );
   });
   expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBeNull();
+});
+
+it('keeps the preference menu available and mounted while a save is pending', async () => {
+  let finishSave: (() => void) | undefined;
+  const pendingSave = new Promise<void>((resolve) => {
+    finishSave = resolve;
+  });
+  const onUpdate = vi.fn(() => pendingSave);
+  const view = render(<Harness saving={false} onUpdate={onUpdate} />);
+  act(() => {
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')
+      ?.click();
+  });
+  const menu = view.querySelector('[data-ui="content.toolbar.full-page-menu"]');
+  expect(menu).not.toBeNull();
+  act(() => {
+    menu
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-page-floating.hide"]')
+      ?.click();
+    root?.render(<Harness saving onUpdate={onUpdate} />);
+  });
+  expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBe(menu);
+  expect(menu?.querySelectorAll('button:disabled')).toHaveLength(0);
+  const next = menu?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.full-page-floating.repeat"]'
+  );
+  act(() => next?.click());
+  expect(next?.disabled).toBe(false);
+  expect(onUpdate).toHaveBeenNthCalledWith(1, { floatingElements: 'hide' });
+  expect(onUpdate).toHaveBeenNthCalledWith(2, { floatingElements: 'repeat' });
+  expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBe(menu);
+  await act(async () => {
+    finishSave?.();
+    await pendingSave;
+    root?.render(<Harness saving={false} onUpdate={onUpdate} />);
+  });
+  expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBe(menu);
+  expect(menu?.querySelectorAll('button:disabled')).toHaveLength(0);
 });

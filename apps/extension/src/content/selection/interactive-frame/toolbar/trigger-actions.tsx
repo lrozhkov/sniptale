@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Pencil } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Scaling, Settings } from 'lucide-react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { FrameCommentIcon } from '../../../../features/highlighter/frame-annotation/icons';
 import { translate } from '../../../../platform/i18n';
@@ -10,7 +10,6 @@ import {
 } from './actions';
 import { canAppendFrameCallout } from '../../../../features/highlighter/frame-annotation/callout/collection';
 import { FRAME_TRIGGER_CONTROL_SIZE } from './trigger-position';
-import { FrameAnnotationEffectIcon as FrameEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
 import type { FrameUIState } from '../../frame-runtime/state/frame-ui.store';
 import {
   isFrameHiddenDuringCapture,
@@ -71,7 +70,7 @@ export function createFrameQuickActions(
   return [
     {
       id: 'settings',
-      icon: <FrameEffectIcon mode={props.frame.effectMode ?? 'border'} size={14} />,
+      icon: <Settings size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
       label: translate('content.interactiveFrame.frameSettings'),
       onClick: (button) => {
         props.popoverAnchorRef.current = button;
@@ -117,7 +116,7 @@ export function createFrameQuickActions(
         ]),
     {
       id: 'edit',
-      icon: <Pencil size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
+      icon: <Scaling size={15} aria-hidden="true" style={frameTriggerIconStyle} />,
       label: translate('content.interactiveFrame.editButton'),
       onClick: props.handleStartEditing,
     },

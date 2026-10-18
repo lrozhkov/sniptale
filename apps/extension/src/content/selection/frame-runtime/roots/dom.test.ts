@@ -1,3 +1,4 @@
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../../features/highlighter/frame-annotation/interaction/z-index';
 // @vitest-environment jsdom
 
 import { act, createElement, useEffect } from 'react';
@@ -384,3 +385,42 @@ describe('frame-roots-renderer-dom descriptors', () => {
     expectSuspensionUnmountsPortalsAndRestoresFromIdle
   );
 });
+
+it.each(['editing', 'resizing'] as const)(
+  'raises the frame root above the blocker during %s and restores idle ordering',
+  (state) => {
+    const container = document.createElement('div');
+    container.style.zIndex = String(FRAME_ANNOTATION_Z_INDEX.frameIdleMax);
+    container.style.pointerEvents = 'none';
+    const child = document.createElement('div');
+    child.id = 'frame-container-frame-1';
+    container.append(child);
+    document.body.append(container);
+    const root = { render: vi.fn(), unmount: vi.fn() } satisfies Root;
+    const currentFrameStates = new Map<string, FrameState>([['frame-1', 'idle']]);
+    const args = {
+      actionRefs: {
+        removeFrameRef: { current: vi.fn() },
+        updateFrameEffectRef: { current: vi.fn() },
+        updateFrameRef: { current: vi.fn() },
+        updateFrameStateRef: { current: vi.fn() },
+      },
+      container,
+      currentFrames: [createFrame('frame-1')],
+      currentFrameStates,
+      globalEffectModeRef: { current: 'border' as const },
+      InteractiveFrameComponent: vi.fn(() => null),
+      rootsRef: { current: new Map([['frame-1', root]]) },
+      presentations: new Map([['frame-1', 'visible' as const]]),
+    };
+    currentFrameStates.set('frame-1', state);
+    renderInteractiveFrames(args);
+    expect(Number(container.style.zIndex)).toBeGreaterThan(
+      FRAME_ANNOTATION_Z_INDEX.blockingOverlay
+    );
+    expect(container.style.pointerEvents).toBe('none');
+    currentFrameStates.set('frame-1', 'idle');
+    renderInteractiveFrames(args);
+    expect(Number(container.style.zIndex)).toBeLessThan(FRAME_ANNOTATION_Z_INDEX.blockingOverlay);
+  }
+);

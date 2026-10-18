@@ -6,6 +6,7 @@ import {
   resolveMicrophoneGain,
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import { createMicrophoneHighPass } from '../stream/audio-mixer-graph';
 import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
 import type { MultiSourceRecorder } from './state';
 import {
@@ -167,32 +168,31 @@ export async function createSourceRecorders(params: {
   }
 }
 
-function createGainProcessedMicrophoneStream(params: {
+async function createGainProcessedMicrophoneStream(params: {
   rawStream: MediaStream;
   settings: VideoRecordingSettings;
-}): { release: () => void; stream: MediaStream } {
+}): Promise<{ release: () => void; stream: MediaStream }> {
   const gain = resolveMicrophoneGain(params.settings);
-  if (gain === 1) {
-    return {
-      release: () => undefined,
-      stream: params.rawStream,
-    };
-  }
 
   const audioContext = new AudioContext();
   let source: MediaStreamAudioSourceNode | null = null;
   let gainNode: GainNode | null = null;
+  let highPass: BiquadFilterNode | null = null;
   try {
+    if (audioContext.state === 'suspended') await audioContext.resume();
     source = audioContext.createMediaStreamSource(params.rawStream);
+    highPass = createMicrophoneHighPass(audioContext);
     gainNode = audioContext.createGain();
     const destination = audioContext.createMediaStreamDestination();
     gainNode.gain.value = gain;
-    source.connect(gainNode);
+    source.connect(highPass);
+    highPass.connect(gainNode);
     gainNode.connect(destination);
 
     return {
       release: () => {
         source?.disconnect();
+        highPass?.disconnect();
         gainNode?.disconnect();
         params.rawStream.getTracks().forEach((track) => track.stop());
         void audioContext.close();
@@ -201,6 +201,7 @@ function createGainProcessedMicrophoneStream(params: {
     };
   } catch (error) {
     source?.disconnect();
+    highPass?.disconnect();
     gainNode?.disconnect();
     void audioContext.close();
     throw error;
@@ -222,7 +223,7 @@ export async function createMicrophoneRecorder(
   });
   let processed: { release: () => void; stream: MediaStream };
   try {
-    processed = createGainProcessedMicrophoneStream({ rawStream, settings });
+    processed = await createGainProcessedMicrophoneStream({ rawStream, settings });
   } catch (error) {
     rawStream.getTracks().forEach((track) => track.stop());
     throw error;

@@ -190,7 +190,7 @@
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-data-search:focus-within {
-  border-color: var(--sniptale-color-border-accent-strong);
+  border-color: var(--sniptale-color-border-strong);
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-data-search-clear {
@@ -202,7 +202,7 @@
 
 .sniptale-ai-modal-adopted
   :is(.sniptale-expand-btn, .sniptale-ai-column-toggle, .sniptale-ai-spoiler-toggle):focus-visible {
-  outline: 2px solid var(--sniptale-color-border-accent-strong);
+  outline: 2px solid var(--sniptale-color-border-strong);
   outline-offset: 1px;
 }
 

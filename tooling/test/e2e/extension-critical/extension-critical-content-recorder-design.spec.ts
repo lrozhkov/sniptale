@@ -108,9 +108,14 @@ async function nativeAction(context: BrowserContext, extensionId: string, page: 
   }
 }
 
-async function admit(context: BrowserContext, extensionId: string, origin: string) {
+async function admit(
+  context: BrowserContext,
+  extensionId: string,
+  origin: string,
+  viewport = primarySizes[0]!
+) {
   const page = await context.newPage();
-  await page.setViewportSize(primarySizes[0]!);
+  await page.setViewportSize(viewport);
   await page.goto(origin);
   const popup = await openRealPopup(context, extensionId);
   await popup.evaluate((host) => {
@@ -808,5 +813,63 @@ for (const family of ['scenario', 'video'] as const) {
         }
       });
     }
+  }
+}
+
+for (const viewport of primarySizes) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`video feedback media corners ${viewport.width} ${theme}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport });
+      try {
+        await configure(launched.context, launched.extensionId, { locale: 'ru', theme });
+        const { page } = await admit(launched.context, launched.extensionId, host.origin, viewport);
+        await ui(page, 'content.toolbar.mode-selector-button').click();
+        await ui(page, 'content.toolbar.mode-option.video-recording').click();
+        await nativeAction(launched.context, launched.extensionId, page);
+        await page.bringToFront();
+        for (const orientation of ['horizontal', 'vertical']) {
+          if (orientation === 'vertical') {
+            await ui(page, 'content.toolbar.settings-button').click();
+            const free = page.getByRole('button', {
+              name: /Free toolbar placement|Свободное размещение панели/u,
+            });
+            if (
+              !(await free.evaluate((node) =>
+                node.classList.contains('sniptale-popover-item-selected')
+              ))
+            )
+              await free.click();
+            await page.getByRole('button', { name: /Vertical view|Вертикальный вид/u }).click();
+          }
+          for (const kind of ['microphone', 'camera']) {
+            const toggle = ui(page, `content.toolbar.video-recording.${kind}.toggle`);
+            const arrow = ui(page, `content.toolbar.video-recording.${kind}.menu`);
+            await expect(toggle).toBeVisible();
+            await expect.soft(toggle).toHaveCSS('border-top-right-radius', '0px', { timeout: 500 });
+            await expect
+              .soft(toggle)
+              .toHaveCSS('border-bottom-right-radius', '0px', { timeout: 500 });
+            await expect.soft(toggle).toHaveCSS('border-top-left-radius', '4px', { timeout: 500 });
+            await expect.soft(arrow).toHaveCSS('border-top-left-radius', '0px', { timeout: 500 });
+            await expect
+              .soft(arrow)
+              .toHaveCSS('border-bottom-left-radius', '0px', { timeout: 500 });
+            await expect.soft(arrow).toHaveCSS('border-top-right-radius', '4px', { timeout: 500 });
+            const left = (await toggle.boundingBox())!;
+            const right = (await arrow.boundingBox())!;
+            expect.soft(Math.abs(left.x + left.width - right.x)).toBeLessThanOrEqual(1);
+            expect.soft(Math.abs(left.y - right.y)).toBeLessThanOrEqual(1);
+          }
+          await capture(page, info, `feedback-media-${orientation}`);
+        }
+      } finally {
+        await closeExtensionBrowser(launched, { removeUserDataDir: true });
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
   }
 }

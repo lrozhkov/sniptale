@@ -6,7 +6,9 @@ const targetResolver = vi.hoisted(() => ({ resolveShieldedPageElement: vi.fn() }
 
 vi.mock('../page-element-target', () => targetResolver);
 
-import { handleOverlayWheel } from './overlay';
+import { handleOverlayWheel, syncNavigationLockOverlay } from './overlay';
+import { getContentUiElementById } from '../../platform/dom-host';
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../features/highlighter/frame-annotation/interaction/z-index';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -125,4 +127,18 @@ it('chains wheel fallback from a bounded iframe window to the scrollable top win
 
   expect(innerScrollBy).not.toHaveBeenCalled();
   expect(topScrollBy).toHaveBeenCalledWith({ behavior: 'auto', left: 0, top: 80 });
+});
+
+it('blocks page pointer input below editable frames and above passive frames', () => {
+  syncNavigationLockOverlay(true);
+  const overlay = getContentUiElementById('sniptale-navigation-lock-overlay');
+  expect(overlay).toBeInstanceOf(HTMLDivElement);
+  const stack = Number(overlay?.style.zIndex);
+  expect(stack).toBeGreaterThan(FRAME_ANNOTATION_Z_INDEX.frameIdleMax);
+  expect(stack).toBeLessThan(FRAME_ANNOTATION_Z_INDEX.frameActive);
+  const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+  overlay?.dispatchEvent(pointer);
+  expect(pointer.defaultPrevented).toBe(true);
+  syncNavigationLockOverlay(false);
+  expect(overlay?.style.display).toBe('none');
 });

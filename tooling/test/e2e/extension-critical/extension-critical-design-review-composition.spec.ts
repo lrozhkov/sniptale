@@ -86,12 +86,26 @@ for (const theme of ['light', 'dark'] as const) {
         const popover = page.locator('[data-ui="content.design-review.popover"]');
         await expect(popover).toBeVisible();
         await expect(popover).toHaveCSS('font-weight', '400');
+        const panelAlpha = await popover.evaluate((node) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const drawing = canvas.getContext('2d')!;
+          drawing.fillStyle = getComputedStyle(node).backgroundColor;
+          drawing.fillRect(0, 0, 1, 1);
+          return drawing.getImageData(0, 0, 1, 1).data[3];
+        });
+        expect(panelAlpha, 'Design Review hides underlying page text').toBe(255);
         const close = popover.getByRole('button', { name: /^(Close|Закрыть)$/u });
         const panelBounds = (await popover.boundingBox())!;
         const closeBounds = (await close.boundingBox())!;
-        expect(
-          Math.abs(closeBounds.x + closeBounds.width / 2 - panelBounds.x - panelBounds.width)
-        ).toBeLessThanOrEqual(8);
+        expect(closeBounds.x).toBeGreaterThanOrEqual(panelBounds.x);
+        expect(closeBounds.y).toBeGreaterThanOrEqual(panelBounds.y);
+        expect(closeBounds.x + closeBounds.width).toBeLessThanOrEqual(
+          panelBounds.x + panelBounds.width
+        );
+        expect(closeBounds.y + closeBounds.height).toBeLessThanOrEqual(
+          panelBounds.y + panelBounds.height
+        );
         await page.screenshot({
           path: info.outputPath('comment-popover.png'),
           fullPage: false,
@@ -125,6 +139,19 @@ for (const theme of ['light', 'dark'] as const) {
             return { foreground: getComputedStyle(button).color, accent };
           });
           expect(categoryPaint.foreground).not.toBe(categoryPaint.accent);
+          const linkedFields = popover
+            .locator('[data-ui="content.design-review.side-field"]')
+            .filter({ has: page.locator('[data-ui="content.design-review.side-values-compact"]') });
+          for (const field of await linkedFields.all()) {
+            const values = await field
+              .locator('[data-ui="content.design-review.side-values-compact"]')
+              .boundingBox();
+            const link = await field.locator('[data-side-link="all"]').boundingBox();
+            if (!values || !link) throw new Error('Linked property controls have no bounds');
+            expect(
+              Math.abs(values.y + values.height / 2 - link.y - link.height / 2)
+            ).toBeLessThanOrEqual(1);
+          }
           await page.screenshot({
             path: info.outputPath(`properties-${index}.png`),
             fullPage: false,

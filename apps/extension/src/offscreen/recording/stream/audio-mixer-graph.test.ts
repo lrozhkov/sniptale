@@ -16,6 +16,13 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     connectedNodes.push(node);
     return node;
   });
+  const highPass = {
+    type: 'lowpass',
+    frequency: { value: 0 },
+    Q: { value: 0 },
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  };
   const gainNode = {
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -35,6 +42,7 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     createMediaStreamDestination: vi.fn(() => destination),
     createMediaStreamSource,
     createGain: vi.fn(() => gainNode),
+    createBiquadFilter: vi.fn(() => highPass),
     createConstantSource: vi.fn(() => silenceSource),
     close,
     resume,
@@ -53,6 +61,7 @@ function createAudioContextHarness(options?: { state?: 'running' | 'suspended' }
     createMediaStreamSource,
     destination,
     gainNode,
+    highPass,
     silenceSource,
     resume,
   };
@@ -105,7 +114,14 @@ async function verifiesSourceLifecycle(): Promise<void> {
   expect(graph.hasAudio()).toBe(true);
 
   expect(harness.connectedNodes[0]?.disconnect).toHaveBeenCalledTimes(1);
+  expect(harness.connectedNodes[1]?.connect).toHaveBeenCalledWith(harness.destination);
+  expect(harness.connectedNodes[2]?.connect).toHaveBeenCalledWith(harness.highPass);
+  expect(harness.highPass.connect).toHaveBeenCalledWith(harness.destination);
+  expect(harness.highPass.type).toBe('highpass');
+  expect(harness.highPass.frequency.value).toBe(80);
+  expect(harness.highPass.Q.value).toBe(Math.SQRT1_2);
   graph.disconnectMicrophoneStream();
+  expect(harness.highPass.disconnect).toHaveBeenCalledOnce();
   graph.disconnectTabStream();
 
   expect(harness.connectedNodes[2]?.disconnect).toHaveBeenCalledTimes(1);
@@ -122,12 +138,14 @@ async function verifiesMicrophoneGainPath(): Promise<void> {
   graph.connectMicrophoneStream(stream, 1.5);
 
   expect(harness.gainNode.gain.value).toBe(1.5);
-  expect(harness.connectedNodes[0]?.connect).toHaveBeenCalledWith(harness.gainNode);
+  expect(harness.connectedNodes[0]?.connect).toHaveBeenCalledWith(harness.highPass);
+  expect(harness.highPass.connect).toHaveBeenCalledWith(harness.gainNode);
   expect(harness.gainNode.connect).toHaveBeenCalledWith(harness.destination);
 
   graph.disconnectMicrophoneStream();
 
   expect(harness.gainNode.disconnect).toHaveBeenCalledOnce();
+  expect(harness.highPass.disconnect).toHaveBeenCalledOnce();
   expect(harness.connectedNodes[0]?.disconnect).toHaveBeenCalledOnce();
 }
 

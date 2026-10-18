@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Minus, Scaling, Settings, Plus, Trash2, X } from 'lucide-react';
 import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
 import {
   ProductGlassToolbar,
@@ -31,7 +31,7 @@ export function FrameAnnotationToolbarEffectButton(props: {
       menuIndicator
       title={props.label ?? commandLabels().get(`effect-${props.effectMode}`)}
     >
-      <FrameAnnotationEffectIcon mode={props.effectMode} size={18} />
+      <Settings size={18} />
     </ProductGlassToolbarButton>
   );
 }
@@ -150,7 +150,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
           onMouseDown={props.onMouseDown}
           title={labels.get('edit')}
         >
-          <Pencil size={18} />
+          <Scaling size={18} />
         </ProductGlassToolbarButton>
       ) : null}
       {props.onCaptureVisibilityChange ? (

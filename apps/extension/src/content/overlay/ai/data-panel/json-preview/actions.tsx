@@ -1,7 +1,8 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { JsonPreviewProps } from '../preview/types';
 import { translate } from '../../../../../platform/i18n';
-import { CheckIcon, CodeBracketsIcon, CopyIcon } from '../preview/icons';
+import { Eye, EyeOff } from 'lucide-react';
+import { CheckIcon, CopyIcon } from '../preview/icons';
 
 type JsonPreviewActionsProps = Pick<
   JsonPreviewProps,
@@ -35,7 +36,11 @@ export function JsonPreviewActions({
           showDataPreview ? translate('aiModal.hideJsonTitle') : translate('aiModal.showJsonTitle')
         }
       >
-        <CodeBracketsIcon />
+        {showDataPreview ? (
+          <EyeOff aria-hidden="true" size={16} />
+        ) : (
+          <Eye aria-hidden="true" size={16} />
+        )}
         {showDataPreview
           ? translate('aiModal.hideJsonButton')
           : translate('aiModal.showJsonButton')}

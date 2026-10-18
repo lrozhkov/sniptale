@@ -326,6 +326,7 @@
 
 /* The content modal keeps its own scroll and resize owners. */
 .sniptale-ai-modal-adopted {
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
   font: 500 13px/18px var(--sniptale-font-interface);
   color: var(--sniptale-color-text-primary);
 }
@@ -406,6 +407,11 @@
   right: auto;
   inset-inline-end: 40px;
   bottom: 8px;
+}
+
+.sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-voice-control > button {
+  width: 32px;
+  height: 32px;
 }
 
 .sniptale-ai-modal-adopted .sniptale-ai-modal-prompt-submit-hint {

@@ -11,6 +11,7 @@ import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extens
 import { startHostServer } from '../support/host-server';
 import {
   openRealPopup,
+  evaluateInTarget,
   sendRuntimeMessage,
   sendRuntimeMessageInTarget,
   triggerExtensionAction,
@@ -137,6 +138,21 @@ for (const [index, scenario] of [
           tabId
         );
       }
+      if (scenario.name === 'WINDOW') {
+        await target.evaluate(() => {
+          const counter = document.createElement('div');
+          counter.style.cssText =
+            'position:fixed;right:8px;bottom:8px;background:white;color:black;font:16px monospace;z-index:1';
+          document.body.append(counter);
+          let frame = 0;
+          const repaint = () => {
+            counter.textContent = `Native window frame ${++frame}`;
+            requestAnimationFrame(repaint);
+          };
+          // X11 can stop producing frames for a static window before recording activation.
+          requestAnimationFrame(repaint);
+        });
+      }
       let secondWindow: Page | undefined;
       if (isMulti) {
         const secondUrl = `${host.origin}/fixtures/host-page.html?discard-second=1`;
@@ -259,6 +275,63 @@ for (const [index, scenario] of [
       expect(prior.recordings?.length).toBeGreaterThan(0);
       if (isMulti) expect(prior.video_projects?.length).toBeGreaterThan(0);
       const discardedId = await begin();
+      if (scenario.name === 'WINDOW') {
+        await popup.close();
+        await target.bringToFront();
+        const action = await triggerExtensionAction(context, extensionId, target);
+        await expect
+          .poll(async () =>
+            evaluateInTarget(
+              context,
+              action,
+              `Boolean(document.querySelector('[data-ui="popup.video-active.stop-button"]'))`
+            )
+          )
+          .toBe(true);
+        await evaluateInTarget(
+          context,
+          action,
+          `document.querySelector('[data-page="menu"]').click()`
+        );
+        await expect
+          .poll(async () =>
+            evaluateInTarget(
+              context,
+              action,
+              `Boolean(document.querySelector('[data-ui="popup.menu.tool-action.drawing"]'))`
+            )
+          )
+          .toBe(true);
+        await evaluateInTarget(
+          context,
+          action,
+          `document.querySelector('[data-ui="popup.menu.tool-action.drawing"]').click()`
+        );
+        const diagnostics = await context.browser()!.newBrowserCDPSession();
+        try {
+          await expect
+            .poll(async () => {
+              const targets = await diagnostics.send('Target.getTargets');
+              return targets.targetInfos.some((candidate) => candidate.targetId === action);
+            })
+            .toBe(false);
+        } finally {
+          await diagnostics.detach();
+        }
+        await expect(target.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+        await expect(target.locator('[data-ui="content.toolbar.drawing.pencil"]')).toBeVisible();
+        await target.screenshot({
+          path: info.outputPath(`window-recording-drawing-${viewport.name}.png`),
+          fullPage: false,
+        });
+        popup = await openRealPopup(context, extensionId);
+        const continued = await readState(popup);
+        expect(continued.state.status).toBe(VideoRecordingStatus.RECORDING);
+        expect(continued.recordingId).toBe(discardedId);
+        await expect
+          .poll(async () => (await readState(popup)).state.duration)
+          .toBeGreaterThan(continued.state.duration);
+      }
       if (scenario.name === 'BACKGROUND_REFUSAL') await refuseNextLeaseRemoval(context);
       if (scenario.name === 'OFFSCREEN_REFUSAL') {
         const activeAssets = (await readAssetObjects(popup)).filter(
@@ -298,6 +371,7 @@ for (const [index, scenario] of [
       });
       await popup.close();
       popup = await openRealPopup(context, extensionId);
+      if (scenario.name === 'WINDOW') await popup.locator('[data-page="video"]').click();
       await expect(popup.locator(START)).toBeVisible();
       expect(await readState(popup)).toMatchObject({
         success: true,

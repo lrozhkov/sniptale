@@ -216,3 +216,16 @@ describe('content-popover range thumb contract', () => {
     expect(switchBlock).not.toContain('--sniptale-range-fill-ratio');
   });
 });
+
+it('reserves a separate contextual slider strip below embedded inspector labels', () => {
+  const embedded = readRuleBlock('.sniptale-content-popover .sniptale-compact-workspace');
+  expect(embedded).toContain('--sniptale-parameter-row-height: 40px');
+  expect(embedded).toContain('--sniptale-parameter-context-space: 8px');
+  expect(embedded).toContain('--sniptale-inspector-range-bottom: 4px');
+  expect(embedded).toContain('--sniptale-parameter-range-hit-top: -4px');
+});
+
+it('obscures host-page text beneath content annotation controls', () => {
+  const block = readRuleBlock('.sniptale-content-popover.sniptale-content-appearance-surface');
+  expect(block).toContain('background: rgb(from var(--sniptale-color-surface-panel) r g b / 1)');
+});

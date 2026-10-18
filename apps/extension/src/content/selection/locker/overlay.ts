@@ -2,8 +2,8 @@ import { appendToContentOverlayRoot, getContentUiElementById } from '../../platf
 import { isPageElementPickerActive, isSelectionDelegatedMode } from './routing';
 import { NAVIGATION_LOCK_OVERLAY_ID } from './constants';
 import { resolveShieldedPageElement } from '../page-element-target';
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../features/highlighter/frame-annotation/interaction/z-index';
 
-const NAVIGATION_LOCK_OVERLAY_Z_INDEX = '2147483644';
 const NAVIGATION_LOCK_CURSOR = [
   `url("data:image/svg+xml,`,
   `%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E`,
@@ -148,7 +148,7 @@ function createNavigationLockOverlay(): HTMLDivElement {
     position: fixed;
     inset: 0;
     background: transparent;
-    z-index: ${NAVIGATION_LOCK_OVERLAY_Z_INDEX};
+    z-index: ${FRAME_ANNOTATION_Z_INDEX.blockingOverlay};
     display: none;
     pointer-events: auto;
     touch-action: none;
