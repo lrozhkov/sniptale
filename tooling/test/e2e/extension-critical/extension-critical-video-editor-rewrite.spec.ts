@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises';
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -66,7 +68,7 @@ async function openSceneText(page: Page, label: Label) {
   );
   await operate(
     page.getByRole('button', {
-      name: label('gallery.videoReview.textTrackDocument'),
+      name: label('videoEditor.sidebar.textDocuments'),
       exact: true,
     })
   );
@@ -166,6 +168,9 @@ async function inspectTextFit(page: Page, panel: Locator, outputPath: (name: str
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
+      // Choice fitting measures React option labels; direct DOM edits bypass that contract.
+      if (node.parentElement?.closest('[data-ui="shared.ui.compact-inspector.segmented-row"]'))
+        continue;
       const original = node.nodeValue ?? '';
       const text = original.trim();
       if (!/[A-Za-zА-Яа-я]/u.test(text)) continue;
@@ -176,10 +181,26 @@ async function inspectTextFit(page: Page, panel: Locator, outputPath: (name: str
   });
   try {
     await panel.getByRole('textbox').first().scrollIntoViewIfNeeded();
+    const overflow = await panel.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return [...element.querySelectorAll('*')]
+        .filter(
+          (node) =>
+            node.getClientRects().length && node.getBoundingClientRect().right > bounds.right + 1
+        )
+        .map((node) => ({
+          tag: node.tagName,
+          ui: node.getAttribute('data-ui'),
+          className: node.getAttribute('class'),
+          text: node.textContent?.slice(0, 140),
+          width: node.getBoundingClientRect().width,
+        }));
+    });
+    await writeFile(outputPath('rewrite-label-overflow.json'), JSON.stringify(overflow, null, 2));
+    await page.screenshot({ path: outputPath('rewrite-label-stress.png'), fullPage: false });
     expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
       true
     );
-    await page.screenshot({ path: outputPath('rewrite-label-stress.png'), fullPage: false });
   } finally {
     await expanded.evaluate((changes) => {
       for (const { node, original } of changes) if (node.isConnected) node.nodeValue = original;
@@ -267,12 +288,13 @@ async function checkIndependentVariant(
       String(source.document.fragments.length)
     )
   );
-  await operate(
-    form.getByRole('button', { name: label('gallery.videoReview.textRewriteMode'), exact: true })
+  await chooseInspectorValue(
+    page,
+    form,
+    label('gallery.videoReview.textRewriteMode'),
+    label('gallery.videoReview.textRewriteScript')
   );
-  await page
-    .getByRole('option', { name: label('gallery.videoReview.textRewriteScript'), exact: true })
-    .click();
+
   await operate(
     form.getByRole('switch', { name: label('gallery.videoReview.textRewriteTiming'), exact: true })
   );
@@ -474,7 +496,7 @@ for (const variant of variants) {
       );
       await operate(
         page.getByRole('button', {
-          name: label('gallery.videoReview.textTrackDocument'),
+          name: label('videoEditor.sidebar.textDocuments'),
           exact: true,
         })
       );

@@ -167,13 +167,11 @@ describe('workspace-sidebar/selection/media-frame', () => {
     expect(onUpdateMediaClipShadowIntensity).toHaveBeenCalledWith('clip-1', 42);
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>('button[aria-label="Режим тени"]')?.click();
-    });
-
-    await act(async () => {
-      const glow = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
-        (option) => option.textContent?.includes('Свечение')
-      );
+      const glow = Array.from(
+        container?.querySelectorAll<HTMLButtonElement>(
+          '[role="group"][aria-label="Режим тени"] button'
+        ) ?? []
+      ).find((option) => option.textContent?.includes('Свечение'));
       expect(glow).toBeDefined();
       glow?.click();
     });
@@ -189,9 +187,13 @@ describe('workspace-sidebar/selection/media-frame disabled state', () => {
   it('keeps media shadow mode controls disabled for locked tracks', async () => {
     await renderHarness({}, true);
 
-    expect(
-      container?.querySelector<HTMLButtonElement>('button[aria-label="Режим тени"]')?.disabled
-    ).toBe(true);
+    const choices = [
+      ...container!.querySelectorAll<HTMLButtonElement>(
+        '[role="group"][aria-label="Режим тени"] button'
+      ),
+    ];
+    expect(choices).toHaveLength(2);
+    expect(choices.every((button) => button.disabled)).toBe(true);
   });
 });
 

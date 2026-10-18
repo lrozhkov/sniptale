@@ -32,7 +32,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders long gradient animation modes as a shared select row instead of segmented buttons', () => {
+it('uses measured choices for the finite gradient animation modes', () => {
   const markup = renderToStaticMarkup(
     <GradientAnimationControls
       {...createGradientProps()}
@@ -41,8 +41,8 @@ it('renders long gradient animation modes as a shared select row instead of segm
   );
 
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundAnimationModeLabel');
-  expect(markup).toContain('shared.ui.compact-inspector.select-field');
-  expect(markup).not.toContain('shared.ui.compact-inspector.segmented-field');
+  expect(markup).not.toContain('shared.ui.compact-inspector.select-field');
+  expect(markup).toContain('shared.ui.compact-inspector.segmented-field');
 });
 
 function createGradientProps() {
@@ -55,3 +55,20 @@ function createGradientProps() {
     recentColors: [],
   };
 }
+
+it('updates animation mode without losing speed or intensity', () => {
+  const props = createGradientProps();
+  const background = {
+    ...createSceneGradientBackground(),
+    animation: { mode: 'none' as const, speed: 67, intensity: 42 },
+  };
+  act(() => root!.render(<GradientAnimationControls {...props} background={background} />));
+  const rotate = [...container!.querySelectorAll('button')].find(
+    (button) => button.textContent === 'videoEditor.sidebar.sceneBackgroundAnimationRotate'
+  );
+  act(() => rotate!.click());
+  expect(props.onSetSceneBackground).toHaveBeenCalledExactlyOnceWith({
+    ...background,
+    animation: { mode: 'rotate', speed: 67, intensity: 42 },
+  });
+});

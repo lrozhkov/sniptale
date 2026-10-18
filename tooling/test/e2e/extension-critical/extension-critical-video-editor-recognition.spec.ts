@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test, type Page } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -336,7 +337,7 @@ for (const variant of variants) {
         .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
         .click();
       await page
-        .getByRole('button', { name: label('gallery.videoReview.textTrackDocument'), exact: true })
+        .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
         .click();
       const textPanel = page.locator('[data-ui="video-editor.text.panel"]');
       await textPanel.locator('article > button').first().click();
@@ -383,15 +384,13 @@ for (const variant of variants) {
         }
         await panel.locator('.sniptale-ai-model-selector-trigger').click();
         await page.getByRole('button', { name: 'Fixture audio chat', exact: true }).click();
-        await panel
-          .getByLabel(label('gallery.videoReview.recognitionProcessingMode'), { exact: true })
-          .click();
-        await page
-          .getByRole('option', {
-            name: label('gallery.videoReview.recognitionRewrite'),
-            exact: true,
-          })
-          .click();
+        await chooseInspectorValue(
+          page,
+          panel,
+          label('gallery.videoReview.recognitionProcessingMode'),
+          label('gallery.videoReview.recognitionRewrite')
+        );
+
         await panel
           .getByRole('textbox', {
             name: label('gallery.videoReview.recognitionInstructions'),

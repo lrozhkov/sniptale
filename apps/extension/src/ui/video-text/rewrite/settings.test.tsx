@@ -111,3 +111,18 @@ it('restores the accepted window on Escape and commits a later explicit numeric 
   expect(change).toHaveBeenCalledOnce();
   expect(change).toHaveBeenLastCalledWith({ window: { start: 3, end: 5 } });
 });
+
+it('chooses editing context through measured segments and resets incompatible segmentation', async () => {
+  await act(async () => root.render(<Settings />));
+  const context = host.querySelector(
+    '[role="group"][aria-label="gallery.videoReview.textRewriteMode"]'
+  )!;
+  expect(context).not.toBeNull();
+  expect(context.querySelector('[aria-pressed="true"]')?.textContent).toBe(
+    'gallery.videoReview.textRewriteScript'
+  );
+  await act(async () => button('textRewritePhrases').click());
+  expect(change).toHaveBeenLastCalledWith({ mode: 'phrases', resegment: false });
+  expect(button('textRewriteStructure')).toBeNull();
+  expect(button('textRewritePhrases').getAttribute('aria-pressed')).toBe('true');
+});

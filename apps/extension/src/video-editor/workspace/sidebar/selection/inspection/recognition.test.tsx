@@ -267,6 +267,10 @@ describe('project recognition inspector', () => {
     expect(host.querySelector('[data-ui="video-editor.recognition.panel"]')).not.toBeNull();
     expect(controller.loadModels).toHaveBeenCalledOnce();
     expect(controller.recognize).not.toHaveBeenCalled();
+    expect(
+      host.querySelector('[role="group"][aria-label="gallery.videoReview.recognitionGrouping"]')
+    ).not.toBeNull();
+    click('gallery.videoReview.recognitionSentences');
     click('gallery.videoReview.recognitionStart');
     const consent = host.querySelector('[data-ui="video-editor.recognition.consent"]');
     expect(consent?.textContent).toContain('Approved Provider');
@@ -281,7 +285,7 @@ describe('project recognition inspector', () => {
       approvedProviderId: 'provider',
       start: 4,
       end: 12,
-      grouping: 'sentences-pauses',
+      grouping: 'sentences',
     });
     expect(controller.apply).not.toHaveBeenCalled();
   });
@@ -417,16 +421,15 @@ describe('project recognition inspector', () => {
       },
     };
     open(createProps(controller));
-    const processing = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.recognitionProcessingMode"]'
+    const processing = host.querySelector(
+      '[role="group"][aria-label="gallery.videoReview.recognitionProcessingMode"]'
     );
-    if (!processing) throw new Error('Missing processing mode');
-    act(() => processing.click());
-    const rewrite = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (option) => option.textContent?.includes('gallery.videoReview.recognitionRewrite')
+    expect(processing).not.toBeNull();
+    expect(processing?.querySelector('[aria-pressed="true"]')?.textContent).toBe(
+      'gallery.videoReview.recognitionVerbatim'
     );
-    if (!rewrite) throw new Error('Missing rewrite choice');
-    await act(async () => rewrite.click());
+    click('gallery.videoReview.recognitionRewrite');
+    click('gallery.videoReview.recognitionParagraphs');
     const instructions = host.querySelector('textarea');
     if (!instructions) throw new Error('Missing instructions');
     act(() => {
@@ -441,7 +444,7 @@ describe('project recognition inspector', () => {
     click('gallery.videoReview.speechConsentContinue');
     expect(controller.recognize).toHaveBeenCalledWith(
       expect.objectContaining({
-        recognition: { mode: 'rewrite', granularity: 'sentence', prompt: 'Keep the meaning.' },
+        recognition: { mode: 'rewrite', granularity: 'paragraph', prompt: 'Keep the meaning.' },
       })
     );
   });
@@ -451,17 +454,13 @@ describe('project recognition inspector', () => {
     addProposal(props, controller);
     open(props);
     expect(host.textContent).not.toContain('gallery.videoReview.recognitionReplaceHint');
-    const mode = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.recognitionMode"]'
-    );
-    if (!mode) throw new Error('Missing application mode');
-    act(() => mode.click());
-    const replace = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
-      (option) => option.textContent?.includes('gallery.videoReview.recognitionReplace')
-    );
-    if (!replace) throw new Error('Missing Replace choice');
-    await act(async () => replace.click());
+    expect(
+      host.querySelector('[role="group"][aria-label="gallery.videoReview.recognitionMode"]')
+    ).not.toBeNull();
+    click('gallery.videoReview.recognitionReplace');
     expect(host.textContent).toContain('gallery.videoReview.recognitionReplaceHint');
+    click('gallery.videoReview.recognitionApply');
+    expect(controller.apply).toHaveBeenCalledExactlyOnceWith('replace');
     controller.proposal!.receipt = controller.proposal!.entry;
     controller.error = 'storage-failed';
     render(props);

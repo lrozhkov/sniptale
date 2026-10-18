@@ -45,16 +45,18 @@ export function ProjectTextRewritePanel(props: {
           {translate('gallery.videoReview.textRewriteTitle')}
         </span>
       </div>
-      <p className="break-words text-xs text-[var(--sniptale-color-text-muted)]">
-        {props.scopeLabel}
-      </p>
-      <p className="text-xs">
-        {translate(
-          target.wholeDocument
-            ? 'gallery.videoReview.textRewriteAllScope'
-            : 'gallery.videoReview.textRewriteSelectedScope'
-        ).replace('{count}', String(target.ids.length))}
-      </p>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+        <span className="min-w-0 break-words text-[var(--sniptale-color-text-muted)]">
+          {props.scopeLabel}
+        </span>
+        <span>
+          {translate(
+            target.wholeDocument
+              ? 'gallery.videoReview.textRewriteAllScope'
+              : 'gallery.videoReview.textRewriteSelectedScope'
+          ).replace('{count}', String(target.ids.length))}
+        </span>
+      </div>
       <TextRewriteSettings
         options={operation.options}
         catalog={operation.catalog}
@@ -122,29 +124,32 @@ function RewriteDisclosure({
       ) : null}
       <p className="text-xs">{translate('gallery.videoReview.textRewriteDisclosure')}</p>
       <p className="text-xs">{translate('videoEditor.sidebar.textRewriteSaveDisclosure')}</p>
-      {binding ? (
-        <p className="text-xs">
-          {translate(
-            binding.kind === 'source'
-              ? 'videoEditor.sidebar.textRewriteSourceScope'
-              : 'videoEditor.sidebar.textRewriteProjectScope'
-          )}
-        </p>
-      ) : null}
       {binding?.kind === 'source' && operation.options.changeIntervals ? (
         <p className="text-xs">{translate('videoEditor.sidebar.textRewriteProjectTiming')}</p>
       ) : null}
-      {context?.fragments.some((fragment) => fragment.ranges && fragment.ranges.length > 1) ? (
-        <p className="text-xs">{translate('videoEditor.sidebar.textRewritePlacements')}</p>
-      ) : null}
-      {context ? (
+      {binding || context ? (
         <TextRewriteDetails
-          label={translate('gallery.videoReview.textRewriteOutbound')}
+          label={translate('videoEditor.sidebar.textRewriteScopeDetails')}
           preferenceId="project-text-rewrite-outbound"
+          variant="information"
         >
-          <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs">
-            {JSON.stringify(context, null, 2)}
-          </pre>
+          {binding ? (
+            <p className="text-xs">
+              {translate(
+                binding.kind === 'source'
+                  ? 'videoEditor.sidebar.textRewriteSourceScope'
+                  : 'videoEditor.sidebar.textRewriteProjectScope'
+              )}
+            </p>
+          ) : null}
+          {context?.fragments.some((fragment) => fragment.ranges && fragment.ranges.length > 1) ? (
+            <p className="text-xs">{translate('videoEditor.sidebar.textRewritePlacements')}</p>
+          ) : null}
+          {context ? (
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs">
+              {JSON.stringify(context, null, 2)}
+            </pre>
+          ) : null}
         </TextRewriteDetails>
       ) : null}
     </>

@@ -10,6 +10,7 @@ import type { WorkspaceSidebarProps } from '../../contracts/props';
 import { AnnotationFields } from '../annotation/fields';
 import { renderShapeStyleFields } from './shape-style';
 import { renderTextStyleFields } from './text-style';
+import { TextTemplateUpgradeFields } from './text-upgrade';
 
 export { renderShapeStyleFields } from './shape-style';
 export { renderTextStyleFields } from './text-style';
@@ -148,8 +149,7 @@ function renderCombinedTextFields(
     selectedTrackLocked,
     onUpdateTextStyle,
     recentColors,
-    onRememberRecentColor,
-    onConvertTextClipToAnnotation
+    onRememberRecentColor
   );
 
   if (!content && !style) {
@@ -160,6 +160,14 @@ function renderCombinedTextFields(
     <div className="space-y-3">
       {content}
       {style}
+      {selectedClip && isTextClip(selectedClip) && onConvertTextClipToAnnotation ? (
+        <TextTemplateUpgradeFields
+          key={selectedClip.id}
+          clipId={selectedClip.id}
+          disabled={selectedTrackLocked}
+          onConvertTextClipToAnnotation={onConvertTextClipToAnnotation}
+        />
+      ) : null}
     </div>
   );
 }

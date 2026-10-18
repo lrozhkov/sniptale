@@ -223,12 +223,29 @@ function proposalField() {
 it('discloses exact repeated source placement and explicit independent project timing before sending', async () => {
   await mount(true);
   expect(host.textContent).toContain('Approved provider');
+  const recipient = [...host.querySelectorAll('p')].find(
+    (node) => node.textContent === 'Provider: Approved provider'
+  )!;
+  expect(recipient.closest('details')).toBeNull();
   expect(host.textContent).toContain('videoEditor.sidebar.textRewriteSourceScope');
   expect(host.textContent).toContain('videoEditor.sidebar.textRewritePlacements');
   expect(host.textContent).not.toContain('videoEditor.sidebar.textRewriteProjectTiming');
   const outbound = [...host.querySelectorAll('summary')].find((summary) =>
-    summary.textContent?.includes('gallery.videoReview.textRewriteOutbound')
+    summary.textContent?.includes('videoEditor.sidebar.textRewriteScopeDetails')
   )!;
+  const details = outbound.closest('details')!;
+  expect(details.dataset['variant']).toBe('information');
+  expect(details.open).toBe(false);
+  for (const key of [
+    'gallery.videoReview.textRewriteDisclosure',
+    'videoEditor.sidebar.textRewriteSaveDisclosure',
+  ]) {
+    const essential = [...host.querySelectorAll('p')].find((node) => node.textContent === key)!;
+    expect(essential).toBeDefined();
+    expect(essential.closest('details')).toBeNull();
+  }
+  expect(details.textContent).toContain('videoEditor.sidebar.textRewriteSourceScope');
+  expect(details.textContent).toContain('videoEditor.sidebar.textRewritePlacements');
   await act(async () => outbound.click());
   expect(outbound.closest('details')?.open).toBe(true);
   const disclosed = JSON.parse(host.querySelector('pre')!.textContent!);
@@ -247,6 +264,10 @@ it('discloses exact repeated source placement and explicit independent project t
   expect(runReviewTextJob).not.toHaveBeenCalled();
   await click('textRewriteTiming');
   expect(host.textContent).toContain('videoEditor.sidebar.textRewriteProjectTiming');
+  const warning = [...host.querySelectorAll('p')].find(
+    (node) => node.textContent === 'videoEditor.sidebar.textRewriteProjectTiming'
+  )!;
+  expect(warning.closest('details')).toBeNull();
   await generate();
   expect(runReviewTextJob).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -256,6 +277,11 @@ it('discloses exact repeated source placement and explicit independent project t
     expect.any(AbortSignal)
   );
   expect(proposalField().value).toBe('Suggested text');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="video.text-rewrite.proposal"] details')?.dataset[
+      'variant'
+    ]
+  ).toBe('structural');
   await click('textRewriteReplace');
   expect(durable.textDocuments?.map((entry) => entry.binding.kind)).toEqual(['source', 'project']);
   expect(durable.textDocuments![1]!.document.fragments[0]).toMatchObject({
@@ -284,6 +310,10 @@ it('edits a project proposal and locks its accepted receipt while a failed Save 
   );
   expect(host.textContent).not.toContain('private error text');
   expect(host.textContent).toContain('videoEditor.sidebar.recognitionSaveRetry');
+  const retry = [...host.querySelectorAll('p')].find(
+    (node) => node.textContent === 'videoEditor.sidebar.recognitionSaveRetry'
+  )!;
+  expect(retry.closest('details')).toBeNull();
   expect(proposalField().closest('fieldset')?.disabled).toBe(true);
   expect(button('textRewriteReplace').disabled).toBe(true);
   expect(button('textRewriteVariant').disabled).toBe(false);

@@ -31,7 +31,10 @@ export function TextRewriteButton({
 }
 
 /** Rewrite details retain the existing inspector preference authority. */
-export function TextRewriteDetails(props: InspectorDisclosureProps) {
+export function TextRewriteDetails({
+  variant = 'structural',
+  ...props
+}: InspectorDisclosureProps & { variant?: 'structural' | 'information' }) {
   const [open, setOpen] = useInspectorDisclosure(props.preferenceId, props.initiallyOpen ?? false);
   return (
     <InspectorDisclosureView
@@ -39,8 +42,12 @@ export function TextRewriteDetails(props: InspectorDisclosureProps) {
       open={open}
       onOpenChange={setOpen}
       dataUi="video.text-rewrite.disclosure"
-      variant="structural"
-      bodyClassName="sniptale-parameter-stack px-2 pt-2"
+      variant={variant}
+      bodyClassName={
+        variant === 'information'
+          ? 'sniptale-information-body'
+          : 'sniptale-parameter-stack px-2 pt-2'
+      }
     />
   );
 }

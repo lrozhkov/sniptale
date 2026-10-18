@@ -88,6 +88,73 @@ it('saves explicit sound enable and disable as one project update while keeping 
     container.remove();
   }
 });
+
+it('separates visual gesture parameters from sound without changing their source-scoped update', () => {
+  updateProject.mockClear();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'rec',
+    filename: 'rec.webm',
+    width: 1280,
+    height: 720,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'drag',
+        kind: 'CLICK',
+        time: 1,
+        duration: 1,
+        point: { x: 0.2, y: 0.3 },
+        label: '',
+        preset: 'NONE',
+        data: {
+          gestureType: 'drag',
+          gestureId: 'drag',
+          button: 0,
+          downTime: 1,
+          upTime: 2,
+          completion: 'released',
+        },
+      },
+    ],
+  });
+  const facts = structuredClone(project.actionEvents);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const props = {
+    project,
+    recordingId: 'rec',
+    sourceInstanceId: project.actionFeedback![0]!.sourceInstanceId,
+    target: { ref: { kind: 'action' as const, id: 'drag' }, family: 'mouse' as const },
+    disabled: false,
+    gesture: true,
+  };
+  try {
+    act(() => root.render(<ActionFeedbackFields {...props} part="sound" />));
+    expect(
+      host.querySelector('[aria-label="gallery.videoReview.actionAudioEnabled"]')
+    ).not.toBeNull();
+    expect(host.textContent).not.toContain('gallery.videoReview.gestureAppearance');
+    act(() => root.render(<ActionFeedbackFields {...props} part="gesture" />));
+    expect(host.querySelector('[aria-label="gallery.videoReview.actionAudioEnabled"]')).toBeNull();
+    const toggle = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.gestureFeedback"]'
+    )!;
+    expect(toggle).not.toBeNull();
+    act(() => toggle.click());
+    expect(updateProject).toHaveBeenCalledOnce();
+    const changed = updateProject.mock.lastCall![0](project);
+    expect(changed.actionFeedback![0]!.gestureStyles![0]).toMatchObject({
+      id: 'drag',
+      effect: 'off',
+    });
+    expect(changed.actionFeedback![0]!.settings).toEqual(project.actionFeedback![0]!.settings);
+    expect(changed.actionEvents).toEqual(facts);
+  } finally {
+    act(() => root.unmount());
+  }
+});
 it.each(['mouse', 'keyboard', 'typing'] as const)(
   'feedback inspector preserves source facts for %s controls',
   async (family) => {
@@ -158,9 +225,8 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
     try {
       render();
       if (family === 'mouse') {
-        click('gallery.videoReview.gestureAppearance');
-        await act(async () =>
-          [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+        act(() =>
+          [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')]
             .find((option) => option.textContent === 'gallery.videoReview.gesture_area')!
             .click()
         );
@@ -188,9 +254,8 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
         expect(project.actionFeedback![0]!.gestureStyles![0]!.effect).toBe('off');
         click('gallery.videoReview.gestureFeedback');
         accept();
-        click('gallery.videoReview.gestureAppearance');
-        await act(async () =>
-          [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+        act(() =>
+          [...host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')]
             .find((option) => option.textContent === 'gallery.videoReview.gesture_area')!
             .click()
         );

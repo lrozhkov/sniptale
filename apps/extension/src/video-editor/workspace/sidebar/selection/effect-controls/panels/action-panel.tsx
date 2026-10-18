@@ -11,7 +11,7 @@ import type { VideoProjectActionPresentationOverride } from '../../../../../../f
 import type { WorkspaceSidebarSelectionPanelProps } from '../../../contracts/selection-panel';
 import { ActionPointButtons, ActionPointFields, ActionPrimaryFields } from '../fields';
 import { InspectorGroupedPanel } from '../../grouped-inspector';
-import { SelectInput } from '../../shared/controls';
+import { OptionButtonsField } from '../../shared/option-buttons';
 import { SelectionEmptyState } from '../../inspection/helpers';
 import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../../shared/panel';
 
@@ -101,7 +101,7 @@ export function InspectActionPanel(props: ActionProps) {
             ? [
                 {
                   id: 'action-sound',
-                  semantic: 'effects' as const,
+                  semantic: 'audio' as const,
                   label: translate('gallery.videoReview.actionAudio'),
                   content: (
                     <ActionFeedbackFields
@@ -113,12 +113,7 @@ export function InspectActionPanel(props: ActionProps) {
                         family: event.kind === 'KEY' ? 'keyboard' : 'mouse',
                       }}
                       disabled={disabled}
-                      gesture={
-                        event.kind === 'CLICK' &&
-                        typeof event.data['gestureType'] === 'string' &&
-                        (event.data['gestureType'] !== 'click' ||
-                          event.data['completion'] !== 'released')
-                      }
+                      part="sound"
                     />
                   ),
                 },
@@ -317,7 +312,7 @@ function ActionAppearanceFields({
   const { event, occurrence } = resolved;
   return (
     <>
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.historyEventMode')}
         value={
           event.presentation?.enabled === undefined
@@ -356,6 +351,20 @@ function ActionAppearanceFields({
         onChange={update}
       />
       <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
+      {event.anchor.kind === 'recording-source' &&
+      event.kind === 'CLICK' &&
+      typeof event.data['gestureType'] === 'string' &&
+      (event.data['gestureType'] !== 'click' || event.data['completion'] !== 'released') ? (
+        <ActionFeedbackFields
+          project={props.project}
+          recordingId={event.anchor.recordingId}
+          sourceInstanceId={event.anchor.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: event.anchor.sourceEventId }, family: 'mouse' }}
+          disabled={disabled}
+          gesture
+          part="gesture"
+        />
+      ) : null}
       <InspectorActionButton
         compact
         tone="secondary"

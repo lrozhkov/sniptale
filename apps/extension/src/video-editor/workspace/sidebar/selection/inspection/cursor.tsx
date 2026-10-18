@@ -151,6 +151,7 @@ function createCursorAppearanceProps(
 ) {
   return {
     captureMode: cursorTrack.captureMode,
+    showVisibility: props.project.source.kind !== 'recording' && !sample.sourceAnchor,
     recentColors: props.recentColors,
     sampleId: sample.id,
     usesTrackAppearance,
@@ -182,6 +183,7 @@ function CursorBehaviorSection(props: {
 }
 
 function CursorAppearanceSection(props: {
+  showVisibility: boolean;
   captureMode: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['captureMode']
   >;
@@ -199,6 +201,16 @@ function CursorAppearanceSection(props: {
 }) {
   return (
     <>
+      <DetailList>
+        <DetailItem
+          label={translate('videoEditor.sidebar.cursorAppearanceModeLabel')}
+          value={translate(
+            props.usesTrackAppearance
+              ? 'videoEditor.sidebar.cursorAppearanceModeTrack'
+              : 'videoEditor.sidebar.cursorAppearanceModeOverride'
+          )}
+        />
+      </DetailList>
       <CursorAppearanceModeButton
         sampleId={props.sampleId}
         skin={props.skin}
@@ -209,6 +221,7 @@ function CursorAppearanceSection(props: {
       <div className="mt-3">
         <CursorSkinFields
           part="appearance"
+          showVisibility={props.showVisibility}
           showCaptureCapability={true}
           animationPreset={props.skin.animationPreset}
           captureMode={props.captureMode}

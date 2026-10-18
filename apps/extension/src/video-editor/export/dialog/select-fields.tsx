@@ -1,7 +1,12 @@
 import { resolveVideoExportDimensions } from '../../../features/video/project/export/output-dimensions';
 import { FileVideo, SlidersHorizontal } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { NumericRow, SelectField, StatusRow } from '../../../ui/compact-inspector-controls';
+import {
+  NumericRow,
+  SegmentedRow,
+  SelectField,
+  StatusRow,
+} from '../../../ui/compact-inspector-controls';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoExportCapabilities,
@@ -140,12 +145,12 @@ function ExportDialogCodecField<TCodec extends string>(props: {
       {props.codecOptions.length === 1 ? (
         <StatusRow label={label} value={props.codecOptions[0]?.label ?? ''} />
       ) : (
-        <SelectField
-          className={EXPORT_FIELD_CLASS_NAME}
+        <SegmentedRow
+          ariaLabel={label}
           label={label}
           value={props.currentCodec}
           onChange={props.onChange}
-          options={props.codecOptions}
+          options={[...props.codecOptions]}
         />
       )}
     </>
@@ -187,30 +192,63 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
 
   return (
     <>
-      <SelectField
-        className={EXPORT_FIELD_CLASS_NAME}
-        label={translate('videoEditor.exportDialog.scopeLabel')}
-        value={currentScope}
-        onChange={(scope) => onChange({ scope })}
-        options={scopeOptions}
-      />
+      {scopeOptions.length === 1 && scopeOptions[0]?.value === currentScope ? (
+        <StatusRow
+          label={translate('videoEditor.exportDialog.scopeLabel')}
+          value={scopeOptions[0].label}
+        />
+      ) : (
+        <SegmentedRow
+          ariaLabel={translate('videoEditor.exportDialog.scopeLabel')}
+          label={translate('videoEditor.exportDialog.scopeLabel')}
+          value={currentScope}
+          onChange={(scope) => onChange({ scope })}
+          options={[...scopeOptions]}
+        />
+      )}
       <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <h3
           className={[
-            'mb-1 flex items-center gap-2 text-sm leading-5 font-semibold',
+            'mb-1 flex items-center gap-2 text-sm leading-5 font-medium',
             'text-[var(--sniptale-color-text-muted)]',
           ].join(' ')}
         >
           <FileVideo size={15} aria-hidden />
           {translate('videoEditor.exportDialog.fileSection')}
         </h3>
-        <SelectField
-          className={EXPORT_FIELD_CLASS_NAME}
-          label={translate('videoEditor.exportDialog.formatLabel')}
-          value={settings.format}
-          onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
-          options={formatOptions}
-        />
+        {formatOptions.length === 1 && formatOptions[0]?.value === settings.format ? (
+          <StatusRow
+            label={translate('videoEditor.exportDialog.formatLabel')}
+            value={formatOptions[0].label}
+          />
+        ) : formatOptions.some((option) => option.value === settings.format) ? (
+          <SegmentedRow
+            ariaLabel={translate('videoEditor.exportDialog.formatLabel')}
+            label={translate('videoEditor.exportDialog.formatLabel')}
+            value={settings.format}
+            onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
+            options={[...formatOptions]}
+          />
+        ) : (
+          <SelectField
+            className={EXPORT_FIELD_CLASS_NAME}
+            label={translate('videoEditor.exportDialog.formatLabel')}
+            value={settings.format}
+            onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
+            options={[
+              {
+                value: settings.format,
+                label: translate(
+                  settings.format === VideoExportFormat.MP4
+                    ? 'videoEditor.exportDialog.formatMp4Label'
+                    : 'videoEditor.exportDialog.formatWebmLabel'
+                ),
+                disabled: true,
+              },
+              ...formatOptions,
+            ]}
+          />
+        )}
         {settings.format === VideoExportFormat.MP4 && codecOptions.length > 0 ? (
           <ExportDialogCodecField
             codecOptions={codecOptions}
@@ -229,7 +267,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
       <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <h3
           className={[
-            'mb-1 flex items-center gap-2 text-sm leading-5 font-semibold',
+            'mb-1 flex items-center gap-2 text-sm leading-5 font-medium',
             'text-[var(--sniptale-color-text-muted)]',
           ].join(' ')}
         >
@@ -250,16 +288,16 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           }}
           options={getExportResolutionOptions()}
         />
-        <SelectField
-          className={EXPORT_FIELD_CLASS_NAME}
+        <SegmentedRow
+          ariaLabel={translate('videoEditor.exportDialog.qualityLabel')}
           label={translate('videoEditor.exportDialog.qualityLabel')}
           value={settings.quality}
           onChange={(quality) => onChange({ quality })}
-          options={getExportQualityOptions()}
+          options={[...getExportQualityOptions()]}
         />
         <div title={translate('videoEditor.exportDialog.frameRateAdaptiveHint')}>
-          <SelectField<'constant' | 'adaptive'>
-            className={EXPORT_FIELD_CLASS_NAME}
+          <SegmentedRow<'constant' | 'adaptive'>
+            ariaLabel={translate('videoEditor.exportDialog.frameRateMode')}
             label={translate('videoEditor.exportDialog.frameRateMode')}
             value={settings.frameRateMode ?? 'constant'}
             options={[

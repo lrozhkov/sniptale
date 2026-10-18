@@ -25,6 +25,37 @@ async function checkInspectorScroll(page: Page, panel: Locator, info: TestInfo) 
   const bodyBox = (await panel.locator('[data-ui="video-editor.inspector.body"]').boundingBox())!;
   const buttonBox = (await rail.getByRole('button').first().boundingBox())!;
   expect(buttonBox.x).toBeGreaterThanOrEqual(bodyBox.x);
+  const railGeometry = await rail.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return {
+      left: box.left + node.clientLeft,
+      right: box.left + node.clientLeft + node.clientWidth,
+      clippingLeft: (() => {
+        let left = box.left;
+        for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+          if (getComputedStyle(parent).overflowX !== 'visible')
+            left = Math.max(left, parent.getBoundingClientRect().left + parent.clientLeft);
+        }
+        return left;
+      })(),
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+      buttons: [...node.querySelectorAll('button')].map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { name: button.title, left: rect.left, right: rect.right, width: rect.width };
+      }),
+    };
+  });
+  await writeFile(
+    info.outputPath('category-rail-geometry.json'),
+    JSON.stringify(railGeometry, null, 2)
+  );
+  expect(railGeometry.scrollWidth).toBe(railGeometry.clientWidth);
+  for (const button of railGeometry.buttons) {
+    expect(button.left, button.name).toBeGreaterThanOrEqual(railGeometry.clippingLeft + 4);
+    expect(button.right, button.name).toBeLessThanOrEqual(railGeometry.right - 4);
+    expect(button.width, button.name).toBe(36);
+  }
   const railBox = (await rail.boundingBox())!;
   const headerBox = (await header.boundingBox())!;
   const bounds = (await settings.boundingBox())!;
@@ -176,7 +207,7 @@ for (const locale of ['ru', 'en'] as const) {
       const summary = disclosure.locator(':scope > summary');
       await expect(disclosure).toHaveAttribute('open', '');
       await expect(summary).toHaveCSS('font-size', '14px');
-      await expect(summary).toHaveCSS('font-weight', '600');
+      await expect(summary).toHaveCSS('font-weight', '500');
       await expect(disclosure).toHaveCSS('border-top-width', '0px');
       await expect(summary).toHaveCSS('min-height', '32px');
       const draft = section.getByRole('textbox').first();

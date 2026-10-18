@@ -55,3 +55,21 @@ it('carries camera commands and live eligibility from surface props to the actua
   });
   expect(atBoundary.canAddCameraPosition).toBe(false);
 });
+
+it('carries object selection and deletion from the surface to the actual inspector', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const onSelectObjectTrack = vi.fn();
+  const onDeleteObjectTrack = vi.fn();
+  controller.projectActions.onSelectObjectTrack = onSelectObjectTrack;
+  controller.projectActions.onDeleteObjectTrack = onDeleteObjectTrack;
+  const props = createSelectionPanelProps({
+    ...getWorkspaceSidebarProps(controller),
+    gridSettings: controller.state.gridSettings,
+  });
+  expect(props.onSelectObjectTrack).toBe(onSelectObjectTrack);
+  expect(props.onDeleteObjectTrack).toBe(onDeleteObjectTrack);
+  props.onSelectObjectTrack?.('object-track');
+  props.onDeleteObjectTrack?.('object-track');
+  expect(onSelectObjectTrack).toHaveBeenCalledExactlyOnceWith('object-track');
+  expect(onDeleteObjectTrack).toHaveBeenCalledExactlyOnceWith('object-track');
+});

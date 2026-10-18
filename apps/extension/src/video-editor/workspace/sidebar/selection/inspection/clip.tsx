@@ -6,6 +6,7 @@ import { translate } from '../../../../../platform/i18n';
 import {
   isAnnotationClip,
   isSubtitleClip,
+  isTextClip,
   isVideoClip,
 } from '../../../../../features/video/project/timeline';
 import type { VideoProjectAnnotationClip } from '../../../../../features/video/project/types/index';
@@ -33,6 +34,7 @@ import {
 } from '../inputs/text-shape';
 import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroups } from '../effect-instance/groups';
+import { TextTemplateUpgradeFields } from '../inputs/text-upgrade';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
 import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
@@ -217,6 +219,21 @@ function createStandardClipGroups(
       ) : null,
     },
     ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+    {
+      id: 'conversion',
+      semantic: 'processing' as const,
+      label: translate('videoEditor.sidebar.textTemplateUpgradeLabel'),
+      visible: isTextClip(clip) && !!props.onConvertTextClipToAnnotation,
+      content:
+        isTextClip(clip) && props.onConvertTextClipToAnnotation ? (
+          <TextTemplateUpgradeFields
+            key={clip.id}
+            clipId={clip.id}
+            disabled={runtime.selectedTrackLocked}
+            onConvertTextClipToAnnotation={props.onConvertTextClipToAnnotation}
+          />
+        ) : null,
+    },
   ] as const;
 }
 
@@ -414,8 +431,7 @@ function renderClipStyleFields(
       runtime.selectedTrackLocked,
       props.onUpdateTextStyle,
       props.recentColors,
-      props.onRememberRecentColor,
-      props.onConvertTextClipToAnnotation
+      props.onRememberRecentColor
     ) ??
     renderShapeStyleFields(
       clip,

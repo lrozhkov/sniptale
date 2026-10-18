@@ -1,7 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneGradientAnimationMode } from '../../../../../features/video/project/types';
 import type { VideoSceneGradientAnimation } from '../../../../../features/video/project/types';
-import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 import type { GradientSceneBackground, SceneBackgroundFieldProps } from './shared';
 
@@ -20,7 +20,7 @@ export function GradientAnimationControls(props: GradientControlProps) {
 
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundAnimationModeLabel')}
         value={animation.mode}
         onChange={(mode) => updateGradientAnimation(props, { ...animation, mode })}

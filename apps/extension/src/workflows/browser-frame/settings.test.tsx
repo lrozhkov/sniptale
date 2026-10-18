@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -378,3 +379,49 @@ it('keeps the address and icon actions in one inspector value owner', async () =
     await act(async () => root.unmount());
   }
 });
+
+it.each(['favicon', 'fileIcon'] as const)(
+  'cancels an armed Space and suppresses repeated Enter for scoped %s actions',
+  async (action) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () =>
+        root.render(
+          <CommandPressScope value={true}>
+            <WindowHeaderSettings header={DEFAULT_WINDOW_HEADER} onChange={vi.fn()} />
+          </CommandPressScope>
+        )
+      );
+      const button = host.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate(`windowHeader.${action}`)}"]`
+      )!;
+      const key = (type: 'keydown' | 'keyup', value: string, repeat = false) => {
+        const event = new KeyboardEvent(type, {
+          key: value,
+          repeat,
+          bubbles: true,
+          cancelable: true,
+        });
+        act(() => button.dispatchEvent(event));
+        return event;
+      };
+      key('keydown', ' ');
+      expect(button.dataset['pressing']).toBe('true');
+      key('keydown', 'Escape');
+      expect(button.hasAttribute('data-pressing')).toBe(false);
+      expect(key('keyup', ' ').defaultPrevented).toBe(true);
+      key('keydown', 'Enter');
+      expect(key('keydown', 'Enter', true).defaultPrevented).toBe(true);
+      key('keyup', 'Enter');
+      expect(button.hasAttribute('data-pressing')).toBe(false);
+      expect(acquire).not.toHaveBeenCalled();
+      expect(importIcon).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  }
+);

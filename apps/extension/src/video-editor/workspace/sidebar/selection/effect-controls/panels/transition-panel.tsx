@@ -137,6 +137,7 @@ function TransitionTiming(props: TransitionPanelProps & { disabled: boolean; imp
       />
       {!props.imported && (
         <OptionButtonsField
+          disabled={disabled}
           label={translate('videoEditor.sidebar.transitionEasingLabel')}
           value={transition.easing}
           onChange={(value) => {

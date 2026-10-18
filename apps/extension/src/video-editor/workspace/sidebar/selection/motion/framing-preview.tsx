@@ -1,3 +1,5 @@
+import { OptionButtonsField } from '../shared/option-buttons';
+import { InspectorActionButton } from '../shared/actions';
 import { useContext, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -66,26 +68,15 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
           {translate('videoEditor.sidebar.cameraExpansionApplied')}
         </p>
       ) : null}
-      <div className="flex gap-1" aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}>
-        {[true, false].map((mode) => (
-          <button
-            key={String(mode)}
-            type="button"
-            aria-pressed={overview === mode}
-            onClick={() => setOverview(mode)}
-            className={[
-              'rounded-md px-2 py-1 text-xs cursor-pointer',
-              overview === mode
-                ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
-                : 'text-[var(--sniptale-color-text-secondary)]',
-            ].join(' ')}
-          >
-            {translate(
-              mode ? 'videoEditor.sidebar.framingAreaView' : 'videoEditor.sidebar.framingResultView'
-            )}
-          </button>
-        ))}
-      </div>
+      <OptionButtonsField
+        label={translate('videoEditor.sidebar.framingPreviewLabel')}
+        value={overview ? 'area' : 'result'}
+        options={[
+          { value: 'area', label: translate('videoEditor.sidebar.framingAreaView') },
+          { value: 'result', label: translate('videoEditor.sidebar.framingResultView') },
+        ]}
+        onChange={(value) => setOverview(value === 'area')}
+      />
       <button
         type="button"
         data-video-editor-local-navigation="true"
@@ -108,13 +99,9 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
         />
       </button>
       {failed ? (
-        <button
-          type="button"
-          className="text-xs text-[var(--sniptale-color-text-secondary)] underline"
-          onClick={reload}
-        >
+        <InspectorActionButton compact onClick={reload}>
           {translate('common.actions.retry')}
-        </button>
+        </InspectorActionButton>
       ) : overview && !following ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate(

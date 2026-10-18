@@ -16,6 +16,7 @@ import type {
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 import { getMediaFitModeOptions } from './media-fit-options';
 
@@ -153,7 +154,7 @@ export function MediaShadowControls(
 ) {
   return (
     <div className="sniptale-parameter-stack space-y-1">
-      <SelectInput
+      <OptionButtonsField
         disabled={props.disabled}
         label={translate('videoEditor.sidebar.mediaShadowModeLabel')}
         value={props.shadowMode}

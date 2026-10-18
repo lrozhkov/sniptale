@@ -111,12 +111,10 @@ it('renders inline inspector controls and wires close, export, select, and toggl
   const closeButton = buttons.find(
     (button) => button.textContent === 'videoEditor.exportDialog.cancel'
   );
-  const formatTrigger = container?.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+  const downloadToggle = container!.querySelector<HTMLInputElement>(
+    'input[type="checkbox"][aria-label="videoEditor.exportDialog.downloadAfterExport"]'
   );
-  const downloadToggle = buttons.find((button) =>
-    button.textContent?.includes('videoEditor.exportDialog.downloadAfterExport')
-  );
+  expect(downloadToggle?.checked).toBe(true);
   const exportButton = buttons.find((button) =>
     button.textContent?.includes('videoEditor.exportDialog.submit')
   );
@@ -126,13 +124,9 @@ it('renders inline inspector controls and wires close, export, select, and toggl
   });
   expect(onClose).toHaveBeenCalledTimes(1);
 
-  act(() => {
-    formatTrigger?.click();
-  });
-
-  const webmOption = Array.from(
-    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  ).find((button) => button.textContent?.includes('videoEditor.exportDialog.formatWebmLabel'));
+  const webmOption = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.formatLabel"] button[title="videoEditor.exportDialog.formatWebmLabel"]'
+  );
 
   await act(async () => {
     webmOption?.click();
@@ -155,7 +149,7 @@ it('renders export setting dropdowns on the stable floating layer', () => {
   renderDialog();
 
   const formatTrigger = container?.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+    '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
   );
 
   act(() => {
@@ -220,17 +214,9 @@ it('restores the default MP4 codec when switching back from WebM during the same
     },
   });
 
-  const formatTrigger = container?.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+  const mp4Option = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.formatLabel"] button[title="videoEditor.exportDialog.formatMp4Label"]'
   );
-
-  act(() => {
-    formatTrigger?.click();
-  });
-
-  const mp4Option = Array.from(
-    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []
-  ).find((button) => button.textContent?.includes('videoEditor.exportDialog.formatMp4Label'));
 
   await act(async () => {
     mp4Option?.click();
@@ -276,17 +262,17 @@ it('does not restore focus over a destination chosen outside the inspector', () 
 it('leaves a portaled select for the adjacent form control on Tab in either direction', () => {
   renderDialog();
   const trigger = container!.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.formatLabel"]'
-  )!;
-  const scope = container!.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.exportDialog.scopeLabel"]'
-  )!;
-  const resolution = container!.querySelector<HTMLButtonElement>(
     '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
   )!;
+  const format = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.formatLabel"] button:last-child'
+  )!;
+  const quality = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.qualityLabel"] button'
+  )!;
   for (const [shiftKey, expected] of [
-    [false, resolution],
-    [true, scope],
+    [false, quality],
+    [true, format],
   ] as const) {
     act(() => trigger.click());
     const option = document.querySelector<HTMLButtonElement>('[role="option"]')!;

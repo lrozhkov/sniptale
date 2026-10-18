@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { setup } from '../../../../project/state/insertion/material.test-support';
 import { resetVideoEditorProjectHistory } from '../../../../project/history';
 import { isSourceTimedClip } from '../../../../project/operations/source-timed-clips';
+import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { ClipSourceRangeControls } from './source-range';
 
 function harness() {
@@ -24,14 +25,16 @@ function harness() {
     if (!isSourceTimedClip(clip)) throw new Error('Expected source timed fixture');
     act(() =>
       root.render(
-        <ClipSourceRangeControls
-          key={clip.id}
-          project={project}
-          clip={clip}
-          locked={false}
-          onTrimClipStart={store.getState().trimClipStart}
-          onTrimClipEnd={store.getState().trimClipEnd}
-        />
+        <InspectorLayout>
+          <ClipSourceRangeControls
+            key={clip.id}
+            project={project}
+            clip={clip}
+            locked={false}
+            onTrimClipStart={store.getState().trimClipStart}
+            onTrimClipEnd={store.getState().trimClipEnd}
+          />
+        </InspectorLayout>
       )
     );
   };
@@ -48,6 +51,7 @@ function harness() {
   render();
   return {
     store,
+    container,
     id,
     asset,
     render,
@@ -170,3 +174,16 @@ it.each([1, 4 / 3])(
     }
   }
 );
+
+it('keeps source boundaries in the canonical inspector value column', () => {
+  const h = harness();
+  try {
+    const rows = [...h.container.querySelectorAll('.sniptale-parameter-row')];
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => !row.className.includes('grid-cols-[minmax(0,1fr)_auto]!'))).toBe(
+      true
+    );
+  } finally {
+    h.dispose();
+  }
+});

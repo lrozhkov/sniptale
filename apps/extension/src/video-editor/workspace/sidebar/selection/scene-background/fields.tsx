@@ -4,6 +4,7 @@ import { createSceneGradientBackground } from '../../../../../features/video/pro
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
 import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { PANEL_META_CLASS_NAME } from '../shared/panel';
 import { SceneBackgroundColorEditor } from './colors';
 import type { SceneBackground, SceneBackgroundFieldProps } from './shared';
@@ -15,7 +16,7 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
   }, [props.sceneBackground.kind]);
   return (
     <div className="sniptale-parameter-stack grid gap-3">
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
         value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
         onChange={(value) => {

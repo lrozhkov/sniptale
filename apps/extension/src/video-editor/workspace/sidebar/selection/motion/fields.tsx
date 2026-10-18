@@ -42,7 +42,7 @@ export function MotionFocusModeField(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <SelectInput
+    <OptionButtonsField
       label={translate('videoEditor.sidebar.motionFocusLabel')}
       value={props.motionRegion.focusMode}
       onChange={(value) => handleMotionFocusModeChange(props.panel, props.motionRegion, value)}

@@ -1,5 +1,6 @@
 import {
   VideoAnnotationControlType,
+  VideoAnnotationControlBindingKind,
   createTemplateRefKey,
   createVideoAnnotationTemplateSnapshot,
   getLegacyAnnotationTemplateRefs,
@@ -14,8 +15,9 @@ import { resolveLocalizedText } from '../../../../../platform/i18n/localized-tex
 import { TextareaField, TextField } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
 import type { AnnotationFieldsSectionProps } from './field-sections';
-import { ColorField, SelectInput, ToggleField } from '../shared/controls';
+import { ColorField, ToggleField } from '../shared/controls';
 import { SliderField } from '../shared/sliders';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { createGeneratedControlCompatibilityPatch } from './generated-compatibility';
 import { getVisibleTemplateControls, resolveControlSection } from './control-sections';
 
@@ -130,6 +132,14 @@ function renderGeneratedNumberControl(args: GeneratedControlRenderArgs) {
       min={args.props.control.min ?? 0}
       max={args.props.control.max ?? 100}
       {...stepProps}
+      {...(args.props.control.binding.kind ===
+        VideoAnnotationControlBindingKind.TIMELINE_PROPERTY &&
+      args.props.control.binding.field === 'durationMs'
+        ? { formatValue: (value: number) => `${(value / 1000).toFixed(2)} s` }
+        : args.props.control.binding.kind === VideoAnnotationControlBindingKind.NODE_PROPERTY &&
+            args.props.control.binding.property === 'radius'
+          ? { formatValue: (value: number) => `${value} px` }
+          : {})}
       onChange={args.onChange}
     />
   );
@@ -137,7 +147,7 @@ function renderGeneratedNumberControl(args: GeneratedControlRenderArgs) {
 
 function renderGeneratedSelectControl(args: GeneratedControlRenderArgs) {
   return (
-    <SelectInput
+    <OptionButtonsField
       label={args.label}
       disabled={args.props.disabled}
       value={typeof args.value === 'string' ? args.value : String(args.props.control.defaultValue)}
@@ -164,7 +174,14 @@ function renderGeneratedBooleanControl(args: GeneratedControlRenderArgs) {
 function renderGeneratedTextControl(args: GeneratedControlRenderArgs) {
   const { label, onChange, props, value } = args;
   const textValue = value ?? props.control.defaultValue ?? '';
-  if (String(textValue).length > 72) {
+  const binding = props.control.binding;
+  const multiline =
+    (binding.kind === VideoAnnotationControlBindingKind.TEMPLATE_FIELD &&
+      (binding.field === 'content.headline' || binding.field === 'content.subline')) ||
+    (binding.kind === VideoAnnotationControlBindingKind.NODE_PROPERTY &&
+      binding.property === 'text') ||
+    (typeof props.control.defaultValue === 'string' && props.control.defaultValue.length > 72);
+  if (multiline) {
     return (
       <TextareaField
         disabled={props.disabled}

@@ -20,7 +20,8 @@ import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls
 import { TextField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectEffectInstancePatch } from '../../../../contracts/commands/patches';
 import { NumberInput } from '../inputs/number';
-import { ColorField, ToggleField, SelectInput } from '../shared/controls';
+import { ColorField, ToggleField } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 
 const EFFECT_ACTION_CLASS_NAME = [
   '!h-[var(--sniptale-compact-control-height,32px)]',
@@ -91,7 +92,22 @@ export function createEffectInstanceGroups(
     const snapshot = args.project.effectSnapshots?.find((item) => item.id === instance.snapshotId);
     const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
     if (!validation?.document) continue;
-    for (const section of getEffectControlSections(validation.document)) {
+    const sections = getEffectControlSections(validation.document);
+    if (
+      validation.document.objectLayout?.handles?.some(
+        (handle) => instance.sceneAnchors?.[handle.id]
+      ) &&
+      !sections.some((section) => section.id === 'geometry')
+    ) {
+      sections.push({
+        id: 'geometry',
+        semantic: 'geometry',
+        label: translate('videoEditor.effectsLibrary.objectGeometry'),
+        advanced: false,
+        controls: [],
+      });
+    }
+    for (const section of sections) {
       const id = `effect-controls-${section.id}`;
       const existing = groups.find((group) => group.id === id);
       const content = (
@@ -216,7 +232,7 @@ function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Elem
   const owner = props.instance.rangeMode === 'owner';
   return (
     <div className="sniptale-parameter-stack space-y-3">
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.effectsLibrary.fxScope')}
         disabled={props.disabled ?? false}
         value={owner ? 'owner' : 'interval'}
@@ -329,7 +345,7 @@ function EffectInstanceControls(
             </div>
           )
         )}
-      {!props.parameterSection &&
+      {(props.parameterSection === undefined || props.parameterSection === 'geometry') &&
         document.objectLayout?.handles?.map((handle) => {
           const point = props.instance.sceneAnchors?.[handle.id];
           if (!point) return null;
@@ -446,7 +462,7 @@ function EffectControl(props: {
   const sequenceOptions = getEffectSequenceOptions(props.documentId, props.control);
   if (sequenceOptions)
     return (
-      <SelectInput
+      <OptionButtonsField
         label={label}
         value={String(props.value)}
         options={sequenceOptions}

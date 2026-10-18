@@ -72,6 +72,7 @@ export function ProjectTextPhrase(props: {
         type="button"
         className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
         aria-expanded={props.expanded}
+        title={fragment.text || translate('gallery.videoReview.textFragment')}
         onClick={props.onToggle}
       >
         <ChevronDown size={14} className={props.expanded ? 'shrink-0' : '-rotate-90 shrink-0'} />

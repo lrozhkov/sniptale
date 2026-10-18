@@ -7,6 +7,7 @@ import {
   createVideoProjectAsset,
 } from '../../../../../features/video/project/factories/creation';
 import { addVideoProjectManualText } from '../../../../../features/video/project/text/authoring';
+import { createReviewCaptionSettings } from '../../../../../features/video/review/text-document';
 import { useVideoEditorStore } from '../../../../state/store';
 import { InspectProjectTextPanel } from './text';
 import {
@@ -26,7 +27,8 @@ vi.mock('../../../../../workflows/ai-settings/query', () => ({
 
 vi.mock('../../../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) =>
+    key === 'gallery.videoReview.speechBatchSelected' ? 'Selected: {count}' : key,
   useAppLocale: () => 'en',
   getCurrentLocale: () => 'en',
 }));
@@ -154,6 +156,15 @@ it('deletes only text, supports Undo and leaves an empty document for its appear
   click('gallery.videoReview.textFragmentDelete');
   expect(useVideoEditorStore.getState().project!.textDocuments![0]!.document.fragments).toEqual([]);
   expect(useVideoEditorStore.getState().project!.duration).toBe(0);
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(
+    'gallery.videoReview.textFragmentEmpty'
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.captionsEnabled"]')).not.toBeNull();
+  expect(
+    [...host.querySelectorAll<HTMLButtonElement>('button')].some(
+      (node) => node.textContent?.includes('videoEditor.sidebar.newProjectText') && !node.disabled
+    )
+  ).toBe(true);
   act(() => useVideoEditorStore.getState().undoProject());
   expect(fragment().text).toBe('Remove');
 });
@@ -247,6 +258,7 @@ it('opens exact single, batch and whole-document scopes and restores the initiat
     checks[2]!.click();
     checks[0]!.click();
   });
+  expect(host.querySelector('[role="status"]')?.textContent).toBe('Selected: 2');
   await act(async () => trigger('selected').click());
   expect(rewrite?.target).toEqual({
     documentId: 'document',
@@ -264,4 +276,27 @@ it('opens exact single, batch and whole-document scopes and restores the initiat
   await close();
   expect(document.activeElement).toBe(trigger('all'));
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('identifies document caption inheritance and retains complete phrase text on its collapsed row', () => {
+  create();
+  const phrase = 'Complete phrase '.repeat(20);
+  type(phrase);
+  act(() => host.querySelector('textarea')!.blur());
+  const header = host.querySelector<HTMLButtonElement>('article > button')!;
+  expect(header.title).toBe(phrase);
+  const style = [...host.querySelectorAll('article summary')].find((node) =>
+    node.textContent?.includes('gallery.videoReview.captionStyle')
+  )!;
+  act(() => style.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(host.querySelector('article')?.textContent).toContain(
+    'videoEditor.sidebar.captionInheritDocument'
+  );
+  expect(host.querySelector('article')?.textContent).not.toContain(
+    'gallery.videoReview.captionInherit'
+  );
+  click('videoEditor.sidebar.captionInheritDocument');
+  expect(fragment().style).toEqual(createReviewCaptionSettings().style);
+  act(() => header.click());
+  expect(host.querySelector<HTMLButtonElement>('article > button')!.title).toBe(phrase);
 });

@@ -119,11 +119,12 @@ it('builds image asset options from project assets for the shared select surface
   ]);
 });
 
-it('renders selected scene background labels through canonical inspector selects', () => {
+it('uses measured choices for background kind and keeps image resources in a dropdown', () => {
   const markup = renderToStaticMarkup(<SceneBackgroundFields {...createProps()} />);
 
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundTypeLabel');
   expect(markup).toContain('shared.ui.compact-inspector.select-field');
+  expect(markup).toContain('shared.ui.compact-inspector.segmented-field');
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundImage');
   expect(markup).toContain('videoEditor.sidebar.sceneBackgroundImageAssetLabel');
   expect(markup).toContain('Background Two');
@@ -146,9 +147,9 @@ it('keeps image kind selected after clicking image when image assets exist', asy
     kind: VideoSceneBackgroundKind.IMAGE,
     assetId: 'asset-1',
   });
-  expect(getSelectTrigger('videoEditor.sidebar.sceneBackgroundTypeLabel')?.textContent).toContain(
-    'videoEditor.sidebar.sceneBackgroundImage'
-  );
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.getAttribute('aria-pressed')
+  ).toBe('true');
 });
 
 it('offers image upload without persisting an invalid background when no assets exist', async () => {
@@ -161,27 +162,13 @@ it('offers image upload without persisting an invalid background when no assets 
     },
   });
 
-  openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
-
-  expect(getOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(false);
-  await act(async () => getOption('videoEditor.sidebar.sceneBackgroundImage')?.click());
+  expect(getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(false);
+  await act(async () => getKindOption('videoEditor.sidebar.sceneBackgroundImage')?.click());
   expect(container?.textContent).toContain('videoEditor.sidebar.sceneBackgroundImageEmpty');
 });
 
-function getSelectTrigger(label: string) {
-  return container?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
-}
-
-function openSelect(label: string) {
-  const trigger = getSelectTrigger(label);
-  expect(trigger).not.toBeNull();
-  act(() => {
-    trigger?.click();
-  });
-}
-
-function getOption(label: string) {
-  return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+function getKindOption(label: string) {
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>('[aria-pressed]') ?? []).find(
     (button) => button.textContent?.trim() === label
   );
 }
@@ -208,8 +195,7 @@ function renderBackgroundHarness(props: SceneBackgroundFieldProps) {
 }
 
 async function clickBackgroundKind(label: string) {
-  openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
-  const option = getOption(label);
+  const option = getKindOption(label);
   expect(option).not.toBeNull();
   await act(async () => {
     option?.click();

@@ -3,11 +3,13 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { exportVideoProjectSubtitles } from '../../../features/video/project/text/subtitle-export';
 import type { VideoProject } from '../../../features/video/project/types';
 import { translate } from '../../../platform/i18n';
-import { SelectField, ToggleField } from '../../../ui/compact-inspector-controls';
+import { CheckboxField, SegmentedRow, SelectField } from '../../../ui/compact-inspector-controls';
+import { InspectorDisclosureView } from '../../../ui/compact-inspector-controls/disclosure';
 import { useSubtitleExport } from '../../runtime/subtitle-export';
 
 /** Subtitle files have an explicit whole-project scope independent of video export settings. */
 export function ProjectSubtitles({ project }: { project: VideoProject }) {
+  const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<'srt' | 'vtt'>('srt');
   const [language, setLanguage] = useState('all');
   const [onlyShown, setOnlyShown] = useState(false);
@@ -32,72 +34,73 @@ export function ProjectSubtitles({ project }: { project: VideoProject }) {
     [project, format, language, onlyShown, normalizeOverlaps]
   );
   return (
-    <details
-      data-ui="video-editor.export.subtitles"
-      className="border-t border-[var(--sniptale-color-border-soft)] pt-3"
+    <InspectorDisclosureView
+      dataUi="video-editor.export.subtitles"
+      variant="structural"
+      level="section"
+      label={translate('gallery.videoReview.subtitlesTitle')}
+      open={open}
+      onOpenChange={setOpen}
+      bodyClassName="grid min-w-0 gap-2 px-2 pt-2"
     >
-      <summary className="cursor-pointer text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-        {translate('gallery.videoReview.subtitlesTitle')}
-      </summary>
-      <div className="mt-3 grid min-w-0 gap-2">
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.subtitlesScope')}:{' '}
-          {translate('videoEditor.exportDialog.scopeProjectLabel')}
+      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate('gallery.videoReview.subtitlesScope')}:{' '}
+        {translate('videoEditor.exportDialog.scopeProjectLabel')}
+      </p>
+      <SegmentedRow
+        ariaLabel={translate('gallery.videoReview.subtitlesFormat')}
+        label={translate('gallery.videoReview.subtitlesFormat')}
+        value={format}
+        onChange={setFormat}
+        options={[
+          { value: 'srt', label: translate('gallery.videoReview.subtitlesSrt') },
+          { value: 'vtt', label: translate('gallery.videoReview.subtitlesWebVtt') },
+        ]}
+      />
+      <SelectField
+        label={translate('gallery.videoReview.subtitlesLanguage')}
+        value={language}
+        onChange={setLanguage}
+        options={[
+          { value: 'all', label: translate('gallery.videoReview.subtitlesAllLanguages') },
+          ...languages.map((value) => ({
+            value: `language:${value}`,
+            label: value || translate('gallery.videoReview.subtitlesUnspecifiedLanguage'),
+          })),
+        ]}
+      />
+      <CheckboxField
+        label={translate('gallery.videoReview.subtitlesOnlyShown')}
+        value={onlyShown}
+        onChange={setOnlyShown}
+      />
+      {format === 'srt' ? (
+        <CheckboxField
+          label={translate('gallery.videoReview.subtitlesNormalize')}
+          value={normalizeOverlaps}
+          onChange={setNormalizeOverlaps}
+        />
+      ) : null}
+      <SubtitleExportFeedback result={result} format={format} />
+      {download.status !== 'idle' ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate(
+            download.status === 'started'
+              ? 'gallery.videoReview.subtitlesDownloadStarted'
+              : 'gallery.videoReview.subtitlesDownloadFailed'
+          )}
         </p>
-        <SelectField
-          label={translate('gallery.videoReview.subtitlesFormat')}
-          value={format}
-          onChange={setFormat}
-          options={[
-            { value: 'srt', label: translate('gallery.videoReview.subtitlesSrt') },
-            { value: 'vtt', label: translate('gallery.videoReview.subtitlesWebVtt') },
-          ]}
-        />
-        <SelectField
-          label={translate('gallery.videoReview.subtitlesLanguage')}
-          value={language}
-          onChange={setLanguage}
-          options={[
-            { value: 'all', label: translate('gallery.videoReview.subtitlesAllLanguages') },
-            ...languages.map((value) => ({
-              value: `language:${value}`,
-              label: value || translate('gallery.videoReview.subtitlesUnspecifiedLanguage'),
-            })),
-          ]}
-        />
-        <ToggleField
-          label={translate('gallery.videoReview.subtitlesOnlyShown')}
-          value={onlyShown}
-          onChange={setOnlyShown}
-        />
-        {format === 'srt' ? (
-          <ToggleField
-            label={translate('gallery.videoReview.subtitlesNormalize')}
-            value={normalizeOverlaps}
-            onChange={setNormalizeOverlaps}
-          />
-        ) : null}
-        <SubtitleExportFeedback result={result} format={format} />
-        {download.status !== 'idle' ? (
-          <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate(
-              download.status === 'started'
-                ? 'gallery.videoReview.subtitlesDownloadStarted'
-                : 'gallery.videoReview.subtitlesDownloadFailed'
-            )}
-          </p>
-        ) : null}
-        <ProductActionButton
-          tone="secondary"
-          disabled={!result.ok || result.count === 0}
-          onClick={() => {
-            if (result.ok) download.download(result.text, format);
-          }}
-        >
-          {translate('gallery.videoReview.subtitlesDownload')}
-        </ProductActionButton>
-      </div>
-    </details>
+      ) : null}
+      <ProductActionButton
+        tone="secondary"
+        disabled={!result.ok || result.count === 0}
+        onClick={() => {
+          if (result.ok) download.download(result.text, format);
+        }}
+      >
+        {translate('gallery.videoReview.subtitlesDownload')}
+      </ProductActionButton>
+    </InspectorDisclosureView>
   );
 }
 

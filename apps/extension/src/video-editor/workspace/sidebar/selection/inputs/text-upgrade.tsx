@@ -6,7 +6,7 @@ import type { VideoProjectAnnotationClip } from '../../../../../features/video/p
 import type { WorkspaceSidebarProps } from '../../contracts/props';
 import { getAnnotationTemplateOptions } from '../annotation/options';
 import { SelectInput } from '../shared/controls';
-import { PANEL_HEADING_CLASS_NAME, PANEL_META_CLASS_NAME } from '../shared/panel';
+import { InformationDisclosure } from '../../../../../ui/compact-inspector-controls/disclosure';
 
 export function TextTemplateUpgradeFields(props: {
   clipId: string;
@@ -24,16 +24,10 @@ export function TextTemplateUpgradeFields(props: {
   }, [props.clipId]);
 
   return (
-    <div
-      className="space-y-3 border-t
-        border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_58%,transparent)] pt-3"
-    >
-      <p className={PANEL_HEADING_CLASS_NAME}>
-        {translate('videoEditor.sidebar.textTemplateUpgradeLabel')}
-      </p>
-      <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>
-        {translate('videoEditor.sidebar.textTemplateUpgradeDescription')}
-      </p>
+    <div className="space-y-3">
+      <InformationDisclosure label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <p>{translate('videoEditor.sidebar.textTemplateUpgradeDescription')}</p>
+      </InformationDisclosure>
       <div className="sniptale-parameter-stack space-y-3">
         <SelectInput
           label={translate('videoEditor.sidebar.annotationTemplateLabel')}

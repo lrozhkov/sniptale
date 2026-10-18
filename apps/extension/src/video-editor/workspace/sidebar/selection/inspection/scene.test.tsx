@@ -193,10 +193,14 @@ function verifiesSceneBackgroundSelectLabels() {
   expect(container?.textContent).toContain('Scene Background');
   expect(
     container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.select-field"]')
-  ).toHaveLength(2);
-  expect(
-    container?.querySelector('[data-ui="shared.ui.compact-inspector.segmented-field"]')
-  ).toBeNull();
+  ).toHaveLength(1);
+  const backgroundType = container?.querySelector(
+    '[role="group"][aria-label="videoEditor.sidebar.sceneBackgroundTypeLabel"]'
+  );
+  expect(backgroundType?.querySelectorAll('button')).toHaveLength(3);
+  expect(backgroundType?.querySelector('[aria-pressed="true"]')?.textContent).toBe(
+    'videoEditor.sidebar.sceneBackgroundImage'
+  );
 }
 
 describe('workspace-sidebar/selection/inspect-scene', () => {
@@ -262,4 +266,16 @@ it('shows grid in its own section through the complete selection body', () => {
   render();
   expect(grid().textContent).toContain('videoEditor.app.gridSizeLabel');
   expect(grid().textContent).toContain('videoEditor.app.gridColorLabel');
+});
+
+it('names the scene document manager by its document scope', () => {
+  renderInspectPanel(createProps());
+  expect(
+    container!.querySelector('nav [aria-label="videoEditor.sidebar.textDocuments"]')
+  ).not.toBeNull();
+  expect(
+    container!.querySelector('nav [aria-label="gallery.videoReview.textTrackDocument"]')
+  ).toBeNull();
+  clickGroup('videoEditor.sidebar.textDocuments');
+  expect(container!.querySelector('[data-ui="video-editor.text.panel"]')).not.toBeNull();
 });

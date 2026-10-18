@@ -4,8 +4,6 @@ import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls
 
 export const PANEL_SECTION_CLASS_NAME = 'space-y-3';
 
-export const PANEL_HEADING_CLASS_NAME =
-  'text-[14px] leading-5 font-semibold text-[var(--sniptale-color-text-primary)]';
 export const PANEL_META_CLASS_NAME =
   'text-[length:var(--sniptale-compact-font-size,12px)] text-[var(--sniptale-color-text-secondary)]';
 export const PANEL_DIVIDER_CLASS_NAME =

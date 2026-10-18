@@ -18,6 +18,14 @@ export function InspectObjectTrackPanel(props: WorkspaceSidebarSelectionPanelPro
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
       <InspectorGroupedPanel groups={createObjectTrackGroups(props, objectTrack)} />
+      <InspectorActionButton
+        tone="danger"
+        separated
+        disabled={!props.onDeleteObjectTrack}
+        onClick={() => props.onDeleteObjectTrack?.(objectTrack.id)}
+      >
+        {translate('videoEditor.sidebar.objectTrackDeleteLabel')}
+      </InspectorActionButton>
     </section>
   );
 }
@@ -34,6 +42,7 @@ function createObjectTrackGroups(
       content: (
         <ObjectTrackSummaryCard
           selected
+          showDelete={false}
           track={objectTrack}
           onDeleteObjectTrack={props.onDeleteObjectTrack}
         />

@@ -72,14 +72,15 @@ it('downloads editable text independently from video export and releases URLs on
   act(() => root.unmount());
   expect(revokeUrl).toHaveBeenCalledTimes(2);
 });
-it('disables download for empty text and respects the shown-only switch without modifying the project', () => {
+it('disables download for empty text and respects the shown-only checkbox without modifying the project', () => {
   const project = fixture();
   const before = structuredClone(project);
   act(() => root.render(<ProjectSubtitles project={project} />));
-  const toggle = container.querySelector<HTMLButtonElement>(
-    '[role="switch"][aria-label="gallery.videoReview.subtitlesOnlyShown"]'
+  const toggle = container.querySelector<HTMLInputElement>(
+    'input[type="checkbox"][aria-label="gallery.videoReview.subtitlesOnlyShown"]'
   );
-  act(() => toggle?.click());
+  expect(toggle).not.toBeNull();
+  act(() => toggle!.click());
   expect(downloadButton().disabled).toBe(true);
   act(() => toggle?.click());
   expect(downloadButton().disabled).toBe(false);
@@ -98,4 +99,33 @@ it('keeps a failed download retryable', () => {
   expect(container.querySelector('[role="status"]')?.textContent).toBe(
     'gallery.videoReview.subtitlesDownloadStarted'
   );
+});
+
+it('uses structural disclosure and preserves deferred normalization across format changes', () => {
+  act(() => root.render(<ProjectSubtitles project={fixture()} />));
+  const disclosure = container.querySelector('details')!;
+  expect(disclosure.classList.contains('sniptale-disclosure')).toBe(true);
+  expect(disclosure.dataset['variant']).toBe('structural');
+  expect(disclosure.open).toBe(false);
+  const normalize = () =>
+    container.querySelector<HTMLInputElement>(
+      'input[type="checkbox"][aria-label="gallery.videoReview.subtitlesNormalize"]'
+    );
+  expect(normalize()?.checked).toBe(false);
+  act(() => normalize()!.click());
+  expect(normalize()?.checked).toBe(true);
+  expect(click).not.toHaveBeenCalled();
+  const format = container.querySelector('[aria-label="gallery.videoReview.subtitlesFormat"]')!;
+  act(() =>
+    format
+      .querySelector<HTMLButtonElement>('[title="gallery.videoReview.subtitlesWebVtt"]')!
+      .click()
+  );
+  expect(normalize()).toBeNull();
+  act(() =>
+    format.querySelector<HTMLButtonElement>('[title="gallery.videoReview.subtitlesSrt"]')!.click()
+  );
+  expect(normalize()?.checked).toBe(true);
+  expect(click).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('videoEditor.exportDialog.scopeProjectLabel');
 });

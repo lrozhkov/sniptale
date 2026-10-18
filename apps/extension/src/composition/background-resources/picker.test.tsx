@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -308,3 +309,41 @@ it('uses the opt-in policy for computer and Library and exposes acquisition erro
   await click('Custom');
   expect(io.library).toHaveBeenCalledWith('image', expect.any(AbortSignal), policy);
 });
+
+it.each(['upload', 'library'] as const)(
+  'cancels an armed Space and suppresses repeated Enter for scoped %s commands',
+  async (action) => {
+    const select = vi.fn();
+    await act(async () =>
+      root.render(
+        <CommandPressScope value={true}>
+          <BackgroundImagePicker onSelect={select} showPresets={false} />
+        </CommandPressScope>
+      )
+    );
+    const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (item) => item.textContent?.trim() === translate(`settings.editor.backgrounds.${action}`)
+    )!;
+    const key = (type: 'keydown' | 'keyup', value: string, repeat = false) => {
+      const event = new KeyboardEvent(type, {
+        key: value,
+        repeat,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => button.dispatchEvent(event));
+      return event;
+    };
+    key('keydown', ' ');
+    expect(button.dataset['pressing']).toBe('true');
+    key('keydown', 'Escape');
+    expect(button.hasAttribute('data-pressing')).toBe(false);
+    expect(key('keyup', ' ').defaultPrevented).toBe(true);
+    key('keydown', 'Enter');
+    expect(key('keydown', 'Enter', true).defaultPrevented).toBe(true);
+    key('keyup', 'Enter');
+    expect(button.hasAttribute('data-pressing')).toBe(false);
+    expect(select).not.toHaveBeenCalled();
+    expect(document.querySelector('dialog[open]')).toBeNull();
+  }
+);

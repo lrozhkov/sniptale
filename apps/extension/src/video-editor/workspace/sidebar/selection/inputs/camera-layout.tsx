@@ -6,7 +6,7 @@ import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import { formatPreciseTime } from '../../../../../composition/library-preview/time-format';
 import { Plus, Trash2, Maximize, EyeOff, Scan } from 'lucide-react';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
-import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { NumberInput } from './number';
 import type { CameraPositionEdit } from '../../../../../features/video/project/camera/animation';
 import { InspectorActionButton } from '../shared/actions';
@@ -181,7 +181,7 @@ function CameraTransitionFields(props: CameraLayoutControlsProps) {
               })
             }
           />
-          <SelectInput
+          <OptionButtonsField
             label={translate('videoEditor.sidebar.cameraTransition')}
             value={position.transition.kind}
             disabled={props.disabled}

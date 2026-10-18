@@ -66,7 +66,7 @@ for (const variant of [
         .click();
       const textCategory = () =>
         page.getByRole('button', {
-          name: label('gallery.videoReview.textTrackDocument'),
+          name: label('videoEditor.sidebar.textDocuments'),
           exact: true,
         });
       await textCategory().click();
@@ -136,7 +136,7 @@ for (const variant of [
         `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${saved.id}&theme=${variant.theme}`
       );
       await textCategory().click();
-      await panel.locator('article > button').click();
+      await panel.locator('article > button[aria-expanded]').click();
       await expect(field).toHaveValue('Montage text / Текст');
       await expect(
         panel.getByRole('switch', {

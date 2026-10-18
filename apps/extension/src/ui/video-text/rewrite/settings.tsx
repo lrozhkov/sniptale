@@ -2,7 +2,7 @@ import { LoaderCircle } from 'lucide-react';
 import type { ReviewTextContext } from '../../../contracts/ai/review-text';
 import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import { InspectorParameterRow } from '../../compact-inspector-controls/layout';
-import { ToggleField, SelectField, TextareaField } from '../../compact-inspector-controls';
+import { ToggleField, SegmentedRow, TextareaField } from '../../compact-inspector-controls';
 import { AIModelSelector } from '../../../features/ai/model-selector';
 import { translate } from '../../../platform/i18n';
 import { TextRewriteButton, TextRewriteNumberRow } from './controls';
@@ -65,7 +65,9 @@ export function TextRewriteSettings(props: {
         maxLength={4_000}
         onChange={(prompt) => patch({ prompt })}
       />
-      <SelectField
+      <SegmentedRow
+        ariaLabel={translate('gallery.videoReview.textRewriteMode')}
+        columns={2}
         label={translate('gallery.videoReview.textRewriteMode')}
         value={options.mode}
         options={[

@@ -20,7 +20,7 @@ import {
 } from '../../../../../features/video/project/annotation-engine';
 import { AnnotationTargetControls } from './target-controls';
 import { InspectorGroupedPanel } from '../grouped-inspector';
-import { AnnotationSummarySection } from './summary';
+import { AnnotationSummarySection, AnnotationResetActions } from './summary';
 import { AnnotationGeneratedControls } from './generated-controls';
 import {
   MODERN_ANNOTATION_CONTROL_SECTIONS,
@@ -69,7 +69,7 @@ function createLegacyAnnotationGroups(
       semantic: 'content' as const,
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
       defaultActive: true,
-      content: <AnnotationGeneralContent props={props} usesTargetGroup={usesTargetGroup} />,
+      content: <AnnotationSummarySection {...props} />,
     },
     createLegacyAnnotationContentGroup(props),
     {
@@ -77,7 +77,6 @@ function createLegacyAnnotationGroups(
       semantic: 'appearance' as const,
       label: translate('videoEditor.sidebar.inspectorGroupStyle'),
       content: renderAnnotationAppearanceFields(props),
-      visible: !usesTargetGroup,
     },
     {
       id: 'target',
@@ -97,6 +96,12 @@ function createLegacyAnnotationGroups(
       semantic: 'animation' as const,
       label: translate('videoEditor.sidebar.inspectorGroupMotion'),
       content: renderAnnotationMotionFields(props),
+    },
+    {
+      id: 'reset',
+      semantic: 'advanced' as const,
+      label: translate('videoEditor.sidebar.annotationRecommendedDefaultsLabel'),
+      content: <AnnotationResetActions {...props} />,
     },
   ] as const;
 }
@@ -126,9 +131,10 @@ function createModernAnnotationGroups(
     const placementTargetVisible = section === VideoAnnotationControlSection.PLACEMENT;
     return {
       id: section,
+      defaultActive: controls.length > 0 || (placementTargetVisible && usesTargetGroup),
       semantic: (
         {
-          advanced: 'appearance',
+          advanced: 'advanced',
           appearance: 'appearance',
           content: 'content',
           motion: 'animation',
@@ -149,25 +155,12 @@ function createModernAnnotationGroups(
   return [
     {
       id: 'basic',
-      semantic: 'appearance' as const,
+      semantic: 'info' as const,
       label: translate('videoEditor.sidebar.annotationInspectorSectionBasic'),
-      defaultActive: true,
       content: <ModernAnnotationSummary packLabel={packLabel} template={template} />,
     },
     ...controlGroups,
   ] as const;
-}
-
-function AnnotationGeneralContent(props: {
-  props: AnnotationFieldsSectionProps;
-  usesTargetGroup: boolean;
-}) {
-  return (
-    <>
-      <AnnotationSummarySection {...props.props} />
-      {props.usesTargetGroup ? renderAnnotationAppearanceFields(props.props) : null}
-    </>
-  );
 }
 
 function ModernAnnotationSummary(props: {

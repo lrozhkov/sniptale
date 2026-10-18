@@ -4,7 +4,7 @@ import type { VideoProject } from '../../../../../features/video/project/types/m
 import type { AudioRecognitionOptions } from '../../../../../contracts/ai/audio';
 import { AIModelSelector } from '../../../../../features/ai/model-selector';
 import { translate, formatNumber, useAppLocale } from '../../../../../platform/i18n';
-import { SelectField, TextareaField } from '../../../../../ui/compact-inspector-controls';
+import { TextareaField } from '../../../../../ui/compact-inspector-controls';
 import { InspectorParameterRow } from '../../../../../ui/compact-inspector-controls/layout';
 import {
   projectRecognitionRange,
@@ -13,6 +13,7 @@ import {
 import type { VideoProjectRecognitionController } from '../../../../runtime/session/recognition';
 import { InspectorActionButton } from '../shared/actions';
 import { NumberInput } from '../inputs/number';
+import { OptionButtonsField } from '../shared/option-buttons';
 
 interface RecognitionInspectorProps {
   project: VideoProject;
@@ -115,7 +116,7 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
             onPromptChange={setPrompt}
           />
         ) : (
-          <SelectField
+          <OptionButtonsField
             label={label('gallery.videoReview.recognitionGrouping')}
             value={grouping}
             options={[
@@ -198,7 +199,7 @@ function AudioChatSettings({
 }) {
   return (
     <>
-      <SelectField
+      <OptionButtonsField
         label={translate('gallery.videoReview.recognitionProcessingMode')}
         value={mode}
         options={[
@@ -209,7 +210,7 @@ function AudioChatSettings({
           if (value === 'transcribe' || value === 'rewrite') onModeChange(value);
         }}
       />
-      <SelectField
+      <OptionButtonsField
         label={translate('gallery.videoReview.recognitionGrouping')}
         value={granularity}
         options={[
@@ -342,7 +343,7 @@ function RecognitionProposal({ controller }: { controller: VideoProjectRecogniti
         </InspectorActionButton>
       )}
       {!proposal.receipt && (
-        <SelectField
+        <OptionButtonsField
           label={translate('gallery.videoReview.recognitionMode')}
           value={applyMode}
           disabled={controller.running || !!proposal.receipt || controller.accepted}

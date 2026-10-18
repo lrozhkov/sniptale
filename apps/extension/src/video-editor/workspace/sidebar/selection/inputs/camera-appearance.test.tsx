@@ -76,13 +76,10 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
       />
     )
   );
-  const shape = container.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.sidebar.cameraShape"]'
+  const option = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((item) =>
+    item.textContent?.includes('cameraShapeEllipse')
   )!;
-  act(() => shape.click());
-  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
-    (item) => item.textContent?.includes('cameraShapeEllipse')
-  )!;
+  expect(option.getAttribute('aria-pressed')).toBe('false');
   await act(async () => {
     option.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     await Promise.resolve();
@@ -139,5 +136,12 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   expect(
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
-  expect(shape.disabled).toBe(true);
+  const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
+  expect(shapeChoices).toHaveLength(3);
+  expect(shapeChoices.every((button) => button.disabled)).toBe(true);
+  expect(
+    shapeChoices
+      .find((button) => button.textContent?.includes('cameraShapeEllipse'))
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
 });

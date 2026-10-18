@@ -187,7 +187,7 @@ it('changes the preset, timing and behavior defaults through the shared controls
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ showKeystrokes: true });
 });
 
-it('shows the sole cursor lane display option directly under Rules', () => {
+it('keeps cursor lane display with Cursor and editable when project controls are locked', () => {
   const project = createEmptyVideoProject('Cursor display');
   project.cursorTrack = {
     ...createVideoProjectCursorTrack(),
@@ -202,6 +202,10 @@ it('shows the sole cursor lane display option directly under Rules', () => {
       },
     ],
   };
+  project.utilityLanes = {
+    actions: { visible: true, locked: true },
+    camera: { visible: true, locked: false },
+  };
   const update = vi.fn();
   trackPresentation.current = {
     panelPrefs: {
@@ -215,7 +219,7 @@ it('shows the sole cursor lane display option directly under Rules', () => {
   act(() =>
     container
       .querySelector<HTMLButtonElement>(
-        'nav button[aria-label="videoEditor.sidebar.historyRules"]'
+        'nav button[aria-label="videoEditor.sidebar.historyCursor"]'
       )!
       .click()
   );
@@ -223,6 +227,7 @@ it('shows the sole cursor lane display option directly under Rules', () => {
     '[aria-label="videoEditor.timeline.cursorLane"]'
   )!;
   expect(toggle).not.toBeNull();
+  expect(toggle.disabled).toBe(false);
   expect(toggle.closest('details')).toBeNull();
   act(() => toggle.click());
   expect(update).toHaveBeenCalledWith(false);

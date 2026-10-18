@@ -190,12 +190,33 @@ describe('workspace-sidebar/selection/inspect-core', () => {
   });
 
   it('renders text-to-template upgrade controls for manual text overlays', () => {
-    renderInspectPanel(createProps());
+    const props = createProps();
+    renderInspectPanel(props);
     clickGroup('videoEditor.sidebar.inspectorGroupStyle');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.textTemplateUpgradeAction');
+    const tabs = [...container!.querySelectorAll<HTMLButtonElement>('nav button')];
+    expect(tabs.at(-2)?.title).toBe('videoEditor.sidebar.textTemplateUpgradeLabel');
+    clickGroup('videoEditor.sidebar.textTemplateUpgradeLabel');
 
     expect(container?.textContent).toContain('videoEditor.sidebar.textTemplateUpgradeLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.textTemplateUpgradeDescription');
     expect(container?.textContent).toContain('videoEditor.sidebar.textTemplateUpgradeAction');
+    const explanation = container?.querySelector('[data-ui="shared.information-disclosure"]');
+    expect(explanation?.hasAttribute('open')).toBe(false);
+    expect(container?.querySelector('[data-section="conversion"] h4')).toBeNull();
+    const convert = [...container!.querySelectorAll('button')].find(
+      (button) => button.textContent === 'videoEditor.sidebar.textTemplateUpgradeAction'
+    )!;
+    act(() => convert.click());
+    expect(props.onConvertTextClipToAnnotation).toHaveBeenCalledExactlyOnceWith(
+      props.selectedClip!.id,
+      'LOWER_THIRD_BASIC'
+    );
+    props.project.tracks = props.project.tracks.map((track) => ({ ...track, locked: true }));
+    renderInspectPanel({ ...props });
+    expect(convert.disabled).toBe(true);
+    act(() => convert.click());
+    expect(props.onConvertTextClipToAnnotation).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces the locked-track state from the selected clip track when no track is selected', () => {

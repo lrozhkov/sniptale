@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useContext, useRef } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { FolderOpen, Globe, LoaderCircle } from 'lucide-react';
 import type { WindowHeader } from '../../features/browser-frame/header';
 import { translate } from '../../platform/i18n';
@@ -24,7 +25,14 @@ export function WindowHeaderIconControls(props: {
   onFile(file: File): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const scoped = useContext(CommandPressScope);
   const fileActive = props.header.faviconEnabled && props.header.faviconSource === 'file';
+  const websitePress = useCommandPress({ enabled: scoped, onClick: props.onWebsite });
+  const filePress = useCommandPress({
+    enabled: scoped,
+    disabled: props.busy === 'file',
+    onClick: () => (fileActive ? props.onClearFile() : input.current?.click()),
+  });
   return (
     <>
       <button
@@ -33,13 +41,17 @@ export function WindowHeaderIconControls(props: {
         aria-label={translate('windowHeader.favicon')}
         title={translate(props.busy === 'site' ? 'windowHeader.loading' : 'windowHeader.favicon')}
         aria-pressed={props.header.faviconEnabled && !fileActive}
-        onClick={props.onWebsite}
+        {...websitePress.props}
+        data-command-press={scoped ? '' : undefined}
+        data-pressing={websitePress.pressed ? 'true' : undefined}
       >
-        {props.busy === 'site' ? (
-          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-        ) : (
-          <Globe size={16} aria-hidden="true" />
-        )}
+        <span className={scoped ? 'sniptale-command-content' : 'contents'}>
+          {props.busy === 'site' ? (
+            <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Globe size={16} aria-hidden="true" />
+          )}
+        </span>
       </button>
       <button
         type="button"
@@ -54,13 +66,17 @@ export function WindowHeaderIconControls(props: {
         )}
         aria-pressed={fileActive}
         disabled={props.busy === 'file'}
-        onClick={() => (fileActive ? props.onClearFile() : input.current?.click())}
+        {...filePress.props}
+        data-command-press={scoped ? '' : undefined}
+        data-pressing={filePress.pressed ? 'true' : undefined}
       >
-        {props.busy === 'file' ? (
-          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-        ) : (
-          <FolderOpen size={16} aria-hidden="true" />
-        )}
+        <span className={scoped ? 'sniptale-command-content' : 'contents'}>
+          {props.busy === 'file' ? (
+            <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <FolderOpen size={16} aria-hidden="true" />
+          )}
+        </span>
       </button>
       <input
         ref={input}

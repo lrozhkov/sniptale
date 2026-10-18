@@ -4,10 +4,10 @@ import { VideoExportSizeHint } from '../../../ui/video-export/size-estimate';
 import { estimateProjectExportSize } from '../estimate-size';
 import type { VideoProject } from '../../../features/video/project/types';
 import React, { useEffect, useRef } from 'react';
-import { Download, FileOutput } from 'lucide-react';
+import { FileOutput } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { OptionRow } from '../../../ui/compact-inspector-controls';
+import { CheckboxField } from '../../../ui/compact-inspector-controls';
 import { VideoExportFormat } from '../../../features/video/project/types';
 import type {
   VideoExportCapabilities,
@@ -61,34 +61,6 @@ function ExportDialogHintCard(props: {
   );
 }
 
-function ExportDialogBooleanToggle({
-  checked,
-  icon,
-  label,
-  onClick,
-}: {
-  checked: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <OptionRow
-      active={checked}
-      label={
-        <span
-          className="inline-flex min-w-0 items-center gap-2 text-[13px] leading-[18px] font-medium
-            text-[var(--sniptale-color-text-primary)]"
-        >
-          {icon}
-          {label}
-        </span>
-      }
-      onToggle={onClick}
-    />
-  );
-}
-
 function ExportDialogDownloadToggle({
   settings,
   onChange,
@@ -97,11 +69,10 @@ function ExportDialogDownloadToggle({
   onChange: (patch: VideoProjectExportSettingsPatch) => void;
 }) {
   return (
-    <ExportDialogBooleanToggle
-      checked={settings.downloadAfterExport}
-      icon={<Download size={16} strokeWidth={2} />}
+    <CheckboxField
+      value={settings.downloadAfterExport}
       label={translate('videoEditor.exportDialog.downloadAfterExport')}
-      onClick={() => onChange({ downloadAfterExport: !settings.downloadAfterExport })}
+      onChange={(downloadAfterExport) => onChange({ downloadAfterExport })}
     />
   );
 }

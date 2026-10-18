@@ -81,15 +81,22 @@ it('edits each visual property without dropping the other authored values', asyn
       ['videoEditor.sidebar.keyFont', 'videoEditor.sidebar.keyMono', { fontFamily: 'monospace' }],
       ['videoEditor.sidebar.keyEntrance', 'videoEditor.sidebar.keySlide', { entrance: 'slide' }],
     ] as const) {
-      await act(async () =>
-        container
-          .querySelector<HTMLButtonElement>(`button[aria-label="${translate(label)}"]`)!
-          .click()
-      );
-      const target = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
-        (el) => el.textContent?.includes(translate(option))
-      )!;
-      await act(async () => target.click());
+      const segment = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')
+      ).find((button) => button.textContent?.includes(translate(option)));
+      if (segment) {
+        await act(async () => segment.click());
+      } else {
+        await act(async () =>
+          container
+            .querySelector<HTMLButtonElement>(`button[aria-label="${translate(label)}"]`)!
+            .click()
+        );
+        const target = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+          (el) => el.textContent?.includes(translate(option))
+        )!;
+        await act(async () => target.click());
+      }
       expect(onKey).toHaveBeenLastCalledWith({ ...keyStyle, ...patch });
     }
   } finally {

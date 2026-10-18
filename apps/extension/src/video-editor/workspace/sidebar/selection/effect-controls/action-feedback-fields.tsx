@@ -20,7 +20,8 @@ import {
   REVIEW_CLICK_DEFAULT,
   type ReviewClickStyle,
 } from '../../../../../features/video/review/advanced/click-animation';
-import { SelectInput, ToggleField } from '../shared/controls';
+import { ToggleField } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 
 /** Local inspector adapter sends one authored update to the established project history port. */
 interface FeedbackProps {
@@ -30,6 +31,7 @@ interface FeedbackProps {
   target: ReviewActionAudioTarget;
   disabled: boolean;
   gesture?: boolean;
+  part?: 'sound' | 'gesture';
 }
 
 export function ActionFeedbackFields(props: FeedbackProps) {
@@ -110,9 +112,18 @@ export function ActionFeedbackFields(props: FeedbackProps) {
       className="sniptale-parameter-stack min-w-0 space-y-2"
       data-ui="video-editor.action-feedback-fields"
     >
-      <FeedbackSoundFields style={style} target={props.target} preset={preset} change={change} />
-      <FeedbackAttackFields style={style} target={props.target} change={change} />
-      {props.gesture ? (
+      {props.part !== 'gesture' ? (
+        <>
+          <FeedbackSoundFields
+            style={style}
+            target={props.target}
+            preset={preset}
+            change={change}
+          />
+          <FeedbackAttackFields style={style} target={props.target} change={change} />
+        </>
+      ) : null}
+      {props.gesture && props.part !== 'sound' ? (
         <FeedbackGestureFields gestureStyle={gestureStyle} changeGesture={changeGesture} />
       ) : null}
     </fieldset>
@@ -162,7 +173,7 @@ function FeedbackSoundFields({
           )
         }
       />
-      <SelectInput
+      <OptionButtonsField
         label={translate('gallery.videoReview.actionAudio')}
         value={style.presetId ?? 'none'}
         options={[
@@ -289,7 +300,7 @@ function FeedbackGestureFields({
         checked={gestureStyle.effect !== 'off'}
         onChange={(enabled) => changeGesture({ effect: enabled ? 'press' : 'off' })}
       />
-      <SelectInput
+      <OptionButtonsField
         label={translate('gallery.videoReview.gestureAppearance')}
         value={gestureStyle.gestureAppearance ?? 'halo'}
         options={(['halo', 'path', 'area'] as const).map((value) => ({
@@ -311,7 +322,6 @@ function FeedbackGestureFields({
                 key={key}
                 appearance="plain"
                 focusAppearance="accent-box"
-                className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
                 label={translate(`gallery.videoReview.gestureArea_${key}`)}
                 value={area[key] * 100}
                 min={min}

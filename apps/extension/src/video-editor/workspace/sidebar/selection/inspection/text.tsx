@@ -27,20 +27,7 @@ export function InspectProjectTextPanel({
   const [limit, setLimit] = useState(50);
   const [batch, setBatch] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
-  const surface = useRef<HTMLDivElement>(null);
-  const trigger = useRef('all');
-  const restoreFocus = useRef(false);
-  useEffect(() => {
-    if (rewrite?.target || !restoreFocus.current) return;
-    restoreFocus.current = false;
-    const buttons = [
-      ...(surface.current?.querySelectorAll<HTMLElement>('[data-project-text-rewrite]') ?? []),
-    ];
-    (
-      buttons.find((button) => button.dataset['projectTextRewrite'] === trigger.current) ??
-      buttons[0]
-    )?.focus();
-  }, [rewrite?.target]);
+  const focus = useTextRewriteFocus(rewrite?.target);
   const documents = project.textDocuments ?? [];
   const entry = documents.find((item) => item.id === choice) ?? documents[0];
   const selectedIds =
@@ -50,7 +37,7 @@ export function InspectProjectTextPanel({
   const openRewrite = (ids: string[], wholeDocument: boolean, source: string) => {
     if (!entry || !rewrite || rewrite.running) return;
     editor.endTyping();
-    trigger.current = source;
+    focus.rememberTrigger(source);
     rewrite.open(entry.id, ids, wholeDocument);
   };
   const targetEntry = documents.find((document) => document.id === rewrite?.target?.documentId);
@@ -73,7 +60,7 @@ export function InspectProjectTextPanel({
     }
   };
   return (
-    <div ref={surface} data-ui="video-editor.text.panel" className="min-w-0 space-y-3 pe-2">
+    <div ref={focus.surface} data-ui="video-editor.text.panel" className="min-w-0 space-y-3 pe-2">
       {rewrite?.target ? (
         <ProjectTextRewritePanel
           project={project}
@@ -84,7 +71,7 @@ export function InspectProjectTextPanel({
               : translate('videoEditor.sidebar.textDocumentChoice')
           }
           onClose={() => {
-            restoreFocus.current = true;
+            focus.requestRestore();
             rewrite.close();
           }}
         />
@@ -118,6 +105,11 @@ export function InspectProjectTextPanel({
                   onRewrite={openRewrite}
                 />
               ) : null}
+              {!entry.document.fragments.length && (
+                <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+                  {translate('gallery.videoReview.textFragmentEmpty')}
+                </p>
+              )}
               {entry.document.fragments.slice(0, limit).map((fragment, index) => (
                 <ProjectTextPhrase
                   key={JSON.stringify([entry.id, fragment.id])}
@@ -200,7 +192,7 @@ function TextRewriteCommands(props: {
   onRewrite(ids: string[], wholeDocument: boolean, source: string): void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       <InspectorActionButton
         data-project-text-rewrite="all"
         disabled={!props.ids.length}
@@ -219,6 +211,12 @@ function TextRewriteCommands(props: {
       </InspectorActionButton>
       {props.batch ? (
         <>
+          <span role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.videoReview.speechBatchSelected').replace(
+              '{count}',
+              String(props.selectedIds.length)
+            )}
+          </span>
           <InspectorActionButton onClick={() => props.onSelectedChange(props.ids)}>
             {translate('gallery.videoReview.textFragmentSelectFound')}
           </InspectorActionButton>
@@ -246,4 +244,31 @@ function documentLabel(project: VideoProject, entry: VideoProjectTextDocument, i
           (asset) => entry.binding.kind === 'source' && asset.id === entry.binding.assetId
         )?.name ?? translate('gallery.videoReview.textFragmentOriginal'));
   return `${label} · ${index + 1}`;
+}
+
+/** Restores the invoking phrase command when the rewrite inspector closes. */
+function useTextRewriteFocus(target: VideoProjectTextRewriteController['target'] | undefined) {
+  const surface = useRef<HTMLDivElement>(null);
+  const trigger = useRef('all');
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (target || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    const buttons = [
+      ...(surface.current?.querySelectorAll<HTMLElement>('[data-project-text-rewrite]') ?? []),
+    ];
+    (
+      buttons.find((button) => button.dataset['projectTextRewrite'] === trigger.current) ??
+      buttons[0]
+    )?.focus();
+  }, [target]);
+  return {
+    surface,
+    rememberTrigger(source: string) {
+      trigger.current = source;
+    },
+    requestRestore() {
+      restoreFocus.current = true;
+    },
+  };
 }

@@ -93,7 +93,7 @@ export function FragmentCaptions({
           label={translate('gallery.videoReview.captionStyle')}
         >
           <ToggleField
-            label={translate('gallery.videoReview.captionInherit')}
+            label={translate('videoEditor.sidebar.captionInheritDocument')}
             value={!fragment.style}
             onChange={() => change({ style: fragment.style ? null : { ...settings.style } })}
           />

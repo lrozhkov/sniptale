@@ -1,4 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
+import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import {
   areProjectClipsEditable,
@@ -42,6 +43,7 @@ export function ClipSourceRangeControls(props: SourceRangeProps) {
 }
 
 function SourceBoundaryField(props: SourceRangeProps & { edge: Edge; disabled: boolean }) {
+  const inspector = useInspectorLayout();
   const value = sourceBoundary(props.clip, props.edge);
   const normalizeValue = (requested: number) => {
     if (!Number.isFinite(requested)) return value;
@@ -62,7 +64,7 @@ function SourceBoundaryField(props: SourceRangeProps & { edge: Edge; disabled: b
   return (
     <NumericRow
       appearance="plain"
-      className="py-0! grid-cols-[minmax(0,1fr)_auto]!"
+      {...(inspector ? {} : { className: 'py-0! grid-cols-[minmax(0,1fr)_auto]!' })}
       label={translate(
         props.edge === 'start' ? 'videoEditor.sidebar.sourceIn' : 'videoEditor.sidebar.sourceOut'
       )}

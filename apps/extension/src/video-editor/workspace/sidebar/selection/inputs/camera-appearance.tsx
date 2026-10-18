@@ -14,7 +14,7 @@ import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/select
 import type { VideoProjectVideoClip } from '../../../../../features/video/project/types';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import { translate } from '../../../../../platform/i18n';
-import { SelectInput } from '../shared/controls';
+import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 import { CameraCropPreview } from './camera-crop-preview';
 
@@ -35,7 +35,7 @@ export function CameraAppearanceControls(props: {
     props.onEdit?.(props.clip.id, { kind: 'appearance', appearance });
   return (
     <div className="sniptale-parameter-stack space-y-2" data-ui="video-editor.camera-appearance">
-      <SelectInput
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.cameraShape')}
         value={value.shape}
         disabled={disabled}

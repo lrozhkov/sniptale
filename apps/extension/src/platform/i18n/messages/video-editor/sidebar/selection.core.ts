@@ -3,6 +3,9 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  textDocuments: { ru: 'Текстовые документы', en: 'Text documents' },
+  captionInheritDocument: { ru: 'Стиль документа', en: 'Use document style' },
+  textRewriteScopeDetails: { ru: 'Размещение текста и запрос', en: 'Text placement and request' },
   cameraLayoutCustom: { ru: 'Произвольное вписывание', en: 'Custom fit' },
   cameraShape: { ru: 'Форма', en: 'Shape' },
   cameraShapeRounded: { ru: 'Прямоугольник', en: 'Rectangle' },

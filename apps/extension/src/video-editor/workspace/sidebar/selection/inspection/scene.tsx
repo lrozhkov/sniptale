@@ -70,7 +70,7 @@ function createSceneGroups(
     {
       id: 'text',
       semantic: 'content' as const,
-      label: translate('gallery.videoReview.textTrackDocument'),
+      label: translate('videoEditor.sidebar.textDocuments'),
       content: (
         <InspectProjectTextPanel
           key={props.project.id}

@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -156,12 +157,13 @@ async function checkFullTextRewrite(
   await form
     .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
     .fill('Перепиши весь сценарий');
-  await form
-    .getByRole('button', { name: label('gallery.videoReview.textRewriteMode'), exact: true })
-    .click();
-  await page
-    .getByRole('option', { name: label('gallery.videoReview.textRewriteScript'), exact: true })
-    .click();
+  await chooseInspectorValue(
+    page,
+    form,
+    label('gallery.videoReview.textRewriteMode'),
+    label('gallery.videoReview.textRewriteScript')
+  );
+
   await expect(
     form.getByRole('switch', {
       name: label('gallery.videoReview.textRewriteStructure'),

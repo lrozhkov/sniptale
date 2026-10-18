@@ -134,8 +134,22 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
             id: 'cursor',
             semantic: 'tracking',
             label: translate('videoEditor.sidebar.historyCursor'),
-            visible: !!props.project.cursorTrack && !!props.onUpdateCursorSkin,
-            content: <HistoryCursorSettings props={props} disabled={disabled} />,
+            visible:
+              !!props.project.cursorTrack &&
+              (!!props.onUpdateCursorSkin ||
+                (!!props.project.cursorTrack.samples.length && !!trackPresentation)),
+            content: (
+              <>
+                <HistoryCursorSettings props={props} disabled={disabled} />
+                {props.project.cursorTrack?.samples.length && trackPresentation ? (
+                  <ToggleField
+                    label={translate('videoEditor.timeline.cursorLane')}
+                    checked={trackPresentation.panelPrefs.prefs.collapsedCursorLaneVisible}
+                    onChange={trackPresentation.panelPrefs.setCollapsedCursorLaneVisible}
+                  />
+                ) : null}
+              </>
+            ),
           },
           {
             id: 'behavior',
@@ -153,13 +167,6 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                   onChange={(clickSuppressionInterval) => update({ clickSuppressionInterval })}
                   formatValue={(value) => `${value.toFixed(2)} s`}
                 />
-                {props.project.cursorTrack?.samples.length && trackPresentation ? (
-                  <ToggleField
-                    label={translate('videoEditor.timeline.cursorLane')}
-                    checked={trackPresentation.panelPrefs.prefs.collapsedCursorLaneVisible}
-                    onChange={trackPresentation.panelPrefs.setCollapsedCursorLaneVisible}
-                  />
-                ) : null}
               </>
             ),
           },
