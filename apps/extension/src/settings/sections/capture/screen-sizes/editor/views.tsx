@@ -1,6 +1,12 @@
 import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { SettingsControlRow } from '../../../../section-surface';
-import { useRef, type Dispatch, type FormEvent, type SetStateAction } from 'react';
+import {
+  useRef,
+  type CSSProperties,
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+} from 'react';
 
 import { translate } from '../../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../../contracts/settings';
@@ -45,6 +51,15 @@ function ViewportPresetNameField(props: {
   );
 }
 
+const dimensionInputStyle: CSSProperties = {
+  MozAppearance: 'textfield',
+  WebkitAppearance: 'none',
+  marginInlineStart: 'auto',
+  maxWidth: 96,
+  textAlign: 'right',
+  display: 'block',
+};
+
 function ViewportPresetDimensionFields(props: {
   disabled: boolean;
   height: number;
@@ -70,14 +85,7 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{
-              MozAppearance: 'textfield',
-              WebkitAppearance: 'none',
-              marginInlineStart: 'auto',
-              maxWidth: 96,
-              textAlign: 'right',
-              display: 'block',
-            }}
+            style={dimensionInputStyle}
           />
         </SettingsControlRow>
       </div>
@@ -100,14 +108,7 @@ function ViewportPresetDimensionFields(props: {
             max={maxViewportPresetDimension}
             required
             disabled={props.disabled}
-            style={{
-              MozAppearance: 'textfield',
-              WebkitAppearance: 'none',
-              marginInlineStart: 'auto',
-              maxWidth: 96,
-              textAlign: 'right',
-              display: 'block',
-            }}
+            style={dimensionInputStyle}
           />
         </SettingsControlRow>
       </div>

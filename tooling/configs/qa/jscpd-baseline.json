@@ -76,6 +76,42 @@
       }
     },
     {
+      "id": "0453e3bf4d36765459f0751aaf6e376595a25b7c34a40aea89c9da81e5bf9345",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-profile.tsx",
+      "reason": "Same audio format literals update distinct authoritative review profile and provider model parameters.",
+      "removalCondition": "Remove when a common audio-format field contract replaces both or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-profile.tsx",
+        "start": 102,
+        "end": 110
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/ai/connections/forms/model-audio-fields.tsx",
+        "start": 213,
+        "end": 221
+      }
+    },
+    {
+      "id": "04fedfa75986e5a0b1ceb9c8f7c4975e114ed313250e374d21368ff91c75452e",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 83,
+        "end": 89
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/product-form-controls/select.css",
+        "start": 226,
+        "end": 232
+      }
+    },
+    {
       "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/selection/frame-settings-popover",
@@ -91,24 +127,6 @@
         "path": "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "start": 230,
         "end": 235
-      }
-    },
-    {
-      "id": "0c14fe2da06f2e3a5094f476d9cd0c3f905e43a6ca636aa17c6b3e06968758ec",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/inspector.css",
-      "reason": "Lexical span crosses unrelated declaration tails and a utility-layer comment; subsequent selectors differ.",
-      "removalCondition": "Remove when exact span disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/inspector.css",
-        "start": 75,
-        "end": 80
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 235,
-        "end": 240
       }
     },
     {
@@ -130,6 +148,24 @@
       }
     },
     {
+      "id": "0f3bff39dedf95bcf4fa03259d197838e2dbaca124dcc4a2cefe2e9065082bae",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 485,
+        "end": 499
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 668,
+        "end": 682
+      }
+    },
+    {
       "id": "0f555468acf5ac5645a587f9637483ed52affca248d9136b312da961f77368f9",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
@@ -145,6 +181,24 @@
         "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
         "start": 274,
         "end": 279
+      }
+    },
+    {
+      "id": "1242e198fb92247d95263d9df9c2f30e68e03f9eed7160103afbe92c5a7d4cf4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 485,
+        "end": 499
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 508,
+        "end": 522
       }
     },
     {
@@ -184,6 +238,24 @@
       }
     },
     {
+      "id": "1a6482b986fc4d0f922fef4ae1480ba152bb6923c59a1e645a62b4229533a645",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+        "start": 189,
+        "end": 201
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+        "start": 363,
+        "end": 375
+      }
+    },
+    {
       "id": "1a8db46787df4d2a9bd069f51bc9732310c066d503be16f4283cc97bd4af72f5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts <-> apps/extension/src/features/web-snapshot/sanitize-css.ts",
@@ -199,6 +271,24 @@
         "path": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
         "start": 483,
         "end": 490
+      }
+    },
+    {
+      "id": "1c5506d526babef59c3477ca3e0dbef4d0b5035d735361bfcdb77b1e70585290",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/inspector.css",
+      "reason": "Lexical span crosses unrelated declaration tails and a utility-layer comment; subsequent selectors differ.",
+      "removalCondition": "Remove when exact span disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/inspector.css",
+        "start": 75,
+        "end": 80
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 239,
+        "end": 244
       }
     },
     {
@@ -454,6 +544,24 @@
       }
     },
     {
+      "id": "31ecf6ba099c49ab291f42da9969a548bc98683d069b62d85578f3030cec1a2e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Transition and focus-visible outline intentionally target the same guide control set under distinct states.",
+      "removalCondition": "Remove when control/state policy changes.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1847,
+        "end": 1858
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1887,
+        "end": 1898
+      }
+    },
+    {
       "id": "323fe2b0ff9da3c7b8b7173b270749b773de7db29921c11cf99ffd12498f1710",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence",
@@ -469,6 +577,24 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/catalog.ts",
         "start": 177,
         "end": 185
+      }
+    },
+    {
+      "id": "33b5e370fd3b69c97d6d29d17abbd428f49d486f3eeb3f3b289b868eb17894d6",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
+      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 573,
+        "end": 578
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 649,
+        "end": 654
       }
     },
     {
@@ -508,24 +634,6 @@
       }
     },
     {
-      "id": "39a83f53f975bfd1cba16fff050bd7a0984c3391c599dfc229e1beb19a51cdd9",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 483,
-        "end": 497
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 506,
-        "end": 520
-      }
-    },
-    {
       "id": "3a67daefe8aff6c92f9cef8dfde2a2196870b696efceca19e24654e713c8e282",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence",
@@ -559,6 +667,24 @@
         "path": "apps/extension/src/gallery/video-review/presentation-library.tsx",
         "start": 76,
         "end": 88
+      }
+    },
+    {
+      "id": "3d9a804e217ca33ad65482ab32c299053a07f53d0cb5f27539048c69b942e2e0",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+      "reason": "The checked-state selector targets two different CSS subjects: the switch track pseudo-element and its thumb descendant. The declarations set background and transform separately. Sharing this selector would require a new selector abstraction without a shared operation.",
+      "removalCondition": "Remove if the switch track and thumb no longer require separate checked-state rules, or if this exact pair disappears.",
+      "reviewBy": "2027-04-18",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 628,
+        "end": 635
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 655,
+        "end": 663
       }
     },
     {
@@ -652,24 +778,6 @@
       }
     },
     {
-      "id": "44de2efd005d61ac4c97550a316d3b658825bb749689ccc889e8726fe9101ef5",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
-      "reason": "Footer match ends at save validation: gradient-kind versus canonical CSS validity. Shared modal/action shell already exists.",
-      "removalCondition": "Remove when validation/footer contracts converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
-        "start": 95,
-        "end": 105
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
-        "start": 104,
-        "end": 114
-      }
-    },
-    {
       "id": "4524502da46e7f938ed7c4edd587a85649e79fa5731a5840782c9af80a91d21c",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
@@ -685,6 +793,24 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 848,
         "end": 852
+      }
+    },
+    {
+      "id": "46e6ca8c02438ba96de0416fdeed689f56c883ea37157beb13d533091e82bb4d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+      "reason": "Common artifact finalization is already shared. Recorder and live producers retain distinct stop, drain and failure-cleanup state machines.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 165,
+        "end": 179
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 433,
+        "end": 447
       }
     },
     {
@@ -1012,42 +1138,6 @@
       }
     },
     {
-      "id": "6104de5773b27177c8bb2adc799e832dba49a29b99847cd9b59895c62f890253",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Same guide control set receives paper-derived base variables and a narrower neutral interaction state.",
-      "removalCondition": "Remove when state policy or selector set changes.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1986,
-        "end": 1996
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 2010,
-        "end": 2020
-      }
-    },
-    {
-      "id": "62924988c55f50b57d521768893debbb11fdce7ef3fe103d6078cee42b870447",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Same guide control set receives transition policy on controls and sizing on direct SVG descendants.",
-      "removalCondition": "Remove when control/icon styling contracts change.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1853
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1895,
-        "end": 1906
-      }
-    },
-    {
       "id": "633782ebf4a500f9c1ce0b76b6a39d58ee1619d395b17206b3a966718c56c05f",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar/transient",
@@ -1282,24 +1372,6 @@
       }
     },
     {
-      "id": "7276c3d5bb19d0b41fb2bb23aa290a90a066e5c98fccbd0547bc8b94bb24c530",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 483,
-        "end": 497
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 735,
-        "end": 749
-      }
-    },
-    {
       "id": "7365fb62b4a7db9ae4ccf21488d0d18019c41bca8a5510f7d6324648f9513fbd",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/public/preparation-surface/effects.css",
@@ -1387,6 +1459,24 @@
         "path": "packages/ui/src/styles/ai-modal-content/fields.css",
         "start": 45,
         "end": 52
+      }
+    },
+    {
+      "id": "7a0743f3386302e3472324866b06cab91508a1c254df95c19cbde9449842c236",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 485,
+        "end": 499
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 737,
+        "end": 751
       }
     },
     {
@@ -1948,21 +2038,21 @@
       }
     },
     {
-      "id": "9d1b78634a7028e290fc4f2657217025beed2590c39b970591717d98956056c6",
+      "id": "9cf90e1fb4ad1cb5b4c175a59cdb4c7ac657076e59e39088ac39829ddbdd2294",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-      "reason": "Common artifact finalization is already shared. Recorder and live producers retain distinct stop, drain and failure-cleanup state machines.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Base transition includes voice controls; hover excludes them and adds disabled/pressed conditions.",
+      "removalCondition": "Remove when interaction sets converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 156,
-        "end": 170
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1847,
+        "end": 1856
       },
       "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 433,
-        "end": 447
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1861,
+        "end": 1870
       }
     },
     {
@@ -1981,6 +2071,24 @@
         "path": "packages/ui/src/styles/glass/popover-controls.css",
         "start": 179,
         "end": 189
+      }
+    },
+    {
+      "id": "9eb945afe9534dede59ca26c1e343fbd44cf3841e617277f6f6eb30c0514991a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 485,
+        "end": 499
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 691,
+        "end": 705
       }
     },
     {
@@ -2017,6 +2125,24 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
         "start": 40,
         "end": 46
+      }
+    },
+    {
+      "id": "a4465bf5d648c0a4962fb4af26df049ea28d57d3543996dac74d72d82d3a8bbf",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
+      "reason": "Both producer factories pass typed artifact identity metadata to the existing staging coordinator. MediaRecorder construction and live encoder admission have different setup and abort paths. Another forwarding helper would not own either producer lifetime.",
+      "removalCondition": "Remove if producer setup acquires one common owner, or if this exact metadata-forwarding pair disappears.",
+      "reviewBy": "2027-04-18",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session.ts",
+        "start": 22,
+        "end": 29
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session.ts",
+        "start": 32,
+        "end": 39
       }
     },
     {
@@ -2128,39 +2254,21 @@
       }
     },
     {
-      "id": "aa373fe52c056ffe3d03027154d8029c25f8698443fec4a48fdd3e96f9bc36a5",
+      "id": "aa02f19fbf7bb02dd6e0253fe0ac7c4a428ec52f4923335a28b55187b906469e",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Transition and focus-visible outline intentionally target the same guide control set under distinct states.",
-      "removalCondition": "Remove when control/state policy changes.",
-      "reviewBy": "2027-09-01",
+      "owner": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+      "reason": "The base thumb selector and its reduced-motion override intentionally address the same controls in different media contexts. The base rule positions and animates the thumb; the accessibility override disables its transition.",
+      "removalCondition": "Remove if reduced-motion handling moves to the base transition contract, or if this exact selector pair disappears.",
+      "reviewBy": "2027-04-18",
       "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1853
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 638,
+        "end": 644
       },
       "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1882,
-        "end": 1893
-      }
-    },
-    {
-      "id": "ab691fb281a7e0cbca92d8c557925c8cd1551462a9fbff8f33693eba88d63a23",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 483,
-        "end": 497
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 712,
-        "end": 726
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 667,
+        "end": 673
       }
     },
     {
@@ -2236,24 +2344,6 @@
       }
     },
     {
-      "id": "b328545de72d4cd93626e4bae0509fd64dcacc5eb857b66cbfe4ab47841f381e",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Base transition includes voice controls; hover excludes them and adds disabled/pressed conditions.",
-      "removalCondition": "Remove when interaction sets converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1842,
-        "end": 1851
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1856,
-        "end": 1865
-      }
-    },
-    {
       "id": "b43c315f07b3cd57a4c3af24029e8425493d4009ac3ab649ebe02381e506163e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/product-form-controls/range.css",
@@ -2323,42 +2413,6 @@
         "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
         "start": 84,
         "end": 89
-      }
-    },
-    {
-      "id": "b9b39856be7aa29f1b9fb2311db9b7ecd581ddae0046513be454f20e9083f355",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 483,
-        "end": 497
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 689,
-        "end": 703
-      }
-    },
-    {
-      "id": "bab4a2a1382227067a36ad0e3e3397c7eb98535361cb16de0203c5b4705df974",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-      "reason": "Recorder inactivity and live starting admission belong to different producer state machines. Existing shared finalization does not own those stop gates.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
-        "start": 92,
-        "end": 97
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
-        "start": 348,
-        "end": 353
       }
     },
     {
@@ -2452,6 +2506,24 @@
       }
     },
     {
+      "id": "c8c481f41eb886d004bb60141a4b77fe65fba17cb3b860ff602c3dc7f1087860",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Same guide control set receives transition policy on controls and sizing on direct SVG descendants.",
+      "removalCondition": "Remove when control/icon styling contracts change.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1847,
+        "end": 1858
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1900,
+        "end": 1911
+      }
+    },
+    {
       "id": "c9aa6b1897a30ba3c9dfaa5ceaaaa02f42889db72cbf1c8cbde579176e8bcf82",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
@@ -2467,24 +2539,6 @@
         "path": "apps/extension/src/video-editor/preview/stage/point-overlay/cursor-path.tsx",
         "start": 358,
         "end": 371
-      }
-    },
-    {
-      "id": "c9f8390d43f84d08795dc494314d1a9f4eb855ec6aaa9141cf2c327dc4562b3b",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
-      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 564,
-        "end": 569
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 640,
-        "end": 645
       }
     },
     {
@@ -2614,21 +2668,21 @@
       }
     },
     {
-      "id": "cf103a84c4454aeed067403209c1427fae723b4a7cd5615408f1873b8b9e9880",
+      "id": "d0732d4516cdac90de77a0dddb6f0c2a769e119b3386ce4a231d74387cfbeddf",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
-      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Same guide control set receives paper-derived base variables and a narrower neutral interaction state.",
+      "removalCondition": "Remove when state policy or selector set changes.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
-        "start": 189,
-        "end": 201
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1991,
+        "end": 2001
       },
       "secondFile": {
-        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
-        "start": 347,
-        "end": 359
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 2015,
+        "end": 2025
       }
     },
     {
@@ -2701,6 +2755,24 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
         "start": 115,
         "end": 126
+      }
+    },
+    {
+      "id": "d9c6830adb29352cb800a5c36a79682db6fdab498085ecee914e713c93b5b770",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 485,
+        "end": 499
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 714,
+        "end": 728
       }
     },
     {
@@ -2848,42 +2920,6 @@
       }
     },
     {
-      "id": "e7ba45c0cf9a6d4caa57b358452e756d8cdc4ebccf82d9c45d7ea80f85916dc7",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/content-popover/index.css",
-        "start": 83,
-        "end": 89
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/product-form-controls/select.css",
-        "start": 217,
-        "end": 223
-      }
-    },
-    {
-      "id": "ea5e32fdd67cb0e59adf490dbcc6154a256b2ccf2a48a1e517a223ac3f4e003f",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-      "reason": "Historical migration records preserve separate database and domain versions with version-specific diagnostics. Their required-store and no-op declarations are independent compatibility contracts.",
-      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 483,
-        "end": 497
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 666,
-        "end": 680
-      }
-    },
-    {
       "id": "eaa8989640e24d6495952981843e4694c35b6c7930e270ac30dbaed5064d51e1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src/validation",
@@ -2917,6 +2953,24 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
         "start": 42,
         "end": 46
+      }
+    },
+    {
+      "id": "eeffbb3fad8ec1444ce944f9e0f0394dbe7759fd1b8d5f9a452439528bba04b0",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+      "reason": "Footer match ends at save validation: gradient-kind versus canonical CSS validity. Shared modal/action shell already exists.",
+      "removalCondition": "Remove when validation/footer contracts converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "start": 95,
+        "end": 105
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "start": 105,
+        "end": 115
       }
     },
     {
@@ -3028,24 +3082,6 @@
       }
     },
     {
-      "id": "f9837ce8f5e0e987443a1785a31e07fe385812904bd7f2b9f5f62c903bace95c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/speech-profile.tsx",
-      "reason": "Same audio format literals update distinct authoritative review profile and provider model parameters.",
-      "removalCondition": "Remove when a common audio-format field contract replaces both or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-profile.tsx",
-        "start": 94,
-        "end": 102
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/ai/connections/forms/model-audio-fields.tsx",
-        "start": 213,
-        "end": 221
-      }
-    },
-    {
       "id": "fed3df6fef0a6ee553e637bba93f8bf9b63c3ca158c719c1704e4bd7dc4ae73d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",
@@ -3061,6 +3097,24 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "start": 128,
         "end": 149
+      }
+    },
+    {
+      "id": "ff3ce8e4501f0587d5900cbc36b346406288aac39f4c195ffcc91a1e19eb6bde",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+      "reason": "Recorder inactivity and live starting admission belong to different producer state machines. Existing shared finalization does not own those stop gates.",
+      "removalCondition": "Remove when this exact finding disappears or when the stated contract distinction is replaced by an accepted common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 93,
+        "end": 98
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 348,
+        "end": 353
       }
     }
   ]
