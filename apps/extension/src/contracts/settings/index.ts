@@ -229,6 +229,7 @@ export interface HotkeyConfig {
 }
 
 export interface QuickActionOverlay {
+  transactionId?: string;
   afterCapture: CaptureActionType;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;

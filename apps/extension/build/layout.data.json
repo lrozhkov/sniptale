@@ -251,6 +251,7 @@
     "@tailwindcss/postcss",
     "@tailwindcss/vite",
     "@vitejs/plugin-react",
+    "canvas",
     "esbuild",
     "postcss",
     "tailwindcss",

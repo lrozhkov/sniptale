@@ -121,6 +121,9 @@ describe('app-view-model helpers', () => {
     expect(result.modeControls.setIsToolbarVisible).toBe(modeState.setIsToolbarVisible);
     expect(result.quickAction.captureActionRef).toBe(modeState.captureActionRef);
     expect(result.quickAction.setTimerDelay).toBe(modeState.setTimerDelay);
+    expect(result.quickAction.timerDelay).toBe(modeState.timerDelay);
+    expect(result.modeState.navigationLockEnabled).toBe(modeState.navigationLockEnabled);
+    expect(result.modeState.quickEditDocumentMode).toBe(modeState.quickEditDocumentMode);
     expect(result.viewport.clearPendingAutoStartCapture).toBe(
       modeState.clearPendingAutoStartCapture
     );

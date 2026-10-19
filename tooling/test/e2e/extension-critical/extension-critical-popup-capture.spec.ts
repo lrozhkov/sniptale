@@ -82,6 +82,7 @@ async function openCapturePage(
   await page.evaluate(() => {
     document.body.style.minHeight = '1400px';
     const target = document.createElement('section');
+    target.id = 'popup-capture-target';
     target.textContent = 'Popup capture proof';
     target.style.cssText =
       'position:absolute;left:180px;top:180px;width:420px;height:220px;background:#f97316';
@@ -113,8 +114,14 @@ async function enableToolbar(popup: Page, page: Page, tabId: number) {
   await expect(page.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
 }
 
-async function triggerCapture(popup: Page, tabId: number, entry: CaptureEntry, mode: CaptureMode) {
-  const config = captureConfig(mode);
+async function triggerCapture(
+  popup: Page,
+  tabId: number,
+  entry: CaptureEntry,
+  mode: CaptureMode,
+  delay = 0
+) {
+  const config = { ...captureConfig(mode), delay };
   if (entry === 'home') {
     return sendPopupCommand(popup, { type: 'TRIGGER_SCREENSHOT_CAPTURE', tabId, config });
   }
@@ -155,6 +162,76 @@ async function finishSelection(page: Page) {
   await page.locator('.sniptale-selection-size-confirm-button').click();
 }
 
+async function createRetainedDrawing(page: Page) {
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+  await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+  await page.keyboard.press('Escape');
+  await page.mouse.click(340, 270);
+  const input = page.locator('[data-ui="content.drawing.text-input"]');
+  await input.fill('Retain popup capture drawing');
+  await input.press('Enter');
+  await expect(page.locator('[data-ui="content.drawing.text-object"]')).toContainText(
+    'Retain popup capture drawing'
+  );
+}
+
+async function checkRetainedDrawing(page: Page) {
+  await expect(page.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+  await expect(page.locator('[data-ui="content.toolbar.drawing.text"]')).toBeVisible();
+  const object = page.locator('[data-ui="content.drawing.text-object"]');
+  await expect(object).toContainText('Retain popup capture drawing');
+  await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+  await expect(object).toHaveCount(0);
+  await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+  await expect(object).toContainText('Retain popup capture drawing');
+  await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+  const canvas = page.locator(
+    '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+  );
+  const pixels = () => canvas.evaluate((element: HTMLCanvasElement) => element.toDataURL());
+  const before = await pixels();
+  await page.mouse.move(740, 320);
+  await page.mouse.down();
+  await page.mouse.move(840, 370, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(pixels).not.toBe(before);
+  await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+  await expect.poll(pixels).toBe(before);
+}
+
+async function editDocumentText(page: Page) {
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.quick-edit"]').click();
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.direct-text"]').click();
+  const target = page.locator('#popup-capture-target');
+  await target.click();
+  await target.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.keyboard.insertText('Retain edited page text');
+  await expect(target).toHaveText('Retain edited page text');
+}
+
+async function checkRetainedDocument(page: Page) {
+  await expect(page.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+  await expect(
+    page.locator('[data-ui="content.toolbar.page-editing-mode.direct-text"]')
+  ).toHaveAttribute('aria-pressed', 'true');
+  const target = page.locator('#popup-capture-target');
+  await expect(target).toHaveText('Retain edited page text');
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.block-selection"]').click();
+  await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+  await expect(target).toHaveText('Popup capture proof');
+  await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+  await expect(target).toHaveText('Retain edited page text');
+  await page.locator('[data-ui="content.toolbar.page-editing-mode.direct-text"]').click();
+}
+
 async function attachDiagnostics(info: TestInfo, popup: Page, tabId: number, messages: string[]) {
   const response: unknown = await sendPopupCommand(popup, {
     type: 'SCREENSHOT_MODE_STATUS',
@@ -192,7 +269,7 @@ async function attachDiagnostics(info: TestInfo, popup: Page, tabId: number, mes
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const entry of ['home', 'quick-action'] as const) {
     for (const mode of ['visible', 'selection', 'full'] as const) {
-      test(`${entry} ${mode} capture releases an existing toolbar at ${viewport.name}`, async ({
+      test(`${entry} ${mode} capture preserves an existing toolbar and drawing at ${viewport.name}`, async ({
         context,
         extensionId,
         hostOrigin,
@@ -215,8 +292,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           viewport.size
         );
         try {
+          await enableToolbar(popup, page, tabId);
+          await createRetainedDrawing(page);
           if (mode === 'selection') {
-            await enableToolbar(popup, page, tabId);
             const beforeCancel = await completedDownloads(popup);
             expect(await triggerCapture(popup, tabId, entry, mode)).toMatchObject({
               success: true,
@@ -226,9 +304,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             await page.keyboard.press('Escape');
             await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
             expect(await completedDownloads(popup)).toBe(beforeCancel);
+            await checkRetainedDrawing(page);
           }
           for (let attempt = 0; attempt < 2; attempt += 1) {
-            await enableToolbar(popup, page, tabId);
             const beforeCapture = await completedDownloads(popup);
             expect(await triggerCapture(popup, tabId, entry, mode)).toMatchObject({
               success: true,
@@ -238,7 +316,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             await expect
               .poll(() => completedDownloads(popup), { timeout: 45_000 })
               .toBe(beforeCapture + 1);
-            await expect(page.locator('[data-ui="content.toolbar.root"]')).not.toBeVisible();
+            await checkRetainedDrawing(page);
             expect(
               messages.filter((message) =>
                 /Screenshot surface|quick-action screenshot surface|cancelled quick-action capture/.test(
@@ -248,6 +326,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             ).toEqual([]);
           }
           await page.screenshot({ path: info.outputPath('capture-complete.png'), fullPage: false });
+          await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+          await page.getByRole('button', { name: 'Close', exact: true }).click();
+          await expect(page.locator('[data-ui="content.toolbar.root"]')).not.toBeVisible();
+          await expect(page.locator('[data-ui="content.drawing.text-object"]')).toHaveCount(0);
         } finally {
           await attachDiagnostics(info, popup, tabId, messages);
           await popup.close();
@@ -283,6 +365,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect
         .poll(() => completedDownloads(popup), { timeout: 45_000 })
         .toBe(beforeCapture + 1);
+      await expect(page.locator('[data-ui="content.toolbar.root"]')).not.toBeVisible();
       expect(
         messages.filter((message) =>
           /Screenshot surface|quick-action screenshot surface/.test(message)
@@ -294,4 +377,48 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.close();
     }
   });
+
+  for (const mode of ['visible', 'selection'] as const) {
+    test(`QuickEdit document survives ${mode} popup capture at ${viewport.name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      test.setTimeout(120_000);
+      const { page, popup, tabId } = await openCapturePage(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport.size
+      );
+      try {
+        await enableToolbar(popup, page, tabId);
+        await editDocumentText(page);
+        const before = await completedDownloads(popup);
+        if (mode === 'visible') {
+          expect(await triggerCapture(popup, tabId, 'quick-action', mode, 10)).toMatchObject({
+            success: true,
+            result: 'accepted',
+          });
+          await page.locator('.sniptale-countdown-cancel').click();
+          await checkRetainedDocument(page);
+          expect(await completedDownloads(popup)).toBe(before);
+        }
+        expect(await triggerCapture(popup, tabId, 'home', mode)).toMatchObject({
+          success: true,
+          result: 'accepted',
+        });
+        if (mode === 'selection') await finishSelection(page);
+        await expect.poll(() => completedDownloads(popup), { timeout: 45_000 }).toBe(before + 1);
+        await checkRetainedDocument(page);
+        await page.screenshot({
+          path: info.outputPath('retained-document-edit.png'),
+          fullPage: false,
+        });
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
 }

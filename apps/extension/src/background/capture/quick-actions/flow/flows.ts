@@ -39,7 +39,8 @@ type QuickActionFlowResult = { result: 'accepted' | 'blocked' };
 async function sendQuickActionMessage(
   args: QuickActionFlowArgs,
   message: QuickActionStartMessage,
-  surfaceBinding: ScreenshotSurfaceBinding
+  surfaceBinding: ScreenshotSurfaceBinding,
+  transactionId: string
 ) {
   const viewport = args.viewportState.get(args.tabId) ?? null;
 
@@ -53,7 +54,7 @@ async function sendQuickActionMessage(
           args.afterCapture === 'save_to_library' ? [MessageType.SAVE_SCREENSHOT_TO_GALLERY] : [],
         tabId: args.tabId,
       }),
-      quickActionOverlay: buildQuickActionOverlay(args),
+      quickActionOverlay: buildQuickActionOverlay({ ...args, transactionId }),
       ...surfaceBinding,
       ...message,
       viewport,
@@ -155,7 +156,8 @@ function resolveContentIntentGrantActionTypes(
 
 async function sendViewerQuickActionMessage(
   args: QuickActionFlowArgs,
-  message: QuickActionStartMessage
+  message: QuickActionStartMessage,
+  transactionId: string
 ): Promise<void> {
   await sendViewerPreparationCommand(
     args.webSnapshotViewerPorts ?? createWebSnapshotViewerPorts(),
@@ -163,7 +165,7 @@ async function sendViewerQuickActionMessage(
     {
       type: MessageType.ENABLE_SCREENSHOT_MODE,
       viewport: args.viewportState.get(args.tabId) ?? null,
-      quickActionOverlay: buildQuickActionOverlay(args),
+      quickActionOverlay: buildQuickActionOverlay({ ...args, transactionId }),
       ...message,
     }
   );
@@ -180,14 +182,15 @@ async function runPreparedQuickActionFlow(
   try {
     const surface = await applyQuickActionSurface(args);
     if (isOwnedViewerQuickAction(args)) {
-      await sendViewerQuickActionMessage(args, message);
+      await sendViewerQuickActionMessage(args, message, surface.transactionId);
     } else {
       await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
       await waitForContentToolbarReady(args.tabId);
       await sendQuickActionMessage(
         args,
         message,
-        requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
+        requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken),
+        surface.transactionId
       );
     }
     args.screenshotModeState.set(args.tabId, true);

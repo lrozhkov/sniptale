@@ -233,6 +233,218 @@ function expectStaleQuickActionCloseDoesNotRestoreLock() {
 }
 
 describe('screenshot-controller-mode', () => {
+  it('authorizes scoped cleanup before querying a session that has not bound its document', async () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    runtime.session.preparationBaseline = {
+      captureAction: 'edit',
+      timerDelay: 7,
+      isToolbarVisible: true,
+      navigationLockEnabled: false,
+      editingMode: 'drawing',
+    };
+    let documentBound = false;
+    sendRuntimeMessageMock.mockImplementation(async (request) => {
+      if (request.type === 'DISABLE_SCREENSHOT_MODE') {
+        documentBound = true;
+        return { success: true };
+      }
+      return {
+        success: true,
+        enabled: true,
+        ...(documentBound
+          ? { surfaceCapabilityToken: 'surface-token', surfaceOperationGeneration: 5 }
+          : {}),
+        viewport: null,
+      };
+    });
+    await closeQuickActionCapture(params, runtime, 1);
+    expect(sendRuntimeMessageMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        type: 'DISABLE_SCREENSHOT_MODE',
+        quickActionTransactionId: 'capture-1',
+        surfaceCapabilityToken: 'surface-token',
+      })
+    );
+    expect(params.quickActionOverlayRef.current).toBeNull();
+  });
+  it('restores borrowed controls after a scoped release failure without generic teardown', async () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    Object.assign(runtime.session, {
+      preparationBaseline: {
+        captureAction: 'edit',
+        timerDelay: 7,
+        isToolbarVisible: true,
+        navigationLockEnabled: false,
+        editingMode: 'drawing',
+      },
+      editingModeBaseline: 'drawing',
+    });
+    sendRuntimeMessageMock.mockImplementation(async (request) =>
+      request.type === 'SCREENSHOT_MODE_STATUS'
+        ? { success: true, enabled: true, surfaceCapabilityToken: 'restored-token' }
+        : { success: false, error: 'Release failed' }
+    );
+    await expect(closeQuickActionCapture(params, runtime, 1)).rejects.toThrow('Release failed');
+    expect(params.setScreenshotMode).not.toHaveBeenCalledWith(false);
+    expect(params.setIsToolbarVisible).toHaveBeenCalledWith(true);
+    expect(params.setCaptureAction).toHaveBeenCalledWith('edit');
+    expect(runtime.restoreEditingMode).toHaveBeenCalledWith('drawing');
+    expect(runtime.session.preparationBaseline).not.toBeNull();
+    expect(params.quickActionOverlayRef.current).toEqual(
+      expect.objectContaining({ transactionId: 'capture-1' })
+    );
+    expect(
+      sendRuntimeMessageMock.mock.calls.filter(
+        ([request]) => request.type === 'DISABLE_SCREENSHOT_MODE'
+      )
+    ).toEqual([[expect.objectContaining({ quickActionTransactionId: 'capture-1' })]]);
+    sendRuntimeMessageMock.mockImplementation(async (request) =>
+      request.type === 'SCREENSHOT_MODE_STATUS'
+        ? { success: true, enabled: true, surfaceCapabilityToken: 'restored-token' }
+        : { success: true }
+    );
+    await closeQuickActionCapture(params, runtime, 1);
+    expect(
+      sendRuntimeMessageMock.mock.calls.filter(
+        ([request]) => request.type === 'DISABLE_SCREENSHOT_MODE'
+      )
+    ).toEqual([
+      [expect.objectContaining({ quickActionTransactionId: 'capture-1' })],
+      [expect.objectContaining({ quickActionTransactionId: 'capture-1' })],
+    ]);
+    expect(params.quickActionOverlayRef.current).toBeNull();
+    expect(runtime.session.preparationBaseline).toBeNull();
+  });
+
+  it('does not restore borrowed controls when explicit Close supersedes a status request', async () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    Object.assign(runtime.session, {
+      preparationBaseline: {
+        captureAction: 'edit',
+        timerDelay: 7,
+        isToolbarVisible: true,
+        navigationLockEnabled: false,
+        editingMode: 'drawing',
+      },
+    });
+    let resolveStatus!: (response: object) => void;
+    sendRuntimeMessageMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveStatus = resolve;
+      })
+    );
+    const closing = closeQuickActionCapture(params, runtime, 1);
+    runtime.session.runGeneration += 1;
+    runtime.session.preparationBaseline = null;
+    resolveStatus({ success: true, enabled: true, surfaceCapabilityToken: 'old-token' });
+    await expect(closing).rejects.toThrow('Screenshot run was superseded');
+    expect(params.setScreenshotMode).not.toHaveBeenCalled();
+    expect(params.setCaptureAction).not.toHaveBeenCalled();
+    expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear a newer overlay when scoped cleanup settles late', async () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    Object.assign(runtime.session, {
+      preparationBaseline: {
+        captureAction: 'edit',
+        timerDelay: 7,
+        isToolbarVisible: true,
+        navigationLockEnabled: false,
+        editingMode: 'drawing',
+      },
+    });
+    let resolveRelease!: (response: object) => void;
+    let markReleaseStarted!: () => void;
+    const releaseStarted = new Promise<void>((resolve) => {
+      markReleaseStarted = resolve;
+    });
+    sendRuntimeMessageMock.mockImplementation(async (request) => {
+      if (request.type === 'SCREENSHOT_MODE_STATUS')
+        return { success: true, enabled: true, surfaceCapabilityToken: 'current-token' };
+      return new Promise((resolve) => {
+        resolveRelease = resolve;
+        markReleaseStarted();
+      });
+    });
+    const closing = closeQuickActionCapture(params, runtime, 1);
+    await releaseStarted;
+    runtime.session.runGeneration += 1;
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-2' });
+    resolveRelease({ success: true });
+    await expect(closing).rejects.toThrow('Screenshot run was superseded');
+    expect(params.quickActionOverlayRef.current).toEqual(
+      expect.objectContaining({ transactionId: 'capture-2' })
+    );
+    expect(params.setCaptureAction).not.toHaveBeenCalled();
+  });
+
+  it('retains QuickEdit document mode as the selection recovery baseline', () => {
+    const params = createScreenshotParams();
+    params.editingModes.quickEditMode = true;
+    params.editingModes.quickEditDocumentMode = true;
+    const session = createScreenshotControllerSession(false);
+    prepareScreenshotMode(params, session, 'selection');
+    expect(session.editingModeBaseline).toBe('quick-edit-document');
+  });
+  it('preserves a borrowed preparation session instead of disabling the toolbar', async () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    Object.assign(runtime.session, {
+      preparationBaseline: {
+        captureAction: 'edit',
+        timerDelay: 7,
+        isToolbarVisible: true,
+        navigationLockEnabled: false,
+        editingMode: 'drawing',
+      },
+    });
+    sendRuntimeMessageMock.mockImplementation(async (request) =>
+      request.type === 'SCREENSHOT_MODE_STATUS'
+        ? {
+            success: true,
+            enabled: true,
+            surfaceCapabilityToken: 'restored-token',
+            surfaceLeaseGeneration: 8,
+            surfaceOperationGeneration: 10,
+            viewport: null,
+          }
+        : { success: true }
+    );
+
+    await closeQuickActionCapture(params, runtime, 1);
+
+    expect(params.setScreenshotMode).not.toHaveBeenCalledWith(false);
+    expect(params.setIsToolbarVisible).toHaveBeenCalledWith(true);
+    expect(params.setCaptureAction).toHaveBeenCalledWith('edit');
+    expect(params.setTimerDelay).toHaveBeenCalledWith(7);
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'DISABLE_SCREENSHOT_MODE',
+        quickActionTransactionId: 'capture-1',
+        surfaceCapabilityToken: 'surface-token',
+        operationGeneration: 5,
+      })
+    );
+  });
+
+  it('keeps visible capture editing owners alive for a borrowed session', () => {
+    const params = createScreenshotParams();
+    params.editingModes.quickEditMode = true;
+    const session = createScreenshotControllerSession(false);
+    Object.assign(session, { preparationBaseline: { editingMode: 'quick-edit' } });
+    prepareScreenshotMode(params, session, 'visible');
+    expect(params.editingModes.disableQuickEditMode).not.toHaveBeenCalled();
+  });
   it(
     'tears down quick-action countdown without re-locking navigation',
     expectQuickActionCancelTearsDownWithoutRelock

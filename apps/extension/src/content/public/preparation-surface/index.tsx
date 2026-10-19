@@ -138,6 +138,7 @@ function usePreparationScreenshotController(
       },
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
+      quickEditDocumentMode: modeState.quickEditDocumentMode,
       restoreEditingMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
@@ -282,6 +283,10 @@ function usePreparationControllers(
         },
         highlighter: () => modeController.handleToggleHighlighterMode(true),
         'quick-edit': () => modeController.handleToggleQuickEditMode(true),
+        'quick-edit-document': () => {
+          modeController.handleToggleQuickEditMode(true);
+          modeController.handleToggleQuickEditDocumentMode(true);
+        },
       })
   );
   const videoRecordingController = useVideoRecordingSurfaceController({

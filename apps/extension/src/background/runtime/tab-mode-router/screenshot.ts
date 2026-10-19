@@ -133,6 +133,9 @@ export function routeScreenshotModeMessage(
         disableScreenshotModeForContent({
           leaseGeneration: message.leaseGeneration,
           operationGeneration: message.operationGeneration,
+          ...(message.quickActionTransactionId === undefined
+            ? {}
+            : { quickActionTransactionId: message.quickActionTransactionId }),
           screenshotModeState: context.screenshotModeState,
           senderDocumentId: context.senderDocumentId,
           surfaceCapabilityToken: message.surfaceCapabilityToken,

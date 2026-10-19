@@ -1,6 +1,19 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Settings, ViewportPreset } from '../../../../contracts/settings';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
+import { buildQuickActionOverlay } from './shared';
+
+it('keeps legacy overlays free of an absent transaction identity', () => {
+  const overlay = buildQuickActionOverlay(createCaptureArgs());
+  expect(overlay).toEqual({
+    afterCapture: 'download_default',
+    delaySeconds: 0,
+    exitAfterCapture: false,
+    imageFormat: 'png',
+    imageQuality: 88,
+  });
+  expect(overlay).not.toHaveProperty('transactionId');
+});
 
 const {
   issueContentPrivilegedActionAutoStartGrantMock,
@@ -210,7 +223,7 @@ beforeEach(() => {
       } else {
         args.viewportState.set(args.tabId, null);
       }
-      return { surfaceCapabilityToken: 'surface-token-1' };
+      return { surfaceCapabilityToken: 'surface-token-1', transactionId: 'transaction-1' };
     }
   );
   releaseQuickActionSurfaceMock.mockResolvedValue(undefined);
@@ -241,6 +254,7 @@ it('starts screenshot selection and marks the tab active', async () => {
       viewport: null,
       contentIntentGrant: { grantToken: 'grant-token-1' },
       quickActionOverlay: {
+        transactionId: 'transaction-1',
         afterCapture: 'copy',
         delaySeconds: 2,
         exitAfterCapture: true,
@@ -336,6 +350,7 @@ it('starts capture mode with the resolved viewport and marks the tab active', as
       },
       contentIntentGrant: { grantToken: 'grant-token-1' },
       quickActionOverlay: {
+        transactionId: 'transaction-1',
         afterCapture: 'download_default',
         delaySeconds: 0,
         exitAfterCapture: false,
@@ -459,6 +474,7 @@ it('routes owned viewer capture flows through the viewer port with preset viewpo
       height: 900,
     },
     quickActionOverlay: {
+      transactionId: 'transaction-1',
       afterCapture: 'download_default',
       delaySeconds: 0,
       exitAfterCapture: false,

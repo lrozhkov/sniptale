@@ -56,8 +56,10 @@ export function buildQuickActionOverlay(args: {
   delaySeconds: number;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
+  transactionId?: string;
 }) {
   return {
+    ...(args.transactionId === undefined ? {} : { transactionId: args.transactionId }),
     afterCapture: args.afterCapture,
     delaySeconds: args.delaySeconds,
     exitAfterCapture: args.action.exitAfterCapture,
