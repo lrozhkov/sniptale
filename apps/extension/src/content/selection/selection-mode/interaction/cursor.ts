@@ -1,7 +1,6 @@
 import { mountStyleInAccessibleDocuments } from '../../../platform/frame';
 import type { SelectionModeSession } from '../session';
 
-const SELECTION_CURSOR_STROKE_FALLBACK = '#3b82f6';
 const SELECTION_CURSOR_STYLE_ID = 'sniptale-crosshair-cursor';
 
 type SelectionModeCursorSession = Pick<SelectionModeSession, 'cursorStyleCleanup'>;
@@ -38,28 +37,5 @@ export function disableSelectionModeCursor(state: SelectionModeCursorSession): v
 }
 
 export function createSelectionCrosshairCursor(): string {
-  const strokeColor = resolveSelectionCursorStroke();
-  const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">',
-    `  <line x1="16" y1="2" x2="16" y2="13" stroke="${strokeColor}"`,
-    '    stroke-width="1.5" stroke-linecap="round"/>',
-    `  <line x1="16" y1="19" x2="16" y2="30" stroke="${strokeColor}"`,
-    '    stroke-width="1.5" stroke-linecap="round"/>',
-    `  <line x1="2" y1="16" x2="13" y2="16" stroke="${strokeColor}"`,
-    '    stroke-width="1.5" stroke-linecap="round"/>',
-    `  <line x1="19" y1="16" x2="30" y2="16" stroke="${strokeColor}"`,
-    '    stroke-width="1.5" stroke-linecap="round"/>',
-    `  <circle cx="16" cy="16" r="2.5" fill="none" stroke="${strokeColor}"`,
-    '    stroke-width="1.2"/>',
-    '</svg>',
-  ].join('\n');
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 16 16, crosshair`;
-}
-
-function resolveSelectionCursorStroke(): string {
-  const resolvedAccent = getComputedStyle(document.documentElement)
-    .getPropertyValue('--sniptale-color-accent')
-    .trim();
-
-  return resolvedAccent || SELECTION_CURSOR_STROKE_FALLBACK;
+  return 'crosshair';
 }

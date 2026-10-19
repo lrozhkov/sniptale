@@ -10,35 +10,39 @@ vi.mock('../../../platform/frame', () => ({
   mountStyleInAccessibleDocuments: mocks.mountStyleMock,
 }));
 
-import { disableSelectionModeCursor, enableSelectionModeCursor } from './cursor';
+import {
+  createSelectionCrosshairCursor,
+  disableSelectionModeCursor,
+  enableSelectionModeCursor,
+} from './cursor';
 
 beforeEach(() => {
   vi.clearAllMocks();
   document.documentElement.style.removeProperty('--sniptale-color-accent');
 });
 
-it('uses the current accent color when mounting the selection cursor', () => {
+it('ignores the current accent color when mounting the selection cursor', () => {
   document.documentElement.style.setProperty('--sniptale-color-accent', '#123456');
   const previousCleanup = vi.fn();
   const nextCleanup = vi.fn();
   mocks.mountStyleMock.mockReturnValue(nextCleanup);
-  const state = { cursorStyleCleanup: previousCleanup } as any;
+  const state = { cursorStyleCleanup: previousCleanup };
 
   enableSelectionModeCursor(state);
   disableSelectionModeCursor(state);
 
   expect(previousCleanup).toHaveBeenCalledOnce();
   expect(mocks.mountStyleMock).toHaveBeenCalledWith(
-    expect.objectContaining({ textContent: expect.stringContaining('%23123456') })
+    expect.objectContaining({
+      textContent: expect.stringContaining('cursor: crosshair !important'),
+    })
   );
   expect(nextCleanup).toHaveBeenCalledOnce();
   expect(state.cursorStyleCleanup).toBeNull();
 });
 
-it('falls back to the default cursor color when no accent is defined', () => {
-  enableSelectionModeCursor({ cursorStyleCleanup: null } as any);
+it.each(['', '#f97316', '#123456'])('uses a native crosshair with accent %s', (accent) => {
+  document.documentElement.style.setProperty('--sniptale-color-accent', accent);
 
-  expect(mocks.mountStyleMock).toHaveBeenCalledWith(
-    expect.objectContaining({ textContent: expect.stringContaining('%233b82f6') })
-  );
+  expect(createSelectionCrosshairCursor()).toBe('crosshair');
 });
