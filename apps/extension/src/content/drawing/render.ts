@@ -13,7 +13,7 @@ import {
   getDrawingShapePoints,
   getDrawingSelectionBounds,
   resolveDrawingTextFontFamily,
-  resolveDrawingTextBackgroundRadii,
+  traceDrawingTextBackground,
   type DrawingObject,
   type DrawingPoint,
 } from '../../features/drawing/public';
@@ -102,17 +102,9 @@ function drawText(
       width: Math.min(bounds.width, Math.max(12, context.measureText(line).width + 12)),
       height: lineHeight,
     }));
-    backgrounds.forEach((rect, index) => {
-      context.beginPath();
-      context.roundRect(
-        rect.left,
-        rect.top,
-        rect.width,
-        rect.height,
-        resolveDrawingTextBackgroundRadii(backgrounds, index)
-      );
-      context.fill();
-    });
+    context.beginPath();
+    traceDrawingTextBackground(context, backgrounds);
+    context.fill();
   }
   context.fillStyle = object.color;
   const metrics = context.measureText('Mg');

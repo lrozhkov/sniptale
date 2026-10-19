@@ -4,7 +4,7 @@ import {
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextFontFamily,
-  resolveDrawingTextBackgroundRadii,
+  resolveDrawingTextBackgroundContours,
   type DrawingFontFamily,
   type DrawingTextBackgroundRect,
 } from '../../features/drawing/public';
@@ -136,24 +136,45 @@ export function DrawingTextBackgrounds(props: {
 }) {
   const color = props.color;
   if (!color) return null;
-  return props.rects.map((rect, index) => (
-    <span
-      key={`${index}:${rect.top}:${rect.left}`}
+  const path = resolveDrawingTextBackgroundContours(props.rects)
+    .map((corners) => {
+      return (
+        corners
+          .map((corner, index) => {
+            const previous = corners[(index + corners.length - 1) % corners.length]!;
+            const next = corners[(index + 1) % corners.length]!;
+            const incomingDistance = Math.hypot(previous.x - corner.x, previous.y - corner.y);
+            const outgoingDistance = Math.hypot(next.x - corner.x, next.y - corner.y);
+            const startX = corner.x + ((previous.x - corner.x) * corner.radius) / incomingDistance;
+            const startY = corner.y + ((previous.y - corner.y) * corner.radius) / incomingDistance;
+            const endX = corner.x + ((next.x - corner.x) * corner.radius) / outgoingDistance;
+            const endY = corner.y + ((next.y - corner.y) * corner.radius) / outgoingDistance;
+            return [
+              `${index === 0 ? 'M' : 'L'} ${startX} ${startY}`,
+              `A ${corner.radius} ${corner.radius} 0 0 1 ${endX} ${endY}`,
+            ].join(' ');
+          })
+          .join(' ') + ' Z'
+      );
+    })
+    .join(' ');
+  return (
+    <svg
       aria-hidden="true"
-      data-ui="content.drawing.text-background"
+      data-ui="content.drawing.text-backgrounds"
       style={{
-        backgroundColor: color,
-        borderRadius: resolveDrawingTextBackgroundRadii(props.rects, index)
-          .map((radius) => `${radius}px`)
-          .join(' '),
-        height: rect.height,
-        left: rect.left,
+        color,
+        height: '100%',
+        left: 0,
+        overflow: 'visible',
         pointerEvents: 'none',
         position: 'absolute',
-        top: rect.top,
-        width: rect.width,
+        top: 0,
+        width: '100%',
         zIndex: 0,
       }}
-    />
-  ));
+    >
+      <path data-ui="content.drawing.text-background" d={path} fill="currentColor" />
+    </svg>
+  );
 }

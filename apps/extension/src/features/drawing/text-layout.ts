@@ -48,6 +48,91 @@ export function resolveDrawingTextBackgroundRadii(
   return [topLeft, topRight, bottomRight, bottomLeft];
 }
 
+export type DrawingTextBackgroundCorner = { x: number; y: number; radius: number };
+
+/** Returns clockwise outer contours without the internal edges between connected lines. */
+export function resolveDrawingTextBackgroundContours(
+  lines: readonly DrawingTextBackgroundRect[]
+): readonly (readonly DrawingTextBackgroundCorner[])[] {
+  const runs: number[][] = [];
+  lines.forEach((line, index) => {
+    const previous = lines[index - 1];
+    const connected =
+      previous &&
+      Math.abs(previous.top + previous.height - line.top) < 0.01 &&
+      previous.left < line.left + line.width &&
+      line.left < previous.left + previous.width;
+    if (connected) runs[runs.length - 1]!.push(index);
+    else runs.push([index]);
+  });
+  return runs.map((run) => {
+    const corners: DrawingTextBackgroundCorner[] = [];
+    for (const index of run) {
+      const line = lines[index]!;
+      const radii = resolveDrawingTextBackgroundRadii(lines, index);
+      corners.push(
+        { x: line.left + line.width, y: line.top, radius: radii[1] },
+        { x: line.left + line.width, y: line.top + line.height, radius: radii[2] }
+      );
+    }
+    for (const index of [...run].reverse()) {
+      const line = lines[index]!;
+      const radii = resolveDrawingTextBackgroundRadii(lines, index);
+      corners.push(
+        { x: line.left, y: line.top + line.height, radius: radii[3] },
+        { x: line.left, y: line.top, radius: radii[0] }
+      );
+    }
+    const distinct = corners.reduce<DrawingTextBackgroundCorner[]>((result, corner) => {
+      const previous = result[result.length - 1];
+      if (previous?.x === corner.x && previous.y === corner.y)
+        previous.radius = Math.max(previous.radius, corner.radius);
+      else result.push(corner);
+      return result;
+    }, []);
+    return distinct.filter((corner, index) => {
+      if (corner.radius) return true;
+      const previous = distinct[(index + distinct.length - 1) % distinct.length]!;
+      const next = distinct[(index + 1) % distinct.length]!;
+      return !(
+        (previous.x === corner.x && next.x === corner.x) ||
+        (previous.y === corner.y && next.y === corner.y)
+      );
+    });
+  });
+}
+
+/** Traces each rounded outer contour into the caller's current canvas path. */
+export function traceDrawingTextBackground(
+  context: {
+    moveTo: (x: number, y: number) => void;
+    arcTo: (
+      firstX: number,
+      firstY: number,
+      secondX: number,
+      secondY: number,
+      radius: number
+    ) => void;
+    closePath: () => void;
+  },
+  lines: readonly DrawingTextBackgroundRect[]
+): void {
+  for (const contour of resolveDrawingTextBackgroundContours(lines)) {
+    const first = contour[0]!;
+    const last = contour[contour.length - 1]!;
+    const distance = Math.hypot(last.x - first.x, last.y - first.y);
+    context.moveTo(
+      first.x + ((last.x - first.x) * first.radius) / distance,
+      first.y + ((last.y - first.y) * first.radius) / distance
+    );
+    contour.forEach((corner, index) => {
+      const next = contour[(index + 1) % contour.length]!;
+      context.arcTo(corner.x, corner.y, next.x, next.y, corner.radius);
+    });
+    context.closePath();
+  }
+}
+
 function estimateCharactersWidth(characters: number, fontSize: number): number {
   return characters * fontSize * TEXT_CHARACTER_WIDTH_FACTOR + DRAWING_TEXT_HORIZONTAL_PADDING;
 }

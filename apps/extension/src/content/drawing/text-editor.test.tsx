@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { createContentDrawingController } from './controller';
 import { createDrawingSession } from '../../features/drawing/public';
+import { DrawingTextBackgrounds } from './text-content';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -16,6 +17,61 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it.each(['#ff8800', '#ff880080'])(
+  'uses one background paint for adjacent lines with %s',
+  (color) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() =>
+        root.render(
+          <DrawingTextBackgrounds
+            color={color}
+            rects={[
+              { left: 0, top: 2, width: 100, height: 25 },
+              { left: 0, top: 27, width: 60, height: 25 },
+            ]}
+          />
+        )
+      );
+      const paths = host.querySelectorAll('svg > path');
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.getAttribute('fill')).toBe('currentColor');
+      expect(host.querySelector('svg')?.style.color).not.toBe('');
+      const path = paths[0]?.getAttribute('d');
+      expect(path?.match(/M /g)).toHaveLength(1);
+      expect(path).toContain('L 100 24 A 3 3 0 0 1 97 27');
+      expect(path).toContain('L 60 27 A 0 0 0 0 1 60 27');
+      expect(path).toContain('L 60 49 A 3 3 0 0 1 57 52');
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
+it('does not interpret a background color as an SVG paint server', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <DrawingTextBackgrounds
+          color="url(https://example.invalid/paint.svg#fill)"
+          rects={[{ left: 0, top: 2, width: 100, height: 25 }]}
+        />
+      )
+    );
+    expect(host.querySelector('path')?.getAttribute('fill')).toBe('currentColor');
+    expect(host.querySelector('svg')?.style.color).toBe('');
+  } finally {
+    act(() => root.unmount());
+  }
 });
 
 it('uses fractional local dimensions for a rotated text draft without another line wrap', () => {
@@ -177,12 +233,11 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   expect(host.querySelector('[data-ui="content.drawing.text-mirror"]')?.textContent).toBe(
     'Stable text\n\u200b'
   );
-  const backgrounds = Array.from(
-    host.querySelectorAll<HTMLElement>('[data-ui="content.drawing.text-background"]')
-  );
-  expect(backgrounds).toHaveLength(2);
-  expect(backgrounds.map((background) => background.style.top)).toEqual(['2px', '27px']);
-  expect(backgrounds.map((background) => background.style.height)).toEqual(['25px', '25px']);
+  const backgrounds = host.querySelectorAll('[data-ui="content.drawing.text-background"]');
+  expect(backgrounds).toHaveLength(1);
+  expect(backgrounds[0]?.getAttribute('d')?.match(/M /g)).toHaveLength(1);
+  expect(backgrounds[0]?.getAttribute('d')).toContain(' 27 ');
+  expect(backgrounds[0]?.getAttribute('d')).toContain(' 52 ');
 
   const zoomKey = new KeyboardEvent('keydown', {
     bubbles: true,

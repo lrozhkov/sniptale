@@ -15,6 +15,60 @@ import {
 } from './vector';
 
 describe('Fabric drawing adapter', () => {
+  it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees', (angle) => {
+    for (const color of ['#ff8800', '#ff880080']) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 400;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#808080';
+      context.fillRect(0, 0, 400, 400);
+      const object = createEditorDrawingFabricObject(
+        {
+          id: 'pixel-proof',
+          kind: 'text',
+          bounds: { x: 0, y: 0, width: 180, height: 100 },
+          text: 'Longer first line\nShort\nLast',
+          color: '#00000000',
+          backgroundColor: color,
+          fontFamily: 'sans',
+          fontSize: 24,
+        },
+        1
+      ) as Textbox;
+      vi.spyOn(object, 'getLineWidth').mockImplementation((index) => [150, 80, 50][index] ?? 0);
+      const radians = (angle * Math.PI) / 180;
+      context.save();
+      context.translate(200, 200);
+      context.rotate(radians);
+      renderEditorDrawingTextBackground(object, context);
+      context.restore();
+      context.fillStyle = color;
+      context.fillRect(0, 0, 5, 5);
+      const expected = context.getImageData(1, 1, 1, 1).data;
+      let edge = object._getTopOffset();
+      for (let line = 0; line < 2; line += 1) {
+        edge += object.getHeightOfLine(line);
+        for (let offset = 20; offset <= 30; offset += 1) {
+          for (const delta of [-0.75, -0.25, 0.25, 0.75]) {
+            const localX = object._getLeftOffset() + offset;
+            const localY = edge + delta;
+            const pixel = context.getImageData(
+              Math.floor(200 + localX * Math.cos(radians) - localY * Math.sin(radians)),
+              Math.floor(200 + localX * Math.sin(radians) + localY * Math.cos(radians)),
+              1,
+              1
+            ).data;
+            expect(
+              Array.from(pixel).every(
+                (channel, index) => Math.abs(channel - expected[index]!) <= 2
+              ),
+              `${color} line=${line} offset=${offset}`
+            ).toBe(true);
+          }
+        }
+      }
+    }
+  });
   it('maps shared objects to current editor types and metadata', () => {
     const shape: DrawingObject = {
       id: 'shape-1',
@@ -51,20 +105,23 @@ describe('Fabric drawing adapter', () => {
       beginPath: vi.fn(),
       fill: vi.fn(),
       fillStyle: '#000000',
-      roundRect: vi.fn(),
+      moveTo: vi.fn(),
+      arcTo: vi.fn(),
+      closePath: vi.fn(),
     };
     renderEditorDrawingTextBackground(object as Textbox, context);
-    expect(context.roundRect).toHaveBeenCalledTimes(2);
-    expect(context.roundRect.mock.calls[0]?.[4]).toEqual([3, 3, 0, 0]);
-    expect(context.roundRect.mock.calls[1]?.[4]?.slice(0, 2)).toEqual([0, 0]);
-    expect(context.roundRect.mock.calls[0]?.[0]).toBe((object as Textbox)._getLeftOffset());
+    expect(context.beginPath).toHaveBeenCalledTimes(1);
+    expect(context.fill).toHaveBeenCalledTimes(1);
+    expect(context.moveTo).toHaveBeenCalledTimes(1);
+    expect(context.closePath).toHaveBeenCalledTimes(1);
+    expect(context.arcTo).toHaveBeenCalled();
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
     const topOffset = (object as Textbox)._getTopOffset();
     applyEditorDrawingTextVisuals(object as Textbox);
     (object as Textbox)._renderTextLinesBackground(context as unknown as CanvasRenderingContext2D);
     expect((object as Textbox)._getTopOffset()).toBe(topOffset);
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
-    expect(context.fill).toHaveBeenCalledTimes(4);
+    expect(context.fill).toHaveBeenCalledTimes(2);
   });
 
   it('removes invisible Fabric stroke geometry from a prepared saved text box', () => {

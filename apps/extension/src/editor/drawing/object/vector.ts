@@ -12,7 +12,7 @@ import {
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextHeight,
-  resolveDrawingTextBackgroundRadii,
+  traceDrawingTextBackground,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
@@ -166,7 +166,10 @@ function createTextObject(drawing: Extract<DrawingObject, { kind: 'text' }>): Fa
 
 export function renderEditorDrawingTextBackground(
   textbox: Textbox,
-  context: Pick<CanvasRenderingContext2D, 'beginPath' | 'fill' | 'fillStyle' | 'roundRect'>
+  context: Pick<
+    CanvasRenderingContext2D,
+    'beginPath' | 'fill' | 'fillStyle' | 'moveTo' | 'arcTo' | 'closePath'
+  >
 ): void {
   if (!textbox.textBackgroundColor) return;
   const previousFill = context.fillStyle;
@@ -180,17 +183,9 @@ export function renderEditorDrawingTextBackground(
     top += height;
     return rect;
   });
-  lines.forEach((line, index) => {
-    context.beginPath();
-    context.roundRect(
-      line.left,
-      line.top,
-      line.width,
-      line.height,
-      resolveDrawingTextBackgroundRadii(lines, index)
-    );
-    context.fill();
-  });
+  context.beginPath();
+  traceDrawingTextBackground(context, lines);
+  context.fill();
   context.fillStyle = previousFill;
 }
 

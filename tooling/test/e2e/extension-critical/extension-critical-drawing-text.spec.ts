@@ -6,18 +6,12 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
 const TEXT = 'A longer first line\nShort\nA final line';
 
-async function backgroundGeometry(root: Locator) {
-  return root.locator('[data-ui="content.drawing.text-background"]').evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const style = getComputedStyle(node);
-      return {
-        left: parseFloat(style.left),
-        top: parseFloat(style.top),
-        width: parseFloat(style.width),
-        height: parseFloat(style.height),
-      };
-    })
-  );
+async function backgroundPath(root: Locator) {
+  const background = root.locator('path[data-ui="content.drawing.text-background"]');
+  await expect(background).toHaveCount(1);
+  const path = await background.getAttribute('d');
+  expect(path).toBeTruthy();
+  return path;
 }
 
 async function rotateContentText(page: Page, object: Locator, degrees: number) {
@@ -47,19 +41,133 @@ async function rotateContentText(page: Page, object: Locator, degrees: number) {
   const start = point(bounds.angle);
   const end = point(degrees);
   await page.mouse.move(start.x, start.y);
-  await page.keyboard.down('Shift');
+  await page.keyboard.down('Control');
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 8 });
   await page.mouse.up();
-  await page.keyboard.up('Shift');
-  await expect(object).toHaveCSS(
-    'transform',
-    degrees === 45
-      ? 'matrix(0.707107, 0.707107, -0.707107, 0.707107, 0, 0)'
-      : 'matrix(0, 1, -1, 0, 0, 0)'
-  );
+  await page.keyboard.up('Control');
+  await expect
+    .poll(() =>
+      object.evaluate((node) =>
+        Number(node.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] ?? 0)
+      )
+    )
+    .toBeCloseTo(degrees, 0);
   return center;
 }
+
+test('rotated text backgrounds have continuous raster coverage at line joins', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}, info) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, {
+    width: 1280,
+    height: 560,
+  });
+  try {
+    await page.evaluate(() => {
+      document.body.style.background = '#808080';
+    });
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+    await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+    await page.locator('[data-ui="content.toolbar.drawing-options.text.font-sans"]').click();
+    const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
+    if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+    await page
+      .locator(
+        '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#f97316"]'
+      )
+      .click();
+    await page.keyboard.press('Escape');
+    await page.mouse.click(300, 230);
+    const input = page.locator('[data-ui="content.drawing.text-input"]');
+    await input.fill(TEXT);
+    await input.press('Enter');
+    const object = page.locator('[data-ui="content.drawing.text-object"]');
+    await expect(object).toHaveCount(1);
+    for (const degrees of [0, 5, 10, 45]) {
+      if (degrees) await rotateContentText(page, object, degrees);
+      const geometry = await object.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const content = node.querySelector('span:last-child')!;
+        return {
+          left: parseFloat(style.left),
+          top: parseFloat(style.top),
+          width: parseFloat(style.width),
+          height: parseFloat(style.height),
+          lineHeight: parseFloat(getComputedStyle(content).lineHeight),
+          angle: Number(node.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] ?? 0),
+        };
+      });
+      const screenshot = await page.screenshot({
+        path: info.outputPath(`text-join-${degrees}.png`),
+        fullPage: false,
+      });
+      const metrics = await page.evaluate(
+        async ({ encoded, geometry }) => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${encoded}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const drawing = canvas.getContext('2d')!;
+          drawing.drawImage(image, 0, 0);
+          const pixels = drawing.getImageData(0, 0, canvas.width, canvas.height).data;
+          const radians = (geometry.angle * Math.PI) / 180;
+          const cosine = Math.cos(radians);
+          const sine = Math.sin(radians);
+          const centerX = geometry.left + geometry.width / 2;
+          const centerY = geometry.top + geometry.height / 2;
+          const errors: number[] = [];
+          let worst = { column: 0, row: 0, localX: 0, localY: 0, rgb: [] as number[], error: 0 };
+          for (let row = 0; row < canvas.height; row += 1) {
+            for (let column = 0; column < canvas.width; column += 1) {
+              const deltaX = column + 0.5 - centerX;
+              const deltaY = row + 0.5 - centerY;
+              const localX = deltaX * cosine + deltaY * sine + geometry.width / 2;
+              const localY = -deltaX * sine + deltaY * cosine + geometry.height / 2;
+              if (localX < 3 || localX > 35) continue;
+              if (
+                ![1, 2].some((line) => Math.abs(localY - (2 + line * geometry.lineHeight)) <= 0.65)
+              )
+                continue;
+              const offset = (row * canvas.width + column) * 4;
+              errors.push(
+                Math.max(
+                  Math.abs(pixels[offset]! - 249),
+                  Math.abs(pixels[offset + 1]! - 115),
+                  Math.abs(pixels[offset + 2]! - 22)
+                )
+              );
+              const error = errors[errors.length - 1]!;
+              if (error > worst.error)
+                worst = {
+                  column,
+                  row,
+                  localX,
+                  localY,
+                  rgb: Array.from(pixels.slice(offset, offset + 3)),
+                  error,
+                };
+            }
+          }
+          return { count: errors.length, maximumError: Math.max(...errors), worst, geometry };
+        },
+        { encoded: screenshot.toString('base64'), geometry }
+      );
+      expect(metrics.count, `${degrees} degree join samples`).toBeGreaterThan(40);
+      expect
+        .soft(metrics.maximumError, `${degrees} degree join RGB error ${JSON.stringify(metrics)}`)
+        .toBeLessThanOrEqual(2);
+    }
+  } finally {
+    await page.close();
+    await popup.close();
+  }
+});
 
 for (const viewport of [
   { width: 1280, height: 560 },
@@ -113,8 +221,7 @@ for (const viewport of [
         await input.press('Enter');
         const object = page.locator('[data-ui="content.drawing.text-object"]');
         await expect(object).toHaveCount(1);
-        const baseline = await backgroundGeometry(object);
-        expect(baseline).toHaveLength(3);
+        const baseline = await backgroundPath(object);
         for (const degrees of [45, 90]) {
           const center = await rotateContentText(page, object, degrees);
           expect.soft(await input.count(), 'rotation release must not create or edit text').toBe(0);
@@ -122,28 +229,7 @@ for (const viewport of [
           await page.mouse.click(center.x, center.y);
           await expect(input).toHaveValue(TEXT);
           const editor = page.locator('[data-ui="content.drawing.text-editor"]');
-          const geometry = await backgroundGeometry(editor);
-          expect(geometry).toHaveLength(baseline.length);
-          geometry.forEach((rect, index) => {
-            for (const dimension of ['left', 'top', 'width', 'height'] as const)
-              expect(
-                Math.abs(rect[dimension] - baseline[index]![dimension]),
-                `${degrees} ${index} ${dimension}`
-              ).toBeLessThanOrEqual(1);
-          });
-          const corners = await editor
-            .locator('[data-ui="content.drawing.text-background"]')
-            .evaluateAll((nodes) =>
-              nodes.map((node) => {
-                const style = getComputedStyle(node);
-                return [style.borderTopLeftRadius, style.borderBottomLeftRadius];
-              })
-            );
-          expect(corners).toEqual([
-            ['3px', '0px'],
-            ['0px', '0px'],
-            ['0px', '3px'],
-          ]);
+          expect(await backgroundPath(editor)).toBe(baseline);
           await page.screenshot({ path: info.outputPath(`text-${degrees}.png`), fullPage: false });
           await input.press('Enter');
           await expect(input).toHaveCount(0);
@@ -224,7 +310,17 @@ for (const viewport of [
     await applyHarnessBootstrap(page, {});
     await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
     await expect(page.locator('[data-ui="editor.page.root"]')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window
+            .__sniptaleEditorHarness!.getCanvasObjects()
+            .some((object) => object['type'] === 'image')
+        )
+      )
+      .toBe(true);
     await page.evaluate(() => window.__sniptaleEditorHarness!.setZoomLevel(1));
+    await expect(page.locator('[data-ui="editor.floating.view-controls.zoom"]')).toHaveText('100%');
     await page.locator('[data-ui="editor.floating.tool-rail.text"]').click();
     const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
     if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();

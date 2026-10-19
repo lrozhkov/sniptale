@@ -5,7 +5,101 @@ import {
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextNaturalWidth,
   resolveDrawingTextBackgroundRadii,
+  resolveDrawingTextBackgroundContours,
+  traceDrawingTextBackground,
 } from './text-layout';
+
+it('removes the internal edge between equal-width line backgrounds', () => {
+  expect(
+    resolveDrawingTextBackgroundContours([
+      { left: 0, top: 0, width: 120, height: 25 },
+      { left: 0, top: 25, width: 120, height: 25 },
+    ])
+  ).toEqual([
+    [
+      { x: 120, y: 0, radius: 3 },
+      { x: 120, y: 50, radius: 3 },
+      { x: 0, y: 50, radius: 3 },
+      { x: 0, y: 0, radius: 3 },
+    ],
+  ]);
+});
+
+it('keeps exposed rounded corners and square concave steps for unequal lines', () => {
+  expect(
+    resolveDrawingTextBackgroundContours([
+      { left: 0, top: 0, width: 120, height: 25 },
+      { left: 0, top: 25, width: 80, height: 25 },
+      { left: 0, top: 50, width: 100, height: 25 },
+    ])
+  ).toEqual([
+    [
+      { x: 120, y: 0, radius: 3 },
+      { x: 120, y: 25, radius: 3 },
+      { x: 80, y: 25, radius: 0 },
+      { x: 80, y: 50, radius: 0 },
+      { x: 100, y: 50, radius: 3 },
+      { x: 100, y: 75, radius: 3 },
+      { x: 0, y: 75, radius: 3 },
+      { x: 0, y: 0, radius: 3 },
+    ],
+  ]);
+});
+
+it('traces both sides of horizontally shifted, overlapping line backgrounds', () => {
+  expect(
+    resolveDrawingTextBackgroundContours([
+      { left: 0, top: 0, width: 100, height: 25 },
+      { left: 20, top: 25, width: 100, height: 25 },
+    ])
+  ).toEqual([
+    [
+      { x: 100, y: 0, radius: 3 },
+      { x: 100, y: 25, radius: 0 },
+      { x: 120, y: 25, radius: 3 },
+      { x: 120, y: 50, radius: 3 },
+      { x: 20, y: 50, radius: 3 },
+      { x: 20, y: 25, radius: 0 },
+      { x: 0, y: 25, radius: 3 },
+      { x: 0, y: 0, radius: 3 },
+    ],
+  ]);
+});
+
+it('keeps vertically or horizontally separated backgrounds in distinct contours', () => {
+  const contours = resolveDrawingTextBackgroundContours([
+    { left: 0, top: 0, width: 120, height: 25 },
+    { left: 0, top: 30, width: 12, height: 25 },
+    { left: 40, top: 55, width: 80, height: 25 },
+  ]);
+  expect(contours).toHaveLength(3);
+  expect(contours.map((contour) => contour.length)).toEqual([4, 4, 4]);
+  expect(contours.flat().every((corner) => corner.radius === 3)).toBe(true);
+  expect(resolveDrawingTextBackgroundContours([])).toEqual([]);
+});
+
+it('uses circular corner tangents to trace the outer contour once', () => {
+  const operations: Array<readonly (string | number)[]> = [];
+  traceDrawingTextBackground(
+    {
+      moveTo: (...coordinates) => operations.push(['moveTo', ...coordinates]),
+      arcTo: (...coordinates) => operations.push(['arcTo', ...coordinates]),
+      closePath: () => operations.push(['closePath']),
+    },
+    [
+      { left: 0, top: 0, width: 120, height: 25 },
+      { left: 0, top: 25, width: 120, height: 25 },
+    ]
+  );
+  expect(operations).toEqual([
+    ['moveTo', 117, 0],
+    ['arcTo', 120, 0, 120, 50, 3],
+    ['arcTo', 120, 50, 0, 50, 3],
+    ['arcTo', 0, 50, 0, 0, 3],
+    ['arcTo', 0, 0, 120, 0, 3],
+    ['closePath'],
+  ]);
+});
 
 it.each([
   [
