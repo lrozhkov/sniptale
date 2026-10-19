@@ -1,13 +1,22 @@
-import { useCallback, useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
+import {
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useState,
+  type CSSProperties,
+  type RefObject,
+} from 'react';
 import {
   DRAWING_TEXT_HORIZONTAL_PADDING,
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextFontFamily,
   resolveDrawingTextBackgroundContours,
+  isDrawingTextStencil,
   type DrawingFontFamily,
   type DrawingTextBackgroundRect,
 } from '../../features/drawing/public';
+import { DrawingTextStencilMask, type DrawingTextStencilSource } from './text-stencil';
 
 export type DrawingTextVisualStyle = {
   backgroundColor: string | null;
@@ -133,9 +142,12 @@ export function useDrawingTextBackgroundRects(args: {
 export function DrawingTextBackgrounds(props: {
   color: string | null;
   rects: readonly DrawingTextBackgroundRect[];
+  text?: DrawingTextStencilSource & { color: string };
 }) {
+  const maskId = useId();
   const color = props.color;
   if (!color) return null;
+  const stencil = props.text && isDrawingTextStencil(props.text.color, color) ? props.text : null;
   const path = resolveDrawingTextBackgroundContours(props.rects)
     .map((corners) => {
       return (
@@ -174,7 +186,17 @@ export function DrawingTextBackgrounds(props: {
         zIndex: 0,
       }}
     >
-      <path data-ui="content.drawing.text-background" d={path} fill="currentColor" />
+      {stencil ? (
+        <defs>
+          <DrawingTextStencilMask id={maskId} source={stencil} rects={props.rects} />
+        </defs>
+      ) : null}
+      <path
+        data-ui="content.drawing.text-background"
+        d={path}
+        fill="currentColor"
+        mask={stencil ? `url(#${maskId})` : undefined}
+      />
     </svg>
   );
 }

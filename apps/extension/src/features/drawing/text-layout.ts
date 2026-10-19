@@ -1,3 +1,10 @@
+import { parseColor } from '@sniptale/foundation/color';
+
+/** Returns whether transparent glyphs must cut through their own text background. */
+export function isDrawingTextStencil(color: string, backgroundColor: string | null): boolean {
+  return Boolean(backgroundColor) && parseColor(color)?.alpha === 0;
+}
+
 export const DRAWING_TEXT_HORIZONTAL_PADDING = 12;
 export const DRAWING_TEXT_LINE_HEIGHT_FACTOR = 1.25;
 export const DRAWING_TEXT_VERTICAL_PADDING = 2;

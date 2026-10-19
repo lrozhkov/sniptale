@@ -121,7 +121,17 @@ function DrawingTextObject(props: {
         width: bounds.width,
       }}
     >
-      <DrawingTextBackgrounds color={style.backgroundColor} rects={backgroundRects} />
+      <DrawingTextBackgrounds
+        color={style.backgroundColor}
+        rects={backgroundRects}
+        text={{
+          contentRef,
+          value: object.text,
+          color: style.color,
+          fontFamily: style.fontFamily,
+          fontSize: style.fontSize,
+        }}
+      />
       <span ref={contentRef} style={contentStyle}>
         {resolveDrawingTextDomValue(object.text)}
       </span>

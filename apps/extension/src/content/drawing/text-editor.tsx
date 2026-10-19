@@ -254,7 +254,17 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         zIndex: 2,
       }}
     >
-      <DrawingTextBackgrounds color={props.style.backgroundColor} rects={backgroundRects} />
+      <DrawingTextBackgrounds
+        color={props.style.backgroundColor}
+        rects={backgroundRects}
+        text={{
+          contentRef: mirrorRef,
+          value: props.draft.value,
+          color: props.style.color,
+          fontFamily: props.style.fontFamily,
+          fontSize: props.style.fontSize,
+        }}
+      />
       <span
         ref={mirrorRef}
         data-ui="content.drawing.text-mirror"

@@ -7,7 +7,21 @@ import {
   resolveDrawingTextBackgroundRadii,
   resolveDrawingTextBackgroundContours,
   traceDrawingTextBackground,
+  isDrawingTextStencil,
 } from './text-layout';
+
+it.each(['transparent', '#0000', '#12345600', 'rgba(12, 34, 56, 0)', 'hsl(120 50% 50% / 0%)'])(
+  'uses a stencil only for zero-alpha %s with a background',
+  (color) => {
+    expect(isDrawingTextStencil(color, '#ff8800')).toBe(true);
+    expect(isDrawingTextStencil(color, null)).toBe(false);
+  }
+);
+
+it.each(['#123456', '#12345601', 'rgba(12, 34, 56, 0.001)', 'invalid'])(
+  'keeps visible or invalid %s out of stencil mode',
+  (color) => expect(isDrawingTextStencil(color, '#ff8800')).toBe(false)
+);
 
 it('removes the internal edge between equal-width line backgrounds', () => {
   expect(
