@@ -206,3 +206,34 @@ it('only stretches source proportions when explicitly requested by custom fittin
     height: 100,
   });
 });
+
+it('reflects only an editable camera without changing positions or unrelated clips', () => {
+  const { project, clip } = fixture();
+  project.clips.push({ ...clip, id: 'other' });
+  const before = structuredClone(project);
+  const next = editCameraPosition(project, clip.id, 3, { kind: 'mirror', mirrored: true });
+  expect(next.version).toBe(8);
+  expect(next.clips[0]).toEqual({ ...clip, cameraMirrored: true });
+  expect(next.clips[1]).toBe(project.clips[1]);
+  expect(project).toEqual(before);
+  expect(editCameraPosition(next, clip.id, 3, { kind: 'mirror', mirrored: true })).toBe(next);
+  const locked = { ...next, tracks: next.tracks.map((track) => ({ ...track, locked: true })) };
+  expect(editCameraPosition(locked, clip.id, 3, { kind: 'mirror', mirrored: false })).toBe(locked);
+  const primary = {
+    ...project,
+    tracks: project.tracks.map((track) => {
+      const primary = { ...track };
+      delete primary.role;
+      return primary;
+    }),
+  };
+  expect(editCameraPosition(primary, clip.id, 3, { kind: 'mirror', mirrored: true })).toBe(primary);
+  const reset = editCameraPosition(next, clip.id, 3, { kind: 'mirror', mirrored: false });
+  expect(reset.clips[0]).toMatchObject({
+    cameraMirrored: false,
+    cameraPositions: clip.cameraPositions,
+  });
+  for (const cameraMirrored of ['yes', 1, null])
+    expect(isVideoProjectClip({ ...clip, cameraMirrored })).toBe(false);
+  expect(isVideoProjectClip({ ...clip, type: 'AUDIO', cameraMirrored: true })).toBe(false);
+});

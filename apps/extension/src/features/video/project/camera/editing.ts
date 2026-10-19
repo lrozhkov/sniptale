@@ -25,6 +25,16 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'mirror') {
+    if (typeof edit.mirrored !== 'boolean' || (clip.cameraMirrored ?? false) === edit.mirrored)
+      return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId ? { ...clip, cameraMirrored: edit.mirrored } : item
+      )
+    );
+  }
   if (edit.kind === 'appearance') {
     if (!isCameraAppearance(edit.appearance)) return project;
     return applyVideoProjectClipsPatch(

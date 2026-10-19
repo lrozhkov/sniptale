@@ -217,6 +217,8 @@ export interface VideoProjectUtilityLanes {
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
   cameraPositions?: CameraPosition[];
   cameraAppearance?: CameraAppearance;
+  /** Reflect camera pixels within their window; the source clock and placement stay unchanged. */
+  cameraMirrored?: boolean;
   type: typeof VideoProjectClipType.VIDEO;
   assetId: string;
   /** A placement's identity survives cuts and timing edits; a duplicate gets a new identity. */
@@ -297,7 +299,7 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4 | 5 | 6 | 7;
+  version: 2 | 3 | 4 | 5 | 6 | 7 | 8;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;

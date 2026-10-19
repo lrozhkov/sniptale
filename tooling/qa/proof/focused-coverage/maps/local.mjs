@@ -1,5 +1,31 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-camera-pixel-orientation',
+    productionFile: 'apps/extension/src/features/video/project/camera/editing.ts',
+    allowCrossOwner: true,
+    reason:
+      'Camera commands affect schema admission, clip copies, source pixels and inspector crops.',
+    testFiles: [
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/validation/clips.test.ts',
+      'apps/extension/src/features/video/project/validation/project.test.ts',
+      'apps/extension/src/features/video/project/camera/appearance.test.ts',
+      'apps/extension/src/features/video/project/camera/animation.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
+      'apps/extension/src/video-editor/preview/stage/point-overlay/index.test.tsx',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-partial.test.ts',
+      'apps/extension/src/features/video/project/timeline/track-audio.test.ts',
+      'apps/extension/src/features/video/review/advanced/webcam.test.ts',
+      'apps/extension/src/workflows/video-review/render-webcam.test.ts',
+    ],
+  },
+  {
     owner: 'shared-video-audio-fades',
     productionFile: 'apps/extension/src/features/video/audio/fades.ts',
     allowCrossOwner: true,

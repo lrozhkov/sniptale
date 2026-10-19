@@ -300,6 +300,7 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  mirrored?: boolean;
   windowHeader?: WindowHeader;
   point: { x: number; y: number };
   frame: MediaFrame & { rotation: number };
@@ -351,8 +352,9 @@ export function mapSourceNormalizedPointToVisualLayer(
   )
     return null;
   const content = getFittedMediaContentFrame(params);
+  const sourceX = content.x + params.point.x * content.width;
   const point = {
-    x: content.x + params.point.x * content.width,
+    x: params.mirrored ? 2 * params.frame.x + params.frame.width - sourceX : sourceX,
     y: content.y + params.point.y * content.height,
   };
   if (!isInsideFrame(point, params.frame)) return null;
@@ -379,8 +381,9 @@ export function mapVisualLayerPointToSourceNormalized(
   const { center, angle } = visualLayerRotation(params.frame);
   const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;
   const y = (params.point.y - center.y - params.renderState.translateY) / params.renderState.scaleY;
+  const unrotatedX = center.x + x * Math.cos(angle) + y * Math.sin(angle);
   const point = {
-    x: center.x + x * Math.cos(angle) + y * Math.sin(angle),
+    x: params.mirrored ? 2 * params.frame.x + params.frame.width - unrotatedX : unrotatedX,
     y: center.y - x * Math.sin(angle) + y * Math.cos(angle),
   };
   const content = getFittedMediaContentFrame(params);
@@ -404,4 +407,25 @@ interface FittedMediaPointMapping {
   point: SourcePoint;
   sourceHeight: number;
   sourceWidth: number;
+}
+
+/** Reflect only camera pixels after their crop; callers retain overlays and decoration. */
+export function drawCameraMediaSource(
+  context: CanvasRenderingContext2D,
+  frame: MediaFrame,
+  mirrored: boolean,
+  render: () => void
+): void {
+  if (!mirrored) {
+    render();
+    return;
+  }
+  context.save();
+  try {
+    context.translate(2 * frame.x + frame.width, 0);
+    context.scale(-1, 1);
+    render();
+  } finally {
+    context.restore();
+  }
 }

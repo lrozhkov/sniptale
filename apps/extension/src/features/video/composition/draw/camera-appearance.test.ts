@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../project/camera/appearance';
-import { drawFittedMediaLayer } from './fitted-media';
+import { drawFittedMediaLayer, drawCameraMediaSource } from './fitted-media';
 import { traceCameraShape } from './media-shadow';
 
 it('clips the source to a rounded window while cropping without stretching', () => {
@@ -45,4 +45,21 @@ it('uses the same closed silhouette for shadow masks at nonzero offsets', () => 
   expect(context.moveTo).toHaveBeenCalledWith(120, 60);
   expect(context.lineTo).toHaveBeenCalledTimes(127);
   expect(context.closePath).toHaveBeenCalledOnce();
+});
+
+it('reflects source pixels about the camera window and restores context after failure', () => {
+  const context = { save: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn() };
+  const render = vi.fn();
+  const frame = { x: 20, y: 40, width: 160, height: 90 };
+  drawCameraMediaSource(context as unknown as CanvasRenderingContext2D, frame, false, render);
+  expect(context.save).not.toHaveBeenCalled();
+  expect(render).toHaveBeenCalledOnce();
+  expect(() =>
+    drawCameraMediaSource(context as unknown as CanvasRenderingContext2D, frame, true, () => {
+      expect(context.translate).toHaveBeenCalledWith(200, 0);
+      expect(context.scale).toHaveBeenCalledWith(-1, 1);
+      throw new Error('Source unavailable');
+    })
+  ).toThrow('Source unavailable');
+  expect(context.restore).toHaveBeenCalledOnce();
 });

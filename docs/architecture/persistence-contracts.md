@@ -439,3 +439,12 @@ The offscreen collector derives `audioFadePhase` for each renderable media clip.
 Preview and export use the existing `getClipGainRange` rule for media clips. Each explicit absolute endpoint takes priority over legacy multiplier fields. An absent endpoint uses the legacy volume and envelope. The existing rule bounds each legacy factor and final endpoint from 0 to 2.
 
 Export derives canonical endpoints in a temporary media plan before range cropping. The plan multiplies track volume once, separately from fades, original attenuation and transitions. Opening and direct export interpret admitted legacy projects consistently. Rendering does not rewrite the supplied project or its durable gain fields. EffectV1 audio plans retain their independent gain semantics.
+
+
+## Camera reflection in Montage
+
+Project JSON version 8 admits optional `cameraMirrored` on VIDEO clips. The value must be a boolean. Omission means false. Versions 2–7 remain readable without this field. Older readers refuse version 8. Mutations retain version 8 after removal of the field or clip. Opening does not write a default.
+
+Only clips on CAMERA tracks apply reflection. Other VIDEO clips retain the setting without applying it. Reflection changes camera pixels inside the cropped window. It preserves source clocks, placement, masks, shadows and window decoration. Source-bound action positions follow reflected pixels. Their glyphs remain upright.
+
+The existing camera command, project mutation, history and save owners control these edits. This change adds no resource writer or physical database migration.

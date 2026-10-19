@@ -124,6 +124,9 @@ export function resolveVideoCompositionActionSourceMapping(
   const asset = project.assets.find((item) => item.id === clip.assetId);
   if (!asset) return null;
   return {
+    mirrored:
+      clip.cameraMirrored === true &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA'),
     frame: clip.transform,
     fitMode: clip.fitMode,
     ...(clip.windowHeader &&

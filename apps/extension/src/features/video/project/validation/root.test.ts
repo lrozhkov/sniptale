@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 8])
+  for (const version of [2, 3, 4, 9])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -106,4 +106,33 @@ it('admits source-bound authored text only in version five and preserves dormant
       ],
     })
   ).toBe(false);
+});
+
+it('fences camera reflection at schema eight and retains the version after removal', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } = await import('./root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'mirror',
+    filename: 'camera.webm',
+    width: 160,
+    height: 90,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  for (const mirrored of [true, false]) {
+    const changed = applyVideoProjectMutationPatch(project, {
+      clips: project.clips.map((clip) =>
+        clip.type === 'VIDEO' ? { ...clip, cameraMirrored: mirrored } : clip
+      ),
+    });
+    expect(changed.version).toBe(8);
+    expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+    expect(isExportReadyVideoProject(changed)).toBe(true);
+    for (const version of [2, 3, 4, 5, 6, 7, 9])
+      expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+    expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
+  }
+  for (const version of [2, 3, 4, 5, 6, 7, 8])
+    expect(isHydratableVideoProject({ ...project, version })).toBe(true);
 });

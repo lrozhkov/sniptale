@@ -168,3 +168,49 @@ it('video fitting projects physical gesture points, paths and authored areas onc
   expect(layer.actions![0]!.point).toEqual({ x: 0.2, y: 0.3 });
   expect(drawActionCompositionState).toHaveBeenCalledOnce();
 });
+
+it('reflects decoded camera pixels without reflecting normal video or action glyphs', () => {
+  for (const trackRole of ['CAMERA', undefined] as const) {
+    const context = createContext();
+    const draw = vi.fn();
+    vi.mocked(drawActionCompositionState).mockClear();
+    const layer = {
+      ...createVideoLayer(),
+      actions: gestureLayer().actions,
+      trackRole,
+      clip: { fitMode: 'STRETCH', cameraMirrored: true },
+    };
+    drawCompositionVisualLayer(
+      context,
+      layer as never,
+      1,
+      1,
+      {},
+      new Map([['video-1', { draw, sourceWidth: 80, sourceHeight: 50 }]])
+    );
+    expect(draw).toHaveBeenCalledWith(context, 10, 12, 80, 50);
+    if (trackRole !== 'CAMERA') expect(context.scale).not.toHaveBeenCalled();
+    else expect(context.scale).toHaveBeenCalledWith(-1, 1);
+    if (trackRole === 'CAMERA') {
+      expect(context.translate).toHaveBeenCalledWith(100, 0);
+      const reflect = vi
+        .mocked(context.scale)
+        .mock.invocationCallOrder.find(
+          (_, i) => vi.mocked(context.scale).mock.calls[i]?.[0] === -1
+        )!;
+      const pixel = draw.mock.invocationCallOrder[0]!;
+      const action = vi.mocked(drawActionCompositionState).mock.invocationCallOrder.at(-1)!;
+      expect(pixel).toBeGreaterThan(reflect);
+      expect(action).toBeGreaterThan(pixel);
+      expect(
+        vi
+          .mocked(context.restore)
+          .mock.invocationCallOrder.some((order) => order > pixel && order < action)
+      ).toBe(true);
+      const painted = vi.mocked(drawActionCompositionState).mock.lastCall![1];
+      expect(painted.point).toEqual({ x: 74, y: 27 });
+      expect(painted.gestureFeedback!.path![0]).toEqual({ x: 82, y: 22 });
+      expect(painted.gestureFeedback!.area).toEqual({ x: 58, y: 22, width: 24, height: 20 });
+    }
+  }
+});

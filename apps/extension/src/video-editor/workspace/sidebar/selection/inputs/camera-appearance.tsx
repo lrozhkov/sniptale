@@ -36,6 +36,21 @@ export function CameraAppearanceControls(props: {
   return (
     <div className="sniptale-parameter-stack space-y-2" data-ui="video-editor.camera-appearance">
       <OptionButtonsField
+        label={translate('gallery.videoReview.webcamMirror')}
+        value={props.clip.cameraMirrored ? 'horizontal' : 'off'}
+        disabled={disabled}
+        options={[
+          { value: 'off', label: translate('gallery.videoReview.webcamMirrorOff') },
+          { value: 'horizontal', label: translate('gallery.videoReview.webcamMirrorOn') },
+        ]}
+        onChange={(value) =>
+          props.onEdit?.(props.clip.id, {
+            kind: 'mirror',
+            mirrored: value === 'horizontal',
+          })
+        }
+      />
+      <OptionButtonsField
         label={translate('videoEditor.sidebar.cameraShape')}
         value={value.shape}
         disabled={disabled}
@@ -87,6 +102,7 @@ export function CameraAppearanceControls(props: {
           width={transform.width}
           height={transform.height}
           appearance={value}
+          mirrored={props.clip.cameraMirrored ?? false}
           fitMode={position?.fitMode ?? props.clip.fitMode}
           disabled={disabled}
           onChange={change}

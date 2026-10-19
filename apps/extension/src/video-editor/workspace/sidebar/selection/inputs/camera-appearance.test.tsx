@@ -137,11 +137,40 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
   const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
-  expect(shapeChoices).toHaveLength(3);
+  expect(shapeChoices).toHaveLength(5);
   expect(shapeChoices.every((button) => button.disabled)).toBe(true);
   expect(
     shapeChoices
       .find((button) => button.textContent?.includes('cameraShapeEllipse'))
       ?.getAttribute('aria-pressed')
   ).toBe('true');
+});
+
+it('commits reflection through the camera command and disables it on locked clips', async () => {
+  const base = createProps();
+  const onEdit = vi.fn();
+  const render = (disabled: boolean, cameraMirrored = false) =>
+    act(() =>
+      root.render(
+        <CameraAppearanceControls
+          project={base.project}
+          clip={{ ...base.clip, cameraMirrored }}
+          currentTime={0}
+          disabled={disabled}
+          onEdit={onEdit}
+        />
+      )
+    );
+  render(false);
+  const horizontal = () =>
+    [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      button.textContent?.includes('webcamMirrorOn')
+    )!;
+  await act(async () =>
+    horizontal().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  );
+  expect(onEdit).toHaveBeenCalledWith(base.clip.id, { kind: 'mirror', mirrored: true });
+  render(true, true);
+  expect(horizontal().getAttribute('aria-pressed')).toBe('true');
+  expect(horizontal().disabled).toBe(true);
 });

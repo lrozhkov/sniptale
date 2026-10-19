@@ -4,7 +4,10 @@ import {
   cameraContentFrame,
   type CameraAppearance,
 } from '../../../../../features/video/project/camera/appearance';
-import { drawFittedMediaLayer } from '../../../../../features/video/composition/draw/fitted-media';
+import {
+  drawFittedMediaLayer,
+  drawCameraMediaSource,
+} from '../../../../../features/video/composition/draw/fitted-media';
 import { translate } from '../../../../../platform/i18n';
 
 interface CameraCropPreviewProps {
@@ -13,6 +16,7 @@ interface CameraCropPreviewProps {
   width: number;
   height: number;
   appearance: CameraAppearance;
+  mirrored?: boolean;
   fitMode?: VideoMediaFitMode;
   disabled: boolean;
   onChange: (appearance: CameraAppearance) => void;
@@ -88,7 +92,10 @@ bg-[var(--sniptale-color-surface-muted)] disabled:cursor-default`}
             panX:
               Math.abs(start.dx) < 0.01
                 ? 0
-                : clamp(start.origin.panX + (2 * (event.clientX - start.x)) / start.dx),
+                : clamp(
+                    start.origin.panX +
+                      (2 * (event.clientX - start.x) * (props.mirrored ? -1 : 1)) / start.dx
+                  ),
             panY:
               Math.abs(start.dy) < 0.01
                 ? 0
@@ -127,7 +134,7 @@ bg-[var(--sniptale-color-surface-muted)] disabled:cursor-default`}
           event.stopPropagation();
           props.onChange({
             ...props.appearance,
-            panX: clamp(props.appearance.panX + delta[0]),
+            panX: clamp(props.appearance.panX + delta[0] * (props.mirrored ? -1 : 1)),
             panY: clamp(props.appearance.panY + delta[1]),
           });
         }}
@@ -214,7 +221,13 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
         shadowMode: undefined,
         sourceWidth: media.videoWidth,
         sourceHeight: media.videoHeight,
-        render: (x, y, w, h) => context.drawImage(media, x, y, w, h),
+        render: (x, y, w, h) =>
+          drawCameraMediaSource(
+            context,
+            { x: 0, y: 0, width: target.width, height: target.height },
+            props.mirrored ?? false,
+            () => context.drawImage(media, x, y, w, h)
+          ),
       });
     };
     draw();
@@ -225,7 +238,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       observer.disconnect();
       window.removeEventListener('resize', draw);
     };
-  }, [appearance, ready, revision, props.width, props.height, props.fitMode]);
+  }, [props.mirrored, appearance, ready, revision, props.width, props.height, props.fitMode]);
   return {
     video,
     canvas,

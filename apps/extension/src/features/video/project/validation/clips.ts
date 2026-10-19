@@ -197,6 +197,12 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   }
 
   if (
+    value['cameraMirrored'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO || typeof value['cameraMirrored'] !== 'boolean')
+  )
+    return false;
+
+  if (
     value['textSnapshot'] !== undefined &&
     (value['type'] !== VideoProjectClipType.AUDIO ||
       !parseVideoProjectVoiceTextSnapshot(value['textSnapshot']))

@@ -6,6 +6,7 @@ import type { VideoMediaFitMode } from '../types/media';
 type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
 export type CameraPositionEdit =
+  | { kind: 'mirror'; mirrored: boolean }
   | { kind: 'appearance'; appearance: CameraAppearance }
   | { kind: 'add' }
   | { kind: 'select'; id: string | null }

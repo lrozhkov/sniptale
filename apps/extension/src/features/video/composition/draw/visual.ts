@@ -3,7 +3,7 @@ import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
-import { drawFittedMediaLayer } from './fitted-media';
+import { drawFittedMediaLayer, drawCameraMediaSource } from './fitted-media';
 import { drawTextCompositionLayer } from './overlays';
 import { drawShapeCompositionLayer } from './shape';
 import { isVideoCompositionFrameSource, type VideoCompositionMediaSource } from './media-source';
@@ -226,10 +226,17 @@ function drawVideoLayer(
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
     render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
-      if (!layer.effectActionsOnly && source instanceof HTMLVideoElement) {
-        drawContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-      } else if (!layer.effectActionsOnly && !(source instanceof HTMLVideoElement)) {
-        source.draw(drawContext, drawX, drawY, drawWidth, drawHeight);
+      if (!layer.effectActionsOnly) {
+        drawCameraMediaSource(
+          drawContext,
+          frame,
+          layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true,
+          () => {
+            if (source instanceof HTMLVideoElement)
+              drawContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
+            else source.draw(drawContext, drawX, drawY, drawWidth, drawHeight);
+          }
+        );
       }
       drawContext.save();
       drawContext.beginPath();
@@ -252,9 +259,14 @@ function drawVideoLayer(
       const sourceHeight =
         source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight;
       const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
+      const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
+      const sourceX = (x: number) => {
+        const projected = drawX + x * drawWidth;
+        return mirrored ? 2 * frame.x + frame.width - projected : projected;
+      };
       for (const action of layer.actions ?? []) {
         const point = action.point
-          ? { x: drawX + action.point.x * drawWidth, y: drawY + action.point.y * drawHeight }
+          ? { x: sourceX(action.point.x), y: drawY + action.point.y * drawHeight }
           : action.renderKind === 'keystroke'
             ? {
                 x: contentBounds.x + 12 * Math.max(0.2, actionScale),
@@ -273,7 +285,7 @@ function drawVideoLayer(
                     ...(action.gestureFeedback.path
                       ? {
                           path: action.gestureFeedback.path.map((item) => ({
-                            x: drawX + item.x * drawWidth,
+                            x: sourceX(item.x),
                             y: drawY + item.y * drawHeight,
                           })),
                         }
@@ -281,7 +293,10 @@ function drawVideoLayer(
                     ...(action.gestureFeedback.area
                       ? {
                           area: {
-                            x: drawX + action.gestureFeedback.area.x * drawWidth,
+                            x: sourceX(
+                              action.gestureFeedback.area.x +
+                                (mirrored ? action.gestureFeedback.area.width : 0)
+                            ),
                             y: drawY + action.gestureFeedback.area.y * drawHeight,
                             width: action.gestureFeedback.area.width * drawWidth,
                             height: action.gestureFeedback.area.height * drawHeight,

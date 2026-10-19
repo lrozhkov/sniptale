@@ -15,6 +15,8 @@ const context = {
   roundRect: vi.fn(),
   clip: vi.fn(),
   drawImage: draw,
+  translate: vi.fn(),
+  scale: vi.fn(),
 };
 beforeEach(() => {
   container = document.createElement('div');
@@ -152,4 +154,20 @@ it('keeps failed media recoverable and releases its source when unmounted', () =
   expect(button().disabled).toBe(false);
   act(() => root.render(null));
   expect(video.hasAttribute('src')).toBe(false);
+});
+
+it('keeps mirrored crop dragging and keyboard movement in the visible direction', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} mirrored />));
+  ready();
+  expect(context.scale).toHaveBeenCalledWith(-1, 1);
+  pointer('pointerdown', 100, 75);
+  pointer('pointermove', 120, 65);
+  pointer('pointerup', 120, 65);
+  expect(p.onChange).toHaveBeenCalledWith({ ...p.appearance, panX: 0.2, panY: 2 / 15 });
+  p.onChange.mockClear();
+  act(() =>
+    button().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
+  );
+  expect(p.onChange).toHaveBeenCalledWith({ ...p.appearance, panX: -0.1 });
 });

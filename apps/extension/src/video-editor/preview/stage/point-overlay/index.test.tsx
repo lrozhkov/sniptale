@@ -488,3 +488,47 @@ it('drags the selected repeated occurrence in source coordinates and preserves i
     clipId: repeat.id,
   });
 });
+
+it.each([
+  { role: 'CAMERA' as const, mirrored: true, displayedX: 84 },
+  { role: 'CAMERA' as const, mirrored: false, displayedX: 36 },
+  { role: 'PRIMARY' as const, mirrored: true, displayedX: 36 },
+])(
+  'keeps the $role mirrored=$mirrored action handle and point picker on painted coordinates',
+  ({ role, mirrored, displayedX }) => {
+    const { project, clip, occurrences } = createCapturedOverlayFixture();
+    if (role === 'CAMERA') project.tracks[0]!.role = role;
+    else delete project.tracks[0]!.role;
+    project.clips = [clip];
+    clip.cameraMirrored = mirrored;
+    clip.fitMode = 'STRETCH';
+    project.actionEvents[0]!.point = { x: 0.2, y: 0.5 };
+    const occurrence = occurrences()[0]!;
+    const onUpdateActionEventDetails = vi.fn();
+    const params = {
+      camera: createCamera(),
+      currentTime: 1,
+      project,
+      stageRef: { current: createStage() },
+      placementMode: createActionPointPlacementMode('fact', clip.id),
+      selectedActionOccurrence: occurrence,
+      selectedMotionRegion: null,
+      onClearPlacementMode: vi.fn(),
+      onUpdateActionEventDetails,
+      onUpdateMotionRegion: vi.fn(),
+    };
+    act(() => root?.render(<PreviewStagePointOverlay {...params} placementMode={null} />));
+    const handle = container?.querySelector<HTMLButtonElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    expect(handle).toBeTruthy();
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(displayedX / 2, 8);
+    expect(parseFloat(handle!.style.top)).toBeCloseTo(40, 8);
+    expect(handleStagePointPlacement(createPointEvent(displayedX, 40), params)).toBe(true);
+    expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+      point: { x: expect.closeTo(0.2, 8), y: 0.5 },
+      clipId: clip.id,
+    });
+    expect(project.actionEvents[0]!.point).toEqual({ x: 0.2, y: 0.5 });
+  }
+);
