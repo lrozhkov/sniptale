@@ -39,10 +39,17 @@ export function useDrawingOptionsLayout(args: {
   panelRef: RefObject<HTMLDivElement | null>;
   tool: DrawingQuickOptionsTool;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  open: boolean;
 }) {
   const [, setViewportRevision] = useState(0);
-  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+  const measurementKey = `${args.displayMode}:${args.tool}:${args.hasSelection}`;
+  const [measured, setMeasured] = useState<{ key: string; width: number; height: number } | null>(
+    null
+  );
   useLayoutEffect(() => {
+    if (!args.open) {
+      return;
+    }
     const surface = args.panelRef.current?.closest<HTMLElement>(
       '[data-ui="content.toolbar.drawing-options.pair"], .sniptale-drawing-options-menu'
     );
@@ -54,7 +61,9 @@ export function useDrawingOptionsLayout(args: {
       const height = root.offsetHeight;
       if (!width || !height) return;
       setMeasured((current) =>
-        current?.width === width && current.height === height ? current : { width, height }
+        current?.key === measurementKey && current.width === width && current.height === height
+          ? current
+          : { key: measurementKey, width, height }
       );
     };
     const refresh = () => {
@@ -71,41 +80,45 @@ export function useDrawingOptionsLayout(args: {
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, [args.displayMode, args.hasSelection, args.panelRef, args.tool]);
+  }, [args.panelRef, args.open, measurementKey]);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
+  const currentMeasurement = measured?.key === measurementKey ? measured : null;
   const menuHeight =
-    measured?.height ??
+    currentMeasurement?.height ??
     dimensions.height + (args.hasSelection && args.displayMode === 'vertical' ? 294 : 0);
   const menuWidth = Math.min(
-    measured?.width ??
+    currentMeasurement?.width ??
       dimensions.width + (args.hasSelection && args.displayMode === 'horizontal' ? 294 : 0),
     Math.max(0, window.innerWidth - 16)
   );
-  const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
-  const positioned = resolveToolbarFloatingMenuStyle({
-    anchorEl: args.triggerRef.current,
-    displayMode: args.displayMode,
-    menuHeight,
-    menuWidth,
-    placement,
-    preferredTop: args.hasSelection ? -16 : 0,
-  });
-  const fallback: CSSProperties =
-    args.displayMode === 'vertical'
-      ? { left: 'calc(100% + 10px)', top: 0 }
-      : { left: 0, top: 'calc(100% + 10px)' };
-  const verticalOverflow: CSSProperties =
-    args.displayMode === 'vertical' ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' } : {};
-  return {
-    placement: resolveToolbarMenuPlacement(args.displayMode, placement),
-    style: {
-      ...(positioned ?? fallback),
-      maxWidth: 'calc(100vw - 16px)',
-      minWidth: 0,
-      overflowX: 'auto',
-      padding: '8px',
-      zIndex: TOOLBAR_SECONDARY_MENU_Z_INDEX,
-      ...verticalOverflow,
-    } satisfies CSSProperties,
+  const resolveLayout = () => {
+    const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
+    const positioned = resolveToolbarFloatingMenuStyle({
+      anchorEl: args.triggerRef.current,
+      displayMode: args.displayMode,
+      menuHeight,
+      menuWidth,
+      placement,
+      preferredTop: args.hasSelection ? -16 : 0,
+    });
+    const fallback: CSSProperties =
+      args.displayMode === 'vertical'
+        ? { left: 'calc(100% + 10px)', top: 0 }
+        : { left: 0, top: 'calc(100% + 10px)' };
+    const verticalOverflow: CSSProperties =
+      args.displayMode === 'vertical' ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' } : {};
+    return {
+      placement: resolveToolbarMenuPlacement(args.displayMode, placement),
+      style: {
+        ...(positioned ?? fallback),
+        maxWidth: 'calc(100vw - 16px)',
+        minWidth: 0,
+        overflowX: 'auto',
+        padding: '8px',
+        zIndex: TOOLBAR_SECONDARY_MENU_Z_INDEX,
+        ...verticalOverflow,
+      } satisfies CSSProperties,
+    };
   };
+  return { ...resolveLayout(), resolveLayout };
 }

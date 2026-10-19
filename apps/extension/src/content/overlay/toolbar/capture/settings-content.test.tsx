@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
-import { ToolbarSettingsDropdown } from './settings-content';
+import { ToolbarSettingsDropdown, useToolbarSettingsDropdownLayout } from './settings-content';
 
 const createTrustedContentActionIntentSource = vi.hoisted(() =>
   vi.fn(() => ({ kind: 'trusted-content-event' as const }))
@@ -22,6 +22,13 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+function SettingsDropdownHarness(
+  props: Omit<ComponentProps<typeof ToolbarSettingsDropdown>, 'layout'>
+) {
+  const resolveLayout = useToolbarSettingsDropdownLayout({ ...props, open: true });
+  return <ToolbarSettingsDropdown {...props} layout={resolveLayout()} />;
+}
 
 function ensureContainer() {
   if (!container) {
@@ -74,7 +81,7 @@ function renderSettingsDropdown(params?: {
 
   act(() => {
     root?.render(
-      <ToolbarSettingsDropdown
+      <SettingsDropdownHarness
         compactMenus={true}
         {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
         onFreePlacementChange={params?.onFreePlacementChange}
@@ -99,12 +106,12 @@ function renderSettingsDropdown(params?: {
   return { onDisableScreenshotMode, onPinToTabChange };
 }
 
-function renderSettingsDropdownNearSidebar() {
+function renderSettingsDropdownNearSidebar(viewportRightInset = 348) {
   ensureContainer();
 
   act(() => {
     root?.render(
-      <ToolbarSettingsDropdown
+      <SettingsDropdownHarness
         compactMenus={true}
         displayMode="vertical"
         menuRef={createMenuRef()}
@@ -123,7 +130,7 @@ function renderSettingsDropdownNearSidebar() {
           right: 896,
           x: 860,
         })}
-        viewportRightInset={348}
+        viewportRightInset={viewportRightInset}
       />
     );
   });
@@ -173,6 +180,46 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(menuSurface?.style.left).toBe('auto');
     expect(menuSurface?.style.right).toBe('calc(100% + 10px)');
+  });
+
+  it('uses the measured settings width to select the opening side', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(200);
+    renderSettingsDropdownNearSidebar(0);
+
+    const menuSurface = container?.querySelector<HTMLElement>('.sniptale-popover-menu');
+
+    expect(menuSurface?.style.left).toBe('auto');
+    expect(menuSurface?.style.right).toBe('calc(100% + 10px)');
+  });
+
+  it('retains the measured opening direction after the settings menu closes', () => {
+    ensureContainer();
+    const triggerRef = createButtonRef({ top: 600, bottom: 636, y: 600 });
+    const menuRef = createMenuRef();
+    menuRef.current = document.createElement('div');
+    const surface = document.createElement('div');
+    Object.defineProperty(surface, 'offsetWidth', { value: 280 });
+    Object.defineProperty(surface, 'offsetHeight', { value: 200 });
+    menuRef.current.appendChild(surface);
+
+    function RetainedSettingsLayout(props: { open: boolean }) {
+      const resolveLayout = useToolbarSettingsDropdownLayout({
+        menuRef,
+        triggerRef,
+        compactMenus: true,
+        displayMode: 'horizontal',
+        open: props.open,
+      });
+      return <output data-placement={resolveLayout().placement} />;
+    }
+
+    act(() => root?.render(<RetainedSettingsLayout open={true} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
+    act(() => root?.render(<RetainedSettingsLayout open={false} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
+    act(() => root?.render(<RetainedSettingsLayout open={true} />));
+    expect(container?.querySelector('output')?.dataset['placement']).toBe('down');
   });
 
   it('toggles pin-to-tab from the settings menu', () => {

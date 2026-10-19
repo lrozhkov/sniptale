@@ -33,9 +33,33 @@ import {
   selectAnnotationForkDrafts,
 } from './annotation-fork-session';
 import { setHighlighterCreationEnabled } from '../../../selection/highlighter';
+import { resolveFrameAnnotationSettingsPopoverDirection } from '../../../../composition/frame-annotation-controls/popover/position';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../../composition/frame-annotation-controls/popover/surface';
+import { resolveMainToolbarFramePopoverDirection } from '../../../selection/interactive-frame/layout/popover-position';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
+
+function resolveCreationMenuDirection(
+  menu: FrameAnnotationCreationMenu,
+  anchorEl: HTMLElement | null
+) {
+  if (!anchorEl) return undefined;
+  if (menu === 'frame') {
+    return resolveMainToolbarFramePopoverDirection(anchorEl, {
+      width: SETTINGS_POPOVER_WIDTH,
+      height: SETTINGS_POPOVER_HEIGHT,
+    });
+  }
+  return resolveFrameAnnotationSettingsPopoverDirection({
+    anchorEl,
+    width: SETTINGS_POPOVER_WIDTH,
+    height: SETTINGS_POPOVER_HEIGHT,
+  });
+}
 
 export function FutureFrameStyleControls(props: {
   compactMenus?: boolean;
@@ -116,6 +140,7 @@ export function FutureFrameStyleControls(props: {
         <FrameAnnotationCreationControls
           activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
           context="content"
+          resolveMenuDirection={resolveCreationMenuDirection}
           frameActive={frameActive}
           calloutTemplateSourceControl={{
             onChange: (source) => setAnnotationTemplateSource('callout', source),

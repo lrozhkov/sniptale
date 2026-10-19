@@ -1,10 +1,41 @@
 import { ChevronDown, Droplet, Focus, ListOrdered, Square } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import type { ReactNode, RefObject } from 'react';
+import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
+import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
 import { FrameCommentIcon } from '../../features/highlighter/frame-annotation/icons';
 import type { EffectMode } from '../../features/highlighter/contracts';
 import { translate } from '../../platform/i18n';
 import type { FrameAnnotationCreationMenu, FrameAnnotationCreationSettings } from './contracts';
+import type { FrameAnnotationMenuDirection } from './popover/position';
+
+export type FrameAnnotationMenuDirectionResolver = (
+  menu: FrameAnnotationCreationMenu,
+  anchor: HTMLElement | null
+) => FrameAnnotationMenuDirection | undefined;
+
+function useCreationMenuDirection(
+  menu: FrameAnnotationCreationMenu,
+  anchorRef: RefObject<HTMLButtonElement | null>,
+  resolve: FrameAnnotationMenuDirectionResolver | undefined
+) {
+  const [direction, setDirection] = useState<FrameAnnotationMenuDirection>();
+  useLayoutEffect(() => {
+    if (!resolve) return;
+    const refresh = () => setDirection(resolve(menu, anchorRef.current));
+    const cleanup = bindFloatingInteractionPositionListeners(anchorRef.current, refresh);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
+    if (anchorRef.current) {
+      observer?.observe(anchorRef.current);
+      const toolbar = anchorRef.current.closest('.sniptale-toolbar');
+      if (toolbar) observer?.observe(toolbar);
+    }
+    return () => {
+      cleanup?.();
+      observer?.disconnect();
+    };
+  });
+  return direction;
+}
 
 function CreationSplitButton(props: {
   active: boolean;
@@ -13,10 +44,13 @@ function CreationSplitButton(props: {
   disabled?: boolean;
   menuOpen: boolean;
   menuRef: RefObject<HTMLButtonElement | null>;
+  menu: FrameAnnotationCreationMenu;
+  resolveMenuDirection?: FrameAnnotationMenuDirectionResolver | undefined;
   onMenuClick: () => void;
   onToggle: () => void;
   title: string;
 }) {
+  const menuSide = useCreationMenuDirection(props.menu, props.menuRef, props.resolveMenuDirection);
   return (
     <div
       className="sniptale-split-action sniptale-full-page-wrapper"
@@ -41,6 +75,7 @@ function CreationSplitButton(props: {
         aria-expanded={props.menuOpen}
         aria-haspopup="menu"
         className="sniptale-split-action-end sniptale-full-page-chevron"
+        data-menu-side={menuSide}
         dataUi={`${props.dataUi}.menu`}
         disabled={props.disabled ?? false}
         onClick={(event) => {
@@ -63,6 +98,7 @@ export function FrameStyleCreationButton(props: {
   frameActive: boolean;
   frameRef: RefObject<HTMLButtonElement | null>;
   onToggleFrame: () => void;
+  resolveMenuDirection?: FrameAnnotationMenuDirectionResolver | undefined;
   settings: FrameAnnotationCreationSettings;
   toggle: (menu: FrameAnnotationCreationMenu) => void;
 }) {
@@ -84,6 +120,8 @@ export function FrameStyleCreationButton(props: {
         disabled={props.disabled ?? false}
         menuOpen={props.activeMenu === 'frame'}
         menuRef={props.frameRef}
+        menu="frame"
+        resolveMenuDirection={props.resolveMenuDirection}
         onMenuClick={() => props.toggle('frame')}
         onToggle={props.onToggleFrame}
         title={getEffectLabel(props.settings.effectMode)}
@@ -103,6 +141,7 @@ export function AnnotationCreationButtons(props: {
   onStepBadgeMenu: () => void;
   onToggleCallout: () => void;
   onToggleStepBadge: () => void;
+  resolveMenuDirection?: FrameAnnotationMenuDirectionResolver | undefined;
   settings: FrameAnnotationCreationSettings;
   showCallout: boolean;
   showStepBadge: boolean;
@@ -131,6 +170,8 @@ export function AnnotationCreationButtons(props: {
           disabled={props.disabled ?? false}
           menuOpen={props.activeMenu === 'callout'}
           menuRef={props.calloutRef}
+          menu="callout"
+          resolveMenuDirection={props.resolveMenuDirection}
           onMenuClick={props.onCalloutMenu}
           onToggle={props.onToggleCallout}
           title={translate('content.callout.settingsTitle')}
@@ -149,6 +190,8 @@ export function AnnotationCreationButtons(props: {
           disabled={props.disabled ?? false}
           menuOpen={props.activeMenu === 'step-badge'}
           menuRef={props.stepBadgeRef}
+          menu="step-badge"
+          resolveMenuDirection={props.resolveMenuDirection}
           onMenuClick={props.onStepBadgeMenu}
           onToggle={props.onToggleStepBadge}
           title={translate('content.stepBadge.settingsTitle')}

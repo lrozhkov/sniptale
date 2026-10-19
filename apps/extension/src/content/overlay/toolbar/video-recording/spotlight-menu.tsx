@@ -10,6 +10,7 @@ import { translate } from '../../../../platform/i18n';
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import type { ToolbarMenuState } from '../state/menu';
 
 type VideoRecordingSpotlightSettings = {
@@ -114,20 +115,26 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
 
 export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
   const state = useSpotlightMenuState(props);
-  const dropdown = resolveToolbarDropdownState({
-    anchorRef: state.triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-    menuHeight: 190,
-    menuWidth: 280,
-    preferredAlign: 'start',
-  });
+  const resolveLayout = () => {
+    const dropdown = resolveToolbarDropdownState({
+      anchorRef: state.triggerRef,
+      displayMode: props.displayMode,
+      getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
+      menuHeight: 190,
+      menuWidth: 280,
+      preferredAlign: 'start',
+    });
+    return { placement: dropdown.menuPlacement, style: dropdown.style };
+  };
+  const dropdown = resolveLayout();
+  const menuSide = useToolbarMenuDirection(resolveLayout);
   const label = translate('content.toolbar.videoRecordingSpotlight');
   return (
     <div className="relative flex">
       <ContentToolbarGroup aria-label={label}>
         <ContentToolbarButton
           ref={state.triggerRef}
+          data-menu-side={menuSide}
           active={state.active}
           tone="property"
           disabled={props.disabled}
@@ -157,7 +164,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
           <ProductToolbarMenu
             className="sniptale-content-menu-adopted"
             compact={props.compact}
-            placement={dropdown.menuPlacement}
+            placement={dropdown.placement}
             style={dropdown.style}
             title={label}
           >

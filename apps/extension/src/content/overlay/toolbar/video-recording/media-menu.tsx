@@ -10,6 +10,7 @@ import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/vide
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import type { ToolbarMenuState, ToolbarPopoverMenu } from '../state/menu';
 import { translate } from '../../../../platform/i18n';
 
@@ -95,14 +96,19 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     open,
     triggerRef,
   });
-  const dropdown = resolveToolbarDropdownState({
-    anchorRef: triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-    menuHeight: Math.max(96, devices.length * 48 + 48),
-    menuWidth: 260,
-    preferredAlign: 'end',
-  });
+  const resolveLayout = () => {
+    const dropdown = resolveToolbarDropdownState({
+      anchorRef: triggerRef,
+      displayMode: props.displayMode,
+      getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
+      menuHeight: Math.max(96, devices.length * 48 + 48),
+      menuWidth: 260,
+      preferredAlign: 'end',
+    });
+    return { placement: dropdown.menuPlacement, style: dropdown.style };
+  };
+  const dropdown = resolveLayout();
+  const menuSide = useToolbarMenuDirection(resolveLayout);
   const toggleMenu = () => {
     if (open) {
       closeMenu();
@@ -132,6 +138,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     loading,
     showLoading,
     menuRef,
+    menuSide,
     open,
     runToggle,
     selectDevice,
@@ -155,7 +162,7 @@ function RecordingMediaDeviceMenu(props: {
         className="sniptale-content-menu-adopted"
         compact
         title={props.label}
-        placement={control.dropdown.menuPlacement}
+        placement={control.dropdown.placement}
         style={control.dropdown.style}
       >
         {control.showLoading && control.devices.length === 0 ? (
@@ -218,6 +225,7 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         aria-haspopup="menu"
         title={props.label}
         data-menu-open={control.open ? 'true' : 'false'}
+        data-menu-side={control.menuSide}
         dataUi={`${props.dataUi}.menu`}
         onClick={(event) => {
           event.stopPropagation();

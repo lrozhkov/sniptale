@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import {
   createDefaultFrameCallout,
   createDefaultFrameStepBadge,
 } from '../../features/highlighter/frame-annotation/defaults';
-import { AnnotationCreationButtons, FrameStyleCreationButton } from './creation-buttons';
+import {
+  AnnotationCreationButtons,
+  FrameStyleCreationButton,
+  type FrameAnnotationMenuDirectionResolver,
+} from './creation-buttons';
+import { FrameAnnotationPopoverMeasurementContext } from './popover/position';
 import { FrameCreationPopovers } from './creation-popovers';
 import type {
   FrameAnnotationCreationFramePopoverRenderer,
@@ -34,6 +39,7 @@ export function FrameAnnotationCreationControls(props: {
   onMenuChange?: (menu: FrameAnnotationCreationMenu | null) => void;
   portalTarget?: HTMLElement | DocumentFragment | ShadowRoot;
   renderFramePopover?: FrameAnnotationCreationFramePopoverRenderer;
+  resolveMenuDirection?: FrameAnnotationMenuDirectionResolver;
   settings: FrameAnnotationCreationSettings;
   showCallout?: boolean;
   showStepBadge?: boolean;
@@ -48,6 +54,7 @@ export function FrameAnnotationCreationControls(props: {
   const frameRef = useRef<HTMLButtonElement>(null);
   const calloutRef = useRef<HTMLButtonElement>(null);
   const stepBadgeRef = useRef<HTMLButtonElement>(null);
+  const [, refreshMeasurements] = useReducer((value) => value + 1, 0);
 
   const update = (patch: Partial<FrameAnnotationCreationSettings>) =>
     props.onChange({ ...props.settings, ...patch });
@@ -118,6 +125,7 @@ export function FrameAnnotationCreationControls(props: {
         onToggleFrame={() => props.onFrameActiveChange?.(!frameActive)}
         settings={props.settings}
         toggle={toggle}
+        resolveMenuDirection={contentContext ? props.resolveMenuDirection : undefined}
       />
       <AnnotationCreationButtons
         activeMenu={activeMenu}
@@ -132,11 +140,12 @@ export function FrameAnnotationCreationControls(props: {
         showCallout={frameActive && showCallout}
         showStepBadge={frameActive && showStepBadge}
         stepBadgeRef={stepBadgeRef}
+        resolveMenuDirection={contentContext ? props.resolveMenuDirection : undefined}
       />
     </>
   );
   return (
-    <>
+    <FrameAnnotationPopoverMeasurementContext value={contentContext ? refreshMeasurements : null}>
       {buttonGroups}
       <FrameCreationPopovers
         activeMenu={activeMenu}
@@ -157,6 +166,6 @@ export function FrameAnnotationCreationControls(props: {
           ? { stepBadgeTemplateSourceControl: props.stepBadgeTemplateSourceControl }
           : {})}
       />
-    </>
+    </FrameAnnotationPopoverMeasurementContext>
   );
 }

@@ -18,6 +18,7 @@ import {
   ToolbarMenuDropdown,
 } from '../menu/dropdown';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import {
   executeToolbarAnnotationExportAction,
   type ToolbarAnnotationExportAction,
@@ -50,6 +51,20 @@ const ANNOTATION_EXPORT_OPTIONS: Array<{
   },
 ];
 
+function resolveAnnotationExportMenuLayout(props: {
+  displayMode: AnnotationExportMenuProps['displayMode'];
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const { menuPlacement, style } = resolveToolbarDropdownState({
+    anchorRef: props.triggerRef,
+    displayMode: props.displayMode,
+    getMenuPosition: (ref, height = 230) => getToolbarMenuPosition(ref.current, height),
+    menuHeight: 230,
+    menuWidth: 280,
+  });
+  return { placement: menuPlacement, style };
+}
+
 function AnnotationExportDropdown(
   props: AnnotationExportMenuProps & {
     busyAction: ToolbarAnnotationExportAction | null;
@@ -62,13 +77,7 @@ function AnnotationExportDropdown(
   }
 ) {
   const adopted = React.useContext(CommandPressScope);
-  const { menuPlacement, style } = resolveToolbarDropdownState({
-    anchorRef: props.triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 230) => getToolbarMenuPosition(ref.current, height),
-    menuHeight: 230,
-    menuWidth: 280,
-  });
+  const { placement: menuPlacement, style } = resolveAnnotationExportMenuLayout(props);
   if (!style) return null;
 
   return (
@@ -148,6 +157,9 @@ function getErrorMessage(action: ToolbarAnnotationExportAction): string {
 
 export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuSide = useToolbarMenuDirection(() =>
+    resolveAnnotationExportMenuLayout({ displayMode: props.displayMode, triggerRef })
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
   const [busyAction, setBusyAction] = useState<ToolbarAnnotationExportAction | null>(null);
@@ -209,6 +221,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         aria-expanded={open}
         aria-haspopup="menu"
         data-menu-open={open ? 'true' : 'false'}
+        data-menu-side={menuSide}
         dataUi="content.toolbar.annotation-export-button"
         disabled={props.disabled || busyAction !== null}
         aria-busy={busyAction !== null}

@@ -12,6 +12,7 @@ import { ToolbarDrawingControls, type ToolbarDrawingControlsOwner } from '../con
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import {
   RECORDING_DRAWING_AUTO_HIDE_DELAYS,
   type RecordingDrawingAutoHideDelay,
@@ -83,19 +84,25 @@ function AutoHideControl(props: {
     open,
     triggerRef,
   });
-  const dropdown = resolveToolbarDropdownState({
-    anchorRef: triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-    menuHeight: 280,
-    menuWidth: 220,
-    preferredAlign: 'end',
-  });
+  const resolveLayout = () => {
+    const dropdown = resolveToolbarDropdownState({
+      anchorRef: triggerRef,
+      displayMode: props.displayMode,
+      getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
+      menuHeight: 280,
+      menuWidth: 220,
+      preferredAlign: 'end',
+    });
+    return { placement: dropdown.menuPlacement, style: dropdown.style };
+  };
+  const dropdown = resolveLayout();
+  const menuSide = useToolbarMenuDirection(resolveLayout);
   const label = translate('content.toolbar.recordingDrawingAutoHide');
   return (
     <div className="relative flex">
       <ContentToolbarButton
         ref={triggerRef}
+        data-menu-side={menuSide}
         type="button"
         active={props.delay > 0}
         tone="property"
@@ -121,7 +128,7 @@ function AutoHideControl(props: {
           <ProductToolbarMenu
             className="sniptale-content-menu-adopted"
             compact={props.compactMenus}
-            placement={dropdown.menuPlacement}
+            placement={dropdown.placement}
             style={dropdown.style}
             title={label}
           >

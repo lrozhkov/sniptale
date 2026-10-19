@@ -1,5 +1,48 @@
 import { expect, test } from '../support/extension-fixture';
+import type { Page } from '@playwright/test';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+
+function readToolbarIndicatorGeometry(button: Element) {
+  const small = button.matches('[data-menu-indicator="true"]');
+  const style = getComputedStyle(
+    small ? button : button.querySelector('svg')!,
+    small ? '::before' : null
+  );
+  const matrix = new DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
+  const right =
+    small && style.borderLeftColor !== 'rgba(0, 0, 0, 0)' && parseFloat(style.borderLeftWidth) > 0;
+  const vector = matrix.transformPoint(new DOMPoint(right ? 1 : 0, right ? 0 : 1));
+  return {
+    x: vector.x,
+    y: vector.y,
+    small,
+    left: style.left,
+    right: style.right,
+    top: style.top,
+    bottom: style.bottom,
+  };
+}
+
+function annotationSurface(page: Page, id: string) {
+  return id.endsWith('future-frame-style.menu')
+    ? page.locator('.sniptale-frame-settings-popover:visible')
+    : id.endsWith('future-frame-callout.menu')
+      ? page.locator('[data-ui="content.toolbar.future-callout-popover"]:visible')
+      : page.locator('[data-ui="content.toolbar.future-step-badge-popover"]:visible');
+}
+
+function openingDirection(
+  menu: { x: number; y: number; width: number },
+  anchor: { x: number; y: number; width: number; height: number }
+) {
+  return menu.x >= anchor.x + anchor.width - 1
+    ? { x: 1, y: 0 }
+    : menu.x + menu.width <= anchor.x + 1
+      ? { x: -1, y: 0 }
+      : menu.y >= anchor.y + anchor.height - 1
+        ? { x: 0, y: 1 }
+        : { x: 0, y: -1 };
+}
 
 for (const viewport of [
   { width: 1280, height: 560 },
@@ -57,32 +100,26 @@ for (const viewport of [
             );
             expect(await indicators.count()).toBeGreaterThan(0);
             for (const indicator of await indicators.all()) {
-              const geometry = await indicator.evaluate((button) => {
-                const small = button.matches('[data-menu-indicator="true"]');
-                const style = getComputedStyle(
-                  small ? button : button.querySelector('svg')!,
-                  small ? '::before' : null
+              const id = (await indicator.getAttribute('data-ui')) ?? '';
+              if (
+                id.includes('future-frame-') &&
+                id.endsWith('.menu') &&
+                (await indicator.isEnabled())
+              ) {
+                await indicator.click();
+                const surface = annotationSurface(page, id);
+                await expect(surface).toBeVisible();
+                const expected = openingDirection(
+                  (await surface.boundingBox())!,
+                  (await indicator.boundingBox())!
                 );
-                const matrix = new DOMMatrixReadOnly(
-                  style.transform === 'none' ? undefined : style.transform
-                );
-                const pointsRight =
-                  small &&
-                  style.borderLeftColor !== 'rgba(0, 0, 0, 0)' &&
-                  parseFloat(style.borderLeftWidth) > 0;
-                const direction = matrix.transformPoint(
-                  new DOMPoint(pointsRight ? 1 : 0, pointsRight ? 0 : 1)
-                );
-                return {
-                  x: direction.x,
-                  y: direction.y,
-                  left: style.left,
-                  right: style.right,
-                  top: style.top,
-                  bottom: style.bottom,
-                  small,
-                };
-              });
+                const actual = await indicator.evaluate(readToolbarIndicatorGeometry);
+                expect(actual.x, `${mode} ${edge} ${id}`).toBeCloseTo(expected.x, 2);
+                expect(actual.y).toBeCloseTo(expected.y, 2);
+                await page.keyboard.press('Escape');
+                continue;
+              }
+              const geometry = await indicator.evaluate(readToolbarIndicatorGeometry);
               expect(
                 geometry.x,
                 `${mode} ${edge} ${await indicator.getAttribute('data-ui')}`
@@ -343,4 +380,124 @@ for (const width of [1280, 1920]) {
       }
     });
   }
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`free toolbar indicators follow their actual menus ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(240_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+    try {
+      await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+      const free = page.getByRole('button', {
+        name: /Free toolbar placement|Свободное размещение панели/u,
+      });
+      if (!(await free.getAttribute('class'))?.includes('sniptale-popover-item-selected'))
+        await free.click();
+      await page.keyboard.press('Escape');
+      for (const mode of [
+        'cursor',
+        'highlighter',
+        'design-review',
+        'quick-edit',
+        'drawing',
+        'video-recording',
+      ]) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        for (const orientation of ['vertical', 'horizontal'] as const) {
+          await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+          await page
+            .getByRole('button', {
+              name:
+                orientation === 'vertical'
+                  ? /Vertical view|Вертикальный вид/u
+                  : /Horizontal view|Горизонтальный вид/u,
+            })
+            .click();
+          await page.keyboard.press('Escape');
+          await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
+          for (const position of ['far', 'near', 'interior']) {
+            const handle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+            const grip = (await handle.boundingBox())!;
+            const along =
+              position === 'near'
+                ? 20
+                : position === 'far'
+                  ? (orientation === 'vertical' ? viewport.width : viewport.height) - 20
+                  : (orientation === 'vertical' ? viewport.width : viewport.height) * 0.6;
+            await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(
+              orientation === 'vertical' ? along : viewport.width / 2,
+              orientation === 'vertical' ? viewport.height / 2 : along,
+              { steps: 5 }
+            );
+            await page.mouse.up();
+            for (const id of [
+              'mode-selector-button',
+              'settings-button',
+              'capture-full-settings-button',
+              'timer-button',
+              'annotation-export-button',
+              ...(mode === 'highlighter'
+                ? [
+                    'future-frame-style.menu',
+                    'future-frame-callout.menu',
+                    'future-frame-step-badge.menu',
+                  ]
+                : []),
+            ]) {
+              const trigger = toolbar.locator(`[data-ui="content.toolbar.${id}"]`);
+              if (!(await trigger.isVisible()) || !(await trigger.isEnabled())) continue;
+              const before = await trigger.evaluate(readToolbarIndicatorGeometry);
+              await trigger.click();
+              await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+              const menus = toolbar.locator('.sniptale-popover-menu:visible');
+              const surface = id.startsWith('future-frame-')
+                ? annotationSurface(page, id)
+                : id === 'mode-selector-button'
+                  ? menus.filter({
+                      has: page.locator('[data-ui="content.toolbar.mode-option.cursor"]'),
+                    })
+                  : menus.last();
+              await expect(surface).toBeVisible();
+              const menu = (await surface.boundingBox())!;
+              const anchor = (await trigger.boundingBox())!;
+              const expected = openingDirection(menu, anchor);
+              const settled = await trigger.evaluate(readToolbarIndicatorGeometry);
+              const expectedBefore = id.startsWith('future-frame-') ? settled : before;
+              expect(expectedBefore.x, `${mode} ${orientation} ${position} ${id}`).toBeCloseTo(
+                expected.x,
+                2
+              );
+              expect(expectedBefore.y, `${mode} ${orientation} ${position} ${id}`).toBeCloseTo(
+                expected.y,
+                2
+              );
+              if (mode === 'design-review' && id === 'mode-selector-button')
+                await page.screenshot({
+                  path: info.outputPath(`${orientation}-${position}.png`),
+                  fullPage: false,
+                });
+              await page.keyboard.press('Escape');
+              const closed = await trigger.evaluate(readToolbarIndicatorGeometry);
+              expect(closed.x).toBeCloseTo(expected.x, 2);
+              expect(closed.y).toBeCloseTo(expected.y, 2);
+            }
+          }
+        }
+      }
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
 }

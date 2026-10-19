@@ -301,9 +301,22 @@ type ToolbarSettingsDropdownProps = ToolbarSettingsUtilityItemsProps & {
   viewportRightInset?: number;
 };
 
-export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
+export function useToolbarSettingsDropdownLayout(
+  props: Pick<
+    ToolbarSettingsDropdownProps,
+    | 'menuRef'
+    | 'triggerRef'
+    | 'displayMode'
+    | 'freePlacement'
+    | 'compactMenus'
+    | 'viewportRightInset'
+  > & { open: boolean }
+) {
   const [menuSize, setMenuSize] = useState({ width: 280, height: 340 });
   useLayoutEffect(() => {
+    if (!props.open) {
+      return;
+    }
     const surface = props.menuRef.current?.firstElementChild;
     if (!(surface instanceof HTMLElement)) return;
     const measure = () => {
@@ -318,19 +331,35 @@ export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(surface);
     return () => observer?.disconnect();
-  }, [props.menuRef, props.freePlacement, props.compactMenus]);
-  const placement = getToolbarMenuPosition(props.triggerRef.current, menuSize.height);
-  const menuStyle = resolveToolbarFloatingMenuStyle({
-    anchorEl: props.triggerRef.current,
-    displayMode: props.displayMode,
-    menuHeight: menuSize.height,
-    menuWidth: menuSize.width,
-    placement,
-    preferredAlign: 'end',
-    ...(props.viewportRightInset === undefined
-      ? {}
-      : { viewportRightInset: props.viewportRightInset }),
-  });
+  }, [props.menuRef, props.freePlacement, props.compactMenus, props.open]);
+  const resolveLayout = () => {
+    const placement = getToolbarMenuPosition(props.triggerRef.current, menuSize.height);
+    const menuStyle = resolveToolbarFloatingMenuStyle({
+      anchorEl: props.triggerRef.current,
+      displayMode: props.displayMode,
+      menuHeight: menuSize.height,
+      menuWidth: menuSize.width,
+      placement,
+      preferredAlign: 'end',
+      ...(props.viewportRightInset === undefined
+        ? {}
+        : { viewportRightInset: props.viewportRightInset }),
+    });
+    return {
+      placement: resolveToolbarMenuPlacement(props.displayMode, placement),
+      verticalPlacement: placement,
+      style: menuStyle,
+    };
+  };
+  return resolveLayout;
+}
+
+export function ToolbarSettingsDropdown(
+  props: ToolbarSettingsDropdownProps & {
+    layout: ReturnType<ReturnType<typeof useToolbarSettingsDropdownLayout>>;
+  }
+) {
+  const { verticalPlacement: placement, style: menuStyle } = props.layout;
   if (!menuStyle) {
     return null;
   }

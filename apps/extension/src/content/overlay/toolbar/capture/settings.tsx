@@ -5,7 +5,8 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
 import type { ToolbarMenuState } from '../state/menu';
-import { ToolbarSettingsDropdown } from './settings-content';
+import { ToolbarSettingsDropdown, useToolbarSettingsDropdownLayout } from './settings-content';
+import { useToolbarMenuDirection } from '../menu/direction';
 import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 type ToolbarSettingsMenuProps = {
@@ -49,6 +50,14 @@ function useToolbarSettingsMenuBindings(props: ToolbarSettingsMenuProps) {
 
 export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
   const bindings = useToolbarSettingsMenuBindings(props);
+  const resolveLayout = useToolbarSettingsDropdownLayout({
+    ...bindings,
+    displayMode: props.displayMode,
+    freePlacement: props.freePlacement ?? true,
+    compactMenus: props.compactMenus,
+    viewportRightInset: props.sidebarVisible ? 348 : 0,
+  });
+  const menuSide = useToolbarMenuDirection(resolveLayout);
 
   return (
     <div className="sniptale-settings-wrapper">
@@ -57,6 +66,7 @@ export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
         type="button"
         dataUi="content.toolbar.settings-button"
         menuIndicator
+        data-menu-side={menuSide}
         title={translate('content.toolbar.settingsLabel')}
         data-menu-open={bindings.open ? 'true' : 'false'}
         onClick={(event) => {
@@ -74,6 +84,7 @@ export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
         open: bindings.open,
         props,
         triggerRef: bindings.triggerRef,
+        layout: resolveLayout(),
       })}
     </div>
   );
@@ -84,6 +95,7 @@ function renderToolbarSettingsDropdown(args: {
   open: boolean;
   props: ToolbarSettingsMenuProps;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
+  layout: ReturnType<ReturnType<typeof useToolbarSettingsDropdownLayout>>;
 }) {
   if (!args.open) {
     return null;
@@ -91,6 +103,7 @@ function renderToolbarSettingsDropdown(args: {
 
   return (
     <ToolbarSettingsDropdown
+      layout={args.layout}
       compactMenus={args.props.compactMenus}
       displayMode={args.props.displayMode}
       menuRef={args.menuRef}

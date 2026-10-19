@@ -18,6 +18,8 @@ import { useDrawingSessionSnapshot } from '../../../drawing/controller';
 import type { DrawingSessionSnapshot, DrawingTool } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
+import { useDrawingOptionsLayout } from './drawing-options-layout';
+import { useToolbarMenuDirection } from '../menu/direction';
 
 type DrawingToolDescriptor = {
   tool: DrawingTool;
@@ -94,6 +96,16 @@ function DrawingToolControl(props: {
   onActivated?: (tool: DrawingTool) => void;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const layout = useDrawingOptionsLayout({
+    displayMode: props.displayMode,
+    hasSelection: props.snapshot.selectedObjectIds.length > 0,
+    panelRef,
+    tool: props.optionsTool ?? 'pencil',
+    triggerRef,
+    open: props.showOptions,
+  });
+  const menuSide = useToolbarMenuDirection(layout.resolveLayout);
   const modifierHintId = useId();
   const Icon = props.icon;
   const label = translate(props.label);
@@ -113,6 +125,7 @@ function DrawingToolControl(props: {
         aria-describedby={modifierHint ? modifierHintId : undefined}
         title={title}
         menuIndicator={disclosureAvailable}
+        data-menu-side={menuSide}
         data-menu-open={disclosureAvailable ? String(props.showOptions) : undefined}
         dataUi={`content.toolbar.drawing.${props.tool}`}
         onClick={() => {
@@ -142,6 +155,8 @@ function DrawingToolControl(props: {
           snapshot={props.snapshot}
           tool={props.optionsTool}
           triggerRef={triggerRef}
+          panelRef={panelRef}
+          layout={layout}
         />
       ) : null}
     </div>

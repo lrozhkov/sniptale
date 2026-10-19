@@ -3,10 +3,46 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useFramePopoverPosition } from './popover-position';
+import {
+  resolveMainToolbarFramePopoverDirection,
+  useFramePopoverPosition,
+} from './popover-position';
+import { FrameAnnotationPopoverMeasurementContext } from '../../../../composition/frame-annotation-controls/popover/position';
 
 let container: HTMLDivElement;
 let root: Root;
+
+it('predicts current toolbar placement from the actual measured popover size', () => {
+  vi.stubGlobal('innerWidth', 1280);
+  vi.stubGlobal('innerHeight', 900);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  let toolbarTop = 450;
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(50, toolbarTop, 500, 50)
+  );
+  vi.spyOn(anchor, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(100, toolbarTop + 5, 40, 35)
+  );
+  const fallbackSize = { width: 160, height: 600 };
+  expect(resolveMainToolbarFramePopoverDirection(anchor, fallbackSize)).toBe('right');
+  const onMeasured = vi.fn();
+  act(() =>
+    root.render(
+      <FrameAnnotationPopoverMeasurementContext value={onMeasured}>
+        <PositionHarness anchorEl={anchor} fallbackHeight={600} layoutHeight={200} />
+      </FrameAnnotationPopoverMeasurementContext>
+    )
+  );
+  expect(onMeasured).toHaveBeenCalledOnce();
+  expect(resolveMainToolbarFramePopoverDirection(anchor, fallbackSize)).toBe('down');
+  toolbarTop = 800;
+  expect(resolveMainToolbarFramePopoverDirection(anchor, fallbackSize)).toBe('up');
+  toolbar.remove();
+});
 
 function setRect(element: Element, rect: DOMRect) {
   element.getBoundingClientRect = vi.fn(() => rect);

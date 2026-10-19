@@ -28,6 +28,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('updates content creation chevrons from their popover resolver after viewport changes', () => {
+  let side: 'right' | 'left' = 'right';
+  const resolveMenuDirection = vi.fn(() => side);
+  const settings = createSettings();
+  act(() =>
+    root.render(
+      <FrameAnnotationCreationControls
+        context="content"
+        onChange={vi.fn()}
+        settings={settings}
+        {...{ resolveMenuDirection }}
+      />
+    )
+  );
+  const triggers = () => host.querySelectorAll('.sniptale-full-page-chevron');
+  expect(triggers()).toHaveLength(3);
+  for (const trigger of triggers()) expect(trigger.getAttribute('data-menu-side')).toBe('right');
+  side = 'left';
+  act(() => window.dispatchEvent(new Event('resize')));
+  for (const trigger of triggers()) expect(trigger.getAttribute('data-menu-side')).toBe('left');
+  expect(resolveMenuDirection.mock.calls.length).toBeGreaterThanOrEqual(6);
+});
+
 it('binds frame activity independently from its menu and covers optional annotation buttons', () => {
   const toggle = vi.fn();
   const enableCallout = vi.fn();

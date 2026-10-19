@@ -12,11 +12,13 @@ const menuComponentMocks = vi.hoisted(() => ({
   viewportSelector: vi.fn((_props: { onMenuStateChange: (isOpen: boolean) => void }) => null),
 }));
 
-vi.mock('./action-dropdown', () => ({
+vi.mock('./action-dropdown', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./action-dropdown')>()),
   CaptureActionDropdown: menuComponentMocks.captureActionDropdown,
 }));
 
-vi.mock('./timer-dropdown', () => ({
+vi.mock('./timer-dropdown', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./timer-dropdown')>()),
   TimerDropdown: menuComponentMocks.timerDropdown,
 }));
 
