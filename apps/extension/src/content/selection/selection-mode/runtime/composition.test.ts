@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
+import { getSelectionModeSizePanelCopy } from '../ui/constants';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
 import { createSelectionModeSession } from '../session';
 import type { SelectionModeRuntimeActionsArgs } from './setup';
 
 const mocks = vi.hoisted(() => ({
+  createDrawingRuntime: vi.fn(),
   createEventHandlers: vi.fn(),
   createEventsBridge: vi.fn(),
   createRuntimeSetup: vi.fn(),
@@ -19,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   isSelectionModeActiveApi: vi.fn(),
   setupRuntimeListeners: vi.fn(),
 }));
+
+vi.mock('../ui/drawing', () => ({ createSelectionDrawingRuntime: mocks.createDrawingRuntime }));
 
 vi.mock('../../frame-runtime/selection-frame-visual', () => ({
   getSelectionFrameVisual: mocks.getSelectionFrameVisual,
@@ -142,6 +147,88 @@ describe('selection-mode runtime composition', () => {
     vi.clearAllMocks();
   });
 
+  it('yields crop gestures while drawing and snapshots committed work before confirmation cleanup', async () => {
+    let active = false;
+    const snapshot = {
+      objects: [],
+      projection: { x: 0, y: 0 },
+      viewport: { width: 1280, height: 560 },
+    };
+    const drawing = {
+      attachToolbar: vi.fn(),
+      isDrawing: () => active,
+      finalize: vi.fn(() => snapshot),
+      dispose: vi.fn(),
+    };
+    mocks.createDrawingRuntime.mockReturnValueOnce(drawing);
+    mocks.enableSelectionModeApi.mockImplementationOnce(async (args) =>
+      args.createOverlayContainer()
+    );
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    const onDrawingSnapshot = vi.fn();
+    await scenario.runtime.enableSelectionMode({ onDrawingSnapshot });
+    const setup = mocks.createRuntimeSetup.mock.calls[0]![0];
+    const bridge = mocks.createEventsBridge.mock.calls[0]![0];
+    const ui = mocks.createUiRuntime.mock.calls[0]![0];
+    const mouse = new MouseEvent('mousedown');
+    scenario.session.dom.finalOverlay = document.createElement('div');
+    scenario.session.dom.sizeTooltip = createContentSizeTooltipDom({
+      mountInto: scenario.session.dom.overlayContainer!,
+      copy: getSelectionModeSizePanelCopy(),
+      widthMin: 10,
+      widthMax: 1280,
+      heightMin: 10,
+      heightMax: 560,
+      maintainAspectRatio: false,
+    });
+    setup.createFinalElements();
+    expect(scenario.session.dom.finalOverlay.style.zIndex).toBe('3');
+    expect(drawing.attachToolbar).toHaveBeenCalledWith(scenario.session.dom.sizeTooltip);
+    active = true;
+    setup.handleClick(mouse);
+    setup.handleMouseDown(mouse);
+    setup.handleMouseMove(mouse);
+    setup.handleMouseUp(mouse);
+    setup.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    bridge.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    setup.handleDragStart(new Event('dragstart'));
+    setup.handleMouseLeave();
+    expect(scenario.handlers.handleClick).not.toHaveBeenCalled();
+    expect(scenario.handlers.handleMouseDown).not.toHaveBeenCalled();
+    expect(scenario.handlers.handleMouseMove).not.toHaveBeenCalled();
+    expect(scenario.handlers.handleMouseUp).not.toHaveBeenCalled();
+    expect(scenario.handlers.handleKeyDown).not.toHaveBeenCalled();
+    active = false;
+    setup.handleClick(mouse);
+    setup.handleMouseDown(mouse);
+    setup.handleMouseMove(mouse);
+    setup.handleMouseUp(mouse);
+    setup.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    bridge.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    setup.handleDragStart(new Event('dragstart'));
+    setup.handleMouseLeave();
+    expect(scenario.handlers.handleClick).toHaveBeenCalledOnce();
+    expect(scenario.handlers.handleMouseMove).toHaveBeenCalledOnce();
+    expect(scenario.handlers.handleMouseUp).toHaveBeenCalledOnce();
+    expect(scenario.handlers.handleKeyDown).toHaveBeenCalledTimes(2);
+    expect(scenario.handlers.handleDragStart).toHaveBeenCalledOnce();
+    expect(scenario.handlers.handleMouseLeave).toHaveBeenCalledOnce();
+    expect(scenario.handlers.handleMouseDown).toHaveBeenCalledOnce();
+    ui.onConfirm();
+    expect(onDrawingSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(drawing.finalize.mock.invocationCallOrder[0]).toBeLessThan(
+      onDrawingSnapshot.mock.invocationCallOrder[0]!
+    );
+    expect(onDrawingSnapshot.mock.invocationCallOrder[0]).toBeLessThan(
+      scenario.events.confirmSelection.mock.invocationCallOrder[0]!
+    );
+    scenario.runtime.cleanupEffects();
+    expect(drawing.dispose.mock.invocationCallOrder[0]).toBeLessThan(
+      scenario.events.cleanup.mock.invocationCallOrder[0]!
+    );
+  });
+
   it('assembles one session authority behind a narrow runtime contract', () => {
     const scenario = createScenario();
     const sizePanelArgs = mocks.createSizePanelSetup.mock.calls[0]?.[0];
@@ -159,7 +246,10 @@ describe('selection-mode runtime composition', () => {
     expect(setupArgs?.session).toBe(scenario.session);
     expect(bridgeArgs?.runtimeArgs).toBe(scenario.runtimeArgs);
     expect(mocks.createEventHandlers).toHaveBeenCalledWith({
-      selectionModeEvents: scenario.events,
+      selectionModeEvents: expect.objectContaining({
+        ...scenario.events,
+        confirmSelection: expect.any(Function),
+      }),
       state: scenario.session,
     });
 

@@ -70,6 +70,7 @@ const tools: readonly DrawingToolDescriptor[] = [
 
 /** Narrow presentation seam used by toolbar modes that share drawing tools but own interaction. */
 export interface ToolbarDrawingControlsOwner {
+  readonly preferredMenuPlacement?: 'up' | 'down';
   readonly activeTool: DrawingTool | null;
   readonly showActions?: boolean;
   readonly persistOptionsDisclosure?: boolean;
@@ -81,6 +82,7 @@ export interface ToolbarDrawingControlsOwner {
 }
 
 function DrawingToolControl(props: {
+  preferredMenuPlacement?: 'up' | 'down';
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
   icon: typeof PenLine;
@@ -104,6 +106,7 @@ function DrawingToolControl(props: {
     tool: props.optionsTool ?? 'pencil',
     triggerRef,
     open: props.showOptions,
+    ...(props.preferredMenuPlacement ? { preferredPlacement: props.preferredMenuPlacement } : {}),
   });
   const menuSide = useToolbarMenuDirection(layout.resolveLayout);
   const modifierHintId = useId();
@@ -193,6 +196,9 @@ export function ToolbarDrawingControls(props: {
         {visibleTools.map(({ tool, icon, label, modifierHint }) => (
           <DrawingToolControl
             key={tool}
+            {...(props.owner?.preferredMenuPlacement
+              ? { preferredMenuPlacement: props.owner.preferredMenuPlacement }
+              : {})}
             controller={controller}
             displayMode={props.displayMode}
             icon={icon}

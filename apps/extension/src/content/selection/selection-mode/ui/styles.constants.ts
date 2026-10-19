@@ -1,4 +1,37 @@
 const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
+  .sniptale-selection-mode-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--sniptale-color-surface-input);
+  }
+
+  .sniptale-selection-toolbar .sniptale-selection-mode-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sniptale-color-text-secondary);
+    cursor: pointer;
+  }
+
+  .sniptale-selection-toolbar .sniptale-selection-mode-option:hover {
+    background: var(--sniptale-color-surface-hover);
+    color: var(--sniptale-color-text-primary-strong);
+  }
+
+  .sniptale-selection-toolbar .sniptale-selection-mode-option[aria-pressed='true'] {
+    background: var(--sniptale-color-surface-panel);
+    color: var(--sniptale-color-text-primary-strong);
+  }
+
   .sniptale-selection-cancel-button {
     transition:
       background 120ms ease,
@@ -21,6 +54,20 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
 
   .sniptale-selection-container button:focus {
     outline: none;
+  }
+
+  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
+    .sniptale-selection-size-confirm-button:hover:not(:disabled),
+  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
+    .sniptale-selection-size-confirm-button:focus-visible {
+    border-color: var(--sniptale-color-border-soft);
+    background: var(--sniptale-color-surface-hover);
+    color: var(--sniptale-color-text-primary-strong);
+  }
+
+  .sniptale-selection-toolbar button:focus-visible {
+    outline: 2px solid var(--sniptale-color-text-primary);
+    outline-offset: 2px;
   }
 `;
 

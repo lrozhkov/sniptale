@@ -6,6 +6,7 @@ import {
   TOOLBAR_SECONDARY_MENU_Z_INDEX,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 
 export type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
 
@@ -34,6 +35,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
 };
 
 export function useDrawingOptionsLayout(args: {
+  preferredPlacement?: 'up' | 'down';
   displayMode: 'horizontal' | 'vertical';
   hasSelection: boolean;
   panelRef: RefObject<HTMLDivElement | null>;
@@ -92,7 +94,17 @@ export function useDrawingOptionsLayout(args: {
     Math.max(0, window.innerWidth - 16)
   );
   const resolveLayout = () => {
-    const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
+    const anchor = args.triggerRef.current;
+    const scale = readContentUiScaleCompensation(anchor);
+    const above = (anchor?.getBoundingClientRect().top ?? 0) / scale;
+    const below =
+      (window.innerHeight - (anchor?.getBoundingClientRect().bottom ?? window.innerHeight)) / scale;
+    const preferredFits =
+      args.preferredPlacement === 'up' ? above >= menuHeight + 18 : below >= menuHeight + 18;
+    const placement =
+      args.preferredPlacement && preferredFits
+        ? args.preferredPlacement
+        : getToolbarMenuPosition(anchor, menuHeight);
     const positioned = resolveToolbarFloatingMenuStyle({
       anchorEl: args.triggerRef.current,
       displayMode: args.displayMode,

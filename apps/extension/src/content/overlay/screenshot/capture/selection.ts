@@ -1,4 +1,8 @@
 import { acquireFrozenSelectionFrame } from '../../../selection/selection-mode/frozen-acquisition';
+import {
+  compositeContentDrawingCapture,
+  type ContentDrawingCaptureSnapshot,
+} from '../../../drawing/capture';
 import { prepareFrozenSelectionFrame } from '../../../selection/selection-mode/frozen';
 import type { FrozenSelectionFrame } from '../../../selection/selection-mode/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -128,12 +132,16 @@ async function captureRegularSelectionDataUrl(
     : undefined;
   logSelectionScreenshotDiag('runSelectionScreenshot.await-selection');
   let confirmedIntentSource = contentIntentSource;
+  let drawingSnapshot: ContentDrawingCaptureSnapshot | undefined;
   const area = await enableSelectionModeDeferredIfCurrent(
     () => isCurrentScreenshotRun(runtime, runToken),
     {
       ...(frozenFrame ? { frozenFrame } : {}),
       captureAction: runtime.captureActionRef.current,
       onCaptureActionChange: runtime.setCaptureAction,
+      onDrawingSnapshot: (snapshot) => {
+        drawingSnapshot = snapshot;
+      },
       onConfirmEvent: (event) => {
         if (confirmedIntentSource?.kind !== 'background-auto-start') return;
         confirmedIntentSource =
@@ -152,7 +160,11 @@ async function captureRegularSelectionDataUrl(
     frozenFrame?.dataUrl ??
     (await captureSelectionFrameWithRetry(runtime, runToken, confirmedIntentSource));
   assertCurrentScreenshotRun(runtime, runToken);
-  const dataUrl = await cropImage(capturedFrameDataUrl, area);
+  const annotatedFrame = drawingSnapshot
+    ? await compositeContentDrawingCapture(capturedFrameDataUrl, drawingSnapshot)
+    : capturedFrameDataUrl;
+  assertCurrentScreenshotRun(runtime, runToken);
+  const dataUrl = await cropImage(annotatedFrame, area);
   frozenFrame?.geometry.assertViewport();
   return { contentIntentSource: confirmedIntentSource, dataUrl };
 }

@@ -75,6 +75,7 @@ export function enhanceSelectionModeToolbar(
   tooltip.root.insertBefore(paddingControls, tooltip.actions);
   tooltip.root.insertBefore(createSelectionToolbarDivider(), tooltip.actions);
   createSelectionCaptureActionControls(tooltip, options);
+  tooltip.actions.append(createSelectionToolbarDivider(), tooltip.cancelButton);
   syncSelectionToolbarCompactControlsChrome(tooltip);
   syncSelectionToolbarPaddingState(tooltip.root, options.getSelection());
 }

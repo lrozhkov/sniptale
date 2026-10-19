@@ -27,6 +27,27 @@ interface CaptureMenuLifecycleState {
 type CaptureActionDescriptor = ReturnType<typeof getCaptureActionDescriptors>[number];
 
 const captureMenuStates = new WeakMap<HTMLElement, CaptureMenuLifecycleState>();
+const captureMenuHeights = new WeakMap<HTMLElement, number>();
+
+function canOpenCaptureMenuBelow(anchorRect: DOMRect, height: number): boolean {
+  return anchorRect.bottom + MENU_GAP + height <= window.innerHeight - VIEWPORT_MARGIN;
+}
+
+function applyCaptureMenuDirection(trigger: HTMLElement, below: boolean): void {
+  trigger.dataset['menuSide'] = below ? 'down' : 'up';
+  const icon = trigger.querySelector('svg');
+  if (icon) icon.style.transform = below ? 'none' : 'rotate(180deg)';
+}
+
+export function syncSelectionCaptureMenuDirection(root: ParentNode): void {
+  const trigger = root.querySelector<HTMLButtonElement>('.sniptale-selection-capture-menu-trigger');
+  if (!trigger) return;
+  const below = canOpenCaptureMenuBelow(
+    trigger.getBoundingClientRect(),
+    captureMenuHeights.get(trigger) ?? 284
+  );
+  applyCaptureMenuDirection(trigger, below);
+}
 
 function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const anchorRect = anchor.getBoundingClientRect();
@@ -37,8 +58,9 @@ function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
     Math.max(anchorRect.left + anchorRect.width / 2 - width / 2, VIEWPORT_MARGIN),
     Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
   );
-  const canOpenBelow =
-    anchorRect.bottom + MENU_GAP + height <= window.innerHeight - VIEWPORT_MARGIN;
+  captureMenuHeights.set(anchor, height);
+  const canOpenBelow = canOpenCaptureMenuBelow(anchorRect, height);
+  applyCaptureMenuDirection(anchor, canOpenBelow);
   const top = canOpenBelow
     ? anchorRect.bottom + MENU_GAP
     : Math.max(VIEWPORT_MARGIN, anchorRect.top - MENU_GAP - height);
@@ -106,6 +128,12 @@ function installCaptureMenuKeyboardNavigation(
   overlayContainer: HTMLElement
 ): void {
   menu.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeSelectionCaptureActionMenu(overlayContainer, true);
+      return;
+    }
     const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
     const currentIndex = items.findIndex((item) => item === event.target);
     if (currentIndex < 0) return;

@@ -11,6 +11,7 @@ let triggerRef: React.RefObject<HTMLButtonElement | null>;
 let panelRef: React.RefObject<HTMLDivElement | null>;
 
 function DrawingLayoutHarness(props: {
+  preferredPlacement?: 'up' | 'down';
   open: boolean;
   displayMode?: 'horizontal' | 'vertical';
   tool?: DrawingQuickOptionsTool;
@@ -23,6 +24,7 @@ function DrawingLayoutHarness(props: {
     panelRef,
     tool: props.tool ?? 'pencil',
     triggerRef,
+    ...(props.preferredPlacement ? { preferredPlacement: props.preferredPlacement } : {}),
   });
   const side =
     layout.placement === 'side' ? (layout.style.right ? 'left' : 'right') : layout.placement;
@@ -73,6 +75,17 @@ afterEach(() => {
 });
 
 describe('drawing options measured placement', () => {
+  it('prefers above for crop tools and falls back below near the top edge', () => {
+    expect(renderLayout({ open: false, displayMode: 'horizontal', preferredPlacement: 'up' })).toBe(
+      'up'
+    );
+    vi.spyOn(triggerRef.current!, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(400, 8, 36, 36)
+    );
+    expect(renderLayout({ open: false, displayMode: 'horizontal', preferredPlacement: 'up' })).toBe(
+      'down'
+    );
+  });
   it('retains the measured opening side while closed', () => {
     expect(renderLayout({ open: true })).toBe('left');
     expect(renderLayout({ open: false })).toBe('left');

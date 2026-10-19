@@ -40,7 +40,8 @@ const {
   syncContentSizeTooltipValuesMock: vi.fn(),
 }));
 
-vi.mock('../final-elements/capture-menu', () => ({
+vi.mock('../final-elements/capture-menu', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../final-elements/capture-menu')>()),
   closeSelectionCaptureActionMenu: closeSelectionCaptureActionMenuMock,
   createSelectionCaptureActionControls: vi.fn(),
 }));

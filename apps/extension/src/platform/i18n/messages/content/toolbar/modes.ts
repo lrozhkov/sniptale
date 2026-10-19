@@ -11,6 +11,8 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  cropResizeMode: { ru: 'Изменить область', en: 'Resize crop' },
+  cropDrawingMode: { ru: 'Рисовать', en: 'Draw' },
   unknownError: {
     ru: 'Неизвестная ошибка',
     en: 'Unknown error',

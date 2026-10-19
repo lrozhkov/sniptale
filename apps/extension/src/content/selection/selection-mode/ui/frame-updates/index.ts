@@ -7,7 +7,10 @@ import { showSelectionModeCancelButton } from '../cancel-button';
 import type { SelectionModeDom } from '../dom-types';
 import type { SelectionRect } from '../types';
 import { syncSelectionToolbarPaddingState } from '../final-elements/toolbar';
-import { closeSelectionCaptureActionMenu } from '../final-elements/capture-menu';
+import {
+  closeSelectionCaptureActionMenu,
+  syncSelectionCaptureMenuDirection,
+} from '../final-elements/capture-menu';
 import { paintSelectionModeDragMask } from '../final-elements/overlay';
 import { syncSelectionToolbarCompactControlsChrome } from '../final-elements/toolbar-chrome';
 
@@ -186,6 +189,7 @@ export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): vo
   updateOverlayShades(dom.finalOverlay, rect);
   syncSelectionToolbarPaddingState(dom.sizePanel, rect);
   updateSizePanelPosition(dom.sizePanel, rect);
+  syncSelectionCaptureMenuDirection(dom.sizePanel);
 }
 
 export function resetFinalElements(dom: SelectionModeDom): void {
