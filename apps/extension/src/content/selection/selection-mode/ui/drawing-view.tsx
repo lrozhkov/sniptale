@@ -3,6 +3,12 @@ import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import type { DrawingTool } from '../../../../features/drawing/public';
+import {
+  projectClientRectToContentUi,
+  readContentUiScaleCompensation,
+  resolveContentUiViewport,
+} from '@sniptale/ui/floating-interactions/scale';
+import { placeSelectionFloatingSurface } from './floating-placement';
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import {
   useDrawingSessionSnapshot,
@@ -15,6 +21,52 @@ import {
 } from '../../../overlay/toolbar/controls/drawing';
 
 export type CropDrawingInteraction = DrawingTool | 'eraser';
+
+const resolveCropDrawingMenuLayout: NonNullable<
+  ToolbarDrawingControlsOwner['resolveMenuLayout']
+> = ({ anchor, menuWidth, menuHeight }) => {
+  const toolbar = anchor.closest<HTMLElement>('.sniptale-selection-toolbar');
+  const frame = toolbar
+    ?.closest('.sniptale-selection-container')
+    ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
+  if (!toolbar || !frame) return null;
+  const scale = readContentUiScaleCompensation(anchor);
+  const anchorRect = projectClientRectToContentUi(anchor.getBoundingClientRect(), scale);
+  const toolbarRect = projectClientRectToContentUi(toolbar.getBoundingClientRect(), scale);
+  const cropRect = projectClientRectToContentUi(frame.getBoundingClientRect(), scale);
+  const viewport = resolveContentUiViewport({
+    clientWidth: window.innerWidth,
+    clientHeight: window.innerHeight,
+    scale,
+  });
+  const position = placeSelectionFloatingSurface({
+    anchor: toolbarRect,
+    exclusion: cropRect,
+    protectedRect: toolbarRect,
+    width: menuWidth,
+    height: menuHeight,
+    viewport,
+  });
+  const placement =
+    position.y + menuHeight <= toolbarRect.y
+      ? 'up'
+      : position.y >= toolbarRect.y + toolbarRect.height
+        ? 'down'
+        : 'side';
+  const leftSide = placement === 'side' && position.x + menuWidth <= toolbarRect.x;
+  return {
+    placement,
+    style: {
+      left: leftSide ? 'auto' : position.x - anchorRect.x,
+      right: leftSide ? anchorRect.x + anchorRect.width - position.x - menuWidth : 'auto',
+      top: placement === 'up' ? 'auto' : position.y - anchorRect.y,
+      bottom:
+        placement === 'up' ? anchorRect.y + anchorRect.height - position.y - menuHeight : 'auto',
+      maxHeight: 'calc(100vh - 16px)',
+      overflowY: 'auto',
+    },
+  };
+};
 
 function DrawingToolbar(props: {
   controller: ContentDrawingController;
@@ -33,6 +85,7 @@ function DrawingToolbar(props: {
     activeTool: props.interaction === 'eraser' ? null : snapshot.activeTool,
     persistOptionsDisclosure: true,
     preferredMenuPlacement: 'up',
+    resolveMenuLayout: resolveCropDrawingMenuLayout,
     showActions: true,
     onToolActivated: props.onInteractionChange,
     renderActions: (snapshot) => (

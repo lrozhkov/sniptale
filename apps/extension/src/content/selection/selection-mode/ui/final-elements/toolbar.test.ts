@@ -26,6 +26,8 @@ vi.mock('../../../../../features/quick-actions-presets/catalog', async (importOr
 
 import { enhanceSelectionModeToolbar, syncSelectionToolbarPaddingState } from './toolbar';
 import { closeSelectionCaptureActionMenu } from './capture-menu';
+import { applySelectionToolbarSurfaceChrome } from './toolbar-chrome';
+import { bindSelectionWidthInput } from '../size-panel/inputs';
 import { handleSelectionModeClick, handleSelectionModeKeyDown } from '../../events/commands';
 import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 import { createSelectionModeSession } from '../../session';
@@ -100,6 +102,114 @@ function createCaptureGuardOptions(): SelectionModeEventOptions {
 }
 
 describe('selection-mode confirmed toolbar', () => {
+  it.each([false, true])(
+    'commits an under-min dimension draft before pointer commands in shadow=%s',
+    (shadow) => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      const mountInto = shadow ? host.attachShadow({ mode: 'open' }) : host;
+      const { tooltip } = createToolbar(undefined, mountInto);
+      let selection = { x: 20, y: 20, width: 100, height: 80 };
+      bindSelectionWidthInput(
+        tooltip.widthInput,
+        tooltip.heightInput,
+        (next) => {
+          selection = next;
+        },
+        {
+          minSelectionSize: 10,
+          maxWidth: 1280,
+          maxHeight: 720,
+          getCurrentSelection: () => selection,
+          getMaintainAspectRatio: () => false,
+          getAspectRatio: () => null,
+        }
+      );
+      tooltip.widthInput.focus();
+      tooltip.widthInput.value = '5';
+      tooltip.widthInput.dispatchEvent(new Event('input', { bubbles: true }));
+      expect(selection.width).toBe(100);
+      tooltip.confirmButton.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        })
+      );
+      expect(tooltip.widthInput.value).toBe('10');
+      expect(selection.width).toBe(10);
+      expect(tooltip.widthInput.matches(':focus')).toBe(false);
+    }
+  );
+
+  it('releases the legacy inline minimum height to the adopted shell geometry', () => {
+    const overlayContainer = document.createElement('div');
+    document.body.append(overlayContainer);
+    const tooltip = createContentSizeTooltipDom({
+      copy,
+      heightMax: 720,
+      heightMin: 10,
+      maintainAspectRatio: false,
+      mountInto: overlayContainer,
+      variant: 'frame-edit',
+      widthMax: 1280,
+      widthMin: 10,
+    });
+    expect(tooltip.root.style.minHeight).toBe('44px');
+    applySelectionToolbarSurfaceChrome(tooltip.root);
+    expect(tooltip.root.style.minHeight).toBe('');
+  });
+
+  it('cancels enabled pointer button focus without changing inputs or keyboard activation', () => {
+    const { tooltip } = createToolbar();
+    applySelectionToolbarSurfaceChrome(tooltip.root);
+    const button = document.createElement('button');
+    tooltip.root.append(button);
+    button.focus();
+    button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+    expect(document.activeElement).not.toBe(button);
+    const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+    const preventDefault = vi.spyOn(mouseDown, 'preventDefault');
+    button.dispatchEvent(mouseDown);
+    expect(mouseDown.defaultPrevented).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    const secondaryMouseDown = new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+    });
+    button.dispatchEvent(secondaryMouseDown);
+    expect(secondaryMouseDown.defaultPrevented).toBe(false);
+    const inputMouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    tooltip.widthInput.dispatchEvent(inputMouseDown);
+    expect(inputMouseDown.defaultPrevented).toBe(false);
+    button.focus();
+    const enter = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' });
+    button.dispatchEvent(enter);
+    expect(document.activeElement).toBe(button);
+    expect(enter.defaultPrevented).toBe(false);
+    button.disabled = true;
+    const disabledMouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    button.dispatchEvent(disabledMouseDown);
+    expect(disabledMouseDown.defaultPrevented).toBe(false);
+  });
+
+  it.each([100, 600])('keeps a ten pixel gap from the outer toolbar at y=%s', (top) => {
+    const { tooltip, overlayContainer } = createToolbar();
+    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+      '.sniptale-selection-capture-menu-trigger'
+    );
+    if (!trigger) throw new Error('Expected capture-menu trigger');
+    vi.spyOn(tooltip.root, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, top, 400, 46));
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(450, top + 7, 18, 32));
+    trigger.click();
+    const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
+    const below = top === 100;
+    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 10 : top - 10 - 284);
+    expect(trigger.dataset['menuSide']).toBe(below ? 'down' : 'up');
+    expect(trigger.style.width).toBe('18px');
+  });
+
   it('uses the compact frame toolbar and groups symmetric padding controls between dividers', () => {
     const { onAdjustPadding, tooltip } = createToolbar();
 
@@ -181,7 +291,7 @@ describe('selection-mode confirmed toolbar', () => {
     expect(
       scenario.tooltip.root.querySelector('.sniptale-selection-capture-menu-trigger')
     ).toBeNull();
-    expect(scenario.tooltip.confirmButton.style.borderRadius).toBe('var(--sniptale-radius-md)');
+    expect(scenario.tooltip.confirmButton.style.borderRadius).toBe('var(--sniptale-radius)');
   });
 
   it('disables the full shrink step when either dimension would cross the minimum', () => {

@@ -37,6 +37,21 @@ async function readCapturedPixels(page: Page) {
   });
 }
 
+async function checkKeyboardDrawingMenuGap(page: Page) {
+  const options = page.locator('.sniptale-drawing-options-popover').first();
+  const toolbar = page.locator('.sniptale-selection-toolbar');
+  await expect(options).toBeVisible();
+  await expect
+    .poll(async () => {
+      const menuBounds = await options.boundingBox();
+      const toolbarBounds = await toolbar.boundingBox();
+      return menuBounds && toolbarBounds
+        ? menuBounds.y + menuBounds.height - toolbarBounds.y
+        : Infinity;
+    })
+    .toBeLessThanOrEqual(-9);
+}
+
 for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`Crop switches Resize and Drawing and captures annotations at ${viewport.width}`, async ({
     hostOrigin,
@@ -113,6 +128,7 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.keyboard.press('Enter');
         await expect(drawingMode).toHaveAttribute('aria-pressed', 'true');
         await expect(resizeMode).toHaveAttribute('aria-pressed', 'false');
+        await checkKeyboardDrawingMenuGap(page);
         await drawingMode.click();
         await expect(toolbar).toHaveAttribute('data-crop-mode', 'drawing');
         await resizeMode.focus();

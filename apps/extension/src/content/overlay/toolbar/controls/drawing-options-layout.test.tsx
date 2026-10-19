@@ -3,7 +3,11 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useDrawingOptionsLayout, type DrawingQuickOptionsTool } from './drawing-options-layout';
+import {
+  useDrawingOptionsLayout,
+  type DrawingQuickOptionsTool,
+  type DrawingMenuLayoutResolver,
+} from './drawing-options-layout';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -11,6 +15,7 @@ let triggerRef: React.RefObject<HTMLButtonElement | null>;
 let panelRef: React.RefObject<HTMLDivElement | null>;
 
 function DrawingLayoutHarness(props: {
+  resolveMenuLayout?: DrawingMenuLayoutResolver;
   preferredPlacement?: 'up' | 'down';
   open: boolean;
   displayMode?: 'horizontal' | 'vertical';
@@ -24,6 +29,7 @@ function DrawingLayoutHarness(props: {
     panelRef,
     tool: props.tool ?? 'pencil',
     triggerRef,
+    ...(props.resolveMenuLayout ? { resolveMenuLayout: props.resolveMenuLayout } : {}),
     ...(props.preferredPlacement ? { preferredPlacement: props.preferredPlacement } : {}),
   });
   const side =
@@ -75,6 +81,22 @@ afterEach(() => {
 });
 
 describe('drawing options measured placement', () => {
+  it('uses the crop owner resolver with measured whole-surface dimensions and its direction', () => {
+    const resolveMenuLayout = vi.fn(() => ({
+      placement: 'side' as const,
+      style: { right: 80, left: 'auto', top: 12 },
+    }));
+    expect(renderLayout({ open: true, displayMode: 'horizontal', resolveMenuLayout })).toBe('left');
+    expect(resolveMenuLayout).toHaveBeenLastCalledWith({
+      anchor: triggerRef.current,
+      menuWidth: 400,
+      menuHeight: 400,
+    });
+    expect(renderLayout({ open: false, displayMode: 'horizontal', resolveMenuLayout })).toBe(
+      'left'
+    );
+  });
+
   it('prefers above for crop tools and falls back below near the top edge', () => {
     expect(renderLayout({ open: false, displayMode: 'horizontal', preferredPlacement: 'up' })).toBe(
       'up'

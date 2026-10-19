@@ -18,7 +18,7 @@ import { useDrawingSessionSnapshot } from '../../../drawing/controller';
 import type { DrawingSessionSnapshot, DrawingTool } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
-import { useDrawingOptionsLayout } from './drawing-options-layout';
+import { useDrawingOptionsLayout, type DrawingMenuLayoutResolver } from './drawing-options-layout';
 import { useToolbarMenuDirection } from '../menu/direction';
 
 type DrawingToolDescriptor = {
@@ -70,6 +70,7 @@ const tools: readonly DrawingToolDescriptor[] = [
 
 /** Narrow presentation seam used by toolbar modes that share drawing tools but own interaction. */
 export interface ToolbarDrawingControlsOwner {
+  readonly resolveMenuLayout?: DrawingMenuLayoutResolver;
   readonly preferredMenuPlacement?: 'up' | 'down';
   readonly activeTool: DrawingTool | null;
   readonly showActions?: boolean;
@@ -82,6 +83,7 @@ export interface ToolbarDrawingControlsOwner {
 }
 
 function DrawingToolControl(props: {
+  resolveMenuLayout?: DrawingMenuLayoutResolver;
   preferredMenuPlacement?: 'up' | 'down';
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
@@ -106,6 +108,7 @@ function DrawingToolControl(props: {
     tool: props.optionsTool ?? 'pencil',
     triggerRef,
     open: props.showOptions,
+    ...(props.resolveMenuLayout ? { resolveMenuLayout: props.resolveMenuLayout } : {}),
     ...(props.preferredMenuPlacement ? { preferredPlacement: props.preferredMenuPlacement } : {}),
   });
   const menuSide = useToolbarMenuDirection(layout.resolveLayout);
@@ -196,6 +199,9 @@ export function ToolbarDrawingControls(props: {
         {visibleTools.map(({ tool, icon, label, modifierHint }) => (
           <DrawingToolControl
             key={tool}
+            {...(props.owner?.resolveMenuLayout
+              ? { resolveMenuLayout: props.owner.resolveMenuLayout }
+              : {})}
             {...(props.owner?.preferredMenuPlacement
               ? { preferredMenuPlacement: props.owner.preferredMenuPlacement }
               : {})}

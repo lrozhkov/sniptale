@@ -7,6 +7,13 @@ import {
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
 import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
+import type { ProductToolbarMenuPlacement } from '@sniptale/ui/product-menus/toolbar';
+
+export type DrawingMenuLayoutResolver = (args: {
+  anchor: HTMLElement;
+  menuWidth: number;
+  menuHeight: number;
+}) => { placement: ProductToolbarMenuPlacement; style: CSSProperties } | null;
 
 export type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
 
@@ -35,6 +42,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
 };
 
 export function useDrawingOptionsLayout(args: {
+  resolveMenuLayout?: DrawingMenuLayoutResolver;
   preferredPlacement?: 'up' | 'down';
   displayMode: 'horizontal' | 'vertical';
   hasSelection: boolean;
@@ -95,6 +103,9 @@ export function useDrawingOptionsLayout(args: {
   );
   const resolveLayout = () => {
     const anchor = args.triggerRef.current;
+    const customLayout = anchor
+      ? args.resolveMenuLayout?.({ anchor, menuWidth, menuHeight })
+      : null;
     const scale = readContentUiScaleCompensation(anchor);
     const above = (anchor?.getBoundingClientRect().top ?? 0) / scale;
     const below =
@@ -105,14 +116,16 @@ export function useDrawingOptionsLayout(args: {
       args.preferredPlacement && preferredFits
         ? args.preferredPlacement
         : getToolbarMenuPosition(anchor, menuHeight);
-    const positioned = resolveToolbarFloatingMenuStyle({
-      anchorEl: args.triggerRef.current,
-      displayMode: args.displayMode,
-      menuHeight,
-      menuWidth,
-      placement,
-      preferredTop: args.hasSelection ? -16 : 0,
-    });
+    const positioned =
+      customLayout?.style ??
+      resolveToolbarFloatingMenuStyle({
+        anchorEl: args.triggerRef.current,
+        displayMode: args.displayMode,
+        menuHeight,
+        menuWidth,
+        placement,
+        preferredTop: args.hasSelection ? -16 : 0,
+      });
     const fallback: CSSProperties =
       args.displayMode === 'vertical'
         ? { left: 'calc(100% + 10px)', top: 0 }
@@ -120,7 +133,8 @@ export function useDrawingOptionsLayout(args: {
     const verticalOverflow: CSSProperties =
       args.displayMode === 'vertical' ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' } : {};
     return {
-      placement: resolveToolbarMenuPlacement(args.displayMode, placement),
+      placement:
+        customLayout?.placement ?? resolveToolbarMenuPlacement(args.displayMode, placement),
       style: {
         ...(positioned ?? fallback),
         maxWidth: 'calc(100vw - 16px)',

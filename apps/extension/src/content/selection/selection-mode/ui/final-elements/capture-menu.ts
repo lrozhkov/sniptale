@@ -15,7 +15,7 @@ import {
 } from './capture-controls';
 import { createSelectionCaptureActionIcon } from './icons';
 
-const MENU_GAP = 8;
+const MENU_GAP = 10;
 const VIEWPORT_MARGIN = 8;
 
 interface CaptureMenuLifecycleState {
@@ -33,6 +33,10 @@ function canOpenCaptureMenuBelow(anchorRect: DOMRect, height: number): boolean {
   return anchorRect.bottom + MENU_GAP + height <= window.innerHeight - VIEWPORT_MARGIN;
 }
 
+function getCaptureMenuShellRect(trigger: HTMLElement): DOMRect {
+  return (trigger.closest('.sniptale-selection-toolbar') ?? trigger).getBoundingClientRect();
+}
+
 function applyCaptureMenuDirection(trigger: HTMLElement, below: boolean): void {
   trigger.dataset['menuSide'] = below ? 'down' : 'up';
   const icon = trigger.querySelector('svg');
@@ -43,7 +47,7 @@ export function syncSelectionCaptureMenuDirection(root: ParentNode): void {
   const trigger = root.querySelector<HTMLButtonElement>('.sniptale-selection-capture-menu-trigger');
   if (!trigger) return;
   const below = canOpenCaptureMenuBelow(
-    trigger.getBoundingClientRect(),
+    getCaptureMenuShellRect(trigger),
     captureMenuHeights.get(trigger) ?? 284
   );
   applyCaptureMenuDirection(trigger, below);
@@ -51,6 +55,7 @@ export function syncSelectionCaptureMenuDirection(root: ParentNode): void {
 
 function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const anchorRect = anchor.getBoundingClientRect();
+  const shellRect = getCaptureMenuShellRect(anchor);
   const menuRect = menu.getBoundingClientRect();
   const width = menuRect.width || 280;
   const height = menuRect.height || 284;
@@ -59,11 +64,11 @@ function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
     Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
   );
   captureMenuHeights.set(anchor, height);
-  const canOpenBelow = canOpenCaptureMenuBelow(anchorRect, height);
+  const canOpenBelow = canOpenCaptureMenuBelow(shellRect, height);
   applyCaptureMenuDirection(anchor, canOpenBelow);
   const top = canOpenBelow
-    ? anchorRect.bottom + MENU_GAP
-    : Math.max(VIEWPORT_MARGIN, anchorRect.top - MENU_GAP - height);
+    ? shellRect.bottom + MENU_GAP
+    : Math.max(VIEWPORT_MARGIN, shellRect.top - MENU_GAP - height);
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
 }

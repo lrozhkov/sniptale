@@ -27,13 +27,11 @@ function createDragCanvas(): HTMLCanvasElement {
 }
 
 const {
-  calculateContentSizeTooltipPositionMock,
   closeSelectionCaptureActionMenuMock,
   setContentSizeTooltipPositionMock,
   syncSelectionToolbarCompactControlsChromeMock,
   syncContentSizeTooltipValuesMock,
 } = vi.hoisted(() => ({
-  calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 34 })),
   closeSelectionCaptureActionMenuMock: vi.fn(),
   setContentSizeTooltipPositionMock: vi.fn(),
   syncSelectionToolbarCompactControlsChromeMock: vi.fn(),
@@ -44,13 +42,6 @@ vi.mock('../final-elements/capture-menu', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../final-elements/capture-menu')>()),
   closeSelectionCaptureActionMenu: closeSelectionCaptureActionMenuMock,
   createSelectionCaptureActionControls: vi.fn(),
-}));
-
-vi.mock('@sniptale/ui/content-size-tooltip/core', () => ({
-  CONTENT_SIZE_TOOLTIP_DIMENSIONS: { width: 430, height: 46 },
-  ContentSizeTooltipCopy: undefined,
-  calculateContentSizeTooltipPosition: calculateContentSizeTooltipPositionMock,
-  mergeStyleRecords: vi.fn(),
 }));
 
 vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
@@ -218,14 +209,9 @@ describe('selection-mode ui frame updates', () => {
       heightMax: 700,
     });
     expect(syncSelectionToolbarCompactControlsChromeMock).toHaveBeenCalledWith(dom.sizeTooltip);
-    expect(calculateContentSizeTooltipPositionMock).toHaveBeenCalledWith({
-      anchorRect: { x: 100, y: 120, width: 240, height: 160 },
-      tooltipHeight: 44,
-      tooltipWidth: 430,
-    });
     expect(setContentSizeTooltipPositionMock).toHaveBeenCalledWith(dom.sizePanel, {
-      left: 12,
-      top: 34,
+      x: 100,
+      y: 60,
     });
     expect(dom.finalOverlay?.querySelector('.sniptale-shade-top')?.getAttribute('style')).toContain(
       'height: 120px'

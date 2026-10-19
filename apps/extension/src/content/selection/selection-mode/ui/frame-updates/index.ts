@@ -1,4 +1,3 @@
-import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
 import {
   setContentSizeTooltipPosition,
   syncContentSizeTooltipValues,
@@ -13,6 +12,7 @@ import {
 } from '../final-elements/capture-menu';
 import { paintSelectionModeDragMask } from '../final-elements/overlay';
 import { syncSelectionToolbarCompactControlsChrome } from '../final-elements/toolbar-chrome';
+import { placeSelectionFloatingSurface } from '../floating-placement';
 
 function createDragFrameSizeLabel(): HTMLDivElement {
   const label = document.createElement('div');
@@ -129,10 +129,12 @@ function updateSizePanelPosition(sizePanel: HTMLElement, rect: SelectionRect): v
   const measured = sizePanel.getBoundingClientRect();
   setContentSizeTooltipPosition(
     sizePanel,
-    calculateContentSizeTooltipPosition({
-      anchorRect: rect,
-      tooltipWidth: measured.width || sizePanel.offsetWidth || 430,
-      tooltipHeight: measured.height || sizePanel.offsetHeight || 44,
+    placeSelectionFloatingSurface({
+      anchor: rect,
+      exclusion: rect,
+      width: measured.width || sizePanel.offsetWidth || 430,
+      height: measured.height || sizePanel.offsetHeight || 50,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
     })
   );
 }
