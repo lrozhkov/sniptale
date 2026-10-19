@@ -164,6 +164,7 @@ async function prepareMicrophoneTake({
   label,
   outputPath,
   before,
+  interrupted,
 }: {
   page: Page;
   voice: Locator;
@@ -172,6 +173,7 @@ async function prepareMicrophoneTake({
   label: (key: Parameters<typeof translate>[0]) => string;
   outputPath: (name: string) => string;
   before: Awaited<ReturnType<typeof readProject>>;
+  interrupted: boolean;
 }) {
   await operate(
     voice.getByRole('button', {
@@ -204,6 +206,7 @@ async function prepareMicrophoneTake({
         const output = context.createMediaStreamDestination();
         oscillator.connect(output);
         oscillator.start();
+        Reflect.set(window, 'voiceFixtureInput', output.stream);
         return output.stream;
       },
     });
@@ -277,8 +280,28 @@ async function prepareMicrophoneTake({
   await expect.poll(() => counter.textContent()).not.toBe(pausedTime);
   // Native MediaRecorder requires elapsed media time, rather than a synthetic clock.
   await page.waitForTimeout(1200);
-  await operate(command('videoEditor.app.recordAudioStop'));
+  if (interrupted) {
+    await page.evaluate(() => {
+      const stream: unknown = Reflect.get(window, 'voiceFixtureInput');
+      if (!(stream instanceof MediaStream)) throw new Error('Missing microphone stream fixture');
+      stream.getTracks().forEach((track) => track.stop());
+    });
+  } else {
+    await operate(command('videoEditor.app.recordAudioStop'));
+  }
   await expect(command('videoEditor.sidebar.textVoiceRecordingNext')).toBeEnabled();
+  await expect
+    .poll(() =>
+      preview.locator('video').evaluateAll((nodes) => nodes.every((video) => video.paused))
+    )
+    .toBe(true);
+  if (interrupted) {
+    await command('videoEditor.sidebar.textVoiceRecordingNext').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: outputPath('voice-microphone-interrupted.png'),
+      fullPage: false,
+    });
+  }
   const rawUrl = await recording.locator('audio').getAttribute('src');
   await operate(page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]'));
   await operate(
@@ -345,7 +368,8 @@ async function prepareMicrophoneTake({
   return expectedDuration;
 }
 
-for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
+for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrupted'] as const) {
+  const microphone = input === 'microphone' || input === 'microphone-interrupted';
   for (const variant of [
     { size: PRIMARY_BROWSER_VIEWPORTS[0].size, locale: 'en', theme: 'dark' },
     { size: PRIMARY_BROWSER_VIEWPORTS[1].size, locale: 'ru', theme: 'light' },
@@ -476,7 +500,7 @@ for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
               exact: true,
             })
           );
-        } else if (input === 'microphone') {
+        } else if (microphone) {
           expectedDuration = await prepareMicrophoneTake({
             page,
             voice,
@@ -484,6 +508,7 @@ for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
             back,
             label,
             before,
+            interrupted: input === 'microphone-interrupted',
             outputPath: (name) => info.outputPath(name),
           });
         } else {
@@ -648,7 +673,7 @@ for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
           await page.keyboard.press('Escape');
           await retry.scrollIntoViewIfNeeded();
           await page.screenshot({ path: info.outputPath('voice-save-retry.png'), fullPage: false });
-          if (input === 'microphone') {
+          if (microphone) {
             const download = page.waitForEvent('download');
             await operate(
               voice.getByRole('button', {
@@ -677,7 +702,7 @@ for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
           textSnapshot: {
             text: {
               text: phrase,
-              kind: input === 'ai' ? 'ai' : input === 'microphone' ? 'microphone' : 'gallery',
+              kind: input === 'ai' ? 'ai' : microphone ? 'microphone' : 'gallery',
             },
           },
         });
