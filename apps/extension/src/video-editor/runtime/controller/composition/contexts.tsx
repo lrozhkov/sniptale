@@ -66,10 +66,12 @@ export const RuntimePreviewContext = createContext<Pick<
   | 'setTimelinePreviewViewport'
   | 'timelinePreviews'
 > | null>(null);
-export const RuntimeProjectContext = createContext<Pick<
-  VideoEditorRuntimeController,
-  'applyLoadedProject'
-> | null>(null);
+export const RuntimeProjectContext = createContext<
+  | (Pick<VideoEditorRuntimeController, 'applyLoadedProject'> & {
+      recordingLeave?: VideoEditorWorkspaceState['voiceRecording'];
+    })
+  | null
+>(null);
 
 export const AssetCommandContext = createContext<VideoEditorCommandHandlers['assets'] | null>(null);
 export const ExportCommandContext = createContext<VideoEditorCommandHandlers['export'] | null>(

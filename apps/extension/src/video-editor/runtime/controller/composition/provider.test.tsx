@@ -74,6 +74,13 @@ const mocks = vi.hoisted(() => {
     setProjectDialogOpen: action,
     autoProcessingModalOpen: false,
     setAutoProcessingModalOpen: action,
+    voiceRecording: {
+      obscured: false,
+      capturing: false,
+      setCapturing: vi.fn(),
+      register: vi.fn(() => () => undefined),
+      request: vi.fn(async () => true),
+    },
     audioRecordingDialogOpen: false,
     audioRecordingTarget: null as
       | import('../../../contracts/insertion').VideoEditorAudioRecordingTarget

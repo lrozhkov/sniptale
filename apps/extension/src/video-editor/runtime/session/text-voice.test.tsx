@@ -53,6 +53,14 @@ vi.mock('../../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: vi.
 vi.mock('../../../workflows/video-review/speech-audio', () => ({
   decodeReviewSpeechDuration: vi.fn(),
 }));
+vi.mock('../../../composition/audio-recording/trim-file', () => ({
+  createTrimmedRecordingFile: vi.fn(
+    async () => new File(['recorded'], 'take.wav', { type: 'audio/wav' })
+  ),
+}));
+vi.mock('../../../composition/audio-recording/dialog/waveform', () => ({
+  useRecordedAudioPeaks: () => [0.1],
+}));
 vi.mock('./save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
 
 function gate<T>() {
@@ -489,4 +497,62 @@ it('keeps a late AI catalog failure out of the local source state', async () => 
   );
   expect(operation.source).toBe('gallery');
   expect(operation.error).toBeNull();
+});
+
+it('records a microphone take through the mounted panel and accepts it with the captured text', async () => {
+  class Recorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state = 'inactive';
+    mimeType = 'audio/webm';
+    start() {
+      this.state = 'recording';
+    }
+    pause() {
+      this.state = 'paused';
+    }
+    stop() {
+      this.state = 'inactive';
+      const data = new Event('dataavailable');
+      Object.defineProperty(data, 'data', { value: new Blob(['raw']) });
+      this.dispatchEvent(data);
+      this.dispatchEvent(new Event('stop'));
+    }
+  }
+  vi.stubGlobal('MediaRecorder', Recorder);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })),
+    },
+  });
+  await mount();
+  await click('gallery.videoReview.textVoiceMicrophone');
+  await click('videoEditor.app.recordAudioStart');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(operation.recording.session.controller.transport.status).toBe('recording');
+  });
+  await click('videoEditor.app.recordAudioStop');
+  await click('videoEditor.sidebar.textVoiceRecordingNext');
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(operation.preview?.textSnapshot.text.kind).toBe('microphone');
+  });
+  expect(operation.preview?.textSnapshot.text.text).toBe('Speak this');
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  await click('gallery.videoReview.speechApply');
+  expect(operation.accepted).toBe(true);
+  expect(useVideoEditorStore.getState().project?.clips[0]).toMatchObject({
+    textSnapshot: { text: { kind: 'microphone', text: 'Speak this' } },
+  });
+  await act(async () => operation.close());
+  expect(operation.target).toBeNull();
 });

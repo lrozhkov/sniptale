@@ -71,6 +71,7 @@ function useVideoEditorRuntimeComposition(
     workspace.autoProcessingModalOpen ||
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
+    workspace.voiceRecording.capturing ||
     workspace.libraryPanelOpen ||
     exportPort.exportState.error !== null ||
     exportPort.exportState.isRunning;
@@ -225,9 +226,16 @@ function useVideoEditorCommandComposition(
       projects: libraries.projects,
       libraries: projectCommandLibraries,
       applyLoadedProject: runtime.applyLoadedProject,
+      beforeLeave: workspace.voiceRecording.request,
       setError: lifecycle.setError,
     }),
-    [libraries.projects, lifecycle.setError, projectCommandLibraries, runtime.applyLoadedProject]
+    [
+      libraries.projects,
+      lifecycle.setError,
+      projectCommandLibraries,
+      runtime.applyLoadedProject,
+      workspace.voiceRecording.request,
+    ]
   );
   const commandPorts = useMemo(
     () => ({ assets: assetCommandPort, export: exportCommandPort, project: projectCommandPort }),
@@ -324,8 +332,11 @@ function useVideoEditorContextProjections(
     ]
   );
   const runtimeProject = useMemo(
-    () => ({ applyLoadedProject: runtime.applyLoadedProject }),
-    [runtime.applyLoadedProject]
+    () => ({
+      applyLoadedProject: runtime.applyLoadedProject,
+      recordingLeave: workspace.voiceRecording,
+    }),
+    [runtime.applyLoadedProject, workspace.voiceRecording]
   );
   return {
     runtimePlayback,

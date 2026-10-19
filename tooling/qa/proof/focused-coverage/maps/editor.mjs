@@ -1,9 +1,130 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'shared-recording-level-presentation',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/level-meter.tsx',
+    allowCrossOwner: true,
+    reason: 'Compact inspector and existing Gallery consumers preserve complete meter status.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/level-meter.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-discard-placement',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/dismissal.tsx',
+    allowCrossOwner: true,
+    reason: 'Inline and portaled consumers preserve recording admission, focus and take recovery.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/dismissal.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/dismissal.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'mounted-microphone-session',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice-recording.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-microphone-view',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice-recording.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: ['apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx'],
+  },
+  {
+    owner: 'montage-mounted-inspector-voice',
+    productionFile: 'apps/extension/src/video-editor/workspace/floating/inspector-stack.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/floating/inspector-stack.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-suspension',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/controller.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/controller.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/controller.playback.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/index.test.tsx',
+      'apps/extension/src/video-editor/recording/audio-modal/dismissal.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-recording-device-controls',
+    productionFile: 'apps/extension/src/composition/audio-recording/dialog/controls.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/composition/audio-recording/dialog/controls.test.tsx',
+      'apps/extension/src/composition/audio-recording/dialog/index.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'workspace-recording-leave-admission',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/workspace-state.ts',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'mounted-recording-context',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/composition/contexts.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/composition/hooks.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
+    owner: 'recording-provider-admission',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/composition/provider.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Recording lifecycle and its actual consumers prove admission, preservation and suspension.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+    ],
+  },
+  {
     owner: 'montage-local-voice-preparation',
     productionFile: 'apps/extension/src/workflows/video/project-voice-take.ts',
     allowCrossOwner: true,
-    reason: 'Local recording bases preserve common acceptance and mounted AI and Library consumers.',
+    reason:
+      'Local recording bases preserve common acceptance and mounted AI and Library consumers.',
     testFiles: [
       'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.test.ts',

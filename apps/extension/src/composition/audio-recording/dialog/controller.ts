@@ -97,6 +97,8 @@ export function useAudioRecordingDialogSession({
   onSave,
   timeline,
   captureLimitSeconds,
+  suspended = false,
+  retainAfterSave = false,
 }: AudioRecordingModalProps) {
   const lifetime = useRef<AbortController | null>(null);
   const savingRef = useRef(false);
@@ -113,6 +115,7 @@ export function useAudioRecordingDialogSession({
     isRetained: (take) => retainedTake.current === take,
     close: () => {
       lifetime.current?.abort();
+      retainedTake.current = null;
       controller.save.resetSession();
       timeline?.onStop();
       onClose();
@@ -126,8 +129,13 @@ export function useAudioRecordingDialogSession({
     deviceId,
     timeline,
     captureLimitSeconds,
-    confirmation.open
+    confirmation.open || suspended
   );
+  useEffect(() => {
+    if (!suspended) return;
+    controller.transport.pauseRecording();
+    controller.trim?.pauseSelection();
+  }, [suspended, controller.transport, controller.trim]);
   useEffect(() => {
     if (!isOpen) return;
     const active = new AbortController();
@@ -140,7 +148,10 @@ export function useAudioRecordingDialogSession({
     retainedTake.current = null;
     return () => {
       active.abort();
-      if (lifetime.current === active) lifetime.current = null;
+      if (lifetime.current === active) {
+        lifetime.current = null;
+        retainedTake.current = null;
+      }
     };
   }, [isOpen]);
   const saveRecording = async () => {
@@ -169,8 +180,10 @@ export function useAudioRecordingDialogSession({
         }
       );
       if (active.signal.aborted) return;
-      controller.save.resetSession();
-      onClose();
+      if (!retainAfterSave) {
+        controller.save.resetSession();
+        onClose();
+      }
     } catch (error) {
       if (!active.signal.aborted) {
         const stage = error instanceof RecordingSaveFailure ? error.stage : 'attach';
@@ -192,7 +205,8 @@ export function useAudioRecordingDialogSession({
   });
   function beginCapture() {
     const active = lifetime.current;
-    if (startingRef.current || savingRef.current || !active || active.signal.aborted) return;
+    if (suspended || startingRef.current || savingRef.current || !active || active.signal.aborted)
+      return;
     retainedTake.current = null;
     takeDownload.reset();
     startingRef.current = true;

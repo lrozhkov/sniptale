@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { useRecordingDismissal } from './dismissal';
+import { RecordingDiscardConfirmation, useRecordingDismissal } from './dismissal';
 import type { AudioRecordingControllerState } from '../session-types';
 
 it('admits one close or replacement and rejects inactive, busy and duplicate confirmations', () => {
@@ -83,6 +83,58 @@ it('admits one close or replacement and rejects inactive, busy and duplicate con
     expect(close).toHaveBeenCalledOnce();
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('places an opted-in confirmation outside the inspector and preserves its theme and cleanup', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let value!: ReturnType<typeof useRecordingDismissal>;
+  const controller: AudioRecordingControllerState = {
+    meter: { status: 'paused', level: 0, peaks: [] },
+    save: { audioBlob: new Blob(['raw']), trimStart: 0, trimEnd: 2, resetSession: vi.fn() },
+    transport: {
+      status: 'recorded',
+      elapsedSeconds: 2,
+      durationLabel: '00:02',
+      error: null,
+      startRecording: vi.fn(),
+      stopRecording: vi.fn(),
+      pauseRecording: vi.fn(),
+      resumeRecording: vi.fn(),
+    },
+    trim: null,
+  };
+  function Subject() {
+    value = useRecordingDismissal({
+      getController: () => controller,
+      isActive: () => true,
+      isBusy: () => false,
+      isRetained: () => false,
+      close: vi.fn(),
+      restart: vi.fn(),
+    });
+    return (
+      <div data-theme="dark">
+        <RecordingDiscardConfirmation portal value={value} />
+      </div>
+    );
+  }
+  try {
+    act(() => root.render(<Subject />));
+    act(() => value.request('close'));
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    expect(dialog).not.toBeNull();
+    expect(host.contains(dialog)).toBe(false);
+    expect(dialog.closest('[data-theme]')?.getAttribute('data-theme')).toBe('dark');
+    act(() => value.cancel());
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

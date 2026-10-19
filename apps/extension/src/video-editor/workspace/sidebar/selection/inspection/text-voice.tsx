@@ -1,5 +1,5 @@
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Check, FolderOpen, LoaderCircle, Play, Square } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
@@ -7,7 +7,9 @@ import { SpeechSynthesisProfileFields } from '../../../../../ui/video-text/speec
 import { SegmentedRow, SelectField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectTextVoiceController } from '../../../../runtime/session/text-voice';
 import { InspectorActionButton } from '../shared/actions';
+import { AudioRecordingDownloadButton } from '../../../../../composition/audio-recording/dialog/controls';
 import { AudioLibrarySelection } from '../../../../../composition/audio-library/selection';
+import { ProjectTextVoiceRecording } from './text-voice-recording';
 import { NumberInput } from '../inputs/number';
 
 /** Montage supplies explicit result-clock placement independently of text source ranges. */
@@ -23,7 +25,7 @@ export function ProjectTextVoicePanel(props: {
     ?.document.fragments.find((entry) => entry.id === op.target?.fragmentId);
   const text =
     op.preview?.textSnapshot.text.text ?? op.consent?.capture.basis.fragment.text ?? fragment?.text;
-  const locked = op.running || !!op.preview || !!op.consent;
+  const locked = op.running || op.recording.session.isSaving || !!op.preview || !!op.consent;
   return (
     <section
       data-ui="video-editor.text-voice.panel"
@@ -34,7 +36,7 @@ export function ProjectTextVoicePanel(props: {
         <InspectorActionButton
           autoFocus
           iconOnly
-          disabled={op.running}
+          disabled={op.running || op.recording.session.isSaving}
           title={translate('gallery.videoReview.textVoiceBack')}
           aria-label={translate('gallery.videoReview.textVoiceBack')}
           onClick={props.onClose}
@@ -57,9 +59,14 @@ export function ProjectTextVoicePanel(props: {
       <SegmentedRow
         value={source}
         ariaLabel={translate('gallery.videoReview.textVoiceSource')}
-        columns={2}
+        columns={3}
         options={[
           { value: 'ai', label: translate('gallery.videoReview.textVoiceAI'), disabled: locked },
+          {
+            value: 'microphone',
+            label: translate('gallery.videoReview.textVoiceMicrophone'),
+            disabled: locked,
+          },
           {
             value: 'gallery',
             label: translate('gallery.videoReview.textVoiceGallery'),
@@ -74,7 +81,19 @@ export function ProjectTextVoicePanel(props: {
           <VoiceAudition
             url={op.preview.url}
             duration={op.preview.duration}
-            focusOnMount={source === 'gallery'}
+            focusOnMount={source !== 'ai'}
+            suspended={
+              !op.inspectorVisible || op.recording.obscured || op.recording.confirmation.open
+            }
+            actions={
+              source === 'microphone' ? (
+                <AudioRecordingDownloadButton
+                  iconOnly
+                  disabled={op.running || op.recording.session.isDownloading}
+                  onDownload={op.recording.session.downloadTake}
+                />
+              ) : undefined
+            }
           />
           <VoicePlacement project={props.project} operation={op} />
           {op.accepted ? (
@@ -113,10 +132,12 @@ function VoiceSourceControls({
 }) {
   const { loadModels, source } = op;
   const pauseTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
-  const locked = op.running || !!op.preview || !!op.consent;
+  const locked = op.running || op.recording.session.isSaving || !!op.preview || !!op.consent;
   useEffect(() => {
     if (source === 'ai') void loadModels();
   }, [loadModels, source]);
+  if (source === 'microphone')
+    return op.preview ? null : <ProjectTextVoiceRecording recording={op.recording} />;
   return source === 'ai' ? (
     <>
       <fieldset disabled={locked} className="min-w-0">
@@ -221,10 +242,14 @@ function VoiceAudition({
   url,
   duration,
   focusOnMount,
+  suspended,
+  actions,
 }: {
   url: string;
   duration: number;
   focusOnMount: boolean;
+  suspended: boolean;
+  actions?: ReactNode;
 }) {
   const surface = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -235,6 +260,9 @@ function VoiceAudition({
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (suspended) audio.current?.pause();
+  }, [suspended]);
   useEffect(() => {
     const element = audio.current;
     return () => {
@@ -286,6 +314,7 @@ function VoiceAudition({
             formatNumber(duration, { maximumFractionDigits: 2 }, locale)
           )}
         </span>
+        {actions}
       </div>
       {failed ? (
         <p role="alert" className="text-sm">

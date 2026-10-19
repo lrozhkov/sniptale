@@ -4,7 +4,7 @@ import { ProductModalHeader } from '@sniptale/ui/product-modal';
 import { Download, Mic, Pause, Play, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { InspectorPanel } from '../../../ui/compact-inspector-controls';
+import { InspectorPanel, SelectField } from '../../../ui/compact-inspector-controls';
 import type { AudioRecordingStatus } from '../session-types';
 
 export function RecordingActionButton(props: {
@@ -195,6 +195,7 @@ export function RecordingSetup(props: {
 }
 
 export function AudioRecordingDeviceSelect(props: {
+  compact?: boolean;
   menuClassName?: string;
   value: string;
   onChange: (value: string) => void;
@@ -219,6 +220,23 @@ export function AudioRecordingDeviceSelect(props: {
       navigator.mediaDevices?.removeEventListener?.('devicechange', update);
     };
   }, []);
+  const options = [
+    { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
+    ...devices.map((device, index) => ({
+      value: device.deviceId,
+      label: device.label || `${translate('videoEditor.app.recordAudioDevice')} ${index + 1}`,
+    })),
+  ];
+  if (props.compact)
+    return (
+      <SelectField
+        label={translate('videoEditor.app.recordAudioDevice')}
+        value={props.value}
+        onChange={props.onChange}
+        disabled={props.disabled}
+        options={options}
+      />
+    );
   return (
     <div className="grid min-w-0 gap-1.5">
       <span
@@ -231,13 +249,7 @@ export function AudioRecordingDeviceSelect(props: {
         id={labelId}
         {...props}
         aria-labelledby={`${labelId}-label`}
-        options={[
-          { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
-          ...devices.map((device, index) => ({
-            value: device.deviceId,
-            label: device.label || `${translate('videoEditor.app.recordAudioDevice')} ${index + 1}`,
-          })),
-        ]}
+        options={options}
       />
     </div>
   );

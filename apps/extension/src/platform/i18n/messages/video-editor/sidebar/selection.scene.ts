@@ -6,6 +6,7 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
   textVoiceNewTrack: { ru: 'Новая дорожка', en: 'New track' },
   textVoiceLane: { ru: 'Линия', en: 'Lane' },
   textVoiceStop: { ru: 'Остановить прослушивание', en: 'Stop preview' },
+  textVoiceRecordingNext: { ru: 'Далее', en: 'Next' },
   textVoiceSaved: { ru: 'Озвучка сохранена', en: 'Speech saved' },
   textVoicePlacementConflict: {
     ru: 'В этом месте дорожка занята или заблокирована. Выберите другую позицию, линию или новую дорожку.',

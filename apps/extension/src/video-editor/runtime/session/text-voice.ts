@@ -30,12 +30,13 @@ import {
   useVideoEditorHistoryPort,
   useVideoEditorTimelineEditingPort,
 } from '../controller/store';
+import { useProjectTextVoiceRecording } from './text-voice-recording';
 import { waitForVideoEditorSave } from './save-readiness';
 
 type VoicePreview = ProjectVoiceTakePreview;
 type VoiceCapture = Awaited<ReturnType<typeof captureProjectTextVoice>>;
 interface VoiceState {
-  source: 'ai' | 'gallery';
+  source: 'ai' | 'microphone' | 'gallery';
   target: { documentId: string; fragmentId: string } | null;
   profile: ReviewSpeechProfile | undefined;
   catalog: AIModelSelectionBootstrapPayload | null;
@@ -133,7 +134,7 @@ function runVoiceAttempt(
   owner: { current: VoiceLifetime },
   lifetime: VoiceLifetime,
   setState: Dispatch<SetStateAction<VoiceState>>,
-  work: (signal: AbortSignal) => Promise<void>,
+  work: (signal: AbortSignal) => Promise<void | VoicePreview>,
   applying: boolean
 ) {
   const current = () => owner.current === lifetime && lifetime.mounted;
@@ -148,7 +149,11 @@ function runVoiceAttempt(
       controller.signal.addEventListener('abort', abort, { once: true });
     });
     try {
-      await Promise.race([work(controller.signal), cancelled]);
+      const prepared = work(controller.signal).then(async (preview) => {
+        if (preview)
+          await retainVoicePreview(preview, owner, lifetime, controller.signal, setState);
+      });
+      await Promise.race([prepared, cancelled]);
       return true;
     } catch (error) {
       if (current() && !controller.signal.aborted)
@@ -240,8 +245,44 @@ async function prepareVoiceConsent(
   return { capture, providerId: provider.id, providerName: provider.name };
 }
 
+async function retainVoicePreview(
+  preview: VoicePreview,
+  owner: { current: VoiceLifetime },
+  lifetime: VoiceLifetime,
+  signal: AbortSignal,
+  setState: Dispatch<SetStateAction<VoiceState>>
+) {
+  if (signal.aborted || owner.current !== lifetime || !lifetime.mounted) {
+    await cleanupProjectVoiceTakePreview(preview);
+    return;
+  }
+  lifetime.preview = preview;
+  setState((value) => ({ ...value, preview }));
+}
+
+async function prepareVoiceSelection(
+  selection: Parameters<typeof prepareProjectLocalTextVoice>[0]['selection'],
+  access: ProjectVoiceTakeAccess,
+  state: Pick<VoiceState, 'target' | 'source' | 'consent'>,
+  run: (work: (signal: AbortSignal) => Promise<VoicePreview>) => ReturnType<typeof runVoiceAttempt>
+) {
+  const { target, source, consent } = state;
+  if (!target || source !== 'gallery' || consent) throw new Error('busy');
+  const prepared = await run((signal) =>
+    prepareProjectLocalTextVoice({
+      access,
+      documentId: target.documentId,
+      fragmentId: target.fragmentId,
+      selection,
+      kind: 'gallery',
+      signal,
+    })
+  );
+  if (!prepared) throw new Error('failed');
+}
+
 /** One mounted inspector owns consent, audition resources, placement and acceptance lifetime. */
-export function useVideoProjectTextVoice(project: VideoProject) {
+export function useVideoProjectTextVoice(project: VideoProject, parentVisible = true) {
   const update = useVideoEditorTimelineEditingPort((port) => port.updateProject);
   const history = useVideoEditorHistoryPort((port) => ({
     begin: port.beginProjectHistoryTransaction,
@@ -277,11 +318,26 @@ export function useVideoProjectTextVoice(project: VideoProject) {
         void cleanupProjectVoiceTakePreview(lifetime.preview).catch(() => undefined);
     };
   }, [lifetime]);
+  const recording = useProjectTextVoiceRecording({
+    access,
+    target: state.target,
+    enabled: !!state.target && state.source === 'microphone',
+    accepted: state.accepted,
+    parentVisible,
+    onPrepared(preview) {
+      if (!current() || lifetime.preview) return false;
+      lifetime.preview = preview;
+      setState((value) => ({ ...value, preview }));
+      return true;
+    },
+  });
   const loadModels = useCallback(() => loadVoiceCatalog(owner, latest, setState), []);
-  const run = (work: (signal: AbortSignal) => Promise<void>, applying = false) =>
+  const run = (work: (signal: AbortSignal) => Promise<void | VoicePreview>, applying = false) =>
     runVoiceAttempt(owner, lifetime, setState, work, applying);
   return {
     ...state,
+    inspectorVisible: parentVisible,
+    recording,
     loadModels,
     open(documentId: string, fragmentId: string) {
       if (!current() || lifetime.active || lifetime.preview) return;
@@ -296,44 +352,37 @@ export function useVideoProjectTextVoice(project: VideoProject) {
     },
     async close() {
       if (!current() || lifetime.active) return;
-      await run(async () => {
-        if (lifetime.preview) await cleanupProjectVoiceTakePreview(lifetime.preview);
-        if (!current()) return;
-        lifetime.preview = null;
-        setState((value) => ({
-          ...value,
-          target: null,
-          preview: null,
-          consent: null,
-          accepted: false,
-        }));
-      });
+      const discard = () =>
+        run(async () => {
+          if (lifetime.preview) await cleanupProjectVoiceTakePreview(lifetime.preview);
+          if (!current()) return;
+          lifetime.preview = null;
+          setState((value) => ({
+            ...value,
+            target: null,
+            preview: null,
+            consent: null,
+            accepted: false,
+          }));
+        });
+      if (latest.current.source === 'microphone')
+        recording.dismiss(() => {
+          void discard();
+        });
+      else await discard();
     },
     changeSource(source: VoiceState['source']) {
+      if (source === latest.current.source) return;
       if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
-      setState((value) => ({ ...value, source, error: null }));
+      const change = () => {
+        if (current()) setState((value) => ({ ...value, source, error: null }));
+      };
+      if (latest.current.source === 'microphone') recording.dismiss(change);
+      else change();
     },
     async prepareLocal(selection: Parameters<typeof prepareProjectLocalTextVoice>[0]['selection']) {
-      const { target, source } = latest.current;
-      if (!target || source !== 'gallery' || lifetime.preview || latest.current.consent)
-        throw new Error('busy');
-      const prepared = await run(async (signal) => {
-        const preview = await prepareProjectLocalTextVoice({
-          access,
-          documentId: target.documentId,
-          fragmentId: target.fragmentId,
-          selection,
-          kind: 'gallery',
-          signal,
-        });
-        if (signal.aborted || !current()) {
-          await cleanupProjectVoiceTakePreview(preview);
-          return;
-        }
-        lifetime.preview = preview;
-        setState((value) => ({ ...value, preview }));
-      });
-      if (!prepared) throw new Error('failed');
+      if (lifetime.preview) throw new Error('busy');
+      await prepareVoiceSelection(selection, access, latest.current, run);
     },
     changeProfile(profile: ReviewSpeechProfile) {
       if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
@@ -356,18 +405,7 @@ export function useVideoProjectTextVoice(project: VideoProject) {
       if (!consent || lifetime.preview) return;
       await run(async (signal) => {
         setState((value) => ({ ...value, consent: null }));
-        const preview = await generateProjectTextVoice(
-          access,
-          consent.capture,
-          consent.providerId,
-          signal
-        );
-        if (signal.aborted || !current()) {
-          await cleanupProjectVoiceTakePreview(preview);
-          return;
-        }
-        lifetime.preview = preview;
-        setState((value) => ({ ...value, preview }));
+        return generateProjectTextVoice(access, consent.capture, consent.providerId, signal);
       });
     },
     async apply() {
@@ -377,7 +415,10 @@ export function useVideoProjectTextVoice(project: VideoProject) {
       await run(async (signal) => {
         await acceptProjectVoiceTake(access, preview, placement, signal);
         signal.throwIfAborted();
-        if (current()) setState((value) => ({ ...value, accepted: true }));
+        if (current()) {
+          if (latest.current.source === 'microphone') recording.markRetained();
+          setState((value) => ({ ...value, accepted: true }));
+        }
       }, true);
     },
     cancel() {

@@ -338,3 +338,30 @@ it('admits one download and ignores its failure after a confirmed new take', asy
   expect(button('Download original recording').disabled).toBe(false);
   download.mockRestore();
 });
+
+it('pauses hidden mounted recording and audition without resetting the raw take', async () => {
+  const state = io.session();
+  state.transport.status = 'recording';
+  await act(async () =>
+    root.render(
+      <MaterialAudioRecordingModal isOpen suspended onClose={close} onSave={async () => {}} />
+    )
+  );
+  expect(state.transport.pauseRecording).toHaveBeenCalled();
+  expect(io.pause).toHaveBeenCalled();
+  expect(state.save.resetSession).not.toHaveBeenCalled();
+  expect(state.save.audioBlob).toBe(source);
+});
+
+it('keeps the full original and trim after successful preparation until explicit retention', async () => {
+  await act(async () =>
+    root.render(
+      <MaterialAudioRecordingModal isOpen retainAfterSave onClose={close} onSave={async () => {}} />
+    )
+  );
+  await act(async () => button('Save to materials').click());
+  expect(io.encode).toHaveBeenCalledOnce();
+  expect(io.session().save.resetSession).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  expect(io.session().save.audioBlob).toBe(source);
+});

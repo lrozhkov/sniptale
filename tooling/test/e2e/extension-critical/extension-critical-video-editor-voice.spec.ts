@@ -156,7 +156,171 @@ async function seedVoiceLibrary(page: Page, body: Buffer) {
   }, body.toString('base64'));
 }
 
-for (const input of ['ai', 'file', 'library'] as const) {
+async function prepareMicrophoneTake({
+  page,
+  voice,
+  textCategory,
+  back,
+  label,
+  outputPath,
+  before,
+}: {
+  page: Page;
+  voice: Locator;
+  textCategory: Locator;
+  back: Locator;
+  label: (key: Parameters<typeof translate>[0]) => string;
+  outputPath: (name: string) => string;
+  before: Awaited<ReturnType<typeof readProject>>;
+}) {
+  await operate(
+    voice.getByRole('button', {
+      name: label('gallery.videoReview.textVoiceMicrophone'),
+      exact: true,
+    })
+  );
+  const recording = voice.locator('[data-ui="video-editor.text-voice.recording"]');
+  const command = (key: Parameters<typeof translate>[0]) =>
+    recording.getByRole('button', {
+      name: label(key),
+      exact: true,
+    });
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      configurable: true,
+      value: async () => {
+        throw new DOMException('Fixture refusal', 'NotAllowedError');
+      },
+    });
+  });
+  await operate(command('videoEditor.app.recordAudioStart'));
+  await expect(recording.getByRole('alert')).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      configurable: true,
+      value: async () => {
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const output = context.createMediaStreamDestination();
+        oscillator.connect(output);
+        oscillator.start();
+        return output.stream;
+      },
+    });
+  });
+  await back.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: outputPath('voice-microphone-setup.png'),
+    fullPage: false,
+  });
+  await operate(command('videoEditor.app.recordAudioStart'));
+  await expect(command('videoEditor.app.recordAudioPause')).toBeVisible();
+  await operate(
+    page.getByRole('button', {
+      name: label('videoEditor.sidebar.inspectorGroupCanvas'),
+      exact: true,
+    })
+  );
+  await operate(textCategory);
+  await expect(command('videoEditor.app.recordAudioResume')).toBeVisible();
+  await operate(back);
+  const discard = page.getByRole('alertdialog');
+  await expect(discard).toBeVisible();
+  await operate(
+    discard.getByRole('button', {
+      name: label('videoEditor.app.recordAudioKeep'),
+      exact: true,
+    })
+  );
+  await command('videoEditor.app.recordAudioResume').scrollIntoViewIfNeeded();
+  const meterBounds = await page.locator('[data-ui="audio-recording.level"]').evaluate((meter) => {
+    const bounds = meter.getBoundingClientRect();
+    return [...meter.children].every((child) => {
+      const rect = child.getBoundingClientRect();
+      return (
+        rect.left >= bounds.left &&
+        rect.right <= bounds.right &&
+        child.scrollWidth <= child.clientWidth
+      );
+    });
+  });
+  expect(meterBounds).toBe(true);
+  await page.screenshot({
+    path: outputPath('voice-microphone-paused.png'),
+    fullPage: false,
+  });
+  await operate(command('videoEditor.app.recordAudioResume'));
+  // Native MediaRecorder requires elapsed media time, rather than a synthetic clock.
+  await page.waitForTimeout(1200);
+  await operate(command('videoEditor.app.recordAudioStop'));
+  await expect(command('videoEditor.sidebar.textVoiceRecordingNext')).toBeEnabled();
+  const rawUrl = await recording.locator('audio').getAttribute('src');
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]'));
+  await operate(
+    page.getByRole('button', {
+      name: label('videoEditor.app.newProjectAction'),
+      exact: true,
+    })
+  );
+  const projectDialog = page.locator('[data-ui="video-editor.project-name-dialog"]');
+  await projectDialog.getByRole('textbox').fill('Discard guard fixture');
+  await operate(
+    projectDialog.getByRole('button', {
+      name: label('videoEditor.app.newProjectAction'),
+      exact: true,
+    })
+  );
+  await expect(discard).toBeVisible();
+  await discard.evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+    await document.fonts.ready;
+  });
+  await page.screenshot({
+    path: outputPath('voice-microphone-navigation-confirmation.png'),
+    fullPage: false,
+  });
+
+  await operate(
+    discard.getByRole('button', {
+      name: label('videoEditor.app.recordAudioKeep'),
+      exact: true,
+    })
+  );
+  await expect(projectDialog).toHaveCount(0);
+  await expect(recording.locator('audio')).toHaveAttribute('src', rawUrl!);
+  expect((await readProject(page))?.id).toBe(before?.id);
+  await command('videoEditor.sidebar.textVoiceRecordingNext').scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: outputPath('voice-microphone-trim.png'),
+    fullPage: false,
+  });
+  const downloaded = page.waitForEvent('download');
+  await operate(command('videoEditor.app.recordAudioDownloadOriginal'));
+  expect((await downloaded).suggestedFilename()).toMatch(/^audio-.*\.webm$/);
+  await operate(command('videoEditor.sidebar.textVoiceRecordingNext'));
+  await expect(recording).toHaveCount(0);
+  await expect(voice.locator('audio')).toHaveCount(1);
+  await expect
+    .poll(async () =>
+      voice
+        .locator('audio')
+        .evaluate((node: HTMLAudioElement) => Number.isFinite(node.duration) && node.duration > 0)
+    )
+    .toBe(true);
+  const expectedDuration = await voice
+    .locator('audio')
+    .evaluate((node: HTMLAudioElement) => node.duration);
+  expect((await readProject(page))?.clips).toEqual(before?.clips);
+  expect(await countRequests(page)).toBe(0);
+  return expectedDuration;
+}
+
+for (const input of ['ai', 'file', 'library', 'microphone'] as const) {
   for (const variant of [
     { size: PRIMARY_BROWSER_VIEWPORTS[0].size, locale: 'en', theme: 'dark' },
     { size: PRIMARY_BROWSER_VIEWPORTS[1].size, locale: 'ru', theme: 'light' },
@@ -250,6 +414,7 @@ for (const input of ['ai', 'file', 'library'] as const) {
         });
         await expect(back).toBeFocused();
         const requests = input === 'ai' ? 1 : 0;
+        let expectedDuration = input === 'ai' ? 3 : 12;
         if (input === 'ai') {
           await voice.locator('.sniptale-ai-model-selector-trigger').click();
           await page.getByRole('button', { name: 'Fixture speech', exact: true }).click();
@@ -286,6 +451,16 @@ for (const input of ['ai', 'file', 'library'] as const) {
               exact: true,
             })
           );
+        } else if (input === 'microphone') {
+          expectedDuration = await prepareMicrophoneTake({
+            page,
+            voice,
+            textCategory,
+            back,
+            label,
+            before,
+            outputPath: (name) => info.outputPath(name),
+          });
         } else {
           const body = syntheticSpeechWav(12);
           if (input === 'library') await seedVoiceLibrary(page, body);
@@ -448,6 +623,16 @@ for (const input of ['ai', 'file', 'library'] as const) {
           await page.keyboard.press('Escape');
           await retry.scrollIntoViewIfNeeded();
           await page.screenshot({ path: info.outputPath('voice-save-retry.png'), fullPage: false });
+          if (input === 'microphone') {
+            const download = page.waitForEvent('download');
+            await operate(
+              voice.getByRole('button', {
+                name: label('videoEditor.app.recordAudioDownloadOriginal'),
+                exact: true,
+              })
+            );
+            expect((await download).suggestedFilename()).toMatch(/^audio-.*\.webm$/);
+          }
           await page.evaluate(() => {
             const allow: unknown = Reflect.get(window, 'allowVoiceSave');
             if (typeof allow !== 'function') throw new Error('Missing Save fixture');
@@ -461,10 +646,15 @@ for (const input of ['ai', 'file', 'library'] as const) {
         const take = accepted?.clips.find((clip) => clip.type === 'AUDIO' && clip.textSnapshot);
         expect(take).toMatchObject({
           startTime: start,
-          duration: input === 'ai' ? 3 : 12,
-          sourceDuration: input === 'ai' ? 3 : 12,
+          duration: expect.closeTo(expectedDuration, 3),
+          sourceDuration: expect.closeTo(expectedDuration, 3),
           playbackRate: 1,
-          textSnapshot: { text: { text: phrase, kind: input === 'ai' ? 'ai' : 'gallery' } },
+          textSnapshot: {
+            text: {
+              text: phrase,
+              kind: input === 'ai' ? 'ai' : input === 'microphone' ? 'microphone' : 'gallery',
+            },
+          },
         });
         expect(accepted?.clips.filter((clip) => clip.id !== take?.id)).toEqual(before?.clips);
         expect(accepted?.tracks).toHaveLength(

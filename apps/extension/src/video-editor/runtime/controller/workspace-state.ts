@@ -44,6 +44,7 @@ export interface VideoEditorWorkspaceState {
   audioRecordingTarget: VideoEditorAudioRecordingTarget | null;
   openTrackAudioRecordingDialog: (target: VideoEditorAudioRecordingTarget) => void;
   confirm: VideoEditorWorkspaceConfirmState;
+  voiceRecording: ReturnType<typeof useVoiceRecordingAdmission>;
   inspector: VideoEditorWorkspaceInspectorState;
   libraryPanelOpen: boolean;
   leftSidebarCollapsed: boolean;
@@ -202,6 +203,23 @@ function useVideoEditorInspectorState(
   return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
 }
 
+/** The mounted recorder owns the take; the workspace only admits leaving its project. */
+function useVoiceRecordingAdmission(obscured: boolean) {
+  const guard = useRef<(() => Promise<boolean>) | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const register = useCallback((request: () => Promise<boolean>) => {
+    guard.current = request;
+    return () => {
+      if (guard.current === request) guard.current = null;
+    };
+  }, []);
+  const request = useCallback(async () => (guard.current ? guard.current() : true), []);
+  return useMemo(
+    () => ({ register, request, capturing, setCapturing, obscured }),
+    [register, request, capturing, obscured]
+  );
+}
+
 /**
  * Holds local shell-only UI state such as sidebar collapse and preview resizing.
  */
@@ -211,6 +229,13 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
   const confirmDialog = useVideoEditorConfirmDialogState();
   const libraryPanel = useVideoEditorLibraryPanelState();
   const audioRecordingDialog = useAudioRecordingDialogState();
+  const voiceRecording = useVoiceRecordingAdmission(
+    projectDialogOpen ||
+      autoProcessingModalOpen ||
+      libraryPanel.libraryPanelOpen ||
+      audioRecordingDialog.audioRecordingDialogOpen ||
+      confirmDialog.confirmDialog !== null
+  );
   const sceneBackgroundColors = useSceneBackgroundColorState();
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] =
     useWorkspacePreference('inspectorCollapsed');
@@ -249,6 +274,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       audioRecordingTarget: audioRecordingDialog.audioRecordingTarget,
       openTrackAudioRecordingDialog: audioRecordingDialog.openTrackAudioRecordingDialog,
       confirm,
+      voiceRecording,
       inspector,
       libraryPanelOpen: libraryPanel.libraryPanelOpen,
       leftSidebarCollapsed,
@@ -275,6 +301,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       audioRecordingDialog.openAudioRecordingDialog,
       clearPlaybackRange,
       confirm,
+      voiceRecording,
       grid,
       inspector,
       leftSidebarCollapsed,

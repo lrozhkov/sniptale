@@ -1,3 +1,4 @@
+import { RecordingDiscardConfirmation } from '../../../composition/audio-recording/dialog/dismissal';
 import { useVideoProjectTextVoice } from '../../runtime/session/text-voice';
 import { useVideoProjectTextRewrite } from '../../runtime/session/text-rewrite';
 import { ExportSettingsPanel } from '../../export/dialog';
@@ -81,7 +82,10 @@ function VideoEditorFloatingInspectorContent({
   const sidebarProps = getWorkspaceSidebarProps(controller);
   const recognition = useVideoProjectRecognition(sidebarProps.project);
   const textRewrite = useVideoProjectTextRewrite(sidebarProps.project);
-  const textVoice = useVideoProjectTextVoice(sidebarProps.project);
+  const textVoice = useVideoProjectTextVoice(
+    sidebarProps.project,
+    !leftSidebarCollapsed && !exportDialog.isOpen
+  );
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
@@ -94,12 +98,14 @@ function VideoEditorFloatingInspectorContent({
       ? { settings: exportDialog.settings, sourceDimensions: exportDialog.sourceDimensions }
       : null;
 
-  if (leftSidebarCollapsed) {
-    return null;
-  }
+  const recordingConfirmation = (
+    <RecordingDiscardConfirmation portal value={textVoice.recording.confirmation} />
+  );
+  if (leftSidebarCollapsed) return recordingConfirmation;
 
   return (
     <>
+      {recordingConfirmation}
       <WorkspacePanelResizeHandle
         resize={resize}
         label={translate('videoEditor.sidebar.resizeInspector')}

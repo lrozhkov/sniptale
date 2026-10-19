@@ -296,3 +296,20 @@ it('opens a collapsed inspector for selection without changing the library or pl
   act(() => workspaceState!.inspector.openSelection());
   expect(workspaceState!.leftSidebarCollapsed).toBe(false);
 });
+
+it('keeps recording leave admission scoped to the registered mounted recorder', async () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const first = vi.fn(async () => false);
+  const second = vi.fn(async () => true);
+  const releaseFirst = workspaceState!.voiceRecording.register(first);
+  await expect(workspaceState!.voiceRecording.request()).resolves.toBe(false);
+  const releaseSecond = workspaceState!.voiceRecording.register(second);
+  releaseFirst();
+  await expect(workspaceState!.voiceRecording.request()).resolves.toBe(true);
+  expect(second).toHaveBeenCalledOnce();
+  releaseSecond();
+  await expect(workspaceState!.voiceRecording.request()).resolves.toBe(true);
+  expect(first).toHaveBeenCalledOnce();
+});

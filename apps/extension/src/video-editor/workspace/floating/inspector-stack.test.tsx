@@ -9,6 +9,19 @@ const { contentSpy } = vi.hoisted(() => ({
 }));
 const hookMocks = vi.hoisted(() => ({ collapsed: false, exportOpen: false }));
 const recognition = vi.hoisted(() => ({ recognize: vi.fn() }));
+const voice = vi.hoisted(() => ({
+  recording: {
+    confirmation: {
+      open: false,
+      cancel: vi.fn(),
+      confirm: vi.fn(),
+      request: vi.fn(),
+      isPending: () => false,
+    },
+  },
+}));
+const voiceHook = vi.hoisted(() => vi.fn(() => voice));
+vi.mock('../../runtime/session/text-voice', () => ({ useVideoProjectTextVoice: voiceHook }));
 const rewrite = vi.hoisted(() => ({ start: vi.fn() }));
 const rewriteHook = vi.hoisted(() => vi.fn(() => rewrite));
 vi.mock('../../runtime/session/text-rewrite', () => ({
@@ -70,6 +83,7 @@ vi.mock('../sidebar/view', () => ({
 beforeEach(() => {
   contentSpy.mockClear();
   rewriteHook.mockClear();
+  voiceHook.mockClear();
   hookMocks.collapsed = false;
   hookMocks.exportOpen = false;
 });
@@ -90,7 +104,9 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
     />
   );
 
-  expect(markup).toBe('');
+  expect(markup).not.toContain('video-editor.floating.context-inspector');
+  expect(markup).not.toContain('role="alertdialog"');
+  expect(voiceHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] }, false);
   expect(contentSpy).not.toHaveBeenCalled();
   expect(rewriteHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] });
 });
@@ -117,6 +133,7 @@ it('passes the mounted recognition controller into the actual floating inspector
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector.resize"');
   expect(markup).toContain('role="separator"');
   expect(markup).toContain('width:344px');
+  expect(voiceHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] }, true);
   expect(markup).toContain('aria-valuenow="344"');
   expect(markup).not.toContain('layers');
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
@@ -147,6 +164,7 @@ it('places export in the existing inspector while retaining inert selection cont
       />
     );
     expect(markup).toContain('mock-export-settings');
+    expect(voiceHook).toHaveBeenCalledExactlyOnceWith({ clips: [], tracks: [] }, false);
     expect(markup).toContain('mock-context-inspector-content');
     expect(markup).toContain('hidden=""');
     expect(markup).toContain('inert=""');

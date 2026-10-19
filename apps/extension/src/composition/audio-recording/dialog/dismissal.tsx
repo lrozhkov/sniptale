@@ -1,4 +1,9 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  resolveThemeSafePortalTarget,
+  useResolvedPortalTheme,
+} from '@sniptale/ui/theme/safe-portal';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../../platform/i18n';
 import type { AudioRecordingControllerState } from '../session-types';
@@ -55,8 +60,9 @@ export function useRecordingDismissal(args: {
 export function RecordingDiscardConfirmation(props: {
   value: ReturnType<typeof useRecordingDismissal>;
   dialogClassName?: string;
+  portal?: boolean;
 }) {
-  return (
+  const dialog = (
     <ProductConfirmDialog
       {...(props.dialogClassName ? { dialogClassName: props.dialogClassName } : {})}
       isOpen={props.value.open}
@@ -67,5 +73,31 @@ export function RecordingDiscardConfirmation(props: {
       onCancel={props.value.cancel}
       onConfirm={props.value.confirm}
     />
+  );
+  return props.portal ? (
+    <RecordingConfirmationPortal open={props.value.open}>{dialog}</RecordingConfirmationPortal>
+  ) : (
+    dialog
+  );
+}
+
+function RecordingConfirmationPortal({ open, children }: { open: boolean; children: ReactNode }) {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const theme = useResolvedPortalTheme(anchor.current);
+  return (
+    <>
+      <span ref={anchor} hidden />
+      {open
+        ? createPortal(
+            <div
+              className="sniptale-extension-surface fixed inset-0 z-[2147483647]"
+              data-theme={theme ?? undefined}
+            >
+              {children}
+            </div>,
+            resolveThemeSafePortalTarget(anchor.current)
+          )
+        : null}
+    </>
   );
 }
