@@ -2,6 +2,7 @@ import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from './remote-job-po
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
   AUDIO_JOB_PORT_NAME,
+  isScenarioSpeechScope,
   AUDIO_JOB_TIMEOUT_MS,
   AUDIO_JOB_KEEPALIVE_MS,
   parseAudioJobServerMessage,
@@ -45,7 +46,23 @@ export function runReviewSpeechJob(
       if (result) resolve(result);
       else reject(error ?? new Error('interrupted'));
     };
-    const cancel = () => cancelReviewRemoteJob(port, start.requestId, finish);
+    let cancelling = false;
+    let cancellationCleanup: Promise<void> = Promise.resolve();
+    const cancelled = () => finish(undefined, new DOMException('Cancelled', 'AbortError'));
+    const cancel = () => {
+      if (!isScenarioSpeechScope(start.scope)) {
+        cancelReviewRemoteJob(port, start.requestId, finish);
+        return;
+      }
+      // Scenario Apply waits for worker settlement so an accepted import cannot race a paid scope.
+      cancelling = true;
+      controller.abort();
+      try {
+        port.postMessage({ type: 'cancel', requestId: start.requestId });
+      } catch {
+        cancelled();
+      }
+    };
     const timer = setTimeout(() => finish(undefined, new Error('timeout')), AUDIO_JOB_TIMEOUT_MS);
     const keepalive = setInterval(() => {
       if (finished) return;
@@ -63,6 +80,15 @@ export function runReviewSpeechJob(
         return;
       }
       if (finished || message.requestId !== start.requestId) return;
+      if (cancelling) {
+        if (message.type === 'audio') {
+          cancellationCleanup = discardAudioStaging(message.staged, start.scope).catch(
+            () => undefined
+          );
+          void cancellationCleanup.then(cancelled);
+        } else if (message.type === 'failure') void cancellationCleanup.then(cancelled);
+        return;
+      }
       if (message.type === 'failure') finish(undefined, new Error(message.code));
       else if (message.type === 'transcript' || message.type === 'audio') {
         if ((message.type === 'transcript') !== (start.operation === 'transcription'))

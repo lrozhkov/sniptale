@@ -1,4 +1,8 @@
-import type { ReviewCaptionSettings, ReviewTextDocument } from '../../review/text-types';
+import type {
+  ReviewCaptionSettings,
+  ReviewTextDocument,
+  ReviewVoiceTextSnapshot,
+} from '../../review/text-types';
 
 /** Placement owns the clock; text provenance never authorizes access to source bytes. */
 export type VideoProjectTextBinding =
@@ -11,4 +15,13 @@ export interface VideoProjectTextDocument {
   binding: VideoProjectTextBinding;
   document: ReviewTextDocument;
   captions?: ReviewCaptionSettings;
+}
+
+/** Historical association belongs to the audio clip, independently of editable text or source lifetime. */
+export interface VideoProjectVoiceTextSnapshot {
+  version: 1;
+  documentId: string;
+  binding: VideoProjectTextBinding;
+  basisHash: string;
+  text: ReviewVoiceTextSnapshot;
 }

@@ -85,7 +85,7 @@ export function createTourDocument(
   id: string = crypto.randomUUID()
 ): import('@sniptale/runtime-contracts/scenario/types/tour').TourDocument {
   return {
-    version: 1,
+    version: 2,
     id,
     stage: { aspect: '16:9', background: '#111827' },
     style: {
@@ -114,11 +114,10 @@ export function createTourImageSlide(
     origin: null,
     fit: 'contain',
     camera: { mode: 'inherit', center: { x: 0.5, y: 0.5 }, zoom: 1 },
-    hotspots: [],
-    annotations: [],
+    actions: [],
     masks: [],
     narration: null,
-    timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+    timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false },
   };
 }
 

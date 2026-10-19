@@ -1,18 +1,9 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
-import type { ReviewVoiceTextSnapshot } from '../../review/text-types';
 import { parseReviewVoiceTextSnapshot } from '../../review/text-validation';
-import type { VideoProjectTextBinding } from './types';
+import type { VideoProjectVoiceTextSnapshot } from './types';
+export type { VideoProjectVoiceTextSnapshot } from './types';
 import { parseVideoProjectTextBinding } from './validation';
-
-/** Historical association belongs to the audio clip, independently of editable text or source lifetime. */
-export interface VideoProjectVoiceTextSnapshot {
-  version: 1;
-  documentId: string;
-  binding: VideoProjectTextBinding;
-  basisHash: string;
-  text: ReviewVoiceTextSnapshot;
-}
 
 /** Validates bounded historical data without acquiring references to its former text or source. */
 export function parseVideoProjectVoiceTextSnapshot(

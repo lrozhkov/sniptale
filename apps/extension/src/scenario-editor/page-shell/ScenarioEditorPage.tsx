@@ -167,6 +167,10 @@ function ScenarioEditorPage() {
           onChange={state.update}
           onImport={imports.resources}
           onImportNarration={(input) => state.commitChange({ kind: 'narration', input })}
+          narrationAI={{
+            prepareNarration: state.prepareNarration,
+            applyNarration: state.applyNarration,
+          }}
           initialSlideId={imageEditor.returnSlideId}
           onEditImage={(slideId) => {
             state.sealEdit();

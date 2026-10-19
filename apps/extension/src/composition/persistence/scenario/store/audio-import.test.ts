@@ -13,7 +13,9 @@ const io = vi.hoisted(() => ({
   decode: vi.fn(),
   close: vi.fn(),
   event: vi.fn(),
+  saved: vi.fn(),
 }));
+vi.mock('../projects/viewing', () => ({ readScenarioViewingSnapshot: io.saved }));
 vi.mock('../aggregate-mutations', () => ({ commitScenarioAggregateMutation: io.commit }));
 vi.mock('../../assets', async (original) => ({
   ...(await original<typeof import('../../assets')>()),
@@ -29,7 +31,19 @@ function input() {
   const project = createGuideProject('Guide', 'guide', 100);
   project.items = [createGuideStep('Keep this', 'step')];
   project.tour = createTourDocument();
-  project.tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
+  project.tour.slides = [
+    {
+      kind: 'navigation',
+      id: 'first',
+      title: '',
+      description: '',
+      background: { color: '#111827', image: null },
+      buttons: [],
+      narration: null,
+      timing: createTourImageSlide().timing,
+    },
+    createTourImageSlide('second'),
+  ];
   return {
     project,
     baseUpdatedAt: 100,
@@ -190,15 +204,29 @@ it('rejects malformed project input before resource acquisition', async () => {
 
 it('attaches a recorded resource to the exact annotation, leaving the slide narration alone', async () => {
   const args = input();
-  const slide = args.project.tour!.slides[0]!;
+  const slide = createTourImageSlide('first');
+  args.project.tour!.slides[0] = slide;
   if (slide.kind !== 'image') throw Error('image');
-  slide.annotations = [{ id: 'hint', text: 'Hint', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'hint', text: 'Hint', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const { project: result } = await importScenarioNarration({ ...args, objectId: 'hint' });
   expect(result.tour!.slides[0]!.narration).toBeNull();
   expect(result.tour).toMatchObject({
     audioResources: [{ duration: 4 }],
     slides: [
-      { annotations: [{ id: 'hint', narration: { duration: 4, trigger: 'activation' } }] },
+      {
+        actions: [
+          {
+            type: 'annotation' as const,
+            object: { id: 'hint', narration: { duration: 4, trigger: 'enter' } },
+          },
+        ],
+      },
       {},
     ],
   });
@@ -222,7 +250,8 @@ it('imports to resources without attaching to a slide', async () => {
 
 it('keeps an object entry trigger when replacing its recorded audio', async () => {
   const args = input();
-  const slide = args.project.tour!.slides[0]!;
+  const slide = createTourImageSlide('first');
+  args.project.tour!.slides[0] = slide;
   if (slide.kind !== 'image') throw Error('image');
   const expected = {
     assetId: 'prior',
@@ -233,8 +262,11 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
     transcript: '',
     trigger: 'enter' as const,
   };
-  slide.annotations = [
-    { id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected }].map(
+      (object) => ({ type: 'annotation' as const, object })
+    ),
   ];
   const { project: result } = await importScenarioNarration({
     ...args,
@@ -242,7 +274,7 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
     expectedNarration: expected,
   });
   expect(result.tour!.slides[0]).toMatchObject({
-    annotations: [{ narration: { trigger: 'enter' } }],
+    actions: [{ type: 'annotation' as const, object: { narration: { trigger: 'enter' } } }],
   });
 });
 
@@ -334,4 +366,115 @@ it('initializes music settings on first atomic attachment', async () => {
   expect(result.tour!.backgroundMusic).toEqual(
     createTourBackgroundMusic({ assetId: result.tour!.backgroundMusic!.assetId, duration: 4 })
   );
+});
+
+async function aiInput() {
+  const args = input();
+  const slide = createTourImageSlide('first');
+  slide.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'hint', text: 'Exact source', anchor: null, appearance: null },
+    },
+  ];
+  args.project.tour!.slides[0] = slide;
+  io.saved.mockResolvedValue({ project: args.project, revision: 3 });
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('Exact source'));
+  return {
+    ...args,
+    objectId: 'hint',
+    expectedRevision: 3,
+    expectedSource: {
+      text: 'Exact source',
+      sourceTextHash: Array.from(new Uint8Array(digest), (b) =>
+        b.toString(16).padStart(2, '0')
+      ).join(''),
+    },
+  };
+}
+it('rejects AI source binding changed during asynchronous preparation', async () => {
+  const args = await aiInput();
+  let finish!: (value: { duration: number }) => void;
+  let decoding!: () => void;
+  const started = new Promise<void>((resolve) => {
+    decoding = resolve;
+  });
+  io.decode.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+        decoding();
+      })
+  );
+  const operation = importScenarioNarration(args);
+  await started;
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw Error('fixture');
+  slide.actions[0]!.object.text = 'Changed during decode';
+  finish({ duration: 4 });
+  await expect(operation).rejects.toThrow('source');
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(io.discard).toHaveBeenCalledOnce();
+  expect(slide.actions[0]!.object.narration).toBeUndefined();
+});
+it('rejects AI Apply after a competing writer changes the aggregate revision', async () => {
+  const args = await aiInput();
+  io.saved
+    .mockResolvedValueOnce({ project: args.project, revision: 3 })
+    .mockResolvedValueOnce({ project: args.project, revision: 4 });
+  await expect(importScenarioNarration(args)).rejects.toThrow('source');
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(io.discard).toHaveBeenCalledOnce();
+});
+it('retries failed AI publication without duplicating narration resources', async () => {
+  const args = await aiInput();
+  io.commit.mockRejectedValueOnce(new Error('publication failed'));
+  await expect(importScenarioNarration(args)).rejects.toThrow('publication failed');
+  expect(args.project.tour!.audioResources ?? []).toEqual([]);
+  const result = await importScenarioNarration(args);
+  expect(result.project.tour!.audioResources).toHaveLength(1);
+  expect(io.commit).toHaveBeenCalledTimes(2);
+  for (const [, options] of io.commit.mock.calls) {
+    expect(options.expectedRevision).toBe(3);
+    expect(options.children.assetPuts).toHaveLength(1);
+  }
+});
+it('rejects changed AI text before decoding and preserves local acquisition', async () => {
+  const args = await aiInput();
+  await expect(
+    importScenarioNarration({ ...args, expectedSource: { ...args.expectedSource, text: 'other' } })
+  ).rejects.toThrow('source');
+  expect(io.decode).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.saved).not.toHaveBeenCalled();
+});
+
+it('retains authoritative aggregate CAS after the last AI source check', async () => {
+  const args = await aiInput();
+  io.commit.mockRejectedValueOnce(new Error('competing aggregate revision'));
+  await expect(importScenarioNarration(args)).rejects.toThrow('competing aggregate revision');
+  expect(io.commit.mock.calls[0]![1].expectedRevision).toBe(3);
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.event).not.toHaveBeenCalled();
+  expect(args.project.tour!.audioResources ?? []).toEqual([]);
+});
+it('rejects a destination narration changed during asynchronous preparation', async () => {
+  const args = await aiInput();
+  io.decode.mockImplementation(async () => {
+    const slide = args.project.tour!.slides[0]!;
+    if (slide.kind !== 'image') throw Error('fixture');
+    slide.actions[0]!.object.narration = {
+      assetId: 'winner',
+      duration: 2,
+      trimStart: 0,
+      trimEnd: 2,
+      gain: 1,
+      transcript: '',
+      trigger: 'activation',
+    };
+    return { duration: 4 };
+  });
+  await expect(importScenarioNarration(args)).rejects.toThrow('source');
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(io.discard).toHaveBeenCalledOnce();
 });

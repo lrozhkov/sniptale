@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import type {
   TourImageSlide,
   TourPoint,
@@ -48,9 +52,10 @@ function mapRect(rect: TourRect, matrix: TourImageTransform): TourRect | null {
 }
 function hasPositions(slide: TourImageSlide): boolean {
   return (
-    slide.hotspots.length > 0 ||
+    getTourHotspots(slide).length > 0 ||
     slide.masks.length > 0 ||
-    slide.annotations.some((annotation) => annotation.anchor !== null) ||
+    getTourAnnotations(slide).some((annotation) => annotation.anchor !== null) ||
+    slide.actions.some((entry) => entry.object.camera?.mode === 'manual') ||
     slide.camera.mode === 'manual'
   );
 }
@@ -72,15 +77,25 @@ export function remapTourImageGeometry(
   if (!hasPositions(slide)) return { status: 'mapped', slide: copy };
   if (!transform || !validTransform(transform)) return review();
   const identity = transform.every((value, index) => value === [1, 0, 0, 1, 0, 0][index]);
-  if (slide.camera.mode === 'manual' && !identity) return review();
-  for (const hotspot of copy.hotspots) {
+  if (
+    (slide.camera.mode === 'manual' ||
+      slide.actions.some((entry) => entry.object.camera?.mode === 'manual')) &&
+    !identity
+  )
+    return review();
+  for (const hotspot of getTourHotspots(copy)) {
     const point = mapPoint(hotspot.point, transform);
     const rect = hotspot.targetRect ? mapRect(hotspot.targetRect, transform) : null;
     if (!point || (hotspot.targetRect && !rect)) return review();
     hotspot.point = point;
     hotspot.targetRect = rect;
+    if (hotspot.visual.kind !== 'point') {
+      const region = mapRect(hotspot.visual.rect, transform);
+      if (!region) return review();
+      hotspot.visual.rect = region;
+    }
   }
-  for (const annotation of copy.annotations) {
+  for (const annotation of getTourAnnotations(copy)) {
     if (!annotation.anchor) continue;
     const point = mapPoint(annotation.anchor, transform);
     if (!point) return review();

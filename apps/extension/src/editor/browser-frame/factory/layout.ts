@@ -1,5 +1,5 @@
 import type { BrowserFrameState } from '../../../features/editor/document/types';
-import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import { MIN_CANVAS_SIZE } from '../../document/model';
 import type { BrowserFrameMockupLayout, BrowserFrameSourceRect } from './types';

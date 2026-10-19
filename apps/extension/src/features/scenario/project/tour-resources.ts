@@ -41,27 +41,26 @@ export function remapTourIdentities(
 ): void {
   tour.id = nextId();
   const slides = new Map(tour.slides.map((slide) => [slide.id, nextId()]));
+  const objects = new Map(
+    tour.slides.flatMap((slide) =>
+      (slide.kind === 'image'
+        ? getTourSlideObjects(slide).map((entry) => entry.object)
+        : slide.buttons
+      ).map((object) => [object.id, nextId()] as const)
+    )
+  );
   for (const slide of tour.slides) {
     slide.id = slides.get(slide.id)!;
-    if (slide.timing.autoplayTarget)
-      slide.timing.autoplayTarget = slides.get(slide.timing.autoplayTarget)!;
-    const actions = slide.kind === 'image' ? slide.hotspots : slide.buttons;
-    const objects = new Map<string, string>();
-    const rename = (object: { id: string }) => {
-      const assigned = nextId();
-      objects.set(object.id, assigned);
-      object.id = assigned;
-    };
-    for (const object of actions) {
-      rename(object);
-      if (object.action.kind === 'slide')
+    for (const object of slide.kind === 'image'
+      ? getTourSlideObjects(slide).map((entry) => entry.object)
+      : slide.buttons) {
+      object.id = objects.get(object.id)!;
+      if ('action' in object && object.action.kind === 'slide')
         object.action.slideId = slides.get(object.action.slideId)!;
+      if ('action' in object && object.action.kind === 'action')
+        object.action.actionId = objects.get(object.action.actionId) ?? object.action.actionId;
     }
-    if (slide.kind !== 'image') continue;
-    for (const object of [...slide.annotations, ...slide.masks]) rename(object);
-    if (slide.objectOrder)
-      slide.objectOrder = slide.objectOrder.map((objectId) => objects.get(objectId) ?? objectId);
-    if (slide.origin) {
+    if (slide.kind === 'image' && slide.origin) {
       slide.origin = {
         stepId: guideIds.get(slide.origin.stepId) ?? slide.origin.stepId,
         blockId: guideIds.get(slide.origin.blockId) ?? slide.origin.blockId,
@@ -73,17 +72,17 @@ export function remapTourIdentities(
 /** Slide first, followed by authored objects in display order; targets belong to the supplied document. */
 export function getTourNarrationTargets(slide: TourSlide) {
   return [
-    slide,
-    ...(slide.kind === 'image'
-      ? getTourSlideObjects(slide).map((entry) => entry.object)
-      : slide.buttons),
+    ...(slide.kind === 'navigation' ? [slide] : []),
+    ...(slide.kind === 'image' ? slide.actions.map((entry) => entry.object) : slide.buttons),
   ];
 }
 
 /** Exact attachment lookup; missing objects are never redirected to the slide. */
 export function getTourNarrationTarget(slide: TourSlide, objectId: string | null) {
   return objectId === null
-    ? slide
+    ? slide.kind === 'navigation'
+      ? slide
+      : undefined
     : getTourNarrationTargets(slide).find((target) => target !== slide && target.id === objectId);
 }
 
@@ -121,7 +120,8 @@ export function getTourNarrationCues(
     const narration = target.narration;
     if (!narration) return [];
     const objectId = target === slide ? null : target.id;
-    const trigger = 'trigger' in narration ? narration.trigger : 'enter';
+    const trigger =
+      slide.kind === 'image' ? 'enter' : 'trigger' in narration ? narration.trigger : 'enter';
     if (event.kind !== trigger || (event.kind === 'activation' && event.objectId !== objectId))
       return [];
     return [{ slideId: slide.id, objectId, narration }];

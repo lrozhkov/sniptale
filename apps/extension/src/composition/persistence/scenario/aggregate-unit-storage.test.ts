@@ -1,3 +1,4 @@
+import { getTourAnnotations } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAsset, getStore, stores } from './aggregate-mutations.test-support';
 import { commitScenarioAggregateMutation } from './aggregate-mutations';
@@ -30,7 +31,12 @@ function project(kind: 'guide' | 'tour') {
     value.tour = createTourDocument('tour');
     value.tour.slides = Array.from({ length: 3 }, (_, index) => ({
       ...createTourImageSlide(`slide-${index}`),
-      annotations: [{ id: `annotation-${index}`, text: unchanged, anchor: null, appearance: null }],
+      actions: [
+        {
+          type: 'annotation' as const,
+          object: { id: `annotation-${index}`, text: unchanged, anchor: null, appearance: null },
+        },
+      ],
     }));
   }
   return value;
@@ -128,7 +134,7 @@ it.each([
     } else {
       const slide = next.tour!.slides[1]!;
       if (slide.kind !== 'image') throw new Error('Expected image slide');
-      slide.annotations[0]!.text = 'Changed annotation';
+      getTourAnnotations(slide)[0]!.text = 'Changed annotation';
     }
     const units = getStore('scenario_project_units');
     const before = [...units].map(([key, value]) => [key, JSON.stringify(value)] as const);

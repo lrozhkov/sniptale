@@ -36,10 +36,9 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   let assets = input.assets;
   let timeline = null;
   let choice = false;
-  const visited = new Set();
   const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = () => Boolean(motionPreference?.matches);
-  const update = createTourTransport(root, input.labels, signal, toggle, seek, manual);
+  const update = createTourTransport(root, input.labels, signal, toggle, seek);
   const setVolumeAvailable = createTourVolumeControls(root, input.labels, signal);
   const playbackView = (elapsed, state) => ({
     elapsed: ended ? (timeline?.duration ?? duration) : (timeline?.offsets[index] ?? 0) + elapsed,
@@ -49,6 +48,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   let audioState = null;
   const { audio, music, refresh } = createTourAudioChannels(root, input.labels, signal, (state) => {
     audioState = state;
+    visit.pause();
     session.pause();
   });
   const visit = createTourVisit(music);
@@ -72,7 +72,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     complete: advance,
   });
   function advance() {
-    const route = tourAutomaticRoute(tour, index, visited, ended);
+    const route = tourAutomaticRoute(tour, index, ended);
     choice = route.choice;
     if (route.finished) visit.finish();
     if (route.target === null) session.pause();
@@ -81,24 +81,25 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   function toggle() {
     audio.stop();
     audioState = null;
+    if (choice && tour.slides[index]?.kind === 'navigation') {
+      choice = false;
+      navigate(index + 1);
+      visit.play();
+      session.play();
+      return;
+    }
     if (session.continuous) {
       visit.pause();
       session.pause();
       return;
     }
-    visited.clear();
-    if (tour.slides[index]) visited.add(tour.slides[index].id);
     choice = false;
     if (ended || visit.completed) navigate(0, true);
-    else visit.play();
+    visit.play();
     session.play();
   }
-  function manual() {
-    audio.stop();
-    visited.clear();
-    session.setManual();
-  }
   function seek(value) {
+    visit.pause();
     audio.stop();
     audioState = null;
     session.pause();
@@ -109,7 +110,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
 
   function show(nextTour, nextIndex, isEnd, nextAssets) {
     assets = nextAssets;
-    tour = nextTour;
+    tour = { ...nextTour, slides: nextTour.slides.map(clockNarrationSlide) };
     index = nextIndex;
     ended = isEnd;
     choice = false;
@@ -130,8 +131,11 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
       visit.finish();
       session.pause();
     }
-    visited.add(slide.id);
     session.load(spec);
+    if (slide.kind === 'navigation') {
+      choice = true;
+      session.pause();
+    }
   }
   bindMotionPreference(
     motionPreference,
@@ -146,6 +150,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   });
   return {
     show,
+    toggle,
     pause,
     refreshAudioControls: refresh,
     restartVisit: visit.restart,
@@ -156,11 +161,10 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     get mode() {
       return session.mode;
     },
-    interact(reason) {
-      visited.clear();
+    interact() {
+      visit.pause();
       audio.stop();
       session.pause();
-      if (reason === 'navigation' || reason === 'point') visit.admit();
     },
   };
 }
@@ -207,8 +211,7 @@ function createTourVisit(music) {
   }
   function restart() {
     music.finish();
-    phase = 'active';
-    music.play();
+    phase = 'paused';
   }
   return {
     finish,
@@ -370,16 +373,30 @@ function bindMotionPreference(preference, signal, session, motion, getEntrance, 
 }
 
 /** A missing choice pauses progression; only physical completion ends the music visit. */
-function tourAutomaticRoute(tour, index, visited, ended) {
-  const target = ended ? tour.slides.length : nextUnvisitedDestination(tour, index, visited);
+function tourAutomaticRoute(tour, index, ended) {
+  const target = ended ? tour.slides.length : nextTourDestination(tour, index);
   const finished = ended || (target === tour.slides.length && !tour.endScreen.enabled);
   return { target: finished ? null : target, choice: target === null, finished };
 }
 
 /** Loop policy belongs to route selection, not the playback clock. */
-function nextUnvisitedDestination(tour, index, visited) {
+function nextTourDestination(tour, index) {
   const target = tourAutoplayDestination(tour, index);
   if (target === tour.slides.length && tour.playback.loop) return 0;
-  if (target === null || (!tour.playback.loop && visited.has(tour.slides[target]?.id))) return null;
+  if (target === null) return null;
   return target;
+}
+
+/** Current action narration follows Play/Pause without changing the authored trigger. */
+function clockNarrationSlide(slide) {
+  if (slide.kind !== 'image') return slide;
+  return {
+    ...slide,
+    actions: slide.actions.map((entry) => ({
+      ...entry,
+      object: entry.object.narration
+        ? { ...entry.object, narration: { ...entry.object.narration, trigger: 'enter' } }
+        : entry.object,
+    })),
+  };
 }

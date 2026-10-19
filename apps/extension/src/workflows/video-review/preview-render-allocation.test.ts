@@ -3,7 +3,7 @@ import { createGradientPaint } from '@sniptale/foundation/paint';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { expect, it, vi } from 'vitest';
 import {

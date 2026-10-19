@@ -2,7 +2,7 @@ import {
   DEFAULT_WINDOW_HEADER,
   isWindowHeaderFavicon,
   type WindowHeader,
-} from '../../browser-frame/header';
+} from '@sniptale/runtime-contracts/window-header';
 import type {
   BrowserFrameState,
   EditorFrameSettings,

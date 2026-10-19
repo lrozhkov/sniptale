@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   event: vi.fn(),
 }));
-vi.mock('./speech-client', () => ({ runReviewSpeechJob: mocks.job }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: mocks.job }));
 vi.mock('./speech-audio', () => ({ decodeReviewSpeechDuration: mocks.decode }));
 vi.mock('../../composition/persistence/assets/audio-staging', () => ({
   readAudioStaging: mocks.read,

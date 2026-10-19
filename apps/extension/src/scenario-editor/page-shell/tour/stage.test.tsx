@@ -1,4 +1,6 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -34,17 +36,19 @@ function fixture() {
     alt: 'Image',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Point',
-      text: 'Explanation',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Point',
+        text: 'Explanation',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   const images: Record<string, string> = {
@@ -73,7 +77,9 @@ it('mounts the shared scene and updates selection without replacing its viewport
   expect(shadow().querySelector('.tour-image')).not.toBeNull();
   expect(shadow().querySelector('.tour-hotspot')!.textContent).toBe('');
   expect(shadow().querySelector('[data-tour-hint-point-count]')).not.toBeNull();
-  expect(shadow().querySelector('[data-tour-hint-previous]')!.textContent).toBeTruthy();
+  expect(shadow().querySelector('[data-tour-hint-previous]')!.getAttribute('aria-label')).toBe(
+    'Back'
+  );
   act(() => shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!.click());
   expect(props.onSelectObject).toHaveBeenCalledWith('point');
   act(() =>
@@ -113,8 +119,17 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   props.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots = [];
-  slide.annotations = [{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
   act(() => root.render(<TourStage {...props} selection={selection} />));
   const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
@@ -144,17 +159,50 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
 });
 
-it('resizes a selected mask on canvas with live geometry, one commit and Escape rollback', () => {
+it('preserves saved privacy masks as non-editable image overlays', () => {
   const props = fixture();
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
   slide.masks = [
     {
-      id: 'mask',
-      kind: 'highlight',
-      color: '#f97316',
-      opacity: 0.3,
+      id: 'private',
+      kind: 'blur',
+      color: '#111827',
+      opacity: 1,
       rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.2 },
+      blurRadius: 20,
+    },
+  ];
+  act(() => root.render(<TourStage {...props} />));
+  const mask = shadow().querySelector<HTMLElement>('.tour-mask')!;
+  expect(mask).not.toBeNull();
+  expect(mask.querySelector('.tour-mask-effect')!.getAttribute('style')).toContain('blur(');
+  expect(mask.querySelectorAll('.tour-resize-handle')).toHaveLength(0);
+  act(() => mask.click());
+  expect(props.onSelectObject).not.toHaveBeenCalled();
+  expect(props.onMoveObject).not.toHaveBeenCalled();
+});
+
+it('resizes a selected hotspot highlight without modifying the image', () => {
+  const props = fixture();
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.actions = [
+    {
+      type: 'hotspot',
+      object: {
+        ...getTourHotspots(slide)[0]!,
+        visual: {
+          kind: 'highlight',
+          rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.2 },
+          color: '#f97316',
+          opacity: 0.3,
+          animation: {
+            enter: { kind: 'none', durationMs: 250 },
+            exit: { kind: 'none', durationMs: 250 },
+          },
+        },
+      },
     },
   ];
   const onResizeObject = vi.fn();
@@ -162,15 +210,23 @@ it('resizes a selected mask on canvas with live geometry, one commit and Escape 
     root.render(
       <TourStage
         {...props}
-        selection={{ kind: 'slide', slideId: 'first', objectId: 'mask' }}
+        selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }}
         onResizeObject={onResizeObject}
       />
     )
   );
-  const box = shadow().querySelector<HTMLElement>('.tour-mask')!;
-  const handle = box.querySelector<HTMLButtonElement>('[data-edge=se]')!;
-  expect(box.dataset['selected']).toBe('true');
+  const box = shadow().querySelector<HTMLElement>('[data-tour-object-id="point"]')!;
   expect(box.querySelectorAll('.tour-resize-handle')).toHaveLength(8);
+  act(() =>
+    box
+      .querySelector('[data-edge=e]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onResizeObject).toHaveBeenCalledOnce();
+  expect(onResizeObject.mock.calls[0]![0]).toBe('point');
+  expect(onResizeObject.mock.calls[0]![1].width).toBeGreaterThan(0.3);
+  onResizeObject.mockClear();
+  const handle = box.querySelector('[data-edge=se]')!;
   const original = box.style.width;
   const pointer = (name: string, x: number) => {
     const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x, clientY: x });
@@ -186,104 +242,11 @@ it('resizes a selected mask on canvas with live geometry, one commit and Escape 
   pointer('pointerup', 30);
   expect(onResizeObject).not.toHaveBeenCalled();
   pointer('pointerdown', 0);
-  pointer('pointermove', 1000);
-  pointer('pointerup', 1000);
-  expect(onResizeObject).toHaveBeenCalledExactlyOnceWith('mask', {
-    x: 0.2,
-    y: 0.2,
-    width: 0.8,
-    height: 0.8,
-  });
-  expect(props.onMoveObject).not.toHaveBeenCalled();
-});
-
-it.each(['blur', 'highlight'] as const)(
-  'shows %s mask handles without a frame and gives the selected mask pointer priority',
-  (kind) => {
-    const props = fixture();
-    const slide = props.tour.slides[0]!;
-    if (slide.kind !== 'image') throw new Error('Expected image');
-    slide.hotspots.push({
-      ...slide.hotspots[0]!,
-      id: 'inactive',
-      point: { x: 0.7, y: 0.5 },
-      action: { kind: 'none' },
-    });
-    slide.masks = [
-      {
-        id: 'mask',
-        kind,
-        color: '#f97316',
-        opacity: 0.3,
-        rect: { x: 0.2, y: 0.4, width: 0.3, height: 0.2 },
-      },
-    ];
-    act(() =>
-      root.render(
-        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'mask' }} />
-      )
-    );
-    const plane = shadow().querySelector<HTMLElement>('.tour-image-plane')!;
-    const mask = shadow().querySelector<HTMLElement>('.tour-mask')!;
-    expect(plane.style.zIndex).toBe('4');
-    expect(plane.style.pointerEvents).toBe('none');
-    expect(shadow().querySelector('style:last-of-type')!.textContent).not.toMatch(
-      /\.tour-mask\[data-selected=['"]?true['"]?\]\s*\{[^}]*outline:/
-    );
-    expect(mask.querySelectorAll('.tour-resize-handle')).toHaveLength(8);
-    expect(mask.querySelector<HTMLButtonElement>('[data-edge=se]')!.disabled).toBe(false);
-    const pointer = (name: string, x: number) => {
-      const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x });
-      Object.defineProperty(event, 'pointerId', { value: 1 });
-      act(() => mask.dispatchEvent(event));
-    };
-    pointer('pointerdown', 0);
-    pointer('pointermove', 108);
-    expect(props.onMoveObject).not.toHaveBeenCalled();
-    pointer('pointerup', 108);
-    expect(props.onMoveObject).toHaveBeenCalledExactlyOnceWith('mask', { x: 0.5, y: 0.4 });
-    expect(props.onSelectObject).toHaveBeenCalledWith('mask');
-    expect(props.onSelectObject).not.toHaveBeenCalledWith('point');
-    expect(props.onSelectObject).not.toHaveBeenCalledWith('inactive');
-    act(() =>
-      root.render(
-        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }} />
-      )
-    );
-    expect(plane.style.zIndex).toBe('');
-    expect(plane.style.pointerEvents).toBe('');
-  }
-);
-
-it('renders independent neutral spotlight and visual blur; locked resize stays inert', () => {
-  const props = fixture();
-  const slide = props.tour.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('Expected image');
-  const mask = {
-    id: 'mask',
-    kind: 'spotlight' as const,
-    color: '#f97316',
-    opacity: 0.3,
-    rect: { x: 0.2, y: 0.2, width: 0.3, height: 0.2 },
-  };
-  slide.masks = [mask];
-  const onResizeObject = vi.fn();
-  act(() => root.render(<TourStage {...props} disabled onResizeObject={onResizeObject} />));
-  const effect = () => shadow().querySelector<HTMLElement>('.tour-mask-effect')!;
-  expect(effect().style.boxShadow).toContain('#111827');
-  expect(effect().style.opacity).toBe('0.6');
-  const handle = shadow().querySelector('[data-edge=se]')!;
-  act(() =>
-    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
-  expect(onResizeObject).not.toHaveBeenCalled();
-  slide.masks = [{ ...mask, kind: 'blur', blurRadius: 20 }];
-  act(() => root.render(<TourStage {...props} tour={structuredClone(props.tour)} />));
-  const imageWidth = Number.parseFloat(
-    shadow().querySelector<HTMLElement>('.tour-image')!.style.width
-  );
-  expect(effect().style.backdropFilter).toBe(`blur(${(20 * imageWidth) / 100}px)`);
-  expect(effect().style.opacity).toBe('');
+  pointer('pointermove', 40);
+  pointer('pointerup', 40);
+  expect(onResizeObject).toHaveBeenCalledOnce();
+  expect(onResizeObject.mock.calls[0]![0]).toBe('point');
+  expect(slide.masks).toHaveLength(0);
 });
 
 it('frames the manual destination on the unzoomed image and commits camera geometry once', () => {
@@ -384,4 +347,96 @@ it('moves the camera with arrows at fixed zoom and preserves focus after commit'
     frame().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
   );
   expect(onFrameCamera).toHaveBeenCalledTimes(1);
+});
+
+it('hides a source target under the header and restores it only inside visible content', () => {
+  const props = fixture();
+  props.tour.stage.windowHeader = DEFAULT_WINDOW_HEADER;
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.imagePlacement = { center: { x: 0.5, y: 0.5 }, zoom: 3 };
+  act(() => root.render(<TourStage {...props} />));
+  const image = shadow().querySelector<HTMLElement>('.tour-image')!;
+  const header = shadow().querySelector<HTMLElement>('.tour-window-header')!;
+  const desiredY = parseFloat(header.style.top) + parseFloat(header.style.height) / 2;
+  const point = getTourHotspots(slide)[0]!;
+  point.point = {
+    x: 0.5,
+    y: (desiredY - parseFloat(image.style.top)) / parseFloat(image.style.height),
+  };
+  const underHeader = { ...props.tour, slides: [{ ...slide }, props.tour.slides[1]!] };
+  act(() => root.render(<TourStage {...props} tour={underHeader} />));
+  const hidden = shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  expect(parseFloat(hidden.style.top)).toBeGreaterThanOrEqual(parseFloat(header.style.top));
+  expect(parseFloat(hidden.style.top)).toBeLessThan(
+    parseFloat(header.style.top) + parseFloat(header.style.height)
+  );
+  expect(hidden.hidden).toBe(true);
+  const visible = {
+    ...slide,
+    actions: slide.actions.map((entry) =>
+      entry.type === 'hotspot'
+        ? { ...entry, object: { ...entry.object, point: { x: 0.5, y: 0.5 } } }
+        : entry
+    ),
+  };
+  act(() => root.render(<TourStage {...props} tour={{ ...props.tour, slides: [visible] }} />));
+  const button = shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  expect(button.hidden).toBe(false);
+  act(() => button.click());
+  expect(props.onSelectObject).toHaveBeenCalledWith('point');
+});
+
+it('projects window chrome and source targets into the stage content box inside its borders', () => {
+  const props = fixture();
+  props.tour.stage.windowHeader = DEFAULT_WINDOW_HEADER;
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.matches('.tour-stage') ? Math.max(0, parseFloat(this.style.width) - 2) : 0;
+  });
+  const height = vi
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockImplementation(function (this: HTMLElement) {
+      return this.matches('.tour-stage') ? Math.max(0, parseFloat(this.style.height) - 2) : 0;
+    });
+  try {
+    act(() => root.render(<TourStage {...props} />));
+    const stage = shadow().querySelector<HTMLElement>('[data-tour-stage]')!;
+    const header = shadow().querySelector<HTMLElement>('.tour-window-header')!;
+    const image = shadow().querySelector<HTMLElement>('.tour-image')!;
+    const point = shadow().querySelector<HTMLElement>('.tour-hotspot')!;
+    expect(parseFloat(header.style.width)).toBe(parseFloat(stage.style.width) - 2);
+    expect(parseFloat(image.style.top)).toBeCloseTo(parseFloat(header.style.height));
+    expect(parseFloat(point.style.left)).toBeCloseTo(stage.clientWidth / 2);
+    expect(parseFloat(point.style.top)).toBeCloseTo(
+      (stage.clientHeight + parseFloat(header.style.height)) / 2
+    );
+  } finally {
+    width.mockRestore();
+    height.mockRestore();
+  }
+});
+
+it('uses text-only explanation copy with accessible icon controls in the shared scaffold', () => {
+  const props = fixture();
+  act(() =>
+    root.render(
+      <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }} />
+    )
+  );
+  expect(shadow().querySelector('[data-tour-hint-action-title]')).toBeNull();
+  expect(shadow().querySelector('[data-tour-hint-title]')).toBeNull();
+  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('Explanation');
+  for (const [selector, label] of [
+    ['previous', 'Back'],
+    ['next', 'Next'],
+    ['close', 'Close'],
+  ]) {
+    const button = shadow().querySelector(`[data-tour-hint-${selector}]`)!;
+    expect(button.getAttribute('aria-label')).toBe(label);
+    expect(button.querySelector('svg')).not.toBeNull();
+    expect(button.textContent?.trim()).toBe('');
+  }
+  expect(shadow().querySelector('[data-tour-hints]')?.getAttribute('aria-pressed')).toBe('true');
 });

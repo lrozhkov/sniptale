@@ -328,3 +328,37 @@ it.each(['matching', 'missing', 'changed'] as const)(
     }
   }
 );
+
+it('requires matching Scenario provider approval before permission and secret activation', async () => {
+  const scenario = {
+    type: 'start' as const,
+    requestId: 'scenario',
+    operation: 'speech' as const,
+    modelId: model.id,
+    approvedProviderId: provider.id,
+    text: 'Saved action',
+    profile: request.profile,
+    scope: {
+      workspaceId: 'scenario',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text' as const, slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+  };
+  // A direct caller can omit approval despite the compile-time contract.
+  const unapproved = { ...scenario };
+  Reflect.deleteProperty(unapproved, 'approvedProviderId');
+  for (const candidate of [
+    unapproved,
+    { ...scenario, approvedProviderId: '' },
+    { ...scenario, approvedProviderId: 'foreign' },
+  ]) {
+    await expect(resolveAudioModelConfig(candidate)).rejects.toThrow('model-unavailable');
+    expect(permission).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  }
+  await expect(resolveAudioModelConfig(scenario)).resolves.toMatchObject({
+    speech: request.profile,
+  });
+  expect(activateStoredAIProviderSecretForUse).toHaveBeenCalledExactlyOnceWith(provider);
+});

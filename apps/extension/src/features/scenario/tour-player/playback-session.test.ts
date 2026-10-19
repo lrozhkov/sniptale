@@ -1,11 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createTourPlaybackSession } from './playback-session.js';
+const { waitForTourImage } = vi.hoisted(() => ({
+  waitForTourImage: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}));
+
+vi.mock('./media.js', () => ({ waitForTourImage }));
 
 const lifetimes: AbortController[] = [];
 afterEach(() => {
   lifetimes.splice(0).forEach((lifetime) => lifetime.abort());
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.mocked(waitForTourImage).mockReset().mockResolvedValue(undefined);
 });
 function harness(autoplay = false) {
   let now = 0;
@@ -162,4 +168,160 @@ it('restores visibility when resuming a sought exit has no valid route', async (
   h.session.play();
   expect(h.session.elapsed).toBe(1100);
   expect(h.motion.frame).toHaveBeenLastCalledWith(1100);
+});
+
+it('keeps ready same-source actions out of a second delayed image gate', async () => {
+  const h = harness();
+  const spec = {
+    entrance: 100,
+    exitStart: 1100,
+    duration: 1400,
+    required: true,
+    source: 'image-a',
+  };
+  h.session.load(spec);
+  await Promise.resolve();
+  expect(h.session.state).toBe('ready');
+  vi.mocked(waitForTourImage).mockImplementationOnce(() => new Promise(() => {}));
+  h.session.load({ ...spec, duration: 1500 });
+  expect(h.session.state).toBe('ready');
+  expect(waitForTourImage).toHaveBeenCalledOnce();
+  h.tick(100);
+  expect(h.session.elapsed).toBe(100);
+  expect(h.session.state).toBe('ready');
+});
+
+it('decodes replacements and retries failed sources without retaining earlier readiness', async () => {
+  const h = harness();
+  const spec = { entrance: 0, exitStart: 1100, duration: 1400, required: true, source: 'image-a' };
+  h.session.load(spec);
+  await Promise.resolve();
+  vi.mocked(waitForTourImage).mockRejectedValueOnce(new Error('Decode failed'));
+  h.session.load({ ...spec, source: 'image-b' });
+  expect(h.session.state).toBe('loading');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(h.session.state).toBe('error');
+  h.session.play();
+  expect(h.session.state).toBe('loading');
+  await Promise.resolve();
+  expect(h.session.state).toBe('ready');
+  h.session.load(spec);
+  expect(h.session.state).toBe('loading');
+  await Promise.resolve();
+  expect(waitForTourImage).toHaveBeenCalledTimes(4);
+  h.session.clear();
+  h.session.load(spec);
+  expect(h.session.state).toBe('loading');
+  await Promise.resolve();
+  expect(waitForTourImage).toHaveBeenCalledTimes(5);
+});
+
+it('does not reuse pending readiness or admit its stale decode after replacement', async () => {
+  const h = harness();
+  let resolveFirst = () => {};
+  vi.mocked(waitForTourImage).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveFirst = resolve;
+      })
+  );
+  const spec = { entrance: 0, exitStart: 1100, duration: 1400, required: true, source: 'image-a' };
+  h.session.load(spec);
+  h.session.load(spec);
+  expect(waitForTourImage).toHaveBeenCalledTimes(2);
+  await Promise.resolve();
+  expect(h.session.state).toBe('ready');
+  h.session.load({ ...spec, source: 'image-b' });
+  resolveFirst();
+  await Promise.resolve();
+  expect(h.session.state).toBe('ready');
+  expect(h.motion.ready).toHaveBeenCalledTimes(2);
+});
+
+it('settles a ready entrance when Manual is selected without advancing playback', async () => {
+  const h = harness(true);
+  await h.load();
+  h.tick(80);
+  h.session.setManual();
+  expect(h.session.elapsed).toBe(100);
+  expect(h.motion.frame).toHaveBeenLastCalledWith(100);
+  expect(h.session.mode).toBe('manual');
+  expect(h.session.continuous).toBe(false);
+  expect(h.session.playing).toBe(false);
+  expect(h.frames.size).toBe(0);
+  h.tick(5000);
+  expect(h.complete).not.toHaveBeenCalled();
+  expect(h.session.elapsed).toBe(100);
+});
+
+it('settles Manual only after pending media is ready and ignores replaced readiness', async () => {
+  const h = harness(true);
+  let resolveFirst = () => {};
+  let resolveSecond = () => {};
+  vi.mocked(waitForTourImage)
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFirst = resolve;
+        })
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSecond = resolve;
+        })
+    );
+  const spec = { entrance: 100, exitStart: 1100, duration: 1400, required: true, source: 'first' };
+  h.session.load(spec);
+  h.session.setManual();
+  expect(h.session.state).toBe('loading');
+  expect(h.motion.ready).not.toHaveBeenCalled();
+  expect(h.frames.size).toBe(0);
+  h.session.load({ ...spec, source: 'second' });
+  h.session.setManual();
+  resolveFirst();
+  await Promise.resolve();
+  expect(h.session.state).toBe('loading');
+  expect(h.motion.ready).not.toHaveBeenCalled();
+  resolveSecond();
+  await Promise.resolve();
+  expect(h.session.state).toBe('ready');
+  expect(h.motion.frame).toHaveBeenLastCalledWith(100);
+  expect(h.session.elapsed).toBe(100);
+  expect(h.session.mode).toBe('manual');
+  expect(h.session.playing).toBe(false);
+  expect(h.frames.size).toBe(0);
+  h.tick(5000);
+  expect(h.complete).not.toHaveBeenCalled();
+});
+
+it('preserves a failed media gate and cancels departure when switching to Manual', async () => {
+  const h = harness(true);
+  vi.mocked(waitForTourImage).mockRejectedValueOnce(new Error('Decode failed'));
+  h.session.load({
+    entrance: 100,
+    exitStart: 1100,
+    duration: 1400,
+    required: true,
+    source: 'broken',
+  });
+  h.session.setManual();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(h.session.state).toBe('error');
+  expect(h.motion.ready).not.toHaveBeenCalled();
+  expect(h.motion.fail).toHaveBeenCalledOnce();
+  expect(h.session.playing).toBe(false);
+  await h.load();
+  h.tick(100);
+  const complete = vi.fn();
+  const cancel = vi.fn();
+  h.session.depart({ complete, cancel });
+  h.tick(80);
+  h.session.setManual();
+  expect(cancel).toHaveBeenCalledOnce();
+  h.tick(5000);
+  expect(complete).not.toHaveBeenCalled();
+  expect(h.complete).not.toHaveBeenCalled();
 });

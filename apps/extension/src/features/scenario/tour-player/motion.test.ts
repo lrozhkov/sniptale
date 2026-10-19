@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { createTourMotion } from './motion';
@@ -33,17 +34,19 @@ function fixture() {
     editDocumentId: null,
     source: { kind: 'import', filename: '' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.8, y: 0.5 },
-      targetRect: null,
-      label: 'Next',
-      text: '',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.8, y: 0.5 },
+        targetRect: null,
+        label: 'Next',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   const prepare = (reduced = false) =>
     motion.prepare(previous, slide, tour, { stageWidth: 640, stageHeight: 360 }, reduced);
@@ -100,7 +103,7 @@ it('retains the authored point appearance while it travels between slides', () =
 it('projects camera motion on the image and masks plane and settles exactly', () => {
   const f = fixture();
   f.tour.playback.autoZoom = true;
-  f.slide.hotspots[0]!.point = { x: 0.5, y: 0.5 };
+  getTourHotspots(f.slide)[0]!.point = { x: 0.5, y: 0.5 };
   f.prepare();
   f.motion.ready();
   f.motion.frame(0);
@@ -116,7 +119,10 @@ it('projects camera motion on the image and masks plane and settles exactly', ()
 });
 it('settles reduced motion and cancellation without retaining executable old links or blocked controls', () => {
   const f = fixture();
-  f.slide.hotspots = [];
+  f.slide.actions = [
+    ...f.slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[].map((object) => ({ type: 'hotspot' as const, object })),
+  ];
   f.scene.innerHTML = '<a href="https://example.com/">Open</a>';
   f.prepare(true);
   f.motion.ready();

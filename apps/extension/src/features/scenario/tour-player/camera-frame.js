@@ -1,3 +1,4 @@
+import { resolveTourImageFrame } from './image-frame.js';
 import { resolveTourCamera } from './camera.js';
 import { bindTourObjectDrag } from './authoring.js';
 import { bindTourRectResize } from './authoring-rect.js';
@@ -9,6 +10,7 @@ export function renderTourCameraFrame(
   imageBox,
   { element, labels, authoring, signal }
 ) {
+  viewport = { ...viewport, content: resolveTourImageFrame(slide, viewport).content };
   const target = resolveTourCamera(slide, viewport, false);
   if (!target) return null;
   const rect = frameForProjection(target, imageBox, viewport);
@@ -87,11 +89,17 @@ export function renderTourCameraFrame(
 
 function frameForProjection(target, base, viewport) {
   const scale = base.width / target.width;
+  const content = viewport.content ?? {
+    x: 0,
+    y: 0,
+    width: viewport.stageWidth,
+    height: viewport.stageHeight,
+  };
   return {
-    x: (base.x - target.x * scale) / viewport.stageWidth,
-    y: (base.y - target.y * scale) / viewport.stageHeight,
-    width: scale,
-    height: scale,
+    x: (base.x + (content.x - target.x) * scale) / viewport.stageWidth,
+    y: (base.y + (content.y - target.y) * scale) / viewport.stageHeight,
+    width: (content.width * scale) / viewport.stageWidth,
+    height: (content.height * scale) / viewport.stageHeight,
   };
 }
 function cameraForFrame(rect, base, viewport) {
@@ -101,6 +109,12 @@ function cameraForFrame(rect, base, viewport) {
       x: clamp(((rect.x + rect.width / 2) * viewport.stageWidth - base.x) / base.width),
       y: clamp(((rect.y + rect.height / 2) * viewport.stageHeight - base.y) / base.height),
     },
-    zoom: Math.max(1, Math.min(8, 1 / rect.width)),
+    zoom: Math.max(
+      1,
+      Math.min(
+        8,
+        (viewport.content?.width ?? viewport.stageWidth) / (viewport.stageWidth * rect.width)
+      )
+    ),
   };
 }

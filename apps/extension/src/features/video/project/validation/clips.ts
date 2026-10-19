@@ -1,4 +1,4 @@
-import { parseWindowHeader } from '../../../browser-frame/header';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { isCameraAppearance } from '../camera/appearance';
 import type { VideoProjectClip } from '../types/index';
 import {

@@ -3,7 +3,7 @@ import { getVideoProject } from '../../composition/persistence/projects';
 import { isCurrentVideoProjectSnapshot } from '../../composition/persistence/projects/revision';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { createLibraryLifecycle } from '../../composition/persistence/library-lifecycle/contracts';
-import { runReviewSpeechJob } from '../video-review/speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import { decodeReviewSpeechDuration } from '../video-review/speech-audio';
 import {
   readAudioStaging,
@@ -21,7 +21,7 @@ vi.mock('../../composition/persistence/projects', () => ({ getVideoProject: vi.f
 vi.mock('../../composition/persistence/projects/revision', () => ({
   isCurrentVideoProjectSnapshot: vi.fn(),
 }));
-vi.mock('../video-review/speech-client', () => ({ runReviewSpeechJob: vi.fn() }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: vi.fn() }));
 vi.mock('../video-review/speech-audio', () => ({ decodeReviewSpeechDuration: vi.fn() }));
 vi.mock('../../composition/persistence/assets/audio-staging', () => ({
   readAudioStaging: vi.fn(),

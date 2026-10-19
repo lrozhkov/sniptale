@@ -559,17 +559,19 @@ it('replaces tour images with new provenance and explicit positional review', as
   });
   const slide = project.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Missing test slide');
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.4, y: 0.5 },
-      targetRect: null,
-      label: 'Click',
-      text: 'Keep',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: true,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.4, y: 0.5 },
+        targetRect: null,
+        label: 'Click',
+        text: 'Keep',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   const { project: result } = await importScenarioImages({
     ...args,
@@ -579,8 +581,8 @@ it('replaces tour images with new provenance and explicit positional review', as
   });
   expect(result.tour!.slides[0]).toMatchObject({
     requiresTargetReview: true,
-    hotspots: [{ point: { x: 0.4, y: 0.5 }, text: 'Keep' }],
     image: { source: { filename: 'replacement.png' } },
+    actions: slide.actions,
   });
   expect(result.items).toEqual(project.items);
 });
@@ -640,7 +642,9 @@ it('creates a tour hotspot from video action evidence and preserves its source c
   });
   expect(result.tour?.slides[0]).toMatchObject({
     image: { source },
-    hotspots: [{ point: { x: 0.2, y: 0.3 }, text: 'Click here' }],
+    actions: [
+      { type: 'hotspot' as const, object: { point: { x: 0.2, y: 0.3 }, text: 'Click here' } },
+    ],
   });
   io.write.mockClear();
   await expect(

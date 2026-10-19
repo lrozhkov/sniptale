@@ -67,13 +67,13 @@ it('discloses measured multiline copy without hiding or changing the full text',
     const full = 'First line\nSecond line';
     f.setCopy('long', full, 40);
     expect(f.toggle.hidden).toBe(false);
-    expect(f.toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
+    expect(f.toggle.getAttribute('aria-label')).toBe('Expand explanation');
     expect(f.hint.dataset['collapsed']).toBe('true');
     expect(f.text.hidden).toBe(false);
     expect(f.text.textContent).toBe(full);
     f.toggle.click();
     expect(f.toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(f.toggle.getAttribute('aria-label')).toBe('Collapse explanation: Details');
+    expect(f.toggle.getAttribute('aria-label')).toBe('Collapse explanation');
     f.render();
     expect(f.hint.dataset['collapsed']).toBe('false');
     f.toggle.click();
@@ -84,11 +84,11 @@ it('discloses measured multiline copy without hiding or changing the full text',
   }
 });
 
-it('omits empty annotations and resets disclosure only for another explanation or scene', () => {
+it('keeps empty annotation controls reachable and resets disclosure only for another explanation or scene', () => {
   const f = fixture();
   try {
     f.setCopy('empty', '', 0);
-    expect(f.hint.hidden).toBe(true);
+    expect(f.hint.hidden).toBe(false);
     f.setCopy('first', 'First\nSecond', 40);
     f.toggle.click();
     f.setCopy('second', 'Third\nFourth', 40);
@@ -105,12 +105,12 @@ it('omits empty annotations and resets disclosure only for another explanation o
   }
 });
 
-it('retains a visible title for the shared long-caption presentation', () => {
+it('keeps long-caption disclosure accessible without a visible title', () => {
   const f = fixture();
   try {
     f.setCopy('long', 'First line\nSecond line', 40);
-    expect(f.title.hidden).toBe(false);
-    expect(f.title.textContent).toBe('Details');
+    expect(f.title.hidden).toBe(true);
+    expect(f.hint.querySelector<HTMLButtonElement>('[data-tour-hint-close]')!.hidden).toBe(false);
     expect(f.hint.dataset['collapsed']).toBe('true');
   } finally {
     f.dispose();
@@ -139,19 +139,13 @@ it('opens long copy from its area while independent actions retain their own beh
   }
 });
 
-it('keeps an audio-only explanation available without a needless text disclosure', () => {
+it('keeps empty caption controls reachable while narration remains in the main transport', () => {
   const f = fixture();
   try {
-    const voice = document.createElement('button');
-    voice.dataset['tourNarration'] = 'voice';
-    voice.textContent = 'Play';
-    f.hint.append(voice);
     f.setCopy('voice', '', 0);
     expect(f.hint.hidden).toBe(false);
     expect(f.toggle.hidden).toBe(true);
-    voice.hidden = true;
-    f.render();
-    expect(f.hint.hidden).toBe(true);
+    expect(f.hint.querySelector('[data-tour-narration]')).toBeNull();
   } finally {
     f.dispose();
   }

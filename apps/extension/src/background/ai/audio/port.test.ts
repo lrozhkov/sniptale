@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimePortFixture } from '../../../../../../tooling/test/support/chrome-runtime-port';
-import { isAudioJobSender } from './authorization';
+import { getAudioJobSenderConsumer, isAudioJobSender } from './authorization';
 import { createAudioJobService } from './service';
 import { registerAudioJobPorts } from './port';
 import { AUDIO_JOB_PORT_NAME, parseAudioJobClientMessage } from '../../../contracts/ai/audio';
@@ -38,12 +38,21 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function connectedPort(owner = sender) {
+function connectedPort(owner: typeof sender | 'scenario' = sender) {
   const service = createAudioJobService();
   const connection = { receive: vi.fn(), disconnect: vi.fn(async () => undefined) };
   const connect = vi.spyOn(service, 'connect').mockReturnValue(connection);
   const stop = registerAudioJobPorts(service);
-  const fixture = createRuntimePortFixture({ name: AUDIO_JOB_PORT_NAME, sender: owner });
+  const fixture = createRuntimePortFixture({
+    name: AUDIO_JOB_PORT_NAME,
+    sender:
+      owner === 'scenario'
+        ? {
+            ...sender,
+            url: 'chrome-extension://extension/apps/extension/src/scenario-editor/index.html',
+          }
+        : owner,
+  });
   browser.listener?.(fixture.port);
   return { ...fixture, connection, connect, stop };
 }
@@ -239,3 +248,85 @@ it('admits project text only from Montage and refuses malformed speech scope at 
   accepted.stop();
   gallery.stop();
 });
+
+const scenarioStart = {
+  type: 'start',
+  requestId: 'scenario',
+  operation: 'speech',
+  modelId: 'model',
+  approvedProviderId: 'provider',
+  text: 'Saved action',
+  profile: { voiceId: 'voice', responseFormat: 'mp3' },
+  scope: {
+    workspaceId: 'scenario',
+    workspaceRevision: 1,
+    target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+    sourceTextHash: 'a'.repeat(64),
+  },
+};
+
+it('binds the exact owned top-level Scenario document to its consumer', () => {
+  const scenarioSender = {
+    ...sender,
+    url: 'chrome-extension://extension/apps/extension/src/scenario-editor/index.html',
+  };
+  expect(getAudioJobSenderConsumer(sender)).toBe('gallery');
+  expect(getAudioJobSenderConsumer(scenarioSender)).toBe('scenario');
+  expect(
+    getAudioJobSenderConsumer({ id: scenarioSender.id, frameId: 0, url: scenarioSender.url })
+  ).toBeNull();
+  for (const patch of [
+    { frameId: 1 },
+    { id: 'other' },
+    { url: 'chrome-extension://extension/apps/extension/src/scenario-editor/index.html.extra' },
+    { url: 'https://example.test/apps/extension/src/scenario-editor/index.html' },
+    { url: 'chrome-extension://other/apps/extension/src/scenario-editor/index.html' },
+  ])
+    expect(getAudioJobSenderConsumer({ ...scenarioSender, ...patch })).toBeNull();
+  const fixture = connectedPort('scenario');
+  expect(fixture.connect.mock.calls[0]?.[1]).toBe('scenario');
+  fixture.onMessage.emit(scenarioStart);
+  expect(fixture.connection.receive).toHaveBeenCalledExactlyOnceWith(scenarioStart);
+});
+
+it.each(['gallery', 'project'] as const)(
+  'refuses Scenario scope from %s before service dispatch',
+  (consumer) => {
+    const fixture =
+      consumer === 'project'
+        ? connectedPort({
+            ...sender,
+            url: 'chrome-extension://extension/apps/extension/src/video-editor/index.html',
+          })
+        : connectedPort();
+    fixture.onMessage.emit(scenarioStart);
+    expect(fixture.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.connection.receive).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['speech', 'transcription'] as const)(
+  'refuses video %s from Scenario before service dispatch',
+  (operation) => {
+    const fixture = connectedPort('scenario');
+    fixture.onMessage.emit({
+      type: 'start',
+      requestId: 'video',
+      operation,
+      modelId: 'model',
+      ...(operation === 'speech'
+        ? { phraseId: 'phrase', textRevision: 1, text: 'hello', profile: scenarioStart.profile }
+        : {}),
+      scope: {
+        workspaceId: 'video',
+        workspaceRevision: 1,
+        target: { kind: 'original' },
+        assetId: 'asset',
+        nativeStart: 0,
+        nativeEnd: 1,
+      },
+    });
+    expect(fixture.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.connection.receive).not.toHaveBeenCalled();
+  }
+);

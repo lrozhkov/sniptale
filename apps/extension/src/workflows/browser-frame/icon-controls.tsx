@@ -1,7 +1,7 @@
 import { useContext, useRef } from 'react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { FolderOpen, Globe, LoaderCircle } from 'lucide-react';
-import type { WindowHeader } from '../../features/browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { translate } from '../../platform/i18n';
 import { WINDOW_HEADER_ICON_ACCEPT } from './local-icon';
 

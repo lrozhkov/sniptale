@@ -1,4 +1,4 @@
-import { windowHeaderGeometry, type WindowHeader } from '../../../browser-frame/header';
+import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import { cameraContentFrame, type CameraAppearance } from '../../project/camera/appearance';
 import { VideoMediaFitMode, type VideoMediaShadowMode } from '../../project/types/index';

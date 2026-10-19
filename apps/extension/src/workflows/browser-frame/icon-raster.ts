@@ -1,4 +1,4 @@
-import { isWindowHeaderFavicon } from '../../features/browser-frame/header';
+import { isWindowHeaderFavicon } from '@sniptale/runtime-contracts/window-header';
 
 /** Normalize icon pixels once; projects retain only bounded PNG, never an object URL. */
 export async function rasterizeWindowHeaderIcon(

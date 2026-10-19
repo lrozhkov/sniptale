@@ -4,7 +4,7 @@ import { act, useEffect, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewStageGeometry, resolveReviewClickRaster } from './stage-geometry';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import {
   DEFAULT_QUICK_EDIT_PERSPECTIVE,

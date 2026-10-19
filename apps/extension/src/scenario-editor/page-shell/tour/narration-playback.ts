@@ -133,9 +133,9 @@ export function createNarrationPlayback(
     update(next: TourNarration) {
       narration = next;
       if (gain) gain.gain.value = next.gain;
-      if (audio.currentTime < next.trimStart || audio.currentTime > next.trimEnd) {
+      if (audio.currentTime < next.trimStart || audio.currentTime >= next.trimEnd) {
         pause();
-        audio.currentTime = next.trimStart;
+        audio.currentTime = Math.max(next.trimStart, Math.min(next.trimEnd, audio.currentTime));
       }
       sync();
     },

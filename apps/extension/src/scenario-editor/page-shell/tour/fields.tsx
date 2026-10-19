@@ -1,6 +1,7 @@
+import { buildTourPlaybackPlan } from '../../../features/scenario/project/tour-playback-plan';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
 import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { SelectField, SegmentedRow } from '../../../ui/compact-inspector-controls/controls';
 import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -17,8 +18,34 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GuideVoiceField } from '../voice-field';
 import { TourInspectorNumericRow } from './numeric-row';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { TextField } from '../../../ui/compact-inspector-controls/text-field';
 import type { Translate } from '../../../platform/i18n';
+
+/** Short exclusive choices retain the shared fitting and keyboard owners. */
+export function TourChoiceField<T extends string>({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <SegmentedRow
+      label={label}
+      ariaLabel={label}
+      value={value}
+      columns={options.length === 2 ? 2 : options.length === 4 ? 4 : options.length === 5 ? 5 : 3}
+      options={options.map((option) => ({ ...option, disabled }))}
+      onChange={onChange}
+    />
+  );
+}
 
 export function TourTextField({
   label,
@@ -119,40 +146,27 @@ export function TourTextPresentation({
           }
         />
       )}
-      <SelectField
-        label={presentationLabel}
-        disabled={disabled}
-        value={value ? effective.presentation : 'inherit'}
-        options={[
-          ...(inherit
-            ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
-            : []),
-          ...(kind !== 'annotation'
-            ? [
-                {
-                  value: 'callout' as const,
-                  label: t('scenario.editor.tourCallout'),
-                },
-              ]
-            : []),
-          ...(kind !== 'hotspot'
-            ? [
-                { value: 'caption-top' as const, label: t('scenario.editor.tourCaptionTop') },
-                { value: 'caption-bottom' as const, label: t('scenario.editor.tourCaptionBottom') },
-              ]
-            : []),
-        ]}
-        onChange={(presentation) =>
-          onChange(
-            presentation === 'inherit'
-              ? null
-              : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, presentation }
-          )
-        }
-      />
+      {kind !== 'hotspot' && (
+        <TourChoiceField
+          label={presentationLabel}
+          disabled={disabled}
+          value={effective.presentation}
+          options={[
+            { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
+            { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
+          ]}
+          onChange={(presentation) =>
+            onChange({
+              ...effective,
+              surface: effective.surface ?? TOUR_HINT_SURFACE,
+              presentation,
+            })
+          }
+        />
+      )}
       {value && (
         <>
-          <SelectField
+          <TourChoiceField
             label={t('scenario.editor.tourTextAlignment')}
             value={value.alignment}
             disabled={disabled}
@@ -180,7 +194,7 @@ export function TourTextPresentation({
                   />
                 </div>
               )}
-              <SelectField
+              <TourChoiceField
                 label={t('scenario.editor.tourTextPlacement')}
                 value={value.placement}
                 disabled={disabled}
@@ -235,7 +249,7 @@ export function TourActionField({
     { value: 'none', label: t('scenario.editor.tourActionNone') },
     { value: 'next', label: t('scenario.editor.tourActionNext') },
     { value: 'previous', label: t('scenario.editor.tourActionPrevious') },
-    { value: 'slide', label: t('scenario.editor.tourActionSlide') },
+    { value: 'action', label: t('scenario.editor.tourActionStep') },
     { value: 'url', label: t('scenario.editor.tourActionUrl') },
     { value: 'restart', label: t('scenario.editor.tourRestart') },
     ...(tour.endScreen.enabled
@@ -256,30 +270,36 @@ export function TourActionField({
           setKind(next);
           setInvalid(false);
           if (next === 'url') return;
-          if (next === 'slide') {
-            const first = tour.slides[0];
-            if (first) onChange({ kind: 'slide', slideId: first.id });
-          } else onChange({ kind: next });
+          if (next === 'action') {
+            const first = buildTourPlaybackPlan(tour).entries.find((entry) => entry.actionId);
+            if (first?.actionId) onChange({ kind: 'action', actionId: first.actionId });
+          } else if (next !== 'slide') onChange({ kind: next });
         }}
       />
-      {kind === 'slide' && (
+      {kind === 'action' && (
         <SelectField
-          label={t('scenario.editor.tourActionSlide')}
+          label={t('scenario.editor.tourActionStep')}
           disabled={disabled}
-          value={value.kind === 'slide' ? value.slideId : (tour.slides[0]?.id ?? '')}
-          options={tour.slides.map((slide, index) => ({
-            value: slide.id,
-            label: `${index + 1}. ${slide.title || t('scenario.editor.tourUntitled')}`,
-          }))}
-          onChange={(slideId) => onChange({ kind: 'slide', slideId })}
+          value={value.kind === 'action' ? value.actionId : ''}
+          options={buildTourPlaybackPlan(tour).entries.flatMap((entry) =>
+            entry.actionId
+              ? [
+                  {
+                    value: entry.actionId,
+                    label: `${entry.ordinal}. ${entry.slide.title || t('scenario.editor.tourHotspot')}`,
+                  },
+                ]
+              : []
+          )}
+          onChange={(actionId) => onChange({ kind: 'action', actionId })}
         />
       )}
       {kind === 'url' && (
-        <ProductInput
-          aria-label={t('scenario.editor.tourActionUrl')}
+        <TextField
+          label={t('scenario.editor.tourActionUrl')}
           value={url}
           disabled={disabled}
-          aria-invalid={invalid}
+          invalid={invalid}
           placeholder="https://"
           maxLength={4000}
           onChange={(event) => {
@@ -288,6 +308,7 @@ export function TourActionField({
           }}
           onBlur={commitUrl}
           onKeyDown={(event) => {
+            if (event.key === 'Escape') event.preventDefault();
             if (event.key === 'Enter') {
               event.preventDefault();
               commitUrl();

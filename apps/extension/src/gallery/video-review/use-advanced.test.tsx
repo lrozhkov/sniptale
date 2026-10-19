@@ -2,7 +2,7 @@
 import { EDITOR_AUTOSAVE_POLICY } from '../../features/autosave/policy';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import {
   createQuickEditZoomRegion,

@@ -1,6 +1,9 @@
 import { createMemoryAudioStaging } from './audio-staging.test-support';
 import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
-const stagingSource = vi.hoisted(() => ({ database: vi.fn() }));
+const stagingSource = vi.hoisted(() => ({ database: vi.fn(), scenario: vi.fn() }));
+vi.mock('../scenario/projects/viewing', () => ({
+  readScenarioViewingSnapshot: stagingSource.scenario,
+}));
 const projectSource = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../projects/index', async (original) => ({
   ...(await original<typeof import('../projects/index')>()),
@@ -519,5 +522,75 @@ it('discards a project ticket after deletion without admitting another scope', a
   );
   expect(memory.files.size).toBe(2);
   await discardAudioStaging(handle, selected);
+  expect(memory.files.size).toBe(0);
+});
+
+async function scenarioFixture() {
+  const { createGuideProject, createTourDocument, createTourImageSlide } =
+    await import('../../../features/scenario/project/public');
+  const project = createGuideProject('Guide', 'scenario');
+  const slide = createTourImageSlide('slide');
+  slide.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'action', text: 'Saved text', anchor: null, appearance: null },
+    },
+  ];
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('Saved text'));
+  const scenarioScope = {
+    workspaceId: project.id,
+    workspaceRevision: 3,
+    target: { kind: 'scenario-text' as const, slideId: slide.id, objectId: 'action' },
+    sourceTextHash: Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join(
+      ''
+    ),
+  };
+  stagingSource.scenario.mockResolvedValue({ project, revision: 3 });
+  return { scenarioScope, slide, project };
+}
+it('rejects Scenario output after deletion between admission and staging', async () => {
+  const memory = memoryStaging();
+  const { scenarioScope, project } = await scenarioFixture();
+  stagingSource.scenario
+    .mockResolvedValueOnce({ project, revision: 3 })
+    .mockResolvedValueOnce(null);
+  await expect(
+    writeAudioStaging({ id: stagingId, scope: scenarioScope, blob: audioBlob() })
+  ).rejects.toThrow('scope');
+  expect(memory.getDirectory).not.toHaveBeenCalled();
+  expect(memory.files.size).toBe(0);
+});
+it('rejects Scenario staged read when saved action text changes', async () => {
+  const memory = memoryStaging();
+  const { scenarioScope, slide } = await scenarioFixture();
+  const handle = await writeAudioStaging({
+    id: stagingId,
+    scope: scenarioScope,
+    blob: audioBlob(),
+  });
+  expect(await (await readAudioStaging(handle, scenarioScope)).text()).toBe('audio');
+  slide.actions[0]!.object.text = 'Changed';
+  memory.getDirectory.mockClear();
+  await expect(readAudioStaging(handle, scenarioScope)).rejects.toThrow('source');
+  expect(memory.getDirectory).not.toHaveBeenCalled();
+  stagingSource.scenario.mockResolvedValue(null);
+  await discardAudioStaging(handle, scenarioScope);
+  expect(memory.files.size).toBe(0);
+});
+it('rechecks Scenario saved source after asynchronous staged reads', async () => {
+  const memory = memoryStaging();
+  const { scenarioScope, project } = await scenarioFixture();
+  const handle = await writeAudioStaging({
+    id: stagingId,
+    scope: scenarioScope,
+    blob: audioBlob(),
+  });
+  stagingSource.scenario
+    .mockResolvedValueOnce({ project, revision: 3 })
+    .mockResolvedValueOnce(null);
+  await expect(readAudioStaging(handle, scenarioScope)).rejects.toThrow('scope');
+  expect(memory.files.size).toBe(2);
+  await discardAudioStaging(handle, scenarioScope);
   expect(memory.files.size).toBe(0);
 });

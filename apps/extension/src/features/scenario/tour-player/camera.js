@@ -1,15 +1,20 @@
+import { resolveTourImageFrame } from './image-frame.js';
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 /** Resolves one source-image projection shared by pixels, overlays and authoring hit tests. */
 export function resolveTourCamera(slide, viewport, autoZoom) {
   if (!slide.image || viewport.stageWidth <= 0 || viewport.stageHeight <= 0) return null;
-  const { stageWidth, stageHeight } = viewport;
+  const { content } = resolveTourImageFrame(slide, viewport);
+  const stageWidth = content.width,
+    stageHeight = content.height;
+  const placement = slide.imagePlacement ?? { center: { x: 0.5, y: 0.5 }, zoom: 1 };
   const scale = (slide.fit === 'cover' ? Math.max : Math.min)(
     stageWidth / slide.image.width,
     stageHeight / slide.image.height
   );
-  const baseWidth = slide.image.width * scale;
-  const baseHeight = slide.image.height * scale;
+  const baseWidth = slide.image.width * scale * placement.zoom;
+  const baseHeight = slide.image.height * scale * placement.zoom;
   const minimumZoom = Math.min(stageWidth / baseWidth, stageHeight / baseHeight);
   const automatic = tourCameraEnabled(slide, autoZoom) && slide.camera.mode !== 'manual';
   const camera =
@@ -17,7 +22,7 @@ export function resolveTourCamera(slide, viewport, autoZoom) {
       ? slide.camera
       : automatic
         ? autoCamera(
-            slide.hotspots[0],
+            getTourHotspots(slide)[0],
             baseWidth,
             baseHeight,
             stageWidth,
@@ -25,7 +30,7 @@ export function resolveTourCamera(slide, viewport, autoZoom) {
             minimumZoom,
             slide.camera.targetZoom
           )
-        : { zoom: 1, center: { x: 0.5, y: 0.5 } };
+        : { zoom: 1, center: placement.center };
   const zoom = clamp(camera.zoom, automatic ? minimumZoom : 1, 8);
   const width = baseWidth * zoom;
   const height = baseHeight * zoom;
@@ -34,8 +39,8 @@ export function resolveTourCamera(slide, viewport, autoZoom) {
     y: boundedCenter(camera.center.y, height, stageHeight),
   };
   return {
-    x: stageWidth / 2 - center.x * width,
-    y: stageHeight / 2 - center.y * height,
+    x: content.x + stageWidth / 2 - center.x * width,
+    y: content.y + stageHeight / 2 - center.y * height,
     width,
     height,
     zoom,
@@ -51,7 +56,7 @@ function boundedCenter(center, imageSize, viewportSize) {
 
 /** Fits the recorded target and click point together, leaving surrounding screenshot context. */
 function autoCamera(hotspot, width, height, stageWidth, stageHeight, minimumZoom, targetZoom) {
-  const rect = hotspot.targetRect;
+  const rect = hotspot.visual.kind === 'point' ? hotspot.targetRect : hotspot.visual.rect;
   const left = Math.min(hotspot.point.x, rect?.x ?? hotspot.point.x);
   const top = Math.min(hotspot.point.y, rect?.y ?? hotspot.point.y);
   const right = Math.max(hotspot.point.x, rect ? rect.x + rect.width : hotspot.point.x);
@@ -81,7 +86,7 @@ export function tourCameraEnabled(slide, autoZoom) {
   if (slide.camera.mode === 'manual') return true;
   return (
     !slide.requiresTargetReview &&
-    slide.hotspots.length === 1 &&
+    getTourHotspots(slide).length === 1 &&
     (slide.camera.mode === 'auto' || (slide.camera.mode === 'inherit' && autoZoom))
   );
 }
@@ -89,7 +94,12 @@ export function tourCameraEnabled(slide, autoZoom) {
 /** Viewer-only full-source projection; authored fit and camera stay untouched. */
 export function resolveTourFullViewCamera(slide, viewport) {
   return resolveTourCamera(
-    { ...slide, fit: 'contain', camera: { ...slide.camera, mode: 'off' } },
+    {
+      ...slide,
+      imagePlacement: undefined,
+      fit: 'contain',
+      camera: { ...slide.camera, mode: 'off' },
+    },
     viewport,
     false
   );

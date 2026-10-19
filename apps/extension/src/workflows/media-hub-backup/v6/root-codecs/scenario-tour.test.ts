@@ -18,14 +18,26 @@ function source() {
     alt: '',
     source: { kind: 'import', filename: 'source.png' },
   };
-  slide.narration = {
-    assetId: 'audio',
-    duration: 3,
-    trimStart: 0,
-    trimEnd: 3,
-    gain: 1,
-    transcript: 'voice',
-  };
+  slide.actions.unshift({
+    type: 'annotation',
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'audio',
+          duration: 3,
+          trimStart: 0,
+          trimEnd: 3,
+          gain: 1,
+          transcript: 'voice',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'audio', duration: 3 });
   tour.audioResources = [{ assetId: 'audio', duration: 3, name: 'Music' }];
@@ -50,7 +62,7 @@ it('roundtrips portable image and audio references and remaps editor/library ide
     galleryAssetId: 'new-gallery',
   });
   const slide = restored.slides[0];
-  expect(slide?.narration?.assetId).toBe('new-audio');
+  expect(slide?.kind === 'image' && slide.actions[0]?.object.narration?.assetId).toBe('new-audio');
   expect(restored.backgroundMusic?.assetId).toBe('new-audio');
   if (slide?.kind !== 'image') throw new Error('Expected image');
   expect(slide.image).toMatchObject({
@@ -98,16 +110,20 @@ it('rejects foreign and physical music refs before restore', () => {
     expect(() => decodePortableTour({ ...portable, backgroundMusic }, refs)).toThrow();
 });
 
-// Frozen v6 shape emitted by 2268d6208: catalog IDs stayed raw logical child IDs.
-const legacyAudioTour = {
-  version: 1,
+// Catalog references name declared logical children in the current Tour schema.
+const logicalCatalogTour = {
+  version: 2,
   id: 'legacy-tour',
   stage: { aspect: '16:9', background: '#000000' },
   style: {
     accent: '#ffffff',
     text: '#ffffff',
     surface: '#000000',
-    textAppearance: { presentation: 'callout', alignment: 'start', placement: 'auto' },
+    textAppearance: {
+      presentation: 'callout' as const,
+      alignment: 'start' as const,
+      placement: 'auto' as const,
+    },
   },
   playback: { autoplay: false, loop: false, minimumHoldSeconds: 4, autoZoom: true },
   transition: { kind: 'none', durationMs: 0, hotspotTravelMs: 0 },
@@ -128,25 +144,25 @@ const legacyAudioTour = {
         gain: 1,
         transcript: '',
       },
-      timing: { mode: 'manual', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+      timing: { mode: 'manual', holdSeconds: 4, truncateNarration: false },
     },
   ],
   endScreen: { enabled: false, title: '', description: '', button: null, restart: true },
 };
 it.each(['voice', 'copied-voice'])(
-  'restores the pre-B31 catalog into declared child %s',
+  'restores logical catalog references into declared child %s',
   (assetId) => {
-    const restored = decodePortableTour(legacyAudioTour, {
+    const restored = decodePortableTour(logicalCatalogTour, {
       ...refs,
       assetIds: new Map([['voice', assetId]]),
     });
     expect(restored.audioResources).toEqual([{ assetId, duration: 3, name: 'Voice.wav' }]);
     expect(restored.slides[0]?.narration?.assetId).toBe(assetId);
     expect(restored.backgroundMusic).toBeUndefined();
-    expect(legacyAudioTour.audioResources[0]?.assetId).toBe('voice');
+    expect(logicalCatalogTour.audioResources[0]?.assetId).toBe('voice');
   }
 );
-it('limits legacy catalog admission to one declared logical reference and valid metadata', () => {
+it('limits logical catalog admission to one declared logical reference and valid metadata', () => {
   const mapping = { ...refs, assetIds: new Map([['voice', 'restored']]) };
   for (const resource of [
     { assetId: 'voice', scenarioAssetId: 'voice', duration: 3, name: 'Ambiguous' },
@@ -157,9 +173,9 @@ it('limits legacy catalog admission to one declared logical reference and valid 
     { assetId: 'voice', duration: 3, name: 'Extra', extra: true },
   ])
     expect(() =>
-      decodePortableTour({ ...legacyAudioTour, audioResources: [resource] }, mapping)
+      decodePortableTour({ ...logicalCatalogTour, audioResources: [resource] }, mapping)
     ).toThrow();
-  expect(() => decodePortableTour(legacyAudioTour, { ...mapping, assetIds: new Map() })).toThrow(
+  expect(() => decodePortableTour(logicalCatalogTour, { ...mapping, assetIds: new Map() })).toThrow(
     'missing'
   );
 });

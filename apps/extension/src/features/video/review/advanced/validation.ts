@@ -42,7 +42,7 @@ import {
   type QuickEditZoomTransition,
 } from './types';
 import { parseQuickEditCanvas } from './canvas';
-import { parseWindowHeader } from '../../../browser-frame/header';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { parseQuickEditWebcam } from './webcam';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';

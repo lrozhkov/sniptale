@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+import {
+  getTourHotspots,
+  getTourAnnotations,
+  TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -12,7 +17,12 @@ import {
 import { createTranslator } from '../../../platform/i18n';
 import { useGuidePanels } from '../panel-layout';
 import { TourWorkspace } from './workspace';
+import type { ScenarioNarrationAccess } from './use-narration-ai';
 const prepare = vi.hoisted(() => vi.fn());
+const narrationCatalog = vi.hoisted(() => vi.fn());
+vi.mock('../../../workflows/ai-settings/query', () => ({
+  requestAIModelSelectionBootstrap: narrationCatalog,
+}));
 vi.mock('../../../workflows/scenario-capture-edit/tour-materials', () => ({
   prepareTourFromGuide: prepare,
 }));
@@ -23,7 +33,15 @@ let panelState: ReturnType<typeof useGuidePanels>;
 const imported = vi.fn();
 const changed = vi.fn();
 const edited = vi.fn();
-function Probe({ initial, locked = false }: { initial: GuideProject; locked?: boolean }) {
+function Probe({
+  initial,
+  locked = false,
+  narrationAI,
+}: {
+  initial: GuideProject;
+  locked?: boolean;
+  narrationAI?: ScenarioNarrationAccess;
+}) {
   const [project, setProject] = useState(initial);
   current = project;
   const panels = useGuidePanels();
@@ -43,6 +61,7 @@ function Probe({ initial, locked = false }: { initial: GuideProject; locked?: bo
       onImport={imported}
       onImportNarration={imported}
       onEditImage={edited}
+      {...(narrationAI ? { narrationAI } : {})}
     />
   );
 }
@@ -53,6 +72,7 @@ beforeEach(() => {
   edited.mockReset();
   imported.mockReset();
   imported.mockResolvedValue(true);
+  narrationCatalog.mockReset().mockRejectedValue(new Error('Catalog unavailable'));
   prepare.mockReset();
   prepare.mockResolvedValue({ tour: createTourDocument(), issues: [] });
   host = document.createElement('div');
@@ -80,18 +100,18 @@ function fixture() {
     source: { kind: 'import', filename: 'test.png' },
   };
   const second = { ...createTourImageSlide('second'), title: 'Second', image: first.image };
-  second.hotspots = [
-    {
+  second.actions.push({
+    type: 'hotspot',
+    object: {
       id: 'link',
       label: 'Go first',
       text: '',
       point: { x: 0.5, y: 0.5 },
       targetRect: null,
       appearance: null,
-      pulse: false,
-      action: { kind: 'slide', slideId: 'first' },
+      visual: { kind: 'point', pulse: false },
     },
-  ];
+  });
   project.tour.slides = [first, second];
   return project;
 }
@@ -128,29 +148,40 @@ it('creates image and navigation slides without changing guide content, and open
   expect(current.items).toEqual(project.items);
 });
 it('duplicates, reorders by keyboard and repairs incoming links only after explicit removal', async () => {
-  await render();
+  const project = fixture();
+  project.tour!.slides.push({
+    kind: 'navigation',
+    id: 'contents',
+    title: 'Contents',
+    description: '',
+    background: { color: '#111827', image: null },
+    narration: null,
+    timing: createTourImageSlide().timing,
+    buttons: [{ id: 'start', label: 'Start', action: { kind: 'slide', slideId: 'first' } }],
+  });
+  await render(project);
   const before = current.items;
   const rows = () => host.querySelectorAll('.tour-slide-row');
   await click('Slide actions', rows()[0]!);
   await click('Duplicate slide', document.body);
-  expect(current.tour!.slides).toHaveLength(3);
+  expect(current.tour!.slides).toHaveLength(4);
   const duplicated = current.tour!.slides[1]!.id;
   const handle = rows()[1]!.querySelector('button')!;
   await key(handle, 'End');
   expect(current.tour!.slides.at(-1)?.id).toBe(duplicated);
-  await key(host.querySelectorAll('.tour-slide-row')[2]!.querySelector('button')!, 'Home');
+  await key(host.querySelectorAll('.tour-slide-row')[3]!.querySelector('button')!, 'Home');
   expect(current.tour!.slides[0]!.id).toBe(duplicated);
   await click('Slide actions', rows()[1]!);
   await click('Delete', document.body);
   expect(host.textContent).toContain('Other slides link here');
   await click('Cancel');
-  expect(current.tour!.slides).toHaveLength(3);
+  expect(current.tour!.slides).toHaveLength(4);
   await click('Slide actions', rows()[1]!);
   await click('Delete', document.body);
   await click('Delete', host.querySelector('.tour-review-notice')!);
   expect(current.tour!.slides.some((s) => s.id === 'first')).toBe(false);
   const second = current.tour!.slides.find((s) => s.id === 'second');
-  expect(second?.kind === 'image' && second.hotspots[0]?.action.kind).toBe('none');
+  expect(second?.kind).toBe('image');
   expect(current.items).toEqual(before);
 });
 it('keeps slide actions inside the selectable card and selection on the card', async () => {
@@ -212,39 +243,54 @@ it('keeps generation review cancellable and prevents locked edits', async () => 
   expect(changed).not.toHaveBeenCalled();
 });
 
-it('imports files into the selected destination and commits source-coordinate object drags', async () => {
-  const project = fixture();
-  const slide = project.tour!.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Point',
-      text: '',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-    },
-  ];
-  slide.annotations = [{ id: 'note', text: 'Note', anchor: { x: 0.2, y: 0.2 }, appearance: null }];
-  slide.masks = [
-    {
-      id: 'mask',
-      rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
-      kind: 'highlight',
-      color: '#F97316',
-      opacity: 0.3,
-    },
-  ];
-  await render(project);
-  expect(
-    host.querySelector('#guide-inspector-panel input[type=file][accept^="image/"]')
-  ).toBeNull();
-  const shadow = () => host.querySelector('.tour-stage-host')!.shadowRoot!;
-  for (const id of ['point', 'mask']) {
-    const marker = shadow().querySelector<HTMLElement>(`[data-tour-object-id="${id}"]`)!;
+it.each(['point', 'highlight'] as const)(
+  'commits source-coordinate %s drags and resize without changing saved privacy regions',
+  async (kind) => {
+    const project = fixture();
+    const slide = project.tour!.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.actions = [
+      {
+        type: 'hotspot',
+        object: {
+          id: 'point',
+          point: { x: 0.5, y: 0.5 },
+          targetRect: null,
+          label: 'Point',
+          text: '',
+          appearance: null,
+          visual:
+            kind === 'point'
+              ? { kind, pulse: false }
+              : {
+                  kind,
+                  rect: { x: 0.4, y: 0.4, width: 0.2, height: 0.2 },
+                  color: '#F97316',
+                  opacity: 0.3,
+                  animation: TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
+                },
+        },
+      },
+      {
+        type: 'annotation',
+        object: { id: 'note', text: 'Note', anchor: { x: 0.2, y: 0.2 }, appearance: null },
+      },
+    ];
+    slide.masks = [
+      {
+        id: 'mask',
+        rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+        kind: 'blur',
+        color: '#F97316',
+        opacity: 0.3,
+      },
+    ];
+    await render(project);
+    expect(
+      host.querySelector('#guide-inspector-panel input[type=file][accept^="image/"]')
+    ).toBeNull();
+    const shadow = () => host.querySelector('.tour-stage-host')!.shadowRoot!;
+    const marker = shadow().querySelector<HTMLElement>('[data-tour-object-id="point"]')!;
     const pointer = (name: string, x: number) => {
       const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x, clientY: 0 });
       Object.defineProperty(event, 'pointerId', { value: 1 });
@@ -255,35 +301,51 @@ it('imports files into the selected destination and commits source-coordinate ob
       pointer('pointermove', 10);
       pointer('pointerup', 10);
     });
+    if (kind === 'highlight')
+      await key(
+        shadow().querySelector('[data-tour-object-id="point"] [data-edge=e]')!,
+        'ArrowRight'
+      );
+    const result = current.tour!.slides[0]!;
+    if (result.kind !== 'image') throw new Error('Expected image');
+    const hotspot = getTourHotspots(result)[0]!;
+    expect(hotspot.point.x).toBeGreaterThan(0.5);
+    if (hotspot.visual.kind !== 'point') expect(hotspot.visual.rect.width).toBeGreaterThan(0.2);
+    expect(result.masks).toEqual(slide.masks);
+    expect(result.actions[1]).toEqual(slide.actions[1]);
+    const header = host.querySelector('#guide-inspector-panel > .guide-panel-heading')!;
+    expect(header.querySelector('[title="Back to slide settings"]')).not.toBeNull();
   }
-  const result = current.tour!.slides[0]!;
-  if (result.kind !== 'image') throw new Error('Expected image');
-  expect(result.hotspots[0]!.point.x).toBeGreaterThan(0.5);
-  expect(result.masks[0]!.rect.x).toBeGreaterThan(0.1);
-  expect(host.textContent).toContain('Back to slide settings');
-});
+);
 it('keeps explanations slide-level: no canvas point marker and a preserved legacy anchor', async () => {
   const project = fixture();
   const slide = project.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.annotations = [
-    {
-      id: 'note',
-      text: 'Note',
-      anchor: { x: 0.2, y: 0.2 },
-      appearance: { presentation: 'callout', alignment: 'start', placement: 'auto' },
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[
+      {
+        id: 'note',
+        text: 'Note',
+        anchor: { x: 0.2, y: 0.2 },
+        appearance: {
+          presentation: 'callout' as const,
+          alignment: 'start' as const,
+          placement: 'auto' as const,
+        },
+      },
+    ].map((object) => ({ type: 'annotation' as const, object })),
   ];
   await render(project);
   const shadow = host.querySelector('.tour-stage-host')!.shadowRoot!;
   expect(shadow.querySelector('[data-tour-object-id="note"]')).toBeNull();
   const result = current.tour!.slides[0]!;
   if (result.kind !== 'image') throw new Error('Expected image');
-  expect(result.annotations[0]!.anchor).toEqual({ x: 0.2, y: 0.2 });
-  expect(result.annotations[0]!.appearance?.presentation).toBe('callout');
+  expect(getTourAnnotations(result)[0]!.anchor).toEqual({ x: 0.2, y: 0.2 });
+  expect(getTourAnnotations(result)[0]!.appearance?.presentation).toBe('callout');
   const hint = shadow.querySelector<HTMLElement>('[data-tour-hint]')!;
   expect(hint.dataset['presentation']).toBe('caption-bottom');
-  expect(hint.querySelector<HTMLElement>('[data-tour-hint-title]')!.hidden).toBe(true);
+  expect(hint.querySelector('[data-tour-hint-title]')).toBeNull();
   expect(hint.querySelector('[data-tour-hint-text]')!.textContent).toBe('Note');
 });
 it('keeps resource payloads identity-only', async () => {
@@ -336,7 +398,14 @@ it('lists navigation backgrounds and keeps missing image previews disabled', asy
 
 it('lists each affected navigation source before clearing links to a removed slide', async () => {
   const project = fixture();
-  project.tour!.slides[1]!.timing.autoplayTarget = 'first';
+  const first = project.tour!.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image');
+  first.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'first-action', text: 'Start', anchor: null, appearance: null },
+    },
+  ];
   const navigation = {
     kind: 'navigation' as const,
     id: 'contents',
@@ -349,7 +418,7 @@ it('lists each affected navigation source before clearing links to a removed sli
       {
         id: 'contents-first',
         label: 'Start here',
-        action: { kind: 'slide' as const, slideId: 'first' },
+        action: { kind: 'action' as const, actionId: 'first-action' },
       },
     ],
   };
@@ -358,21 +427,30 @@ it('lists each affected navigation source before clearing links to a removed sli
   await click('Slide actions', host.querySelector('.tour-slide-row')!);
   await click('Delete', document.body);
   const notice = host.querySelector('.tour-review-notice')!;
-  expect(notice.textContent).toContain('Second — Automatic transition');
-  expect(notice.textContent).toContain('Second — Go first');
+  expect(notice.textContent).not.toContain('Second');
   expect(notice.textContent).toContain('Contents — Start here');
   expect(current.tour!.slides).toHaveLength(3);
   await click('Delete', notice);
   expect(current.tour!.slides).toHaveLength(2);
-  expect(current.tour!.slides[0]?.timing.autoplayTarget).toBeNull();
   const repaired = current.tour!.slides[1]!;
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
 });
 
 it('shows object narration without slide narration in the selected-object drill-down', async () => {
-  await render();
+  const project = fixture();
+  const first = project.tour!.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image');
+  first.actions = [
+    { type: 'annotation', object: { id: 'start', text: 'Start', anchor: null, appearance: null } },
+  ];
+  await render(project);
+  const sourceInspector = host.querySelector('#guide-inspector-panel')!;
+  expect(sourceInspector.querySelector('button[aria-label="Narration"]')).toBeNull();
+  await click('Show all settings', sourceInspector);
+  expect(sourceInspector.querySelector('.tour-audio-acquisition')).toBeNull();
+  await click('Show settings sections', sourceInspector);
   await click('2Second');
-  await click('Slide objects', host.querySelector('#guide-inspector-panel')!);
+  await click('Actions', host.querySelector('#guide-inspector-panel')!);
   await click('Go first');
   const inspector = host.querySelector('#guide-inspector-panel')!;
   expect(inspector.textContent).not.toContain('Object narration');
@@ -393,16 +471,12 @@ it('uses the header presentation switch and keeps grouped objects switchable wit
   const panel = () => host.querySelector('#guide-inspector-panel')!;
   await click('Show all settings', panel());
   expect(panel().querySelector('nav')).toBeNull();
-  expect(panel().textContent).toContain('Slide narration');
+  expect(panel().textContent).not.toContain('Slide narration');
   await click('Show settings sections', panel());
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Playback', panel());
   expect(panel().textContent).not.toContain('Slide narration');
-  await click('Narration', panel());
-  expect(
-    [...panel().querySelectorAll('button')].some((button) => button.textContent === 'Record')
-  ).toBe(true);
-  await click('Slide objects', panel());
+  await click('Actions', panel());
   await click('Hotspot', panel());
   expect(panel().querySelector('nav')).not.toBeNull();
   expect(panel().querySelector('[title="Show all settings"]')).not.toBeNull();
@@ -421,7 +495,7 @@ it('uses the header presentation switch and keeps grouped objects switchable wit
   ).toBe(true);
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Back to slide settings', panel());
-  expect(panel().querySelector('[aria-label="Slide objects"]')?.getAttribute('aria-pressed')).toBe(
+  expect(panel().querySelector('[aria-label="Actions"]')?.getAttribute('aria-pressed')).toBe(
     'true'
   );
 });
@@ -437,42 +511,13 @@ it('cancels native image drags from the stage before they can become image impor
   expect(current.tour!.slides).toHaveLength(2);
 });
 
-it('offers visual blur without overwriting highlight opacity or numeric canvas geometry', async () => {
-  await render();
-  const panel = host.querySelector('#guide-inspector-panel')!;
-  await click('Slide objects', panel);
-  await click('Highlight', panel);
-  expect(panel.querySelector('[aria-label="Width"]')).toBeNull();
-  expect(panel.querySelector('[aria-label="X"]')).toBeNull();
-  await click('Highlight', panel);
-  await click('Blur', document.body);
-  const slide = current.tour!.slides[0]!;
-  if (slide.kind !== 'image') throw new Error('Expected image');
-  expect(slide.masks[0]!.kind).toBe('blur');
-  expect(slide.masks[0]!.opacity).toBe(0.3);
-  await click('Appearance', panel);
-  expect(panel.querySelector('[aria-label="Blur radius"]')).not.toBeNull();
-  await click('Effect type', panel);
-  await click('Blur', panel);
-  await click('Highlight', document.body);
-  const restored = current.tour!.slides[0]!;
-  if (restored.kind !== 'image') throw new Error('Expected image');
-  expect(restored.masks[0]!.opacity).toBe(0.3);
-  const frame = host.querySelector('.tour-stage-host')!.shadowRoot!.querySelector('.tour-mask')!;
-  const handle = frame.querySelector('[data-edge=e]')!;
-  await key(handle, 'ArrowRight');
-  const resized = current.tour!.slides[0]!;
-  if (resized.kind !== 'image') throw new Error('Expected image');
-  expect(resized.masks[0]!.rect.width).toBeGreaterThan(0.3);
-});
-
 it('places contextual tour controls inside the page header', async () => {
   await render();
   const header = host.querySelector('header')!;
   const controls = header.querySelector('.tour-header-controls');
   expect(controls).not.toBeNull();
   const labels = [...controls!.querySelectorAll('button')].map((button) => button.title);
-  expect(labels).toContain('Preview');
+  expect(labels).toContain('Preview from here');
   expect(labels).toContain('Edit image');
   expect(labels).not.toContain('Editing');
 });
@@ -500,7 +545,7 @@ it('keeps Edit image stable for image and navigation slides and degrades cleanly
   expect(editImage()).toBeNull();
   expect(
     [...host.querySelectorAll<HTMLButtonElement>('.tour-header-controls button')].find(
-      (button) => button.title === 'Preview'
+      (button) => button.title === 'Preview from here'
     )?.disabled
   ).toBe(true);
   await click('1First');
@@ -532,7 +577,14 @@ it('moves preview, replay and camera framing through one disposable header mode'
   await click('Camera area');
   expect(stage().dataset['view']).toBe('frame');
   expect(stage().shadowRoot!.querySelector('.tour-camera-frame')).not.toBeNull();
-  await click('Preview');
+  const frame = stage().shadowRoot!.querySelector('.tour-camera-frame')!;
+  await key(frame.querySelector('[data-edge=e]')!, 'ArrowLeft');
+  const committed = current.tour!.slides[0]!;
+  if (committed.kind !== 'image') throw new Error('Expected image');
+  expect(committed.camera.zoom).toBeGreaterThan(2);
+  expect(committed).toEqual({ ...slide, camera: committed.camera });
+  expect(current.tour!.slides[1]).toEqual(project.tour!.slides[1]);
+  await click('Preview from here');
   expect(stage().dataset['view']).toBe('preview');
   expect(stage().hasAttribute('inert')).toBe(false);
   await act(async () => {
@@ -549,14 +601,14 @@ it('moves preview, replay and camera framing through one disposable header mode'
   await click('Return to editing');
   expect(stage().dataset['view']).toBe('edit');
   expect(width()).toBe(base);
-  expect(changed).not.toHaveBeenCalled();
+  expect(changed).toHaveBeenCalledTimes(1);
 });
 
 it('returns to editing when another slide is selected and disposes the preview player', async () => {
   instantImages();
   const tick = playbackFrames();
   await render();
-  await click('Preview');
+  await click('Preview from here');
   const stage = () => host.querySelector<HTMLElement>('.tour-stage-host')!;
   expect(stage().dataset['view']).toBe('preview');
   const scene = () => stage().shadowRoot!.querySelector('[data-tour-scene]')!;
@@ -606,14 +658,28 @@ function playbackFrames() {
 it('returns from end selection to the exact audio usage and retains grouped resource controls', async () => {
   const project = fixture();
   project.tour!.audioResources = [{ assetId: 'voice', duration: 2, name: 'Voice.wav' }];
-  project.tour!.slides[0]!.narration = {
-    assetId: 'voice',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  const first = project.tour!.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image');
+  first.actions = [
+    {
+      type: 'annotation',
+      object: {
+        id: 'spoken-action',
+        text: 'Listen',
+        anchor: null,
+        appearance: null,
+        narration: {
+          assetId: 'voice',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+          trigger: 'enter',
+        },
+      },
+    },
+  ];
   await render(project);
   await click('End of tour');
   await click('Resources');
@@ -625,7 +691,7 @@ it('returns from end selection to the exact audio usage and retains grouped reso
   await click('Bindings: 1', library);
   expect(panelState.rightScope).toBe('selection');
   expect(panelState.rightOpen).toBe(true);
-  expect(host.querySelector('#guide-inspector-panel h2')?.textContent).toBe('First');
+  expect(host.querySelector('#guide-inspector-panel')?.textContent).toContain('Listen');
   expect(library.querySelector<HTMLButtonElement>('[title="Attach to selection"]')?.disabled).toBe(
     false
   );
@@ -633,5 +699,251 @@ it('returns from end selection to the exact audio usage and retains grouped reso
     library.querySelector('.guide-image-resources .guide-image-upload-compact')
   ).not.toBeNull();
   expect(library.querySelector('.tour-audio-resources .tour-audio-acquisition')).not.toBeNull();
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['off', 'annotation'],
+  ['manual', 'annotation'],
+  ['off', 'hotspot'],
+  ['manual', 'hotspot'],
+] as const)(
+  'frames the selected action camera over %s defaults for %s and commits only that action',
+  async (mode, actionType) => {
+    const project = fixture();
+    const slide = project.tour!.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.image!.width = 640;
+    slide.image!.height = 360;
+    slide.camera = { mode, center: { x: 0.5, y: 0.5 }, zoom: mode === 'off' ? 1 : 2 };
+    slide.actions = ['framed', 'neighbor'].map((id, index) => ({
+      type: 'annotation' as const,
+      object: {
+        id,
+        text: index === 0 ? 'Framed action' : 'Neighbor action',
+        anchor: null,
+        appearance: null,
+        camera: { mode: 'manual' as const, center: { x: 0.5, y: 0.5 }, zoom: index === 0 ? 4 : 3 },
+      },
+    }));
+    if (actionType === 'hotspot') {
+      slide.actions[0] = {
+        type: 'hotspot',
+        object: {
+          id: 'framed',
+          label: 'Framed action',
+          text: 'Framed copy',
+          point: { x: 0.5, y: 0.5 },
+          targetRect: null,
+          appearance: null,
+          visual: { kind: 'point', pulse: false },
+          camera: { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 4 },
+        },
+      };
+    }
+    const original = structuredClone(slide);
+    await render(project);
+    await click('Actions', host.querySelector('#guide-inspector-panel')!);
+    await click(actionType === 'hotspot' ? 'Framed copy' : 'Framed action');
+    await click('Camera area');
+    const shadow = host.querySelector('.tour-stage-host')!.shadowRoot!;
+    const frame = shadow.querySelector<HTMLElement>('.tour-camera-frame')!;
+    expect(frame.style.width).toBe('160px');
+    await key(frame.querySelector('[data-edge=e]')!, 'ArrowLeft');
+    const updated = current.tour!.slides[0]!;
+    if (updated.kind !== 'image') throw new Error('Expected image');
+    expect(updated.camera).toEqual(original.camera);
+    expect(updated.actions[0]!.object.camera!.zoom).toBeGreaterThan(4);
+    expect(updated.actions[0]!.object).toEqual({
+      ...original.actions[0]!.object,
+      camera: updated.actions[0]!.object.camera,
+    });
+    expect(updated.actions[1]).toEqual(original.actions[1]);
+    expect(updated.timing).toEqual(original.timing);
+  }
+);
+
+it('preserves the chosen preview origin on Replay and restores author selection and scroll', async () => {
+  instantImages();
+  const project = fixture();
+  const first = project.tour!.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image');
+  first.actions = [
+    { type: 'annotation', object: { id: 'start', text: 'Start', anchor: null, appearance: null } },
+  ];
+  await render(project);
+  await click('2Second');
+  await click('Actions', host.querySelector('#guide-inspector-panel')!);
+  await click('Go first');
+  const inspector = host.querySelector<HTMLElement>('#guide-inspector-panel .guide-panel-scroll')!;
+  const library = host.querySelector<HTMLElement>('#guide-library-panel .guide-panel-scroll');
+  inspector.scrollTop = 123;
+  if (library) library.scrollTop = 77;
+  const stage = () => host.querySelector('.tour-stage-host')!.shadowRoot!;
+  const player = () => stage().querySelector<HTMLElement>('#tour-player')!;
+  const caption = stage().querySelector<HTMLElement>('[data-tour-hint-text]')!;
+  caption.scrollTop = 91;
+  await click('Preview from beginning');
+  expect(player().dataset['slideId']).toBe('first');
+  expect(player().dataset['actionId']).toBe('start');
+  await act(async () => stage().querySelector<HTMLButtonElement>('[data-tour-next]')!.click());
+  expect(player().dataset['actionId']).toBe('link');
+  await click('Replay');
+  expect(player().dataset['actionId']).toBe('start');
+  await click('Return to editing');
+  expect(stage().querySelector('[data-tour-object-id="link"]')?.getAttribute('data-selected')).toBe(
+    'true'
+  );
+  expect(inspector.scrollTop).toBe(123);
+  if (library) expect(library.scrollTop).toBe(77);
+  expect(stage().querySelector<HTMLElement>('[data-tour-hint-text]')!.scrollTop).toBe(91);
+  await click('Preview from here');
+  expect(player().dataset['actionId']).toBe('link');
+  await act(async () => stage().querySelector<HTMLButtonElement>('[data-tour-previous]')!.click());
+  expect(player().dataset['actionId']).toBe('start');
+  await click('Replay');
+  expect(player().dataset['actionId']).toBe('link');
+  await click('Return to editing');
+  await click('End of tour');
+  await click('Preview from beginning');
+  expect(player().dataset['actionId']).toBe('start');
+  await click('Return to editing');
+  expect(host.querySelector('.tour-stage-host')!.getAttribute('data-view')).toBe('edit');
+  expect(host.querySelector('.tour-end-row')?.getAttribute('aria-current')).toBe('step');
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it('uses authored text in the action row and selected inspector header without changing saved labels', async () => {
+  const project = fixture();
+  const slide = project.tour!.slides[1]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  getTourHotspots(slide)[0]!.text = ' \n Authored instruction \nMore detail';
+  await render(project);
+  await click('2Second');
+  await click('Actions', host.querySelector('#guide-inspector-panel')!);
+  const row = host.querySelector<HTMLButtonElement>('.tour-object-row')!;
+  expect(row.title).toBe('Authored instruction');
+  await act(async () => row.click());
+  expect(host.querySelector('#guide-inspector-panel')!.getAttribute('aria-label')).toBe(
+    'Authored instruction'
+  );
+  expect(getTourHotspots(slide)[0]!.label).toBe('Go first');
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it('returns batch AI to the document category and original trigger focus', async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  const access: ScenarioNarrationAccess = {
+    prepareNarration: vi.fn(async () => {
+      throw new Error('Unexpected generation');
+    }),
+    applyNarration: vi.fn(async () => false),
+  };
+  const project = fixture();
+  const slide = project.tour!.slides[1]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  getTourHotspots(slide)[0]!.text = 'Narrate this authored instruction';
+  const original = structuredClone(project);
+  await act(async () => root.render(<Probe initial={project} narrationAI={access} />));
+  await act(async () => panelState.openRight('document'));
+  await click('Playback', host.querySelector('#guide-inspector-panel')!);
+  const category = [
+    ...host.querySelectorAll<HTMLButtonElement>('#guide-inspector-panel button'),
+  ].find((node) => node.title === 'Playback' || node.textContent?.trim() === 'Playback')!;
+  expect(category.getAttribute('aria-pressed')).toBe('true');
+  const trigger = host.querySelector<HTMLButtonElement>('[data-ai-batch]')!;
+  expect(trigger.disabled).toBe(false);
+  await act(async () => trigger.focus());
+  await act(async () => trigger.click());
+  const form = host.querySelector<HTMLElement>('[data-tour-narration-ai]')!;
+  expect(form).not.toBeNull();
+  expect(document.activeElement).toBe(form);
+  expect(host.querySelector('#guide-inspector-panel')!.getAttribute('aria-label')).toBe(
+    'AI narration'
+  );
+  expect(panelState.rightScope).toBe('document');
+  expect(host.querySelector<HTMLButtonElement>('[data-ai-generate]')!.disabled).toBe(true);
+  await click('Back to slide settings', host.querySelector('#guide-inspector-panel')!);
+  await act(async () => frames.splice(0).forEach((callback) => callback(0)));
+  expect(host.querySelector('[data-tour-narration-ai]')).toBeNull();
+  expect(host.querySelector('#guide-inspector-panel')!.getAttribute('aria-label')).toBe(
+    'Tour appearance'
+  );
+  expect(panelState.rightScope).toBe('document');
+  expect(host.querySelector('input[aria-label="Minimum"]')).not.toBeNull();
+  expect(category.getAttribute('aria-pressed')).toBe('true');
+  expect(document.activeElement).toBe(trigger);
+  expect(current).toEqual(original);
+  expect(changed).not.toHaveBeenCalled();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(access.applyNarration).not.toHaveBeenCalled();
+});
+
+it('restores the single-action AI trigger after closing its form', async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
+  const access: ScenarioNarrationAccess = {
+    prepareNarration: vi.fn(async () => {
+      throw new Error('Unexpected generation');
+    }),
+    applyNarration: vi.fn(async () => false),
+  };
+  const project = fixture();
+  const slide = project.tour!.slides[1]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  getTourHotspots(slide)[0]!.text = 'Single authored instruction';
+  await act(async () => root.render(<Probe initial={project} narrationAI={access} />));
+  await click('2Second');
+  await click('Actions', host.querySelector('#guide-inspector-panel')!);
+  await click('Single authored instruction');
+  await click('Narration', host.querySelector('#guide-inspector-panel')!);
+  const original = structuredClone(current);
+  const trigger = host.querySelector<HTMLButtonElement>('[data-ai-single]')!;
+  expect(trigger.disabled).toBe(false);
+  await act(async () => trigger.focus());
+  await act(async () => trigger.click());
+  expect(trigger.isConnected).toBe(false);
+  expect(host.querySelector('[data-tour-narration-ai]')!.getAttribute('aria-label')).toBe(
+    'AI narration'
+  );
+  expect(host.querySelector<HTMLButtonElement>('[data-ai-generate]')!.disabled).toBe(true);
+  expect(panelState.rightScope).toBe('selection');
+  await click('Back to slide settings', host.querySelector('#guide-inspector-panel')!);
+  await act(async () => frames.splice(0).forEach((callback) => callback(0)));
+  const restored = host.querySelector<HTMLButtonElement>('[data-ai-single]')!;
+  expect(restored).not.toBe(trigger);
+  expect(document.activeElement).toBe(restored);
+  expect(host.querySelector('#guide-inspector-panel')!.getAttribute('aria-label')).toBe(
+    'Single authored instruction'
+  );
+  expect(current).toEqual(original);
+  expect(getTourHotspots(slide)[0]!.label).toBe('Go first');
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it.each([
+  [' \n Authored annotation \nMore detail', 'Authored annotation'],
+  [' \n ', 'Text action'],
+])('projects annotation title %s without changing source data', async (text, title) => {
+  const project = fixture();
+  const slide = project.tour!.slides[1]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.actions.push({
+    type: 'annotation',
+    object: { id: 'note', text, anchor: null, appearance: null },
+  });
+  const original = structuredClone(project);
+  await render(project);
+  await click('2Second');
+  await click('Actions', host.querySelector('#guide-inspector-panel')!);
+  const row = [...host.querySelectorAll<HTMLButtonElement>('.tour-object-row')].find(
+    (node) => node.title === title
+  )!;
+  expect(row).not.toBeUndefined();
+  await act(async () => row.click());
+  expect(host.querySelector('#guide-inspector-panel')!.getAttribute('aria-label')).toBe(title);
+  expect(getTourHotspots(slide)[0]!.label).toBe('Go first');
+  expect(current).toEqual(original);
   expect(changed).not.toHaveBeenCalled();
 });

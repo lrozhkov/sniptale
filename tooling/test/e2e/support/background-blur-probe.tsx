@@ -4,7 +4,7 @@ import { ReviewBackgroundBlurPreview } from '../../../../apps/extension/src/gall
 import { drawReviewBackgroundPaint } from '../../../../apps/extension/src/workflows/video-review/scene-background';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { computeQuickEditSceneLayout } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import type { QuickEditBackgroundSettings } from '../../../../apps/extension/src/features/video/review/advanced/types';
 
 /** Real SVG decode, shared live raster and export scene, including camera exposure passes. */

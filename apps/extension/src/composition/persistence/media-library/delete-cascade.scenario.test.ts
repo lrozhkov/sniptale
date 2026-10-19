@@ -277,14 +277,26 @@ it('removes a published audio resource, narration and history on direct permanen
   const project = createGuideProject('Audio guide', 'audio-scenario', 1);
   const tour = createTourDocument('audio-tour');
   const slide = createTourImageSlide('audio-slide');
-  slide.narration = {
-    assetId: 'audio-child',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  slide.actions.unshift({
+    type: 'annotation',
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'audio-child',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   tour.audioResources = [{ assetId: 'audio-child', duration: 2, name: 'Voice' }];
   project.tour = tour;

@@ -1,3 +1,7 @@
+import {
+  getTourHotspots,
+  getTourAnnotations,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -40,7 +44,7 @@ export function useTourSelection(
     tour?.slides.find((entry) => entry.id === rememberedSlide?.slideId) ?? tour?.slides[0] ?? null;
   const objects =
     slide?.kind === 'image'
-      ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+      ? [...getTourHotspots(slide), ...getTourAnnotations(slide), ...slide.masks]
       : (slide?.buttons ?? []);
   const selection: TourSelection | null =
     remembered?.kind === 'end'

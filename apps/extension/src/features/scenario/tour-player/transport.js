@@ -1,9 +1,5 @@
 const SVG = 'http://www.w3.org/2000/svg';
 const FACES = {
-  manual: {
-    fill: 'none',
-    d: 'M8 13V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 7-7 7-3 0-5-2-7-5l-3-4a2 2 0 0 1 3-2l2 2',
-  },
   play: { fill: 'currentColor', d: 'M8 5v14l11-7z' },
   pause: { fill: 'currentColor', d: 'M7 5h4v14H7zm6 0h4v14h-4z' },
   retry: { fill: 'none', d: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
@@ -11,6 +7,12 @@ const FACES = {
   contents: { fill: 'none', d: 'M3 4h18v16H3zM14 4v16M17 8h1M17 12h1M17 16h1' },
   previous: { fill: 'none', d: 'm15 18-6-6 6-6' },
   next: { fill: 'none', d: 'm9 18 6-6-6-6' },
+  hints: {
+    fill: 'none',
+    d:
+      'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7' +
+      'a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z',
+  },
 };
 
 // Lucide Play, Pause, RotateCcw and X geometry matches the surrounding editor controls.
@@ -31,31 +33,25 @@ const NARRATION_FACES = {
 };
 
 /** Disposable transport DOM; elapsed time and navigation remain owned by the player. */
-export function createTourTransport(root, labels, signal, onToggle, onSeek, onManual) {
+export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   const document = root.ownerDocument;
   const close = root.querySelector('[data-tour-hint-close]');
   close?.replaceChildren(createIcon(document, NARRATION_FACES.close));
-  for (const name of ['contents', 'previous', 'next']) {
+  for (const name of ['contents', 'previous', 'next', 'hints', 'hint-previous', 'hint-next']) {
     const control = root.querySelector(`[data-tour-${name}]`);
     if (!control) continue;
-    control.replaceChildren(createIcon(document, FACES[name]));
+    control.replaceChildren(createIcon(document, FACES[name.replace('hint-', '')]));
     control.classList.add('tour-icon-button');
-    control.setAttribute('aria-label', labels[name]);
-    control.title = labels[name];
+    if (name !== 'hints') {
+      control.setAttribute('aria-label', labels[name.replace('hint-', '')]);
+      control.title = labels[name.replace('hint-', '')];
+    }
   }
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'tour-button tour-icon-button';
   button.dataset.tourPlay = '';
   button.addEventListener('click', onToggle, { signal });
-  const manual = document.createElement('button');
-  manual.type = 'button';
-  manual.className = 'tour-button tour-icon-button';
-  manual.dataset.tourManual = '';
-  manual.title = labels.manual ?? 'Manual navigation';
-  manual.setAttribute('aria-label', manual.title);
-  manual.append(createIcon(document, FACES.manual));
-  manual.addEventListener('click', onManual, { signal });
   const label = document.createElement('span');
   label.className = 'tour-playback-label';
   const time = document.createElement('span');
@@ -71,12 +67,10 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek, onMa
   range.addEventListener('input', () => onSeek(Number(range.value)), { signal });
   const status = root.querySelector('[data-tour-status]');
   const playback = root.querySelector('[data-tour-playback]');
-  playback.append(manual, button, time, range);
+  playback.append(button, time, range);
   signal.addEventListener('abort', () => playback.replaceChildren(), { once: true });
   return ({ elapsed, duration, playing, state, mode }) => {
     root.dataset.tourMode = mode;
-    manual.setAttribute('aria-pressed', String(mode === 'manual'));
-    manual.disabled = state === 'empty';
     const face = transportFace(state, playing);
     const text =
       state === 'error' || state === 'audio-error'

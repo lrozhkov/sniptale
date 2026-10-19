@@ -1,3 +1,4 @@
+import { assertScenarioSpeechScope } from '../scenario/speech-scope';
 import { sameReviewSourceIdentity } from '../../../features/video/review/source-identity';
 import { readLibrarySceneSource } from '../projects/library-scene-source';
 import { readVideoWorkspace } from '../review-workspaces/store';
@@ -12,6 +13,7 @@ import {
   isAudioSourceJobScope,
   isProjectAudioJobScope,
   isProjectAudioTextJobScope,
+  isScenarioSpeechScope,
   parseAudioJobScope,
   sameAudioJobScope,
   type AudioJobScope,
@@ -80,6 +82,10 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
   if (isProjectAudioJobScope(scope)) {
     if (isProjectAudioTextJobScope(scope)) await readVideoProjectTextAudioTarget(scope);
     else await readVideoProjectAudioTarget(scope);
+    return;
+  }
+  if (isScenarioSpeechScope(scope)) {
+    await assertScenarioSpeechScope(scope);
     return;
   }
   const snapshot = await readVideoWorkspace(scope.workspaceId);
@@ -198,6 +204,7 @@ export async function readAudioStaging(
   scope: AudioJobScope
 ): Promise<File> {
   validateId(handle.id);
+  if (isScenarioSpeechScope(scope)) await assertScenarioSpeechScope(scope);
   const root = await directory(false);
   return navigator.locks.request(`sniptale:audio-staging:${handle.id}`, async () => {
     if (isProjectAudioJobScope(scope)) await assertScopeExists(scope);
@@ -227,6 +234,7 @@ export async function readAudioStaging(
     const file = await (await root.getFileHandle(handle.id)).getFile();
     if (file.size !== size) throw new Error('Incomplete audio staging.');
     if (isProjectAudioTextJobScope(scope)) await assertScopeExists(scope);
+    if (isScenarioSpeechScope(scope)) await assertScenarioSpeechScope(scope);
     return new File([file], mimeType === 'audio/wav' ? 'audio.wav' : 'audio.mp3', {
       type: mimeType,
     });

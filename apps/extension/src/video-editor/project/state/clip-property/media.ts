@@ -1,4 +1,4 @@
-import { parseWindowHeader } from '../../../../features/browser-frame/header';
+import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
   activeCameraPosition,

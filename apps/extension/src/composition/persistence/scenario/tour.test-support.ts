@@ -17,14 +17,26 @@ export function tourProject() {
     alt: 'image',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.narration = {
-    assetId: 'audio',
-    duration: 3,
-    trimStart: 0,
-    trimEnd: 3,
-    gain: 1,
-    transcript: 'hello',
-  };
+  slide.actions.unshift({
+    type: 'annotation',
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'audio',
+          duration: 3,
+          trimStart: 0,
+          trimEnd: 3,
+          gain: 1,
+          transcript: 'hello',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   tour.slides = [slide];
   project.tour = tour;
   return project;

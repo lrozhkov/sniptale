@@ -2636,3 +2636,29 @@ html[data-guide-height-resizing] * {
     --guide-voice-accessory-space: var(--guide-voice-active-space);
   }
 }
+
+/* The existing panel remains the scroll owner; its category rail stays in view. */
+.guide-page .tour-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+/* The complete field owns hover, including the path to its accessories. */
+.sniptale-scenario-workspace
+  .guide-voice-field:is(:hover, :focus-within)
+  > :is(input, textarea):not(:disabled) {
+  border-color: var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-input);
+}
+.sniptale-scenario-workspace .guide-voice-field > .guide-voice-control {
+  top: 4px;
+}
+
+.guide-page .tour-inspector-panel > .guide-panel-heading > .tour-inspector-back {
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+}

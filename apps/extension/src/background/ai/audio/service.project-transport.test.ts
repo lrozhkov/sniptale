@@ -84,7 +84,7 @@ function setup(mode: 'multipart' | 'audio-chat') {
     createId: () => ticket,
   });
   const messages: AudioJobServerMessage[] = [];
-  const connection = service.connect((message) => messages.push(message));
+  const connection = service.connect((message) => messages.push(message), 'project');
   return { saved, request, config, wav, resolveModel, discard, messages, connection };
 }
 

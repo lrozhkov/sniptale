@@ -1,7 +1,7 @@
 import {
   windowHeaderGeometry,
   DEFAULT_WINDOW_HEADER,
-} from '../../../features/browser-frame/header';
+} from '@sniptale/runtime-contracts/window-header';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_BROWSER_FRAME_STATE,

@@ -14,7 +14,7 @@ import {
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
-import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { reviewCutTransitionAt } from '../../../../apps/extension/src/features/video/review/cuts';
 import {

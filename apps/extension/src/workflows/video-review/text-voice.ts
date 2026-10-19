@@ -18,7 +18,7 @@ import {
   type ReviewTextTakePreview,
   type ReviewTextTakeOptions,
 } from './text-take';
-import { runReviewSpeechJob } from './speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import { applyReviewTextTakeBatch } from './text-take-batch';
 
 import type { createVideoReviewSession } from './session';

@@ -1,3 +1,5 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -360,31 +362,54 @@ it('copies tour images once across representations and independently copies narr
     alt: '',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.narration = {
-    assetId: 'source-audio',
-    duration: 3,
-    trimStart: 0,
-    trimEnd: 3,
-    gain: 1,
-    transcript: 'voice',
-  };
-  slide.hotspots = [
-    {
-      id: 'hotspot',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Again',
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
       text: '',
-      action: { kind: 'slide', slideId: 'slide' },
+      anchor: null,
       appearance: null,
-      pulse: true,
+      narration: {
+        ...{
+          assetId: 'source-audio',
+          duration: 3,
+          trimStart: 0,
+          trimEnd: 3,
+          gain: 1,
+          transcript: 'voice',
+        },
+        trigger: 'enter' as const,
+      },
     },
+  });
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'hotspot',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Again',
+        text: '',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: true },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
-  slide.hotspots[0]!.narration = { ...slide.narration, trigger: 'activation' };
+  getTourHotspots(slide)[0]!.narration = {
+    ...slide.actions[0]!.object.narration!,
+    trigger: 'activation' as const,
+  };
   source.tour.audioResources = [{ assetId: 'detached-audio', duration: 3, name: 'Unused.wav' }];
   source.tour.slides = [slide];
   source.tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'source-audio', duration: 3 });
   source.tour.stage.image = structuredClone(slide.image);
+  source.tour.stage.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'application',
+    title: 'Window',
+  };
+  slide.imagePlacement = { center: { x: 0.3, y: 0.7 }, zoom: 2 };
   const image = await io.asset('source-image');
   io.asset.mockImplementation(async (id) =>
     id === 'source-audio' || id === 'detached-audio'
@@ -408,16 +433,91 @@ it('copies tour images once across representations and independently copies narr
   if (copied?.kind !== 'image') throw new Error('Expected tour image');
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
   expect(result.tour?.stage.image).toEqual(copied.image);
+  expect(result.tour?.stage.windowHeader).toEqual(source.tour.stage.windowHeader);
+  expect(copied.imagePlacement).toEqual(slide.imagePlacement);
   expect(result.tour?.stage.image?.editDocumentId).not.toBe('source-document');
   expect(source.tour.stage.image?.assetId).toBe('source-image');
-  expect(copied.narration?.assetId).not.toBe('source-audio');
-  expect(result.tour?.backgroundMusic?.assetId).toBe(copied.narration?.assetId);
+  expect(copied.actions[0]!.object.narration?.assetId).not.toBe('source-audio');
+  expect(result.tour?.backgroundMusic?.assetId).toBe(copied.actions[0]!.object.narration?.assetId);
   expect(source.tour.backgroundMusic.assetId).toBe('source-audio');
-  expect(copied.hotspots[0]?.action).toEqual({ kind: 'slide', slideId: copied.id });
-  expect(copied.hotspots[0]!.narration?.assetId).toBe(copied.narration?.assetId);
-  expect(copied.hotspots[0]!.narration?.trigger).toBe('activation');
+  expect(getTourHotspots(copied)[0]?.visual).toEqual({ kind: 'point', pulse: true });
+  expect(getTourHotspots(copied)[0]!.narration?.assetId).toBe(
+    copied.actions[0]!.object.narration?.assetId
+  );
+  expect(getTourHotspots(copied)[0]!.narration?.trigger).toBe('activation');
   expect(result.tour!.audioResources).toHaveLength(2);
   expect(result.tour!.audioResources![0]!.assetId).not.toBe('detached-audio');
   expect(io.write).toHaveBeenCalledTimes(3);
   expect(source.tour.slides[0]?.id).toBe('slide');
+});
+
+it('duplicates an editable tour with a deleted action link without losing the orphan destination', async () => {
+  const { createTourDocument, createTourImageSlide } =
+    await import('../../../../../features/scenario/project/public');
+  const { applyTourCommands } =
+    await import('../../../../../features/scenario/project/tour-commands');
+  const { parseGuideProject } = await import('@sniptale/runtime-contracts/scenario/guide-parser');
+  const initial = createGuideProject('Source', 'source', 100);
+
+  const slide = createTourImageSlide('image');
+  slide.actions = ['removed-action', 'retained-action'].map((id) => ({
+    type: 'annotation' as const,
+    object: { id, text: id, anchor: null, appearance: null },
+  }));
+  const tour = createTourDocument('tour');
+  tour.slides = [
+    {
+      kind: 'navigation',
+      id: 'contents',
+      title: 'Contents',
+      description: '',
+      background: { color: '#ffffff', image: null },
+      narration: null,
+      timing: slide.timing,
+      buttons: slide.actions.map(({ object }) => ({
+        id: `link-${object.id}`,
+        label: object.text,
+        action: { kind: 'action' as const, actionId: object.id },
+      })),
+    },
+    slide,
+  ];
+
+  initial.tour = tour;
+  expect(parseGuideProject(initial).status).toBe('ok');
+  const source = applyTourCommands(
+    initial,
+    [
+      {
+        kind: 'replace-slide',
+        slideId: slide.id,
+        slide: { ...slide, actions: slide.actions.slice(1) },
+      },
+    ],
+    { images: [], audio: [] }
+  );
+  expect(parseGuideProject(source).status).toBe('ok');
+  const before = structuredClone(source);
+  io.commit.mockImplementation(async (project) => {
+    expect(parseGuideProject(project).status).toBe('ok');
+    return { project, workspaceRevision: 0 };
+  });
+  const { project: copied } = await duplicateScenarioProjectRecord(source, 'Copy');
+  const copy = copied.tour!;
+
+  const contents = copy.slides[0]!;
+  const image = copy.slides[1]!;
+  if (contents.kind !== 'navigation' || image.kind !== 'image') throw new Error('Invalid fixture');
+  expect(contents.buttons[0]!.action).toEqual({ kind: 'action', actionId: 'removed-action' });
+  expect(contents.buttons[1]!.action).toEqual({
+    kind: 'action',
+    actionId: image.actions[0]!.object.id,
+  });
+  expect(image.actions[0]!.object.id).not.toBe('retained-action');
+
+  expect(parseGuideProject(copied).status).toBe('ok');
+  expect(source).toEqual(before);
+  expect(io.asset).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit).toHaveBeenCalledOnce();
 });

@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../../platform/i18n';
-import { prepareTourHtml, saveTourHtml, type PreparedTourHtml } from '../runtime/tour-html';
+import {
+  prepareTourHtml,
+  saveTourHtml,
+  TourHtmlPreparationError,
+  type TourHtmlBlocker,
+  type PreparedTourHtml,
+} from '../runtime/tour-html';
 import type { TourHtmlImageOptions } from '../runtime/tour-html-images';
 import { tourPlayerLabels } from './labels';
 
@@ -11,46 +17,62 @@ export function useTourHtmlExport(
   options: TourHtmlImageOptions,
   t: Translate
 ) {
+  // Autosave acknowledgment changes object identity and timestamps without changing export content.
+  const content = useMemo(
+    () =>
+      JSON.stringify({ ...project, updatedAt: 0 }, (_key, value: unknown) =>
+        value !== null && typeof value === 'object' && !Array.isArray(value)
+          ? Object.fromEntries(
+              Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+            )
+          : value
+      ),
+    [project]
+  );
   const [prepared, setPrepared] = useState<{
     artifact: PreparedTourHtml;
-    project: GuideProject;
+    content: string;
     options: TourHtmlImageOptions;
     version: number;
   } | null>(null);
   const [status, setStatus] = useState<
     'idle' | 'preparing' | 'saving' | 'failed' | 'saved' | 'history-failed'
   >('idle');
+  const [blocker, setBlocker] = useState<TourHtmlBlocker | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const version = useRef(0);
   const current = useRef<AbortController | null>(null);
-  const snapshot = useRef({ project, options });
-  snapshot.current = { project, options };
-  const ready = prepared?.project === project && prepared.options === options ? prepared : null;
+  const snapshot = useRef({ content, options });
+  snapshot.current = { content, options };
+  const ready = prepared?.content === content && prepared.options === options ? prepared : null;
   useEffect(() => {
     current.current?.abort();
     current.current = null;
     setPrepared(null);
     setStatus('idle');
+    setBlocker(null);
     return () => {
       current.current?.abort();
       current.current = null;
     };
-  }, [project, options]);
+  }, [content, options]);
   const cancel = () => {
     current.current?.abort();
     current.current = null;
     setStatus('idle');
+    setBlocker(null);
   };
   const run = async (save: boolean) => {
     if (current.current || (save && !ready)) return;
     const controller = new AbortController();
     current.current = controller;
     setStatus(save ? 'saving' : 'preparing');
+    setBlocker(null);
     if (!save) setPrepared(null);
     const valid = () =>
       !controller.signal.aborted &&
       current.current === controller &&
-      snapshot.current.project === project &&
+      snapshot.current.content === content &&
       snapshot.current.options === options;
     try {
       if (save && ready) {
@@ -67,15 +89,26 @@ export function useTourHtmlExport(
           },
         });
         if (!valid()) return;
-        setPrepared({ artifact, project, options, version: ++version.current });
+        setPrepared({ artifact, content, options, version: ++version.current });
         setStatus('idle');
+        setBlocker(null);
       }
     } catch (error) {
-      if (valid())
+      if (valid()) {
         setStatus(error instanceof DOMException && error.name === 'AbortError' ? 'idle' : 'failed');
+        setBlocker(error instanceof TourHtmlPreparationError ? error.blocker : null);
+      }
     } finally {
       if (current.current === controller) current.current = null;
     }
   };
-  return { ready, status, progress, cancel, prepare: () => run(false), save: () => run(true) };
+  return {
+    ready,
+    status,
+    blocker,
+    progress,
+    cancel,
+    prepare: () => run(false),
+    save: () => run(true),
+  };
 }

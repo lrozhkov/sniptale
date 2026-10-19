@@ -4,7 +4,7 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
 } from '../../features/video/review/advanced/scene';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 it('paints the observed path and authored area in the fitted video while the held halo stays filled', () => {
   const context = {

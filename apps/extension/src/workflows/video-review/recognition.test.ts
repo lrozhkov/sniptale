@@ -27,7 +27,7 @@ const remote = vi.hoisted(() => ({
     })
   ),
 }));
-vi.mock('./speech-client', () => ({ runReviewSpeechJob: remote.job }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: remote.job }));
 vi.mock('./speech-audio', () => ({
   extractReviewSpeechWav: remote.extract,
   planReviewSpeechChunks: remote.plan,

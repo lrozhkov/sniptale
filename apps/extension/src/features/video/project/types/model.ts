@@ -1,5 +1,5 @@
 import type { CameraAppearance } from '../camera/appearance';
-import type { VideoProjectVoiceTextSnapshot } from '../text/voice-take';
+import type { VideoProjectVoiceTextSnapshot } from '../text/types';
 import type { VideoMediaFitMode } from './media';
 import type {
   VideoProjectActionEvent,

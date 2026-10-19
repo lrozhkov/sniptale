@@ -7,7 +7,7 @@ import {
 import { createVideoClipFromAsset } from '../../features/video/project/factories/clip';
 import { getVideoProject } from '../../composition/persistence/projects';
 import { readVideoProjectAudioSource } from '../../composition/persistence/projects/audio-source';
-import { runReviewSpeechJob } from '../video-review/speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import { extractReviewSpeechWav, planReviewSpeechChunks } from '../video-review/speech-audio';
 import {
   prepareProjectRecognition,
@@ -21,7 +21,7 @@ vi.mock('../../composition/persistence/projects', () => ({ getVideoProject: vi.f
 vi.mock('../../composition/persistence/projects/audio-source', () => ({
   readVideoProjectAudioSource: vi.fn(),
 }));
-vi.mock('../video-review/speech-client', () => ({ runReviewSpeechJob: vi.fn() }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: vi.fn() }));
 vi.mock('../video-review/speech-audio', () => ({
   extractReviewSpeechWav: vi.fn(),
   planReviewSpeechChunks: vi.fn(),

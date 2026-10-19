@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { ReviewStageFocusControl } from './stage-focus';
 import {
   computeQuickEditSceneLayout,

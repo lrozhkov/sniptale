@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { drawReviewSceneFrame } from './scene-frame';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 
 it.each(['none', 'publish', 'background', 'overlay'] as const)(
   'forwards managed backing to real header/exposure helpers and releases on failure=%s',

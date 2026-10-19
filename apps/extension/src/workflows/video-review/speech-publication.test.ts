@@ -19,7 +19,7 @@ vi.mock('../../composition/persistence/projects', () => ({ prepareProjectAsset: 
 vi.mock('../../composition/persistence/projects/voiceover-publication-lock', () => ({
   withVoiceoverAttachmentLock: (_id: string, fn: () => Promise<void>) => fn(),
 }));
-vi.mock('./speech-client', () => ({ runReviewSpeechJob: mocks.job }));
+vi.mock('../audio-jobs/client', () => ({ runReviewSpeechJob: mocks.job }));
 vi.mock('./speech-audio', () => ({ decodeReviewSpeechDuration: mocks.decode }));
 vi.mock('../../composition/persistence/assets/audio-staging', () => ({
   readAudioStaging: mocks.read,

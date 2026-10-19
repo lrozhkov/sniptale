@@ -18,9 +18,9 @@ it('keeps the independent tour in current and retained snapshots through metadat
 });
 it('refuses unsupported nested tours and tour-bearing step templates', () => {
   const project = tourProject();
-  expect(parseGuideProject({ ...project, tour: { ...project.tour, version: 2 } })).toEqual({
+  expect(parseGuideProject({ ...project, tour: { ...project.tour, version: 1 } })).toEqual({
     status: 'unsupported',
-    version: 2,
+    version: 1,
     representation: 'tour',
   });
   expect(parseGuideProject({ ...project, purpose: 'step-template' }).status).toBe('invalid');

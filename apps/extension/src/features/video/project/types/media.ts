@@ -1,4 +1,4 @@
-import type { WindowHeader } from '../../../browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 
 /** Bounded, source-time amplitude envelope stored with each media asset. */
 export const MAX_VIDEO_PROJECT_AUDIO_PEAKS = 30_000;

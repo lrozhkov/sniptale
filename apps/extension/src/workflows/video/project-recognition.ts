@@ -18,7 +18,7 @@ import {
   planReviewSpeechChunks,
   reviewSpeechWavIsSilent,
 } from '../video-review/speech-audio';
-import { runReviewSpeechJob } from '../video-review/speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import {
   recognitionFragments,
   reviewRecognitionPhrases,

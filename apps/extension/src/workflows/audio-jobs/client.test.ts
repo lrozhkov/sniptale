@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { runReviewSpeechJob } from './speech-client';
+import { runReviewSpeechJob } from './client';
 vi.mock('../../composition/persistence/assets/audio-staging', () => ({
   writeAudioStaging: staging.write,
   discardAudioStaging: staging.discard,
@@ -453,3 +453,86 @@ it.each(['cancel', 'disconnect', 'unexpected-upload'] as const)(
     expect(staging.write).not.toHaveBeenCalled();
   }
 );
+
+it('waits for Scenario cancellation acknowledgement before settling the paid operation', async () => {
+  const job = connectedJob();
+  const controller = new AbortController();
+  const start = {
+    type: 'start' as const,
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'p',
+    operation: 'speech' as const,
+    scope: {
+      workspaceId: 's',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text' as const, slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+    text: 'text',
+    profile: { voiceId: 'alloy', responseFormat: 'wav' as const },
+  };
+  const promise = runReviewSpeechJob(start, { signal: controller.signal });
+  let settled = false;
+  void promise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    }
+  );
+  controller.abort();
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  expect(job.postMessage).toHaveBeenLastCalledWith({ type: 'cancel', requestId: 'r' });
+  job.receive({ type: 'failure', requestId: 'r', code: 'cancelled' });
+  await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+});
+it('discards a Scenario output that crossed cancellation before releasing Apply admission', async () => {
+  const job = connectedJob();
+  const controller = new AbortController();
+  const scope = {
+    workspaceId: 's',
+    workspaceRevision: 1,
+    target: { kind: 'scenario-text' as const, slideId: 'slide', objectId: 'action' },
+    sourceTextHash: 'a'.repeat(64),
+  };
+  const staged = { id: '12345678-1234-4234-8234-123456789abc', mimeType: 'audio/wav', size: 4 };
+  let release!: () => void;
+  staging.discard.mockImplementationOnce(
+    () =>
+      new Promise<undefined>((resolve) => {
+        release = () => resolve(undefined);
+      })
+  );
+  const promise = runReviewSpeechJob(
+    {
+      type: 'start',
+      requestId: 'r',
+      modelId: 'm',
+      approvedProviderId: 'p',
+      operation: 'speech',
+      scope,
+      text: 'text',
+      profile: { voiceId: 'alloy', responseFormat: 'wav' },
+    },
+    { signal: controller.signal }
+  );
+  let settled = false;
+  void promise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    }
+  );
+  controller.abort();
+  job.receive({ type: 'audio', requestId: 'r', staged });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  expect(staging.discard).toHaveBeenLastCalledWith(staged, scope);
+  release();
+  await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+});

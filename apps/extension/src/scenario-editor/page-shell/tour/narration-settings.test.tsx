@@ -10,7 +10,20 @@ vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
 });
-vi.mock('./narration-preview', () => ({ TourNarrationPreview: () => <div data-preview /> }));
+vi.mock('../../../composition/persistence/scenario/store/public', async (original) => ({
+  ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
+  getScenarioAssetBlob: vi.fn(async () => new Blob(['voice'])),
+}));
+vi.mock('./narration-playback', () => ({
+  createNarrationPlayback: (
+    _audio: unknown,
+    _narration: unknown,
+    changed: (value: unknown) => void
+  ) => {
+    changed({ time: 0, playing: false, ready: true, failed: false });
+    return { update: vi.fn(), toggle: vi.fn(), seek: vi.fn() };
+  },
+}));
 vi.mock('./fields', () => ({ TourTextField: () => null }));
 let root: Root;
 let host: HTMLDivElement;
@@ -26,10 +39,20 @@ const narration = {
   gain: 1,
   transcript: '',
 };
-const slide = { ...createTourImageSlide('slide'), narration };
+const slide = {
+  kind: 'navigation' as const,
+  id: 'slide',
+  title: '',
+  description: '',
+  background: { color: '#111827', image: null },
+  buttons: [],
+  narration,
+  timing: createTourImageSlide().timing,
+};
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: vi.fn() });
   host = document.createElement('div');
   recordingHost = document.createElement('div');
   document.body.append(host, recordingHost);
@@ -95,7 +118,7 @@ it('keeps the current narration on failure and permits selecting the same file a
   await render();
   await act(async () => choose());
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
-  expect(host.querySelector('[data-preview]')).not.toBeNull();
+  expect(host.querySelector('[data-tour-narration-preview]')).not.toBeNull();
   await act(async () => choose());
   expect(onImport).toHaveBeenCalledTimes(2);
   expect(host.querySelector('[role="alert"]')).toBeNull();
@@ -114,7 +137,7 @@ it('removes the narration through slide history and disables acquisition during 
   expect(onChange).toHaveBeenCalledWith({ ...slide, narration: null }, undefined);
 });
 
-it('commits trim and amplification through the existing slide edit callback', async () => {
+it('groups integrated trim edits in existing narration history', async () => {
   await render();
   for (const [label, value, key, expected] of [
     ['Start, s', '1', 'trimStart', 1],
@@ -155,14 +178,17 @@ it('opens a recording draft and closes it without altering saved narration', asy
 
 it('edits and unlinks an object binding without altering slide narration', async () => {
   const objectSlide = {
-    ...slide,
-    annotations: [
+    ...createTourImageSlide('slide'),
+    actions: [
       {
-        id: 'hint',
-        text: 'Hint',
-        anchor: null,
-        appearance: null,
-        narration: { ...narration, trigger: 'enter' as const },
+        type: 'annotation' as const,
+        object: {
+          id: 'hint',
+          text: 'Hint',
+          anchor: null,
+          appearance: null,
+          narration: { ...narration, trigger: 'enter' as const },
+        },
       },
     ],
   };
@@ -181,9 +207,8 @@ it('edits and unlinks an object binding without altering slide narration', async
     )
   );
   expect(host.textContent).toContain('Object narration');
-  expect(host.querySelector('[aria-label="Narration starts"]')?.textContent).toContain(
-    'When the slide opens'
-  );
+  expect(host.querySelector('[aria-label="Narration starts"]')).toBeNull();
+  expect(host.textContent).toContain('Narration starts when the action or contents opens.');
   const input = host.querySelector<HTMLInputElement>('input[aria-label="Volume"]')!;
   act(() => {
     input.focus();
@@ -193,9 +218,14 @@ it('edits and unlinks an object binding without altering slide narration', async
   act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      narration,
-      annotations: [
-        expect.objectContaining({ narration: { ...narration, trigger: 'enter', gain: 1.5 } }),
+      narration: null,
+      actions: [
+        {
+          type: 'annotation' as const,
+          object: expect.objectContaining({
+            narration: { ...narration, trigger: 'enter' as const, gain: 1.5 },
+          }),
+        },
       ],
     }),
     'narration:slide:hint'
@@ -203,8 +233,10 @@ it('edits and unlinks an object binding without altering slide narration', async
   act(() => host.querySelector<HTMLButtonElement>('button[title="Unlink narration"]')!.click());
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      narration,
-      annotations: [expect.objectContaining({ narration: null })],
+      narration: null,
+      actions: [
+        { type: 'annotation' as const, object: expect.objectContaining({ narration: null }) },
+      ],
     }),
     undefined
   );
@@ -212,14 +244,17 @@ it('edits and unlinks an object binding without altering slide narration', async
 
 it('chooses a reusable material while preserving the selected object trigger', async () => {
   const objectSlide = {
-    ...slide,
-    annotations: [
+    ...createTourImageSlide('slide'),
+    actions: [
       {
-        id: 'hint',
-        text: 'Hint',
-        anchor: null,
-        appearance: null,
-        narration: { ...narration, trigger: 'enter' as const },
+        type: 'annotation' as const,
+        object: {
+          id: 'hint',
+          text: 'Hint',
+          anchor: null,
+          appearance: null,
+          narration: { ...narration, trigger: 'enter' as const },
+        },
       },
     ],
   };
@@ -244,19 +279,22 @@ it('chooses a reusable material while preserving the selected object trigger', a
   act(() => host.querySelector<HTMLButtonElement>('.tour-audio-picker .tour-audio-name')!.click());
   expect(onChange).toHaveBeenCalledWith(
     expect.objectContaining({
-      narration,
-      annotations: [
-        expect.objectContaining({
-          narration: {
-            assetId: 'other',
-            duration: 3,
-            trimStart: 0,
-            trimEnd: 3,
-            gain: 1,
-            transcript: '',
-            trigger: 'enter',
-          },
-        }),
+      narration: null,
+      actions: [
+        {
+          type: 'annotation' as const,
+          object: expect.objectContaining({
+            narration: {
+              assetId: 'other',
+              duration: 3,
+              trimStart: 0,
+              trimEnd: 3,
+              gain: 1,
+              transcript: '',
+              trigger: 'enter' as const,
+            },
+          }),
+        },
       ],
     }),
     undefined

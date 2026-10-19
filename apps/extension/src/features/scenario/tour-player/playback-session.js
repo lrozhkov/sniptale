@@ -101,6 +101,7 @@ export function createTourPlaybackSession({ signal, motion, hidden, autoplay, ch
     setManual() {
       mode = 'manual';
       pause();
+      if (spec && clock.elapsed < spec.entrance) clock.seek(spec.entrance);
     },
     get elapsed() {
       return clock.elapsed;
@@ -145,6 +146,14 @@ function createTourMediaGate(signal, motion, clock, hidden, pause, resume) {
   let state = 'empty';
   let generation = 0;
   let loading = null;
+  let source = null;
+  function ready() {
+    state = 'ready';
+    motion.ready();
+    clock.seek(clock.elapsed);
+    if (hidden()) pause();
+    else resume();
+  }
   function cancel() {
     generation += 1;
     loading?.abort();
@@ -157,25 +166,28 @@ function createTourMediaGate(signal, motion, clock, hidden, pause, resume) {
     clear() {
       cancel();
       state = 'empty';
+      source = null;
     },
     load(spec) {
+      const retained = state === 'ready' && Boolean(spec.source) && source === spec.source;
       cancel();
+      source = spec.source;
       const token = generation;
-      state = 'loading';
+      state = retained ? 'ready' : 'loading';
       clock.reset(spec.duration);
+      if (retained) {
+        ready();
+        return;
+      }
       loading = new AbortController();
-      const ready =
+      const readiness =
         spec.required && !spec.source
           ? Promise.reject(new Error('Missing image.'))
           : waitForTourImage(spec.source, loading.signal);
-      ready
+      readiness
         .then(() => {
           if (signal.aborted || token !== generation) return;
-          state = 'ready';
-          motion.ready();
-          clock.seek(clock.elapsed);
-          if (hidden()) pause();
-          else resume();
+          ready();
         })
         .catch(() => {
           if (signal.aborted || token !== generation) return;

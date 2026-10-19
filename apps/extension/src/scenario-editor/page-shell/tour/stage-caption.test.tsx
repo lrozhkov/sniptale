@@ -6,7 +6,7 @@ import { createTourDocument } from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
 import { TourStage } from './stage';
 
-it('places the Slides control last in the editor footer', () => {
+it('places the Contents control last in the editor footer', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -26,6 +26,7 @@ it('places the Slides control last in the editor footer', () => {
       )
     );
     const shadow = host.querySelector('.tour-stage-host')!.shadowRoot!;
+    expect(shadow.querySelector('[data-tour-contents]')?.textContent).toBe('Contents');
     expect(shadow.querySelector('[data-tour-hint-point-count]')!.parentElement?.className).toBe(
       'tour-hint-controls'
     );

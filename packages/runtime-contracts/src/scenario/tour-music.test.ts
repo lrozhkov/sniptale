@@ -3,7 +3,7 @@ import { parseTourDocument } from './tour-parser';
 import { createTourBackgroundMusic, type TourDocument } from './types/tour';
 function document(): TourDocument {
   return {
-    version: 1,
+    version: 2,
     id: 'tour',
     stage: { aspect: '16:9', background: '#000000' },
     style: {
@@ -68,7 +68,7 @@ it('rejects malformed music and conflicting media identity while permitting shar
       description: '',
       background: { color: '#000000', image: null },
       buttons: [],
-      timing: { mode: 'auto', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+      timing: { mode: 'auto', holdSeconds: 4, truncateNarration: false },
       narration: {
         assetId: 'audio',
         duration: 4,

@@ -6,7 +6,7 @@ import interfaceLicense from '@sniptale/ui/styles/interface-font-license?raw';
 import documentLicense from '@sniptale/ui/styles/document-font-license?raw';
 import interfaceFont from '@sniptale/ui/styles/interface-font?inline';
 import documentFont from '@sniptale/ui/styles/document-font?inline';
-import { createTourDocument } from '../project/factories';
+import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { buildTourPlayerHtml, type TourPlayerLabels } from './document';
 const labels: TourPlayerLabels = {
   expand: 'Expand explanation',
@@ -30,7 +30,27 @@ const labels: TourPlayerLabels = {
 };
 
 function fixture() {
-  return { tour: createTourDocument('fonts'), title: 'Fonts', labels, assets: [] };
+  const tour = createTourDocument('fonts');
+  const slide = createTourImageSlide('font-slide');
+  slide.image = {
+    assetId: 'font-image',
+    galleryAssetId: null,
+    editDocumentId: null,
+    width: 1,
+    height: 1,
+    alt: '',
+    source: { kind: 'import', filename: 'font.png' },
+  };
+  slide.actions = [
+    { type: 'annotation', object: { id: 'font-action', text: '', anchor: null, appearance: null } },
+  ];
+  tour.slides = [slide];
+  return {
+    tour,
+    title: 'Fonts',
+    labels,
+    assets: [{ id: 'font-image', mime: 'image/png', base64: 'AA==' }],
+  };
 }
 
 it('embeds bundled variable fonts, roles and licenses without executable content', async () => {

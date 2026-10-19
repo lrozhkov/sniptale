@@ -1,6 +1,6 @@
 import type { VideoProjectTextRewriteController } from '../../../runtime/session/text-rewrite';
 import type { VideoProjectRecognitionController } from '../../../runtime/session/recognition';
-import type { WindowHeader } from '../../../../features/browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { VideoEditorSessionActions } from '../../../contracts/commands/session';

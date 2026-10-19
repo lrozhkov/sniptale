@@ -1,4 +1,5 @@
-.sniptale-disclosure > summary {
+.sniptale-disclosure > summary,
+.sniptale-disclosure-trigger {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -14,26 +15,32 @@
 .sniptale-disclosure > summary::-webkit-details-marker {
   display: none;
 }
-.sniptale-disclosure > summary > :is(h3, h4, span) {
+.sniptale-disclosure > summary > :is(h3, h4, span),
+.sniptale-disclosure-trigger > span {
   flex: 1;
   min-width: 0;
   margin: 0;
   font: inherit;
   overflow-wrap: anywhere;
 }
-.sniptale-disclosure > summary > svg {
+.sniptale-disclosure > summary > svg,
+.sniptale-disclosure-trigger > svg {
   flex: none;
 }
-.sniptale-disclosure > summary > svg:last-child {
+.sniptale-disclosure > summary > svg:last-child,
+.sniptale-disclosure-trigger > svg:last-child {
   transition: transform 120ms ease;
 }
-.sniptale-disclosure[open] > summary > svg:last-child {
+.sniptale-disclosure[open] > summary > svg:last-child,
+.sniptale-disclosure-trigger[aria-expanded='true'] > svg:last-child {
   transform: rotate(180deg);
 }
-.sniptale-disclosure > summary:hover {
+.sniptale-disclosure > summary:hover,
+.sniptale-disclosure-trigger:hover {
   color: var(--sniptale-color-text-primary);
 }
-.sniptale-disclosure > summary:focus-visible {
+.sniptale-disclosure > summary:focus-visible,
+.sniptale-disclosure-trigger:focus-visible {
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }
@@ -50,7 +57,16 @@
   margin-top: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .sniptale-disclosure > summary > svg:last-child {
+  .sniptale-disclosure > summary > svg:last-child,
+  .sniptale-disclosure-trigger > svg:last-child {
     transition: none;
   }
+}
+
+.sniptale-disclosure-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: start;
 }

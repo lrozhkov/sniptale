@@ -62,7 +62,7 @@ function wav(): File {
   view.setUint32(40, 32000, true);
   return new File([bytes], 'audio.wav', { type: 'audio/wav' });
 }
-function setup() {
+function setup(consumer: import('./authorization').AudioJobConsumer = 'gallery') {
   const deps = {
     authorize: vi.fn(async (): Promise<void> => undefined),
     resolveModel: vi.fn(async () => config),
@@ -77,7 +77,7 @@ function setup() {
   };
   const service = createAudioJobService(deps);
   const messages: AudioJobServerMessage[] = [];
-  const connection = service.connect((message) => messages.push(message));
+  const connection = service.connect((message) => messages.push(message), consumer);
   return { deps, service, messages, connection };
 }
 async function authorized(job: ReturnType<typeof setup>) {
@@ -408,7 +408,7 @@ it('project tickets refuse stale uploads before POST and cannot replay', async (
       nativeEnd: 1,
     },
   };
-  const job = setup();
+  const job = setup('project');
   job.connection.receive(projectRequest);
   await vi.waitFor(() =>
     expect(job.messages).toContainEqual({
@@ -448,7 +448,7 @@ it('runs project transcription through the existing upload and cleanup lifecycle
       nativeEnd: 1,
     },
   };
-  const job = setup();
+  const job = setup('project');
   job.deps.request.mockResolvedValueOnce({
     kind: 'transcript',
     result: { text: 'Project speech' },
@@ -472,4 +472,88 @@ it('runs project transcription through the existing upload and cleanup lifecycle
   execute(job);
   expect(job.deps.request).toHaveBeenCalledOnce();
   await job.connection.disconnect();
+});
+
+it('enforces the bound consumer even when the Port parser is bypassed', async () => {
+  const scenario = {
+    type: 'start' as const,
+    requestId: 'scenario',
+    operation: 'speech' as const,
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    text: 'Saved action',
+    profile: speech.profile,
+    scope: {
+      workspaceId: 'scenario',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text' as const, slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+  };
+  const job = setup();
+  job.connection.receive(scenario);
+  expect(job.messages).toContainEqual({
+    type: 'failure',
+    requestId: 'scenario',
+    code: 'unauthorized',
+  });
+  expect(job.deps.authorize).not.toHaveBeenCalled();
+  const scenarioMessages: AudioJobServerMessage[] = [];
+  const scenarioConnection = job.service.connect(
+    (message) => scenarioMessages.push(message),
+    'scenario'
+  );
+  scenarioConnection.receive(speech);
+  scenarioConnection.receive(transcription);
+  expect(scenarioMessages).toEqual([
+    { type: 'failure', requestId: 'r', code: 'unauthorized' },
+    { type: 'failure', requestId: 'r', code: 'unauthorized' },
+  ]);
+  expect(job.deps.resolveModel).not.toHaveBeenCalled();
+  scenarioConnection.receive(scenario);
+  await vi.waitFor(() =>
+    expect(scenarioMessages.some((message) => message.type === 'audio')).toBe(true)
+  );
+  expect(job.deps.request).toHaveBeenCalledOnce();
+  await Promise.all([job.connection.disconnect(), scenarioConnection.disconnect()]);
+});
+
+it('rejects Scenario speech after backup replacement changes its saved source', async () => {
+  const job = setup();
+  let replaced = false;
+  job.deps.authorize.mockImplementation(async () => {
+    if (replaced) throw new Error('stale');
+  });
+  let release!: (value: Awaited<ReturnType<typeof requestAudio>>) => void;
+  job.deps.request.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      })
+  );
+  const connection = job.service.connect((message) => job.messages.push(message), 'scenario');
+  connection.receive({
+    type: 'start',
+    requestId: 'scenario',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    operation: 'speech',
+    text: 'Saved action',
+    profile: speech.profile,
+    scope: {
+      workspaceId: 'scenario',
+      workspaceRevision: 1,
+      target: { kind: 'scenario-text', slideId: 'slide', objectId: 'action' },
+      sourceTextHash: 'a'.repeat(64),
+    },
+  });
+  await vi.waitFor(() => expect(job.deps.request).toHaveBeenCalledOnce());
+  replaced = true;
+  release({ kind: 'audio', blob: new Blob(['voice'], { type: 'audio/mpeg' }) });
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({ type: 'failure', requestId: 'scenario', code: 'stale' })
+  );
+  expect(job.deps.write).not.toHaveBeenCalled();
+  expect(job.messages.some((message) => message.type === 'audio')).toBe(false);
+  await connection.disconnect();
 });

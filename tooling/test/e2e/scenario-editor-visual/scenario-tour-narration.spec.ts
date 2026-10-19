@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { expect, type Locator } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
@@ -35,6 +35,68 @@ function narrationWav(seconds = 5) {
       44 + index * 2
     );
   return wav;
+}
+
+async function exerciseNarrationTrim(
+  page: Page,
+  panel: Locator,
+  t: ReturnType<typeof createTranslator>,
+  info: TestInfo,
+  locale: string
+) {
+  const start = panel.getByRole('spinbutton', {
+    name: t('scenario.editor.tourAudioStart'),
+    exact: true,
+  });
+  const preview = panel.locator('[data-tour-narration-preview]');
+  const startHandle = preview.getByRole('slider', {
+    name: t('scenario.editor.tourAudioStart'),
+    exact: true,
+  });
+  const endHandle = preview.getByRole('slider', {
+    name: t('scenario.editor.tourAudioEnd'),
+    exact: true,
+  });
+  await startHandle.focus();
+  await startHandle.press('ArrowRight');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '0.51');
+  await start.fill('0.5');
+  await start.press('Enter');
+  const scale = preview.locator('.tour-narration-scale');
+  await scale.scrollIntoViewIfNeeded();
+  const bounds = await scale.boundingBox();
+  const handle = await endHandle.boundingBox();
+  await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds!.x + bounds!.width * 0.6, bounds!.y + bounds!.height / 2);
+  await page.mouse.up();
+  await expect(endHandle).toHaveAttribute('aria-valuenow', '3');
+  const end = preview.getByRole('spinbutton', {
+    name: t('scenario.editor.tourAudioEnd'),
+    exact: true,
+  });
+  await end.fill('1');
+  await end.press('Enter');
+  const audio = preview.locator('audio');
+  await preview.getByRole('button', { name: t('scenario.editor.tourPlay'), exact: true }).click();
+  await expect
+    .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
+    .toBeGreaterThanOrEqual(0.99);
+  await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
+  expect(await audio.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeLessThanOrEqual(
+    1.03
+  );
+  await endHandle.press('End');
+  await expect(endHandle).toHaveAttribute('aria-valuenow', '5');
+  await startHandle.press('End');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '4.99');
+  await start.fill('0.5');
+  await start.press('Enter');
+  await expect(startHandle).toHaveAttribute('aria-valuenow', '0.5');
+  await page.screenshot({
+    path: info.outputPath(`integrated-trim-${locale}.png`),
+    fullPage: false,
+  });
 }
 
 for (const [locale, theme, viewport] of [
@@ -88,7 +150,13 @@ for (const [locale, theme, viewport] of [
       await panel
         .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
         .click();
-      await expect(page.locator('.tour-stage-host .tour-hotspot')).toHaveCount(1);
+      await expect(page.locator('.tour-canvas .tour-stage-host .tour-hotspot')).toHaveCount(1);
+      const text = panel.getByRole('textbox', {
+        name: t('scenario.editor.textLabel'),
+        exact: true,
+      });
+      await text.fill(`Voice action ${index + 1}`);
+      await text.press('Tab');
       await library
         .locator('.guide-left-navigation')
         .getByRole('button', { name: t('scenario.editor.guideResources'), exact: true })
@@ -98,22 +166,17 @@ for (const [locale, theme, viewport] of [
         .getByRole('button', { name: t('scenario.editor.tourAudioAttach'), exact: true })
         .click();
       await category('tourNarration').click();
-      if (index === 0) {
-        await panel
-          .getByRole('button', { name: t('scenario.editor.tourAudioTrigger'), exact: true })
-          .click();
-        await page
-          .getByRole('option', { name: t('scenario.editor.tourAudioOnEnter'), exact: true })
-          .click();
-      }
-      const start = panel.getByRole('textbox', {
+      const start = panel.getByRole('spinbutton', {
         name: t('scenario.editor.tourAudioStart'),
         exact: true,
       });
       await start.fill('0.5');
       await start.press('Enter');
+      if (index === 0) await exerciseNarrationTrim(page, panel, t, info, locale);
       ids.push(
-        (await page.locator('.tour-stage-host #tour-player').getAttribute('data-slide-id'))!
+        (await page
+          .locator('.tour-canvas .tour-stage-host #tour-player')
+          .getAttribute('data-slide-id'))!
       );
     }
     await expect(
@@ -175,6 +238,7 @@ for (const [locale, theme, viewport] of [
     const check = async (player: Locator, surface: string) => {
       const audio = player.locator('audio:not([data-tour-music])');
       const music = player.locator('audio[data-tour-music]');
+      const play = player.locator('[data-tour-play]');
       const musicMute = player.locator('[data-tour-music-mute]');
       const gain = () => page.evaluate(() => Number(Reflect.get(window, 'observedMusicGain')));
       const direct = async (index: number) => {
@@ -182,46 +246,52 @@ for (const [locale, theme, viewport] of [
         await player.locator('.tour-contents-list button').nth(index).click();
         await expect(player).toHaveAttribute('data-slide-id', ids[index]!);
         await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+        await expect(player).toHaveAttribute('data-tour-playing', 'false');
       };
-      await player.locator('[data-tour-manual]').click();
+      await expect(player.locator('[data-tour-manual]')).toHaveCount(0);
+      await expect(
+        player.locator('[data-tour-narration-toggle], [data-tour-narration-replay]')
+      ).toHaveCount(0);
+      if ((await player.getAttribute('data-tour-playing')) === 'true') await play.click();
       await direct(0);
+      const actionId = await player.getAttribute('data-action-id');
+      await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
+      await expect.poll(() => music.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
+      await play.click();
+      await expect(play).toHaveAccessibleName(t('scenario.editor.tourPause'));
+      await expect
+        .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
+        .toBeGreaterThan(0.65);
       await expect
         .poll(() => music.evaluate((node: HTMLAudioElement) => node.currentTime))
         .toBeGreaterThan(0.05);
       const musicSource = await music.getAttribute('src');
-      const toggle = player.locator('[data-tour-narration-toggle]:visible');
-      const replay = player.locator('[data-tour-narration-replay]:visible');
-      await expect(toggle).toHaveCount(1);
-      await replay.click();
-      await expect
-        .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
-        .toBeGreaterThan(0.65);
-      await expect(toggle).toHaveAccessibleName(t('scenario.editor.tourNarrationPause'));
       await expect.poll(gain).toBeCloseTo(0.25, 2);
-      await toggle.focus();
-      await page.keyboard.press('Space');
+      await play.click();
+      await expect(play).toHaveAccessibleName(t('scenario.editor.tourPlay'));
       await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
-      await expect(toggle).toHaveAccessibleName(t('scenario.editor.tourNarrationResume'));
+      await expect.poll(() => music.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
       await expect.poll(gain).toBeCloseTo(1, 2);
-      expect(await music.evaluate((node: HTMLAudioElement) => node.paused)).toBe(false);
       const paused = await audio.evaluate((node: HTMLAudioElement) => node.currentTime);
-      await expect(player).toHaveAttribute('data-slide-id', ids[0]!);
-      await expect(player).toHaveAttribute('data-tour-mode', 'manual');
+      await expect(player).toHaveAttribute('data-action-id', actionId!);
+      await play.focus();
       await page.keyboard.press('Space');
+      await expect(player).toHaveAttribute('data-tour-playing', 'true');
       await expect
         .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
         .toBeGreaterThan(paused + 0.1);
-      await toggle.click();
+      await play.click();
+      await expect(player).toHaveAttribute('data-tour-playing', 'false');
       const volume = player.locator('[data-tour-volume]');
       await expect(volume).toHaveAccessibleName(t('scenario.editor.tourVolume'));
       await volume.fill('0.4');
       await expect
         .poll(() => audio.evaluate((node: HTMLAudioElement) => node.volume))
         .toBeCloseTo(0.4, 2);
-      const mute = player.locator('[data-tour-mute]');
       await expect
         .poll(() => music.evaluate((node: HTMLAudioElement) => node.volume))
         .toBeCloseTo(0.12, 2);
+      const mute = player.locator('[data-tour-mute]');
       await musicMute.click();
       await expect(musicMute).toHaveAccessibleName(t('scenario.editor.tourMusicUnmute'));
       await expect.poll(() => music.evaluate((node: HTMLAudioElement) => node.volume)).toBe(0);
@@ -236,49 +306,34 @@ for (const [locale, theme, viewport] of [
       await expect
         .poll(() => audio.evaluate((node: HTMLAudioElement) => node.volume))
         .toBeCloseTo(0.4, 2);
-      expect(await audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
-      await replay.click();
-      await expect
-        .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
-        .toBeGreaterThan(0.55);
-      expect(await audio.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeLessThan(1.5);
-      const beforeNavigation = await music.evaluate((node: HTMLAudioElement) => node.currentTime);
+      await expect(player).toHaveAttribute('data-tour-playing', 'false');
       await direct(1);
       expect(await music.getAttribute('src')).toBe(musicSource);
-      expect(
-        await music.evaluate((node: HTMLAudioElement) => node.currentTime)
-      ).toBeGreaterThanOrEqual(beforeNavigation);
       await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
-      await expect(toggle).toHaveAccessibleName(t('scenario.editor.tourNarrationReplay'));
-      await toggle.click();
+      await play.click();
       await expect
         .poll(() => audio.evaluate((node: HTMLAudioElement) => node.currentTime))
         .toBeGreaterThan(0.65);
-      await toggle.click();
-      await expect(toggle).toHaveAccessibleName(t('scenario.editor.tourNarrationResume'));
+      expect(await audio.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeLessThan(1.5);
+      await play.click();
+      await expect.poll(() => audio.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
+      await expect.poll(() => music.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
       expect(await audio.evaluate((node: HTMLAudioElement) => node.error)).toBeNull();
       await expect(player.locator('[data-tour-status]')).toBeHidden();
-      const placement = await toggle.evaluate((button) => {
-        const hint = button.closest('.tour-hint')!;
-        const group = button.parentElement!.getBoundingClientRect();
-        const footer = hint.querySelector('.tour-hint-controls')!.getBoundingClientRect();
-        const header = hint.querySelector('.tour-hint-header')!.getBoundingClientRect();
-        const close = hint.querySelector('[data-tour-hint-close]')!.getBoundingClientRect();
-        const icon = hint.querySelector('[data-tour-hint-close] svg')!.getBoundingClientRect();
-        return {
-          group: { x: group.x, y: group.y },
-          footer: { x: footer.x, y: footer.y },
-          headerBottom: header.bottom,
-          close: { width: close.width, height: close.height },
-          icon: { width: icon.width, height: icon.height },
-        };
-      });
-      expect(placement.group.x).toBeCloseTo(placement.footer.x, 0);
-      expect(placement.group.y).toBeGreaterThanOrEqual(placement.headerBottom);
-      expect(placement.close).toEqual({ width: 28, height: 28 });
-      expect(placement.icon).toEqual({ width: 20, height: 20 });
+      const hint = player.locator('.tour-hint:visible');
+      await expect(hint.locator('[data-tour-hint-action-title]')).toHaveCount(0);
+      await expect(
+        hint.getByRole('button', { name: t('scenario.editor.tourHintPrevious'), exact: true })
+      ).toBeVisible();
+      await expect(
+        hint.getByRole('button', { name: t('scenario.editor.tourHintNext'), exact: true })
+      ).toBeVisible();
+      const close = hint.locator('[data-tour-hint-close]');
+      const closeBox = await close.boundingBox();
+      expect(closeBox!.width).toBe(32);
+      expect(closeBox!.height).toBe(32);
       const bounds = await player.boundingBox();
-      for (const control of [toggle, replay, volume, mute, musicMute]) {
+      for (const control of [play, volume, mute, musicMute, close]) {
         const box = await control.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(bounds!.x - 1);
         expect(box!.y).toBeGreaterThanOrEqual(bounds!.y - 1);
@@ -287,21 +342,20 @@ for (const [locale, theme, viewport] of [
       }
       if (surface === 'normal') {
         await direct(0);
-        const beforeAutomatic = await music.evaluate((node: HTMLAudioElement) => node.currentTime);
-        await player.locator('[data-tour-play]').click();
+        await play.click();
         await expect(player).toHaveAttribute('data-slide-id', ids[1]!, { timeout: 12000 });
         expect(await music.getAttribute('src')).toBe(musicSource);
         expect(await music.evaluate((node: HTMLAudioElement) => node.currentTime)).toBeGreaterThan(
-          beforeAutomatic
+          1
         );
-        await player.locator('[data-tour-play]').click();
+        await play.click();
         await expect.poll(() => music.evaluate((node: HTMLAudioElement) => node.paused)).toBe(true);
         const retained = await music.evaluate((node: HTMLAudioElement) => node.currentTime);
-        await player.locator('[data-tour-play]').click();
+        await play.click();
         await expect
           .poll(() => music.evaluate((node: HTMLAudioElement) => node.currentTime))
-          .toBeGreaterThan(retained);
-        await player.locator('[data-tour-manual]').click();
+          .toBeGreaterThan(retained + 0.05);
+        await play.click();
       }
       await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
       const screenshot = info.outputPath(`narration-${surface}-${locale}.png`);
@@ -311,13 +365,14 @@ for (const [locale, theme, viewport] of [
         contentType: 'image/png',
       });
     };
-    const player = page.locator('.tour-stage-host #tour-player');
+    const player = page.locator('.tour-canvas .tour-stage-host #tour-player');
     await check(player, 'normal');
     await player.evaluate((root) => root.requestFullscreen());
     await check(player, 'fullscreen');
     await page.evaluate(() => document.exitFullscreen());
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
+      let complete = false;
       Object.defineProperty(window, 'showSaveFilePicker', {
         configurable: true,
         value: async () => ({
@@ -326,12 +381,25 @@ for (const [locale, theme, viewport] of [
               write(chunk) {
                 chunks.push(chunk);
               },
+              close() {
+                complete = true;
+              },
             }),
         }),
       });
+      Object.defineProperty(window, 'savedNarrationTourComplete', {
+        configurable: true,
+        get: () => complete,
+      });
       Object.defineProperty(window, 'savedNarrationTour', {
         configurable: true,
-        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+        get: () => {
+          const decoder = new TextDecoder();
+          return (
+            chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join('') +
+            decoder.decode()
+          );
+        },
       });
     });
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
@@ -341,8 +409,11 @@ for (const [locale, theme, viewport] of [
       .click();
     await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
     await expect
-      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedNarrationTour'))))
-      .toContain('<!doctype html>');
+      .poll(() => page.evaluate(() => Reflect.get(window, 'savedNarrationTourComplete')))
+      .toBe(true);
+    expect(await page.evaluate(() => String(Reflect.get(window, 'savedNarrationTour')))).toContain(
+      '</html>'
+    );
     const output = info.outputPath('narration-tour.html');
     await writeFile(
       output,
@@ -362,18 +433,23 @@ for (const [locale, theme, viewport] of [
         const payload = JSON.parse(node.textContent!);
         return payload.tour.slides.map(
           (slide: {
-            hotspots: { narration: { trigger: string; trimStart: number; gain: number } }[];
+            actions: {
+              type: string;
+              object: { narration: { trigger: string; trimStart: number; gain: number } };
+            }[];
           }) =>
-            slide.hotspots.map((point) => ({
-              trigger: point.narration.trigger,
-              trimStart: point.narration.trimStart,
-              gain: point.narration.gain,
-            }))
+            slide.actions
+              .filter((action) => action.type === 'hotspot')
+              .map(({ object }) => ({
+                trigger: object.narration.trigger,
+                trimStart: object.narration.trimStart,
+                gain: object.narration.gain,
+              }))
         );
       });
       expect(attachments).toEqual([
         [{ trigger: 'enter', trimStart: 0.5, gain: 1 }],
-        [{ trigger: 'activation', trimStart: 0.5, gain: 1 }],
+        [{ trigger: 'enter', trimStart: 0.5, gain: 1 }],
       ]);
       const musicBinding = await page
         .locator('#tour-data')

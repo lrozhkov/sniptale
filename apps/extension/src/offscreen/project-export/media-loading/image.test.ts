@@ -33,7 +33,7 @@ vi.mock('../../../features/video/project/scene/background', async (importOrigina
 }));
 
 import { loadImagesForProject } from './image';
-import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
 import {
   createEmptyVideoProject,

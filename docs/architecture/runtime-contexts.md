@@ -156,9 +156,11 @@ A missing contextMenu field leaves the current setting unchanged during selectiv
 
 Action availability remains an independent runtime decision. Section titles and positions convey no action authority, and action/preset IDs cannot be introduced by imported section data.
 
-### Gallery audio operations
+### Audio operations
 
-`background/ai/audio` owns the Gallery-only `sniptale-gallery-audio-job` Port. Each Port permits one explicit transcription or speech operation. Background checks the exact extension Gallery document. It replays the durable workspace. It checks the workspace revision and discriminated original/voiceover target.
+`background/ai/audio` owns the `sniptale-gallery-audio-job` Port for Gallery, Montage and Scenario pages. The transport retains its existing name. Background checks the exact top-level extension document and binds its consumer for the Port lifetime. Gallery permits transcription and video speech. Montage permits saved project-clip transcription and saved project-text speech. Scenario permits only authored Scenario speech. A trusted sender cannot submit another consumer's scope.
+
+For Gallery, background replays the durable workspace. It checks the workspace revision and discriminated original/voiceover target.
 
 It admits only a continuous authorized native interval. Original transcription includes Cut intervals. Timeline projection remains independent. Original jobs bind the current Library immutable locator and physical object to the workspace source identity, MIME and size. A caller-supplied asset ID alone grants no access.
 
@@ -169,6 +171,10 @@ The receiver checks staging scope, WAV shape and duration before egress.
 Before the POST, recheck provider configuration, secret availability and optional origin permission. One deadline covers authorization, upload preparation and response. Disconnect, cancel and local-data erasure abort active jobs. Erasure reserves exclusion before cancellation and waits for writes. Worker restart loses all tickets and the page observes Port interruption.
 
 No automatic retry or resumable paid job exists. Ports carry only parsed text, timing data, fixed errors and scoped handles, never audio bytes or credentials.
+
+Scenario speech binds the saved project revision, slide, action and SHA256 of the exact authored text. The canonical gate uses `readScenarioViewingSnapshot`, without publication recovery or editor writes. It checks the source before egress, after response and at temporary staging boundaries. Scenario requires an approved provider identity before permission or secret activation. The shared runtime-neutral client resides under `workflows/audio-jobs`. Gallery, Montage and Scenario retain separate workflow and UI owners.
+
+The Scenario page explicitly saves the source before generation without changing its autosave preference. The mounted form owns sequential requests, cancellation and disposable preview Blobs. Apply remains unavailable until generation settles. Each explicit Apply uses the current page snapshot and aggregate revision through the existing narration import. It checks frozen source text and expected narration after asynchronous preparation. Serial Apply uses each accepted snapshot for the next import, without another writer or atomic batch operation. Earlier accepted imports survive a later failure. Project replacement or page disposal ends the form lifetime.
 
 `background/ai/llm/review-text-job` and its typed `sniptale-gallery-review-text` Port own Gallery AI text editing. They use the existing one-shot LLM capability authority with purpose `review-text`. It does not masquerade as a DOM, scenario or audio operation. Consume the exact top-level Gallery document and disclosed context/destination binding once. Recheck committed workspace text and result-time projection before POST.
 

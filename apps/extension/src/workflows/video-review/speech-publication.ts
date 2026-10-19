@@ -1,4 +1,4 @@
-import type { AudioJobScope } from '../../contracts/ai/audio';
+import type { AudioTextJobScope } from '../../contracts/ai/audio';
 import {
   AUDIO_STAGING_TTL_MS,
   type AudioSourceJobScope,
@@ -20,7 +20,7 @@ import {
   type ReviewSpeechReplacement,
 } from '../../features/video/review/speech-transcript';
 import type { createVideoReviewSession } from './session';
-import { runReviewSpeechJob } from './speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import { decodeReviewSpeechDuration } from './speech-audio';
 import {
   reviewSpeechPublicationBasis,
@@ -351,7 +351,7 @@ export async function applyReviewSpeechBatch(
 
 export async function readPreparedReviewSpeechAudio(
   staged: AudioStagedHandle,
-  scope: AudioJobScope,
+  scope: AudioSourceJobScope | AudioTextJobScope,
   signal: AbortSignal
 ) {
   const blob = await readAudioStaging(staged, scope);

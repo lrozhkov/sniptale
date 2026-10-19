@@ -95,7 +95,7 @@ async function setup() {
   const read = vi.fn();
   const service = createAudioJobService({ resolveModel, write, discard, read });
   const messages: AudioJobServerMessage[] = [];
-  const connection = service.connect((message) => messages.push(message));
+  const connection = service.connect((message) => messages.push(message), 'project');
   const fetch = vi.fn(
     async () => new Response('wave', { headers: { 'Content-Type': 'audio/wav' } })
   );

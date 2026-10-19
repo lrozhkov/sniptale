@@ -30,19 +30,29 @@ it('keeps scene, inspector and both navigation controls in sync without authorin
     alt: 'Image',
     source: { kind: 'import', filename: 'image.png' },
   };
-  first.annotations = ['one', 'two'].map((id) => ({
-    id,
-    text: id,
-    anchor: null,
-    appearance: null,
-  }));
+  first.actions = [
+    ...first.actions.filter((entry) => entry.type !== 'annotation'),
+    ...['one', 'two']
+      .map((id) => ({
+        id,
+        text: id,
+        anchor: null,
+        appearance: null,
+      }))
+      .map((object) => ({ type: 'annotation' as const, object })),
+  ];
   const empty = createTourImageSlide('empty');
   empty.title = 'Empty';
   const last = {
     ...structuredClone(first),
     id: 'last',
     title: 'Last',
-    annotations: [{ id: 'three', text: 'three', anchor: null, appearance: null }],
+    actions: [
+      {
+        type: 'annotation' as const,
+        object: { id: 'three', text: 'three', anchor: null, appearance: null },
+      },
+    ],
   };
   const menu: TourNavigationSlide = {
     kind: 'navigation',

@@ -4,6 +4,7 @@ import { readAssetFile } from '../../../composition/persistence/assets/opfs-stor
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
 import {
   isAudioSourceJobScope,
+  isScenarioSpeechScope,
   isProjectAudioSourceJobScope,
   isProjectAudioJobScope,
   isProjectAudioTextJobScope,
@@ -12,6 +13,7 @@ import {
 } from '../../../contracts/ai/audio';
 import { readVideoProjectAudioSource } from '../../../composition/persistence/projects/audio-source';
 import { readVideoProjectTextAudioTarget } from '../../../composition/persistence/projects/text-audio-scope';
+import { assertScenarioSpeechScope } from '../../../composition/persistence/scenario/speech-scope';
 import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
@@ -24,17 +26,45 @@ import type { AudioJobStart } from '../../../contracts/ai/audio';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { isOwnedExtensionPagePath } from '../../../platform/navigation/extension-pages/sender-url';
 
+export type AudioJobConsumer = 'gallery' | 'scenario' | 'project';
+
+/** Resolves an owned top-level document; its consumer is bound for the Port lifetime. */
+export function getAudioJobSenderConsumer(
+  sender: chrome.runtime.MessageSender | undefined
+): AudioJobConsumer | null {
+  if (!sender?.documentId || sender.id !== chrome.runtime.id || sender.frameId !== 0) return null;
+  if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html'))
+    return 'gallery';
+  if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/scenario-editor/index.html'))
+    return 'scenario';
+  if (isOwnedExtensionPagePath(sender.url, 'apps/extension/src/video-editor/index.html'))
+    return 'project';
+  return null;
+}
+
 export function isAudioJobSender(
   sender: chrome.runtime.MessageSender | undefined,
   scope?: AudioJobScope
 ): boolean {
-  if (!sender?.documentId || sender.id !== chrome.runtime.id || sender.frameId !== 0) return false;
-  const gallery = isOwnedExtensionPagePath(sender.url, 'apps/extension/src/gallery/index.html');
-  const project = isOwnedExtensionPagePath(
-    sender.url,
-    'apps/extension/src/video-editor/index.html'
-  );
-  return scope ? (isProjectAudioJobScope(scope) ? project : gallery) : gallery || project;
+  const consumer = getAudioJobSenderConsumer(sender);
+  if (!consumer) return false;
+  if (!scope) return true;
+  return isScenarioSpeechScope(scope)
+    ? consumer === 'scenario'
+    : isProjectAudioJobScope(scope)
+      ? consumer === 'project'
+      : consumer === 'gallery';
+}
+
+/** Sender identity permits only the operation family owned by that document. */
+export function isAudioJobAllowedForConsumer(
+  request: AudioJobStart,
+  consumer: AudioJobConsumer
+): boolean {
+  if (consumer === 'scenario')
+    return request.operation === 'speech' && isScenarioSpeechScope(request.scope);
+  if (consumer === 'project') return isProjectAudioJobScope(request.scope);
+  return !isScenarioSpeechScope(request.scope) && !isProjectAudioJobScope(request.scope);
 }
 
 async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSourceJobScope) {
@@ -53,7 +83,7 @@ async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSo
 /** Sender identity alone never authorizes an asset: durable selection is rechecked before POST. */
 export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
   if (isProjectAudioTextJobScope(request.scope)) {
-    if (request.operation !== 'speech' || !request.approvedProviderId)
+    if (request.operation !== 'speech' || !('phraseId' in request) || !request.approvedProviderId)
       throw new Error('unauthorized');
     const { fragment } = await readVideoProjectTextAudioTarget(request.scope);
     if (
@@ -68,6 +98,12 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
     if (request.operation !== 'transcription' || !request.approvedProviderId)
       throw new Error('unauthorized');
     await readVideoProjectAudioSource(request.scope);
+    return;
+  }
+  if (isScenarioSpeechScope(request.scope)) {
+    if (request.operation !== 'speech') throw new Error('unauthorized');
+    const savedText = await assertScenarioSpeechScope(request.scope);
+    if (savedText !== request.text) throw new Error('stale');
     return;
   }
   const snapshot = await readVideoWorkspace(request.scope.workspaceId);
@@ -90,6 +126,7 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
       scope.timeDomain === 'source' ? workspace.source.duration : (segments.at(-1)?.resultEnd ?? 0);
     if (
       request.operation !== 'speech' ||
+      !('phraseId' in request) ||
       !matchesReviewTextScope(fragment, scope) ||
       request.phraseId !== scope.target.fragmentId ||
       request.textRevision !== scope.textRevision ||
@@ -134,6 +171,7 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
   )
     throw new Error('unauthorized');
   if (request.operation === 'speech') {
+    if (!('phraseId' in request)) throw new Error('stale');
     const transcript =
       target.kind === 'original'
         ? document.advancedContent.audio.originalSpeech?.transcript

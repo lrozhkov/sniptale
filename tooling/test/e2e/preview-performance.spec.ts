@@ -2,7 +2,7 @@ import { replaceNativeReviewWorkspace } from './support/native-review-workspace'
 import { chromium, expect, test as base, type Page, type ConsoleMessage } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
-import { DEFAULT_WINDOW_HEADER } from '../../../apps/extension/src/features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../../apps/extension/src/features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../../apps/extension/src/features/video/review/advanced/focus';
 import { createQuickEditWatermark } from '../../../apps/extension/src/features/video/review/advanced/watermark';

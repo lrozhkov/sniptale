@@ -1,7 +1,12 @@
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
-import { createContext, useContext, useId, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { NumericRow } from '../../ui/compact-inspector-controls/numeric';
+import type {
+  CompactInspectorNumericScrub,
+  CompactInspectorUnit,
+} from '../../ui/compact-inspector-controls/shared';
+import '../../ui/compact-inspector-controls/disclosure.css';
 import './inspector.css';
 
 const InspectorCategorizedContentContext = createContext(false);
@@ -18,9 +23,8 @@ export function InspectorCategorizedContent({
   children: ReactNode;
 }) {
   const content = <div className="guide-inspector-categorized">{children}</div>;
-  if (!flatten) return content;
   return (
-    <InspectorCategorizedContentContext.Provider value={true}>
+    <InspectorCategorizedContentContext.Provider value={flatten}>
       {content}
     </InspectorCategorizedContentContext.Provider>
   );
@@ -56,14 +60,14 @@ export function GuideInspectorGroup({
             {collapsible ? (
               <button
                 type="button"
-                className="guide-inspector-disclosure"
+                className="guide-inspector-disclosure sniptale-disclosure-trigger"
                 aria-expanded={expanded}
                 aria-controls={bodyId}
                 onClick={() => setExpanded(!expanded)}
               >
                 <Icon size={16} aria-hidden="true" />
                 <span>{title}</span>
-                <ChevronDown size={16} aria-hidden="true" />
+                <ChevronDown size={level === 'group' ? 14 : 16} aria-hidden="true" />
               </button>
             ) : (
               <span className="guide-inspector-static-heading">
@@ -94,6 +98,8 @@ export function GuideInspectorNumber({
   min,
   max,
   step = 1,
+  unit,
+  scrub,
   disabled,
   onChange,
 }: {
@@ -102,23 +108,32 @@ export function GuideInspectorNumber({
   min: number;
   max: number;
   step?: number;
+  unit?: CompactInspectorUnit;
+  scrub?: CompactInspectorNumericScrub;
   disabled: boolean;
   onChange: (value: number) => void;
 }) {
+  const [preview, setPreview] = useState<number | null>(null);
+  useEffect(() => setPreview(null), [value, disabled]);
   return (
     <NumericRow
       appearance="plain"
       label={label}
-      value={value}
+      value={preview ?? value}
       min={min}
       max={max}
       step={step}
+      unit={unit}
+      scrub={scrub}
       precision={0}
       disabled={disabled}
       focusAppearance="accent-box"
       normalizeValue={Math.round}
-      onPreviewValue={() => {}}
-      onCommitValue={onChange}
+      onPreviewValue={setPreview}
+      onCommitValue={(next) => {
+        setPreview(null);
+        onChange(next);
+      }}
     />
   );
 }

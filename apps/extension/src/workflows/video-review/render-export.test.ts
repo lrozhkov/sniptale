@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { drawReviewSceneFrame } from './scene-frame';
 import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';

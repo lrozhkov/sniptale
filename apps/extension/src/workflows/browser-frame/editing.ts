@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_WINDOW_HEADER, type WindowHeader } from '../../features/browser-frame/header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  type WindowHeader,
+} from '@sniptale/runtime-contracts/window-header';
 import { translate } from '../../platform/i18n';
 import { acquireWindowHeaderFavicon } from './favicon';
 import { importWindowHeaderIcon } from './local-icon';

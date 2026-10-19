@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
+import { getTourHotspots } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml } from './document';
+import { createTourDocument } from '../project/factories';
+import { createTourActionSlide as createTourImageSlide } from './test-support';
+import { buildTourPlayerTestHtml as buildTourPlayerHtml } from './test-support';
 import { createTourPlayer } from './controller';
 
 const labels = {
@@ -132,17 +134,21 @@ function authoringInput() {
     alt: '',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Open',
-      text: 'Text',
-      action: { kind: 'url', url: 'https://example.com/' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter(
+      (entry) => entry.type !== 'hotspot' && !entry.object.id.endsWith('-action')
+    ),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Open',
+        text: 'Text',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   return {
@@ -207,7 +213,7 @@ it.each([false, true])(
       y: 0.5,
     });
     expect(
-      input.tour.slides[0]?.kind === 'image' && input.tour.slides[0].hotspots[0]?.point
+      input.tour.slides[0]?.kind === 'image' && getTourHotspots(input.tour.slides[0])[0]?.point
     ).toEqual({ x: 0.5, y: 0.5 });
     const original = point.style.left;
     pointer(point, 'pointerdown', 0);
@@ -266,7 +272,7 @@ it('does not preview or commit object drags while the host locks editing', async
   expect(moved).not.toHaveBeenCalled();
 });
 
-it('selects an authored mask with native click activation without moving it', async () => {
+it('keeps saved privacy masks visible without authoring interaction', async () => {
   const selected = vi.fn();
   const moved = vi.fn();
   const { player, root } = await mount({
@@ -279,18 +285,20 @@ it('selects an authored mask with native click activation without moving it', as
     {
       id: 'mask',
       rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
-      kind: 'highlight',
+      kind: 'redact',
       color: '#F97316',
       opacity: 0.3,
     },
   ];
   player.update(input);
   root.querySelector<HTMLButtonElement>('.tour-mask')!.click();
-  expect(selected).toHaveBeenCalledWith('mask');
+  expect(selected).not.toHaveBeenCalled();
+  expect(root.querySelector('.tour-mask-effect')).not.toBeNull();
+  expect(root.querySelector('.tour-mask .tour-resize-handle')).toBeNull();
   expect(moved).not.toHaveBeenCalled();
 });
 
-it('separates structural Previous from visited Back and clears history on Restart', async () => {
+it('uses the same structural Previous for controls and restarts at the beginning', async () => {
   const { player, root } = await mount();
   const tour = createTourDocument('routes');
   tour.slides = ['a', 'b', 'c'].map((id) => ({
@@ -320,7 +328,7 @@ it('separates structural Previous from visited Back and clears history on Restar
   press('Previous slide');
   expect(root.dataset['slideId']).toBe('b');
   root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
-  expect(root.dataset['slideId']).toBe('c');
+  expect(root.dataset['slideId']).toBe('a');
   press('Restart tour');
   expect(root.dataset['slideId']).toBe('a');
   expect(root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.disabled).toBe(true);
@@ -392,32 +400,24 @@ it('plays, pauses, seeks across a linear tour and pauses when hidden without aut
   seek.dispatchEvent(new Event('input', { bubbles: true }));
   expect(root.dataset['slideId']).toBe('third');
 });
-it('waits at automatic cycles and ambiguous routes, but permits an explicitly looping tour', async () => {
+it('skips empty authored containers during automatic action progression', async () => {
   const { player, root } = await mount();
   const tick = playbackFrames();
   const tour = shortTour();
-  tour.slides[1]!.timing.autoplayTarget = 'first';
+  const empty = createTourImageSlide('empty');
+  empty.actions = [];
+  tour.slides.splice(1, 0, empty);
   player.update({ tour, labels, assets: [] });
   await tick(0);
-  const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
-  play.click();
-  await tick(100);
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
   await tick(100);
   expect(root.dataset['slideId']).toBe('second');
-  expect(play.textContent).toBe('Play');
-  expect(root.querySelector('[role=status]')!.textContent).toBe('Choose a destination');
-  expect(root.querySelector<HTMLInputElement>('[data-tour-seek]')!.max).toBe('100');
-  tour.playback.loop = true;
-  player.update({ tour, labels, assets: [] });
-  await tick(0);
-  play.click();
+  expect(root.querySelector('[data-tour-counter]')!.textContent).toBe('2 / 3');
   await tick(100);
-  expect(root.dataset['slideId']).toBe('first');
-  await tick(100);
-  expect(root.dataset['slideId']).toBe('second');
+  expect(root.dataset['slideId']).toBe('third');
   player.dispose();
   await tick(1000);
-  expect(root.dataset['slideId']).toBe('second');
+  expect(root.dataset['slideId']).toBe('third');
 });
 it('stops at the technical end and restarts from its play control with empty back history', async () => {
   const { player, root } = await mount();
@@ -459,7 +459,6 @@ it('gates playback on decoded current media, ignores stale loads and permits ret
   });
   const first = input.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('Expected image');
-  first.hotspots[0]!.action = { kind: 'next' };
   player.update(input);
   const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
   Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
@@ -511,10 +510,13 @@ it('autoplay waits on URL choices and never treats a link as a timed destination
   };
   player.update({ tour, labels, assets: [] });
   await tick(0);
-  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
   await tick(100);
   expect(root.dataset['slideId']).toBe('first');
   expect(root.querySelector('[role=status]')!.textContent).toBe('Choose a destination');
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+  await tick(0);
+  expect(root.dataset['slideId']).toBe('second');
+  player.select('first');
   expect(root.querySelector('a')!.getAttribute('rel')).toBe('noopener noreferrer');
 });
 it('wraps the physical end only when loop is enabled and otherwise stops without an end screen', async () => {
@@ -539,35 +541,30 @@ it('wraps the physical end only when loop is enabled and otherwise stops without
   expect(root.dataset['slideId']).toBe('first');
 });
 
-it('keeps seek local on a branch with an explicit default while autoplay still follows that default', async () => {
+it('seeks across contents and actions through the global timeline', async () => {
   const { player, root } = await mount();
   const tick = playbackFrames();
   const tour = shortTour();
-  const timing = { ...tour.slides[0]!.timing, autoplayTarget: 'second' };
   tour.slides[0] = {
     kind: 'navigation',
-    id: 'first',
+    id: 'contents',
     title: '',
     description: '',
-    background: { color: '#000000', image: null },
-    buttons: [
-      { id: 'b', label: 'B', action: { kind: 'slide', slideId: 'second' } },
-      { id: 'c', label: 'C', action: { kind: 'slide', slideId: 'third' } },
-    ],
+    background: { color: '#111827', image: null },
+    buttons: [{ id: 'jump', label: 'Third', action: { kind: 'action', actionId: 'third-action' } }],
     narration: null,
-    timing,
+    timing: tour.slides[0]!.timing,
   };
   player.update({ tour, labels, assets: [] });
   await tick(0);
   const seek = root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
-  expect(seek.max).toBe('100');
-  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
-  await tick(100);
+  expect(seek.max).toBe('300');
+  seek.value = '200';
+  seek.dispatchEvent(new Event('input', { bubbles: true }));
+  expect(root.dataset['slideId']).toBe('third');
+  expect(root.querySelector('[data-tour-counter]')!.textContent).toBe('2 / 2');
+  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
   expect(root.dataset['slideId']).toBe('second');
-  expect(seek.max).toBe('100');
-  player.select('third');
-  await tick(0);
-  expect(seek.value).toBe('0');
 });
 
 it('animates manual entrance and pauses or resumes it through the transport clock', async () => {
@@ -583,9 +580,10 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   await tick(50);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   expect(play.textContent).toBe('Play');
-  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   await tick(1000);
-  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
+  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+  expect(scene.inert).toBe(false);
+  expect(root.dataset['slideId']).toBe('first');
   play.click();
   await tick(50);
   expect(scene.inert).toBe(false);
@@ -790,4 +788,42 @@ it('keeps every navigation link reachable across unequal text page heights', asy
     next.click();
   }
   expect(visited.size).toBe(13);
+});
+
+it('toggles Space in both directions without navigating and exposes no Manual control', async () => {
+  const tick = playbackFrames();
+  const { root, player } = await mount();
+  player.update({ tour: shortTour(), labels, assets: [] });
+  await tick(0);
+  const press = () =>
+    root.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.pause);
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.play);
+  const before = root.dataset['actionId'];
+  press();
+  expect(play.getAttribute('aria-label')).toBe(labels.pause);
+  expect(root.dataset['actionId']).toBe(before);
+  expect(root.querySelector('[data-tour-manual]')).toBeNull();
+  root.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+  expect(root.dataset['slideId']).toBe('second');
+  expect(play.getAttribute('aria-label')).toBe(labels.play);
+});
+
+it('fits the scene without reserving toolbar or feedback height', async () => {
+  const { root } = await mount();
+  Object.defineProperty(root, 'clientWidth', { value: 1280, configurable: true });
+  Object.defineProperty(root, 'clientHeight', { value: 560, configurable: true });
+  const toolbar = root.querySelector<HTMLElement>('.tour-toolbar')!;
+  Object.defineProperty(toolbar, 'offsetHeight', { value: 100, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+  const stage = root.querySelector<HTMLElement>('[data-tour-stage]')!;
+  expect(parseFloat(stage.style.height)).toBe(560);
+  const geometry = [stage.style.width, stage.style.height];
+  Object.defineProperty(toolbar, 'offsetHeight', { value: 200, configurable: true });
+  root.querySelector<HTMLElement>('[data-tour-status]')!.textContent = 'Loading';
+  window.dispatchEvent(new Event('resize'));
+  expect([stage.style.width, stage.style.height]).toEqual(geometry);
 });

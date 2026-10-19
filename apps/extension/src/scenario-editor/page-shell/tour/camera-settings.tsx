@@ -1,5 +1,5 @@
 import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { TourChoiceField } from './fields';
 import type { TourDocument, TourImageSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { ScanSearch } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
@@ -38,7 +38,7 @@ export function TourCameraSettings({
   return (
     <GuideInspectorGroup id="camera" icon={ScanSearch} title={t('scenario.editor.tourCamera')}>
       <div className="tour-text-field">
-        <SelectField
+        <TourChoiceField
           label={t('scenario.editor.tourCameraMode')}
           value={camera.mode}
           disabled={locked}

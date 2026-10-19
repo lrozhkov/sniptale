@@ -781,4 +781,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 7, to: 8 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 33,
+    toDatabaseVersion: 34,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE, SCENARIO_PROJECT_UNITS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          SCENARIO_PROJECTS_STORE,
+          SCENARIO_PROJECT_HISTORY_STORE,
+          SCENARIO_PROJECT_UNITS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Scenario framing stores are unavailable.');
+      return undefined;
+    },
+  },
 ];

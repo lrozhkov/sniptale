@@ -35,17 +35,19 @@ function fixture() {
     alt: 'Image',
     source: { kind: 'import', filename: 'image.png' },
   };
-  slide.hotspots = [
-    {
-      id: 'point',
-      point: { x: 0.5, y: 0.5 },
-      targetRect: null,
-      label: 'Point',
-      text: 'Explanation',
-      action: { kind: 'next' },
-      appearance: null,
-      pulse: false,
-    },
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'hotspot'),
+    ...[
+      {
+        id: 'point',
+        point: { x: 0.5, y: 0.5 },
+        targetRect: null,
+        label: 'Point',
+        text: 'Explanation',
+        appearance: null,
+        visual: { kind: 'point' as const, pulse: false },
+      },
+    ].map((object) => ({ type: 'hotspot' as const, object })),
   ];
   tour.slides = [slide, createTourImageSlide('second')];
   const images: Record<string, string> = {
@@ -109,12 +111,17 @@ async function renderPreview(props: ReturnType<typeof fixture>) {
   return tick;
 }
 
-it('keeps preview interactive: pointer and keyboard hints, pagination, Escape and denied links', async () => {
+it('keeps preview interactive with global action navigation, Escape and no authored links', async () => {
   const props = fixture();
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots[0]!.action = { kind: 'url', url: 'https://example.com/' };
-  slide.annotations = [{ id: 'note', text: 'Second page', anchor: null, appearance: null }];
+  slide.actions = [
+    ...slide.actions.filter((entry) => entry.type !== 'annotation'),
+    ...[{ id: 'note', text: 'Second page', anchor: null, appearance: null }].map((object) => ({
+      type: 'annotation' as const,
+      object,
+    })),
+  ];
   instantImages();
   await renderPreview(props);
   const stage = host.querySelector<HTMLElement>('.tour-stage-host')!;
@@ -125,18 +132,20 @@ it('keeps preview interactive: pointer and keyboard hints, pagination, Escape an
   const hotspot = shadow().querySelector<HTMLElement>('.tour-hotspot')!;
   expect(hotspot.tagName).toBe('BUTTON');
   expect(shadow().querySelector('a[href]')).toBeNull();
-  // The counter spans both hints, the empty second slide, and the enabled end screen.
+  // Empty authoring slides and the end screen do not consume action numbers.
   const hint = () => shadow().querySelector<HTMLElement>('[data-tour-hint]')!;
   act(() => hotspot.focus());
   expect(hint().hidden).toBe(false);
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 4');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 2');
   act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click());
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('2 / 4');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('2 / 2');
   expect(hint().querySelector('[data-tour-hint-text]')!.textContent).toBe('Second page');
   act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click());
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 4');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 2');
+  const activeHotspot = shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  act(() => activeHotspot.focus());
   act(() =>
-    hotspot.dispatchEvent(
+    activeHotspot.dispatchEvent(
       new KeyboardEvent('keydown', {
         key: 'Escape',
         bubbles: true,
@@ -146,9 +155,8 @@ it('keeps preview interactive: pointer and keyboard hints, pagination, Escape an
     )
   );
   expect(hint().hidden).toBe(true);
-  expect(shadow().activeElement).toBe(hotspot);
-  act(() => hotspot.click());
-  act(() => hotspot.click());
+  expect(shadow().activeElement).toBe(activeHotspot);
+  act(() => shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!.click());
   expect(shadow().querySelector('a[href]')).toBeNull();
   expect(shadow().querySelector('#tour-player')!.getAttribute('data-slide-id')).toBe('first');
   expect(props.onSelectObject).not.toHaveBeenCalled();
@@ -161,14 +169,27 @@ it('plays preview narration and releases it when the preview player is disposed'
   const props = fixture();
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.narration = {
-    assetId: 'voice',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  if (slide.kind !== 'image') throw new Error('Expected image.');
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'voice',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   props.images['voice'] = 'data:audio/wav;base64,AA==';
   instantImages();
   await renderPreview(props);
@@ -180,9 +201,17 @@ it('plays preview narration and releases it when the preview player is disposed'
   expect(shadow().querySelector('audio')).toBeNull();
 });
 
-it('starts at the selected slide and navigates the entire tour without editing selection', async () => {
+it('starts at the selected action and navigates the entire tour without editing selection', async () => {
   const props = fixture();
   props.selection.slideId = 'second';
+  const second = props.tour.slides[1]!;
+  if (second.kind !== 'image') throw new Error('Expected image');
+  second.actions = [
+    {
+      type: 'annotation',
+      object: { id: 'second-action', text: 'Continue', anchor: null, appearance: null },
+    },
+  ];
   instantImages();
   await renderPreview(props);
   const player = shadow().querySelector<HTMLElement>('#tour-player')!;
@@ -202,14 +231,27 @@ it('recovers the real preview when narration URL arrives after image URLs', asyn
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   const props = fixture();
   const slide = props.tour.slides[0]!;
-  slide.narration = {
-    assetId: 'voice',
-    duration: 2,
-    trimStart: 0,
-    trimEnd: 2,
-    gain: 1,
-    transcript: '',
-  };
+  if (slide.kind !== 'image') throw new Error('Expected image.');
+  slide.actions.unshift({
+    type: 'annotation' as const,
+    object: {
+      id: slide.id + '-voice',
+      text: '',
+      anchor: null,
+      appearance: null,
+      narration: {
+        ...{
+          assetId: 'voice',
+          duration: 2,
+          trimStart: 0,
+          trimEnd: 2,
+          gain: 1,
+          transcript: '',
+        },
+        trigger: 'enter' as const,
+      },
+    },
+  });
   instantImages();
   const tick = await renderPreview(props);
   const status = () => shadow().querySelector<HTMLElement>('[data-tour-status]')!;

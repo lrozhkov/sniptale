@@ -1,5 +1,5 @@
 import type { ArchiveReader, ArchiveRootDescriptor } from '../../../composition/archive-transfer';
-import { isWindowHeaderFavicon } from '../../../features/browser-frame/header';
+import { isWindowHeaderFavicon } from '@sniptale/runtime-contracts/window-header';
 import { assertMetadataJson, parseBoundedJson } from './codec';
 import { MAX_EXPANDED_ROOT_METADATA_BYTES, type MediaHubBackupRootEnvelope } from './contracts';
 import type { ArchiveRootPayload, MediaHubBackupRootInventoryItem } from './contracts';

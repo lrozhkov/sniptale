@@ -1,4 +1,4 @@
-import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import type {
   BrowserFrameState,

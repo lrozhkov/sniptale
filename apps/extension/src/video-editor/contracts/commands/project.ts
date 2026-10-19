@@ -1,4 +1,4 @@
-import type { WindowHeader } from '../../../features/browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';

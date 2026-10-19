@@ -333,7 +333,10 @@ function drawImageLayer(
 }
 
 function admittedVisualWindowHeader(
-  clip: { id: string; windowHeader?: import('../../../browser-frame/header').WindowHeader },
+  clip: {
+    id: string;
+    windowHeader?: import('@sniptale/runtime-contracts/window-header').WindowHeader;
+  },
   images: Record<string, HTMLImageElement>,
   camera: boolean
 ) {

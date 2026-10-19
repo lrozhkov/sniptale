@@ -56,5 +56,27 @@ it('rejects a removed or incompatible project', async () => {
   io.list.mockResolvedValue([]);
   await expect(readAvailableScenarioHistory('guide')).rejects.toThrow('unavailable');
   io.list.mockResolvedValue([{ id: 'guide', availability: 'unsupported' }]);
-  await expect(readAvailableScenarioHistory('guide')).rejects.toThrow('unavailable');
+  await expect(readAvailableScenarioHistory('guide')).rejects.toThrow('unsupported');
+  expect(io.history).not.toHaveBeenCalled();
+});
+
+it('reports unsupported resource admission without opening or reading its history', async () => {
+  io.list.mockResolvedValue([{ id: 'guide', availability: 'unsupported' }]);
+  const enter = vi.fn(async () => {
+    throw new Error('Unavailable guide cannot be pruned.');
+  });
+  const open = vi.fn();
+  await expect(openExistingScenarioProject('guide', enter, open)).rejects.toThrow('unsupported');
+  expect(io.history).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
+  expect(enter.mock.invocationCallOrder[0]).toBeLessThan(io.list.mock.invocationCallOrder[0]!);
+});
+
+it('leaves a refused resource session closed without reading project metadata or history', async () => {
+  const enter = vi.fn(async () => false);
+  const open = vi.fn();
+  await openExistingScenarioProject('guide', enter, open);
+  expect(io.list).not.toHaveBeenCalled();
+  expect(io.history).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
 });

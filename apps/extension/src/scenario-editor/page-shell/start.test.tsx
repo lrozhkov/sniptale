@@ -36,6 +36,7 @@ vi.mock('../../workflows/project-covers', () => ({
   createProjectCoverService: () => ({ getCover: mocks.cover }),
 }));
 import { ScenarioEditorStart } from './start';
+import { UnsupportedScenarioTourError } from './runtime/open-existing';
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -144,4 +145,29 @@ it('captures the saved project revision for its visible-card cover request', asy
     { kind: 'scenario', id: 'current', workspaceRevision: 4 },
     expect.any(AbortSignal)
   );
+});
+
+it('explains an unsupported direct-link tour while keeping retry and creation available', async () => {
+  await render('unsupported');
+  expect(container.textContent).toContain('scenario.editor.tourUnsupportedOpen');
+  expect(actions()[0]?.disabled).toBe(false);
+  const retry = actions().find((button) =>
+    button.textContent?.includes('shared.editorStart.retry')
+  );
+  expect(retry).toBeDefined();
+  await act(async () => retry!.click());
+  expect(reload).toHaveBeenCalledOnce();
+});
+
+it('explains a recent project becoming unsupported during activation', async () => {
+  mocks.list.mockResolvedValue([
+    { id: 'changed', name: 'Changed tour', updatedAt: 7, availability: 'available' },
+  ]);
+  openExisting.mockRejectedValueOnce(new UnsupportedScenarioTourError());
+  await render();
+  const row = actions().find((button) => button.textContent?.includes('Changed tour'));
+  expect(row).toBeDefined();
+  await act(async () => row!.click());
+  expect(container.textContent).toContain('scenario.editor.tourUnsupportedOpen');
+  expect(openExisting).toHaveBeenCalledWith('changed');
 });

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { translate } from '../../platform/i18n';
 import {
   COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
   COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
@@ -199,10 +200,19 @@ export function NumericRow({
 }: NumericRowProps) {
   const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
   const inspector = useInspectorLayout();
+  const scaleNoteId = useId();
+  const scrubValue = scrub?.value ?? props.value;
+  const outOfScale = Boolean(
+    scrub &&
+    scrubValue !== null &&
+    scrubValue !== undefined &&
+    (scrubValue < scrub.min || scrubValue > scrub.max)
+  );
 
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-row"
+      data-out-of-scale={outOfScale ? 'true' : undefined}
       data-appearance={appearance}
       data-range-visible={range.visible ? 'true' : 'false'}
       data-has-scrub={scrub ? 'true' : undefined}
@@ -241,6 +251,8 @@ export function NumericRow({
       {scrub ? (
         <NumericRangeScrub
           active={range.active}
+          outOfScale={outOfScale}
+          descriptionId={outOfScale ? scaleNoteId : undefined}
           disabled={props.disabled}
           label={label}
           onActiveChange={range.setActive}
@@ -251,6 +263,11 @@ export function NumericRow({
           value={props.value}
           visible={range.visible}
         />
+      ) : null}
+      {outOfScale ? (
+        <p id={scaleNoteId} className="sniptale-numeric-scale-note">
+          {translate('shared.ui.numericOutsideSliderRange')}
+        </p>
       ) : null}
     </div>
   );

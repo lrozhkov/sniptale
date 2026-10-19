@@ -17,7 +17,7 @@ import {
 } from '../../features/video/project/text/voice-take';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
-import { runReviewSpeechJob } from '../video-review/speech-client';
+import { runReviewSpeechJob } from '../audio-jobs/client';
 import { decodeReviewSpeechDuration } from '../video-review/speech-audio';
 
 /** The mounted editor owns Save and aborts its operation signal when its session ends. */

@@ -1,4 +1,4 @@
-import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { expect, it } from 'vitest';

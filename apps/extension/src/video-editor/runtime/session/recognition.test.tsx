@@ -10,7 +10,7 @@ import { createVideoClipFromAsset } from '../../../features/video/project/factor
 import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import { getVideoProject } from '../../../composition/persistence/projects';
 import { readVideoProjectAudioSource } from '../../../composition/persistence/projects/audio-source';
-import { runReviewSpeechJob } from '../../../workflows/video-review/speech-client';
+import { runReviewSpeechJob } from '../../../workflows/audio-jobs/client';
 import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
 import { waitForVideoEditorSave } from './save-readiness';
 import { useVideoEditorStore } from '../../state/store';
@@ -20,7 +20,7 @@ vi.mock('../../../composition/persistence/projects', () => ({ getVideoProject: v
 vi.mock('../../../composition/persistence/projects/audio-source', () => ({
   readVideoProjectAudioSource: vi.fn(),
 }));
-vi.mock('../../../workflows/video-review/speech-client', () => ({ runReviewSpeechJob: vi.fn() }));
+vi.mock('../../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: vi.fn() }));
 vi.mock('../../../workflows/video-review/speech-audio', () => ({
   extractReviewSpeechWav: vi.fn(async () => new Blob(['wav'])),
   planReviewSpeechChunks: vi.fn(

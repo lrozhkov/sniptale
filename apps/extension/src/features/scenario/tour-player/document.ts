@@ -1,3 +1,5 @@
+import { composeWindowHeaderSvg } from '../../browser-frame/appearance';
+import { buildTourPlaybackPlan } from '../project/tour-playback-plan';
 import interfaceFaces from '@sniptale/ui/styles/fonts?raw';
 import designTokens from '@sniptale/ui/styles/design-tokens?raw';
 import golosVariable from '@sniptale/ui/styles/interface-font?inline';
@@ -9,6 +11,23 @@ import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
+
+/** Passive artwork is disposable and never enters the authored project contract. */
+export function prepareTourWindowHeaders(tour: TourDocument): Record<string, string> {
+  const header = tour.stage.windowHeader;
+  const result: Record<string, string> = {};
+  if (!header) return result;
+  const [aspectWidth, aspectHeight] = tour.stage.aspect.split(':').map(Number);
+  const window = { width: (aspectWidth! / aspectHeight!) * 900, height: 900 };
+  const artwork = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(header, window))}`;
+  for (const slide of tour.slides) {
+    if (slide.kind !== 'image' || !slide.image) continue;
+    const source = slide.image;
+    const key = `${source.width}x${source.height}`;
+    if (!result[key]) result[key] = artwork;
+  }
+  return result;
+}
 
 export interface TourPlayerLabels {
   musicMute?: string;
@@ -40,6 +59,8 @@ export interface TourPlayerLabels {
   authoredView?: string;
   end?: string;
   manual?: string;
+  showHints?: string;
+  hideHints?: string;
   play: string;
   pause: string;
   seek: string;
@@ -128,7 +149,9 @@ function selectAssets<T extends { id: string; mime: string }>(
 ) {
   const required = new Map<string, 'image' | 'audio'>();
   if (tour.stage.image) required.set(tour.stage.image.assetId, 'image');
-  for (const slide of tour.slides) {
+  for (const slide of tour.slides.filter(
+    (slide) => slide.kind === 'navigation' || slide.actions.length
+  )) {
     if (slide.kind === 'image' && slide.requiresTargetReview)
       throw new Error('Tour image targets require review before export.');
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
@@ -172,9 +195,38 @@ async function buildTourPlayerShell(args: {
 }): Promise<readonly [string, string]> {
   const parsed = parseTourDocument(args.tour);
   if (parsed.status !== 'ok') throw new Error('Invalid tour.');
-  const tour = parsed.document;
+  const tour = {
+    ...parsed.document,
+    slides: parsed.document.slides.filter(
+      (slide) => slide.kind === 'navigation' || slide.actions.length
+    ),
+  };
+  const plan = buildTourPlaybackPlan(tour);
+  if (!plan.actionCount) throw new Error('Add an action before exporting the tour.');
+  const actionIds = new Set(
+    plan.entries.flatMap((entry) => (entry.actionId ? [entry.actionId] : []))
+  );
+  for (const slide of tour.slides) {
+    if (
+      slide.kind === 'image' &&
+      slide.actions.some((entry) => entry.type === 'hotspot') &&
+      !slide.image
+    )
+      throw new Error('Missing tour image.');
+    if (
+      slide.kind === 'navigation' &&
+      slide.buttons.some(({ action }) =>
+        action.kind === 'action'
+          ? !actionIds.has(action.actionId)
+          : action.kind === 'slide' &&
+            !plan.entries.some((entry) => entry.sourceSlideId === action.slideId)
+      )
+    )
+      throw new Error('Tour navigation target is missing.');
+  }
   const { audioResources: _materials, ...viewerTour } = tour;
   const payload = {
+    headers: prepareTourWindowHeaders(tour),
     tour: {
       ...viewerTour,
       stage: {
@@ -221,18 +273,32 @@ async function buildTourPlayerShell(args: {
 </section>
 <aside class="tour-hint" data-tour-hint hidden>
 <div class="tour-hint-header">
-<strong class="tour-hint-action-title" data-tour-hint-action-title hidden></strong>
-<button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true">
-<span data-tour-hint-title></span></button>
-<button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">×</button>
+<button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true"
+ aria-label="${escape(labels.collapse)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m6 15 6-6 6 6"/>
+</svg>
+</button>
+<button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m6 6 12 12M6 18 18 6"/>
+</svg>
+</button>
 </div>
 <div class="tour-hint-text" data-tour-hint-text></div>
 <div class="tour-hint-controls">
 <button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">
-${escape(labels.previous)}</button>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m15 18-6-6 6-6"/>
+</svg>
+</button>
 <span data-tour-hint-point-count hidden></span>
 <span data-tour-hint-count hidden></span>
-<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
+<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m9 18 6-6-6-6"/>
+</svg>
+</button>
 </div>
 </aside>
 <dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
@@ -262,6 +328,12 @@ ${escape(labels.previous)}</button>
 </svg>
 </button>
 </div>
+<button id="hints" class="tour-button tour-icon-button" data-tour-hints aria-pressed="true"
+ aria-label="${escape(labels.showHints || labels.details)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-5a8.5 8.5 0 1 1 16-3.5Z"/>
+</svg>
+</button>
 <button class="tour-button tour-contents-trigger" data-tour-contents
  aria-haspopup="dialog" aria-expanded="false"
  aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">

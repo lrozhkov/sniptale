@@ -1,3 +1,5 @@
+import { InspectorDisclosureView } from '../../../ui/compact-inspector-controls/disclosure';
+import { useInspectorDisclosure } from '../../../composition/inspector-disclosures/state';
 import {
   TOUR_HINT_SURFACE,
   type TourTextAppearance,
@@ -20,6 +22,7 @@ export function TourHintStyle({
   disabled: boolean;
   t: Translate;
 }) {
+  const [expanded, setExpanded] = useInspectorDisclosure('hint-style-details', false);
   const resources = useSurfaceStylePresetCatalog();
   const surface = value.surface ?? TOUR_HINT_SURFACE;
   return (
@@ -37,7 +40,6 @@ export function TourHintStyle({
       <ColorField
         triggerVariant="swatch"
         floatingPlacement="side"
-        layout="stacked"
         label={t('scenario.editor.tourTextColor')}
         title={t('scenario.editor.tourTextColor')}
         value={surface.textColor}
@@ -47,21 +49,30 @@ export function TourHintStyle({
         allowTransparent={false}
         onChange={(textColor) => onChange({ ...value, surface: { ...surface, textColor } })}
       />
-      {(
-        [
-          { key: 'width', label: t('scenario.editor.tourHintWidth'), min: 200, max: 640 },
-          { key: 'padding', label: t('scenario.editor.tourHintPadding'), min: 8, max: 24 },
-        ] as const
-      ).map(({ key, ...props }) => (
-        <TourInspectorNumericRow
-          key={key}
-          {...props}
-          value={surface[key]}
-          unit="px"
-          disabled={disabled}
-          onChange={(next) => onChange({ ...value, surface: { ...surface, [key]: next } })}
-        />
-      ))}
+      <InspectorDisclosureView
+        dataUi="scenario-editor.hint-style-details"
+        variant="structural"
+        label={t('scenario.editor.tourAdvancedAppearance')}
+        open={expanded}
+        onOpenChange={setExpanded}
+        bodyClassName="sniptale-parameter-stack"
+      >
+        {(
+          [
+            { key: 'width', label: t('scenario.editor.tourHintWidth'), min: 200, max: 640 },
+            { key: 'padding', label: t('scenario.editor.tourHintPadding'), min: 8, max: 24 },
+          ] as const
+        ).map(({ key, ...props }) => (
+          <TourInspectorNumericRow
+            key={key}
+            {...props}
+            value={surface[key]}
+            unit="px"
+            disabled={disabled}
+            onChange={(next) => onChange({ ...value, surface: { ...surface, [key]: next } })}
+          />
+        ))}
+      </InspectorDisclosureView>
     </div>
   );
 }

@@ -43,21 +43,18 @@ export function GuideHtmlImageFields({
       </div>
       {(frame || value.optimize) && (
         <>
-          <div title={frame ? t('scenario.editor.htmlFrameSizeHint') : undefined}>
+          {!frame && (
             <SelectField
               label={t('scenario.editor.htmlMaxEdge')}
-              disabled={disabled || frame}
+              disabled={disabled}
               value={String(value.maxEdge)}
-              options={htmlImageEdges.map((edge) => ({
-                value: String(edge),
-                label: `${edge} px`,
-              }))}
+              options={htmlImageEdges.map((edge) => ({ value: String(edge), label: `${edge} px` }))}
               onChange={(next) => {
                 const maxEdge = htmlImageEdges.find((edge) => String(edge) === next);
                 if (maxEdge !== undefined) onChange({ maxEdge });
               }}
             />
-          </div>
+          )}
           <SelectField
             label={t('scenario.editor.htmlQuality')}
             disabled={disabled}

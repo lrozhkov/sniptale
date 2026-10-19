@@ -1,5 +1,5 @@
 import { composeWindowHeaderSvg } from '../../../browser-frame/appearance';
-import type { WindowHeader } from '../../../browser-frame/header';
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoProject, VideoProjectClip } from '../../project/types';
 
 /** Content-bound keys prevent a stale async raster from appearing after an edit or undo. */

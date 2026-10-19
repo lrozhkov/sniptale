@@ -1,6 +1,6 @@
 import { InformationDisclosure } from '../../../ui/compact-inspector-controls/disclosure';
 import { ToggleField } from '../../../ui/compact-inspector-controls/controls';
-import { SelectField } from '../../../ui/compact-inspector-controls/controls';
+import { TourChoiceField } from './fields';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Play, Timer } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
@@ -45,6 +45,8 @@ export function TourPlaybackSettings({
         value={tour.playback.minimumHoldSeconds}
         min={0.1}
         max={3600}
+        unit="s"
+        scrub={{ min: 0.1, max: 10, step: 0.1 }}
         step={0.5}
         precision={1}
         disabled={disabled}
@@ -60,7 +62,7 @@ export function TourPlaybackSettings({
 
 /** A slide may override hold time and choose its default branch without changing click actions. */
 export function TourTimingSettings({
-  tour,
+  hasNarration,
   slide,
   disabled,
   onChange,
@@ -68,6 +70,7 @@ export function TourTimingSettings({
 }: {
   tour: TourDocument;
   slide: TourSlide;
+  hasNarration?: boolean;
   disabled: boolean;
   onChange: (slide: TourSlide) => boolean;
   t: Translate;
@@ -78,7 +81,7 @@ export function TourTimingSettings({
   return (
     <GuideInspectorGroup id="timing" icon={Timer} title={t('scenario.editor.tourTiming')}>
       <div className="tour-text-field">
-        <SelectField
+        <TourChoiceField
           label={t('scenario.editor.tourDurationMode')}
           value={timing.mode}
           disabled={disabled}
@@ -97,13 +100,15 @@ export function TourTimingSettings({
             value={timing.holdSeconds}
             min={0.1}
             max={3600}
+            unit="s"
+            scrub={{ min: 0.1, max: 10, step: 0.1 }}
             step={0.5}
             precision={1}
             disabled={disabled}
             onPreview={changeHold}
             onChange={changeHold}
           />
-          {slide.narration && (
+          {(hasNarration ?? Boolean(slide.narration)) && (
             <ToggleField
               disabled={disabled}
               value={timing.truncateNarration}
@@ -118,23 +123,6 @@ export function TourTimingSettings({
           )}
         </>
       )}
-      <div className="tour-text-field">
-        <SelectField
-          label={t('scenario.editor.tourAutomaticTransition')}
-          value={timing.autoplayTarget ?? ''}
-          disabled={disabled}
-          options={[
-            { value: '', label: t('scenario.editor.tourFollowActions') },
-            ...tour.slides.map((entry, index) => ({
-              value: entry.id,
-              label: `${index + 1}. ${entry.title}`,
-            })),
-          ]}
-          onChange={(target) =>
-            onChange({ ...slide, timing: { ...timing, autoplayTarget: target || null } })
-          }
-        />
-      </div>
       <InformationDisclosure label={t('common.actions.details')}>
         <p>{t('scenario.editor.tourTimingHint')}</p>
       </InformationDisclosure>

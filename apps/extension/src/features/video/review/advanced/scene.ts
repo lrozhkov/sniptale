@@ -26,7 +26,7 @@ import {
 } from './spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
-import { windowHeaderGeometry } from '../../../browser-frame/header';
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { fitVideoRect } from '../geometry';
 import { fitQuickEditSourceCrop } from './canvas';
 import type {

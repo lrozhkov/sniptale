@@ -64,8 +64,8 @@ it.each([1, 2])(
     expect(proposal.issues).toEqual([]);
     expect(proposal.tour.slides[0]).toMatchObject({
       image: { width: 800 * dpr, height: 600 * dpr },
-      hotspots: [{ point: { x: 0.25, y: 0.5 } }],
       origin: { stepId: 'step', blockId: 'image' },
+      actions: [{ type: 'hotspot' as const, object: { point: { x: 0.25, y: 0.5 } } }],
     });
     expect(args.project).toEqual(before);
   }
@@ -91,7 +91,9 @@ it('reports selection capture without a known crop instead of inventing a target
   step.blocks[0].source.captureSurface = 'selection';
   const proposal = await prepareTourFromGuide(args);
   expect(proposal.issues).toEqual([{ kind: 'place-hotspot', sourceId: 'image' }]);
-  expect(proposal.tour.slides[0]).toMatchObject({ hotspots: [] });
+  expect(proposal.tour.slides[0]).toMatchObject({
+    actions: [{ type: 'annotation', object: { text: '' } }],
+  });
 });
 it('honors cancellation without allocating or modifying a project', async () => {
   const controller = new AbortController();
