@@ -8,6 +8,7 @@ export function reviewKeyboardTarget(event: Pick<KeyboardEvent, 'target'>): HTML
   if (!(target instanceof HTMLElement) || target.closest(hidden)) return null;
   const editor = target.closest(editorSelector);
   if (!editor) return null;
+  if (editor.querySelector('[data-ui="gallery.videoReview.modeChoice"]')) return null;
   if (
     Array.from(editor.querySelectorAll(layers)).some(
       (layer) => !layer.closest(hidden) && getComputedStyle(layer).display !== 'none'

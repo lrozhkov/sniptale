@@ -172,6 +172,7 @@ function reviewAdvancedUiCommands(
         ui: {
           ...current.ui,
           mode,
+          ...(current.ui.modeSelectionPending === undefined ? {} : { modeSelectionPending: false }),
           advancedTracksInitialized:
             current.ui.advancedTracksInitialized ||
             current.ui.mode === 'advanced' ||

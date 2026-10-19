@@ -6,7 +6,7 @@ import {
 } from '../../../../apps/extension/src/features/video/review/document';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
-import { addReviewFocus } from './quick-editor-media-fixture';
+import { addReviewFocus, installReviewModeChoice } from './quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from './native-review-workspace';
 import type { applyHarnessBootstrap } from '../extension-critical.helpers';
 
@@ -34,6 +34,7 @@ export async function applyCameraPolicyBootstrap(
 }
 
 export async function openGalleryCursorScene(page: Page, locale: 'ru' | 'en' = 'en') {
+  await installReviewModeChoice(page);
   const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
   await page.locator('[data-ui="gallery.videoReview.enter"]').click();

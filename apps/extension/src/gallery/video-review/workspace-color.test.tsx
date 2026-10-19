@@ -4,6 +4,35 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { useReviewWorkspaceColor } from './workspace-color';
 
+it('resolves the automatic workspace color after the initial mode choice', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  document.body.dataset['theme'] = 'light';
+  const root = createRoot(host);
+  const change = vi.fn();
+  let control!: ReturnType<typeof useReviewWorkspaceColor>;
+  function Harness({ ready }: { ready: boolean }) {
+    const container = useRef<HTMLDivElement>(null);
+    control = useReviewWorkspaceColor(container, undefined, change, ready);
+    return ready ? (
+      <div
+        ref={container}
+        style={{ '--sniptale-color-surface-canvas': '#123456' } as React.CSSProperties}
+      />
+    ) : null;
+  }
+  try {
+    act(() => root.render(<Harness ready={false} />));
+    act(() => root.render(<Harness ready />));
+    expect(control.value).toBe('#123456ff');
+    expect(change).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    delete document.body.dataset['theme'];
+  }
+});
+
 it('cancels previews on theme changes and resets only the current saved override', async () => {
   const host = document.createElement('div');
   document.body.append(host);

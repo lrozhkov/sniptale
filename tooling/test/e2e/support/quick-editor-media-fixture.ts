@@ -18,6 +18,27 @@ import { betaV1Fixture } from '../../../../apps/extension/src/composition/persis
 /** The immutable fixture writer needs page evaluation, never a browser or worker attachment. */
 export interface ReviewMediaFixtureWriter {
   evaluate<Arg>(writer: (argument: Arg) => Promise<void>, argument: Arg): Promise<void>;
+  locator?: Page['locator'];
+  addLocatorHandler?: Page['addLocatorHandler'];
+}
+
+const modeChoicePages = new WeakSet<
+  Pick<ReviewMediaFixtureWriter, 'locator' | 'addLocatorHandler'>
+>();
+
+export async function installReviewModeChoice(
+  page: Pick<ReviewMediaFixtureWriter, 'locator' | 'addLocatorHandler'>,
+  mode: 'basic' | 'advanced' = 'basic'
+) {
+  if (!page.locator || !page.addLocatorHandler || modeChoicePages.has(page)) return;
+  const choice = page.locator(`[data-ui="gallery.videoReview.modeChoice.${mode}"]`);
+  await page.addLocatorHandler(
+    page.locator('[data-ui="gallery.videoReview.modeChoice"]'),
+    async () => {
+      await choice.click();
+    }
+  );
+  modeChoicePages.add(page);
 }
 
 export async function seedReviewVideo(
@@ -27,8 +48,10 @@ export async function seedReviewVideo(
   gaps = false,
   history = false,
   source?: { bytes: Uint8Array; mimeType: 'video/webm' | 'video/mp4' },
-  recordingPoint?: { x: number; y: number }
+  recordingPoint?: { x: number; y: number },
+  options: { modeChoice?: 'basic' | 'advanced' | 'manual' } = {}
 ) {
+  if (options.modeChoice !== 'manual') await installReviewModeChoice(page, options.modeChoice);
   let bytes = source
     ? Buffer.from(source.bytes)
     : await readFile(new URL(`../fixtures/${filename}`, import.meta.url));

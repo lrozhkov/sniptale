@@ -61,11 +61,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, resource, persistence, capture, or recovery authority. Remove when the analyzer models this cohesive UI receiver. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "57581854484820d39813f4d9305955c0c417758b041a7cff69f2fe2551165457",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, resource lifetime, persistence writer, keyboard authority or recovery policy. Remove when the analyzer models this cohesive UI receiver. Fresh complete-candidate architecture review must validate this classification.",
+      "astHash": "ba7175e3ea589c354571e11a640a5485967d0216b370e872b2048f8cf5541335",
       "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
-      "reason": "tool-noise: The existing editor composes preview, inspector, and timeline in one grid. This candidate moves the existing recorder into an inspector slot and restricts inert to unrelated controls. The176-line JSX body has14 statements and score3 delta0. Capture, playback, persistence, and recovery remain in their existing owners. A forwarding-only JSX adapter would distribute the same composition. Main inspected the exact body and native mounted-identity/save proof. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-17"
+      "reason": "tool-noise: The existing editor receiver adds a conditional initial-mode screen before its editor JSX. The pending flag comes from the existing advanced UI projection. Selection delegates to the existing setMode command and autosave owner. Leaving delegates to onBack. The chooser adds no durable state, transport, resource or recovery authority. Existing hooks retain their owners and call order. Readiness informs the existing panel and color owners when their DOM attaches. The 183-line function has 17 statements, nesting1 and no direct state or effect authority. A forwarding-only JSX split would distribute the same composition. Independent mode_structural_prewrite and quick_mode_architecture_review inspection supports Keep. Fresh complete-candidate architecture review remains required.",
+      "reviewDate": "2026-10-19"
     },
     {
       "rule": "structural-file-risk",
@@ -94,10 +94,10 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: One typed RU/EN track-order label extends the existing static message catalog. The catalog has no runtime authority, effects, or state; score2 delta0 and cohesion1. Splitting a label would fragment its existing semantic catalog. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-17",
-      "astHash": "5488899ed9193c7f18dec85cf063665df86504ab590b41e8cb2b26357aa8d894",
+      "reason": "tool-noise: The candidate adds typed RU/EN initial-mode titles, descriptions and a later-switch hint to the existing video-review message catalog. The file remains static locale data with no state, effects, external dependency edges or runtime authority and cohesion1. Splitting these messages only to satisfy the file cap would fragment their existing semantic catalog. Independent mode_structural_prewrite inspection supports Keep. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable behavior, mutable state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "84fdbb648be512db29387a8d5b8c9c9222b7fcd95d3f6c9fe07e0afd08601403",
       "signatureHash": "401666a2c5baa7b93761dc388924bab5516dc4c098271f424f4811eccf1344ef"
     },
     {
@@ -512,10 +512,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence:review-workspaces",
-      "reason": "tool-noise: The cursor-only candidate is replaced by a shared pure cursor/master candidate. Source identity, CAS admission, strict transaction, validation, commit/abort and cleanup remain in the existing store protocol. The helper creates no writer or independent transaction authority. Independent track_controls_structural_diagnosis inspected this correction. Fresh corrected-candidate architecture review remains required.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess a new state authority, runtime, independent transaction or recovery policy. Remove when structural analysis models this cohesive transaction owner.",
-      "reviewDate": "2026-10-15",
-      "astHash": "9092965c52cbb284922de199d4968d193c7eda9b2f652c7bcffe54ceda0d09d6",
+      "reason": "tool-noise: The candidate adds the pending initial-mode preference only in the new-workspace branch of openVideoWorkspace. Existing workspaces return through the existing branch. Source admission, validation, strict transaction, revision checks, commit, abort and cleanup remain in the existing store protocol. The candidate introduces no additional writer, transaction or recovery authority. Moving this creation-only field into a forwarding helper would distribute the same transaction. Independent mode_structural_prewrite inspection supports Keep. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any additional writer, transaction, state authority, source-admission policy or recovery lifetime. Remove when the analyzer models this cohesive transaction owner. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "09537278d38db5493ba23e95043e67b457c450e3e76927117a330f1883a32ce3",
       "signatureHash": "0d394a6f4302cc17c058195d5d41f56c7919e652c64a8628c0e7a5c267fbb155"
     },
     {

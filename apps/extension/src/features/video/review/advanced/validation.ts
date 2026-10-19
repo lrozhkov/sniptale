@@ -171,6 +171,8 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   if (!lockedTracks) return null;
   const initialized = value['advancedTracksInitialized'];
   if (initialized !== undefined && typeof initialized !== 'boolean') return null;
+  const modeSelectionPending = value['modeSelectionPending'];
+  if (modeSelectionPending !== undefined && typeof modeSelectionPending !== 'boolean') return null;
   const workspaceColors = parseWorkspaceColors(value['workspaceColors']);
   if (!workspaceColors) return null;
   const tracks = parseTrackVisibility(value['tracks']);
@@ -180,6 +182,7 @@ function parseUiState(value: unknown): QuickEditUiState | null {
     ...(value['workspaceColors'] === undefined ? {} : { workspaceColors }),
     ...(value['lockedTracks'] === undefined ? {} : { lockedTracks }),
     mode: value['mode'],
+    ...(modeSelectionPending === undefined ? {} : { modeSelectionPending }),
     ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
     overlaysVisible: value['overlaysVisible'] === false ? false : true,

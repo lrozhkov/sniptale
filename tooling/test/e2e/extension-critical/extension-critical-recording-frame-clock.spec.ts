@@ -14,6 +14,7 @@ import {
 import type { RecordingFrameClockAnchor } from '../../../../apps/extension/src/contracts/video/recording-frame-clock';
 import { resolveBrowserViewport } from '../support/browser-viewport';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
+import { installReviewModeChoice } from '../support/quick-editor-media-fixture';
 
 import {
   sendRuntimeMessage,
@@ -564,6 +565,7 @@ for (const { resolution, fault, crop } of [
             `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
           );
           await gallery.getByRole('button', { name: filename, exact: true }).first().click();
+          await installReviewModeChoice(gallery);
           await gallery.locator('[data-ui="gallery.videoReview.enter"]').click();
           const strip = gallery.locator('[data-ui="gallery.videoReview.historyStrip"]');
           await expect(strip.locator('button').first()).toBeVisible();

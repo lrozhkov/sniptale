@@ -58,7 +58,7 @@ const resizeKeys: readonly string[] = [
 ];
 
 /** Mounted-editor preferences; effective bounds never overwrite the user's requested sizes. */
-export function useReviewPanelLayout(enabled: boolean) {
+export function useReviewPanelLayout(enabled: boolean, ready = true) {
   const container = useRef<HTMLDivElement>(null);
   const timeline = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
@@ -87,6 +87,7 @@ export function useReviewPanelLayout(enabled: boolean) {
     if (!enabled) finish(true);
   }, [enabled, finish]);
   useEffect(() => {
+    if (!ready) return;
     const node = container.current;
     if (!node) return;
     const measure = () => {
@@ -119,7 +120,7 @@ export function useReviewPanelLayout(enabled: boolean) {
       window.removeEventListener('blur', cancel);
       finish(false);
     };
-  }, [finish]);
+  }, [finish, ready]);
   const update = (panel: Panel, value: number | null) => {
     if (!current.current.enabled) return;
     const { min, max } = current.current.bounds[panel];
