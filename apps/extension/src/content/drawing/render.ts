@@ -16,9 +16,11 @@ import {
   resolveDrawingTextFontFamily,
   traceDrawingTextBackground,
   type DrawingObject,
+  type DrawingBounds,
   type DrawingPoint,
 } from '../../features/drawing/public';
 import { drawRoughArrow } from './rough-arrow';
+import { getDrawingMultiRotationHandlePoint } from './interaction';
 
 export interface DrawingViewportProjection {
   readonly x: number;
@@ -328,15 +330,27 @@ export function renderDrawingSelection(
 export function renderDrawingMultiSelection(
   context: CanvasRenderingContext2D,
   objects: readonly DrawingObject[],
-  projection: DrawingViewportProjection
+  projection: DrawingViewportProjection,
+  rotation?: { bounds: DrawingBounds; angle: number }
 ): void {
-  const bounds = getDrawingSelectionBounds(objects);
+  const bounds = rotation?.bounds ?? getDrawingSelectionBounds(objects);
   if (!bounds) return;
   context.save();
+  if (rotation) {
+    const center = viewportPoint(getDrawingBoundsCenter(bounds), projection);
+    context.translate(center.x, center.y);
+    context.rotate((rotation.angle * Math.PI) / 180);
+    context.translate(-center.x, -center.y);
+  }
   context.strokeStyle = '#2563eb';
   context.lineWidth = 1;
   context.setLineDash([4, 3]);
   context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
+  context.setLineDash([]);
+  renderDrawingRotationControl(
+    context,
+    viewportPoint(getDrawingMultiRotationHandlePoint(bounds), projection)
+  );
   context.restore();
 }
 

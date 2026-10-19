@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { RefObject } from 'react';
 import {
   getDrawingObjectRotation,
+  getDrawingSelectionBounds,
   hitTestDrawingDocument,
   resolveDrawingToolCursor,
   type DrawingObject,
@@ -18,6 +19,7 @@ import { resolveDrawingFrameRenderables } from './frame-renderables';
 import { handleDrawingKeyDown, useDrawingEscapeOwnership } from './keyboard';
 import {
   getDrawingViewportProjection,
+  isDrawingMultiRotationHandle,
   resolveDrawingResizeHandle,
   resolveDrawingRotationHandle,
   toDrawingScenePoint,
@@ -124,7 +126,7 @@ function resolveDrawingCanvasHoverCursor(args: {
   const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
   if (!args.active) return baseCursor;
   const draft = args.pointer.draftRef.current;
-  if (draft?.kind === 'rotate') return 'grabbing';
+  if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
   if (draft?.kind === 'resize')
     return resolveDrawingResizeCursor(draft.handle, true, getDrawingObjectRotation(draft.original));
   const selected =
@@ -135,6 +137,14 @@ function resolveDrawingCanvasHoverCursor(args: {
       : null;
   const rotationHandle = selected ? resolveDrawingRotationHandle(selected, args.point) : null;
   if (rotationHandle) return 'grab';
+  if (args.snapshot.selectedObjectIds.length > 1) {
+    const bounds = getDrawingSelectionBounds(
+      args.snapshot.document.objects.filter((object) =>
+        args.snapshot.selectedObjectIds.includes(object.id)
+      )
+    );
+    if (bounds && isDrawingMultiRotationHandle(bounds, args.point)) return 'grab';
+  }
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
   if (handle && selected)
     return resolveDrawingResizeCursor(handle, false, getDrawingObjectRotation(selected));
@@ -164,7 +174,7 @@ function resolveDrawingResizeCursor(
 
 function isNonTextSelectionDrag(draft: PointerDraft | null): boolean {
   if (!draft) return false;
-  if (draft.kind === 'move-selection')
+  if (draft.kind === 'move-selection' || draft.kind === 'rotate-selection')
     return draft.originals.every((object) => object.kind !== 'text');
   return (
     (draft.kind === 'move' || draft.kind === 'resize' || draft.kind === 'rotate') &&
@@ -207,7 +217,7 @@ function createDrawingPointerHandlers(args: {
       const draft = pointer.draftRef.current;
       setSelectionDragHidden(isNonTextSelectionDrag(draft));
       textGestureRef.current =
-        draft?.kind === 'rotate'
+        draft?.kind === 'rotate' || draft?.kind === 'rotate-selection'
           ? { dragged: true, start: toDrawingScenePoint(event, root) }
           : (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
             ? { dragged: false, start: toDrawingScenePoint(event, root) }

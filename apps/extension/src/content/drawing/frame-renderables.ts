@@ -10,7 +10,7 @@ export function resolveDrawingFrameRenderables(
   draft: PointerDraft | null
 ): DrawingFrameRenderable[] {
   let movedById: Map<string, DrawingObject> | null = null;
-  if (draft?.kind === 'move-selection') {
+  if (draft?.kind === 'move-selection' || draft?.kind === 'rotate-selection') {
     movedById = new Map();
     for (const object of draft.objects) {
       if (!movedById.has(object.id)) movedById.set(object.id, object);
@@ -18,7 +18,7 @@ export function resolveDrawingFrameRenderables(
   }
   const committed = objects.map((object) => ({
     object:
-      draft?.kind === 'move-selection'
+      draft?.kind === 'move-selection' || draft?.kind === 'rotate-selection'
         ? (movedById?.get(object.id) ?? object)
         : draft &&
             draft.kind !== 'create' &&

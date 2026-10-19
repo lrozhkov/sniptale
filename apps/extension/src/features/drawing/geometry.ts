@@ -346,6 +346,32 @@ export function translateDrawingObject(object: DrawingObject, delta: DrawingPoin
   return { ...object, bounds: { ...object.bounds, ...move(object.bounds) } };
 }
 
+/** Applies one rigid rotation without changing local dimensions or stroke geometry. */
+export function rotateDrawingObjectAround(
+  object: DrawingObject,
+  center: DrawingPoint,
+  degrees: number
+): DrawingObject {
+  const delta = ((((degrees + 180) % 360) + 360) % 360) - 180;
+  if (delta === 0) return object;
+  if (object.kind === 'arrow') {
+    return {
+      ...object,
+      start: rotateDrawingPoint(object.start, center, delta),
+      end: rotateDrawingPoint(object.end, center, delta),
+    };
+  }
+  const originalCenter = getDrawingBoundsCenter(getDrawingObjectBounds(object));
+  const nextCenter = rotateDrawingPoint(originalCenter, center, delta);
+  return translateDrawingObject(
+    {
+      ...object,
+      rotation: ((((getDrawingObjectRotation(object) + delta + 180) % 360) + 360) % 360) - 180,
+    },
+    { x: nextCenter.x - originalCenter.x, y: nextCenter.y - originalCenter.y }
+  );
+}
+
 export function replaceDrawingObjectBounds(
   object: DrawingObject,
   nextBounds: DrawingBounds

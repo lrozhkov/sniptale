@@ -11,6 +11,7 @@ import type { PageScrollRoot } from '../platform/page-scroll';
 import {
   resizeDrawingObject,
   rotateDrawingObject,
+  rotateDrawingSelection,
   toDrawingScenePoint,
   type PointerDraft,
 } from './interaction';
@@ -62,6 +63,14 @@ export function updateDrawingPointerDraft(args: {
   root: PageScrollRoot;
 }): { draft: PointerDraft; selection?: readonly string[] } {
   const { draft, event, point } = args;
+  if (draft.kind === 'rotate-selection') {
+    return {
+      draft: rotateDrawingSelection(draft, point, {
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+      }),
+    };
+  }
   if (draft.kind === 'create') return { draft: updateCreateDraft(draft, event, args.root) };
   if (draft.kind === 'move') {
     return {

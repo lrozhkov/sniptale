@@ -8,7 +8,108 @@ import {
   hitTestDrawingObject,
   replaceDrawingObjectBounds,
   translateDrawingObject,
+  rotateDrawingObjectAround,
+  rotateDrawingPoint,
+  getDrawingBoundsCenter,
+  transformDrawingObjectPoint,
 } from './geometry';
+import type { DrawingObject } from './model';
+
+it('rigidly rotates mixed geometry around one pivot without changing styles or local sizes', () => {
+  const objects: DrawingObject[] = [
+    {
+      id: 'shape',
+      kind: 'parallelogram',
+      bounds: { x: 10, y: 20, width: 80, height: 40 },
+      width: 4,
+      color: '#123456',
+      rotation: 25,
+      skewX: 12,
+    },
+    {
+      id: 'text',
+      kind: 'text',
+      bounds: { x: 150, y: 30, width: 120, height: 60 },
+      text: 'Two\nlines',
+      color: '#0000',
+      backgroundColor: '#f97316',
+      fontSize: 20,
+      rotation: -15,
+    },
+    {
+      id: 'path',
+      kind: 'marker',
+      samples: [
+        { x: 12, y: 140, t: 1 },
+        { x: 100, y: 180, t: 8 },
+      ],
+      color: '#000',
+      opacity: 0.4,
+      width: 12,
+      rotation: 10,
+    },
+    {
+      id: 'arrow',
+      kind: 'arrow',
+      start: { x: 170, y: 180 },
+      end: { x: 260, y: 200 },
+      color: '#000',
+      width: 8,
+      dynamicWidth: true,
+    },
+    { id: 'blur', kind: 'blur', bounds: { x: 30, y: 220, width: 90, height: 45 }, amount: 8 },
+  ];
+  const pivot = { x: 130, y: 110 };
+  for (const original of objects) {
+    expect(rotateDrawingObjectAround(original, pivot, 360)).toBe(original);
+    const rotated = rotateDrawingObjectAround(original, pivot, 90);
+    const restored = rotateDrawingObjectAround(rotated, pivot, -90);
+    expect(rotated.id).toBe(original.id);
+    if (original.kind === 'arrow' && rotated.kind === 'arrow') {
+      expect(rotated.start.x).toBeCloseTo(60);
+      expect(rotated.start.y).toBeCloseTo(150);
+      expect(
+        Math.hypot(rotated.end.x - rotated.start.x, rotated.end.y - rotated.start.y)
+      ).toBeCloseTo(
+        Math.hypot(original.end.x - original.start.x, original.end.y - original.start.y)
+      );
+      expect(rotated.width).toBe(original.width);
+    } else {
+      const expectedCenter = rotateDrawingPoint(
+        getDrawingBoundsCenter(getDrawingObjectBounds(original)),
+        pivot,
+        90
+      );
+      const center = getDrawingBoundsCenter(getDrawingObjectBounds(rotated));
+      expect(center.x).toBeCloseTo(expectedCenter.x, 3);
+      expect(center.y).toBeCloseTo(expectedCenter.y, 3);
+      const originalBounds = getDrawingObjectBounds(original);
+      const sample = transformDrawingObjectPoint(original, originalBounds);
+      const expectedSample = rotateDrawingPoint(sample, pivot, 90);
+      const actualSample = transformDrawingObjectPoint(rotated, getDrawingObjectBounds(rotated));
+      expect(actualSample.x).toBeCloseTo(expectedSample.x, 3);
+      expect(actualSample.y).toBeCloseTo(expectedSample.y, 3);
+    }
+    const originalBounds = getDrawingObjectBounds(original);
+    const restoredBounds = getDrawingObjectBounds(restored);
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(restoredBounds[key]).toBeCloseTo(originalBounds[key], 3);
+    if ('bounds' in original && 'bounds' in rotated) {
+      expect(rotated.bounds.width).toBe(original.bounds.width);
+      expect(rotated.bounds.height).toBe(original.bounds.height);
+    }
+    if (original.kind === 'text' && rotated.kind === 'text')
+      expect(rotated).toMatchObject({
+        text: original.text,
+        fontSize: original.fontSize,
+        backgroundColor: original.backgroundColor,
+      });
+    if (original.kind === 'parallelogram' && rotated.kind === 'parallelogram')
+      expect(rotated.skewX).toBe(original.skewX);
+    if (original.kind === 'marker' && rotated.kind === 'marker')
+      expect(rotated.samples.map(({ t: timestamp }) => timestamp)).toEqual([1, 8]);
+  }
+});
 
 it('normalizes reverse drags and selects the topmost object', () => {
   expect(createDrawingBounds({ x: 20, y: 30 }, { x: 5, y: 10 })).toEqual({

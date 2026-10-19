@@ -70,7 +70,13 @@ export function drawDrawingFrame(args: {
       .map(({ object }) => object)
       .filter((object) => selectedIds.includes(object.id));
     if (selected.length === 1) renderDrawingSelection(context, selected[0]!, projection);
-    else renderDrawingMultiSelection(context, selected, projection);
+    else
+      renderDrawingMultiSelection(
+        context,
+        selected,
+        projection,
+        draft?.kind === 'rotate-selection' ? draft : undefined
+      );
   }
   context.restore();
 }

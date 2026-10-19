@@ -18,11 +18,15 @@ import { DRAWING_SELECTION_ACCENT } from './chrome';
 
 type DrawingArrow = Extract<DrawingObject, { kind: 'arrow' }>;
 type ArrowEndpoint = 'start' | 'end';
-const arrowControlAnchors = new WeakMap<FabricObject, Record<ArrowEndpoint, Point>>();
+const arrowControlAnchors = new WeakMap<
+  FabricObject,
+  Record<ArrowEndpoint, Point> & { path: Path['path'] | null }
+>();
 
 export function syncDrawingArrowControlAnchors(object: FabricObject, drawing: DrawingArrow): void {
   const sceneToObject = util.invertTransform(object.calcTransformMatrix());
   arrowControlAnchors.set(object, {
+    path: object instanceof Path ? object.path : null,
     start: new Point(drawing.start.x, drawing.start.y).transform(sceneToObject),
     end: new Point(drawing.end.x, drawing.end.y).transform(sceneToObject),
   });
@@ -37,6 +41,10 @@ function toViewportPoint<
   endpoint: ArrowEndpoint,
   point: { x: number; y: number }
 ): Point {
+  if (arrowControlAnchors.get(object)?.path !== object.path) {
+    const drawing = readEditorDrawingObject(object);
+    if (drawing?.kind === 'arrow') syncDrawingArrowControlAnchors(object, drawing);
+  }
   const anchor = arrowControlAnchors.get(object)?.[endpoint];
   return (anchor ?? new Point(point.x, point.y).subtract(object.pathOffset)).transform(
     util.multiplyTransformMatrices(object.getViewportTransform(), object.calcTransformMatrix())
