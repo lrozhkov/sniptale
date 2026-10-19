@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types/model';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readNativeVideoProject as readProject } from '../support/native-video-project';
@@ -1010,11 +1011,23 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
             fullPage: false,
           });
         }
+        if (input === 'file') {
+          await page.setViewportSize({ ...variant.size });
+          const edited = await readProject(page);
+          if (!edited) throw new Error('Missing edited project');
+          await deleteAcceptedVoiceText(page, text, edited, label, (name) => info.outputPath(name));
+        }
         await page.reload();
         await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
         const reopened = await readProject(page);
         expect(reopened?.clips.find((clip) => clip.id === take?.id)).toEqual(take);
         await page.setViewportSize({ ...variant.size });
+        if (input === 'file') {
+          expect(reopened?.textDocuments?.[0]?.document.fragments).toEqual([]);
+          expect(reopened?.clips).toEqual(accepted?.clips);
+          expect(reopened?.assets).toEqual(accepted?.assets);
+          await verifyRetainedVoicePlayback(page, label, (name) => info.outputPath(name));
+        }
         if (originalAudioMute && take?.type === 'AUDIO')
           await verifyOriginalAudioRestore(page, take, label, (name) => info.outputPath(name));
         if (input === 'ai' && take?.type === 'AUDIO')
@@ -1025,6 +1038,86 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
       }
     });
   }
+}
+
+async function deleteAcceptedVoiceText(
+  page: Page,
+  text: Locator,
+  accepted: VideoProject,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => string
+) {
+  await operate(
+    text.getByRole('button', { name: label('gallery.videoReview.textFragmentDelete'), exact: true })
+  );
+  const fragments = async () => (await readProject(page))?.textDocuments?.[0]?.document.fragments;
+  await expect.poll(fragments).toEqual([]);
+  const deleted = await readProject(page);
+  expect(deleted?.clips).toEqual(accepted.clips);
+  expect(deleted?.tracks).toEqual(accepted.tracks);
+  expect(deleted?.assets).toEqual(accepted.assets);
+  await page.screenshot({ path: capture('voice-text-deleted.png'), fullPage: false });
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+  await expect.poll(fragments).toEqual(accepted.textDocuments?.[0]?.document.fragments);
+  expect((await readProject(page))?.clips).toEqual(accepted.clips);
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+  await expect.poll(fragments).toEqual([]);
+  expect((await readProject(page))?.clips).toEqual(accepted.clips);
+}
+
+async function verifyRetainedVoicePlayback(
+  page: Page,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => string
+) {
+  await operate(
+    page.getByRole('button', {
+      name: label('videoEditor.timeline.seekToEnd'),
+      exact: true,
+    })
+  );
+  // The full take extends the project; the transport remains mounted beyond the ruler viewport.
+  const previous = page.getByRole('button', {
+    name: label('videoEditor.timeline.previousFrame'),
+    exact: true,
+  });
+  for (let frame = 0; frame < 60; frame++) await previous.click();
+  const expectedHash = createHash('sha256').update(syntheticSpeechWav(12)).digest('hex');
+  const viewer = page.locator('[data-ui="video-editor.workspace.viewer"]');
+  // Identify the retained take by its actual bytes, independently of media-bank order.
+  await expect
+    .poll(() =>
+      viewer.locator('audio').evaluateAll(async (nodes, expected) => {
+        for (const node of nodes) {
+          if (!node.src) continue;
+          const bytes = await (await fetch(node.src)).arrayBuffer();
+          const digest = await crypto.subtle.digest('SHA-256', bytes);
+          const hash = Array.from(new Uint8Array(digest), (v) =>
+            v.toString(16).padStart(2, '0')
+          ).join('');
+          if (hash !== expected) continue;
+          node.setAttribute('data-retained-voice', 'true');
+          return true;
+        }
+        return false;
+      }, expectedHash)
+    )
+    .toBe(true);
+  const audio = viewer.locator('audio[data-retained-voice="true"]');
+  await expect.poll(() => audio.evaluate((node) => node.duration)).toBeCloseTo(12, 3);
+  const start = await audio.evaluate((node) => node.currentTime);
+  await operate(
+    page.getByRole('button', { name: label('videoEditor.timeline.play'), exact: true })
+  );
+  await expect
+    .poll(() => audio.evaluate((node) => !node.paused && node.currentTime > 10.05))
+    .toBe(true);
+  expect(await audio.evaluate((node) => node.currentTime)).toBeGreaterThan(start + 0.05);
+  expect(await audio.evaluate((node) => node.error)).toBeNull();
+  await operate(
+    page.getByRole('button', { name: label('videoEditor.timeline.pause'), exact: true })
+  );
+  await page.screenshot({ path: capture('voice-retained-reopened.png'), fullPage: false });
 }
 
 async function holdSecondBatchRequest(page: Page) {
