@@ -1,3 +1,4 @@
+import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
 import { editMotionBlurPhase } from '../../../features/video/project/motion/blur';
 import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
@@ -228,6 +229,15 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
         const target = project.motionRegions?.find((region) => region.id === motionRegionId);
+        const transition =
+          patch.motionTransitionPhase === undefined
+            ? undefined
+            : target && editMotionTransitionPhase(target, patch.motionTransitionPhase);
+        if (
+          patch.motionTransitionPhase !== undefined &&
+          (!target || transition === null || transition === target)
+        )
+          return project;
         const phases =
           patch.motionBlurPhase === undefined
             ? undefined
@@ -255,9 +265,19 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
                   })
                 : region;
             }
-            const { sourceClipId, cameraFollow, motionBlurPhase: _phase, ...properties } = patch;
+            const {
+              sourceClipId,
+              cameraFollow,
+              motionBlurPhase: _phase,
+              motionTransitionPhase: _transition,
+              ...properties
+            } = patch;
             if (sourceClipId !== undefined && region.duration <= 0) return region;
-            let updated = { ...region, ...properties, ...(phases ? { motionBlur: phases } : {}) };
+            let updated = {
+              ...(transition ?? region),
+              ...properties,
+              ...(phases ? { motionBlur: phases } : {}),
+            };
             if (cameraFollow !== undefined) {
               const { cameraFollow: _previous, ...rest } = updated;
               updated = cameraFollow ? { ...rest, cameraFollow } : rest;

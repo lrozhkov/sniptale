@@ -1,3 +1,4 @@
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { recordingIdForProjectAsset } from '../../../features/video/project/source-interactions';
 import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
@@ -278,8 +279,7 @@ function bindSelectedCameraRegions(
 ): VideoProject {
   const camera = selected.flatMap((row) => (row.region ? [row.region] : []));
   if (!camera.length) return project;
-  return {
-    ...project,
+  return applyVideoProjectMutationPatch(project, {
     motionRegions: [
       ...(project.motionRegions ?? []).filter(
         (region) =>
@@ -293,7 +293,7 @@ function bindSelectedCameraRegions(
       ),
       ...camera,
     ],
-  };
+  });
 }
 
 export async function prepareAutoProcessing(

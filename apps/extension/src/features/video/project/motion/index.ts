@@ -1,3 +1,6 @@
+import { parseMotionPhaseTransitions } from './transitions';
+import type { MotionPhaseTransitions } from './transitions';
+import { motionTransitionSettings } from './timing';
 import { parseMotionBlurPhases } from './blur';
 import { parseMotionSourceBinding, projectMotionSourceBinding } from './source-binding';
 import {
@@ -171,9 +174,11 @@ export function resolveMotionOverlayZoomMode(
 
 export function createVideoProjectMotionRegion(
   project: Pick<VideoProject, 'height' | 'width' | 'cursorFocusPath'>,
-  startTime: number
+  startTime: number,
+  phaseTransitions?: MotionPhaseTransitions
 ): VideoProjectMotionRegion {
   return {
+    ...(phaseTransitions ? { phaseTransitions: { ...phaseTransitions } } : {}),
     duration: 2.8,
     easing: VideoTemporalEasing.EASE_IN_OUT,
     focusArea: null,
@@ -211,10 +216,15 @@ export function normalizeVideoProjectMotionRegion(
   const startTime = resolveMotionStartTime(project.duration, region.startTime, duration);
   const cameraFollow = parseCameraFollowSettings(region.cameraFollow);
   const motionBlur = parseMotionBlurPhases(region.motionBlur);
+  const phaseTransitions = parseMotionPhaseTransitions(region.phaseTransitions);
+  const phaseRegion = phaseTransitions ? { ...region, phaseTransitions } : region;
+  const enter = motionTransitionSettings(phaseRegion, 'enter');
+  const exit = motionTransitionSettings(phaseRegion, 'exit');
 
   return projectMotionSourceBinding(project, {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(motionBlur ? { motionBlur } : {}),
+    ...(phaseTransitions ? { phaseTransitions } : {}),
     ...(sourceBinding ? { sourceBinding } : {}),
     ...(animation ? { animation } : {}),
     ...(incomingConnection ? { incomingConnection } : {}),
@@ -234,12 +244,12 @@ export function normalizeVideoProjectMotionRegion(
     startTime,
     targetAction,
     zoomInDuration: clampNumber(
-      Number.isFinite(region.zoomInDuration) ? region.zoomInDuration : 0,
+      Number.isFinite(enter.duration) ? enter.duration : 0,
       0,
       animationDuration
     ),
     zoomOutDuration: clampNumber(
-      Number.isFinite(region.zoomOutDuration) ? region.zoomOutDuration : 0,
+      Number.isFinite(exit.duration) ? exit.duration : 0,
       0,
       animationDuration
     ),

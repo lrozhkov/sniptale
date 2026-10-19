@@ -1,3 +1,4 @@
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { hydrateVideoProject } from '../../../features/video/project/hydration';
@@ -224,5 +225,25 @@ it('records blur through actual history, refuses invalid edits and keeps retries
   expect(store.getState().project?.sceneBackground?.blur).toBe(12.5);
   store.getState().redoProject();
   expect(store.getState().project?.sceneBackground?.blur).toBe(0);
+  store.setState(store.getInitialState(), true);
+});
+
+it('creates new phase curves through the actual project mutation and history', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createProject([createVideoClip({ duration: 8, sourceDuration: 8 })]));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.addMotionRegion(1);
+  const project = store.getState().project!;
+  expect(project.version).toBe(18);
+  expect(project.motionRegions?.[0]?.phaseTransitions).toEqual({
+    enter: 'ease-in-out',
+    exit: 'ease-in-out',
+  });
+  expect(isHydratableVideoProject(project)).toBe(true);
+  store.getState().undoProject();
+  expect(store.getState().project?.motionRegions ?? []).toHaveLength(0);
+  store.getState().redoProject();
+  expect(store.getState().project?.motionRegions).toEqual(project.motionRegions);
   store.setState(store.getInitialState(), true);
 });

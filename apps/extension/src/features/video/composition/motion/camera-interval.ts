@@ -1,5 +1,5 @@
 import { resolveMotionConnectionSource } from '../../project/motion';
-import { getMotionAnimationTime } from '../../project/motion/timing';
+import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import { motionRegionBlurPhase } from './blur';
 import { resolveProjectCameraEdges } from './project-follow';
@@ -47,13 +47,15 @@ function phaseKey(project: VideoProject, span: CameraSpan, time: number) {
   if (span.kind === 'link' && span.destination.incomingConnection?.easing === 'INSTANT')
     return 'instant-link';
   if (owner.motionBlur === undefined) {
-    if (span.kind === 'link' || owner.easing !== 'INSTANT') return 'legacy';
+    if (span.kind === 'link') return 'legacy';
     const edges = resolveProjectCameraEdges(project, owner);
     const local = getMotionAnimationTime(owner, time - owner.startTime);
     const phase = motionRegionBlurPhase(owner, time, edges);
-    if (phase === 'enter' && local <= 0) return 'instant-start';
-    const exit = Math.max(0, (owner.animation?.duration ?? owner.duration) - owner.zoomOutDuration);
-    return phase === 'exit' && local > exit ? 'instant-exit' : 'legacy';
+    if (phase === 'enter' && local <= 0 && motionTransitionSettings(owner, 'enter').instant)
+      return 'instant-start';
+    const exit = motionTransitionSettings(owner, 'exit');
+    const start = Math.max(0, (owner.animation?.duration ?? owner.duration) - exit.duration);
+    return phase === 'exit' && exit.instant && local > start ? 'instant-exit' : 'legacy';
   }
   return span.kind === 'link'
     ? 'link'
@@ -69,6 +71,7 @@ function cameraControlKey(region: VideoProjectMotionRegion) {
     easing: region.easing,
     targetAction: region.targetAction,
     cameraFollow: region.cameraFollow,
+    phaseTransitions: region.phaseTransitions,
     zoomInDuration: region.zoomInDuration,
     zoomOutDuration: region.zoomOutDuration,
     overlayZoomMode: region.overlayZoomMode,
@@ -150,8 +153,8 @@ function cameraBoundaries(project: VideoProject) {
     const end = region.animation?.end ?? region.duration;
     const duration = region.animation?.duration ?? region.duration;
     for (const edge of [
-      Math.min(region.zoomInDuration, duration),
-      Math.max(0, duration - region.zoomOutDuration),
+      Math.min(motionTransitionSettings(region, 'enter').duration, duration),
+      Math.max(0, duration - motionTransitionSettings(region, 'exit').duration),
     ]) {
       if (edge > start && edge < end)
         result.push(region.startTime + ((edge - start) * region.duration) / (end - start));

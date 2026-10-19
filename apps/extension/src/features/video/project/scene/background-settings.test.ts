@@ -149,7 +149,7 @@ it('fences active and dormant metadata at schema fourteen and preserves removal'
         false
       );
   }
-  expect(isHydratableVideoProject({ ...changed, version: 18 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 19 })).toBe(false);
   expect(
     applyVideoProjectMutationPatch(changed, {
       sceneBackground: { kind: 'solid', color: '#123456' },
@@ -191,7 +191,7 @@ it('admits bounded common blur only at schema sixteen and keeps absent legacy va
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     for (let version = 2; version <= 15; version++)
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 18 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 19 })).toBe(false);
     expect(
       applyVideoProjectMutationPatch(changed, {
         sceneBackground: { kind: 'solid', color: '#123456' },

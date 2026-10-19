@@ -1,3 +1,5 @@
+import { cameraTransitionProgress } from '../../project/motion/transitions';
+import { motionTransitionSettings } from '../../project/motion/timing';
 import { regionMotionBlurAmount } from './blur';
 import { motionBlurPhaseSetting } from '../../project/motion/blur';
 import { resolveActiveMotionRegion, resolveConnectingMotionRegions } from './camera-interval';
@@ -31,15 +33,24 @@ function resolveMotionProgress(
 ): number {
   const localTime = getMotionAnimationTime(region, currentTime - region.startTime);
   const animationDuration = region.animation?.duration ?? region.duration;
-  const zoomInDuration = Math.min(region.zoomInDuration, animationDuration);
+  const enter = motionTransitionSettings(region, 'enter');
+  const exit = motionTransitionSettings(region, 'exit');
+  const zoomInDuration = Math.min(enter.duration, animationDuration);
   if (!connectedIn && zoomInDuration > 0 && localTime < zoomInDuration) {
-    return applyTemporalEasing(localTime / zoomInDuration, region.easing);
+    return enter.explicit
+      ? cameraTransitionProgress(localTime / zoomInDuration, enter.type)
+      : applyTemporalEasing(localTime / zoomInDuration, region.easing);
   }
 
-  const zoomOutStart = Math.max(0, animationDuration - region.zoomOutDuration);
-  if (!connectedOut && region.zoomOutDuration > 0 && localTime > zoomOutStart) {
-    const progress = (localTime - zoomOutStart) / region.zoomOutDuration;
-    return 1 - applyTemporalEasing(progress, region.easing);
+  const zoomOutStart = Math.max(0, animationDuration - exit.duration);
+  if (!connectedOut && exit.duration > 0 && localTime > zoomOutStart) {
+    const progress = (localTime - zoomOutStart) / exit.duration;
+    return (
+      1 -
+      (exit.explicit
+        ? cameraTransitionProgress(progress, exit.type)
+        : applyTemporalEasing(progress, region.easing))
+    );
   }
 
   return 1;

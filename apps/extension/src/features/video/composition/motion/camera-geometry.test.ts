@@ -115,6 +115,53 @@ it.each([
   }
 );
 
+it.each(['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const)(
+  'matches the actual authored %s phase with retained clocks',
+  (type) => {
+    const { project, region, policy } = fixture();
+    const selected = {
+      ...region,
+      phaseTransitions: { enter: type, exit: type },
+      animation: { start: 0.2, end: 2.8, duration: 3 },
+    };
+    project.motionRegions = [selected];
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region: selected,
+      policy,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([['source', {}]]),
+    });
+    const pan = {
+      x: selected.focusPoint.x * selected.scale - project.width / 2,
+      y: selected.focusPoint.y * selected.scale - project.height / 2,
+    };
+    for (const time of [0.01, 0.2, 0.4, 1, 2.6, 2.9]) {
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const point = { x: 0.58, y: 0.5 };
+      const x = (point.x * project.width - camera.viewportX) * camera.scale;
+      const y = (point.y * project.height - camera.viewportY) * camera.scale;
+      const clearance = Math.min(x, y, project.width - x, project.height - y);
+      const bounds = geometry.clearanceBounds({
+        start: time,
+        end: time,
+        segmentId: 'source',
+        targetScale: selected.scale,
+        pan: { minX: pan.x, maxX: pan.x, minY: pan.y, maxY: pan.y },
+        actual: { from: point, to: point },
+      })!;
+      expect(bounds.viewport!.low).toBeCloseTo(clearance, 7);
+      expect(bounds.viewport!.high).toBeCloseTo(clearance, 7);
+    }
+  }
+);
+
 it('retains source crop failure before rotation even when the resulting canvas point is inside the output', () => {
   const { project, region, policy } = fixture();
   const clip = project.clips[0]!;

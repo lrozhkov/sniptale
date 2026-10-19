@@ -1,3 +1,5 @@
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import { InspectCameraFollowSettings } from '../inspection/cursor-path';
 import { resolveCameraFollowPolicy } from '../../../../../features/video/project/camera/cursor-policy';
 import { resolveProjectCursorFocusPath } from '../../../../../features/video/project/cursor-focus-path/projection';
@@ -12,7 +14,7 @@ import { ManualAreaFields } from './area';
 import { MotionFramingPreview } from './framing-preview';
 import {
   MotionBlurField,
-  MotionEasingField,
+  MotionTransitionTypeField,
   MotionFocusModeField,
   MotionOverlayZoomField,
   MotionTargetActionField,
@@ -118,11 +120,6 @@ export function MotionBehaviorFields(props: {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionEasingField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.easing}
-      />
       <InspectorDetails
         preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
         label={translate('videoEditor.sidebar.inspectorMoreDetails')}
@@ -187,7 +184,19 @@ function MotionZoomFields(props: {
   return (
     <div className="sniptale-parameter-stack space-y-1">
       {(['enter', 'exit'] as const).map((phase) => {
-        const field = phase === 'enter' ? 'zoomInDuration' : 'zoomOutDuration';
+        const changeDuration = (duration: number) =>
+          props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+            motionTransitionPhase: { phase, duration },
+          });
+        const setting = motionTransitionSettings(props.motionRegion, phase);
+        const other = motionTransitionSettings(
+          props.motionRegion,
+          phase === 'enter' ? 'exit' : 'enter'
+        );
+        const duration =
+          props.motionRegion.animation?.duration ??
+          props.motionRegion.sourceBinding?.animation.duration ??
+          props.motionRegion.duration;
         return (
           <InspectorDetails
             key={phase}
@@ -199,18 +208,38 @@ function MotionZoomFields(props: {
                 : 'gallery.videoReview.zoomTransitionOut'
             )}
           >
-            <SliderField
-              label={translate('gallery.videoReview.zoomTransitionDuration')}
-              value={props.motionRegion[field]}
-              min={0}
-              max={5}
-              step={0.05}
-              onChange={(value) =>
-                props.panel.onUpdateMotionRegion(props.motionRegion.id, { [field]: value })
-              }
-              formatValue={(value) => `${value.toFixed(2)} s`}
-            />
-            <MotionBlurField {...props} phase={phase} />
+            <fieldset
+              aria-label={translate(
+                phase === 'enter'
+                  ? 'gallery.videoReview.zoomTransitionIn'
+                  : 'gallery.videoReview.zoomTransitionOut'
+              )}
+              className="min-w-0 sniptale-parameter-stack"
+              data-ui="video-editor.motion.transition"
+              data-phase={phase}
+            >
+              <MotionBlurField {...props} phase={phase} />
+              <MotionTransitionTypeField {...props} phase={phase} />
+              <NumericRow
+                appearance="plain"
+                focusAppearance="accent-box"
+                label={translate('gallery.videoReview.zoomTransitionDuration')}
+                value={setting.duration}
+                min={0}
+                max={Math.min(60, Math.max(0, duration - other.duration))}
+                precision={2}
+                step={0.01}
+                unit="s"
+                scrub={{
+                  min: 0,
+                  max: Math.min(5, Math.max(0, duration - other.duration)),
+                  step: 0.01,
+                }}
+                disabled={setting.type === 'none'}
+                onPreviewValue={changeDuration}
+                onCommitValue={changeDuration}
+              />
+            </fieldset>
           </InspectorDetails>
         );
       })}

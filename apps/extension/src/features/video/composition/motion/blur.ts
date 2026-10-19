@@ -1,5 +1,5 @@
 import type { VideoProjectMotionRegion } from '../../project/types';
-import { getMotionAnimationTime } from '../../project/motion/timing';
+import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
 import { motionBlurPhaseSetting } from '../../project/motion/blur';
 
 /** Camera exposure in seconds: 100% spans one 30 FPS frame, independent of playback refresh. */
@@ -22,10 +22,11 @@ export function motionRegionBlurPhase(
 ): 'enter' | 'exit' | 'hold' {
   const local = getMotionAnimationTime(region, time - region.startTime);
   const duration = region.animation?.duration ?? region.duration;
-  const enter = Math.min(region.zoomInDuration, duration);
+  const enter = Math.min(motionTransitionSettings(region, 'enter').duration, duration);
   if (!edges.connectedIn && enter > 0 && local < enter) return 'enter';
-  const exit = Math.max(0, duration - region.zoomOutDuration);
-  if (!edges.connectedOut && region.zoomOutDuration > 0 && local >= exit) return 'exit';
+  const out = motionTransitionSettings(region, 'exit').duration;
+  const exit = Math.max(0, duration - out);
+  if (!edges.connectedOut && out > 0 && local >= exit) return 'exit';
   return 'hold';
 }
 
@@ -37,7 +38,7 @@ export function regionMotionBlurAmount(
 ) {
   if (region.motionBlur === undefined) return region.motionBlurAmount ?? 0;
   const phase = motionRegionBlurPhase(region, time, edges);
-  if (phase === 'hold' || region.easing === 'INSTANT') return 0;
+  if (phase === 'hold' || motionTransitionSettings(region, phase).instant) return 0;
   const setting = motionBlurPhaseSetting(region.motionBlur, phase);
   return setting.enabled ? setting.strength : 0;
 }

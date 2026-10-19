@@ -298,6 +298,7 @@ function compatibleProjectCameraPhases(
           (right.animation.end - right.animation.start) / right.duration
       ) <= 1e-9 &&
       left.easing === right.easing &&
+      JSON.stringify(left.phaseTransitions) === JSON.stringify(right.phaseTransitions) &&
       left.zoomInDuration === right.zoomInDuration &&
       left.zoomOutDuration === right.zoomOutDuration
     );

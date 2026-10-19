@@ -1,3 +1,4 @@
+import { cameraTransitionDerivative } from '../../project/motion/transitions';
 import { proveCameraPlan } from '../../composition/motion/camera-plan-proof';
 import type { CameraPlanSpan } from '../../composition/motion/camera-plan-proof';
 import type { CameraProofGeometry } from '../../composition/motion/camera-plan-proof';
@@ -42,8 +43,8 @@ function phaseTrajectory(
 ) {
   const sign = entering ? 1 : -1;
   const duration = end - start;
-  const velocity = type === 'linear' ? sign / duration : 0;
-  const acceleration = type === 'linear' ? 0 : (sign * 6) / duration ** 2;
+  const velocity = (sign * cameraTransitionDerivative(0, type, 1)) / duration;
+  const acceleration = (sign * cameraTransitionDerivative(0, type, 2)) / duration ** 2;
   return createCameraTrajectory({
     start,
     end,

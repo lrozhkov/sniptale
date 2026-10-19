@@ -1,3 +1,4 @@
+import { parseMotionPhaseTransitions } from '../motion/transitions';
 import { parseMotionBlurPhases } from '../motion/blur';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { isRecordingInteractionMetadata } from './recording-telemetry';
@@ -196,8 +197,10 @@ export function isVideoProjectActionPresentationOverride(value: unknown): boolea
 }
 
 export function isMotionRegion(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
-    isRecord(value) &&
+    phaseTransitions !== null &&
     (value['cameraFollow'] === undefined ||
       parseCameraFollowSettings(value['cameraFollow']) !== null) &&
     (value['sourceBinding'] === undefined ||
@@ -218,8 +221,16 @@ export function isMotionRegion(value: unknown): boolean {
       (target) =>
         isRecord(target) && isString(target['eventId']) && isNullable(target['clipId'], isString)
     ) &&
-    isBoundedNumber(value['zoomInDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
-    isBoundedNumber(value['zoomOutDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    isBoundedNumber(
+      value['zoomInDuration'],
+      0,
+      phaseTransitions?.enter === undefined ? MAX_VIDEO_PROJECT_DURATION_SECONDS : 60
+    ) &&
+    isBoundedNumber(
+      value['zoomOutDuration'],
+      0,
+      phaseTransitions?.exit === undefined ? MAX_VIDEO_PROJECT_DURATION_SECONDS : 60
+    ) &&
     (value['motionBlurAmount'] === undefined || isBoundedNumber(value['motionBlurAmount'], 0, 1)) &&
     parseMotionBlurPhases(value['motionBlur']) !== null &&
     value['cameraMode'] !== 'PATH' &&

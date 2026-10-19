@@ -1,3 +1,4 @@
+import type { MotionTransitionPhaseEdit } from '../../../features/video/project/motion/transitions';
 import type { MotionBlurPhaseEdit } from '../../../features/video/project/motion/blur';
 import type { MediaSourceCrop } from '../../../features/video/project/media-crop';
 import type { VideoClipTransitionKind } from '../../../features/video/project/types/index';
@@ -64,6 +65,7 @@ export type VideoEditorMotionRegionPatch = Partial<
 > & {
   sourceClipId?: string | null;
   motionBlurPhase?: MotionBlurPhaseEdit;
+  motionTransitionPhase?: MotionTransitionPhaseEdit;
   cameraFollow?: VideoProjectMotionRegion['cameraFollow'] | null;
 };
 

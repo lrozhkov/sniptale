@@ -6,11 +6,8 @@ import {
   VideoEditorSelectionKind,
   type VideoEditorSelection,
 } from '../../../../contracts/selection';
-import {
-  VideoMotionOverlayZoomMode,
-  VideoTemporalEasing,
-} from '../../../../../features/video/project/types';
-import { MotionBlurField, MotionEasingField, MotionOverlayZoomField } from './fields';
+import { VideoMotionOverlayZoomMode } from '../../../../../features/video/project/types';
+import { MotionBlurField, MotionTransitionTypeField, MotionOverlayZoomField } from './fields';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -85,17 +82,19 @@ function createPanelProps(): WorkspaceSidebarSelectionPanelProps {
 }
 
 describe('workspace-sidebar/selection/motion-fields', () => {
-  it('renders motion easing through canonical temporal easing options', () => {
+  it('renders each phase through the canonical mode choices', () => {
     const markup = renderToStaticMarkup(
-      <MotionEasingField
-        motionRegionId="motion-1"
+      <MotionTransitionTypeField
+        motionRegion={createVideoProjectMotionRegion(createPanelProps().project, 0)}
+        phase="enter"
         panel={createPanelProps()}
-        value={VideoTemporalEasing.EASE_IN_OUT}
       />
     );
 
-    expect(markup).toContain('videoEditor.sidebar.motionEasingLabel');
-    expect(markup).toContain('videoEditor.sidebar.temporalEasingEaseInOut');
+    expect(markup).toContain('gallery.videoReview.zoomTransitionType');
+    expect(markup).toContain('gallery.videoReview.transitionSmooth');
+    expect(markup).toContain('gallery.videoReview.transitionNone');
+    expect(markup).toContain('videoEditor.sidebar.temporalEasingInstant');
   });
 
   it('renders motion blur through canonical slider controls', () => {

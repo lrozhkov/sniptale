@@ -1,3 +1,4 @@
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createProject,
@@ -219,6 +220,12 @@ it.each([false, true])(
     expect(off.project).toBe(project);
     const on = await prepareAutoProcessing(project, { ...cameraRequest, camera: true });
     expect(on.status).toBe('ready');
+    expect(on.project?.version).toBe(18);
+    expect(on.project?.motionRegions?.[0]?.phaseTransitions).toEqual({
+      enter: 'ease-in-out',
+      exit: 'ease-in-out',
+    });
+    expect(isHydratableVideoProject(on.project)).toBe(true);
     expect(on.suggestions).toHaveLength(1);
     expect(on.project?.motionRegions?.[0]?.targetAction).toEqual({
       eventId: 'click',

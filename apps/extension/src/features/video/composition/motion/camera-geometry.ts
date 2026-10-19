@@ -1,3 +1,6 @@
+import { cameraTransitionDerivative } from '../../project/motion/transitions';
+import type { CameraTransitionType } from '../../project/motion/transitions';
+import { motionTransitionSettings } from '../../project/motion/timing';
 import { roundedWindowClearance } from '../../project/window-geometry';
 import { boundCameraSourceGeometry, cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
@@ -47,7 +50,8 @@ function easingPieces(
   start: number,
   end: number,
   easing: VideoTemporalEasing,
-  entering: boolean
+  entering: boolean,
+  type?: CameraTransitionType
 ): CameraTrajectory[] {
   const duration = end - start;
   const sign = entering ? 1 : -1;
@@ -71,6 +75,21 @@ function easingPieces(
       fromAcceleration: { x: sign * a0, y: 0 },
       toAcceleration: { x: sign * a1, y: 0 },
     });
+  if (type !== undefined) {
+    if (type === 'none' || type === 'instant') return [];
+    return [
+      curve(
+        start,
+        end,
+        0,
+        1,
+        cameraTransitionDerivative(0, type, 1) / duration,
+        cameraTransitionDerivative(1, type, 1) / duration,
+        cameraTransitionDerivative(0, type, 2) / duration ** 2,
+        cameraTransitionDerivative(1, type, 2) / duration ** 2
+      ),
+    ];
+  }
   switch (easing) {
     case VideoTemporalEasing.LINEAR:
       return [curve(start, end, 0, 1, 1 / duration, 1 / duration, 0, 0)];
@@ -108,30 +127,39 @@ function nominalPhase(
     ? (region.animation.end - region.animation.start) / region.duration
     : 1;
   const output = (local: number) => region.startTime + (local - animationStart) / rate;
-  const enterDuration = Math.min(region.zoomInDuration, animationDuration);
-  const exitStart = Math.max(0, animationDuration - region.zoomOutDuration);
+  const enterSettings = motionTransitionSettings(region, 'enter');
+  const exitSettings = motionTransitionSettings(region, 'exit');
+  const enterDuration = Math.min(enterSettings.duration, animationDuration);
+  const exitStart = Math.max(0, animationDuration - exitSettings.duration);
   const enter =
     !connectedIn && enterDuration > 0
-      ? easingPieces(output(0), output(enterDuration), region.easing, true)
+      ? easingPieces(
+          output(0),
+          output(enterDuration),
+          region.easing,
+          true,
+          region.phaseTransitions?.enter
+        )
       : [];
   const exit =
-    !connectedOut && region.zoomOutDuration > 0
+    !connectedOut && exitSettings.duration > 0
       ? easingPieces(
           output(exitStart),
-          output(exitStart + region.zoomOutDuration),
+          output(exitStart + exitSettings.duration),
           region.easing,
-          false
+          false,
+          region.phaseTransitions?.exit
         )
       : [];
   const pieces = [...enter, ...exit];
   const at = (time: number) => {
     const local = getMotionAnimationTime(region, time - region.startTime);
     if (!connectedIn && enterDuration > 0 && local < enterDuration) {
-      if (region.easing === VideoTemporalEasing.INSTANT) return local <= 0 ? 0 : 1;
+      if (enterSettings.instant) return local <= 0 ? 0 : 1;
       return enter.find((piece) => time <= piece.end) ?? 1;
     }
-    if (!connectedOut && region.zoomOutDuration > 0 && local > exitStart) {
-      if (region.easing === VideoTemporalEasing.INSTANT) return 0;
+    if (!connectedOut && exitSettings.duration > 0 && local > exitStart) {
+      if (exitSettings.instant) return 0;
       return exit.find((piece) => time <= piece.end) ?? 0;
     }
     return 1;
@@ -153,10 +181,9 @@ function nominalPhase(
       )
     )
   );
-  if (!connectedIn && (!enterDuration || region.easing === VideoTemporalEasing.INSTANT))
-    discontinuities.push(output(0));
-  if (!connectedOut && (!region.zoomOutDuration || region.easing === VideoTemporalEasing.INSTANT))
-    discontinuities.push(output(region.zoomOutDuration ? exitStart : animationDuration));
+  if (!connectedIn && (!enterDuration || enterSettings.instant)) discontinuities.push(output(0));
+  if (!connectedOut && (!exitSettings.duration || exitSettings.instant))
+    discontinuities.push(output(exitSettings.duration ? exitStart : animationDuration));
   for (const time of [region.startTime, region.startTime + region.duration]) {
     const phase = at(time);
     const active = hasActiveCameraPhase(phase, time);

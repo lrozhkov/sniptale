@@ -494,7 +494,7 @@ The existing command, history, save, and resource owners retain authority. Previ
 
 ## Montage scene background variants
 
-Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–17 without these fields and refuse future versions.
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–18 without these fields and refuse future versions.
 
 The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
 
@@ -517,7 +517,7 @@ Camera tracks retain this field without applying it. Their camera appearance rem
 
 ## Montage scene background blur
 
-Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–17 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
+Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–18 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
 
 Blur applies to the complete gradient or image background after fitting and animation. Solid backgrounds retain the value without applying it. Kind changes, image replacement and source deletion preserve this common value. Remembered paint variants cannot contain blur. Clips, headers, shadows, actions and transitions retain their own rendering semantics.
 
@@ -540,7 +540,7 @@ Gallery and Montage share the inset calculation. Gallery retains its enabled-bac
 
 ## Montage motion blur phases
 
-Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–17 and refuse future versions.
+Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–18 and refuse future versions.
 
 Reading adds no defaults. Absent phase settings retain the legacy `motionBlurAmount` behavior. An explicit phase map overrides that scalar. A missing phase in an explicit map stays disabled. Disabled settings retain their strength. The first phase edit preserves the other legacy strengths.
 
@@ -549,3 +549,18 @@ Entrance and exit use the retained animation clock. An outgoing source region ow
 The existing project updater merges scalar phase edits into its current region. Invalid, repeated, missing-target and locked edits preserve project identity and history. Undo, redo, save and portable restore retain authored settings. Clip duplication copies bound motion regions with independent identities and maps connections between copied regions. It removes connections to sources outside the copied selection. Unbound scene regions remain unchanged.
 
 Mutation and clearing retain schema 17. This field adds no writer, queued operation, store or physical database migration. The existing save revision owner remains authoritative.
+
+
+## Montage camera phase transitions
+
+Project schema 18 admits optional `phaseTransitions` on a `MotionRegion`. The partial map contains `enter` and `exit` types. Valid types are `none`, `linear`, `ease-in-out`, `ease-out` and `instant`. Earlier schemas refuse the map. Readers accept schemas 2–18 and refuse future versions. Unknown map keys do not enter the model.
+
+The existing `zoomInDuration` and `zoomOutDuration` fields remain authoritative. Reading adds no defaults. An absent phase retains its scalar easing curve and endpoint behavior. Explicit `ease-in-out` uses the Gallery smoothstep curve. Legacy scalar `EASE_IN_OUT` retains its two-piece cubic curve.
+
+An explicit `none` consumes no transition time. An exit with this type holds the camera target until the region ends. `instant` remains a separate mode. Editing one phase reserves the other active duration. Two explicit phases fit their active durations proportionally into the retained animation interval. An explicit duration is finite and ranges from zero through 60 seconds.
+
+New manual and automatic camera regions use explicit Gallery smooth defaults. The existing project mutation owner promotes these projects to schema 18. Factory calls without phase settings retain their legacy contract. Mutation and clearing retain schema 18.
+
+The existing updater merges each scalar command into the current region. Invalid, equal, missing-target and locked edits preserve identity and history. Undo, redo, save and portable restore retain the settings. Source-bound split parts retain their animation clock. Clip duplication copies bound settings into independent region identities.
+
+Connected regions retain their phase settings. Existing connection topology suppresses connected entrance and exit phases. Connection easing retains its existing owner. The shared transition math adds no writer, store, resource or physical database migration.

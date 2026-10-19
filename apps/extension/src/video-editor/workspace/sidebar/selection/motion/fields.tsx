@@ -1,3 +1,8 @@
+import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
+import type {
+  CameraTransitionPhase,
+  CameraTransitionType,
+} from '../../../../../features/video/project/motion/transitions';
 import {
   motionBlurPhaseSetting,
   type MotionBlurPhase,
@@ -8,13 +13,9 @@ import {
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
 } from '../../../../../features/video/project/types';
-import type { VideoTemporalEasing } from '../../../../../features/video/project/types';
 import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import {
-  getMotionOverlayZoomModeOptions,
-  getTemporalEasingOptions,
-} from '../effect-controls/options';
+import { getMotionOverlayZoomModeOptions } from '../effect-controls/options';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SelectInput } from '../shared/controls';
 import { SliderField } from '../shared/sliders';
@@ -73,19 +74,33 @@ export function MotionFocusModeField(props: {
   );
 }
 
-export function MotionEasingField(props: {
-  motionRegionId: string;
+export function MotionTransitionTypeField(props: {
+  motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
+  phase: CameraTransitionPhase;
   panel: WorkspaceSidebarSelectionPanelProps;
-  value: VideoTemporalEasing;
 }) {
+  const setting = motionTransitionSettings(props.motionRegion, props.phase);
+  const labels = {
+    none: 'gallery.videoReview.transitionNone',
+    linear: 'gallery.videoReview.transitionLinear',
+    'ease-in-out': 'gallery.videoReview.transitionSmooth',
+    'ease-out': 'videoEditor.sidebar.temporalEasingEaseOut',
+    instant: 'videoEditor.sidebar.temporalEasingInstant',
+  } as const;
   return (
-    <SelectInput
-      label={translate('videoEditor.sidebar.motionEasingLabel')}
-      value={props.value}
-      onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegionId, { easing: value })
+    <OptionButtonsField<CameraTransitionType>
+      label={translate('gallery.videoReview.zoomTransitionType')}
+      layout="stacked"
+      value={setting.type}
+      options={(['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const).map((type) => ({
+        value: type,
+        label: translate(labels[type]),
+      }))}
+      onChange={(type) =>
+        props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+          motionTransitionPhase: { phase: props.phase, type },
+        })
       }
-      options={getTemporalEasingOptions()}
     />
   );
 }

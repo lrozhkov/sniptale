@@ -112,7 +112,7 @@ it('roundtrips schema seven through admission and hydration without changing aut
   const parsed = parseHydratableVideoProject(serialized);
   expect(parsed).toEqual(changed);
   expect(getProjectTrackAudioVolume(hydrateVideoProject(parsed!), track.id)).toBe(0.37);
-  for (const version of [2, 3, 4, 5, 6, 18])
+  for (const version of [2, 3, 4, 5, 6, 19])
     expect(parseHydratableVideoProject({ ...changed, version })).toBeNull();
   for (const version of [2, 3, 4, 5, 6, 7])
     expect(parseHydratableVideoProject({ ...project, version })).not.toBeNull();

@@ -1,3 +1,4 @@
+import type { MotionPhaseTransitions } from '../motion/transitions';
 import type { MotionBlurPhases } from '../motion/blur';
 export const VideoProjectSourceKind = {
   MANUAL: 'manual',
@@ -386,6 +387,7 @@ export interface VideoProjectMotionRegion {
   motionBlurAmount?: number;
   /** Explicit phase settings override the retained legacy scalar. */
   motionBlur?: MotionBlurPhases;
+  phaseTransitions?: MotionPhaseTransitions;
   overlayZoomMode?: VideoMotionOverlayZoomMode;
 
   scale: number;

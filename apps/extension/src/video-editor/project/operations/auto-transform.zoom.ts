@@ -1,3 +1,4 @@
+import { DEFAULT_MOTION_PHASE_TRANSITIONS } from '../../../features/video/project/motion/transitions';
 import {
   constrainMotionTiming,
   getMotionInsertionRange,
@@ -225,7 +226,7 @@ function createAutoRegion(
   }
 
   const normalized = normalizeVideoProjectMotionRegion(project, {
-    ...createVideoProjectMotionRegion(project, click.time),
+    ...createVideoProjectMotionRegion(project, click.time, DEFAULT_MOTION_PHASE_TRANSITIONS),
     id: `auto-motion:${click.id}`,
     duration,
     focusMode: VideoMotionFocusMode.ACTION,

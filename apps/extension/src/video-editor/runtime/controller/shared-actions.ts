@@ -1,3 +1,4 @@
+import { DEFAULT_MOTION_PHASE_TRANSITIONS } from '../../../features/video/project/motion/transitions';
 import type { VideoEditorSceneBackgroundEdit } from '../../contracts/commands/patches';
 import { isRecord, isBoundedNumber } from '../../../features/video/project/validation/primitives';
 import { parseSceneBackgroundSettings } from '../../../features/video/project/scene/background-settings';
@@ -237,7 +238,11 @@ function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
         return project;
       const range = getMotionInsertionRange(project, startTime ?? store.getCurrentTime());
       if (!range) return project;
-      const created = createVideoProjectMotionRegion(project, range.startTime);
+      const created = createVideoProjectMotionRegion(
+        project,
+        range.startTime,
+        DEFAULT_MOTION_PHASE_TRANSITIONS
+      );
       const region = bindMotionRegionToUniqueVideo(project, {
         ...created,
         duration: Math.min(created.duration, range.duration),

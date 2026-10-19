@@ -1,3 +1,4 @@
+import type { CameraTransition } from '../../project/motion/transitions';
 import type { MotionBlurPhases } from '../../project/motion/blur';
 import type { Gradient, Paint } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
@@ -45,10 +46,7 @@ export interface QuickEditUiState {
   overlaysVisible: boolean;
 }
 
-export interface QuickEditZoomTransition {
-  type: 'none' | 'linear' | 'ease-in-out';
-  duration: number;
-}
+export type QuickEditZoomTransition = CameraTransition<'none' | 'linear' | 'ease-in-out'>;
 
 /** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
 export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
