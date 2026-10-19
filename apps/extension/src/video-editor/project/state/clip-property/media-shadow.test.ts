@@ -96,6 +96,7 @@ it('applies active camera size and appearance across its lane without replacing 
   const camera = {
     ...source,
     cameraAppearance: appearance,
+    shadowColor: '#3399ff',
     shadowIntensity: 80,
     shadowMode: VideoMediaShadowMode.GLOW,
     cameraPositions: [
@@ -139,6 +140,7 @@ it('applies active camera size and appearance across its lane without replacing 
     cameraAppearance: appearance,
     shadowIntensity: 80,
     shadowMode: 'GLOW',
+    shadowColor: '#3399ff',
     transform: { x: 700, y: 200, rotation: 15, width: 420, height: 420 },
     cameraPositions: [
       {
@@ -204,4 +206,115 @@ it('applies fit mode and preset scale in one undoable change and respects track 
   const locked = store.getState().project;
   store.getState().updateMediaClipFitMode('clip-video', VideoMediaFitMode.COVER, 100);
   expect(store.getState().project).toBe(locked);
+});
+
+it('authors independent media colors, preserves dormant values and supports history and retry', () => {
+  const store = createContentStore();
+  store.getState().setProject(createProjectWithMediaTrack());
+  store.getState().updateClipTransform('clip-video', { x: 321 });
+  store.getState().updateMediaClipShadowColor('clip-video', '#ff008080');
+  const accepted = store.getState().project;
+  expect(accepted?.version).toBe(9);
+  expect(accepted?.clips.find((clip) => clip.id === 'clip-video')).toMatchObject({
+    shadowColor: '#ff008080',
+    shadowIntensity: 0,
+    transform: { x: 321 },
+  });
+  const history = store.getState().projectHistory;
+  store.getState().updateMediaClipShadowColor('clip-video', '#ff008080');
+  store.getState().updateMediaClipShadowColor('clip-video', 'url(invalid)');
+  store.getState().updateMediaClipShadowColor('clip-text', '#00ff00');
+  expect(store.getState().project).toBe(accepted);
+  expect(store.getState().projectHistory).toBe(history);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, accepted!);
+  if (undo?.status !== 'applied') throw new Error('Expected shadow undo');
+  expect(undo.project.clips.find((clip) => clip.id === 'clip-video')).not.toHaveProperty(
+    'shadowColor'
+  );
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected shadow redo');
+  expect(redo.project.clips.find((clip) => clip.id === 'clip-video')).toHaveProperty(
+    'shadowColor',
+    '#ff008080'
+  );
+  store.getState().updateMediaClipShadowMode('clip-video', 'GLOW');
+  store.getState().updateMediaClipShadowIntensity('clip-video', 0);
+  store.getState().updateMediaClipShadowColor('clip-image', '#0000ff');
+  expect(store.getState().project?.clips.find((clip) => clip.id === 'clip-video')).toMatchObject({
+    shadowColor: '#ff008080',
+    shadowIntensity: 0,
+    shadowMode: 'GLOW',
+  });
+  expect(store.getState().project?.clips.find((clip) => clip.id === 'clip-image')).toHaveProperty(
+    'shadowColor',
+    '#0000ff'
+  );
+});
+
+it('copies or clears color with track visuals and refuses locked media before retry', () => {
+  const store = createContentStore();
+  const project = createProjectWithMediaTrack();
+  store.getState().setProject({
+    ...project,
+    tracks: project.tracks.map((track) => ({ ...track, locked: true })),
+  });
+  const locked = store.getState().project;
+  store.getState().updateMediaClipShadowColor('clip-video', '#ff0000');
+  expect(store.getState().project).toBe(locked);
+  store.getState().setProject(project);
+  store.getState().updateMediaClipShadowColor('clip-image', '#0000ff');
+  store.getState().applyMediaClipVisualsToTrack('clip-video');
+  expect(
+    store.getState().project?.clips.find((clip) => clip.id === 'clip-image')
+  ).not.toHaveProperty('shadowColor');
+  store.getState().updateMediaClipShadowColor('clip-video', '#ff0000');
+  store.getState().applyMediaClipVisualsToTrack('clip-video');
+  expect(store.getState().project?.clips.find((clip) => clip.id === 'clip-image')).toHaveProperty(
+    'shadowColor',
+    '#ff0000'
+  );
+});
+
+it('retains authored color while refitting an active camera position and refuses empty colors', () => {
+  const store = createContentStore();
+  const project = createProjectWithMediaTrack();
+  project.tracks = project.tracks.map((track) => ({ ...track, role: 'CAMERA' }));
+  project.clips = project.clips.map((clip) =>
+    clip.type === 'VIDEO'
+      ? {
+          ...clip,
+          cameraPositions: [
+            {
+              id: 'destination',
+              sourceTime: 1,
+              transform: { ...clip.transform, x: 200 },
+              fitMode: clip.fitMode,
+              transition: { kind: 'instant', duration: 0 },
+            },
+          ],
+        }
+      : clip
+  );
+  store.getState().setProject(project);
+  store.setState({ currentTime: 2 });
+  store.getState().updateMediaClipShadowColor('clip-video', '#12345680');
+  const accepted = store.getState().project;
+  for (const invalid of ['', ' '.repeat(500)])
+    store.getState().updateMediaClipShadowColor('clip-video', invalid);
+  expect(store.getState().project).toBe(accepted);
+  const before = accepted!.clips.find((clip) => clip.id === 'clip-video');
+  store.getState().updateMediaClipFitMode('clip-video', 'COVER');
+  store.getState().updateMediaClipFitScalePercent('clip-video', 75);
+  const after = store.getState().project!.clips.find((clip) => clip.id === 'clip-video');
+  if (before?.type !== 'VIDEO' || after?.type !== 'VIDEO') throw new Error('Missing camera');
+  expect(after).toMatchObject({ shadowColor: '#12345680', fitScalePercent: 75 });
+  expect(after.transform).toEqual(before.transform);
+  expect(after.cameraPositions?.[0]).toMatchObject({
+    id: 'destination',
+    sourceTime: 1,
+    fitMode: 'COVER',
+  });
+  expect(after.cameraPositions?.[0]?.transform).not.toEqual(before.cameraPositions?.[0]?.transform);
+  expect(after.sourceStart).toBe(before.sourceStart);
+  expect(after.sourceDuration).toBe(before.sourceDuration);
 });

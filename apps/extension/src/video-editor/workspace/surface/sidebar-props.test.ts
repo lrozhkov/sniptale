@@ -45,6 +45,9 @@ describe('workspace/sidebar-props', () => {
     expect(props.onUpdateMediaClipShadowMode).toBe(
       controller.clipActions.onUpdateMediaClipShadowMode
     );
+    expect(props.onUpdateMediaClipShadowColor).toBe(
+      controller.clipActions.onUpdateMediaClipShadowColor
+    );
     expect(props.onUpdateEffectInstance).toBe(controller.projectActions.onUpdateEffectInstance);
     props.onUpdateSubtitleTrackStyle?.('track-1', { color: '#fff' });
 

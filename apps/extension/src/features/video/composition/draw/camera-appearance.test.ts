@@ -63,3 +63,42 @@ it('reflects source pixels about the camera window and restores context after fa
   ).toThrow('Source unavailable');
   expect(context.restore).toHaveBeenCalledOnce();
 });
+
+it('passes authored color to the shared shadow mask without tinting source pixels', async () => {
+  const { createVisualTestContext } = await import('./visual.test-support');
+  for (const camera of [false, true])
+    for (const shadowMode of ['BACKDROP', 'GLOW'] as const) {
+      const context = createVisualTestContext();
+      const source = vi.fn(() => expect(context.globalAlpha).toBe(1));
+      drawFittedMediaLayer({
+        context,
+        displayScale: 1,
+        fitMode: 'STRETCH',
+        frame: { x: 10, y: 20, width: 100, height: 80 },
+        camera,
+        shadowIntensity: 60,
+        shadowMode,
+        shadowColor: '#ff000080',
+        sourceWidth: 100,
+        sourceHeight: 80,
+        render: source,
+      });
+      expect(Reflect.get(context.__maskContext, 'shadowColor')).toBe('#ff000080');
+      expect(source).toHaveBeenCalledOnce();
+      expect(context.globalAlpha).toBe(1);
+    }
+  const context = createVisualTestContext();
+  drawFittedMediaLayer({
+    context,
+    displayScale: 1,
+    fitMode: 'STRETCH',
+    frame: { x: 10, y: 20, width: 100, height: 80 },
+    shadowIntensity: 0,
+    shadowMode: undefined,
+    shadowColor: '#ff0000',
+    sourceWidth: 100,
+    sourceHeight: 80,
+    render: vi.fn(),
+  });
+  expect(context.__maskContext.fillRect).not.toHaveBeenCalled();
+});

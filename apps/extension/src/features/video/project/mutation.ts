@@ -12,6 +12,13 @@ function getMutationSchemaVersion(
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
 ): VideoProject['version'] {
   if (
+    project.version === 9 ||
+    (patch.clips ?? project.clips).some(
+      (clip) => (clip.type === 'VIDEO' || clip.type === 'IMAGE') && clip.shadowColor !== undefined
+    )
+  )
+    return 9;
+  if (
     project.version === 8 ||
     (patch.clips ?? project.clips).some(
       (clip) => clip.type === 'VIDEO' && clip.cameraMirrored !== undefined

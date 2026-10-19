@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 9])
+  for (const version of [2, 3, 4, 10])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,10 +129,59 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 9])
+    for (const version of [2, 3, 4, 5, 6, 7, 10])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
   for (const version of [2, 3, 4, 5, 6, 7, 8])
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+});
+
+it('admits authored media shadow colors only in schema nine without writing defaults', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } = await import('./root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'shadow',
+    filename: 'source.webm',
+    width: 160,
+    height: 90,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  for (const shadowColor of ['#ff008080', 'rgba(20, 40, 80, 0.5)', 'transparent']) {
+    const changed = applyVideoProjectMutationPatch(project, {
+      clips: project.clips.map((clip) => (clip.type === 'VIDEO' ? { ...clip, shadowColor } : clip)),
+    });
+    expect(changed.version).toBe(9);
+    expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+    expect(isExportReadyVideoProject(changed)).toBe(true);
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 10])
+      expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+    expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
+  }
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9]) {
+    const parsed = parseHydratableVideoProject({ ...project, version });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.clips.some((clip) => 'shadowColor' in clip)).toBe(false);
+  }
+  const clip = project.clips[0]!;
+  for (const shadowColor of [
+    null,
+    4,
+    '',
+    'url(https://invalid.test)',
+    '#zzzzzz',
+    'red'.repeat(1000),
+  ])
+    expect(
+      isHydratableVideoProject({ ...project, version: 9, clips: [{ ...clip, shadowColor }] })
+    ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      version: 9,
+      clips: [{ ...clip, type: 'AUDIO', shadowColor: '#ff0000' }],
+    })
+  ).toBe(false);
 });

@@ -107,6 +107,7 @@ function createPanelActionProps(onUpdateClipPlaybackRate: UpdatePlaybackRate) {
     onUpdateMediaClipFitScalePercent: vi.fn(),
     onUpdateMediaClipShadowIntensity: vi.fn(),
     onUpdateMediaClipShadowMode: vi.fn(),
+    onUpdateMediaClipShadowColor: vi.fn(),
     onUpdateMotionRegion: vi.fn(),
     onUpdateShapeStyle: vi.fn(),
     onUpdateTextContent: vi.fn(),

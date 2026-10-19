@@ -1,3 +1,5 @@
+import { parseColor } from '@sniptale/foundation/color';
+import { isColorString } from '../../../../features/video/project/validation/primitives';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
@@ -34,6 +36,7 @@ export function createClipMediaStyleActions(
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipShadowColor'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
 > {
@@ -59,6 +62,12 @@ export function createClipMediaStyleActions(
       set((state) =>
         applyProjectUpdate(state, (project) =>
           updateMediaClipVisuals(project, clipId, { shadowIntensity })
+        )
+      ),
+    updateMediaClipShadowColor: (clipId, shadowColor) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) =>
+          updateMediaClipVisuals(project, clipId, { shadowColor })
         )
       ),
     updateMediaClipShadowMode: (clipId, shadowMode) =>
@@ -131,6 +140,7 @@ function updateMediaClipVisuals(
     fitScalePercent?: number;
     shadowIntensity?: number;
     shadowMode?: VideoMediaShadowMode;
+    shadowColor?: string;
   },
   time = 0
 ) {
@@ -139,6 +149,12 @@ function updateMediaClipVisuals(
     return project;
   }
 
+  if (
+    patch.shadowColor !== undefined &&
+    (!isColorString(patch.shadowColor) || !parseColor(patch.shadowColor))
+  )
+    return project;
+  const shadowColor = patch.shadowColor ?? clip.shadowColor;
   const isCamera =
     clip.type === 'VIDEO' &&
     project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
@@ -159,6 +175,7 @@ function updateMediaClipVisuals(
   const shouldRefreshTransform = patch.fitMode !== undefined || patch.fitScalePercent !== undefined;
   if (
     !shouldRefreshTransform &&
+    shadowColor === clip.shadowColor &&
     shadowIntensity === normalizeVideoMediaShadowIntensity(clip.shadowIntensity) &&
     shadowMode === normalizeVideoMediaShadowMode(clip.shadowMode)
   ) {
@@ -177,6 +194,7 @@ function updateMediaClipVisuals(
           fitScalePercent,
           shadowIntensity,
           shadowMode,
+          ...(shadowColor === undefined ? {} : { shadowColor }),
         };
       }
       return {
@@ -185,6 +203,7 @@ function updateMediaClipVisuals(
         fitScalePercent,
         shadowIntensity,
         shadowMode,
+        ...(shadowColor === undefined ? {} : { shadowColor }),
         transform: shouldRefreshTransform
           ? resolveMediaClipFitTransform(project, item, fitMode, fitScalePercent)
           : item.transform,
@@ -226,7 +245,7 @@ function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, tim
     clips: project.clips.map((item) =>
       item.trackId === clip.trackId && isMediaClip(item)
         ? {
-            ...item,
+            ...copyMediaShadowColor(item, clip),
             fitMode: clip.fitMode,
             fitScalePercent: clip.fitScalePercent ?? 100,
             shadowIntensity: normalizeVideoMediaShadowIntensity(clip.shadowIntensity),
@@ -256,7 +275,7 @@ function applyCameraVisualsToTrack(
     clips: project.clips.map((clip) => {
       if (clip.type !== 'VIDEO' || clip.trackId !== source.trackId) return clip;
       return {
-        ...clip,
+        ...copyMediaShadowColor(clip, source),
         cameraAppearance: { ...appearance },
         shadowIntensity: normalizeVideoMediaShadowIntensity(source.shadowIntensity),
         shadowMode: normalizeVideoMediaShadowMode(source.shadowMode),
@@ -274,4 +293,14 @@ function applyCameraVisualsToTrack(
       };
     }),
   });
+}
+
+function copyMediaShadowColor<T extends { shadowColor?: string }>(
+  target: T,
+  source: { shadowColor?: string }
+): T {
+  const copy = { ...target };
+  if (source.shadowColor === undefined) delete copy.shadowColor;
+  else copy.shadowColor = source.shadowColor;
+  return copy;
 }

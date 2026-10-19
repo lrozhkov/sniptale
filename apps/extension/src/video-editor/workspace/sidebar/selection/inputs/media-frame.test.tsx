@@ -14,6 +14,7 @@ import {
   VideoMediaShadowMode,
   VideoProjectClipType,
   type VideoProjectVideoClip,
+  type VideoProjectImageClip,
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { MediaFrameControls } from './media-frame';
@@ -66,7 +67,7 @@ function setInputValue(input: HTMLInputElement, value: string) {
 async function renderHarness(
   handlers: Partial<WorkspaceSidebarSelectionPanelProps> = {},
   locked = false,
-  clip = createClip()
+  clip: VideoProjectVideoClip | VideoProjectImageClip = createClip()
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -105,6 +106,11 @@ async function renderHarness(
         onUpdateMediaClipFitScalePercent={handlers.onUpdateMediaClipFitScalePercent ?? vi.fn()}
         onUpdateMediaClipShadowIntensity={handlers.onUpdateMediaClipShadowIntensity ?? vi.fn()}
         onUpdateMediaClipShadowMode={handlers.onUpdateMediaClipShadowMode ?? vi.fn()}
+        onUpdateMediaClipShadowColor={handlers.onUpdateMediaClipShadowColor ?? vi.fn()}
+        {...(handlers.recentColors ? { recentColors: handlers.recentColors } : {})}
+        {...(handlers.onRememberRecentColor
+          ? { onRememberRecentColor: handlers.onRememberRecentColor }
+          : {})}
         onUpdateMediaClipWindowHeader={handlers.onUpdateMediaClipWindowHeader ?? vi.fn()}
       />
     );
@@ -241,3 +247,51 @@ it('cancels a pending favicon when selection changes to another clip with the sa
   });
   expect(onUpdateMediaClipWindowHeader).toHaveBeenCalledTimes(1);
 });
+
+it.each(['VIDEO', 'IMAGE'] as const)(
+  'edits dormant %s shadow color through the shared field and cancels without a command',
+  async (type) => {
+    const clip = type === 'IMAGE' ? { ...createClip(), type: 'IMAGE' as const } : createClip();
+    const onUpdateMediaClipShadowColor = vi.fn();
+    const onRememberRecentColor = vi.fn(async () => {});
+    await renderHarness(
+      {
+        onUpdateMediaClipShadowColor,
+        onRememberRecentColor,
+        recentColors: ['#abcdef'],
+      },
+      false,
+      clip
+    );
+    const trigger = () =>
+      container!.querySelector<HTMLButtonElement>(
+        '[data-ui="video-editor.media-shadow"] [data-ui="shared.ui.color-selector.value-trigger"]'
+      )!;
+    await act(async () => trigger().click());
+    let input = container!.querySelector<HTMLInputElement>('input[aria-label="Цвет тени"]')!;
+    await act(async () => {
+      setInputValue(input, '#00ff00');
+    });
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(onUpdateMediaClipShadowColor).not.toHaveBeenCalled();
+    expect(onRememberRecentColor).not.toHaveBeenCalled();
+    await act(async () => trigger().click());
+    input = container!.querySelector<HTMLInputElement>('input[aria-label="Цвет тени"]')!;
+    await act(async () => {
+      setInputValue(input, '#12abef');
+    });
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(onUpdateMediaClipShadowColor).toHaveBeenCalledExactlyOnceWith('clip-1', '#12abef');
+    expect(onRememberRecentColor).toHaveBeenCalledExactlyOnceWith('#12abef');
+    await renderHarness({ onUpdateMediaClipShadowColor }, true, clip);
+    expect(
+      container!.querySelector(
+        '[data-ui="video-editor.media-shadow"] [data-ui="shared.ui.color-selector.value-trigger"]'
+      )
+    ).toBeNull();
+  }
+);

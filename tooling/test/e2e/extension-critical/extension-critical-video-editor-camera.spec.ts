@@ -53,6 +53,35 @@ function pixelError(
   return error / (before.width * before.height * 3);
 }
 
+async function shadowRing(
+  canvas: Locator,
+  frame: { x: number; y: number; width: number; height: number }
+) {
+  return canvas.evaluate((node: HTMLCanvasElement, area) => {
+    const context = node.getContext('2d');
+    if (!context) throw new Error('Missing native composition context');
+    const x = Math.round(area.x * node.width),
+      y = Math.round(area.y * node.height);
+    const width = Math.round(area.width * node.width),
+      height = Math.round(area.height * node.height);
+    const pixels = context.getImageData(0, 0, node.width, node.height).data;
+    let red = 0,
+      blue = 0,
+      count = 0;
+    const pad = Math.max(3, Math.round(height / 6));
+    for (let py = Math.max(0, y - pad); py < Math.min(node.height, y + height + pad); py++)
+      for (let px = Math.max(0, x - pad); px < Math.min(node.width, x + width + pad); px++) {
+        if (px >= x && px < x + width && py >= y && py < y + height) continue;
+        const index = (py * node.width + px) * 4;
+        red += pixels[index]!;
+        blue += pixels[index + 2]!;
+        count++;
+      }
+    if (!count) throw new Error('Shadow ring is empty');
+    return { red: red / count, blue: blue / count };
+  }, frame);
+}
+
 async function cameraGeometry(page: Page, owner: Locator, capture: (name: string) => string) {
   const closeMaterials = page.locator('[data-ui="video-editor.materials.close"]');
   if (await closeMaterials.isVisible()) await operate(closeMaterials);
@@ -68,7 +97,9 @@ async function cameraGeometry(page: Page, owner: Locator, capture: (name: string
     await page.mouse.up();
     await expect.poll(async () => Math.round((await inspector.boundingBox())!.width)).toBe(width);
     const before = await rail.boundingBox();
-    await owner.locator('[aria-pressed]').first().scrollIntoViewIfNeeded();
+    const colorRow = owner.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
+    if (await colorRow.count()) await colorRow.scrollIntoViewIfNeeded();
+    else await owner.locator('[aria-pressed]').first().scrollIntoViewIfNeeded();
     expect(
       await owner.evaluate((node) => {
         const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
@@ -98,7 +129,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   test(`camera mirror retains source pixels and montage placement ${viewport.size.width} ${locale}`, async ({
     page,
   }, info) => {
-    test.setTimeout(90000);
+    test.setTimeout(120000);
     await page.setViewportSize({ ...viewport.size });
     await page.emulateMedia({ colorScheme: theme });
     const host = await startHostServer();
@@ -289,6 +320,153 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await horizontal.scrollIntoViewIfNeeded();
       await expect(horizontal).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: info.outputPath('camera-reopened.png'), fullPage: false });
+      const shadow = page.locator('[data-ui="video-editor.media-shadow"]');
+      const shadowLabel = label('gallery.videoReview.webcamShadowColor');
+      const intensity = shadow.getByRole('textbox', {
+        name: label('videoEditor.sidebar.mediaShadowIntensityLabel'),
+        exact: true,
+      });
+      const readCamera = async () =>
+        (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === camera.id);
+      const setColor = async (color: string) => {
+        await operate(shadow.getByRole('button', { name: shadowLabel, exact: true }));
+        const input = shadow.getByRole('textbox', { name: shadowLabel, exact: true });
+        await input.fill(color);
+        await input.press('Enter');
+        await expect
+          .poll(async () => {
+            const clip = await readCamera();
+            return clip && 'shadowColor' in clip ? clip.shadowColor : null;
+          })
+          .toBe(color);
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            )
+        );
+      };
+      await intensity.scrollIntoViewIfNeeded();
+      await intensity.fill('80');
+      await intensity.press('Enter');
+      const sourcePixels = await pixels(stage, frame);
+      await setColor('#ff0000');
+      const red = await shadowRing(stage, frame);
+      await operate(shadow.locator('[data-ui="shared.ui.color-selector.picker-trigger"]'));
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
+      await expect(picker).toBeVisible();
+      const pickerBox = await picker.boundingBox();
+      expect(pickerBox!.x).toBeGreaterThanOrEqual(0);
+      expect(pickerBox!.x + pickerBox!.width).toBeLessThanOrEqual(viewport.size.width + 1);
+      await page.screenshot({ path: info.outputPath('shadow-picker.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await expect(picker).toBeHidden();
+      expect(await readCamera()).toMatchObject({ shadowColor: '#ff0000' });
+
+      await operate(shadow.getByRole('button', { name: shadowLabel, exact: true }));
+      const canceledColor = shadow.getByRole('textbox', { name: shadowLabel, exact: true });
+      await canceledColor.fill('#00ff00');
+      await canceledColor.press('Escape');
+      await expect(shadow.getByRole('button', { name: shadowLabel, exact: true })).toContainText(
+        '#FF0000'
+      );
+      expect(await readCamera()).toMatchObject({ shadowColor: '#ff0000' });
+      await setColor('#0000ff');
+      await expect
+        .poll(async () => {
+          const blue = await shadowRing(stage, frame);
+          return Math.min(red.red - blue.red, blue.blue - red.blue);
+        })
+        .toBeGreaterThan(0.3);
+      expect(pixelError(sourcePixels, await pixels(stage, frame), false)).toBeLessThan(1);
+      expect((await readNativeVideoProject(page))?.version).toBe(9);
+      await checkInspectorPaintedFont(
+        page,
+        shadow.getByRole('button', { name: shadowLabel, exact: true }),
+        'camera-shadow-color'
+      );
+      await shadow
+        .locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('shadow-colored.png'), fullPage: false });
+      await writeFile(
+        info.outputPath('shadow-pixels.json'),
+        JSON.stringify(
+          {
+            red,
+            blue: await shadowRing(stage, frame),
+            sourceError: pixelError(sourcePixels, await pixels(stage, frame), false),
+          },
+          null,
+          2
+        )
+      );
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect
+        .poll(async () => {
+          const clip = await readCamera();
+          return clip && 'shadowColor' in clip ? clip.shadowColor : null;
+        })
+        .toBe('#ff0000');
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+      await expect
+        .poll(async () => {
+          const clip = await readCamera();
+          return clip && 'shadowColor' in clip ? clip.shadowColor : null;
+        })
+        .toBe('#0000ff');
+      await intensity.fill('0');
+      await intensity.press('Enter');
+      await expect
+        .poll(async () => {
+          const clip = await readCamera();
+          return clip && 'shadowIntensity' in clip ? clip.shadowIntensity : null;
+        })
+        .toBe(0);
+      await cameraGeometry(page, shadow, (name) =>
+        info.outputPath(name.replace('camera-mirror', 'shadow-color'))
+      );
+      await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+      await shadow
+        .locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('shadow-all-sections.png'), fullPage: false });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await expect
+        .poll(async () => {
+          const clip = await readCamera();
+          return clip && 'shadowColor' in clip ? clip.shadowColor : null;
+        })
+        .toBe('#0000ff');
+      const reopenedCamera = await readCamera();
+      expect(reopenedCamera).toMatchObject({
+        cameraMirrored: true,
+        shadowIntensity: 0,
+        shadowColor: '#0000ff',
+      });
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.sceneProperties'),
+          exact: true,
+        })
+      );
+      await page
+        .locator(`[data-project-timeline-clip="${camera.id}"]`)
+        .click({ modifiers: ['Control'] });
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupStyle'),
+          exact: true,
+        })
+      );
+      await shadow
+        .locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+        .scrollIntoViewIfNeeded();
+      await expect(shadow.getByRole('button', { name: shadowLabel, exact: true })).toContainText(
+        '#0000FF'
+      );
+      await page.screenshot({ path: info.outputPath('shadow-reopened.png'), fullPage: false });
       if (index === 0) {
         await page.setViewportSize({ width: 1200, height: 560 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

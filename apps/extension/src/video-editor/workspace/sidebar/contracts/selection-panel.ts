@@ -88,6 +88,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onUpdateMediaClipFitScalePercent?: WorkspaceSidebarProps['onUpdateMediaClipFitScalePercent'];
   onUpdateMediaClipShadowIntensity?: WorkspaceSidebarProps['onUpdateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode?: WorkspaceSidebarProps['onUpdateMediaClipShadowMode'];
+  onUpdateMediaClipShadowColor?: WorkspaceSidebarProps['onUpdateMediaClipShadowColor'];
   onUpdateMediaClipWindowHeader?: WorkspaceSidebarProps['onUpdateMediaClipWindowHeader'];
   onApplyMediaClipVisualsToTrack?: WorkspaceSidebarProps['onApplyMediaClipVisualsToTrack'];
   onConvertTextClipToAnnotation?: WorkspaceSidebarProps['onConvertTextClipToAnnotation'];

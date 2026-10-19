@@ -1,3 +1,4 @@
+import { parseColor } from '@sniptale/foundation/color';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { isCameraAppearance } from '../camera/appearance';
 import type { VideoProjectClip } from '../types/index';
@@ -195,6 +196,15 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (!isRecord(value) || !hasBaseClipFields(value) || !hasOriginalAudioMute(value)) {
     return false;
   }
+
+  if (
+    value['shadowColor'] !== undefined &&
+    ((value['type'] !== VideoProjectClipType.VIDEO &&
+      value['type'] !== VideoProjectClipType.IMAGE) ||
+      !isColorString(value['shadowColor']) ||
+      parseColor(value['shadowColor']) === null)
+  )
+    return false;
 
   if (
     value['cameraMirrored'] !== undefined &&

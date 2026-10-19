@@ -81,12 +81,19 @@ function isTransition(value: unknown): boolean {
 function isHydratableProjectShape(value: unknown): value is VideoProject {
   return (
     isRecord(value) &&
-    (value['version'] === 8 ||
+    (value['version'] === 9 ||
+      !Array.isArray(value['clips']) ||
+      value['clips'].every(
+        (clip: unknown) => !isRecord(clip) || clip['shadowColor'] === undefined
+      )) &&
+    (value['version'] === 9 ||
+      value['version'] === 8 ||
       !Array.isArray(value['clips']) ||
       value['clips'].every(
         (clip: unknown) => !isRecord(clip) || clip['cameraMirrored'] === undefined
       )) &&
-    (value['version'] === 8 ||
+    (value['version'] === 9 ||
+      value['version'] === 8 ||
       value['version'] === 7 ||
       value['version'] === 6 ||
       value['version'] === 5 ||
@@ -97,7 +104,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
         value['actionFeedback'] === undefined)) &&
     (value['cameraFollowDefaults'] === undefined ||
       parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
-    (value['version'] === 8 ||
+    (value['version'] === 9 ||
+      value['version'] === 8 ||
       value['version'] === 7 ||
       value['version'] === 6 ||
       value['version'] === 5 ||
@@ -107,14 +115,16 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
-    (value['version'] === 8 ||
+    (value['version'] === 9 ||
+      value['version'] === 8 ||
       value['version'] === 7 ||
       value['version'] === 6 ||
       !Array.isArray(value['clips']) ||
       value['clips'].every(
         (clip: unknown) => !isRecord(clip) || clip['originalAudioMute'] === undefined
       )) &&
-    (value['version'] === 8 ||
+    (value['version'] === 9 ||
+      value['version'] === 8 ||
       value['version'] === 7 ||
       !Array.isArray(value['tracks']) ||
       value['tracks'].every(
@@ -122,7 +132,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
       )) &&
     isString(value['id']) &&
     (value['textDocuments'] === undefined ||
-      ((value['version'] === 8 ||
+      ((value['version'] === 9 ||
+        value['version'] === 8 ||
         value['version'] === 7 ||
         value['version'] === 6 ||
         value['version'] === 5) &&

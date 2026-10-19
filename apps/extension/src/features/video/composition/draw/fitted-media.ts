@@ -174,6 +174,7 @@ export function drawFittedMediaLayer(params: {
   fitMode: VideoMediaFitMode;
   frame: MediaFrame;
   render: MediaFrameRenderer;
+  shadowColor?: string;
   shadowIntensity: number | undefined;
   shadowMode: VideoMediaShadowMode | undefined;
   sourceHeight: number;
@@ -212,7 +213,8 @@ export function drawFittedMediaLayer(params: {
       : params.frame,
     params.displayScale,
     params.cameraAppearance,
-    params.camera
+    params.camera,
+    params.shadowColor
   );
   if (params.windowHeaderImage) {
     drawWindowMediaPlane(params);

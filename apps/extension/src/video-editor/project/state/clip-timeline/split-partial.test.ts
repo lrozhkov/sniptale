@@ -389,19 +389,22 @@ it.each(['boundary', 'click', 'dwell'] as const)(
 it('keeps camera reflection through a partial rate-two split and independent duplicate', () => {
   const { project, screen, camera, cameraTrack } = setup(1, 4);
   cameraTrack.role = 'CAMERA';
-  const mirrored = { ...camera, cameraMirrored: true };
+  const mirrored = { ...camera, cameraMirrored: true, shadowColor: '#ff008080' };
   const authored = {
     ...project,
-    version: 8 as const,
+    version: 9 as const,
     clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
   };
   const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
   expect(split).not.toBeNull();
   const cameraClips = split!.project.clips.filter((clip) => clip.trackId === cameraTrack.id);
   expect(cameraClips).toHaveLength(2);
-  expect(cameraClips.every((clip) => clip.type === 'VIDEO' && clip.cameraMirrored === true)).toBe(
-    true
-  );
+  expect(
+    cameraClips.every(
+      (clip) =>
+        clip.type === 'VIDEO' && clip.cameraMirrored === true && clip.shadowColor === '#ff008080'
+    )
+  ).toBe(true);
   expect(
     cameraClips.map((clip) =>
       clip.type === 'VIDEO' ? [clip.sourceStart, clip.sourceDuration, clip.playbackRate] : []
@@ -414,7 +417,13 @@ it('keeps camera reflection through a partial rate-two split and independent dup
   expect(duplicate).not.toBeNull();
   expect(
     duplicate!.project.clips.find((clip) => clip.id === duplicate!.duplicateClipId)
-  ).toMatchObject({ cameraMirrored: true, sourceStart: 1, sourceDuration: 8, playbackRate: 2 });
+  ).toMatchObject({
+    cameraMirrored: true,
+    shadowColor: '#ff008080',
+    sourceStart: 1,
+    sourceDuration: 8,
+    playbackRate: 2,
+  });
   expect(project.clips.find((clip) => clip.id === screen.id)).toBe(screen);
   expect('cameraMirrored' in camera).toBe(false);
 });

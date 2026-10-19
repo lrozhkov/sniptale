@@ -47,6 +47,9 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onUpdateMediaClipShadowMode
       ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
       : {}),
+    ...(props.onUpdateMediaClipShadowColor
+      ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
+      : {}),
     ...(props.onUpdateMediaClipWindowHeader
       ? { onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader }
       : {}),

@@ -22,6 +22,8 @@ export const VideoMediaShadowMode = {
 export type VideoMediaShadowMode = (typeof VideoMediaShadowMode)[keyof typeof VideoMediaShadowMode];
 
 export interface VideoProjectMediaShadowFields {
+  /** Authored window color remains available when shadow intensity is zero. */
+  shadowColor?: string;
   shadowIntensity?: number;
   shadowMode?: VideoMediaShadowMode;
 }

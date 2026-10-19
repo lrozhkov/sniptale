@@ -448,3 +448,10 @@ Project JSON version 8 admits optional `cameraMirrored` on VIDEO clips. The valu
 Only clips on CAMERA tracks apply reflection. Other VIDEO clips retain the setting without applying it. Reflection changes camera pixels inside the cropped window. It preserves source clocks, placement, masks, shadows and window decoration. Source-bound action positions follow reflected pixels. Their glyphs remain upright.
 
 The existing camera command, project mutation, history and save owners control these edits. This change adds no resource writer or physical database migration.
+
+
+### Media window shadow colors
+
+Video-project schema 9 admits `shadowColor` on VIDEO and IMAGE clips. The field contains a bounded color that the foundation parser supports. Versions 2–8 refuse this field. Readers refuse future versions. Mutations retain schema 9 after removal. Opening does not write default colors.
+
+Color belongs to each media window. It does not change source bytes, placement, source time, or EffectV1 settings. Zero intensity retains the color. Mode changes retain authored colors. A missing color uses the existing mode default. Track application copies the source color and removes a target color when the source uses the default. Existing mutation, history, save, and export owners retain authority.

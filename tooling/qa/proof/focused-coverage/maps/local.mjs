@@ -1,5 +1,28 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-media-shadow-color',
+    productionFile: 'apps/extension/src/video-editor/project/state/clip-property/media.ts',
+    allowCrossOwner: true,
+    reason:
+      'Media shadow commands affect schema admission, track copies, shared rendering and inspector routing.',
+    testFiles: [
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/validation/clips.test.ts',
+      'apps/extension/src/features/video/project/hydration/clip.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-shadow.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-partial.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-frame.test.tsx',
+      'apps/extension/src/video-editor/project/state/actions.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/store.test.tsx',
+      'apps/extension/src/video-editor/workspace/surface/sidebar-props.test.ts',
+      'apps/extension/src/features/video/review/advanced/webcam.test.ts',
+      'apps/extension/src/workflows/video-review/render-webcam.test.ts',
+    ],
+  },
+  {
     owner: 'montage-camera-pixel-orientation',
     productionFile: 'apps/extension/src/features/video/project/camera/editing.ts',
     allowCrossOwner: true,

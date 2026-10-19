@@ -15,7 +15,7 @@ import type {
   VideoMediaShadowMode as VideoMediaShadowModeValue,
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { SelectInput } from '../shared/controls';
+import { ColorField, SelectInput } from '../shared/controls';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { SliderField } from '../shared/sliders';
 import { getMediaFitModeOptions } from './media-fit-options';
@@ -28,11 +28,13 @@ type MediaFrameControlsProps = Pick<
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipShadowColor'
   | 'onUpdateMediaClipWindowHeader'
-> & {
-  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
-  locked: boolean;
-};
+> &
+  Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'recentColors' | 'onRememberRecentColor'>> & {
+    clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
+    locked: boolean;
+  };
 
 type MediaFrameClip = Extract<
   NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
@@ -40,11 +42,14 @@ type MediaFrameClip = Extract<
 >;
 
 type MediaFrameFieldProps = {
+  recentColors?: readonly string[] | undefined;
+  onRememberRecentColor?: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'] | undefined;
   clip: MediaFrameClip;
   clipId: string;
   disabled: boolean;
   fitMode: VideoMediaFitMode;
   fitScalePercent: number;
+  shadowColor?: string;
   shadowIntensity: number;
   shadowMode: VideoMediaShadowModeValue;
   onApplyMediaClipVisualsToTrack?: WorkspaceSidebarSelectionPanelProps['onApplyMediaClipVisualsToTrack'];
@@ -52,6 +57,7 @@ type MediaFrameFieldProps = {
   onUpdateMediaClipFitScalePercent?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipFitScalePercent'];
   onUpdateMediaClipShadowIntensity?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowMode'];
+  onUpdateMediaClipShadowColor?: WorkspaceSidebarSelectionPanelProps['onUpdateMediaClipShadowColor'];
 };
 
 export function MediaFrameControls(props: MediaFrameControlsProps) {
@@ -88,6 +94,10 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           disabled={props.locked}
           shadowIntensity={props.clip.shadowIntensity ?? 0}
           shadowMode={props.clip.shadowMode ?? VideoMediaShadowMode.BACKDROP}
+          {...(props.clip.shadowColor === undefined ? {} : { shadowColor: props.clip.shadowColor })}
+          onUpdateMediaClipShadowColor={props.onUpdateMediaClipShadowColor}
+          recentColors={props.recentColors}
+          onRememberRecentColor={props.onRememberRecentColor}
           onUpdateMediaClipShadowIntensity={props.onUpdateMediaClipShadowIntensity}
           onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
         />
@@ -148,12 +158,16 @@ export function MediaShadowControls(
     | 'disabled'
     | 'shadowIntensity'
     | 'shadowMode'
+    | 'shadowColor'
+    | 'recentColors'
+    | 'onRememberRecentColor'
     | 'onUpdateMediaClipShadowIntensity'
     | 'onUpdateMediaClipShadowMode'
+    | 'onUpdateMediaClipShadowColor'
   >
 ) {
   return (
-    <div className="sniptale-parameter-stack space-y-1">
+    <div className="sniptale-parameter-stack space-y-1" data-ui="video-editor.media-shadow">
       <OptionButtonsField
         disabled={props.disabled}
         label={translate('videoEditor.sidebar.mediaShadowModeLabel')}
@@ -170,6 +184,17 @@ export function MediaShadowControls(
         disabled={props.disabled}
         formatValue={(value) => `${Math.round(value)}%`}
         onChange={(value) => props.onUpdateMediaClipShadowIntensity?.(props.clipId, value)}
+      />
+      <ColorField
+        label={translate('gallery.videoReview.webcamShadowColor')}
+        value={
+          props.shadowColor ??
+          (props.shadowMode === VideoMediaShadowMode.GLOW ? '#ffffff' : '#000000')
+        }
+        disabled={props.disabled || !props.onUpdateMediaClipShadowColor}
+        onChange={(value) => props.onUpdateMediaClipShadowColor?.(props.clipId, value)}
+        recentColors={props.recentColors}
+        onRememberRecentColor={props.onRememberRecentColor}
       />
     </div>
   );

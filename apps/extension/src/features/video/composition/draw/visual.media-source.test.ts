@@ -214,3 +214,36 @@ it('reflects decoded camera pixels without reflecting normal video or action gly
     }
   }
 });
+
+it('uses the same authored shadow color for decoded video and image windows', () => {
+  for (const kind of ['video', 'image'] as const) {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'shadow',
+      filename: 'source.webm',
+      width: 160,
+      height: 90,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+    });
+    const original = project.clips.find((clip) => clip.type === 'VIDEO');
+    if (!original) throw new Error('Missing video');
+    const styled = { ...original, shadowIntensity: 70, shadowColor: '#00ff0080' };
+    project.clips = [kind === 'video' ? styled : { ...styled, type: 'IMAGE' }];
+    const layer = resolveVideoCompositionFrame(project, 0).visualLayers[0];
+    if (!layer) throw new Error('Missing visual layer');
+    const context = createVisualTestContext();
+    const draw = vi.fn();
+    drawCompositionVisualLayer(
+      context,
+      layer,
+      1,
+      1,
+      { [styled.assetId]: { naturalWidth: 160, naturalHeight: 90 } as HTMLImageElement },
+      new Map([[styled.id, { draw, sourceWidth: 160, sourceHeight: 90 }]])
+    );
+    expect(Reflect.get(context.__maskContext, 'shadowColor')).toBe('#00ff0080');
+    if (kind === 'video') expect(draw).toHaveBeenCalledOnce();
+    else expect(context.drawImage).toHaveBeenCalled();
+  }
+});

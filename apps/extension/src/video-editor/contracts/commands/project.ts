@@ -115,6 +115,7 @@ export interface VideoEditorProjectActions
   updateMediaClipFitScalePercent: (clipId: string, fitScalePercent: number) => void;
   updateMediaClipShadowIntensity: (clipId: string, shadowIntensity: number) => void;
   updateMediaClipShadowMode: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  updateMediaClipShadowColor: (clipId: string, shadowColor: string) => void;
   updateMediaClipWindowHeader: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   applyMediaClipVisualsToTrack: (clipId: string) => void;
   closeTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;

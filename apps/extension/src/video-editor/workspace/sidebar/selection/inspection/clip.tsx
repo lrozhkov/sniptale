@@ -302,6 +302,12 @@ function createCameraAppearanceGroup(
           disabled={locked}
           shadowIntensity={clip.shadowIntensity ?? 0}
           shadowMode={clip.shadowMode ?? 'BACKDROP'}
+          recentColors={props.recentColors}
+          onRememberRecentColor={props.onRememberRecentColor}
+          {...(clip.shadowColor === undefined ? {} : { shadowColor: clip.shadowColor })}
+          {...(props.onUpdateMediaClipShadowColor
+            ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
+            : {})}
           {...(props.onUpdateMediaClipShadowIntensity
             ? { onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity }
             : {})}

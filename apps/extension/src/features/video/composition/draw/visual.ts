@@ -223,6 +223,7 @@ function drawVideoLayer(
       : {}),
     shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
+    ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
     render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
@@ -339,6 +340,7 @@ function drawImageLayer(
     frame,
     shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
+    ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: image.naturalHeight,
     sourceWidth: image.naturalWidth,
     render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
