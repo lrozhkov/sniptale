@@ -77,16 +77,26 @@ export async function prepareProjectLocalTextVoice(args: {
     | { kind: 'file'; file: File }
     | { kind: 'library'; id: string; auditionedSource?: LibrarySource };
   kind: 'microphone' | 'gallery';
+  /** Microphone callers capture the canonical basis when recording starts. */
+  recordingBasisHash?: string;
   signal: AbortSignal;
 }): Promise<ProjectVoiceTakePreview> {
   const { access, documentId, fragmentId, selection, signal } = args;
   signal.throwIfAborted();
   const project = access.getProject();
   if (!project) throw new Error('stale');
-  if (args.kind === 'microphone' && selection.kind !== 'file') throw new Error('invalid-request');
+  if (
+    (args.kind === 'microphone' && selection.kind !== 'file') ||
+    (args.recordingBasisHash !== undefined && args.kind !== 'microphone')
+  )
+    throw new Error('invalid-request');
   const initial = localProjectKey(project);
   const captured = await captureVideoProjectVoiceTextBasis(project, documentId, fragmentId);
   signal.throwIfAborted();
+  const admitted = access.getProject();
+  if (!admitted || localProjectKey(admitted) !== initial) throw new Error('stale');
+  if (args.recordingBasisHash !== undefined && args.recordingBasisHash !== captured.basisHash)
+    throw new Error('stale');
   const source =
     selection.kind === 'library'
       ? (selection.auditionedSource ?? (await readLibraryAudioBindingSource(selection.id)))

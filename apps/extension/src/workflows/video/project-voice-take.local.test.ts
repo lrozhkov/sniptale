@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import * as digest from '@sniptale/platform/security/digest';
+import { captureVideoProjectVoiceTextBasis } from '../../features/video/project/text/voice-scope';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
   getVideoProject,
@@ -125,7 +127,8 @@ function fixture() {
     prepare: (
       library = false,
       kind: 'microphone' | 'gallery' = 'gallery',
-      operationSignal = signal()
+      operationSignal = signal(),
+      basis?: Awaited<ReturnType<typeof captureVideoProjectVoiceTextBasis>>
     ) =>
       prepareProjectLocalTextVoice({
         access,
@@ -133,6 +136,7 @@ function fixture() {
         fragmentId: 'phrase',
         kind,
         signal: operationSignal,
+        ...(basis ? { recordingBasisHash: basis.basisHash } : {}),
         selection: library ? { kind: 'library', id: source.mediaId } : { kind: 'file', file },
       }),
     change: () => {
@@ -310,4 +314,95 @@ it('propagates decoder refusal without acquiring a source or URL', async () => {
   await expect(f.prepare()).rejects.toThrow('Unsupported audio duration.');
   expect(prepareProjectAsset).not.toHaveBeenCalled();
   expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it.each(['text', 'timing', 'identity', 'target', 'hash'] as const)(
+  'refuses a recorded basis with changed %s before decoding or writing',
+  async (change) => {
+    const f = fixture();
+    const basis = await captureVideoProjectVoiceTextBasis(f.project(), 'script', 'phrase');
+    const fragment = f.project().textDocuments![0]!.document.fragments[0]!;
+    if (change === 'text') {
+      fragment.text = 'New words after recording';
+      fragment.revision += 1;
+    } else if (change === 'timing') {
+      fragment.start += 1;
+      fragment.end += 1;
+      fragment.timingRevision += 1;
+    } else if (change === 'identity') f.recreate();
+    else if (change === 'target') {
+      const other = structuredClone(f.project());
+      other.textDocuments![0]!.id = 'other';
+      Object.assign(basis, await captureVideoProjectVoiceTextBasis(other, 'other', 'phrase'));
+    } else basis.basisHash = 'sha256:' + '0'.repeat(64);
+    await expect(f.prepare(false, 'microphone', signal(), basis)).rejects.toThrow('stale');
+    expect(inspectReviewAudio).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(prepareProjectAsset).not.toHaveBeenCalled();
+    expect(f.access.save).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps the recording basis across unrelated edits and retries refusal with the original bytes', async () => {
+  const f = fixture();
+  const basis = await captureVideoProjectVoiceTextBasis(f.project(), 'script', 'phrase');
+  const fragment = f.project().textDocuments![0]!.document.fragments[0]!;
+  const original = structuredClone(fragment);
+  fragment.text = 'Changed during recording';
+  fragment.revision += 1;
+  await expect(f.prepare(false, 'microphone', signal(), basis)).rejects.toThrow('stale');
+  Object.assign(fragment, original);
+  f.change();
+  const preview = await f.prepare(false, 'microphone', signal(), basis);
+  expect(preview.blob).toBe(f.file);
+  expect(preview.textSnapshot).toMatchObject({
+    basisHash: basis.basisHash,
+    text: { kind: 'microphone', text: original.text, revision: original.revision },
+  });
+  expect(inspectReviewAudio).toHaveBeenCalledOnce();
+  expect(f.access.save).not.toHaveBeenCalled();
+  await acceptProjectVoiceTake(f.access, preview, { start: 3 }, signal());
+  f.project().textDocuments![0]!.document.fragments[0]!.text = 'Changed after acceptance';
+  expect(f.project().clips[0]).toMatchObject({
+    textSnapshot: { text: { text: original.text } },
+  });
+});
+
+it('does not apply a supplied microphone basis to a Library take', async () => {
+  const f = fixture();
+  const basis = await captureVideoProjectVoiceTextBasis(f.project(), 'script', 'phrase');
+  await expect(f.prepare(true, 'gallery', signal(), basis)).rejects.toThrow('invalid-request');
+  expect(readLibraryAudioBindingSource).not.toHaveBeenCalled();
+  expect(inspectReviewAudio).not.toHaveBeenCalled();
+});
+
+it('refuses a project change while the recording basis is checked before starting decode', async () => {
+  const f = fixture();
+  const basis = await captureVideoProjectVoiceTextBasis(f.project(), 'script', 'phrase');
+  const wait = gate();
+  const original = digest.createSha256Digest;
+  const hashing = vi.spyOn(digest, 'createSha256Digest').mockImplementationOnce(async (text) => {
+    await wait.promise;
+    return original(text);
+  });
+  try {
+    const pending = f.prepare(false, 'microphone', signal(), basis);
+    await vi.waitFor(() => expect(hashing).toHaveBeenCalledOnce());
+    f.recreate();
+    wait.release();
+    await expect(pending).rejects.toThrow('stale');
+    expect(inspectReviewAudio).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(prepareProjectAsset).not.toHaveBeenCalled();
+  } finally {
+    hashing.mockRestore();
+  }
+});
+
+it('keeps a recorded basis valid when only caption visibility changes', async () => {
+  const f = fixture();
+  const basis = await captureVideoProjectVoiceTextBasis(f.project(), 'script', 'phrase');
+  f.project().textDocuments![0]!.document.fragments[0]!.showInVideo = false;
+  const preview = await f.prepare(false, 'microphone', signal(), basis);
+  expect(preview.textSnapshot.text.text).toBe(basis.basis.fragment.text);
 });

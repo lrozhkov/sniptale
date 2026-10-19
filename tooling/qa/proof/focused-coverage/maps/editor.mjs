@@ -1,5 +1,18 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'montage-local-voice-preparation',
+    productionFile: 'apps/extension/src/workflows/video/project-voice-take.ts',
+    allowCrossOwner: true,
+    reason: 'Local recording bases preserve common acceptance and mounted AI and Library consumers.',
+    testFiles: [
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/features/video/project/text/voice-scope.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
     owner: 'montage-text-voice-panel',
     productionFile:
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
