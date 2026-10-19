@@ -31,7 +31,7 @@ export function TourHighlightAnimationFields({
         />
       )}
       {(['enter', 'exit'] as const).map((phase) => (
-        <div key={phase}>
+        <div key={phase} className="sniptale-parameter-stack">
           <div className="tour-text-field">
             <TourChoiceField
               label={t(

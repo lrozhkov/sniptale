@@ -17,6 +17,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import { createTranslator } from '../../../platform/i18n';
 import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspector } from './inspector';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { getSystemSurfaceStylePresets } from '../../../features/highlighter/surface-style/system-presets';
 vi.mock(
   '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
@@ -42,6 +43,7 @@ let project: GuideProject;
 let selected: TourSelection | null;
 let scope: 'selection' | 'document';
 let disabled: boolean;
+let refuseChanges: boolean;
 let presentation: 'all' | 'sections';
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -76,6 +78,7 @@ beforeEach(() => {
   selected = { kind: 'slide', slideId: 'image', objectId: null };
   scope = 'selection';
   disabled = false;
+  refuseChanges = false;
   presentation = 'all';
   draw();
 });
@@ -88,26 +91,29 @@ function draw() {
   const slideId = selected?.kind === 'slide' ? selected.slideId : null;
   act(() =>
     root.render(
-      <TourInspector
-        presentation={presentation}
-        narration={<div data-testid="narration-slot" />}
-        tour={project.tour!}
-        slide={project.tour!.slides.find((s) => s.id === slideId) ?? null}
-        selection={selected}
-        scope={scope}
-        disabled={disabled}
-        t={createTranslator('en')}
-        onChangeSlide={(slide) => accept({ kind: 'replace-slide', slideId: slide.id, slide })}
-        onChangeTour={(tour) => accept({ kind: 'replace-tour', tour })}
-        onSelectObject={(id) => {
-          if (selected?.kind === 'slide') selected = { ...selected, objectId: id };
-          draw();
-        }}
-      />
+      <InspectorLayout>
+        <TourInspector
+          presentation={presentation}
+          narration={<div data-testid="narration-slot" />}
+          tour={project.tour!}
+          slide={project.tour!.slides.find((s) => s.id === slideId) ?? null}
+          selection={selected}
+          scope={scope}
+          disabled={disabled}
+          t={createTranslator('en')}
+          onChangeSlide={(slide) => accept({ kind: 'replace-slide', slideId: slide.id, slide })}
+          onChangeTour={(tour) => accept({ kind: 'replace-tour', tour })}
+          onSelectObject={(id) => {
+            if (selected?.kind === 'slide') selected = { ...selected, objectId: id };
+            draw();
+          }}
+        />
+      </InspectorLayout>
     )
   );
 }
 function accept(command: Parameters<typeof applyTourCommands>[1][number]) {
+  if (refuseChanges) return false;
   try {
     project = applyTourCommands(project, [command], {
       images: getTourImages(project.tour!),
@@ -814,3 +820,174 @@ it('offers complete focus-style choices and keeps region data', async () => {
     [...group().querySelectorAll<HTMLButtonElement>('button')].every((button) => button.disabled)
   ).toBe(true);
 });
+
+it.each(['navigation', 'end'] as const)(
+  'labels the %s URL and clears its draft without replacing an accepted destination',
+  async (context) => {
+    const savedUrl = 'https://example.com/saved';
+    if (context === 'navigation') {
+      const nav = project.tour!.slides[1]!;
+      if (nav.kind !== 'navigation') throw new Error('Expected navigation');
+      nav.buttons = [{ id: 'link', label: 'Open', action: { kind: 'url', url: savedUrl } }];
+      selected = { kind: 'slide', slideId: nav.id, objectId: 'link' };
+    } else {
+      project.tour!.endScreen.button = { label: 'Open', url: savedUrl };
+      selected = { kind: 'end' };
+    }
+    draw();
+    const field = () => host.querySelector<HTMLInputElement>('input[aria-label="Open link"]')!;
+    const row = field().closest('.sniptale-parameter-row');
+    expect(row?.querySelector('.sniptale-parameter-name')?.textContent).toBe('Open link');
+    expect(field().maxLength).toBe(4000);
+    const acceptedUrl = () => {
+      if (context === 'end') return project.tour!.endScreen.button?.url;
+      const nav = project.tour!.slides[1]!;
+      if (nav.kind !== 'navigation') throw new Error('Expected navigation');
+      const action = nav.buttons[0]!.action;
+      return action.kind === 'url' ? action.url : null;
+    };
+    const edit = async (value: string) =>
+      act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+          field(),
+          value
+        );
+        field().dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    await act(async () => field().focus());
+    await edit('invalid destination');
+    await act(async () =>
+      field().dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+    );
+    expect(document.activeElement).toBe(field());
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(field().value).toBe('invalid destination');
+    expect(acceptedUrl()).toBe(savedUrl);
+    await act(async () => field().dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(field().getAttribute('aria-invalid')).toBe('true');
+    expect(field().value).toBe('invalid destination');
+    expect(acceptedUrl()).toBe(savedUrl);
+    const clear = row!.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
+    expect(clear.getAttribute('aria-label')).toContain('Open link');
+    await act(async () => clear.click());
+    expect(field().value).toBe('');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(acceptedUrl()).toBe(savedUrl);
+    expect(document.activeElement).toBe(field());
+    await edit('https://example.com/new');
+    await act(async () =>
+      field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(acceptedUrl()).toBe('https://example.com/new');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    await edit('https://example.com/blur');
+    await act(async () => field().dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(acceptedUrl()).toBe('https://example.com/blur');
+  }
+);
+
+it.each([
+  { label: 'Alignment', key: 'align', end: 'end', home: 'start', middle: 'center' },
+  { label: 'Vertical position', key: 'vertical', end: 'end', home: 'start', middle: 'center' },
+  { label: 'Button columns', key: 'columns', end: 3, home: 1, middle: 2 },
+] as const)(
+  'operates the $label icon radios with one Tab stop and preserves other slide data',
+  async ({ label, key, end, home, middle }) => {
+    selected = { kind: 'slide', slideId: 'nav', objectId: null };
+    draw();
+    const before = structuredClone(project.tour!.slides[1]!);
+    if (before.kind !== 'navigation') throw new Error('Expected navigation');
+    const group = () =>
+      host.querySelector<HTMLElement>(`[role="radiogroup"][aria-label="${label}"]`)!;
+    expect(group()).not.toBeNull();
+    const radios = () => [...group().querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+    expect(radios()).toHaveLength(3);
+    const selectedRadio = () =>
+      radios().find((node) => node.getAttribute('aria-checked') === 'true')!;
+    expect(radios().filter((node) => node.tabIndex === 0)).toEqual([selectedRadio()]);
+    expect(radios().every((node) => !node.hasAttribute('aria-pressed'))).toBe(true);
+    const press = async (button: HTMLButtonElement, key: string) =>
+      act(async () => {
+        button.focus();
+        button.dispatchEvent(
+          new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        );
+      });
+    const value = () => {
+      const slide = project.tour!.slides[1]!;
+      if (slide.kind !== 'navigation') throw new Error('Expected navigation');
+      return slide.layout?.[key];
+    };
+    await press(selectedRadio(), 'End');
+    expect(value()).toBe(end);
+    expect(document.activeElement).toBe(radios()[2]);
+    await press(selectedRadio(), 'ArrowRight');
+    expect(value()).toBe(home);
+    expect(document.activeElement).toBe(radios()[0]);
+    await press(selectedRadio(), 'ArrowDown');
+    expect(value()).toBe(middle);
+    await press(selectedRadio(), 'Home');
+    expect(value()).toBe(home);
+    await press(selectedRadio(), 'ArrowLeft');
+    expect(value()).toBe(end);
+    await press(selectedRadio(), 'ArrowUp');
+    expect(value()).toBe(middle);
+    expect(radios().filter((node) => node.tabIndex === 0)).toEqual([selectedRadio()]);
+    const after = project.tour!.slides[1]!;
+    if (after.kind !== 'navigation') throw new Error('Expected navigation');
+    const { layout: _beforeLayout, ...beforeContent } = before;
+    const { layout: _afterLayout, ...afterContent } = after;
+    expect(afterContent).toEqual(beforeContent);
+    disabled = true;
+    draw();
+    expect(radios().every((node) => node.disabled && node.tabIndex === -1)).toBe(true);
+    await press(selectedRadio(), 'Home');
+    expect(value()).toBe(middle);
+  }
+);
+
+it.each(['all', 'sections'] as const)(
+  'keeps navigation-button deletion after every setting and preserves refused removal in %s view',
+  async (mode) => {
+    selected = { kind: 'slide', slideId: 'nav', objectId: null };
+    presentation = mode;
+    draw();
+    if (mode === 'sections') await click('Contents links');
+    await click('Add button');
+    const selection = structuredClone(selected);
+    const remove = () =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent?.trim() === 'Delete'
+      )!;
+    expect(remove().closest('.guide-inspector-group')).toBeNull();
+    expect(remove().closest('.tour-object-inspector')).not.toBeNull();
+    if (mode === 'sections') await click('Narration');
+    const narration = host.querySelector('[data-testid="narration-slot"]')!;
+    expect(narration).not.toBeNull();
+    expect(remove()).toBeDefined();
+    expect(
+      narration.compareDocumentPosition(remove()) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(remove().closest('[data-ui="scenario-editor.inspector-categories"]')).toBeNull();
+    refuseChanges = true;
+    await act(async () => remove().click());
+    expect(selected).toEqual(selection);
+    const unchanged = project.tour!.slides[1]!;
+    expect(unchanged.kind === 'navigation' && unchanged.buttons).toHaveLength(1);
+    disabled = true;
+    draw();
+    expect(remove().disabled).toBe(true);
+    await act(async () => remove().click());
+    expect(selected).toEqual(selection);
+    refuseChanges = false;
+    disabled = false;
+    draw();
+    await act(async () => remove().click());
+    const slide = project.tour!.slides[1]!;
+    expect(slide.kind === 'navigation' && slide.buttons).toEqual([]);
+    expect(selected).toEqual({ kind: 'slide', slideId: 'nav', objectId: null });
+  }
+);

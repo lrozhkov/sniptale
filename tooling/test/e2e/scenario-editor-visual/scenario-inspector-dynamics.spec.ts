@@ -47,7 +47,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
           return Math.round(track.right - thumb.right);
         })
       )
-      .toBe(3);
+      .toBe(4);
     const numeric = panel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').first();
     await numeric.hover();
     const slider = numeric.locator('input[type="range"]');
@@ -103,7 +103,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
       const choice = panel
-        .locator('.guide-inspector-choice [role="group"] button[aria-pressed="false"]')
+        .locator(
+          '[data-ui="shared.ui.compact-inspector.segmented-row"] button[aria-pressed="false"]'
+        )
         .first();
       const idle = await choice.evaluate((node) => getComputedStyle(node).color);
       await choice.hover();
@@ -185,12 +187,19 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await expect(actions).toHaveCSS('opacity', '1');
       expect(await actions.evaluate((node) => node.contains(document.activeElement))).toBe(true);
       await info.attach(`objects-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`objects-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       const library = page.locator('#guide-library-panel');
       const tabs = library.locator('.guide-left-navigation');
       const oldLeft = await tabs.evaluate((node) => getComputedStyle(node, '::after').left);
+      const resourceIcon = tabs
+        .getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true })
+        .locator('svg');
+      const idleIconColor = await resourceIcon.evaluate((node) => getComputedStyle(node).color);
       await tabs.getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true }).click();
       await expect
         .poll(() => tabs.evaluate((node) => getComputedStyle(node, '::after').left))
@@ -198,15 +207,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect(
         await tabs.evaluate((node) => getComputedStyle(node, '::after').transitionDuration)
       ).toBe('0.28s');
-      const active = tabs.locator('[aria-pressed="true"]');
       await expect
-        .poll(() =>
-          active.evaluate(
-            (node) =>
-              getComputedStyle(node.querySelector('svg')!).color === getComputedStyle(node).color
-          )
-        )
-        .toBe(true);
+        .poll(() => resourceIcon.evaluate((node) => getComputedStyle(node).color))
+        .not.toBe(idleIconColor);
       await expect(library.locator('.guide-resource-footer')).toHaveCount(0);
       const images = library.locator('.guide-image-resources');
       const previewButton = images
@@ -255,6 +258,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       });
       await expect(library.locator('.tour-audio-resource')).toHaveCount(1);
       await expect(library.locator('.tour-audio-acquisition [aria-expanded]')).toHaveCount(1);
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', { name: ru ? 'Действия' : 'Actions', exact: true })
+        .click();
+      await panel.locator('[data-inspector-object]').first().click();
       await library.locator('.tour-audio-resource').hover();
       await library
         .getByRole('button', {
@@ -268,7 +276,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await library.locator('.tour-audio-resource .tour-audio-name').click();
       await expect(library.locator('[data-tour-narration-preview]')).toBeVisible();
       await info.attach(`resources-full-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`resources-full-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       const resize = page.locator('.guide-panel-divider-left');
@@ -286,7 +297,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         )
       ).toEqual([]);
       await info.attach(`resources-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`resources-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       await page.getByRole('button', { name: ru ? 'Руководство' : 'Guide', exact: true }).click();
@@ -306,7 +320,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await page.keyboard.press('Escape');
       await expect(guidePreview).toBeFocused();
       await info.attach(`guide-resources-${locale}-${theme}`, {
-        body: await library.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`guide-resources-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
     });

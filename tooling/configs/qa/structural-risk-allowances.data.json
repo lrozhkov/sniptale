@@ -1612,11 +1612,11 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/inspector.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: Fresh project and UI state feed one inspector root. Accepted mutations use the existing command owner. Focus-style assertions prove the same control route and retained region geometry. The candidate adds no independent fixture resource or effect lifetime. Main inspected this body. Read-only structural diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, geometry authority, writer, clock, effect or cleanup lifetime. Remove when the analyzer models this cohesive receiver. Fresh independent architecture review must inspect the classification.",
+      "reason": "tool-noise: This file mounts one inspector for each isolated test. The fixture command receiver owns accepted project changes. URL drafts, radio keys, and deletion assertions exercise that same receiver. Per-test setup resets project, selection, and refusal flags. Score6 delta2 counts fixture owners and state, not new runtime authorities. The independent architecture reviewer must check this exact record.",
+      "removalCondition": "Remove this record when the AST or signature changes. Reassess each new production authority, effect lifetime, or writer. Remove this record when the analyzer distinguishes isolated test fixtures.",
       "reviewDate": "2026-10-19",
-      "astHash": "dcf688820b0c3ad480dd14467fe4395657cb78971c00e53b5d2354b96d57b9c1",
-      "signatureHash": "b24508f6d86389b7e9f04b6ddaccc2137592d82311694ffde1fc104427bb08c6"
+      "astHash": "34d3486b273d516056dc640f3de1ff6b37c1dabc212f8634ba1f3a212aadee78",
+      "signatureHash": "eb766e6590bfb60c2d8cd97c4df301f9a6e4b3aff6eacc5566291a3689e76a9d"
     },
     {
       "rule": "structural-file-risk",
@@ -1639,6 +1639,17 @@
       "reviewDate": "2026-10-19",
       "astHash": "67f500fc8b5eabfad0dd958810e7be1544aad9075a26d5eb6e179f765a7a9812",
       "signatureHash": "a0ff341f91b7204849e157495edd0bf35277a97d4821551fb7f85c30ec6d58d3"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:scenario-editor:page-shell",
+      "reason": "tool-noise: This file mounts one page per isolated test. Its state counts describe separate fixture cases, not concurrent production authorities. The change updates shared range events, adaptive camera selection, a supported narration destination, and preview titles. Page commands retain geometry, autosave, and selection authority. Score2 delta0 and cohesion1.00 match that fixture structure. The independent architecture reviewer must check this exact record.",
+      "removalCondition": "Remove this record when the AST or signature changes. Reassess each new production authority, effect lifetime, or writer. Remove this record when the analyzer distinguishes isolated test fixtures.",
+      "reviewDate": "2026-10-19",
+      "astHash": "30bdbcd0153eec21c3877828bf7c3e55e20dd18663fba6b521d658ce735d863c",
+      "signatureHash": "7beef1b7353b6b79108cc3c806636666b8e4d1cd5cc6ac16f000ccd4910b8e3d"
     }
   ]
 }

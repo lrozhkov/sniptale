@@ -32,7 +32,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await panel.evaluate((node) =>
         [
           ...node.querySelectorAll(
-            'button, [role="group"], .guide-style-fields, .guide-inspector-choice, .guide-style-accent'
+            'button, [role="group"], .guide-style-fields, .sniptale-parameter-row, .guide-style-accent'
           ),
         ]
           .filter((el) => el.getBoundingClientRect().right > node.getBoundingClientRect().right + 1)
@@ -46,7 +46,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toEqual([]);
     expect(
       await panel
-        .locator('.guide-inspector-choice [role="group"] button > span')
+        .locator('.sniptale-property-segments > button')
         .evaluateAll((nodes) =>
           nodes
             .filter((node) => node.scrollWidth > node.clientWidth)
@@ -115,7 +115,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
           await panel.evaluate((node) =>
             [
               ...node.querySelectorAll<HTMLElement>(
-                'h2, h3, button, .guide-inspector-choice, .guide-style-accent'
+                'h2, h3, button, .sniptale-parameter-row, .guide-style-accent'
               ),
             ]
               .filter((el) => el.getBoundingClientRect().width > 0)
@@ -496,18 +496,23 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
       const segment = panel
-        .locator('.guide-inspector-choice [role="group"] button[aria-pressed="true"]')
+        .locator(
+          '[data-ui="shared.ui.compact-inspector.segmented-row"] button[aria-pressed="true"]'
+        )
         .first();
       await expect.soft(segment).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(
-        panel.locator('.guide-inspector-choice [role="group"] > span[aria-hidden]').first()
-      ).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const segments = segment.locator('..');
+      await expect(segments).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const inactive = segments.locator('button[aria-pressed="false"]').first();
+      expect(await inactive.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
+        await segment.evaluate((node) => getComputedStyle(node).backgroundColor)
+      );
       await expect(segment).toHaveCSS('box-shadow', 'none');
       const valueFonts = await panel
         .locator(
           [
-            '.guide-inspector-choice [role="group"] button[aria-pressed="true"]',
-            '.guide-inspector-choice [data-ui="shared.ui.compact-select"] > button',
+            '[data-ui="shared.ui.compact-inspector.segmented-row"] button[aria-pressed="true"]',
+            '.sniptale-parameter-row [data-ui="shared.ui.compact-select"] > button',
           ].join(', ')
         )
         .evaluateAll((nodes) =>
@@ -522,6 +527,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
             ].join('|');
           })
         );
+      expect(valueFonts.length).toBeGreaterThan(1);
       expect(new Set(valueFonts).size).toBe(1);
 
       await segment.hover();
@@ -531,9 +537,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const colorSpacing = await accent.evaluate(
         (node) =>
           node.querySelector(':scope > button')!.getBoundingClientRect().left -
-          node
-            .querySelector('[data-ui="shared.ui.color-selector.trigger"]')!
-            .getBoundingClientRect().right
+          node.querySelector(':scope > .sniptale-parameter-row')!.getBoundingClientRect().right
       );
       expect.soft(colorSpacing).toBe(8);
       await accent.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
@@ -541,7 +545,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect.soft(await palette.locator('button').count()).toBeGreaterThanOrEqual(8);
       await page.keyboard.press('Escape');
       await info.attach(`guide-colors-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath(`guide-colors-${locale}-${theme}.png`),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
       await page
@@ -551,13 +558,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .locator('.guide-page-header')
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
-      const parameterLabels = [
-        '.guide-number-toggle',
-        '.tour-text-field > span:not(.guide-voice-field)',
-        '[data-ui="shared.ui.compact-inspector.numeric-row"] > span',
-        '[data-ui="shared.ui.compact-inspector.color-field"] > span',
-        '[data-ui="shared.ui.surface-style-selector"] > div:first-child > span',
-      ].join(', ');
+      const parameterLabels = '.sniptale-parameter-row > .sniptale-parameter-name';
       for (const section of [
         ru ? 'Воспроизведение' : 'Playback',
         ru ? 'Текстовое действие' : 'Text action',
@@ -581,11 +582,15 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         expect(fonts.length).toBeGreaterThan(2);
         expect.soft(new Set(fonts).size).toBe(1);
         for (const toggle of await panel.getByRole('switch').all()) {
-          await expect.soft(toggle).toHaveCSS('width', '32px');
-          await expect.soft(toggle).toHaveCSS('height', '20px');
+          await expect.soft(toggle).toHaveCSS('width', '40px');
+          await expect.soft(toggle).toHaveCSS('height', '32px');
+        }
+        const advanced = panel.locator('[data-ui="scenario-editor.hint-style-details"]');
+        if (await advanced.count()) {
+          if (!(await advanced.getAttribute('open'))) await advanced.locator('summary').click();
         }
         const numeric = panel
-          .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+          .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]:visible')
           .first();
         await numeric.hover();
         const scrub = numeric.locator(
@@ -597,7 +602,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         );
         expect.soft(fill).not.toBe('');
         await info.attach(`document-${section}-${locale}-${theme}`, {
-          body: await panel.screenshot(),
+          body: await page.screenshot({
+            path: info.outputPath(`document-${section}-${locale}-${theme}.png`),
+            fullPage: false,
+          }),
           contentType: 'image/png',
         });
       }
@@ -635,20 +643,25 @@ for (const locale of ['ru', 'en'] as const) {
           exact: true,
         })
         .click();
-      const row = panel
-        .locator('.guide-inspector-choice:has(> span + [data-ui="shared.ui.compact-select"])')
-        .first();
-      await expect(row).toBeVisible();
+      const t = createTranslator(locale);
+      const layout = panel.getByRole('region', {
+        name: t('scenario.editor.appearanceLayout'),
+        exact: true,
+      });
+      const appearance = panel.getByRole('region', {
+        name: t('scenario.editor.guideStyleGroup'),
+        exact: true,
+      });
+      const leftDivider = page.locator('.guide-panel-divider-left');
+      await leftDivider.focus();
+      for (let index = 0; index < 9; index++) await leftDivider.press('ArrowLeft');
+      const divider = page.locator('.guide-panel-divider-right');
       for (const width of [420, 260]) {
-        await panel.evaluate((node, size) => {
-          (node as HTMLElement).style.width = `${size}px`;
-        }, width);
-        const layout = panel
-          .locator(
-            '.guide-inspector-group:has(> .guide-inspector-group-heading .guide-inspector-static-heading)' +
-              ':has(> .guide-inspector-group-body > [data-ui="shared.ui.compact-select"]:only-child)'
-          )
-          .first();
+        await divider.focus();
+        await divider.press('Home');
+        if (width === 260)
+          for (let index = 0; index < 10; index++) await divider.press('ArrowRight');
+        await expect(divider).toHaveAttribute('aria-valuenow', String(width));
         await layout.scrollIntoViewIfNeeded();
         const heading = (await layout.locator('.guide-inspector-group-heading').boundingBox())!;
         const field = (await layout.locator('[data-ui="shared.ui.compact-select"]').boundingBox())!;
@@ -657,20 +670,30 @@ for (const locale of ['ru', 'en'] as const) {
             Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
           ).toBeLessThanOrEqual(1);
         else expect(field.y).toBeGreaterThanOrEqual(heading.y + heading.height);
-        await row.scrollIntoViewIfNeeded();
-        const label = (await row.locator(':scope > span').first().boundingBox())!;
-        const select = (await row
-          .locator(':scope > [data-ui="shared.ui.compact-select"]')
-          .first()
-          .boundingBox())!;
-        if (width === 420)
-          expect(
-            Math.abs(label.y + label.height / 2 - select.y - select.height / 2)
-          ).toBeLessThanOrEqual(1);
-        else expect(select.y).toBeGreaterThanOrEqual(label.y + label.height);
-        expect(select.x + select.width).toBeLessThanOrEqual(
-          (await panel.boundingBox())!.x + width + 1
-        );
+        const rows = appearance.locator('.sniptale-parameter-row');
+        expect(await rows.count()).toBeGreaterThan(1);
+        for (const row of await rows.all()) {
+          await row.scrollIntoViewIfNeeded();
+          const label = (await row.locator(':scope > .sniptale-parameter-name').boundingBox())!;
+          const value = (await row.locator(':scope > .sniptale-parameter-value').boundingBox())!;
+          if ((await row.getAttribute('data-layout')) === 'stacked')
+            expect(value.y).toBeGreaterThanOrEqual(label.y + label.height);
+          else
+            expect(
+              Math.abs(label.y + label.height / 2 - value.y - value.height / 2)
+            ).toBeLessThanOrEqual(1);
+          const bounds = (await panel.boundingBox())!;
+          expect(value.x + value.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+        }
+        await expect(
+          appearance.locator('[data-ui="shared.ui.compact-inspector.segmented-field"]').filter({
+            hasText: t('scenario.editor.appearanceTheme'),
+          })
+        ).toHaveAttribute('data-layout', width === 260 ? 'stacked' : 'inline');
+        await page.screenshot({
+          path: info.outputPath(`semantic-rows-${width}.png`),
+          fullPage: false,
+        });
       }
       await page
         .getByRole('button', {
@@ -688,15 +711,23 @@ for (const locale of ['ru', 'en'] as const) {
       const paint = panel.locator('[data-ui="shared.ui.paint-selector"]').first();
       await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
       const trigger = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
-      await expect(trigger.locator('.lucide-palette')).toHaveCount(1);
-      await expect(trigger).toContainText('#');
+      await expect(trigger.locator('[data-ui="shared.ui.paint-selector.preview"]')).toBeVisible();
+      await expect(paint.locator('[data-ui="shared.ui.color-selector.value-trigger"]')).toHaveText(
+        /^#(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/
+      );
+      await expect(paint.locator('.sniptale-parameter-name')).toHaveText(
+        t('scenario.editor.tourBackground')
+      );
       await expect(trigger).toHaveCSS('border-top-width', '0px');
       await trigger.click();
       await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
       await trigger.click();
       await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
       await info.attach('scenario-semantic-inspector', {
-        body: await panel.screenshot(),
+        body: await page.screenshot({
+          path: info.outputPath('scenario-semantic-inspector.png'),
+          fullPage: false,
+        }),
         contentType: 'image/png',
       });
     });
@@ -1086,6 +1117,9 @@ for (const [locale, theme] of [
       ['note', 'guideAddNote'],
       ['image-slot', 'guideAddImage'],
     ] as const) {
+      await panel
+        .getByRole('button', { name: t('scenario.editor.guideStepSettings'), exact: true })
+        .click();
       const add = step
         .locator('.guide-insertion-block')
         .last()

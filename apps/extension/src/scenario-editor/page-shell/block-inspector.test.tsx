@@ -226,3 +226,46 @@ it('preserves text settings across presentations and commits one scrubbed minimu
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['all', 'sections'] as const)(
+  'shows exact custom width without adding a width writer in %s',
+  async (presentation) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const change = vi.fn();
+    try {
+      await act(async () =>
+        root.render(
+          <GuideBlockInspector
+            item={createGuideStep('Step')}
+            block={{ kind: 'text', id: 'custom', paragraphs: [], width: 37 }}
+            presentation={presentation}
+            disabled={false}
+            onChange={change}
+            onClose={vi.fn()}
+            t={createTranslator('en')}
+          />
+        )
+      );
+      expect(
+        host.querySelector('[data-ui="shared.ui.compact-inspector.status-row"] output')?.textContent
+      ).toBe('37%');
+      expect(host.querySelector('input[aria-label="Block width"]')).toBeNull();
+      const presets = host.querySelector('[aria-label="Block width"][role="group"]')!;
+      expect([...presets.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+        '1:1',
+        '1:2',
+        '1:3',
+        '1:4',
+      ]);
+      expect(presets.querySelector('[aria-pressed="true"]')).toBeNull();
+      expect(change).not.toHaveBeenCalled();
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);

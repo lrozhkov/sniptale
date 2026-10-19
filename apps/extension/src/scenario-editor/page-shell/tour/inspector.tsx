@@ -281,6 +281,26 @@ function TourInspectorContent(props: InspectorProps) {
               },
             ])
           : settings('object')}
+        {slide.kind === 'navigation' && slide.buttons.some((button) => button.id === objectId) && (
+          <div className="tour-object-destructive-actions">
+            <ScenarioInspectorActionButton
+              tone="danger"
+              disabled={disabled}
+              onClick={() => {
+                if (
+                  props.onChangeSlide({
+                    ...slide,
+                    buttons: slide.buttons.filter((button) => button.id !== objectId),
+                  })
+                )
+                  onSelectObject(null);
+              }}
+            >
+              <Trash2 size={15} />
+              {t('common.actions.delete')}
+            </ScenarioInspectorActionButton>
+          </div>
+        )}
       </div>
     );
   return (

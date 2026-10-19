@@ -11,6 +11,9 @@ import { createTranslator } from '../../platform/i18n';
 import { GuideAppearance } from './appearance';
 let host: HTMLDivElement;
 let root: Root;
+vi.mock('./template-catalog', () => ({
+  useGuideTemplateCatalog: () => ({ entries: [], status: 'ready', reload: vi.fn() }),
+}));
 const change = vi.fn();
 const project = createGuideProject('Guide');
 project.items = [
@@ -157,4 +160,29 @@ it('keeps selected-step style groups subordinate to Appearance', async () => {
     expect(group.querySelector('h4')).not.toBeNull();
     expect(group.getAttribute('data-level')).toBe('group');
   }
+});
+
+it('keeps the template subgroup named and collapsible in the Layout category', async () => {
+  await act(async () =>
+    root.render(
+      <GuideAppearance
+        project={project}
+        selectedId="step"
+        presentation="sections"
+        disabled={false}
+        onChange={change}
+        onSaveTemplate={async () => true}
+        onApplyTemplate={async () => true}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  const templates = host.querySelector<HTMLElement>('section[aria-label="My layouts"]')!;
+  const disclosure = templates.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  expect(disclosure).not.toBeNull();
+  expect(disclosure.textContent).toBe('My layouts');
+  expect(templates.textContent).toContain('Save as layout');
+  await act(async () => disclosure.click());
+  expect(templates.querySelector<HTMLElement>('.guide-inspector-group-body')?.hidden).toBe(true);
+  expect(change).not.toHaveBeenCalled();
 });

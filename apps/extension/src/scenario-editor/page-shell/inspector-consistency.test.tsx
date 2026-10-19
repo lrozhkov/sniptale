@@ -273,3 +273,42 @@ it('retains commit-only integer editing through the field and leaves its name pa
   expect(change).toHaveBeenCalledExactlyOnceWith(7);
   expect(host.querySelector('input[type="range"]')).toBeNull();
 });
+
+it('previews the shared image scrub and commits once after the interaction', () => {
+  const change = vi.fn();
+  function Field() {
+    const [value, setValue] = useState(600);
+    return (
+      <InspectorLayout>
+        <GuideInspectorNumber
+          label="Zoom"
+          value={value}
+          min={10}
+          max={10000}
+          unit="%"
+          scrub={{ min: 10, max: 400 }}
+          disabled={false}
+          onChange={(next) => {
+            change(next);
+            setValue(next);
+          }}
+        />
+      </InspectorLayout>
+    );
+  }
+  act(() => root.render(<Field />));
+  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  const numeric = host.querySelector<HTMLInputElement>('input:not([type="range"])')!;
+  expect(numeric.value).toBe('600');
+  expect(range.value).toBe('400');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '150');
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(numeric.value).toBe('150');
+  expect(range.value).toBe('150');
+  expect(change).not.toHaveBeenCalled();
+  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft', bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith(150);
+  expect(numeric.value).toBe('150');
+});

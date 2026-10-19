@@ -139,6 +139,9 @@ async function editField(selector: string, value: string) {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
     field.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  if (field.type === 'range') {
+    await act(async () => field.dispatchEvent(new Event('pointerup', { bubbles: true })));
+  }
 }
 async function settleAutosave() {
   await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
@@ -200,7 +203,7 @@ it('keeps one framing draft bound to its inspector and discards it on selection 
   expect(inspector.hasAttribute('hidden')).toBe(false);
   expect(first.querySelector('.guide-image-controls')).toBeNull();
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
-  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom range"]', '200');
   expect(first.querySelector('img')?.style.scale).toBe('2');
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await settleAutosave();
@@ -411,6 +414,11 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   );
   await render();
   const choose = async (label: string, option: string) => {
+    const group = container.querySelector<HTMLElement>(`[role="group"][aria-label="${label}"]`);
+    if (group) {
+      await click(option, group);
+      return;
+    }
     await click(label);
     const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
       (entry) => entry.textContent === option
@@ -427,8 +435,11 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   await choose('Camera mode', 'Full view');
   await settleAutosave();
   expect(io.save).toHaveBeenCalledOnce();
-  const mode = container.querySelector<HTMLButtonElement>('[aria-label="Camera mode"]');
-  expect(mode?.disabled).toBe(false);
+  const mode = container.querySelector<HTMLElement>('[role="group"][aria-label="Camera mode"]')!;
+  expect(mode).not.toBeNull();
+  expect(
+    [...mode.querySelectorAll<HTMLButtonElement>('button')].every((button) => !button.disabled)
+  ).toBe(true);
   await click('Resources');
   const upload = container.querySelector<HTMLButtonElement>(
     '.guide-image-resources button[title="Image"]'
@@ -443,7 +454,16 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
 
 it('imports narration from the mounted tour inspector through the source-bound page command', async () => {
   const project = createGuideProject('Tour', 'guide', 100);
-  const slide = createTourImageSlide('voice-slide');
+  const slide: import('@sniptale/runtime-contracts/scenario/types/tour').TourNavigationSlide = {
+    kind: 'navigation',
+    id: 'voice-slide',
+    title: 'Voice',
+    description: '',
+    background: { color: '#ffffff', image: null },
+    buttons: [],
+    narration: null,
+    timing: createTourImageSlide('voice-slide').timing,
+  };
   project.tour = { ...createTourDocument(), slides: [slide] };
   io.load.mockResolvedValue(project);
   io.narration.mockResolvedValue({ project: { ...project, updatedAt: 101 }, workspaceRevision: 2 });
@@ -533,7 +553,8 @@ it('places tour controls after the title and representation switch only in tour 
     representation.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   const actions = [...controls.querySelectorAll('button')].map((button) => button.title);
-  expect(actions).toContain('Preview');
+  expect(actions).toContain('Preview from here');
+  expect(actions).toContain('Preview from beginning');
   expect(actions).toContain('Edit image');
   expect(actions).not.toContain('Editing');
   await click('Guide');
@@ -703,20 +724,18 @@ it('keeps a framing session out of autosave and commits all geometry once on Don
       .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
   );
   const inspector = container.querySelector('#guide-inspector-panel')!;
-  expect(inspector.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  expect(inspector.querySelector('input[aria-label="Zoom"]')).toBeNull();
   await click('Framing', inspector.querySelector('nav')!);
   await click('Frame and image', inspector);
-  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
-  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '300');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom range"]', '200');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom range"]', '300');
   await settleAutosave();
   expect(io.save).not.toHaveBeenCalled();
   expect(image.querySelector('img')?.style.scale).toBe('3');
   await click('Show all settings', inspector);
   expect(image.querySelector('img')?.style.scale).toBe('3');
   await click('Show settings sections', inspector);
-  expect(inspector.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe(
-    '300'
-  );
+  expect(inspector.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')?.value).toBe('300');
   await settleAutosave();
   expect(io.save).not.toHaveBeenCalled();
   await click('Done', image);
@@ -727,7 +746,7 @@ it('keeps a framing session out of autosave and commits all geometry once on Don
   await settleAutosave();
   io.save.mockClear();
   await click('Frame and image', image);
-  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom range"]', '200');
   await click('Cancel', image);
   await settleAutosave();
   expect(image.querySelector('img')?.style.scale).toBe('1');

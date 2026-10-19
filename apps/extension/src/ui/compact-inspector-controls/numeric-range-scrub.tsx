@@ -28,6 +28,8 @@ const NUMERIC_ROW_RANGE_TRACK_BACKGROUND = [
 
 interface NumericRangeScrubProps {
   active: boolean;
+  outOfScale?: boolean | undefined;
+  descriptionId?: string | undefined;
   disabled?: boolean | undefined;
   label: string;
   onActiveChange: (active: boolean) => void;
@@ -49,10 +51,12 @@ function EnabledNumericRangeScrub(props: NumericRangeScrubProps) {
   const visible = props.visible || props.active || focused;
 
   return (
-    <NumericRangeScrubShell visible={visible} rangeRatio={state.rangeRatio}>
+    <NumericRangeScrubShell visible={visible} rangeRatio={props.outOfScale ? 0 : state.rangeRatio}>
       <NumericRangeTrack />
       <NumericRangeInput
         label={props.label}
+        descriptionId={props.descriptionId}
+        outOfScale={props.outOfScale}
         onFocusChange={setFocused}
         onActiveChange={props.onActiveChange}
         onCommitValue={props.onCommitValue}
@@ -60,7 +64,7 @@ function EnabledNumericRangeScrub(props: NumericRangeScrubProps) {
         readValue={state.readValue}
         rangeMax={state.rangeMax}
         rangeMin={state.rangeMin}
-        rangeRatio={state.rangeRatio}
+        rangeRatio={props.outOfScale ? 0 : state.rangeRatio}
         rangeStep={state.rangeStep}
         rangeValue={state.rangeValue}
         visible={visible}
@@ -126,6 +130,8 @@ function NumericRangeTrack() {
 }
 
 function NumericRangeInput(props: {
+  descriptionId?: string | undefined;
+  outOfScale?: boolean | undefined;
   onFocusChange: (focused: boolean) => void;
   label: string;
   onActiveChange: (active: boolean) => void;
@@ -162,6 +168,8 @@ function NumericRangeInput(props: {
   return (
     <input
       aria-label={`${props.label} range`}
+      aria-describedby={props.descriptionId}
+      data-out-of-scale={props.outOfScale ? 'true' : undefined}
       type="range"
       min={props.rangeMin}
       max={props.rangeMax}

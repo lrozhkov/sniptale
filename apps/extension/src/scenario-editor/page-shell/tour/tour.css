@@ -383,7 +383,7 @@ html[data-tour-reordering] * {
 .tour-coordinate-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
-  gap: 0.375rem;
+  gap: 4px;
 }
 .tour-review-notice {
   border-radius: var(--sniptale-radius-sm);

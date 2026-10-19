@@ -62,24 +62,6 @@ export function TourNavigationSettings({
           t={t}
           onChange={(action) => changeButton({ action })}
         />
-        <div className="tour-object-destructive-actions">
-          <ScenarioInspectorActionButton
-            tone="danger"
-            disabled={disabled}
-            onClick={() => {
-              if (
-                onChange({
-                  ...slide,
-                  buttons: slide.buttons.filter((entry) => entry.id !== button.id),
-                })
-              )
-                onSelect(null);
-            }}
-          >
-            <Trash2 size={15} />
-            {t('common.actions.delete')}
-          </ScenarioInspectorActionButton>
-        </div>
       </GuideInspectorGroup>
     );
   return (

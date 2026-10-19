@@ -19,16 +19,23 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const block = step.locator('.guide-block[data-kind="text"]').first();
     const inspector = page.locator('#guide-inspector-panel');
     await block.locator('textarea').focus();
+    const showAll = inspector.getByRole('button', { name: 'Show all settings', exact: true });
+    if (await showAll.count()) await showAll.click();
     await inspector.getByRole('button', { name: 'Half width', exact: true }).click();
     await expect(block).toHaveAttribute('data-width', '50');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(block).toHaveAttribute('data-width', '100');
+    await inspector.getByRole('button', { name: 'Step settings', exact: true }).click();
     const add = step
       .locator('.guide-insertion-block')
       .last()
-      .getByRole('button', { name: 'Note', exact: true });
+      .getByRole('button', { name: 'Add block', exact: true });
     await add.focus();
-    await add.click();
+    await add.press('Enter');
+    await page
+      .locator('.guide-action-menu')
+      .getByRole('button', { name: 'Note', exact: true })
+      .click();
     const note = step.locator('.guide-block[data-kind="note"]').last();
     await note.locator('textarea').fill('Keep this note.');
     await inspector.getByRole('button', { name: 'Note type', exact: true }).click();
@@ -74,11 +81,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     );
     await page.locator('main img').last().scrollIntoViewIfNeeded();
     await testInfo.attach(`block-inspector-${theme}`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({
+        path: testInfo.outputPath(`block-inspector-${theme}.png`),
+        fullPage: false,
+      }),
       contentType: 'image/png',
     });
     await inspector.getByRole('button', { name: 'Step settings', exact: true }).click();
-    await expect(step.getByRole('textbox', { name: 'Step title', exact: true })).toBeFocused();
+    await expect(step).toBeFocused();
     await expect(
       inspector
         .getByRole('region', { name: 'Step layout', exact: true })
@@ -109,13 +119,25 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const add = page
         .locator('article#compare .guide-insertion-block')
         .last()
-        .getByRole('button', { name: locale === 'ru' ? 'Подзаголовок' : 'Heading', exact: true });
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Добавить блок' : 'Add block',
+          exact: true,
+        });
       await add.focus();
-      await add.click();
+      await add.press('Enter');
+      await page
+        .locator('.guide-action-menu')
+        .getByRole('button', { name: locale === 'ru' ? 'Подзаголовок' : 'Heading', exact: true })
+        .click();
       const block = page.locator('.guide-block[data-kind="heading"]').first();
       const field = block.locator('input,textarea').first();
       await field.fill(locale === 'ru' ? 'Подзаголовок раздела' : 'Section heading');
       const inspector = page.locator('#guide-inspector-panel');
+      const all = inspector.getByRole('button', {
+        name: locale === 'ru' ? 'Показать все настройки' : 'Show all settings',
+        exact: true,
+      });
+      if (await all.count()) await all.click();
       if (!(await inspector.isVisible()))
         await page
           .locator('.guide-page-header')
@@ -151,7 +173,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await expect(field).toHaveCSS('font-size', '20px');
       await testInfo.attach(`heading-presets-${theme}-${locale}`, {
         body: await page.screenshot({
-          path: `tasks/scenario-production-polish/heading-${theme}-${locale}.png`,
+          path: testInfo.outputPath(`heading-${theme}-${locale}.png`),
+          fullPage: false,
         }),
         contentType: 'image/png',
       });

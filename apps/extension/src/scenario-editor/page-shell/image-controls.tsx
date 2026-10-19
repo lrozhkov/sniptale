@@ -7,8 +7,12 @@ import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './in
 import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
-import { ProductRange } from '@sniptale/ui/product-form-controls';
-import { ToggleField, TextField, SegmentedRow } from '../../ui/compact-inspector-controls';
+import {
+  ToggleField,
+  TextField,
+  SegmentedRow,
+  StatusRow,
+} from '../../ui/compact-inspector-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   AlignLeft,
@@ -17,7 +21,7 @@ import {
   Columns2,
   MousePointer2,
   Focus,
-  Maximize2,
+  Images,
   RotateCcw,
   ScanLine,
   Text,
@@ -231,7 +235,7 @@ function guideImageSections(
           {
             id: 'htmlImages',
             label: t('scenario.editor.htmlImages'),
-            icon: Maximize2,
+            icon: Images,
             content: (
               <ImageHtmlSettings
                 block={block}
@@ -301,6 +305,7 @@ function GuideImageGeometryFields({
           {overview}
           <GuideImageRangeField
             label={t('scenario.editor.guideImageZoom')}
+            unit="%"
             min={10}
             max={10000}
             sliderMax={400}
@@ -330,6 +335,7 @@ function GuideImageGeometryFields({
               ? 'scenario.editor.guideImageWidth'
               : 'scenario.editor.guideImageHeight'
           )}
+          unit="px"
           min={1}
           max={GUIDE_LIMITS.maxDimension}
           sliderMax={2000}
@@ -438,6 +444,7 @@ function GuideImageCaptionAlignment({
 
 function GuideImageRangeField({
   label,
+  unit,
   min,
   max,
   sliderMax,
@@ -447,6 +454,7 @@ function GuideImageRangeField({
   onChange,
 }: {
   label: string;
+  unit: 'px' | '%';
   min: number;
   max: number;
   sliderMax: number;
@@ -456,26 +464,17 @@ function GuideImageRangeField({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="guide-image-range-field">
-      <GuideInspectorNumber
-        label={label}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        value={value}
-        onChange={onChange}
-      />
-      <ProductRange
-        aria-label={label}
-        min={min}
-        max={Math.min(max, Math.max(sliderMax, value))}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-      />
-    </div>
+    <GuideInspectorNumber
+      label={label}
+      unit={unit}
+      min={min}
+      max={max}
+      step={step}
+      scrub={{ min, max: sliderMax, step }}
+      disabled={disabled}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -490,7 +489,7 @@ function ImageHtmlSettings({
   'block' | 'htmlDefaults' | 'disabled' | 'onChange' | 't'
 >) {
   return (
-    <GuideInspectorGroup id="htmlImages" icon={Maximize2} title={t('scenario.editor.htmlImages')}>
+    <GuideInspectorGroup id="htmlImages" icon={Images} title={t('scenario.editor.htmlImages')}>
       <div className="guide-html-switch">
         <ToggleField
           label={t('scenario.editor.htmlInherit')}
@@ -540,26 +539,35 @@ function ImageActionContext({ source, t }: { source: GuideImageBlock['source']; 
       icon={MousePointer2}
       title={t('scenario.editor.guideVideoActionContext')}
     >
-      <p>
-        {t(
+      <StatusRow
+        label={t('scenario.editor.guideVideoActionKind')}
+        value={t(
           action.kind === 'KEY'
             ? 'scenario.editor.guideVideoKey'
             : 'scenario.editor.guideVideoClick'
-        )}{' '}
-        · {t('scenario.editor.guideVideoActionTime').replace('{seconds}', action.time.toFixed(2))}
-      </p>
-      <p>{action.label}</p>
+        )}
+      />
+      <StatusRow
+        label={t('scenario.editor.guideVideoPosition')}
+        value={t('scenario.editor.guideVideoActionTime').replace(
+          '{seconds}',
+          action.time.toFixed(2)
+        )}
+      />
+      <StatusRow label={t('scenario.editor.guideVideoActionLabel')} value={action.label} />
       {action.target && (
-        <p>
-          {[action.target.name, action.target.tag, action.target.role].filter(Boolean).join(' · ')}
-        </p>
+        <StatusRow
+          label={t('scenario.editor.guideVideoActionTarget')}
+          value={[action.target.name, action.target.tag, action.target.role]
+            .filter(Boolean)
+            .join(' · ')}
+        />
       )}
       {action.point && (
-        <p>
-          {t('scenario.editor.guideVideoActionPoint')
-            .replace('{x}', String(Math.round(action.point.x * 100)))
-            .replace('{y}', String(Math.round(action.point.y * 100)))}
-        </p>
+        <StatusRow
+          label={t('scenario.editor.guideVideoActionPointLabel')}
+          value={`${Math.round(action.point.x * 100)}% × ${Math.round(action.point.y * 100)}%`}
+        />
       )}
     </GuideInspectorGroup>
   );

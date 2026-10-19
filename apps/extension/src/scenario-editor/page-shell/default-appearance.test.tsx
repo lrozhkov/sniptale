@@ -84,3 +84,10 @@ it('disables HTML default edits with the document mutation gate', async () => {
   await act(async () => button('Click to view').click());
   expect(changeHtml).not.toHaveBeenCalled();
 });
+
+it('places the apply-all command after HTML settings', async () => {
+  await render();
+  const html = host.querySelector('section[aria-label="HTML images"]')!;
+  const applyAll = button('Apply to all steps');
+  expect(html.compareDocumentPosition(applyAll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});

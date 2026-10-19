@@ -18,7 +18,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GuideVoiceField } from '../voice-field';
 import { TourInspectorNumericRow } from './numeric-row';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { TextField } from '../../../ui/compact-inspector-controls/text-field';
 import type { Translate } from '../../../platform/i18n';
 
 /** Short exclusive choices retain the shared fitting and keyboard owners. */
@@ -295,11 +295,11 @@ export function TourActionField({
         />
       )}
       {kind === 'url' && (
-        <ProductInput
-          aria-label={t('scenario.editor.tourActionUrl')}
+        <TextField
+          label={t('scenario.editor.tourActionUrl')}
           value={url}
           disabled={disabled}
-          aria-invalid={invalid}
+          invalid={invalid}
           placeholder="https://"
           maxLength={4000}
           onChange={(event) => {
@@ -308,6 +308,7 @@ export function TourActionField({
           }}
           onBlur={commitUrl}
           onKeyDown={(event) => {
+            if (event.key === 'Escape') event.preventDefault();
             if (event.key === 'Enter') {
               event.preventDefault();
               commitUrl();

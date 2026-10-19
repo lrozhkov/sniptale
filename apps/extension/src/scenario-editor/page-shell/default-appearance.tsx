@@ -33,6 +33,14 @@ export function GuideDefaultAppearance({
         t={t}
         onChange={(patch) => onApply({ ...style, ...patch }, false)}
       />
+      <GuideInspectorGroup id="htmlImages" icon={Images} title={t('scenario.editor.htmlImages')}>
+        <GuideHtmlImageFields
+          value={htmlImages}
+          disabled={disabled}
+          onChange={onHtmlImagesChange}
+          t={t}
+        />
+      </GuideInspectorGroup>
       <div className="guide-inspector-bulk">
         <ProductActionButton
           compact
@@ -44,14 +52,6 @@ export function GuideDefaultAppearance({
         </ProductActionButton>
         <p className="guide-inspector-hint">{t('scenario.editor.guideApplyAllHint')}</p>
       </div>
-      <GuideInspectorGroup id="htmlImages" icon={Images} title={t('scenario.editor.htmlImages')}>
-        <GuideHtmlImageFields
-          value={htmlImages}
-          disabled={disabled}
-          onChange={onHtmlImagesChange}
-          t={t}
-        />
-      </GuideInspectorGroup>
     </div>
   );
 }

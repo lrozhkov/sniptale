@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
-import { ToggleField, SegmentedRow } from '../../ui/compact-inspector-controls';
+import { ToggleField, SegmentedRow, StatusRow } from '../../ui/compact-inspector-controls';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideBlock,
@@ -260,8 +260,9 @@ export function GuideBlockPlacement<T extends GuideBlock>({
     <GuideInspectorGroup
       id="placement"
       icon={Columns2}
-      title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
+      title={t('scenario.editor.guidePlacementGroup')}
     >
+      <StatusRow label={t('scenario.editor.guideBlockWidth')} value={<output>{width}%</output>} />
       <CompactSegmentedSelector
         columns={4}
         ariaLabel={t('scenario.editor.guideBlockWidth')}
@@ -314,6 +315,7 @@ function GuideBlockHeight({
       <NumericRow
         appearance="plain"
         label={t('scenario.editor.guideBlockHeight')}
+        unit="px"
         value={preview ?? value}
         min={0}
         max={GUIDE_LIMITS.maxDimension}

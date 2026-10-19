@@ -67,6 +67,9 @@ it('edits content, bounded optimization and viewer independently using shared co
       quality: 0.95,
       viewer: false,
     });
+    await click('Optimize size');
+    expect(host.querySelector('[aria-label="Maximum edge"]')?.textContent).toContain('1280');
+    expect(host.querySelector('[aria-label="WebP quality"]')?.textContent).toContain('95%');
     expect(host.querySelector('p')).toBeNull();
   } finally {
     await act(async () => root.unmount());
@@ -96,12 +99,11 @@ it.each([false, true])(
       expect(control('Click to view').getAttribute('aria-checked')).toBe('false');
       expect(control('Optimize size').disabled).toBe(true);
       expect(control('Optimize size').getAttribute('aria-checked')).toBe('true');
-      expect(control('Maximum edge').disabled).toBe(true);
+      expect(control('Maximum edge')).toBeNull();
       expect(control('WebP quality').disabled).toBe(false);
       await act(async () => {
         control('Click to view').click();
         control('Optimize size').click();
-        control('Maximum edge').click();
       });
       expect(change).not.toHaveBeenCalled();
       expect(document.querySelector('[role="option"]')).toBeNull();
@@ -125,13 +127,7 @@ it.each([false, true])(
           />
         )
       );
-      for (const label of [
-        'Saved content',
-        'Optimize size',
-        'Maximum edge',
-        'WebP quality',
-        'Click to view',
-      ]) {
+      for (const label of ['Saved content', 'Optimize size', 'WebP quality', 'Click to view']) {
         expect(control(label).disabled).toBe(true);
         await act(async () => control(label).click());
       }

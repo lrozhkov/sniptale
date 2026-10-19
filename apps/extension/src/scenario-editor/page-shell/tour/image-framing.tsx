@@ -22,7 +22,7 @@ export function TourImageFraming({
   if (!slide.image) return null;
   const placement = slide.imagePlacement ?? { center: { x: 0.5, y: 0.5 }, zoom: 1 };
   return (
-    <div data-ui="tour.image.framing" className="tour-image-framing">
+    <div data-ui="tour.image.framing" className="tour-image-framing sniptale-parameter-stack">
       {images[slide.image.assetId] && (
         <div className="tour-image-framing-preview">
           <TourStage

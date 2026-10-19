@@ -127,22 +127,31 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
   expect(host.querySelector('script')).toBeNull();
 });
 
-it('synchronizes visible sliders with zoom and frame values', async () => {
-  await render('blob:image', false, block, true);
+it('uses one contextual range per exact image dimension without clamping off-scale values', async () => {
+  await render('blob:image', false, { ...block, frame: { width: 3500, height: 600 } }, true);
+  await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
   expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual([
-    'Zoom, %',
-    'Frame width',
-    'Frame height',
+    'Zoom range',
+    'Frame width range',
+    'Frame height range',
   ]);
-  expect(ranges.map((range) => range.value)).toEqual(['100', '800', '600']);
+  expect(host.querySelector('input[aria-label="Frame width"]')?.getAttribute('value')).toBe('3500');
+  expect(ranges[1]?.max).toBe('2000');
+  for (const range of ranges) {
+    expect(range.closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')).not.toBeNull();
+  }
+  await act(async () => ranges[1]?.focus());
+  await act(async () => ranges[1]?.blur());
+  expect(change).not.toHaveBeenCalled();
+  await render('blob:image', false, block, true);
+  const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom range"]')!;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
-      ranges[0],
-      '200'
-    );
-    ranges[0]?.dispatchEvent(new Event('change', { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '200');
+    zoom.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => zoom.dispatchEvent(new Event('pointerup', { bubbles: true })));
   expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
 });
 
@@ -220,7 +229,7 @@ it('holds inspector geometry when bounds are on until the current image decodes'
 
 it('lets numeric Escape cancel the draft before inspector dismissal', async () => {
   await render('blob:image', false, block, true);
-  const field = host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')!;
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;
   await act(async () => field.focus());
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '250');
@@ -263,14 +272,19 @@ it('shows saved click and keyboard provenance without inventing missing geometry
     },
   };
   await render(null, false, { ...block, source });
-  expect(host.textContent).toContain('Point: 25% × 50%');
+  expect(host.textContent).toContain('25% × 50%');
+  expect(
+    [...host.querySelectorAll('[data-ui="shared.ui.compact-inspector.status-row"]')].some(
+      (row) => row.textContent === 'Point25% × 50%'
+    )
+  ).toBe(true);
   expect(host.textContent).toContain('button');
   await render(null, false, {
     ...block,
     source: { ...source, action: { ...source.action, kind: 'KEY', target: null, point: null } },
   });
   expect(host.textContent).toContain('Keystroke');
-  expect(host.textContent).not.toContain('Point:');
+  expect(host.textContent).not.toContain('Point');
 });
 
 it('makes editing and replacing the selected image available from its inspector', async () => {
@@ -311,7 +325,7 @@ it('offers image block placement and preserves image metadata', async () => {
 
 it('offers framing entry without exposing draft-only geometry outside the session', async () => {
   await render();
-  expect(host.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  expect(host.querySelector('input[aria-label="Zoom"]')).toBeNull();
   expect(host.querySelector('[aria-label="Center image"]')).toBeNull();
   expect(host.querySelector('[aria-label="Image fit"]')).toBeNull();
   expect(host.textContent).not.toContain('Ctrl');
@@ -371,7 +385,7 @@ it('restricts active framing to its category without dropping the draft fields',
   expect(
     [...host.querySelectorAll('nav button')].map((button) => button.getAttribute('aria-label'))
   ).toEqual(['Framing']);
-  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe('200');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')?.value).toBe('200');
   expect(host.querySelector('[data-inspector-edit-image]')).toBeNull();
   expect(change).not.toHaveBeenCalled();
 });
