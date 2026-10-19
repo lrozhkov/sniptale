@@ -523,12 +523,41 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           )
         ).toBeCloseTo(10, 0);
         expect(
-          Math.abs(bounds.x - Math.min(Math.max(shell.x, 8), viewport.width - bounds.width - 8))
+          Math.abs(
+            bounds.x -
+              Math.min(
+                Math.max((await pencil.boundingBox())!.x, 8),
+                viewport.width - bounds.width - 8
+              )
+          )
         ).toBeLessThanOrEqual(1);
         const expectedSide = bounds.y + bounds.height <= shell.y ? 'up' : 'down';
         await expect(pencil).toHaveAttribute('data-menu-side', expectedSide);
         await page.screenshot({
           path: info.outputPath('crop-floating-tools.png'),
+          fullPage: false,
+        });
+        for (const tool of ['marker', 'text', 'shape', 'arrow']) {
+          const activeButton = toolbar.locator(`[data-ui="content.toolbar.drawing.${tool}"]`);
+          await activeButton.click();
+          const toolPanel = toolbar.locator('.sniptale-drawing-options-popover').filter({
+            has: page.locator(`[data-ui="content.toolbar.drawing-options.${tool}"]`),
+          });
+          await expect(toolPanel).toBeVisible();
+          await expect
+            .poll(async () => {
+              const panelBounds = (await toolPanel.boundingBox())!;
+              const anchorBounds = (await activeButton.boundingBox())!;
+              const expectedLeft = Math.min(
+                Math.max(anchorBounds.x, 8),
+                viewport.width - panelBounds.width - 8
+              );
+              return Math.abs(panelBounds.x - expectedLeft);
+            })
+            .toBeLessThanOrEqual(1);
+        }
+        await page.screenshot({
+          path: info.outputPath('crop-floating-tools-arrow.png'),
           fullPage: false,
         });
         if (scenario === 'top') {

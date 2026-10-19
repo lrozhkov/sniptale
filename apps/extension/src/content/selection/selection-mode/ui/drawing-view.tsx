@@ -48,7 +48,7 @@ const resolveCropDrawingMenuLayout: NonNullable<
   const cropRect = frame
     ? projectClientRectToContentUi(frame.getBoundingClientRect(), scale)
     : null;
-  const left = Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8));
+  const left = Math.min(Math.max(8, anchorRect.x), Math.max(8, viewport.width - menuWidth - 8));
   const adjacentPositions = [
     { placement: 'up', top: toolbarRect.y - menuHeight - upperGap, fits: above >= menuHeight },
     {

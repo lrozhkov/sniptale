@@ -141,12 +141,39 @@ function createTooltip(container: HTMLElement): ContentSizeTooltipDom {
 
 const menuPlacementCases = [
   {
+    placement: 'up',
+    toolbar: [300, 300, 200, 50],
+    crop: [300, 360, 200, 200],
+    anchorOffset: 140,
+    height: 40,
+    width: 100,
+    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
+  },
+  {
+    placement: 'up',
+    toolbar: [0, 300, 200, 50],
+    crop: [0, 360, 200, 200],
+    anchorOffset: 0,
+    height: 40,
+    width: 100,
+    style: { left: 8, right: 'auto', top: 'auto', bottom: 51 },
+  },
+  {
+    placement: 'up',
+    toolbar: [800, 300, 192, 50],
+    crop: [800, 360, 192, 200],
+    anchorOffset: 160,
+    height: 40,
+    width: 100,
+    style: { left: -68, right: 'auto', top: 'auto', bottom: 51 },
+  },
+  {
     placement: 'down',
     toolbar: [300, 300, 200, 50],
     crop: [300, 200, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+    style: { left: 0, right: 'auto', top: 51, bottom: 'auto' },
   },
   {
     placement: 'up',
@@ -154,7 +181,7 @@ const menuPlacementCases = [
     crop: [300, 420, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
+    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'up',
@@ -162,7 +189,7 @@ const menuPlacementCases = [
     crop: [300, 360, 200, 200],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
+    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'down',
@@ -170,7 +197,7 @@ const menuPlacementCases = [
     crop: [300, 8, 200, 100],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+    style: { left: 0, right: 'auto', top: 51, bottom: 'auto' },
   },
   {
     placement: 'up',
@@ -179,7 +206,7 @@ const menuPlacementCases = [
     height: 58,
     width: 100,
     pairPadding: 8,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 43 },
+    style: { left: 0, right: 'auto', top: 'auto', bottom: 43 },
   },
   {
     placement: 'down',
@@ -188,7 +215,7 @@ const menuPlacementCases = [
     height: 58,
     width: 100,
     pairPadding: 8,
-    style: { left: -20, right: 'auto', top: 43, bottom: 'auto' },
+    style: { left: 0, right: 'auto', top: 43, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -196,7 +223,7 @@ const menuPlacementCases = [
     crop: [8, 8, 400, 584],
     height: 580,
     width: 200,
-    style: { left: -20, right: 'auto', top: -197, bottom: 'auto' },
+    style: { left: 0, right: 'auto', top: -197, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -204,7 +231,7 @@ const menuPlacementCases = [
     crop: [592, 8, 400, 584],
     height: 580,
     width: 200,
-    style: { left: -20, right: 'auto', top: -197, bottom: 'auto' },
+    style: { left: 0, right: 'auto', top: -197, bottom: 'auto' },
   },
 ];
 
@@ -223,6 +250,7 @@ function checkMenuPlacement(
     width,
     style,
     pairPadding,
+    anchorOffset = 20,
   }: (typeof menuPlacementCases)[number]
 ) {
   vi.stubGlobal('innerWidth', 1000);
@@ -241,7 +269,7 @@ function checkMenuPlacement(
     harness.tooltip.root.append(pair);
   }
   vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
-    new DOMRect(toolbarX + 20, toolbarY + 9, 32, 32)
+    new DOMRect(toolbarX + anchorOffset, toolbarY + 9, 32, 32)
   );
   vi.spyOn(harness.tooltip.root, 'getBoundingClientRect').mockReturnValue(
     new DOMRect(toolbarX, toolbarY, toolbarWidth, toolbarHeight)
@@ -257,8 +285,8 @@ function checkMenuPlacement(
   const position = {
     x:
       typeof layout?.style.left === 'number'
-        ? toolbarX + 20 + layout.style.left
-        : toolbarX + 52 - Number(layout?.style.right) - width,
+        ? toolbarX + anchorOffset + layout.style.left
+        : toolbarX + anchorOffset + 32 - Number(layout?.style.right) - width,
     y:
       typeof layout?.style.top === 'number'
         ? toolbarY + 9 + layout.style.top
