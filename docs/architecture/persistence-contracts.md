@@ -455,3 +455,10 @@ The existing camera command, project mutation, history and save owners control t
 Video-project schema 9 admits `shadowColor` on VIDEO and IMAGE clips. The field contains a bounded color that the foundation parser supports. Versions 2–8 refuse this field. Readers refuse future versions. Mutations retain schema 9 after removal. Opening does not write default colors.
 
 Color belongs to each media window. It does not change source bytes, placement, source time, or EffectV1 settings. Zero intensity retains the color. Mode changes retain authored colors. A missing color uses the existing mode default. Track application copies the source color and removes a target color when the source uses the default. Existing mutation, history, save, and export owners retain authority.
+
+
+### Camera circle windows
+
+Video-project schema 10 admits the circle shape on VIDEO camera appearances. Versions 2–9 refuse this shape. Readers refuse future versions. Mutations retain schema 10 after removal. Opening does not write default appearances. Non-camera VIDEO clips retain dormant settings.
+
+The visible circle fits inside the authored pixel frame. The original frame and source clock remain unchanged. Gallery and Montage use the same frame and shape parser. Camera drawing, shadows, crops, and action editing use this geometry. Action editing evaluates the current camera position before source projection. Crop and mirror apply before rotation and transition scaling. Existing history, save, resource, and export owners retain authority.

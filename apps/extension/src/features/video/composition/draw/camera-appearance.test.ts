@@ -102,3 +102,33 @@ it('passes authored color to the shared shadow mask without tinting source pixel
   });
   expect(context.__maskContext.fillRect).not.toHaveBeenCalled();
 });
+
+it('crops and masks a circle inside the original nonsquare frame for native and decoded drawing', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+    clip: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const render = vi.fn();
+  const frame = { x: 10, y: 20, width: 200, height: 100 };
+  drawFittedMediaLayer({
+    context,
+    displayScale: 1,
+    fitMode: 'CONTAIN',
+    frame,
+    cameraAppearance: { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' },
+    shadowIntensity: 0,
+    shadowMode: undefined,
+    sourceWidth: 200,
+    sourceHeight: 100,
+    render,
+  });
+  expect(render).toHaveBeenCalledWith(10, 20, 200, 100);
+  expect(context.moveTo).toHaveBeenCalledWith(160, 70);
+  expect(context.clip).toHaveBeenCalledOnce();
+  expect(frame).toEqual({ x: 10, y: 20, width: 200, height: 100 });
+});

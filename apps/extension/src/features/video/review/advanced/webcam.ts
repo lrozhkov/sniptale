@@ -2,6 +2,7 @@ import { parseQuickEditShadow } from './shadow-validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   DEFAULT_CAMERA_APPEARANCE,
+  cameraWindowFrame,
   isCameraAppearance,
   type CameraAppearance,
 } from '../../project/camera/appearance';
@@ -32,11 +33,6 @@ interface QuickEditWebcamHiddenRange {
   end: number;
 }
 
-/** Quick review additionally offers a true circle; full-editor appearance remains unchanged. */
-type WebcamAppearance = Omit<CameraAppearance, 'shape'> & {
-  shape: CameraAppearance['shape'] | 'circle';
-};
-
 /** Authored camera content. Disabled content still retains its immutable source. */
 export interface QuickEditWebcam {
   assetId: string;
@@ -44,7 +40,7 @@ export interface QuickEditWebcam {
   /** Positive values delay the camera: cameraTime = mainSourceTime - offsetSeconds. */
   offsetSeconds: number;
   mirrored: boolean;
-  appearance: WebcamAppearance;
+  appearance: CameraAppearance;
   shadow?: { intensity: number; color: string };
   placement: QuickEditWebcamPlacement;
   positions: QuickEditWebcamPosition[];
@@ -139,7 +135,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     typeof value['enabled'] !== 'boolean' ||
     typeof value['mirrored'] !== 'boolean' ||
     !isBoundedNumber(value['offsetSeconds'], -MAX_TIME, MAX_TIME) ||
-    !parseWebcamAppearance(value['appearance'])
+    !isCameraAppearance(value['appearance'])
   )
     return null;
   const placement = parsePlacement(value['placement']);
@@ -150,7 +146,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     (a, b) => a.end <= b.start
   );
   if (!placement || !positions || !hiddenRanges) return null;
-  const appearance = parseWebcamAppearance(value['appearance'])!;
+  const appearance = value['appearance'];
   const shadow = value['shadow'];
   let parsedShadow: QuickEditWebcam['shadow'];
   if (shadow !== undefined) {
@@ -256,29 +252,27 @@ export function quickEditWebcamFrameAt(
   };
 }
 
-function parseWebcamAppearance(value: unknown): WebcamAppearance | null {
-  if (!isRecord(value)) return null;
-  const circle = value['shape'] === 'circle';
-  const candidate = circle ? { ...value, shape: 'ellipse' } : value;
-  if (!isCameraAppearance(candidate)) return null;
-  return { ...candidate, shape: circle ? 'circle' : candidate.shape };
-}
-
 /** Resolve a centered, inscribed pixel circle without rewriting authored scene-relative positions. */
 export function quickEditWebcamBounds(
   placement: QuickEditWebcamPlacement,
   output: { width: number; height: number },
-  shape: WebcamAppearance['shape']
+  shape: CameraAppearance['shape']
 ): QuickEditWebcamPlacement {
   if (shape !== 'circle') return placement;
-  const diameter = Math.min(placement.width * output.width, placement.height * output.height);
-  const width = diameter / output.width;
-  const height = diameter / output.height;
+  const frame = cameraWindowFrame(
+    {
+      x: placement.x * output.width,
+      y: placement.y * output.height,
+      width: placement.width * output.width,
+      height: placement.height * output.height,
+    },
+    shape
+  );
   return {
-    x: placement.x + (placement.width - width) / 2,
-    y: placement.y + (placement.height - height) / 2,
-    width,
-    height,
+    x: frame.x / output.width,
+    y: frame.y / output.height,
+    width: frame.width / output.width,
+    height: frame.height / output.height,
   };
 }
 

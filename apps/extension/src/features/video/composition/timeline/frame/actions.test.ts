@@ -244,3 +244,35 @@ it.each(['halo', 'path', 'area'] as const)(
     expect(resolveVideoCompositionActions(project, 1.5)).toEqual([]);
   }
 );
+
+it('evaluates a partial rate-two camera position and its circle crop at project time', () => {
+  const { project, clip } = capturedProject();
+  project.tracks[0]!.role = 'CAMERA';
+  clip.transform = { x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 };
+  clip.sourceStart = 1;
+  clip.sourceDuration = 3;
+  clip.playbackRate = 2;
+  clip.duration = 1.5;
+  project.duration = 1.5;
+  clip.cameraAppearance = { shape: 'circle', roundness: 61, zoom: 1, panX: 0, panY: 0 };
+  clip.cameraPositions = [
+    {
+      id: 'move',
+      sourceTime: 2,
+      transform: { ...clip.transform, x: 100, width: 160, height: 80 },
+      fitMode: 'CONTAIN',
+      transition: { kind: 'smooth', duration: 1 },
+    },
+  ];
+  const occurrence = resolveVideoCompositionActions(project, 0.75)[0]?.occurrence;
+  if (!occurrence) throw new Error('Missing camera action');
+  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, 0.75);
+  expect(mapping).toMatchObject({
+    frame: { x: 60, y: 20, width: 120, height: 60 },
+    fitMode: 'COVER',
+    cameraAppearance: clip.cameraAppearance,
+  });
+  expect(clip.transform).toEqual({ x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 });
+  expect(clip.sourceStart).toBe(1);
+  expect(clip.playbackRate).toBe(2);
+});

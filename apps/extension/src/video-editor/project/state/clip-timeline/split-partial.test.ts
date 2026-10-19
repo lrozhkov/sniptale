@@ -389,10 +389,17 @@ it.each(['boundary', 'click', 'dwell'] as const)(
 it('keeps camera reflection through a partial rate-two split and independent duplicate', () => {
   const { project, screen, camera, cameraTrack } = setup(1, 4);
   cameraTrack.role = 'CAMERA';
-  const mirrored = { ...camera, cameraMirrored: true, shadowColor: '#ff008080' };
+  const cameraAppearance = {
+    shape: 'circle' as const,
+    roundness: 61,
+    zoom: 1.5,
+    panX: 0.2,
+    panY: -0.1,
+  };
+  const mirrored = { ...camera, cameraMirrored: true, shadowColor: '#ff008080', cameraAppearance };
   const authored = {
     ...project,
-    version: 9 as const,
+    version: 10 as const,
     clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
   };
   const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
@@ -402,7 +409,10 @@ it('keeps camera reflection through a partial rate-two split and independent dup
   expect(
     cameraClips.every(
       (clip) =>
-        clip.type === 'VIDEO' && clip.cameraMirrored === true && clip.shadowColor === '#ff008080'
+        clip.type === 'VIDEO' &&
+        clip.cameraMirrored === true &&
+        clip.shadowColor === '#ff008080' &&
+        clip.cameraAppearance?.shape === 'circle'
     )
   ).toBe(true);
   expect(
@@ -419,6 +429,7 @@ it('keeps camera reflection through a partial rate-two split and independent dup
     duplicate!.project.clips.find((clip) => clip.id === duplicate!.duplicateClipId)
   ).toMatchObject({
     cameraMirrored: true,
+    cameraAppearance,
     shadowColor: '#ff008080',
     sourceStart: 1,
     sourceDuration: 8,

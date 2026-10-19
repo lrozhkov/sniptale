@@ -1,6 +1,10 @@
 import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
-import { cameraContentFrame, type CameraAppearance } from '../../project/camera/appearance';
+import {
+  cameraContentFrame,
+  cameraWindowFrame,
+  type CameraAppearance,
+} from '../../project/camera/appearance';
 import { VideoMediaFitMode, type VideoMediaShadowMode } from '../../project/types/index';
 import { drawMediaFrameShadow, traceCameraShape } from './media-shadow';
 
@@ -66,7 +70,9 @@ function getFittedMediaFrame(params: {
   };
 }
 
+/** Resolve source pixel bounds before clip rotation and transition scaling. */
 export function getFittedMediaContentFrame(params: {
+  cameraAppearance?: CameraAppearance;
   windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
   frame: MediaFrame;
@@ -86,6 +92,23 @@ export function getFittedMediaContentFrame(params: {
     });
     const inset = (plane.height * headerHeight) / (params.sourceHeight + headerHeight);
     return { ...plane, y: plane.y + inset, height: plane.height - inset };
+  }
+  if (params.cameraAppearance) {
+    const frame = cameraWindowFrame(params.frame, params.cameraAppearance.shape);
+    const content = cameraContentFrame(
+      frame.width,
+      frame.height,
+      params.sourceWidth,
+      params.sourceHeight,
+      params.cameraAppearance,
+      params.fitMode === VideoMediaFitMode.STRETCH
+    );
+    return {
+      x: frame.x + content.x,
+      y: frame.y + content.y,
+      width: content.width,
+      height: content.height,
+    };
   }
   if (
     shouldDrawFittedMediaDirectly({
@@ -180,6 +203,8 @@ export function drawFittedMediaLayer(params: {
   sourceHeight: number;
   sourceWidth: number;
 }): void {
+  if (params.cameraAppearance?.shape === 'circle')
+    params = { ...params, frame: cameraWindowFrame(params.frame, 'circle') };
   const drawFitted = (render: MediaFrameRenderer) => {
     drawFittedMediaFrame(
       params.context,
@@ -219,23 +244,11 @@ export function drawFittedMediaLayer(params: {
   if (params.windowHeaderImage) {
     drawWindowMediaPlane(params);
   } else if (params.cameraAppearance) {
-    const content = cameraContentFrame(
-      params.frame.width,
-      params.frame.height,
-      params.sourceWidth,
-      params.sourceHeight,
-      params.cameraAppearance,
-      params.fitMode === VideoMediaFitMode.STRETCH
-    );
+    const content = getFittedMediaContentFrame(params);
     params.context.save();
     traceCameraShape(params.context, params.frame, params.cameraAppearance);
     params.context.clip();
-    params.render(
-      params.frame.x + content.x,
-      params.frame.y + content.y,
-      content.width,
-      content.height
-    );
+    params.render(content.x, content.y, content.width, content.height);
     params.context.restore();
   } else drawFitted(params.render);
 }
@@ -302,6 +315,7 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  cameraAppearance?: CameraAppearance;
   mirrored?: boolean;
   windowHeader?: WindowHeader;
   point: { x: number; y: number };
@@ -344,6 +358,15 @@ function isInsideFrame(point: SourcePoint, frame: MediaFrame): boolean {
   );
 }
 
+function isInsideVisualFrame(point: SourcePoint, params: VisualLayerSourcePointMapping): boolean {
+  const frame = cameraWindowFrame(params.frame, params.cameraAppearance?.shape ?? 'rounded');
+  if (!isInsideFrame(point, frame)) return false;
+  if (params.cameraAppearance?.shape !== 'circle') return true;
+  const x = (point.x - frame.x - frame.width / 2) / (frame.width / 2);
+  const y = (point.y - frame.y - frame.height / 2) / (frame.height / 2);
+  return x * x + y * y <= 1 + 1e-9;
+}
+
 /** Map a visible source point through fit, rotation and the transition's affine transform. */
 export function mapSourceNormalizedPointToVisualLayer(
   params: VisualLayerSourcePointMapping
@@ -359,7 +382,7 @@ export function mapSourceNormalizedPointToVisualLayer(
     x: params.mirrored ? 2 * params.frame.x + params.frame.width - sourceX : sourceX,
     y: content.y + params.point.y * content.height,
   };
-  if (!isInsideFrame(point, params.frame)) return null;
+  if (!isInsideVisualFrame(point, params)) return null;
   const { center, angle } = visualLayerRotation(params.frame);
   const x = point.x - center.x;
   const y = point.y - center.y;
@@ -389,7 +412,7 @@ export function mapVisualLayerPointToSourceNormalized(
     y: center.y - x * Math.sin(angle) + y * Math.cos(angle),
   };
   const content = getFittedMediaContentFrame(params);
-  if (!isInsideFrame(point, params.frame) || !isInsideFrame(point, content)) return null;
+  if (!isInsideVisualFrame(point, params) || !isInsideFrame(point, content)) return null;
   return {
     x: Math.min(1, Math.max(0, (point.x - content.x) / content.width)),
     y: Math.min(1, Math.max(0, (point.y - content.y) / content.height)),

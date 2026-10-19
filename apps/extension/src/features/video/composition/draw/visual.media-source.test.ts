@@ -247,3 +247,40 @@ it('uses the same authored shadow color for decoded video and image windows', ()
     else expect(context.drawImage).toHaveBeenCalled();
   }
 });
+
+it.each([false, true])(
+  'uses circle on decoded frames only for camera=%s without changing source geometry',
+  (camera) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'circle',
+      filename: 'source.webm',
+      width: 160,
+      height: 90,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+    });
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+    if (!clip) throw new Error('Missing video');
+    clip.cameraAppearance = { shape: 'circle', roundness: 0, zoom: 1, panX: 0, panY: 0 };
+    if (camera) project.tracks[0]!.role = 'CAMERA';
+    const layer = resolveVideoCompositionFrame(project, 0).visualLayers.find(
+      (layer) => layer.kind === 'video'
+    );
+    if (!layer) throw new Error('Missing layer');
+    const context = createVisualTestContext(),
+      draw = vi.fn();
+    drawCompositionVisualLayer(
+      context,
+      layer,
+      1,
+      1,
+      {},
+      new Map([[clip.id, { draw, sourceWidth: 160, sourceHeight: 90 }]])
+    );
+    expect(draw).toHaveBeenCalledWith(context, 0, 0, 160, 90);
+    if (camera) expect(context.moveTo).toHaveBeenCalledWith(125, 45);
+    else expect(context.moveTo).not.toHaveBeenCalled();
+    expect(clip.transform).toMatchObject({ width: 160, height: 90 });
+  }
+);

@@ -198,6 +198,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   }
 
   if (
+    isRecord(value['cameraAppearance']) &&
+    value['cameraAppearance']['shape'] === 'circle' &&
+    value['type'] !== VideoProjectClipType.VIDEO
+  )
+    return false;
+
+  if (
     value['shadowColor'] !== undefined &&
     ((value['type'] !== VideoProjectClipType.VIDEO &&
       value['type'] !== VideoProjectClipType.IMAGE) ||

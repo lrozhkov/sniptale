@@ -95,3 +95,54 @@ it('rejects cropped source points, letterbox clicks and degenerate transforms', 
     })
   ).toBeNull();
 });
+
+it.each([false, true])(
+  'round-trips circle crop, mirrored=%s, rotation and transition scaling',
+  async (mirrored) => {
+    const { DEFAULT_CAMERA_APPEARANCE } = await import('../../project/camera/appearance');
+    const {
+      getFittedMediaContentFrame,
+      mapSourceNormalizedPointToVisualLayer,
+      mapVisualLayerPointToSourceNormalized,
+    } = await import('./fitted-media');
+    const geometry = {
+      mirrored,
+      cameraAppearance: {
+        ...DEFAULT_CAMERA_APPEARANCE,
+        shape: 'circle' as const,
+        zoom: 1.5,
+        panX: 0.2,
+        panY: -0.1,
+      },
+      fitMode: 'STRETCH' as const,
+      frame: { x: 20, y: 40, width: 200, height: 100, rotation: 90 },
+      sourceWidth: 400,
+      sourceHeight: 200,
+      renderState: { translateX: 10, translateY: -5, scaleX: 2, scaleY: 0.5 },
+    };
+    expect(getFittedMediaContentFrame(geometry)).toEqual({
+      x: 40,
+      y: 17.5,
+      width: 150,
+      height: 150,
+    });
+    const point = mapSourceNormalizedPointToVisualLayer({ ...geometry, point: { x: 0.5, y: 0.5 } });
+    expect(point?.x).toBeCloseTo(125, 8);
+    expect(point?.y).toBeCloseTo(mirrored ? 87.5 : 82.5, 8);
+    if (!point) throw new Error('Missing circle point');
+    const restored = mapVisualLayerPointToSourceNormalized({ ...geometry, point });
+    expect(restored?.x).toBeCloseTo(0.5, 8);
+    expect(restored?.y).toBeCloseTo(0.5, 8);
+    expect(
+      mapSourceNormalizedPointToVisualLayer({ ...geometry, point: { x: 0, y: 0 } })
+    ).toBeNull();
+    expect(
+      mapVisualLayerPointToSourceNormalized({
+        ...geometry,
+        frame: { ...geometry.frame, rotation: 0 },
+        renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+        point: { x: 70, y: 40 },
+      })
+    ).toBeNull();
+  }
+);

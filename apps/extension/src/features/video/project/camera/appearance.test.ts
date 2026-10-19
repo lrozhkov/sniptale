@@ -237,3 +237,47 @@ it('reflects only an editable camera without changing positions or unrelated cli
     expect(isVideoProjectClip({ ...clip, cameraMirrored })).toBe(false);
   expect(isVideoProjectClip({ ...clip, type: 'AUDIO', cameraMirrored: true })).toBe(false);
 });
+
+it('shares an inscribed circle without rewriting placement and keeps appearance edits idempotent', async () => {
+  const { cameraWindowFrame } = await import('./appearance');
+  const { project, clip } = fixture();
+  expect(cameraWindowFrame({ x: 10, y: 20, width: 200, height: 100 }, 'circle')).toEqual({
+    x: 60,
+    y: 20,
+    width: 100,
+    height: 100,
+  });
+  expect(cameraWindowFrame({ x: 10, y: 20, width: 100, height: 200 }, 'circle')).toEqual({
+    x: 10,
+    y: 70,
+    width: 100,
+    height: 100,
+  });
+  const appearance = {
+    ...DEFAULT_CAMERA_APPEARANCE,
+    shape: 'circle' as const,
+    roundness: 73,
+    zoom: 1.5,
+    panX: 0.2,
+  };
+  expect(isCameraAppearance(appearance)).toBe(true);
+  const next = editCameraPosition(project, clip.id, 2, { kind: 'appearance', appearance });
+  expect(next.version).toBe(10);
+  expect(next.clips[0]).toEqual({ ...clip, cameraAppearance: appearance });
+  expect(editCameraPosition(next, clip.id, 2, { kind: 'appearance', appearance })).toBe(next);
+  const locked = {
+    ...project,
+    tracks: project.tracks.map((track) => ({ ...track, locked: true })),
+  };
+  expect(editCameraPosition(locked, clip.id, 2, { kind: 'appearance', appearance })).toBe(locked);
+  expect(
+    editCameraPosition(project, clip.id, 2, {
+      kind: 'appearance',
+      appearance: DEFAULT_CAMERA_APPEARANCE,
+    })
+  ).toBe(project);
+  const points = cameraSilhouette(200, 100, appearance);
+  expect(points[0]).toEqual({ x: 150, y: 50 });
+  for (const point of points) expect(Math.hypot(point.x - 100, point.y - 50)).toBeCloseTo(50, 8);
+  expect(clip).not.toHaveProperty('cameraAppearance');
+});

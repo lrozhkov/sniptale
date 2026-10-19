@@ -13,6 +13,9 @@ const context = {
   restore: vi.fn(),
   beginPath: vi.fn(),
   roundRect: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  closePath: vi.fn(),
   clip: vi.fn(),
   drawImage: draw,
   translate: vi.fn(),
@@ -170,4 +173,28 @@ it('keeps mirrored crop dragging and keyboard movement in the visible direction'
     button().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
   );
   expect(p.onChange).toHaveBeenCalledWith({ ...p.appearance, panX: -0.1 });
+});
+
+it('uses a square circle preview and retains mirrored pan semantics', () => {
+  const p = {
+    ...props(),
+    mirrored: true,
+    appearance: { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' as const, zoom: 2 },
+  };
+  act(() => root.render(<CameraCropPreview {...p} />));
+  ready();
+  expect(button().style.aspectRatio).toBe('150 / 150');
+  expect(button().style.maxWidth).toBe('176px');
+  const bounds = button().getBoundingClientRect();
+  vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue({
+    ...bounds,
+    width: 150,
+    height: 150,
+    right: 150,
+    bottom: 150,
+  });
+  pointer('pointerdown', 10, 10);
+  pointer('pointermove', 25, 10);
+  pointer('pointerup', 25, 10);
+  expect(p.onChange).toHaveBeenCalledExactlyOnceWith({ ...p.appearance, panX: 0.12 });
 });

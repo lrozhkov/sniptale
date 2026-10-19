@@ -60,7 +60,6 @@ export function drawReviewWebcam(
   const appearance = {
     ...webcam.appearance,
     ...cropSettings,
-    shape: webcam.appearance.shape === 'circle' ? ('ellipse' as const) : webcam.appearance.shape,
   };
   const width = placement.width * output.width;
   const height = placement.height * output.height;

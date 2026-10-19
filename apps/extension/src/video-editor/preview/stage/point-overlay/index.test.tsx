@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
+
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import {
@@ -530,5 +532,56 @@ it.each([
       clipId: clip.id,
     });
     expect(project.actionEvents[0]!.point).toEqual({ x: 0.2, y: 0.5 });
+  }
+);
+
+it.each(['crop', 'destination', 'circle', 'dormant'] as const)(
+  'keeps the camera action handle and picker aligned with its %s',
+  (kind) => {
+    const { project, clip, occurrences } = createCapturedOverlayFixture();
+    if (kind === 'dormant') delete project.tracks[0]!.role;
+    else project.tracks[0]!.role = 'CAMERA';
+    project.clips = [clip];
+    clip.fitMode = 'STRETCH';
+    project.actionEvents[0]!.point = { x: 0.6, y: 0.5 };
+    if (kind === 'crop') clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, zoom: 2, panX: 1 };
+    else if (kind === 'circle' || kind === 'dormant')
+      clip.cameraAppearance = { ...DEFAULT_CAMERA_APPEARANCE, shape: 'circle' };
+    else
+      clip.cameraPositions = [
+        {
+          id: 'destination',
+          sourceTime: 0.5,
+          transform: { ...clip.transform, x: 120 },
+          fitMode: 'STRETCH',
+          transition: { kind: 'instant', duration: 0 },
+        },
+      ];
+    const displayedX =
+      kind === 'crop' ? 36 : kind === 'circle' ? 64 : kind === 'dormant' ? 68 : 168;
+    const onUpdateActionEventDetails = vi.fn();
+    const params = {
+      camera: createCamera(),
+      currentTime: 1,
+      project,
+      stageRef: { current: createStage() },
+      placementMode: createActionPointPlacementMode('fact', clip.id),
+      selectedActionOccurrence: occurrences()[0]!,
+      selectedMotionRegion: null,
+      onClearPlacementMode: vi.fn(),
+      onUpdateActionEventDetails,
+      onUpdateMotionRegion: vi.fn(),
+    };
+    act(() => root?.render(<PreviewStagePointOverlay {...params} placementMode={null} />));
+    const handle = container!.querySelector<HTMLButtonElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    expect(handle).not.toBeNull();
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(displayedX / 2, 8);
+    expect(handleStagePointPlacement(createPointEvent(displayedX, 40), params)).toBe(true);
+    expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+      point: { x: expect.closeTo(0.6, 8), y: 0.5 },
+      clipId: clip.id,
+    });
   }
 );

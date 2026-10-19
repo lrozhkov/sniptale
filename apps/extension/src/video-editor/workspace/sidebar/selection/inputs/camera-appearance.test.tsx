@@ -137,7 +137,7 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
     container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
   ).toBeNull();
   const shapeChoices = [...container.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
-  expect(shapeChoices).toHaveLength(5);
+  expect(shapeChoices).toHaveLength(6);
   expect(shapeChoices.every((button) => button.disabled)).toBe(true);
   expect(
     shapeChoices
@@ -173,4 +173,86 @@ it('commits reflection through the camera command and disables it on locked clip
   render(true, true);
   expect(horizontal().getAttribute('aria-pressed')).toBe('true');
   expect(horizontal().disabled).toBe(true);
+});
+
+it('offers circle with one diameter and retains the authored frame ratio and dormant roundness', () => {
+  const base = createProps();
+  const clip = {
+    ...base.clip,
+    transform: { ...base.clip.transform, width: 200, height: 100 },
+    cameraAppearance: { ...DEFAULT_CAMERA_APPEARANCE, roundness: 61 },
+  };
+  const onEdit = vi.fn(),
+    onUpdateClipTransform = vi.fn();
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+        onUpdateClipTransform={onUpdateClipTransform}
+      />
+    )
+  );
+  const circle = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'gallery.videoReview.webcamCircle'
+  )!;
+  act(() => circle.click());
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith(clip.id, {
+    kind: 'appearance',
+    appearance: { ...clip.cameraAppearance, shape: 'circle' },
+  });
+  const circleClip = {
+    ...clip,
+    cameraAppearance: { ...clip.cameraAppearance, shape: 'circle' as const },
+  };
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={circleClip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+        onUpdateClipTransform={onUpdateClipTransform}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.webcamDiameter"]'
+  )!;
+  expect(input.value).toBe('100');
+  expect(container.querySelector('input[aria-label="videoEditor.sidebar.widthLabel"]')).toBeNull();
+  expect(container.querySelector('input[aria-label="videoEditor.sidebar.heightLabel"]')).toBeNull();
+  expect(
+    container.querySelector('input[aria-label="videoEditor.sidebar.cameraRoundness"]')
+  ).toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '150');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(onUpdateClipTransform).toHaveBeenCalledWith(clip.id, { width: 300, height: 150 });
+  expect(circleClip.transform).toEqual(clip.transform);
+  act(() =>
+    root.render(
+      <CameraAppearanceControls
+        project={base.project}
+        clip={clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+      />
+    )
+  );
+  expect(
+    container.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.cameraRoundness"]'
+    )?.value
+  ).toBe('61');
+  expect(
+    container.querySelector('input[aria-label="gallery.videoReview.webcamDiameter"]')
+  ).toBeNull();
 });

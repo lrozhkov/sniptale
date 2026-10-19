@@ -1,4 +1,4 @@
-import { isCameraAppearance } from './appearance';
+import { isCameraAppearance, DEFAULT_CAMERA_APPEARANCE } from './appearance';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import type { VideoProject, VideoProjectVideoClip } from '../types';
 import {
@@ -37,6 +37,15 @@ export function editCameraPosition(
   }
   if (edit.kind === 'appearance') {
     if (!isCameraAppearance(edit.appearance)) return project;
+    const current = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+    if (
+      current.shape === edit.appearance.shape &&
+      current.roundness === edit.appearance.roundness &&
+      current.zoom === edit.appearance.zoom &&
+      current.panX === edit.appearance.panX &&
+      current.panY === edit.appearance.panY
+    )
+      return project;
     return applyVideoProjectClipsPatch(
       project,
       project.clips.map((item) =>

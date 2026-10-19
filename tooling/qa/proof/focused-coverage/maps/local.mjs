@@ -33,6 +33,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/project/validation/clips.test.ts',
       'apps/extension/src/features/video/project/validation/project.test.ts',
       'apps/extension/src/features/video/project/camera/appearance.test.ts',
+      'apps/extension/src/features/video/project/effect-instance/apply-targets.test.ts',
       'apps/extension/src/features/video/project/camera/animation.test.ts',
       'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',

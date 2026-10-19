@@ -53,6 +53,42 @@ function pixelError(
   return error / (before.width * before.height * 3);
 }
 
+function circleMaskError(
+  visible: Awaited<ReturnType<typeof pixels>>,
+  hidden: Awaited<ReturnType<typeof pixels>>
+) {
+  expect([visible.width, visible.height]).toEqual([hidden.width, hidden.height]);
+  const width = visible.width + 4,
+    height = visible.height + 4;
+  const centerX = width / 2 - 2,
+    centerY = height / 2 - 2,
+    radius = Math.min(width, height) / 2;
+  let outside = 0,
+    inside = 0,
+    outsideCount = 0,
+    insideCount = 0;
+  for (let y = 0; y < visible.height; y++)
+    for (let x = 0; x < visible.width; x++) {
+      const distance = Math.hypot(x + 0.5 - centerX, y + 0.5 - centerY);
+      let difference = 0;
+      for (let channel = 0; channel < 3; channel++)
+        difference += Math.abs(
+          visible.data[(y * visible.width + x) * 4 + channel]! -
+            hidden.data[(y * visible.width + x) * 4 + channel]!
+        );
+      if (distance > radius + 2) {
+        outside += difference;
+        outsideCount++;
+      }
+      if (distance < radius - 4) {
+        inside += difference;
+        insideCount++;
+      }
+    }
+  if (!outsideCount || !insideCount) throw new Error('Circle pixel samples are unavailable');
+  return { outsideError: outside / outsideCount / 3, insideDifference: inside / insideCount / 3 };
+}
+
 async function shadowRing(
   canvas: Locator,
   frame: { x: number; y: number; width: number; height: number }
@@ -126,10 +162,10 @@ async function cameraGeometry(page: Page, owner: Locator, capture: (name: string
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   const locale = index === 0 ? 'en' : 'ru';
   const theme = index === 0 ? 'dark' : 'light';
-  test(`camera mirror retains source pixels and montage placement ${viewport.size.width} ${locale}`, async ({
+  test(`camera window retains source pixels and montage placement ${viewport.size.width} ${locale}`, async ({
     page,
   }, info) => {
-    test.setTimeout(120000);
+    test.setTimeout(150000);
     await page.setViewportSize({ ...viewport.size });
     await page.emulateMedia({ colorScheme: theme });
     const host = await startHostServer();
@@ -467,6 +503,131 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         '#0000FF'
       );
       await page.screenshot({ path: info.outputPath('shadow-reopened.png'), fullPage: false });
+      const beforeCircle = await readNativeVideoProject(page);
+      const beforeCircleCamera = await readCamera();
+      const circleChoice = owner.getByRole('button', {
+        name: label('gallery.videoReview.webcamCircle'),
+        exact: true,
+      });
+      const cameraShape = async () => {
+        const clip = await readCamera();
+        return clip?.type === 'VIDEO' ? (clip.cameraAppearance?.shape ?? 'rounded') : null;
+      };
+      const shapeSelect = owner.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraShape'),
+        exact: true,
+      });
+      if (await shapeSelect.count()) {
+        await operate(shapeSelect);
+        await operate(
+          page.getByRole('option', {
+            name: label('gallery.videoReview.webcamCircle'),
+            exact: true,
+          })
+        );
+      } else await operate(circleChoice);
+      await expect.poll(cameraShape).toBe('circle');
+      expect((await readNativeVideoProject(page))?.version).toBe(10);
+      expect((await readCamera())?.transform).toEqual(beforeCircleCamera?.transform);
+      expect(
+        (await readNativeVideoProject(page))?.clips.filter((clip) => clip.id !== camera.id)
+      ).toEqual(beforeCircle?.clips.filter((clip) => clip.id !== camera.id));
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(cameraShape).not.toBe('circle');
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+      await expect.poll(cameraShape).toBe('circle');
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupCamera'),
+          exact: true,
+        })
+      );
+      const opacity = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.opacityLabel'),
+        exact: true,
+      });
+      await opacity.scrollIntoViewIfNeeded();
+      await opacity.fill('0');
+      await opacity.press('Enter');
+      await expect.poll(async () => (await readCamera())?.transform.opacity).toBe(0);
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const hiddenPixels = await pixels(stage, frame);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(async () => (await readCamera())?.transform.opacity).toBe(1);
+      await expect
+        .poll(
+          async () => circleMaskError(await pixels(stage, frame), hiddenPixels).insideDifference
+        )
+        .toBeGreaterThan(1);
+      const circlePixels = circleMaskError(await pixels(stage, frame), hiddenPixels);
+      expect(circlePixels.outsideError).toBeLessThan(1);
+      await writeFile(info.outputPath('circle-pixels.json'), JSON.stringify(circlePixels, null, 2));
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupStyle'),
+          exact: true,
+        })
+      );
+      const diameter = owner.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamDiameter'),
+        exact: true,
+      });
+      await diameter.scrollIntoViewIfNeeded();
+      await checkInspectorPaintedFont(
+        page,
+        (await shapeSelect.count()) ? shapeSelect : circleChoice,
+        'camera-circle-choice'
+      );
+      if ((await crop.locator('..').getAttribute('open')) === null) await operate(crop);
+      await expect
+        .poll(async () =>
+          preview.evaluate((node: HTMLCanvasElement) => Math.abs(node.width - node.height))
+        )
+        .toBeLessThanOrEqual(1);
+      await page.screenshot({ path: info.outputPath('circle-camera.png'), fullPage: false });
+      await cameraGeometry(page, owner, (name) =>
+        info.outputPath(name.replace('camera-mirror', 'circle-camera'))
+      );
+      await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+      await diameter.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('circle-all-sections.png'), fullPage: false });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await expect.poll(cameraShape).toBe('circle');
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.sceneProperties'),
+          exact: true,
+        })
+      );
+      await page
+        .locator(`[data-project-timeline-clip="${camera.id}"]`)
+        .click({ modifiers: ['Control'] });
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupStyle'),
+          exact: true,
+        })
+      );
+      if (await shapeSelect.count()) {
+        await shapeSelect.scrollIntoViewIfNeeded();
+        await expect(shapeSelect).toContainText(label('gallery.videoReview.webcamCircle'));
+      } else {
+        await circleChoice.scrollIntoViewIfNeeded();
+        await expect(circleChoice).toHaveAttribute('aria-pressed', 'true');
+      }
+      expect(await readCamera()).toMatchObject({
+        transform: beforeCircleCamera?.transform,
+        shadowColor: '#0000ff',
+        cameraMirrored: true,
+        cameraAppearance: { shape: 'circle' },
+      });
+      await page.screenshot({ path: info.outputPath('circle-reopened.png'), fullPage: false });
       if (index === 0) {
         await page.setViewportSize({ width: 1200, height: 560 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

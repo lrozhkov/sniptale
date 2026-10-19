@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 10])
+  for (const version of [2, 3, 4, 11])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,7 +129,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 10])
+    for (const version of [2, 3, 4, 5, 6, 7, 11])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -156,7 +156,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 10])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 11])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -184,4 +184,46 @@ it('admits authored media shadow colors only in schema nine without writing defa
       clips: [{ ...clip, type: 'AUDIO', shadowColor: '#ff0000' }],
     })
   ).toBe(false);
+});
+
+it('fences circle at schema ten and retains dormant camera settings without opening writes', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { DEFAULT_CAMERA_APPEARANCE } = await import('../camera/appearance');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } = await import('./root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'circle',
+    filename: 'source.webm',
+    width: 160,
+    height: 90,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+  if (!clip) throw new Error('Missing video');
+  const cameraAppearance = {
+    ...DEFAULT_CAMERA_APPEARANCE,
+    shape: 'circle' as const,
+    roundness: 61,
+  };
+  const changed = applyVideoProjectMutationPatch(project, {
+    clips: project.clips.map((item) =>
+      item.id === clip.id ? { ...clip, cameraAppearance } : item
+    ),
+  });
+  expect(changed.version).toBe(10);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 11])
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    const parsed = parseHydratableVideoProject({ ...project, version });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.clips[0]).not.toHaveProperty('cameraAppearance');
+  }
+  for (const type of ['IMAGE', 'AUDIO'])
+    expect(
+      isHydratableVideoProject({ ...changed, clips: [{ ...clip, type, cameraAppearance }] })
+    ).toBe(false);
+  expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(10);
 });

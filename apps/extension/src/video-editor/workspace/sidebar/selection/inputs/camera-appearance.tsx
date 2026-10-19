@@ -30,6 +30,11 @@ export function CameraAppearanceControls(props: {
   const value = props.clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
   const position = activeCameraPosition(props.clip, props.currentTime);
   const transform = position?.transform ?? props.clip.transform;
+  const diameter = Math.min(transform.width, transform.height);
+  const maximumDiameter = Math.max(
+    1,
+    (7680 * diameter) / Math.max(transform.width, transform.height)
+  );
   const disabled = props.disabled || !props.onEdit;
   const change = (appearance: CameraAppearance) =>
     props.onEdit?.(props.clip.id, { kind: 'appearance', appearance });
@@ -58,28 +63,54 @@ export function CameraAppearanceControls(props: {
           { value: 'rounded', label: translate('videoEditor.sidebar.cameraShapeRounded') },
           { value: 'soft', label: translate('videoEditor.sidebar.cameraShapeSoft') },
           { value: 'ellipse', label: translate('videoEditor.sidebar.cameraShapeEllipse') },
+          { value: 'circle', label: translate('gallery.videoReview.webcamCircle') },
         ]}
         onChange={(shape) => change({ ...value, shape })}
       />
-      {(['width', 'height'] as const).map((field) => (
+      {value.shape === 'circle' ? (
         <SliderField
-          key={field}
-          label={translate(
-            field === 'width' ? 'videoEditor.sidebar.widthLabel' : 'videoEditor.sidebar.heightLabel'
+          label={translate('gallery.videoReview.webcamDiameter')}
+          value={diameter}
+          min={Math.min(40, maximumDiameter)}
+          max={maximumDiameter}
+          scrubMax={Math.max(
+            Math.min(40, maximumDiameter),
+            Math.min(maximumDiameter, props.project.width, props.project.height)
           )}
-          value={transform[field]}
-          min={40}
-          max={7680}
-          scrubValue={transform[field]}
-          scrubMin={40}
-          scrubMax={Math.max(40, props.project[field])}
           step={1}
           disabled={props.disabled || !props.onUpdateClipTransform}
           formatValue={(v) => `${Math.round(v)}px`}
-          onChange={(size) => props.onUpdateClipTransform?.(props.clip.id, { [field]: size })}
+          onChange={(size) => {
+            const scale = size / diameter;
+            props.onUpdateClipTransform?.(props.clip.id, {
+              width: transform.width * scale,
+              height: transform.height * scale,
+            });
+          }}
         />
-      ))}
-      {value.shape !== 'ellipse' ? (
+      ) : (
+        (['width', 'height'] as const).map((field) => (
+          <SliderField
+            key={field}
+            label={translate(
+              field === 'width'
+                ? 'videoEditor.sidebar.widthLabel'
+                : 'videoEditor.sidebar.heightLabel'
+            )}
+            value={transform[field]}
+            min={40}
+            max={7680}
+            scrubValue={transform[field]}
+            scrubMin={40}
+            scrubMax={Math.max(40, props.project[field])}
+            step={1}
+            disabled={props.disabled || !props.onUpdateClipTransform}
+            formatValue={(v) => `${Math.round(v)}px`}
+            onChange={(size) => props.onUpdateClipTransform?.(props.clip.id, { [field]: size })}
+          />
+        ))
+      )}
+      {value.shape !== 'ellipse' && value.shape !== 'circle' ? (
         <SliderField
           label={translate('videoEditor.sidebar.cameraRoundness')}
           min={0}

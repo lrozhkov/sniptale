@@ -2,6 +2,7 @@ import type { VideoMediaFitMode } from '../../../../../features/video/project/ty
 import { useEffect, useRef, useState } from 'react';
 import {
   cameraContentFrame,
+  cameraWindowFrame,
   type CameraAppearance,
 } from '../../../../../features/video/project/camera/appearance';
 import {
@@ -33,6 +34,10 @@ export function CameraCropPreview(props: CameraCropPreviewProps) {
     dy: number;
   } | null>(null);
   const appearance = draft ?? props.appearance;
+  const frame = cameraWindowFrame(
+    { x: 0, y: 0, width: props.width, height: props.height },
+    appearance.shape
+  );
   const { video, canvas, ready, failed, retry } = useCameraCropFrame(props, appearance);
   useEffect(() => {
     if (props.disabled) {
@@ -56,8 +61,8 @@ export function CameraCropPreview(props: CameraCropPreviewProps) {
         className={`relative mx-auto block max-h-44 w-full touch-none overflow-hidden rounded-md
 bg-[var(--sniptale-color-surface-muted)] disabled:cursor-default`}
         style={{
-          aspectRatio: `${props.width} / ${props.height}`,
-          maxWidth: `${(176 * props.width) / props.height}px`,
+          aspectRatio: `${frame.width} / ${frame.height}`,
+          maxWidth: `${(176 * frame.width) / frame.height}px`,
           cursor: draft ? 'grabbing' : 'grab',
         }}
         onPointerDown={(event) => {

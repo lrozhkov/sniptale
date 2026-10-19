@@ -1,3 +1,4 @@
+import { resolveCameraClip } from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
 import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
@@ -123,18 +124,18 @@ export function resolveVideoCompositionActionSourceMapping(
     return null;
   const asset = project.assets.find((item) => item.id === clip.assetId);
   if (!asset) return null;
+  const camera = project.tracks.some(
+    (track) => track.id === clip.trackId && track.role === 'CAMERA'
+  );
+  const visual = camera ? resolveCameraClip(clip, currentTime) : clip;
   return {
-    mirrored:
-      clip.cameraMirrored === true &&
-      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA'),
-    frame: clip.transform,
-    fitMode: clip.fitMode,
-    ...(clip.windowHeader &&
-    !project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
-      ? { windowHeader: clip.windowHeader }
-      : {}),
+    mirrored: camera && clip.cameraMirrored === true,
+    ...(camera && visual.cameraAppearance ? { cameraAppearance: visual.cameraAppearance } : {}),
+    frame: visual.transform,
+    fitMode: visual.fitMode,
+    ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
-    renderState: resolveClipTransitionVisualState(project, clip, currentTime),
+    renderState: resolveClipTransitionVisualState(project, visual, currentTime),
   };
 }
