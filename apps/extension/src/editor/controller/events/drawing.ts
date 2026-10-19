@@ -217,6 +217,10 @@ export function createEditorDrawingEventHandlers(
       }
       if ('button' in event.e && event.e.button !== 0) return;
       if (!canvas || !bindings.getSource()) return;
+      if (event.transform?.target.__corner) {
+        textTargetCandidate = null;
+        return;
+      }
       if (bindings.getActiveTool() === 'text' && isTextTarget(event.target)) {
         const point = canvas.getScenePoint(event.e);
         canvas.setActiveObject(event.target, event.e);

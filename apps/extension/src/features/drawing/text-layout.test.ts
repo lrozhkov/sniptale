@@ -4,7 +4,57 @@ import {
   resolveDrawingTextHeight,
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextNaturalWidth,
+  resolveDrawingTextBackgroundRadii,
 } from './text-layout';
+
+it.each([
+  [
+    [120, 120],
+    [
+      [3, 3, 0, 0],
+      [0, 0, 3, 3],
+    ],
+  ],
+  [
+    [120, 80],
+    [
+      [3, 3, 3, 0],
+      [0, 0, 3, 3],
+    ],
+  ],
+  [
+    [80, 120],
+    [
+      [3, 3, 0, 0],
+      [0, 3, 3, 3],
+    ],
+  ],
+  [
+    [120, 119],
+    [
+      [3, 3, 1, 0],
+      [0, 0, 3, 3],
+    ],
+  ],
+] as const)('joins adjacent backgrounds with widths %s', (widths, expected) => {
+  const lines = widths.map((width, index) => ({ left: 0, top: index * 25.5, height: 25.5, width }));
+  expect(lines.map((_line, index) => resolveDrawingTextBackgroundRadii(lines, index))).toEqual(
+    expected
+  );
+});
+
+it('keeps exposed corners rounded for separate lines and blanks', () => {
+  const lines = [
+    { left: 0, top: 0, width: 120, height: 25 },
+    { left: 0, top: 30, width: 12, height: 25 },
+    { left: 40, top: 55, width: 80, height: 25 },
+  ];
+  expect(lines.map((_line, index) => resolveDrawingTextBackgroundRadii(lines, index))).toEqual([
+    [3, 3, 3, 3],
+    [3, 3, 3, 3],
+    [3, 3, 3, 3],
+  ]);
+});
 
 it('lets a short text box resize beyond its natural width', () => {
   expect(clampDrawingTextWidth('Hi', 20, 0)).toBe(80);

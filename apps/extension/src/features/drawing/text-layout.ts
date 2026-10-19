@@ -7,6 +7,47 @@ const TEXT_BOX_MAX_WIDTH = 640;
 const TEXT_BOX_MAX_UNBROKEN_CHARACTERS = 16;
 const TEXT_CHARACTER_WIDTH_FACTOR = 0.55;
 
+/** A text line background in unrotated drawing coordinates. */
+export type DrawingTextBackgroundRect = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
+/** Returns clockwise corner radii with square joins between adjacent text lines. */
+export function resolveDrawingTextBackgroundRadii(
+  lines: readonly DrawingTextBackgroundRect[],
+  index: number
+): [number, number, number, number] {
+  const line = lines[index];
+  if (!line) return [0, 0, 0, 0];
+  const joinRadii = (neighbor: DrawingTextBackgroundRect | undefined, adjacent: boolean) => {
+    if (
+      !neighbor ||
+      !adjacent ||
+      neighbor.left >= line.left + line.width ||
+      neighbor.left + neighbor.width <= line.left
+    )
+      return [3, 3] as const;
+    return [
+      Math.min(3, Math.max(0, neighbor.left - line.left)),
+      Math.min(3, Math.max(0, line.left + line.width - neighbor.left - neighbor.width)),
+    ] as const;
+  };
+  const previous = lines[index - 1];
+  const next = lines[index + 1];
+  const [topLeft, topRight] = joinRadii(
+    previous,
+    previous !== undefined && Math.abs(previous.top + previous.height - line.top) < 0.01
+  );
+  const [bottomLeft, bottomRight] = joinRadii(
+    next,
+    next !== undefined && Math.abs(line.top + line.height - next.top) < 0.01
+  );
+  return [topLeft, topRight, bottomRight, bottomLeft];
+}
+
 function estimateCharactersWidth(characters: number, fontSize: number): number {
   return characters * fontSize * TEXT_CHARACTER_WIDTH_FACTOR + DRAWING_TEXT_HORIZONTAL_PADDING;
 }

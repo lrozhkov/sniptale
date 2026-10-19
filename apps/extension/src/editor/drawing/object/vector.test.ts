@@ -35,7 +35,7 @@ describe('Fabric drawing adapter', () => {
       id: 'text-1',
       kind: 'text',
       bounds: { x: 5, y: 6, width: 120, height: 40 },
-      text: 'One\nTwo',
+      text: 'One\nOne',
       color: '#111',
       backgroundColor: '#ff08',
       fontFamily: 'handwritten',
@@ -55,6 +55,8 @@ describe('Fabric drawing adapter', () => {
     };
     renderEditorDrawingTextBackground(object as Textbox, context);
     expect(context.roundRect).toHaveBeenCalledTimes(2);
+    expect(context.roundRect.mock.calls[0]?.[4]).toEqual([3, 3, 0, 0]);
+    expect(context.roundRect.mock.calls[1]?.[4]?.slice(0, 2)).toEqual([0, 0]);
     expect(context.roundRect.mock.calls[0]?.[0]).toBe((object as Textbox)._getLeftOffset());
     expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
     const topOffset = (object as Textbox)._getTopOffset();

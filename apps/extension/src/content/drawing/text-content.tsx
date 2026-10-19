@@ -4,7 +4,9 @@ import {
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextFontFamily,
+  resolveDrawingTextBackgroundRadii,
   type DrawingFontFamily,
+  type DrawingTextBackgroundRect,
 } from '../../features/drawing/public';
 
 export type DrawingTextVisualStyle = {
@@ -12,13 +14,6 @@ export type DrawingTextVisualStyle = {
   color: string;
   fontFamily: DrawingFontFamily;
   fontSize: number;
-};
-
-type DrawingTextBackgroundRect = {
-  height: number;
-  left: number;
-  top: number;
-  width: number;
 };
 
 export function resolveDrawingTextContentStyle(style: DrawingTextVisualStyle): CSSProperties {
@@ -104,12 +99,20 @@ export function useDrawingTextBackgroundRects(args: {
   const measure = useCallback(() => {
     const element = args.contentRef.current;
     if (!element) return;
-    const measured = readDrawingTextBackgroundRects(
-      element,
-      args.value,
-      args.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR
-    );
-    setRects(measured);
+    const parent = element.parentElement;
+    const transform = parent?.style.transform ?? '';
+    try {
+      if (parent) parent.style.transform = 'none';
+      setRects(
+        readDrawingTextBackgroundRects(
+          element,
+          args.value,
+          args.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR
+        )
+      );
+    } finally {
+      if (parent) parent.style.transform = transform;
+    }
   }, [args.contentRef, args.fontSize, args.value]);
 
   useLayoutEffect(() => {
@@ -140,7 +143,9 @@ export function DrawingTextBackgrounds(props: {
       data-ui="content.drawing.text-background"
       style={{
         backgroundColor: color,
-        borderRadius: 3,
+        borderRadius: resolveDrawingTextBackgroundRadii(props.rects, index)
+          .map((radius) => `${radius}px`)
+          .join(' '),
         height: rect.height,
         left: rect.left,
         pointerEvents: 'none',

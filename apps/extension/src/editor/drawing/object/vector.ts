@@ -12,6 +12,7 @@ import {
   DRAWING_TEXT_VERTICAL_PADDING,
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextHeight,
+  resolveDrawingTextBackgroundRadii,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
@@ -172,13 +173,23 @@ export function renderEditorDrawingTextBackground(
   context.fillStyle = textbox.textBackgroundColor;
   const left = textbox._getLeftOffset();
   let top = textbox._getTopOffset();
-  textbox._textLines.forEach((_line, index) => {
+  const lines = textbox._textLines.map((_line, index) => {
     const height = textbox.getHeightOfLine(index);
     const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
-    context.beginPath();
-    context.roundRect(left, top, width, height, 3);
-    context.fill();
+    const rect = { left, top, width, height };
     top += height;
+    return rect;
+  });
+  lines.forEach((line, index) => {
+    context.beginPath();
+    context.roundRect(
+      line.left,
+      line.top,
+      line.width,
+      line.height,
+      resolveDrawingTextBackgroundRadii(lines, index)
+    );
+    context.fill();
   });
   context.fillStyle = previousFill;
 }

@@ -18,6 +18,47 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('uses fractional local dimensions for a rotated text draft without another line wrap', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    height: '94px',
+    width: '210.390625px',
+  } as CSSStyleDeclaration);
+  const onChange = vi.fn();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <DrawingTextEditor
+        draft={{
+          autoWidth: true,
+          height: 40,
+          id: null,
+          maxWidth: 640,
+          point: { x: 20, y: 30 },
+          rotation: 45,
+          value: 'A longer first line\nShort\nA final line',
+          width: 80,
+        }}
+        layoutRevision={0}
+        projection={{ x: 0, y: 0 }}
+        style={{ backgroundColor: '#fef08a', color: '#111827', fontFamily: 'sans', fontSize: 24 }}
+        onCancel={vi.fn()}
+        onChange={onChange}
+        onCommit={vi.fn()}
+      />
+    )
+  );
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ height: 94, width: 211 }));
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="content.drawing.text-editor"]')?.style.transform
+  ).toBe('rotate(45deg)');
+  act(() => root.unmount());
+});
+
 it('publishes a changed text draft before it enters shared Drawing history', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const session = createDrawingSession({ onDocumentCommit: () => true });

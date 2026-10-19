@@ -207,9 +207,11 @@ function createDrawingPointerHandlers(args: {
       const draft = pointer.draftRef.current;
       setSelectionDragHidden(isNonTextSelectionDrag(draft));
       textGestureRef.current =
-        (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
-          ? { dragged: false, start: toDrawingScenePoint(event, root) }
-          : null;
+        draft?.kind === 'rotate'
+          ? { dragged: true, start: toDrawingScenePoint(event, root) }
+          : (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
+            ? { dragged: false, start: toDrawingScenePoint(event, root) }
+            : null;
       event.currentTarget.style.cursor = selectionDragHiddenRef.current
         ? 'none'
         : resolveDrawingCanvasHoverCursor({

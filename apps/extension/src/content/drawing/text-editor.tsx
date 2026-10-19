@@ -173,9 +173,13 @@ function useDrawingTextEditorLayout(props: DrawingTextEditorProps) {
     const synchronizeBounds = () => {
       if (!active) return;
       const mirror = mirrorRef.current;
-      const measuredHeight = mirror ? Math.ceil(mirror.getBoundingClientRect().height) : 0;
+      const measuredHeight = mirror
+        ? Math.ceil(parseFloat(getComputedStyle(mirror).height)) || 0
+        : 0;
       const measurer = measurementRef.current;
-      const measuredWidth = measurer ? Math.ceil(measurer.getBoundingClientRect().width) : 0;
+      const measuredWidth = measurer
+        ? Math.ceil(parseFloat(getComputedStyle(measurer).width)) || 0
+        : 0;
       const nextHeight = measuredHeight > 0 ? measuredHeight : draft.height;
       const nextWidth =
         draft.autoWidth && measuredWidth > 0
@@ -209,7 +213,7 @@ function resolveChangedTextDraft(args: {
   const { draft, fontSize, measurementElement, value } = args;
   if (measurementElement) measurementElement.textContent = value || '\u200b';
   const measuredWidth = measurementElement
-    ? Math.ceil(measurementElement.getBoundingClientRect().width)
+    ? Math.ceil(parseFloat(getComputedStyle(measurementElement).width)) || 0
     : 0;
   return {
     ...draft,
