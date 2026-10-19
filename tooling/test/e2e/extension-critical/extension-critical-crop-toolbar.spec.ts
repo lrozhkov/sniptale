@@ -18,10 +18,7 @@ async function openCropWorkspace(
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
   await page.locator('[data-ui="content.toolbar.timer-button"]').click();
-  await page
-    .locator('[data-ui="content.toolbar.timer-menu"]')
-    .getByText('No delay', { exact: true })
-    .click();
+  await page.locator('[data-ui="content.toolbar.timer-menu"]').getByRole('button').first().click();
   const capture = page.locator('[data-ui="content.toolbar.capture-selection-button"]');
   const mainGeometry = await capture.evaluate((button) => ({
     height: button.getBoundingClientRect().height,
@@ -49,37 +46,145 @@ async function noPointerRing(button: Locator) {
   await expect(button).toHaveCSS('outline-style', 'none');
 }
 
+async function restPointer(page: Page, toolbar: Locator) {
+  const bounds = (await toolbar.boundingBox())!;
+  await page.mouse.move(bounds.x + 2, bounds.y + 2);
+}
+
+async function buttonAppearance(button: Locator) {
+  return button.evaluate(async (node) => {
+    await Promise.all(
+      node
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+    const style = getComputedStyle(node);
+    const icon = node.querySelector('svg');
+    return {
+      background: style.backgroundColor,
+      border: style.borderTopColor,
+      color: style.color,
+      radius: style.borderTopLeftRadius,
+      shadow: style.boxShadow,
+      weight: style.fontWeight,
+      stroke: icon ? getComputedStyle(icon).strokeWidth : null,
+      outline: style.outlineStyle,
+    };
+  });
+}
+
+async function choiceAppearance(page: Page, toolbar: Locator, button: Locator) {
+  await restPointer(page, toolbar);
+  const idle = await buttonAppearance(button);
+  await button.hover();
+  const hover = await buttonAppearance(button);
+  await button.click();
+  await restPointer(page, toolbar);
+  const selected = await buttonAppearance(button);
+  await button.hover();
+  const selectedHover = await buttonAppearance(button);
+  return { idle, hover, selected, selectedHover };
+}
+
+async function drawingSemantics(page: Page, toolbar: Locator) {
+  const tools: Record<string, Awaited<ReturnType<typeof choiceAppearance>>> = {};
+  const toolButton = (tool: string) =>
+    toolbar.locator(`[data-ui="content.toolbar.drawing.${tool}"]`);
+  for (const tool of ['select', 'pencil', 'marker', 'text', 'shape', 'arrow', 'blur']) {
+    await toolButton(tool === 'select' ? 'pencil' : 'select').click();
+    tools[tool] = await choiceAppearance(page, toolbar, toolButton(tool));
+  }
+  await toolButton('pencil').click();
+  if ((await toolButton('pencil').getAttribute('aria-expanded')) !== 'true') {
+    await toolButton('pencil').click();
+  }
+  await toolbar.locator('[data-ui="content.toolbar.drawing-options.pencil.width-2"]').click();
+  const property = await choiceAppearance(
+    page,
+    toolbar,
+    toolbar.locator('[data-ui="content.toolbar.drawing-options.pencil.width-4"]')
+  );
+  const options = toolbar
+    .locator('.sniptale-drawing-options-popover')
+    .filter({ has: page.locator('[data-ui="content.toolbar.drawing-options.pencil"]') });
+  const menu = (await options.boundingBox())!;
+  const shell = (await toolbar.boundingBox())!;
+  const gap = Math.max(menu.y - shell.y - shell.height, shell.y - menu.y - menu.height);
+  await toolButton('blur').click();
+  for (const left of [300, 420]) {
+    await page.mouse.move(left, 300);
+    await page.mouse.down();
+    await page.mouse.move(left + 50, 340, { steps: 4 });
+    await page.mouse.up();
+  }
+  const actions: Record<
+    string,
+    {
+      idle: Awaited<ReturnType<typeof buttonAppearance>>;
+      hover: Awaited<ReturnType<typeof buttonAppearance>>;
+    }
+  > = {};
+  for (const action of [
+    'front',
+    'forward',
+    'backward',
+    'back',
+    'duplicate',
+    'delete',
+    'deselect',
+  ]) {
+    const dataUi =
+      action === 'deselect'
+        ? 'content.toolbar.drawing-options.deselect'
+        : `drawing.selection.actions.${action}`;
+    const button = toolbar.locator(`[data-ui="${dataUi}"]`);
+    await restPointer(page, toolbar);
+    const idle = await buttonAppearance(button);
+    await button.hover();
+    actions[action] = { idle, hover: await buttonAppearance(button) };
+  }
+  return { tools, property, actions, gap };
+}
+
 async function checkCaptureChrome(page: Page) {
   const toolbar = page.locator('.sniptale-selection-toolbar');
   const capture = page.locator('.sniptale-selection-size-confirm-button');
   const trigger = page.locator('.sniptale-selection-capture-menu-trigger');
+  await restPointer(page, toolbar);
+  const idle = await Promise.all([capture, trigger].map(buttonAppearance));
+  const geometry = await Promise.all([capture, trigger].map((button) => button.boundingBox()));
+  await expect(capture.locator('.sniptale-selection-capture-action-label')).toHaveCSS(
+    'font-weight',
+    '400'
+  );
+  for (const state of idle) {
+    expect(state.background).toBe('rgba(0, 0, 0, 0)');
+    expect(state.border).toBe('rgba(0, 0, 0, 0)');
+    expect(state.stroke).toBe('1.75px');
+  }
   for (const target of [capture, trigger]) {
     await target.hover();
-    const readChrome = () =>
-      toolbar.evaluate((root) => {
-        const buttons = [
-          '.sniptale-selection-size-confirm-button',
-          '.sniptale-selection-capture-menu-trigger',
-        ];
-        return buttons.map((selector) => {
-          const style = getComputedStyle(root.querySelector(selector)!);
-          return { background: style.backgroundColor, border: style.borderTopColor };
-        });
-      });
-    await expect
-      .poll(async () => {
-        const chrome = await readChrome();
-        return (
-          chrome[0]!.background !== 'rgba(0, 0, 0, 0)' &&
-          chrome[0]!.background === chrome[1]!.background &&
-          chrome[0]!.border === chrome[1]!.border
-        );
-      })
-      .toBe(true);
+    const hovered = await buttonAppearance(target);
+    const neighbor = await buttonAppearance(target === capture ? trigger : capture);
+    expect(hovered.background).toBe('rgba(0, 0, 0, 0)');
+    expect(hovered.border).toBe('rgba(0, 0, 0, 0)');
+    expect(hovered.weight).toBe('450');
+    expect(hovered.stroke).toBe('1.875px');
+    expect(neighbor).toEqual(idle[target === capture ? 1 : 0]);
+    await expect(capture.locator('.sniptale-selection-capture-action-label')).toHaveCSS(
+      'font-weight',
+      target === capture ? '450' : '400'
+    );
+    const current = await Promise.all([capture, trigger].map((button) => button.boundingBox()));
+    for (const index of [0, 1])
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        expect(Math.abs(current[index]![key] - geometry[index]![key])).toBeLessThanOrEqual(1);
+      }
   }
   await trigger.click();
   const menu = page.locator('.sniptale-selection-capture-menu');
   await expect(menu).toBeVisible();
+  expect((await buttonAppearance(trigger)).background).toBe('rgba(0, 0, 0, 0)');
   await expect
     .poll(async () => {
       const shell = (await toolbar.boundingBox())!;
@@ -148,6 +253,7 @@ async function checkToolFocus(
   );
   await marker.click();
   await noPointerRing(marker);
+  if ((await marker.getAttribute('aria-expanded')) !== 'true') await marker.click();
   const option = page.locator('[data-ui="content.toolbar.drawing-options.marker"] button').first();
   await option.click();
   await noPointerRing(option);
@@ -185,10 +291,13 @@ async function checkSelectedPair(
   const toolbar = (await page.locator('.sniptale-selection-toolbar').boundingBox())!;
   expect(overlap((await pair.boundingBox())!, toolbar)).toBeLessThanOrEqual(1);
   const bounds = (await pair.boundingBox())!;
+  const trigger = (await page
+    .locator('[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.blur"]')
+    .boundingBox())!;
   expect(
     Math.min(
-      Math.abs(bounds.y + bounds.height - toolbar.y),
-      Math.abs(bounds.y - toolbar.y - toolbar.height)
+      Math.abs(bounds.y + bounds.height - trigger.y),
+      Math.abs(bounds.y - trigger.y - trigger.height)
     )
   ).toBeCloseTo(10, 0);
 }
@@ -208,9 +317,36 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         theme
       );
       try {
+        await popup.evaluate(
+          async (locale) => {
+            await chrome.storage.local.set({ 'sniptale-locale-preference': locale });
+          },
+          theme === 'dark' ? 'ru' : 'en'
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+        const mainSemantics = await drawingSemantics(
+          page,
+          page.locator('[data-ui="content.toolbar.root"]')
+        );
         await selectCrop(page, { x: 200, y: 220, width: 400, height: 200 });
+        await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+        const cropSemantics = await drawingSemantics(
+          page,
+          page.locator('.sniptale-selection-toolbar')
+        );
+        expect(cropSemantics.tools).toEqual(mainSemantics.tools);
+        expect(cropSemantics.property).toEqual(mainSemantics.property);
+        expect(cropSemantics.actions).toEqual(mainSemantics.actions);
+        expect(Math.abs(cropSemantics.gap - mainSemantics.gap)).toBeLessThanOrEqual(1);
+        for (const action of ['undo', 'redo'])
+          await expect(page.locator(`[data-ui="content.crop.${action}"]`)).toHaveAttribute(
+            'data-command-chrome',
+            'true'
+          );
         await checkCaptureChrome(page);
         await checkDimensionField(page);
+        await checkCaptureChrome(page);
         await checkToolFocus(page, mainGeometry);
         await page.mouse.move(viewport.width - 20, viewport.height - 20);
         await page.screenshot({
@@ -230,6 +366,9 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           await page.screenshot({ path: info.outputPath('crop-toolbar-960.png'), fullPage: false });
         }
       } finally {
+        await popup.evaluate(async () => {
+          await chrome.storage.local.set({ 'sniptale-locale-preference': 'en' });
+        });
         await popup.close();
         await page.close();
       }
@@ -276,14 +415,15 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width - 7);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height - 7);
         const shell = (await toolbar.boundingBox())!;
+        const trigger = (await pencil.boundingBox())!;
         if (scenario === 'top') {
           expect(overlap(bounds, crop)).toBeLessThanOrEqual(1);
           expect(bounds.y).toBeGreaterThan(shell.y + shell.height);
         }
         expect(
           Math.min(
-            Math.abs(bounds.y + bounds.height - shell.y),
-            Math.abs(bounds.y - shell.y - shell.height)
+            Math.abs(bounds.y + bounds.height - trigger.y),
+            Math.abs(bounds.y - trigger.y - trigger.height)
           )
         ).toBeCloseTo(10, 0);
         expect(

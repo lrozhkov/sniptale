@@ -96,10 +96,35 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
   }
 
   .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
-    .sniptale-selection-capture-split-action:hover button:not(:disabled) {
-    border-color: var(--sniptale-color-border-soft);
-    background: var(--sniptale-color-surface-hover);
+    :is(.sniptale-selection-size-confirm-button, .sniptale-selection-capture-menu-trigger) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: var(--sniptale-color-text-primary);
+    font-weight: var(--sniptale-control-font-weight);
+  }
+
+  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
+    :is(.sniptale-selection-size-confirm-button, .sniptale-selection-capture-menu-trigger)
+    svg {
+    stroke-width: var(--sniptale-control-icon-stroke);
+  }
+
+  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
+    :is(
+      .sniptale-selection-size-confirm-button,
+      .sniptale-selection-capture-menu-trigger
+    ):is(:hover, :focus-visible):not(:disabled) {
     color: var(--sniptale-color-text-primary-strong);
+    font-weight: var(--sniptale-control-font-weight-hover);
+  }
+
+  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
+    :is(
+      .sniptale-selection-size-confirm-button,
+      .sniptale-selection-capture-menu-trigger
+    ):is(:hover, :focus-visible):not(:disabled) svg {
+    stroke-width: var(--sniptale-control-icon-stroke-hover);
   }
 
   .sniptale-selection-toolbar .sniptale-content-size-tooltip-stepper {
@@ -114,15 +139,6 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     padding: 0 8px;
     border-color: var(--sniptale-color-border-strong) !important;
     box-shadow: none !important;
-  }
-
-  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
-    .sniptale-selection-size-confirm-button:hover:not(:disabled),
-  .sniptale-selection-toolbar.sniptale-content-size-tooltip[data-variant='frame-edit']
-    .sniptale-selection-size-confirm-button:focus-visible {
-    border-color: var(--sniptale-color-border-soft);
-    background: var(--sniptale-color-surface-hover);
-    color: var(--sniptale-color-text-primary-strong);
   }
 
   .sniptale-selection-toolbar button:focus-visible {

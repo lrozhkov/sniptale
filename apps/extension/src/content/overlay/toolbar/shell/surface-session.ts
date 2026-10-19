@@ -21,7 +21,7 @@ export async function refreshToolbarSurfaceSession() {
   });
   if (status?.success) {
     const applied = updateBinding({
-      token: status.enabled ? (status.surfaceCapabilityToken ?? null) : null,
+      token: status.enabled ? status.surfaceCapabilityToken : null,
       ...(status.surfaceLeaseGeneration === undefined
         ? {}
         : { leaseGeneration: status.surfaceLeaseGeneration }),

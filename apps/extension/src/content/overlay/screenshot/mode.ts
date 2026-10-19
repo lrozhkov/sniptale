@@ -269,6 +269,13 @@ export function prepareScreenshotMode(
 ): void {
   session.preparationBaseline =
     startContext.preparationBaseline ?? session.preparationBaseline ?? null;
+  if (session.preparationBaseline && !startContext.preparationBaseline) {
+    session.preparationBaseline = {
+      ...session.preparationBaseline,
+      editingMode: resolveEditingModeBaseline(params.editingModes),
+      navigationLockEnabled: params.navigationLockEnabled,
+    };
+  }
   session.editingModeBaseline =
     type === 'selection'
       ? (session.preparationBaseline?.editingMode ??

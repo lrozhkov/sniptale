@@ -22,7 +22,7 @@ export function useToolbarViewportStatus(params: {
         if (disposed) return;
         if (response?.success) {
           const applied = updateBinding({
-            token: response.enabled ? (response.surfaceCapabilityToken ?? null) : null,
+            token: response.enabled ? response.surfaceCapabilityToken : null,
             ...(response.surfaceLeaseGeneration === undefined
               ? {}
               : { leaseGeneration: response.surfaceLeaseGeneration }),

@@ -69,6 +69,44 @@ afterEach(() => {
 });
 
 describe('useToolbarViewportStatus', () => {
+  it('ignores an unbound status after a newer preparation binding', async () => {
+    let resolveStatus!: (response: { success: true; enabled: true }) => void;
+    viewportStatusMocks.sendRuntimeMessage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveStatus = resolve;
+      })
+    );
+    setScreenshotSurfaceBinding({ token: 'startup-token', operationGeneration: 1 });
+    const setCurrentViewport = vi.fn();
+    await renderElement(<ViewportStatusHarness setCurrentViewport={setCurrentViewport} />);
+    setScreenshotSurfaceBinding({ token: 'replacement-token', operationGeneration: 8 });
+    await act(async () => resolveStatus({ success: true, enabled: true }));
+    expect(getScreenshotSurfaceCapabilityToken()).toBe('replacement-token');
+    expect(setCurrentViewport).not.toHaveBeenCalled();
+  });
+
+  it('preserves the minted binding when enabled status has not bound its document', async () => {
+    setScreenshotSurfaceBinding({
+      token: 'startup-token',
+      leaseGeneration: 3,
+      operationGeneration: 4,
+    });
+    viewportStatusMocks.sendRuntimeMessage.mockResolvedValueOnce({
+      success: true,
+      enabled: true,
+      viewport: { width: 640, height: 480 },
+    });
+    const setCurrentViewport = vi.fn();
+    await renderElement(<ViewportStatusHarness setCurrentViewport={setCurrentViewport} />);
+    expect(createDisableScreenshotModeRequest()).toEqual({
+      type: MessageType.DISABLE_SCREENSHOT_MODE,
+      surfaceCapabilityToken: 'startup-token',
+      leaseGeneration: 3,
+      operationGeneration: 5,
+    });
+    expect(setCurrentViewport).toHaveBeenCalledWith({ width: 640, height: 480 });
+  });
+
   it('ignores a status response after its toolbar unmounts', async () => {
     let resolveStatus!: (response: { success: true; enabled: false }) => void;
     viewportStatusMocks.sendRuntimeMessage.mockReturnValueOnce(

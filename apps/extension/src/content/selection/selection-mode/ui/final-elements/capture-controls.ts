@@ -49,7 +49,7 @@ function configureCaptureActionButton(
   copy.textContent = label;
   Object.assign(copy.style, {
     fontSize: '12px',
-    fontWeight: '500',
+    fontWeight: 'inherit',
     lineHeight: '1.2',
     whiteSpace: 'nowrap',
   });

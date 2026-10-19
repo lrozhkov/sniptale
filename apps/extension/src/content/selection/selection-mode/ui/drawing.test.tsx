@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, useEffect } from 'react';
+import { act, useContext, useEffect } from 'react';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
@@ -102,7 +103,10 @@ vi.mock('../../../overlay/toolbar/controls/drawing', () => ({
   }) => {
     state.resolveMenuLayout = props.owner.resolveMenuLayout;
     return (
-      <div data-tools-placement={props.owner.preferredMenuPlacement}>
+      <div
+        data-tools-placement={props.owner.preferredMenuPlacement}
+        data-command-scope={String(useContext(CommandPressScope))}
+      >
         {props.owner.renderActions?.(props.controller.session.getSnapshot())}
       </div>
     );
@@ -142,15 +146,15 @@ const menuPlacementCases = [
     crop: [300, 200, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+    style: { left: -20, right: 'auto', top: 42, bottom: 'auto' },
   },
   {
     placement: 'up',
-    toolbar: [300, 500, 200, 50],
-    crop: [300, 400, 200, 90],
+    toolbar: [300, 520, 200, 50],
+    crop: [300, 420, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 42 },
   },
   {
     placement: 'up',
@@ -158,7 +162,7 @@ const menuPlacementCases = [
     crop: [300, 360, 200, 200],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 42 },
   },
   {
     placement: 'down',
@@ -166,7 +170,7 @@ const menuPlacementCases = [
     crop: [300, 8, 200, 100],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+    style: { left: -20, right: 'auto', top: 42, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -314,6 +318,19 @@ function setup(initialDrawing = false) {
 }
 
 describe('crop remembered drawing mode', () => {
+  it('adopts the normal drawing command scope and removes shell adoption on disposal', () => {
+    const { runtime, tooltip, toggle } = setup();
+    toggle();
+    expect(tooltip.root.classList.contains('sniptale-content-toolbar-adopted')).toBe(true);
+    expect(tooltip.root.querySelector('[data-command-scope="true"]')).not.toBeNull();
+    for (const action of ['undo', 'redo']) {
+      const button = tooltip.root.querySelector(`[data-ui="content.crop.${action}"]`)!;
+      expect(button.hasAttribute('data-command-press')).toBe(true);
+      expect(button.getAttribute('data-command-chrome')).toBe('true');
+    }
+    act(() => runtime.dispose());
+    expect(tooltip.root.classList.contains('sniptale-content-toolbar-adopted')).toBe(false);
+  });
   it('applies remembered Drawing only when the final toolbar attaches without saving hydration', () => {
     const container = document.createElement('div');
     document.body.append(container);

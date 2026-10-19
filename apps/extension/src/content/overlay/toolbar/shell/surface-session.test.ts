@@ -26,6 +26,45 @@ function deferredStatus() {
 }
 
 describe('toolbar surface status ordering', () => {
+  it('preserves startup authority when enabled status omits an unbound token', async () => {
+    setScreenshotSurfaceBinding({
+      token: 'startup-token',
+      leaseGeneration: 3,
+      operationGeneration: 4,
+    });
+    sendRuntimeMessage.mockResolvedValueOnce({ success: true, enabled: true });
+    expect(await refreshToolbarSurfaceSession()).toMatchObject({ success: true, enabled: true });
+    expect(createDisableScreenshotModeRequest()).toMatchObject({
+      surfaceCapabilityToken: 'startup-token',
+      leaseGeneration: 3,
+      operationGeneration: 5,
+    });
+  });
+
+  it('does not mint authority from an enabled status without a token', async () => {
+    setScreenshotSurfaceBinding({ token: null });
+    sendRuntimeMessage.mockResolvedValueOnce({ success: true, enabled: true });
+    await refreshToolbarSurfaceSession();
+    expect(getScreenshotSurfaceCapabilityToken()).toBeNull();
+  });
+
+  it('retires the current binding when status explicitly disables preparation', async () => {
+    sendRuntimeMessage.mockResolvedValueOnce({ success: true, enabled: false });
+    await refreshToolbarSurfaceSession();
+    expect(getScreenshotSurfaceCapabilityToken()).toBeNull();
+  });
+
+  it('rejects an unbound status superseded by a newer binding', async () => {
+    const status = deferredStatus();
+    setScreenshotSurfaceBinding({ token: 'replacement-token', operationGeneration: 8 });
+    status.resolve({ success: true, enabled: true });
+    expect(await status.pending).toBeUndefined();
+    expect(createDisableScreenshotModeRequest()).toMatchObject({
+      surfaceCapabilityToken: 'replacement-token',
+      operationGeneration: 9,
+    });
+  });
+
   it.each([false, true])('ignores an old %s status after a newer binding', async (enabled) => {
     const status = deferredStatus();
     setScreenshotSurfaceBinding({ token: 'replacement-token', operationGeneration: 8 });

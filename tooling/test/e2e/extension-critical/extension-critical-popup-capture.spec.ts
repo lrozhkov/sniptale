@@ -119,9 +119,10 @@ async function triggerCapture(
   tabId: number,
   entry: CaptureEntry,
   mode: CaptureMode,
-  delay = 0
+  delay = 0,
+  afterCapture: ScreenshotCaptureConfig['afterCapture'] = 'download_default'
 ) {
-  const config = { ...captureConfig(mode), delay };
+  const config = { ...captureConfig(mode), delay, afterCapture };
   if (entry === 'home') {
     return sendPopupCommand(popup, { type: 'TRIGGER_SCREENSHOT_CAPTURE', tabId, config });
   }
@@ -267,6 +268,91 @@ async function attachDiagnostics(info: TestInfo, popup: Page, tabId: number, mes
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop output actions retain preparation without conflicting feedback at ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(180_000);
+    const errors: string[] = [];
+    context.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    const { page, popup, tabId } = await openCapturePage(
+      context,
+      extensionId,
+      hostOrigin,
+      viewport.size
+    );
+    try {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: hostOrigin });
+      await enableToolbar(popup, page, tabId);
+      for (const afterCapture of [
+        'copy',
+        'download_default',
+        'ask_system',
+        'save_to_library',
+        'ask_preset',
+        'edit',
+      ] as const) {
+        const beforeDownloads = await completedDownloads(popup);
+        if (afterCapture === 'copy')
+          await page.evaluate(() => navigator.clipboard.writeText('Crop clipboard proof'));
+        const editorOpened = afterCapture === 'edit' ? context.waitForEvent('page') : undefined;
+        expect(
+          await triggerCapture(popup, tabId, 'home', 'selection', 0, afterCapture)
+        ).toMatchObject({
+          success: true,
+          result: 'accepted',
+        });
+        await finishSelection(page);
+        await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+        if (afterCapture === 'copy') {
+          await expect
+            .poll(() =>
+              page.evaluate(async () => {
+                const items = await navigator.clipboard.read();
+                return items.some((item) => item.types.includes('image/png'));
+              })
+            )
+            .toBe(true);
+        } else if (afterCapture === 'download_default' || afterCapture === 'ask_system') {
+          await expect
+            .poll(() => completedDownloads(popup), { timeout: 45_000 })
+            .toBe(beforeDownloads + 1);
+        } else if (afterCapture === 'ask_preset') {
+          const dialog = page.getByRole('dialog');
+          await expect(dialog).toBeVisible();
+          await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+        } else if (editorOpened) {
+          const editor = await editorOpened;
+          await editor.waitForURL(/editor/);
+          await editor.close();
+          await page.bringToFront();
+        } else {
+          await expect(page.locator('[data-ui="shared.toast.host"] [role="status"]')).toBeVisible();
+        }
+        await expect(page.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+        if (afterCapture === 'copy') await createRetainedDrawing(page);
+        await checkRetainedDrawing(page);
+        await expect(page.locator('[data-ui="shared.toast.host"] [role="alert"]')).toHaveCount(0);
+        expect(
+          errors.filter((message) =>
+            /Screenshot surface|Selection error|Screenshot error/.test(message)
+          )
+        ).toEqual([]);
+        await page.screenshot({
+          path: info.outputPath(`crop-${afterCapture}.png`),
+          fullPage: false,
+        });
+      }
+    } finally {
+      await attachDiagnostics(info, popup, tabId, errors);
+      await popup.close();
+      await page.close();
+    }
+  });
+
   for (const entry of ['home', 'quick-action'] as const) {
     for (const mode of ['visible', 'selection', 'full'] as const) {
       test(`${entry} ${mode} capture preserves an existing toolbar and drawing at ${viewport.name}`, async ({

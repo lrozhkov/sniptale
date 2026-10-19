@@ -232,6 +232,78 @@ function expectStaleQuickActionCloseDoesNotRestoreLock() {
   expect(params.quickActionOverlayRef.current).not.toBeNull();
 }
 
+describe('screenshot-controller retained preparation mode', () => {
+  it('preserves the explicit baseline carried by a queued borrowed capture', () => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    const preparationBaseline = {
+      captureAction: 'edit' as const,
+      timerDelay: 7,
+      isToolbarVisible: true,
+      navigationLockEnabled: false,
+      editingMode: 'drawing' as const,
+    };
+    prepareScreenshotMode(params, runtime.session, 'selection', { preparationBaseline });
+    expect(runtime.session.preparationBaseline).toBe(preparationBaseline);
+    expect(runtime.session.editingModeBaseline).toBe('drawing');
+  });
+
+  it.each([
+    'cursor',
+    'design-review',
+    'highlighter',
+    'quick-edit',
+    'quick-edit-document',
+    'ai-pick',
+    'drawing',
+  ])('uses the current main %s mode for Crop after a failed borrowed release', async (mode) => {
+    const params = createScreenshotParams();
+    const runtime = createScreenshotRuntime();
+    Object.assign(params.quickActionOverlayRef.current!, { transactionId: 'capture-1' });
+    Object.assign(runtime.session, {
+      preparationBaseline: {
+        captureAction: 'edit',
+        timerDelay: 7,
+        isToolbarVisible: true,
+        navigationLockEnabled: false,
+        editingMode: 'drawing',
+      },
+      editingModeBaseline: 'drawing',
+    });
+    sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'Release failed' });
+    await expect(closeQuickActionCapture(params, runtime, 1)).rejects.toThrow('Release failed');
+    vi.mocked(runtime.restoreEditingMode).mockClear();
+    params.navigationLockEnabled = mode !== 'cursor' && mode !== 'drawing';
+    Object.assign(params.editingModes, {
+      drawingMode: mode === 'drawing',
+      designReviewMode: mode === 'design-review',
+      highlighterMode: mode === 'highlighter',
+      quickEditMode: mode === 'quick-edit' || mode === 'quick-edit-document',
+      quickEditDocumentMode: mode === 'quick-edit-document',
+      aiPickMode: mode === 'ai-pick',
+    });
+    prepareScreenshotMode(params, runtime.session, 'selection');
+    expect(runtime.session.editingModeBaseline).toBe(mode === 'cursor' ? null : mode);
+    expect(runtime.session.navigationLockBaseline).toBe(params.navigationLockEnabled);
+    sendRuntimeMessageMock.mockImplementation(async (request) =>
+      request.type === 'SCREENSHOT_MODE_STATUS'
+        ? { success: true, enabled: true, surfaceCapabilityToken: 'surface-token' }
+        : { success: true }
+    );
+    await closeQuickActionCapture(params, runtime, 1);
+    if (mode === 'cursor') expect(runtime.restoreEditingMode).not.toHaveBeenCalled();
+    else expect(runtime.restoreEditingMode).toHaveBeenCalledExactlyOnceWith(mode);
+    expect(params.setScreenshotMode).not.toHaveBeenCalledWith(false);
+    expect(runtime.setNavigationLockEnabled).toHaveBeenLastCalledWith(params.navigationLockEnabled);
+    expect(params.quickActionOverlayRef.current).toBeNull();
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quickActionTransactionId: 'capture-1',
+      })
+    );
+  });
+});
+
 describe('screenshot-controller-mode', () => {
   it('authorizes scoped cleanup before querying a session that has not bound its document', async () => {
     const params = createScreenshotParams();

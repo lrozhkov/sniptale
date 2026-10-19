@@ -3,6 +3,7 @@ import { useEffect, useReducer } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import {
   projectClientRectToContentUi,
   readContentUiScaleCompensation,
@@ -33,8 +34,8 @@ const resolveCropDrawingMenuLayout: NonNullable<
     clientHeight: window.innerHeight,
     scale,
   });
-  const above = toolbarRect.y - 18;
-  const below = viewport.height - toolbarRect.y - toolbarRect.height - 18;
+  const above = anchorRect.y - 18;
+  const below = viewport.height - anchorRect.y - anchorRect.height - 18;
   const frame = toolbar
     .closest('.sniptale-selection-container')
     ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
@@ -43,8 +44,8 @@ const resolveCropDrawingMenuLayout: NonNullable<
     : null;
   const left = Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8));
   const adjacentPositions = [
-    { placement: 'up', top: toolbarRect.y - menuHeight - 10, fits: above >= menuHeight },
-    { placement: 'down', top: toolbarRect.y + toolbarRect.height + 10, fits: below >= menuHeight },
+    { placement: 'up', top: anchorRect.y - menuHeight - 10, fits: above >= menuHeight },
+    { placement: 'down', top: anchorRect.y + anchorRect.height + 10, fits: below >= menuHeight },
   ] as const;
   const clearPosition = cropRect
     ? adjacentPositions.find(
@@ -64,9 +65,7 @@ const resolveCropDrawingMenuLayout: NonNullable<
     y: Math.min(
       Math.max(
         8,
-        placement === 'up'
-          ? toolbarRect.y - menuHeight - 10
-          : toolbarRect.y + toolbarRect.height + 10
+        placement === 'up' ? anchorRect.y - menuHeight - 10 : anchorRect.y + anchorRect.height + 10
       ),
       Math.max(8, viewport.height - menuHeight - 8)
     ),
@@ -119,6 +118,7 @@ function DrawingToolbar(props: {
       <>
         <ContentToolbarButton
           type="button"
+          tone="utility"
           disabled={!history.canUndo && !pendingText}
           aria-label={translate('editor.toolbar.undo')}
           title={translate('editor.toolbar.undo')}
@@ -129,6 +129,7 @@ function DrawingToolbar(props: {
         </ContentToolbarButton>
         <ContentToolbarButton
           type="button"
+          tone="utility"
           disabled={!history.canRedo || pendingText}
           aria-label={translate('editor.toolbar.redo')}
           title={translate('editor.toolbar.redo')}
@@ -218,7 +219,7 @@ export function createCropDrawingView(options: {
       layer.style.pointerEvents = state.drawing ? 'auto' : 'none';
       flushSync(() => {
         root.render(
-          <>
+          <CommandPressScope value={true}>
             <DrawingSurface
               controller={options.controller}
               active={state.drawing}
@@ -236,7 +237,7 @@ export function createCropDrawingView(options: {
                 onModeChange={options.onModeChange}
               />
             ) : null}
-          </>
+          </CommandPressScope>
         );
       });
     },

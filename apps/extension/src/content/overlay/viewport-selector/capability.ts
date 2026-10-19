@@ -35,9 +35,12 @@ export function setScreenshotSurfaceBinding(args: ScreenshotSurfaceBinding): voi
 
 export function createScreenshotSurfaceStatusBindingUpdater() {
   const revision = surfaceBindingRevision;
-  return (binding: ScreenshotSurfaceBinding): boolean => {
+  return (
+    binding: Omit<ScreenshotSurfaceBinding, 'token'> & { token: string | null | undefined }
+  ): boolean => {
     if (revision !== surfaceBindingRevision) return false;
-    setScreenshotSurfaceBinding(binding);
+    if (binding.token === undefined) return true;
+    setScreenshotSurfaceBinding({ ...binding, token: binding.token });
     return true;
   };
 }

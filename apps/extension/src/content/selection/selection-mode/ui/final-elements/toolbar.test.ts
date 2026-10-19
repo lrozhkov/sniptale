@@ -51,6 +51,15 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 720 });
 });
 
+it('lets the capture label inherit quiet command weight for hover changes', () => {
+  const { tooltip } = createToolbar();
+  const label = tooltip.confirmButton.querySelector<HTMLElement>(
+    '.sniptale-selection-capture-action-label'
+  );
+  expect(label?.textContent).toBe('Download');
+  expect(label?.style.fontWeight).toBe('inherit');
+});
+
 function createToolbar(
   selection = { x: 20, y: 20, width: 100, height: 80 },
   mountInto: HTMLElement | ShadowRoot = document.body,

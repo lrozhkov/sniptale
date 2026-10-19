@@ -10,6 +10,8 @@ import { createCropDrawingView } from './drawing-view';
 import { createCropDrawingHistory } from './drawing-history';
 
 function mountCropToolbarSlots(tooltip: ContentSizeTooltipDom) {
+  const wasAdopted = tooltip.root.classList.contains('sniptale-content-toolbar-adopted');
+  tooltip.root.classList.add('sniptale-content-toolbar-adopted');
   const sizingChildren = Array.from(tooltip.root.children).filter(
     (element) => element !== tooltip.actions
   );
@@ -36,6 +38,7 @@ function mountCropToolbarSlots(tooltip: ContentSizeTooltipDom) {
       tooltip.root.dataset['cropMode'] = drawing ? 'drawing' : 'resize';
     },
     dispose() {
+      if (!wasAdopted) tooltip.root.classList.remove('sniptale-content-toolbar-adopted');
       mode.remove();
       controls.remove();
       resize.replaceWith(...Array.from(resize.childNodes));

@@ -90,7 +90,10 @@ async function checkKeyboardDrawingMenuGap(page: Page) {
         ? menuBounds.y + menuBounds.height - toolbarBounds.y
         : Infinity;
     })
-    .toBeLessThanOrEqual(-9);
+    .toBeLessThanOrEqual(0);
+  const menuBounds = (await options.boundingBox())!;
+  const toolbarBounds = (await toolbar.boundingBox())!;
+  expect(menuBounds.y + menuBounds.height - toolbarBounds.y).toBeGreaterThanOrEqual(-2);
 }
 
 async function checkCropUndoRedo(page: Page) {
@@ -125,6 +128,51 @@ async function checkCropUndoRedo(page: Page) {
 }
 
 for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop drawing preserves the independent main mode at ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(180_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    try {
+      for (const mode of ['cursor', 'design-review', 'highlighter', 'quick-edit', 'drawing']) {
+        for (const exit of ['escape', 'cancel']) {
+          const trigger = page.locator('[data-ui="content.toolbar.mode-selector-button"]');
+          await trigger.click();
+          await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+          const label = await trigger.getAttribute('aria-label');
+          await openImmediateCrop(page);
+          await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+          await page
+            .locator(
+              '[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.pencil"]'
+            )
+            .click();
+          await stroke(page, { x: 550, y: 300 }, { x: 780, y: 320 });
+          if (exit === 'cancel') {
+            await page.locator('.sniptale-selection-size-cancel-button').click();
+          } else {
+            for (
+              let attempt = 0;
+              attempt < 5 && (await page.locator('.sniptale-selection-container').count());
+              attempt++
+            ) {
+              await page.keyboard.press('Escape');
+            }
+          }
+          await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+          await expect(trigger).toHaveAttribute('aria-label', label!);
+          await expect(page.locator('[data-ui="content.crop.drawing-layer"]')).toHaveCount(0);
+          await page.screenshot({ path: info.outputPath(`${mode}-${exit}.png`), fullPage: false });
+        }
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+
   test(`Crop remembers its mode and restores normal drawing at ${viewport.width}`, async ({
     hostOrigin,
   }, info) => {
