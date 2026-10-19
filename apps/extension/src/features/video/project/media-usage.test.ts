@@ -123,3 +123,20 @@ it('counts dormant source-bound documents without treating provenance as an asse
   ]);
   expect([...getProjectAssetUseCounts(project)]).toEqual([['source', 1]]);
 });
+
+it('protects dormant scene images without counting the same active image twice', () => {
+  const project = createEmptyVideoProject();
+  project.sceneBackground = {
+    kind: 'solid',
+    color: '#123456',
+    remembered: { image: { kind: 'image', assetId: 'retained', imageFit: 'contain' } },
+  };
+  expect([...getProjectAssetUseCounts(project)]).toEqual([['retained', 1]]);
+  project.sceneBackground = { ...project.sceneBackground, kind: 'image', assetId: 'retained' };
+  expect([...getProjectAssetUseCounts(project)]).toEqual([['retained', 1]]);
+  project.sceneBackground = { ...project.sceneBackground, assetId: 'other' };
+  expect([...getProjectAssetUseCounts(project)]).toEqual([
+    ['other', 1],
+    ['retained', 1],
+  ]);
+});

@@ -18,7 +18,10 @@ it('preserves canonical preset geometry, color space, stop identity and animatio
       animation: { mode: 'breathe', speed: 42, intensity: 24 },
     };
     const project = syncProjectSceneBackground({ backgroundColor: '#000000' }, background);
-    expect(getProjectSceneBackground(project)).toEqual(background);
+    expect(getProjectSceneBackground(project)).toEqual({
+      ...background,
+      remembered: { solid: { kind: 'solid', color: '#000000' } },
+    });
   }
 });
 

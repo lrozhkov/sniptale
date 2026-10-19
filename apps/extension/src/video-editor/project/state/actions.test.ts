@@ -473,3 +473,33 @@ it('retains dormant source text when removing unused materials through the proje
   expect(cleaned.textDocuments).toEqual(project.textDocuments);
   expect(isExportReadyVideoProject(cleaned)).toBe(true);
 });
+
+it('keeps a dormant background image through unused cleanup and history', () => {
+  const store = createVideoEditorTestStore();
+  const source = createVideoAsset('Background');
+  const retained = {
+    ...source,
+    type: 'IMAGE' as const,
+    metadata: { ...source.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const unused = { ...retained, id: 'unused-image' };
+  store.getState().setProject({
+    ...createEmptyVideoProject('Retained background'),
+    version: 14,
+    assets: [retained, unused],
+    sceneBackground: {
+      kind: 'solid',
+      color: '#123456',
+      remembered: { image: { kind: 'image', assetId: retained.id, imageFit: 'contain' } },
+    },
+  });
+  const before = store.getState().project!;
+  store.getState().removeUnusedAssets();
+  const after = store.getState().project!;
+  expect(after.assets).toEqual([retained]);
+  expect(after.sceneBackground).toEqual(before.sceneBackground);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.assets).toEqual([retained, unused]);
+});

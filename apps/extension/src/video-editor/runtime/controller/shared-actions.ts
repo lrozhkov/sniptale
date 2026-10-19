@@ -1,10 +1,14 @@
+import { parseSceneBackgroundSettings } from '../../../features/video/project/scene/background-settings';
 import { getMotionInsertionRange } from '../../../features/video/project/motion/placement';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { bindMotionRegionToUniqueVideo } from '../../../features/video/project/motion/source-binding';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
-import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
+import {
+  syncProjectSceneBackground,
+  getProjectSceneBackground,
+} from '../../../features/video/project/scene/background';
 import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
 import {
   VideoCursorCaptureMode,
@@ -264,10 +268,29 @@ function createProjectPresentationUpdaters(store: WorkspaceProjectUpdaterStore) 
       }));
     },
     setSceneBackground(sceneBackground: VideoProjectSceneBackground) {
-      store.updateProject((project) => ({
-        ...project,
-        ...syncProjectSceneBackground(project, sceneBackground),
-      }));
+      const parsed = parseSceneBackgroundSettings(sceneBackground);
+      if (!parsed) return;
+      store.updateProject((project) => {
+        const next = syncProjectSceneBackground(project, parsed);
+        const imageIds = [
+          ...(next.sceneBackground.kind === 'image' ? [next.sceneBackground.assetId] : []),
+          ...(next.sceneBackground.remembered?.image
+            ? [next.sceneBackground.remembered.image.assetId]
+            : []),
+        ];
+        if (
+          imageIds.some(
+            (id) => !project.assets.some((asset) => asset.id === id && asset.type === 'IMAGE')
+          )
+        )
+          return project;
+        if (
+          JSON.stringify(next.sceneBackground) ===
+          JSON.stringify(getProjectSceneBackground(project))
+        )
+          return project;
+        return { ...project, ...next };
+      });
     },
     setTimelinePlacementMode(timelinePlacementMode: VideoTimelinePlacementMode) {
       store.updateProject((project) => ({

@@ -1,5 +1,30 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-background-variants',
+    productionFile: 'apps/extension/src/features/video/project/scene/background-settings.ts',
+    allowCrossOwner: true,
+    reason: 'Scene variants affect project admission, history, resources and both render adapters.',
+    testFiles: [
+      'apps/extension/src/features/video/project/scene/background-settings.test.ts',
+      'apps/extension/src/features/video/project/library-source-removal.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+      'apps/extension/src/features/video/project/media-usage.test.ts',
+      'apps/extension/src/video-editor/project/state/actions.test.ts',
+      'apps/extension/src/features/video/project/scene/background.test.ts',
+      'apps/extension/src/features/video/project/scene/background-gradient.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/validation/project.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/shared-actions.test.ts',
+      'apps/extension/src/video-editor/runtime/commands/assets.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.test.tsx',
+      'apps/extension/src/composition/persistence/projects/index.save.test.ts',
+      'apps/extension/src/composition/persistence/media-library/dependencies.test.ts',
+      'apps/extension/src/offscreen/project-export/media-loading/image.test.ts',
+    ],
+  },
+  {
     owner: 'camera-source-geometry',
     productionFile:
       'apps/extension/src/features/video/composition/motion/camera-source-geometry.ts',

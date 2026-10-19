@@ -21,6 +21,14 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   if (project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE) {
     uses.push({ assetId: project.sceneBackground.assetId, kind: 'scene' });
   }
+  const rememberedImage = project.sceneBackground?.remembered?.image;
+  if (
+    rememberedImage &&
+    (project.sceneBackground?.kind !== VideoSceneBackgroundKind.IMAGE ||
+      rememberedImage.assetId !== project.sceneBackground.assetId)
+  ) {
+    uses.push({ assetId: rememberedImage.assetId, kind: 'scene' });
+  }
   for (const track of project.objectTracks ?? []) {
     if (track.analysis)
       uses.push({

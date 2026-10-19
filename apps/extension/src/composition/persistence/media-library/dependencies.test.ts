@@ -127,3 +127,26 @@ it('retains canonical scenario identity after its published root bytes are repla
     )
   ).toBe(true);
 });
+
+it('retains dormant background sources and refuses schema fourteen deletion shortcuts', () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const retained = {
+    ...entry,
+    project: {
+      ...entry.project,
+      version: 14,
+      sceneBackground: {
+        kind: 'solid',
+        color: '#123456',
+        remembered: {
+          image: { kind: 'image', assetId: entry.project.assets[0]!.id, imageFit: 'contain' },
+        },
+      },
+    },
+  };
+  expect(videoEntryIsUnrelated(retained, targets.recording, new Set())).toBe(false);
+  expect(videoEntryIsUnrelated(retained, targets.screenshot, new Set())).toBe(false);
+  expect(
+    videoSourceUsesMedia({ kind: 'recording', recordingId: 'record' }, targets.recording, new Set())
+  ).toBe(true);
+});

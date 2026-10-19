@@ -1,3 +1,4 @@
+import { saveVideoProject } from './index';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   VideoProjectAssetType,
@@ -116,7 +117,6 @@ beforeEach(() => {
 });
 
 it('journals removed project-owned assets while saving without revoking mounted Undo sources', async () => {
-  const { saveVideoProject } = await import('./index');
   const existingProject = createVideoProject({
     assets: [createProjectOwnedVideoAsset('asset-a'), createProjectOwnedVideoAsset('asset-b')],
   });
@@ -614,4 +614,42 @@ it('commits and re-admits authored text without replacing its shared gallery doc
       project: expect.objectContaining({ textDocuments: project.textDocuments, version: 5 }),
     })
   );
+});
+
+it('saves dormant background images with the existing asset graph without scheduling their deletion', async () => {
+  const { saveVideoProject } = await import('./index');
+  const base = createProjectOwnedVideoAsset('background');
+  const image: VideoProjectAsset = {
+    ...base,
+    type: VideoProjectAssetType.IMAGE,
+    metadata: { ...base.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const project = createVideoProject({
+    version: 14,
+    assets: [image],
+    sceneBackground: {
+      kind: 'solid',
+      color: '#123456',
+      remembered: { image: { kind: 'image', assetId: image.id, imageFit: 'contain' } },
+    },
+  });
+  const before = structuredClone(project);
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === project.id ? createVideoProjectEntry(project) : undefined
+  );
+  await saveVideoProject(project);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({
+        version: 14,
+        assets: [image],
+        sceneBackground: project.sceneBackground,
+      }),
+    })
+  );
+  expect(
+    projectsDbMocks.txPutMock.mock.calls.flat().some((entry) => entry?.kind === 'physical-delete')
+  ).toBe(false);
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(project).toEqual(before);
 });

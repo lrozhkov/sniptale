@@ -1,8 +1,8 @@
+import { parseSceneBackgroundSettings, retainSceneBackgroundVariants } from './background-settings';
 import { DEFAULT_VIDEO_PROJECT_BACKGROUND } from '../defaults';
 import {
   drawGradientSceneBackground,
   getSceneGradientLegacyColor,
-  normalizeGradientSceneBackground,
   resolveGradientSceneBackgroundFrame,
 } from './background-gradient';
 import {
@@ -26,31 +26,28 @@ function normalizeSceneBackground(
     return createFallbackSolidBackground(fallbackColor);
   }
 
-  switch (sceneBackground.kind) {
-    case VideoSceneBackgroundKind.SOLID:
-      return createFallbackSolidBackground(sceneBackground.color || fallbackColor);
-    case VideoSceneBackgroundKind.GRADIENT:
-      return normalizeGradientSceneBackground(sceneBackground);
-    case VideoSceneBackgroundKind.IMAGE:
-      return sceneBackground.assetId
-        ? sceneBackground
-        : createFallbackSolidBackground(fallbackColor);
-  }
+  const parsed = parseSceneBackgroundSettings(sceneBackground);
+  if (!parsed) throw new Error('Invalid scene background');
+  return parsed;
 }
 
-function drawCoverImage(
+function drawBackgroundImage(
   context: CanvasRenderingContext2D,
   image: CanvasImageSource,
   imageWidth: number,
   imageHeight: number,
   width: number,
-  height: number
+  height: number,
+  imageFit: 'cover' | 'contain'
 ) {
   if (imageWidth <= 0 || imageHeight <= 0 || width <= 0 || height <= 0) {
     return;
   }
 
-  const scale = Math.max(width / imageWidth, height / imageHeight);
+  const scale =
+    imageFit === 'contain'
+      ? Math.min(width / imageWidth, height / imageHeight)
+      : Math.max(width / imageWidth, height / imageHeight);
   const drawWidth = imageWidth * scale;
   const drawHeight = imageHeight * scale;
   const drawX = (width - drawWidth) / 2;
@@ -113,7 +110,10 @@ export function syncProjectSceneBackground(
 
   return {
     backgroundColor: getSceneBackgroundLegacyColor(normalizedSceneBackground),
-    sceneBackground: normalizedSceneBackground,
+    sceneBackground: retainSceneBackgroundVariants(
+      getProjectSceneBackground(project),
+      normalizedSceneBackground
+    ),
   };
 }
 
@@ -156,13 +156,14 @@ export function drawSceneBackground(params: {
         return;
       }
 
-      drawCoverImage(
+      drawBackgroundImage(
         params.context,
         image,
         image.naturalWidth,
         image.naturalHeight,
         params.width,
-        params.height
+        params.height,
+        params.sceneBackground.imageFit ?? 'cover'
       );
     }
   }

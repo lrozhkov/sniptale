@@ -558,14 +558,31 @@ it('imports a fresh background privately in one project update without adding a 
   );
   expect(params.updateProject).toHaveBeenCalledOnce();
   const update = vi.mocked(params.updateProject).mock.calls[0]![0];
-  const next = update(project);
+  const concurrent = {
+    ...project,
+    name: 'Parallel rename',
+    sceneBackground: {
+      kind: 'gradient' as const,
+      gradient: (
+        await import('../../../features/video/project/scene/background-gradient')
+      ).createSceneGradientBackground().gradient,
+      animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
+      remembered: { solid: { kind: 'solid' as const, color: '#123456' } },
+    },
+  };
+  const next = update(concurrent);
+  expect(next.name).toBe('Parallel rename');
+  expect(next.sceneBackground?.remembered?.gradient).toMatchObject({
+    animation: concurrent.sceneBackground.animation,
+  });
+  expect(next.sceneBackground?.remembered?.solid?.color).toBe('#123456');
   expect(next.assets).toContainEqual(asset);
   expect(importProjectAssetMock).toHaveBeenCalledWith(
     expect.any(File),
     VideoProjectAssetType.IMAGE,
     { publishToLibrary: false }
   );
-  expect(next.sceneBackground).toEqual({ kind: 'image', assetId: asset.id });
+  expect(next.sceneBackground).toMatchObject({ kind: 'image', assetId: asset.id });
   expect(next.clips).toEqual(project.clips);
   expect(params.addAssetClip).not.toHaveBeenCalled();
   expect(params.upsertAsset).not.toHaveBeenCalled();
@@ -599,5 +616,9 @@ it('freezes the current Library background instead of reusing an older project p
   expect(next.assets.find((item) => item.id === asset.id)?.source).toMatchObject({
     originMediaId: 'library-image',
   });
-  expect(next.sceneBackground).toEqual({ kind: 'image', assetId: asset.id });
+  expect(next.sceneBackground).toEqual({
+    kind: 'image',
+    assetId: asset.id,
+    remembered: { solid: { kind: 'solid', color: project.backgroundColor } },
+  });
 });

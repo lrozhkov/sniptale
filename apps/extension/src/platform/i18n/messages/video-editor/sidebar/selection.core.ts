@@ -3,6 +3,9 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  sceneBackgroundImageFit: { en: 'Image fit', ru: 'Масштаб' },
+  sceneBackgroundImageCover: { en: 'Fill', ru: 'Заполнить' },
+  sceneBackgroundImageContain: { en: 'Fit', ru: 'Вписать' },
   mediaCrop: { ru: 'Кадрирование исходника', en: 'Source crop' },
   mediaCropLeft: { ru: 'Слева', en: 'Left' },
   mediaCropTop: { ru: 'Сверху', en: 'Top' },

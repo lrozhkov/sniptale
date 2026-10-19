@@ -95,3 +95,69 @@ it('rejects an occupied zoom insertion and fits the next free gap', () => {
   actions.addMotionRegion(1);
   expect(project.motionRegions?.at(-1)).toMatchObject({ startTime: 1, duration: 1 });
 });
+
+it('uses current variants for independent edits and refuses invalid, equal and missing-resource updates', async () => {
+  const project = createEmptyVideoProject('Background');
+  const store = createStore(project),
+    actions = createWorkspaceProjectUpdaters(store);
+  actions.setSceneBackground({ kind: 'solid', color: '#123456' });
+  const gradient = (
+    await import('../../../features/video/project/scene/background-gradient')
+  ).createSceneGradientBackground('#abcdef');
+  actions.setSceneBackground({
+    ...gradient,
+    animation: { mode: 'breathe', speed: 42, intensity: 72 },
+  });
+  project.name = 'Unrelated edit';
+  const before = structuredClone(project.sceneBackground);
+  const observed: VideoProject[] = [];
+  store.updateProject = (updater) => {
+    const next = updater(project);
+    observed.push(next);
+    Object.assign(project, next);
+  };
+  actions.setSceneBackground({ kind: 'image', assetId: 'missing' });
+  expect(observed.at(-1)).toBe(project);
+  actions.setSceneBackground(project.sceneBackground!);
+  expect(observed.at(-1)).toBe(project);
+  const invalid = { kind: 'image', assetId: 'missing', imageFit: 'stretch' };
+  expect(() => Reflect.apply(actions.setSceneBackground, actions, [invalid])).not.toThrow();
+  expect(project.sceneBackground).toEqual(before);
+  expect(project.name).toBe('Unrelated edit');
+  actions.setSceneBackground({
+    ...gradient,
+    animation: { mode: 'rotate', speed: 20, intensity: 30 },
+    remembered: {},
+  });
+  expect(project.sceneBackground?.remembered?.solid?.color).toBe('#123456');
+});
+
+it('records variant and fit edits through actual history and keeps retries as no-ops', async () => {
+  const store = useVideoEditorStore;
+  const project = createEmptyVideoProject('History');
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(project);
+  const actions = createWorkspaceProjectUpdaters({
+    ...store.getState(),
+    getCurrentTime: () => store.getState().currentTime,
+  });
+  actions.setSceneBackground({ kind: 'solid', color: '#123456' });
+  const solid = store.getState().project!;
+  actions.setSceneBackground(
+    (
+      await import('../../../features/video/project/scene/background-gradient')
+    ).createSceneGradientBackground()
+  );
+  const gradient = store.getState().project!;
+  expect(gradient.version).toBe(14);
+  expect(gradient.sceneBackground?.remembered?.solid?.color).toBe('#123456');
+  const history = store.getState().projectHistory;
+  actions.setSceneBackground(gradient.sceneBackground!);
+  expect(store.getState().project).toBe(gradient);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground).toEqual(solid.sceneBackground);
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground).toEqual(gradient.sceneBackground);
+  store.setState(store.getInitialState(), true);
+});

@@ -80,10 +80,7 @@ export function removeVideoProjectLibrarySources(
     ...(project.transitions
       ? { transitions: project.transitions.filter(({ id }) => !removedTransitionIds.has(id)) }
       : {}),
-    ...(project.sceneBackground?.kind === 'image' &&
-    removedAssetIds.has(project.sceneBackground.assetId)
-      ? { sceneBackground: { kind: 'solid', color: project.backgroundColor } }
-      : {}),
+    ...removeSourceBackground(project, removedAssetIds),
     ...(project.cursorTrack
       ? {
           cursorTrack: {
@@ -112,6 +109,30 @@ export function removeVideoProjectLibrarySources(
   const reconciled = { ...next, ...reconcileVideoProjectInteractionSources(project, next) };
   assertExportReadyVideoProject(reconciled);
   return reconciled;
+}
+
+function removeSourceBackground(
+  project: VideoProject,
+  removedAssetIds: ReadonlySet<string>
+): Partial<Pick<VideoProject, 'sceneBackground' | 'backgroundColor'>> {
+  const background = project.sceneBackground;
+  if (!background) return {};
+  let remembered = background.remembered;
+  if (remembered?.image && removedAssetIds.has(remembered.image.assetId)) {
+    const { image: _removedImage, ...remaining } = remembered;
+    remembered = remaining;
+  }
+  const removedActive = background.kind === 'image' && removedAssetIds.has(background.assetId);
+  if (!removedActive && remembered === background.remembered) return {};
+  const { remembered: _previousMemory, ...active } = background;
+  // Restore authored solid settings so a later type switch cannot replace them with fallback paint.
+  const next = removedActive
+    ? (remembered?.solid ?? { kind: 'solid' as const, color: project.backgroundColor })
+    : active;
+  return {
+    sceneBackground: { ...next, ...(remembered !== undefined ? { remembered } : {}) },
+    ...(removedActive && next.kind === 'solid' ? { backgroundColor: next.color } : {}),
+  };
 }
 
 function removeSourceMotionRegions(

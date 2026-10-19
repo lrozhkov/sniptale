@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
-import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
+import { resolveSceneBackgroundKind } from '../../../../../features/video/project/scene/background-settings';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
 import { SelectInput } from '../shared/controls';
@@ -15,7 +15,7 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
     if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
   }, [props.sceneBackground.kind]);
   return (
-    <div className="sniptale-parameter-stack grid gap-3">
+    <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
       <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
         value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
@@ -62,6 +62,24 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
           options={getSceneBackgroundAssetOptions(props.imageAssets)}
         />
       )}
+      {props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE && (
+        <OptionButtonsField
+          label={translate('videoEditor.sidebar.sceneBackgroundImageFit')}
+          value={props.sceneBackground.imageFit ?? 'cover'}
+          options={[
+            { value: 'cover', label: translate('videoEditor.sidebar.sceneBackgroundImageCover') },
+            {
+              value: 'contain',
+              label: translate('videoEditor.sidebar.sceneBackgroundImageContain'),
+            },
+          ]}
+          onChange={(imageFit) => {
+            if (props.sceneBackground.kind !== VideoSceneBackgroundKind.IMAGE) return;
+            props.onSetSceneBackground({ ...props.sceneBackground, imageFit });
+            props.onResetSceneBackgroundPreview();
+          }}
+        />
+      )}
       {props.onImportImage && (
         <BackgroundImagePicker
           onSelect={({ file, originMediaId }) =>
@@ -85,51 +103,30 @@ function handleSceneBackgroundKindChange(
   nextKind: SceneBackground['kind'],
   props: SceneBackgroundFieldProps
 ) {
-  switch (nextKind) {
-    case VideoSceneBackgroundKind.SOLID:
-      props.onSetSceneBackground(resolveSolidSceneBackground(props.sceneBackground));
-      props.onResetSceneBackgroundPreview();
-      return;
-    case VideoSceneBackgroundKind.GRADIENT:
-      props.onSetSceneBackground(resolveGradientSceneBackground(props.sceneBackground));
-      props.onResetSceneBackgroundPreview();
-      return;
-    case VideoSceneBackgroundKind.IMAGE: {
-      const firstAsset = props.imageAssets[0];
-      if (!firstAsset) {
-        return;
-      }
-
-      props.onSetSceneBackground({
-        kind: VideoSceneBackgroundKind.IMAGE,
-        assetId: firstAsset.id,
-      });
-      props.onResetSceneBackgroundPreview();
-    }
-  }
-}
-
-function resolveSolidSceneBackground(sceneBackground: SceneBackground) {
-  return {
-    kind: VideoSceneBackgroundKind.SOLID,
-    color:
-      sceneBackground.kind === VideoSceneBackgroundKind.SOLID ? sceneBackground.color : '#111111',
-  } as const;
-}
-
-function resolveGradientSceneBackground(sceneBackground: SceneBackground) {
-  return sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT
-    ? sceneBackground
-    : createSceneGradientBackground();
+  const next = resolveSceneBackgroundKind(
+    props.sceneBackground,
+    nextKind,
+    props.imageAssets[0]?.id
+  );
+  if (!next) return;
+  props.onSetSceneBackground(next);
+  props.onResetSceneBackgroundPreview();
 }
 
 function commitSceneBackgroundImage(
   assetId: string,
-  props: Pick<SceneBackgroundFieldProps, 'onResetSceneBackgroundPreview' | 'onSetSceneBackground'>
+  props: Pick<
+    SceneBackgroundFieldProps,
+    'onResetSceneBackgroundPreview' | 'onSetSceneBackground' | 'sceneBackground'
+  >
 ) {
   props.onSetSceneBackground({
     kind: VideoSceneBackgroundKind.IMAGE,
     assetId,
+    ...(props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE &&
+    props.sceneBackground.imageFit !== undefined
+      ? { imageFit: props.sceneBackground.imageFit }
+      : {}),
   });
   props.onResetSceneBackgroundPreview();
 }

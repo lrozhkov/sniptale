@@ -1,3 +1,5 @@
+import { createSceneGradientBackground } from '../../../features/video/project/scene/background-gradient';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
 import { expect, it } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
@@ -584,3 +586,77 @@ it('purges a secondary source from a text-capable project and retains independen
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   expect(harness.complete).toHaveBeenCalledTimes(1);
 });
+
+it.each(['dormant', 'active'] as const)(
+  'purges a confirmed %s background source without losing unrelated variants',
+  async (mode) => {
+    const entry = createVideoProjectEntryWithMediaClip({ version: 14 });
+    const originalAsset = entry.project.assets[0]!;
+    const image = {
+      ...originalAsset,
+      type: 'IMAGE' as const,
+      metadata: {
+        ...originalAsset.metadata,
+        duration: null,
+        hasAudio: false,
+        mimeType: 'image/png',
+      },
+    };
+    const solid = { kind: 'solid' as const, color: '#abcdef' };
+    const gradient = {
+      ...createSceneGradientBackground('#123456ff'),
+      animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
+    };
+    const remembered = {
+      solid,
+      gradient,
+      image: { kind: 'image' as const, assetId: image.id, imageFit: 'contain' as const },
+    };
+    entry.project.assets = [image];
+    entry.project.clips = [];
+    entry.project.sceneBackground =
+      mode === 'dormant'
+        ? { ...gradient, remembered }
+        : { kind: 'image', assetId: image.id, remembered };
+    rows.get('video_projects')!.clear();
+    rows.get('video_projects')!.set(entry.id, entry);
+    rows.get('media_library')!.set(mediaId, {
+      ...mediaEntry(),
+      kind: 'image',
+      mimeType: 'image/png',
+      filename: 'background.png',
+      originalFilename: 'background.png',
+      duration: null,
+    });
+    rows.get('project_assets')!.set('project-asset-1', {
+      id: 'project-asset-1',
+      assetId: physicalId,
+      createdAt: 1,
+      size: 5,
+      mimeType: 'image/png',
+    });
+    rows.get('asset_refs')!.set(physicalId, {
+      assetId: physicalId,
+      createdAt: 1,
+      size: 5,
+      mimeType: 'image/png',
+      storagePath: 'object',
+    });
+    expect(isExportReadyVideoProject(entry.project)).toBe(true);
+    await deleteMediaAssetWithProjectCascade(mediaId, [
+      { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+    ]);
+    const saved = rows.get('video_projects')!.get(entry.id) as typeof entry;
+    expect(saved.workspaceRevision).toBe(1);
+    expect(saved.project.version).toBe(14);
+    expect(saved.project.assets).toEqual([]);
+    expect(saved.project.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
+    expect(saved.project.sceneBackground?.remembered?.image).toBeUndefined();
+    expect(saved.project.sceneBackground).toMatchObject(mode === 'dormant' ? gradient : solid);
+    expect(isExportReadyVideoProject(saved.project)).toBe(true);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(rows.get('project_assets')?.has('project-asset-1')).toBe(false);
+    expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+    expect(harness.complete).toHaveBeenCalledOnce();
+  }
+);

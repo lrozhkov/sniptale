@@ -491,3 +491,17 @@ The crop uses normalized coordinates in the original source. Both editors share 
 Drawing and source-point projection use the same fitted geometry. Headers join the cropped media plane. Source points outside the crop do not project into the scene. Manual scene points remain independent. Recorded separate cursors retain their source points and easing. Camera containment uses the original source binding and exact eased interval bounds.
 
 The existing command, history, save, and resource owners retain authority. Preview seeks do not reload the source. A preview failure preserves editable metadata. This change adds no persistence writer or physical database migration.
+
+## Montage scene background variants
+
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–13 without these fields and refuse future schema 15.
+
+The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
+
+Background changes retain the outgoing variant through the existing project updater, history and save authority. The current project supplies remembered values when another edit uses stale UI data. Undo and redo restore complete snapshots. Later mutations retain schema 14 after field removal.
+
+Dormant image assets remain in the project asset graph. Existing save, backup and deletion owners retain their bytes. Export admission checks active and dormant image references. Preview loads only the active image. Failed decoding retains the authored settings and existing fallback paint.
+
+These settings apply to the project canvas. They do not resize clips, change source clocks or define source window layout. No database store, resource authority or asynchronous writer changes.
+
+Source deletion with user approval removes matching active and remembered image references. It preserves other variants. Active image removal restores the remembered solid variant or uses the legacy fallback.

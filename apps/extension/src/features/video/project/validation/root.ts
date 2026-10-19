@@ -1,3 +1,4 @@
+import { parseSceneBackgroundSettings } from '../scene/background-settings';
 import {
   parseVideoProjectTextDocuments,
   hasValidVideoProjectTextReferences,
@@ -6,7 +7,6 @@ import { parseVideoProjectActionFeedback } from '../action-feedback/validation';
 import { parseCursorFocusPath } from '../cursor-focus-path/validation';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { resolveVideoProjectActionOccurrences } from '../action-occurrences';
-import { parsePaint } from '@sniptale/foundation/paint';
 import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
 import {
   VideoProjectClipType,
@@ -56,16 +56,6 @@ function isProjectSource(value: unknown): boolean {
   return true;
 }
 
-function isSceneBackground(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    ((value['kind'] === VideoSceneBackgroundKind.SOLID && isColorString(value['color'])) ||
-      (value['kind'] === VideoSceneBackgroundKind.GRADIENT &&
-        parsePaint({ kind: 'gradient', gradient: value['gradient'] }) !== null) ||
-      (value['kind'] === VideoSceneBackgroundKind.IMAGE && isString(value['assetId'])))
-  );
-}
-
 function isTransition(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -102,7 +92,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 13) &&
+    isBoundedNumber(version, 2, 14) &&
     Number.isInteger(version) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
@@ -112,6 +102,10 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
+    (version >= 14 ||
+      !isRecord(value['sceneBackground']) ||
+      (value['sceneBackground']['remembered'] === undefined &&
+        value['sceneBackground']['imageFit'] === undefined)) &&
     (version >= 5 || value['textDocuments'] === undefined) &&
     (version >= 7 ||
       !Array.isArray(value['tracks']) ||
@@ -159,7 +153,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['actionEvents'], isActionEvent) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
-    (value['sceneBackground'] === undefined || isSceneBackground(value['sceneBackground'])) &&
+    (value['sceneBackground'] === undefined ||
+      parseSceneBackgroundSettings(value['sceneBackground']) !== null) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&
     !Object.hasOwn(value, 'templateInstances') &&
     isEffectProjectBranches(value['effectSnapshots'], value['effectInstances']) &&
@@ -270,9 +265,10 @@ function hasValidSceneBackgroundReferences(
   project: VideoProject,
   assetIds: ReadonlySet<string>
 ): boolean {
-  return !(
-    project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE &&
-    !assetIds.has(project.sceneBackground.assetId)
+  const background = project.sceneBackground;
+  return (
+    (background?.kind !== VideoSceneBackgroundKind.IMAGE || assetIds.has(background.assetId)) &&
+    (!background?.remembered?.image || assetIds.has(background.remembered.image.assetId))
   );
 }
 

@@ -202,3 +202,44 @@ async function clickBackgroundKind(label: string) {
     await Promise.resolve();
   });
 }
+
+it('restores the retained image instead of choosing the first library asset', async () => {
+  const props = createProps();
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: {
+      kind: 'solid',
+      color: '#123456',
+      remembered: { image: { kind: 'image', assetId: 'asset-2', imageFit: 'contain' } },
+    },
+  });
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImage');
+  expect(props.onSetSceneBackground).toHaveBeenCalledWith({
+    kind: 'image',
+    assetId: 'asset-2',
+    imageFit: 'contain',
+  });
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImageContain')?.getAttribute('aria-pressed')
+  ).toBe('true');
+});
+
+it('edits image fit through measured choices and preserves the asset and remembered variants', async () => {
+  const props = createProps();
+  const remembered = { solid: { kind: 'solid' as const, color: '#123456' } };
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: { kind: 'image', assetId: 'asset-2', remembered },
+  });
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundImageContain');
+  expect(props.onSetSceneBackground).toHaveBeenCalledWith({
+    kind: 'image',
+    assetId: 'asset-2',
+    imageFit: 'contain',
+    remembered,
+  });
+  expect(
+    getKindOption('videoEditor.sidebar.sceneBackgroundImageContain')?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(props.onResetSceneBackgroundPreview).toHaveBeenCalled();
+});

@@ -95,3 +95,21 @@ it('draws canonical gradients through the scene entry point and forwards animati
   expect(vi.mocked(context.createLinearGradient).mock.calls[1]).not.toEqual(initial);
   expect(context.fillRect).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+  { imageFit: 'cover' as const, expected: [0, -150, 200, 400] },
+  { imageFit: 'contain' as const, expected: [75, 0, 50, 100] },
+  { imageFit: undefined, expected: [0, -150, 200, 400] },
+])('draws the original image with centered $imageFit geometry', ({ imageFit, expected }) => {
+  const context = createContext();
+  const image = { naturalWidth: 25, naturalHeight: 50 } as HTMLImageElement;
+  drawSceneBackground({
+    context,
+    width: 200,
+    height: 100,
+    loadedImages: { image },
+    sceneBackground: { kind: 'image', assetId: 'image', ...(imageFit ? { imageFit } : {}) },
+  });
+  expect(context.drawImage).toHaveBeenCalledWith(image, ...expected);
+  expect(context.fillRect).toHaveBeenCalledWith(0, 0, 200, 100);
+});

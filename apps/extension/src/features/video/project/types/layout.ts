@@ -160,9 +160,17 @@ export interface VideoProjectGradientBackground {
 export interface VideoProjectImageBackground {
   kind: typeof VideoSceneBackgroundKind.IMAGE;
   assetId: string;
+  imageFit?: 'cover' | 'contain';
 }
 
-export type VideoProjectSceneBackground =
+export interface VideoProjectBackgroundVariants {
+  solid?: VideoProjectSolidBackground;
+  gradient?: VideoProjectGradientBackground;
+  image?: VideoProjectImageBackground;
+}
+
+export type VideoProjectSceneBackground = (
   | VideoProjectSolidBackground
   | VideoProjectGradientBackground
-  | VideoProjectImageBackground;
+  | VideoProjectImageBackground
+) & { remembered?: VideoProjectBackgroundVariants };
