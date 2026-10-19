@@ -333,6 +333,27 @@ it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees',
     }
   }
 });
+it.each(['#00000000', '#00000080', '#111827'])(
+  'keeps the editing caret opaque without changing glyph color %s',
+  (color) => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'text-caret',
+        kind: 'text',
+        bounds: { x: 0, y: 0, width: 160, height: 40 },
+        text: 'Caret',
+        color,
+        backgroundColor: '#f97316',
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    expect(object.cursorColor).toBe('#2563eb');
+    expect(object.fill).toBe(color);
+    expect(readEditorDrawingObject(object)).toMatchObject({ color, text: 'Caret' });
+  }
+);
 describe('Fabric drawing adapter', () => {
   it.each([
     { fontSize: 16, text: 'One', color: '#111' },

@@ -19,6 +19,38 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it.each(['#00000000', '#00000080', '#111827'])(
+  'keeps the insertion caret independent of glyph color %s',
+  (color) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      act(() =>
+        root.render(
+          <DrawingTextEditor
+            draft={{ id: null, point: { x: 20, y: 30 }, value: 'Caret', width: 160 }}
+            projection={{ x: 0, y: 0 }}
+            style={{ backgroundColor: '#f97316', color, fontFamily: 'sans', fontSize: 24 }}
+            onCancel={vi.fn()}
+            onChange={vi.fn()}
+            onCommit={vi.fn()}
+          />
+        )
+      );
+      const input = host.querySelector('textarea')!;
+      expect(input.style.caretColor).toBe('rgb(37, 99, 235)');
+      expect(input.value).toBe('Caret');
+      expect(input.selectionStart).toBe(5);
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
 it.each(['#ff8800', '#ff880080'])(
   'uses one background paint for adjacent lines with %s',
   (color) => {

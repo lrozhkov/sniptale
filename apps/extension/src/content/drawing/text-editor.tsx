@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
   clampDrawingTextWidth,
   resolveDrawingTextNaturalWidth,
@@ -311,6 +312,7 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
           ...resolveDrawingTextContentStyle(props.style),
           background: 'transparent',
           border: 0,
+          caretColor: DEFAULT_COLOR_INFO_STRONG,
           height: '100%',
           inset: 0,
           outline: 'none',

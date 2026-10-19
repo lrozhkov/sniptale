@@ -313,6 +313,13 @@ for (const viewport of [
       await checkPixels(page, scene, normal, stencil, region);
       await page.mouse.click(region.x + region.width / 2, region.y + region.height / 2);
       await expect(input).toHaveValue(TEXT);
+      await expect(input).toHaveCSS('caret-color', 'rgb(37, 99, 235)');
+      await input.press('ArrowLeft');
+      await page.screenshot({
+        path: info.outputPath('transparent-text-caret.png'),
+        fullPage: false,
+        caret: 'initial',
+      });
       await expect(page.locator('[data-ui="content.drawing.text-editor"] mask')).toHaveCount(1);
       await input.fill(`${TEXT}\nEdited`);
       await input.press('Enter');
@@ -435,6 +442,53 @@ for (const viewport of [
           });
         }
       }
+      const center = await page
+        .locator('[data-ui="editor.canvas.selection-chrome"] polygon')
+        .evaluate((polygon: SVGPolygonElement) => {
+          const matrix = polygon.getScreenCTM()!;
+          const start = polygon.points.getItem(0);
+          const end = polygon.points.getItem(2);
+          const point = new DOMPoint((start.x + end.x) / 2, (start.y + end.y) / 2).matrixTransform(
+            matrix
+          );
+          return { x: point.x, y: point.y };
+        });
+      await page.mouse.click(center.x, center.y);
+      const input = page.locator('textarea[data-fabric="textarea"]:focus');
+      await expect(input).toHaveValue(TEXT);
+      await input.press('ArrowDown');
+      await input.press('End');
+      await input.press('!');
+      await expect(input).toHaveValue(`${TEXT}!`);
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const canvas = document.querySelector<HTMLCanvasElement>(
+              '[data-ui="editor.canvas.layer"] canvas.upper-canvas'
+            )!;
+            const pixels = canvas
+              .getContext('2d')!
+              .getImageData(0, 0, canvas.width, canvas.height).data;
+            let blue = 0;
+            for (let offset = 0; offset < pixels.length; offset += 4) {
+              if (
+                pixels[offset + 3]! > 200 &&
+                [37, 99, 235].every(
+                  (value, channel) => Math.abs(pixels[offset + channel]! - value) <= 2
+                )
+              )
+                blue += 1;
+            }
+            return blue;
+          })
+        )
+        .toBeGreaterThan(5);
+      await page.screenshot({
+        path: info.outputPath('transparent-text-caret.png'),
+        fullPage: false,
+        caret: 'initial',
+      });
+      await input.press('Escape');
     } finally {
       await page.close();
     }

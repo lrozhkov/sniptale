@@ -1,4 +1,5 @@
 import { Ellipse, Path, Point, Polygon, Rect, Textbox, Triangle, type FabricObject } from 'fabric';
+import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
   buildDrawingArrowOutline,
   buildDrawingFreehandArrowLines,
@@ -257,6 +258,7 @@ function renderEditorDrawingTextStencil(
 }
 
 export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
+  textbox.cursorColor = DEFAULT_COLOR_INFO_STRONG;
   if (!textboxVisualAdapters.has(textbox)) {
     const adapter: TextboxVisualAdapter = {
       getLineLeftOffset: textbox._getLineLeftOffset.bind(textbox),
