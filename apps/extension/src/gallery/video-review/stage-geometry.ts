@@ -1,4 +1,4 @@
-import { uncropQuickEditVideoRect } from '../../features/video/review/advanced/canvas';
+import { uncropMediaSourceRect } from '../../features/video/project/media-crop';
 import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
 import { useEffect, useState, type RefObject } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
@@ -93,7 +93,7 @@ function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout
   if (layout.sourceCrop && layout.visibleVideoRect) {
     const visibleVideoRect = snapPreviewRect(layout.visibleVideoRect);
     const crop = layout.sourceCrop;
-    const videoRect = uncropQuickEditVideoRect(visibleVideoRect, crop);
+    const videoRect = uncropMediaSourceRect(visibleVideoRect, crop);
     const windowRect = {
       ...visibleVideoRect,
       y: Math.round(layout.windowRect.y),

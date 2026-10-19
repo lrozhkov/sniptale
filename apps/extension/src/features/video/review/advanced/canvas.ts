@@ -1,28 +1,6 @@
+import { parseMediaSourceCrop } from '../../project/media-crop';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { QuickEditCanvasSize, QuickEditRect } from './types';
-
-/** Source-normalized bounds remain independent of output resolution and camera authoring. */
-function parseSourceCrop(value: unknown): QuickEditRect | null {
-  if (!isRecord(value)) return null;
-  const { x, y, width, height } = value;
-  if (
-    typeof x !== 'number' ||
-    typeof y !== 'number' ||
-    typeof width !== 'number' ||
-    typeof height !== 'number' ||
-    ![x, y, width, height].every(Number.isFinite) ||
-    x < 0 ||
-    y < 0 ||
-    width <= 0 ||
-    height <= 0 ||
-    !Number.isFinite(7680 / width) ||
-    !Number.isFinite(7680 / height) ||
-    x + width > 1 ||
-    y + height > 1
-  )
-    return null;
-  return { x, y, width, height };
-}
 
 /** Custom canvases are codec-friendly, bounded to an 8K frame's pixel budget. */
 export function parseQuickEditCanvas(value: unknown): QuickEditCanvasSize | null {
@@ -43,7 +21,7 @@ export function parseQuickEditCanvas(value: unknown): QuickEditCanvasSize | null
     width * height > 33_177_600
   )
     return null;
-  const crop = value['crop'] === undefined ? undefined : parseSourceCrop(value['crop']);
+  const crop = value['crop'] === undefined ? undefined : parseMediaSourceCrop(value['crop']);
   if (crop === null) return null;
   return { width, height, ...(crop ? { crop } : {}) };
 }
@@ -87,18 +65,5 @@ export function quickEditCanvasPreset(
   return {
     width: Math.max(2, Math.round((x * unit) / 2) * 2),
     height: Math.max(2, Math.round((y * unit) / 2) * 2),
-  };
-}
-
-/** Recover source bounds from a visible crop; callers own any raster snapping before this operation. */
-export function uncropQuickEditVideoRect(
-  visible: QuickEditRect,
-  crop: QuickEditRect
-): QuickEditRect {
-  return {
-    x: visible.x - (crop.x * visible.width) / crop.width,
-    y: visible.y - (crop.y * visible.height) / crop.height,
-    width: visible.width / crop.width,
-    height: visible.height / crop.height,
   };
 }

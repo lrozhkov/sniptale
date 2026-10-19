@@ -1,4 +1,4 @@
-import { uncropQuickEditVideoRect } from './canvas';
+import { uncropMediaSourceRect } from '../../project/media-crop';
 import {
   evaluateReviewFollowCursor,
   resolveReviewCursorCameraPlan,
@@ -463,7 +463,7 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     width: fitted.width,
     height: fitted.height,
   };
-  const videoRect = crop ? uncropQuickEditVideoRect(visibleVideoRect, crop) : visibleVideoRect;
+  const videoRect = crop ? uncropMediaSourceRect(visibleVideoRect, crop) : visibleVideoRect;
   const windowRect = {
     ...visibleVideoRect,
     y: visibleVideoRect.y - headerHeight,

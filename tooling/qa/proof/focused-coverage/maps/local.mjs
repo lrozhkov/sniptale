@@ -1,5 +1,21 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'media-source-crop',
+    productionFile: 'apps/extension/src/features/video/project/media-crop.ts',
+    allowCrossOwner: true,
+    reason:
+      'Source crop admission and inverse geometry feed Gallery canvas, scene, stage and render settings.',
+    testFiles: [
+      'apps/extension/src/features/video/project/media-crop.test.ts',
+      'apps/extension/src/features/video/review/advanced/canvas.test.ts',
+      'apps/extension/src/features/video/review/advanced/scene.test.ts',
+      'apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts',
+      'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
+      'apps/extension/src/gallery/video-review/source-crop-editor.test.tsx',
+      'apps/extension/src/workflows/video-review/render-settings.test.ts',
+    ],
+  },
+  {
     owner: 'camera-source-visibility',
     productionFile: 'apps/extension/src/features/video/project/camera/visibility.ts',
     allowCrossOwner: true,
