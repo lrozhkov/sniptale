@@ -1,5 +1,32 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'montage-recording-preview-playback',
+    productionFile:
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording-playback.ts',
+    allowCrossOwner: true,
+    reason:
+      'Mounted capture and its audio sinks prove range, cancellation and silent playback admission.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio-cleanup.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/effect-audio.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-recording-preview-mute',
+    productionFile: 'apps/extension/src/video-editor/workspace/surface/canvas.tsx',
+    allowCrossOwner: true,
+    reason: 'Canvas consumer and media sync prove recording mute without changing project audio.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/surface/main.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio-cleanup.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/effect-audio.test.ts',
+    ],
+  },
+  {
     owner: 'shared-recording-level-presentation',
     productionFile: 'apps/extension/src/composition/audio-recording/dialog/level-meter.tsx',
     allowCrossOwner: true,

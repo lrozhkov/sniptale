@@ -428,3 +428,12 @@ it('publishes cache preparation changes through the playback context', () => {
   act(render);
   expect(preparing).toBe(false);
 });
+
+it('keeps recording-owned video playback out of overlay pause while blocking global shortcuts', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Voice');
+  mocks.workspace.voiceRecording.capturing = true;
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(false);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.voiceRecording.capturing = false;
+});

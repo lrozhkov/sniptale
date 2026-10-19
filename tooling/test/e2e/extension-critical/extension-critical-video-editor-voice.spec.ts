@@ -213,8 +213,30 @@ async function prepareMicrophoneTake({
     path: outputPath('voice-microphone-setup.png'),
     fullPage: false,
   });
+  const playVideo = recording.getByRole('switch', {
+    name: label('videoEditor.app.recordAudioPlayVideo'),
+    exact: true,
+  });
+  await expect(playVideo).toBeChecked();
+  await playVideo.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: outputPath('voice-microphone-options.png'), fullPage: false });
+  const counter = page.locator('[data-playback-counter] > span:last-child');
+  const initialTime = await counter.textContent();
   await operate(command('videoEditor.app.recordAudioStart'));
   await expect(command('videoEditor.app.recordAudioPause')).toBeVisible();
+  await expect.poll(() => counter.textContent()).not.toBe(initialTime);
+  await expect(playVideo).toBeDisabled();
+  await command('videoEditor.app.recordAudioPause').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: outputPath('voice-microphone-monitor.png'), fullPage: false });
+  const preview = page.locator('[data-ui="video-editor.workspace.viewer"]');
+  expect(
+    await preview
+      .locator('video')
+      .evaluateAll((nodes) => nodes.length > 0 && nodes.every((video) => video.muted))
+  ).toBe(true);
+  expect(
+    await preview.locator('audio').evaluateAll((nodes) => nodes.every((audio) => audio.paused))
+  ).toBe(true);
   await operate(
     page.getByRole('button', {
       name: label('videoEditor.sidebar.inspectorGroupCanvas'),
@@ -223,6 +245,7 @@ async function prepareMicrophoneTake({
   );
   await operate(textCategory);
   await expect(command('videoEditor.app.recordAudioResume')).toBeVisible();
+  const pausedTime = await counter.textContent();
   await operate(back);
   const discard = page.getByRole('alertdialog');
   await expect(discard).toBeVisible();
@@ -249,7 +272,9 @@ async function prepareMicrophoneTake({
     path: outputPath('voice-microphone-paused.png'),
     fullPage: false,
   });
+  await expect(counter).toHaveText(pausedTime!);
   await operate(command('videoEditor.app.recordAudioResume'));
+  await expect.poll(() => counter.textContent()).not.toBe(pausedTime);
   // Native MediaRecorder requires elapsed media time, rather than a synthetic clock.
   await page.waitForTimeout(1200);
   await operate(command('videoEditor.app.recordAudioStop'));

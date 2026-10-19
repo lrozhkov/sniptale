@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
 import type { VideoEditorLibraryPanelProps } from '../../library/contracts/panel';
 import { createHeaderController, createPreviewController } from './main.test-support';
-import { RuntimePlaybackContext } from '../../runtime/controller/composition/contexts';
+import {
+  RuntimeProjectContext,
+  RuntimePlaybackContext,
+} from '../../runtime/controller/composition/contexts';
 
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
@@ -600,4 +603,31 @@ it('opens export from collapsed state and closes it when the inspector collapses
     hookMocks.closeExport.mockClear();
     await act(async () => root.unmount());
   }
+});
+
+it('mutes the Montage preview while the mounted microphone owns playback', () => {
+  hookMocks.controller = createWorkspaceController();
+  const value = {
+    applyLoadedProject: vi.fn(),
+    recordingLeave: {
+      capturing: true,
+      setCapturing: vi.fn(),
+      obscured: false,
+      register: () => () => undefined,
+      request: async () => true,
+    },
+  };
+  renderToStaticMarkup(
+    <RuntimeProjectContext.Provider value={value}>
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimeProjectContext.Provider>
+  );
+  expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(true);
+  value.recordingLeave.capturing = false;
+  renderToStaticMarkup(
+    <RuntimeProjectContext.Provider value={value}>
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimeProjectContext.Provider>
+  );
+  expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(false);
 });

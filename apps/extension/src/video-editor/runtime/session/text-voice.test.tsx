@@ -534,6 +534,7 @@ it('records a microphone take through the mounted panel and accepts it with the 
   });
   await mount();
   await click('gallery.videoReview.textVoiceMicrophone');
+  await click('videoEditor.app.recordAudioPlayVideo');
   await click('videoEditor.app.recordAudioStart');
   await vi.waitFor(async () => {
     await act(async () => {});

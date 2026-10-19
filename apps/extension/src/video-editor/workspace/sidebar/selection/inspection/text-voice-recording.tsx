@@ -38,6 +38,12 @@ export function ProjectTextVoiceRecording({
             disabled={locked || capturing}
           />
           <ToggleField
+            label={translate('videoEditor.app.recordAudioPlayVideo')}
+            value={recording.playVideo}
+            onChange={recording.setPlayVideo}
+            disabled={locked || capturing}
+          />
+          <ToggleField
             label={translate('gallery.videoReview.voiceoverDurationLimit')}
             value={durationLimit.enabled}
             onChange={durationLimit.setEnabled}

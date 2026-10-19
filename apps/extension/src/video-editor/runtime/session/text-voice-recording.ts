@@ -9,7 +9,7 @@ import {
   type ProjectVoiceTakePreview,
 } from '../../../workflows/video/project-voice-take';
 import { RuntimeProjectContext } from '../controller/composition/contexts';
-import { useVideoEditorPlaybackPort } from '../controller/store';
+import { useTextVoiceRecordingPlayback } from './text-voice-recording-playback';
 
 type Target = { documentId: string; fragmentId: string };
 type Capture = Target & { hash: string; access: ProjectVoiceTakeAccess };
@@ -41,7 +41,8 @@ function useRecordingLeaveProtection(
         (session.starting ||
           session.isSaving ||
           session.confirmation.open ||
-          session.controller.transport.status === 'recording')
+          session.controller.transport.status === 'recording' ||
+          session.controller.transport.status === 'paused')
     );
     return () => setCapturing?.(false);
   }, [
@@ -118,6 +119,7 @@ export function useProjectTextVoiceRecording(args: {
   target: Target | null;
   enabled: boolean;
   accepted: boolean;
+  startTime: number;
   parentVisible: boolean;
   onPrepared(preview: ProjectVoiceTakePreview): boolean;
 }) {
@@ -125,7 +127,10 @@ export function useProjectTextVoiceRecording(args: {
   const [open, setOpen] = useState(true);
   const obscured = useContext(RuntimeProjectContext)?.recordingLeave?.obscured ?? false;
   const durationLimit = useRecordingDurationLimit(3600);
-  const setPlaying = useVideoEditorPlaybackPort((port) => port.setPlaying);
+  const playback = useTextVoiceRecordingPlayback(
+    args.enabled,
+    visible && !obscured && args.parentVisible
+  );
   const captured = useRef<Capture | null>(null);
   const retained = useRef<(() => void) | undefined>(undefined);
   const current = useRef({ ...args, visible });
@@ -160,13 +165,18 @@ export function useProjectTextVoiceRecording(args: {
         const latest = admitted();
         if (latest.access !== owner.access || JSON.stringify(owner.access.getProject()) !== initial)
           throw new Error('stale');
-        setPlaying(false);
+        await playback.start(project, owner.startTime);
+        const ready = admitted();
+        if (ready.access !== owner.access || JSON.stringify(owner.access.getProject()) !== initial)
+          throw new Error('stale');
         captured.current = { ...target, hash: basis.basisHash, access: owner.access };
       },
-      onStop: () => undefined,
+      onStop: playback.stop,
+      onPause: playback.pause,
       onResume: async () => {
         admitted();
-        setPlaying(false);
+        await playback.resume();
+        admitted();
       },
     },
     onClose: () => {
@@ -216,6 +226,8 @@ export function useProjectTextVoiceRecording(args: {
   return {
     session,
     durationLimit,
+    playVideo: playback.playVideo,
+    setPlayVideo: playback.setPlayVideo,
     setVisible,
     obscured,
     markRetained() {

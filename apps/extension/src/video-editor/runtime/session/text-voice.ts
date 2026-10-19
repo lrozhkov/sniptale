@@ -323,6 +323,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
     target: state.target,
     enabled: !!state.target && state.source === 'microphone',
     accepted: state.accepted,
+    startTime: state.placement.start,
     parentVisible,
     onPrepared(preview) {
       if (!current() || lifetime.preview) return false;

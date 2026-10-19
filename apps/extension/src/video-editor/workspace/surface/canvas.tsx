@@ -2,7 +2,8 @@ import { WorkspacePanelHeader } from '../floating/panel-header';
 import type { ProjectAssetUse } from '../../../features/video/project/media-usage';
 import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
 import { useWorkspaceTrackPresentation } from './track-presentation';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import { RuntimeProjectContext } from '../../runtime/controller/composition/contexts';
 import { CompactSegmentedSelector } from '../../../ui/compact-inspector-controls/control-renderers';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -134,6 +135,7 @@ function VideoEditorWorkspaceUpper(
   props: VideoEditorWorkspaceCanvasProps & { onRevealClip: (clipId: string) => void }
 ) {
   const recordingLayout = useVideoEditorLayoutController();
+  const recording = useContext(RuntimeProjectContext)?.recordingLeave;
   const header = useVideoEditorHeaderController();
   const preview = useVideoEditorPreviewController();
   const viewer = useWorkspacePreviewContext();
@@ -220,7 +222,9 @@ function VideoEditorWorkspaceUpper(
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
         <PreviewStage
-          mutePreviewAudio={recordingLayout.audioRecordingDialogOpen}
+          mutePreviewAudio={
+            recordingLayout.audioRecordingDialogOpen || (recording?.capturing ?? false)
+          }
           headerContent={viewerHeading}
           headerActions={
             <VideoEditorWorkspaceHeaderActions

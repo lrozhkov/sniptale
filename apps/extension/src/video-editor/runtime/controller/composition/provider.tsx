@@ -150,7 +150,8 @@ function useVideoEditorRuntimeComposition(
     enabled:
       lifecycle.project !== null &&
       !workspace.preview.sourceViewerActive &&
-      !(workspace.audioRecordingDialogOpen && workspace.audioRecordingTarget !== null),
+      !(workspace.audioRecordingDialogOpen && workspace.audioRecordingTarget !== null) &&
+      !workspace.voiceRecording.capturing,
     isPlaying: playback.isPlaying,
     setPlaybackPlaying: runtime.setPlaybackPlaying,
   });
