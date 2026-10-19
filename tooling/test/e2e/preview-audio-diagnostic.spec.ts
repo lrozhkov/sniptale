@@ -125,3 +125,56 @@ test('original audio attenuation agrees with preview and selected-range native P
     );
   }
 });
+
+test('actual preview media sync preserves amplification and agrees with native exported PCM', async ({
+  page,
+}) => {
+  const { origin, server } = await startHostServer();
+  try {
+    await page.goto(`${origin}/tooling/test/harness/preview-audio-diagnostic.html`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForFunction(
+      () => typeof window.__sniptalePreviewAudioDiagnostic?.runAmplification === 'function'
+    );
+    const result: unknown = await page.evaluate(async () => {
+      const diagnostic = window.__sniptalePreviewAudioDiagnostic;
+      if (!diagnostic) throw new Error('Diagnostic unavailable');
+      return diagnostic.runAmplification();
+    });
+    if (!Array.isArray(result) || result.length !== 2)
+      throw new Error('Invalid amplified preview result');
+    for (const value of result) {
+      const row: unknown = value;
+      if (
+        typeof row !== 'object' ||
+        row === null ||
+        !('volume' in row) ||
+        typeof row.volume !== 'number' ||
+        !('gain' in row) ||
+        typeof row.gain !== 'number' ||
+        !('previewRms' in row) ||
+        typeof row.previewRms !== 'number' ||
+        !('exportRms' in row) ||
+        typeof row.exportRms !== 'number' ||
+        !('expectedRms' in row) ||
+        typeof row.expectedRms !== 'number' ||
+        !('elementVolume' in row) ||
+        !('unchanged' in row)
+      ) {
+        throw new Error('Invalid amplified preview sample');
+      }
+      expect(row.volume === 1.5 || row.volume === 2).toBe(true);
+      expect(row.gain).toBeCloseTo(row.volume, 6);
+      expect(row.elementVolume).toBe(1);
+      expect(row.unchanged).toBe(true);
+      expect(Math.abs(row.previewRms - row.expectedRms)).toBeLessThan(row.expectedRms * 0.05);
+      expect(Math.abs(row.exportRms - row.expectedRms)).toBeLessThan(1e-4);
+      expect(Math.abs(row.previewRms - row.exportRms)).toBeLessThan(row.expectedRms * 0.05);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

@@ -322,3 +322,27 @@ describe('preview-stage-audio-runtime', () => {
     verifiesSlowPlaybackRateAudioSync
   );
 });
+
+it.each([1, 1.5, 2])(
+  'preserves %sx clip gain through actual audio and video preview sync',
+  async (volume) => {
+    const graph = installPreviewAudioContextHarness();
+    const project = createEmptyVideoProject('Amplified preview');
+    const video = createVideoClip(project.tracks[0]!.id, { id: 'video', volume });
+    const audioClip = createAudioClip(project.tracks[0]!.id, { id: 'audio', volume });
+    const clips = [video, audioClip];
+    const elements = Object.fromEntries(clips.map((clip) => [clip.id, createAudioElement()]));
+    await renderHarness({
+      audioRefs: { current: elements },
+      currentTime: 6,
+      isPlaying: true,
+      project: createProject(clips, [video.assetId]),
+      syncedClips: clips,
+    });
+    expect(graph.latestContext.gains.map((gain) => gain.gain.value)).toEqual([volume, volume]);
+    for (const element of Object.values(elements)) {
+      expect(element.volume).toBe(1);
+      expect(element.play).toHaveBeenCalledOnce();
+    }
+  }
+);

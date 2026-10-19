@@ -1,3 +1,12 @@
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../apps/extension/src/features/video/project/factories/creation';
+import { createAudioClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
+import { syncPreviewAudioElements } from '../../../apps/extension/src/video-editor/preview/stage/runtime/audio-elements';
+import { createPreviewMediaSyncState } from '../../../apps/extension/src/video-editor/preview/stage/media/sync';
+import { collectRenderableAudioClips } from '../../../apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect';
+import { scheduleOfflineAudioClipMix } from '../../../apps/extension/src/offscreen/project-export/offline-audio/mix/schedule';
 import { runOriginalAudioDiagnostic } from './original-audio-diagnostic';
 import {
   cleanupPreviewAudioGraph,
@@ -34,6 +43,7 @@ type PreviewAudioDiagnosticResult = {
 };
 
 type PreviewAudioDiagnosticApi = {
+  runAmplification: typeof runAmplificationDiagnostic;
   runOriginalAudio: typeof runOriginalAudioDiagnostic;
   getLastResult: () => PreviewAudioDiagnosticResult | null;
   run: () => Promise<PreviewAudioDiagnosticResult>;
@@ -273,6 +283,7 @@ function runOnce(): Promise<PreviewAudioDiagnosticResult> {
 window.__sniptalePreviewAudioDiagnostic = {
   getLastResult: () => lastResult,
   runOriginalAudio: runOriginalAudioDiagnostic,
+  runAmplification: runAmplificationDiagnostic,
   run: runOnce,
 };
 
@@ -284,3 +295,82 @@ document.getElementById('run-preview-audio-diagnostic')?.addEventListener('click
     }
   });
 });
+
+function rootMeanSquare(samples: Float32Array) {
+  return Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+}
+
+async function runAmplificationDiagnostic() {
+  const results = [];
+  for (const volume of [1.5, 2]) {
+    const context = createDriverScenarioContext();
+    try {
+      await waitForCanPlay(context.audio);
+      const project = createEmptyVideoProject('Amplified preview');
+      const asset = createVideoProjectAsset(
+        'Native sine',
+        'AUDIO',
+        { kind: 'project-asset', projectAssetId: 'native-sine' },
+        {
+          width: 0,
+          height: 0,
+          duration: 2,
+          mimeType: 'audio/wav',
+          size: 1,
+          hasAudio: true,
+          audioPeaks: null,
+        }
+      );
+      const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset);
+      clip.volume = volume;
+      project.assets = [asset];
+      project.clips = [clip];
+      project.duration = 2;
+      const before = JSON.stringify(project);
+      syncPreviewAudioElements({
+        audioRefs: { current: { [clip.id]: context.audio } },
+        audioGraphState: context.state,
+        currentTime: 0,
+        isPlaying: true,
+        mediaSyncState: createPreviewMediaSyncState(),
+        project,
+        syncedClips: [clip],
+      });
+      const node = context.state.nodesByClipId.get(clip.id);
+      const live = context.state.audioContext;
+      if (!node || !live) throw new Error('Native preview graph unavailable');
+      const analyser = live.createAnalyser();
+      analyser.fftSize = 4096;
+      node.gain.connect(analyser);
+      const deadline = performance.now() + 3000;
+      while (context.audio.currentTime < 0.2 || live.state !== 'running') {
+        if (performance.now() > deadline) throw new Error('Native amplified preview did not start');
+        await delay(25);
+      }
+      const samples = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(samples);
+      const previewRms = rootMeanSquare(samples);
+      const buffer = await live.decodeAudioData(
+        await (await fetch(context.audio.src)).arrayBuffer()
+      );
+      const offline = new OfflineAudioContext(1, DIAGNOSTIC_SAMPLE_RATE, DIAGNOSTIC_SAMPLE_RATE);
+      for (const input of collectRenderableAudioClips(project)) {
+        await scheduleOfflineAudioClipMix(offline, input, buffer);
+      }
+      const rendered = await offline.startRendering();
+      results.push({
+        volume,
+        gain: node.gain.gain.value,
+        elementVolume: context.audio.volume,
+        previewRms,
+        exportRms: rootMeanSquare(rendered.getChannelData(0).slice(9600, 13696)),
+        expectedRms: volume * rootMeanSquare(buffer.getChannelData(0).slice(9600, 13696)),
+        unchanged: before === JSON.stringify(project),
+      });
+      analyser.disconnect();
+    } finally {
+      cleanupDriverScenario(context);
+    }
+  }
+  return results;
+}

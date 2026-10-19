@@ -28,10 +28,6 @@ import { applyPreviewPitchPreservation } from './playback/pitch';
 
 const logger = createLogger({ namespace: 'VideoEditorPreviewAudio' });
 
-function clampPreviewAudioVolume(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
 function preparePreviewAudioElement(audio: HTMLAudioElement, playbackRate: number): void {
   applyPreviewPitchPreservation(audio);
   audio.defaultMuted = false;
@@ -80,7 +76,7 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
 
   const gain =
     !params.mutePreviewAudio && isClipActive
-      ? clampPreviewAudioVolume(getClipCompositeAudioGain(project, clip, currentTime))
+      ? getClipCompositeAudioGain(project, clip, currentTime)
       : 0;
   setPreviewAudioNodeGain(node, gain);
 
