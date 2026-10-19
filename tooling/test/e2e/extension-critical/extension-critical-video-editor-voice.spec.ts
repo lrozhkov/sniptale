@@ -212,6 +212,120 @@ async function verifyOriginalAudioRestore(
   expect((await readProject(page))?.clips.find((clip) => clip.id === take.id)).toEqual(manual);
 }
 
+async function verifyTrackAudioMaster(
+  page: Page,
+  trackId: string,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => string
+) {
+  const before = await readProject(page);
+  const track = before?.tracks.find((track) => track.id === trackId);
+  if (!before || !track) throw new Error('Missing AUDIO track');
+  const select = page
+    .locator('[data-ui="video-editor.timeline.track-select"]')
+    .filter({ hasText: track.name })
+    .first();
+  await operate(select);
+  const sections = page.locator('[data-ui="video-editor.inspector.sections"]');
+  await operate(
+    sections
+      .locator('nav')
+      .getByRole('button', { name: label('videoEditor.sidebar.inspectorGroupAudio'), exact: true })
+  );
+  const owner = page.locator('[data-ui="video-editor.inspector.track-audio"]');
+  const level = owner.getByRole('textbox', {
+    name: label('videoEditor.sidebar.trackVolumeLabel'),
+    exact: true,
+  });
+  for (const percent of [0, 150, 200]) {
+    await level.fill(String(percent));
+    await level.press('Tab');
+    await expect
+      .poll(
+        async () =>
+          (await readProject(page))?.tracks.find((track) => track.id === trackId)?.audioVolume
+      )
+      .toBe(percent / 100);
+  }
+  await checkInspectorPaintedFont(page, level, 'track-master');
+  expect((await readProject(page))?.clips).toEqual(before.clips);
+  const row = select.locator('..');
+  await operate(
+    row.getByRole('button', { name: label('videoEditor.timeline.trackEditable'), exact: true })
+  );
+  await expect(level).toBeDisabled();
+  await operate(
+    row.getByRole('button', { name: label('videoEditor.timeline.trackLocked'), exact: true })
+  );
+  await expect(level).toBeEnabled();
+  for (let index = 0; index < 3; index++)
+    await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+  await expect
+    .poll(
+      async () =>
+        (await readProject(page))?.tracks.find((track) => track.id === trackId)?.audioVolume
+    )
+    .toBe(1.5);
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+  await expect(level).toHaveValue('200');
+  await level.fill('100');
+  await level.press('Tab');
+  await expect
+    .poll(
+      async () =>
+        (await readProject(page))?.tracks.find((track) => track.id === trackId)?.audioVolume
+    )
+    .toBe(1);
+  await level.fill('200');
+  await level.press('Tab');
+  await expect
+    .poll(
+      async () =>
+        (await readProject(page))?.tracks.find((track) => track.id === trackId)?.audioVolume
+    )
+    .toBe(2);
+  const materialsClose = page.locator('[data-ui="video-editor.materials.close"]');
+  if (await materialsClose.isVisible()) await operate(materialsClose);
+  const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+  const handle = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
+  const original = (await inspector.boundingBox())!.width;
+  for (const width of [359, 360, 361, original]) {
+    const box = (await handle.boundingBox())!;
+    const current = (await inspector.boundingBox())!.width;
+    await page.mouse.move(box.x + box.width / 2, box.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + current - width, box.y + 12);
+    await page.mouse.up();
+    await expect
+      .poll(async () => Math.round((await inspector.boundingBox())!.width))
+      .toBe(Math.round(width));
+    const fits = await owner.evaluate((node) => {
+      const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+      if (!(body instanceof HTMLElement)) throw new Error('Missing inspector scroll owner');
+      const bounds = body.getBoundingClientRect();
+      return (
+        body.scrollWidth <= body.clientWidth + 1 &&
+        [...node.querySelectorAll('input,button')].every((control) => {
+          const rect = control.getBoundingClientRect();
+          return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+        })
+      );
+    });
+    expect(fits).toBe(true);
+    await page.screenshot({ path: capture(`track-master-${width}.png`), fullPage: false });
+  }
+  await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+  await expect(level).toHaveValue('200');
+  await page.screenshot({ path: capture('track-master-all-sections.png'), fullPage: false });
+  await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+  await page.reload();
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  const reopened = await readProject(page);
+  expect(reopened?.version).toBe(7);
+  expect(reopened?.tracks.find((track) => track.id === trackId)?.audioVolume).toBe(2);
+  expect(reopened?.clips).toEqual(before.clips);
+}
+
 async function refuseTakeSave(page: Page) {
   await page.evaluate(() => {
     const put = IDBObjectStore.prototype.put;
@@ -931,6 +1045,8 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
         await page.setViewportSize({ ...variant.size });
         if (originalAudioMute && take?.type === 'AUDIO')
           await verifyOriginalAudioRestore(page, take, label, (name) => info.outputPath(name));
+        if (input === 'ai' && take?.type === 'AUDIO')
+          await verifyTrackAudioMaster(page, take.trackId, label, (name) => info.outputPath(name));
         expect(errors).toEqual([]);
       } finally {
         await new Promise<void>((resolve) => host.server.close(() => resolve()));

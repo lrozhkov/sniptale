@@ -127,6 +127,8 @@ export interface VideoProjectShapeStyle {
 }
 
 export interface VideoProjectTrack {
+  /** Independent AUDIO track master; omission means unity. */
+  audioVolume?: number;
   effectsBypassed?: boolean;
   id: string;
   name: string;

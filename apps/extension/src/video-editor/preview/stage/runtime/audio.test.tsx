@@ -346,3 +346,25 @@ it.each([1, 1.5, 2])(
     }
   }
 );
+
+it('applies a live AUDIO track master without changing the media element or clip gain', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const project = createEmptyVideoProject('Audio master');
+  const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+  track.audioVolume = 2;
+  project.tracks.push(track);
+  const clip = createAudioClip(track.id, { volume: 1.5 });
+  const current = createProject([clip]);
+  current.tracks = project.tracks;
+  const audio = createAudioElement();
+  await renderHarness({
+    audioRefs: { current: { [clip.id]: audio } },
+    currentTime: 6,
+    isPlaying: true,
+    project: current,
+    syncedClips: [clip],
+  });
+  expect(graph.latestContext.gains[0]!.gain.value).toBe(3);
+  expect(clip.volume).toBe(1.5);
+  expect(audio.volume).toBe(1);
+});

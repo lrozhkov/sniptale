@@ -378,6 +378,10 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Аудио-клип',
     en: 'Audio clip',
   },
+  trackVolumeLabel: {
+    ru: 'Громкость дорожки',
+    en: 'Track volume',
+  },
   volumeLabel: {
     ru: 'Общая громкость',
     en: 'Unified gain',

@@ -307,3 +307,44 @@ it.each([{}, [{ start: 0, end: 8, volume: 0 }], [{ start: 0, end: 8, volume: 'in
     ).toEqual([]);
   }
 );
+
+it('projects AUDIO masters once for full and partial export while preserving clips', () => {
+  const project = createEmptyVideoProject('Track export');
+  project.duration = 8;
+  const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Music',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'music' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 10,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.volume = 1.5;
+  const neighbor = { ...clip, id: 'neighbor', trackId: project.tracks[0]!.id };
+  project.assets = [asset];
+  project.tracks.push(track);
+  project.clips = [clip, neighbor];
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = structuredClone(project);
+  expect(collectRenderableAudioClips(project).map((clip) => clip.volume)).toEqual([3, 1.5]);
+  const partial = collectRenderableAudioClips(project, {
+    rangeStartSeconds: 2,
+    rangeEndSeconds: 4,
+  });
+  expect(partial.map((clip) => [clip.volume, clip.startTime, clip.duration])).toEqual([
+    [3, 0, 2],
+    [1.5, 0, 2],
+  ]);
+  expect(project).toEqual(before);
+  track.audioVolume = 0;
+  expect(collectRenderableAudioClips(project).map((clip) => clip.volume)).toEqual([0, 1.5]);
+});

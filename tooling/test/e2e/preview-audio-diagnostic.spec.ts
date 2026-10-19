@@ -142,7 +142,7 @@ test('actual preview media sync preserves amplification and agrees with native e
       if (!diagnostic) throw new Error('Diagnostic unavailable');
       return diagnostic.runAmplification();
     });
-    if (!Array.isArray(result) || result.length !== 2)
+    if (!Array.isArray(result) || result.length !== 5)
       throw new Error('Invalid amplified preview result');
     for (const value of result) {
       const row: unknown = value;
@@ -151,6 +151,8 @@ test('actual preview media sync preserves amplification and agrees with native e
         row === null ||
         !('volume' in row) ||
         typeof row.volume !== 'number' ||
+        !('master' in row) ||
+        typeof row.master !== 'number' ||
         !('gain' in row) ||
         typeof row.gain !== 'number' ||
         !('previewRms' in row) ||
@@ -165,12 +167,16 @@ test('actual preview media sync preserves amplification and agrees with native e
         throw new Error('Invalid amplified preview sample');
       }
       expect(row.volume === 1.5 || row.volume === 2).toBe(true);
-      expect(row.gain).toBeCloseTo(row.volume, 6);
+      expect(row.gain).toBeCloseTo(row.volume * row.master, 6);
       expect(row.elementVolume).toBe(1);
       expect(row.unchanged).toBe(true);
-      expect(Math.abs(row.previewRms - row.expectedRms)).toBeLessThan(row.expectedRms * 0.05);
+      expect(Math.abs(row.previewRms - row.expectedRms)).toBeLessThan(
+        Math.max(1e-4, row.expectedRms * 0.05)
+      );
       expect(Math.abs(row.exportRms - row.expectedRms)).toBeLessThan(1e-4);
-      expect(Math.abs(row.previewRms - row.exportRms)).toBeLessThan(row.expectedRms * 0.05);
+      expect(Math.abs(row.previewRms - row.exportRms)).toBeLessThan(
+        Math.max(1e-4, row.expectedRms * 0.05)
+      );
     }
   } finally {
     await new Promise<void>((resolve, reject) =>

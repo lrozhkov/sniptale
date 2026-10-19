@@ -1,3 +1,4 @@
+import { getProjectTrackAudioVolume } from '../../../../features/video/project/timeline/track-audio';
 import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
 import { buildProjectTransitionSegments } from '../../../../features/video/project/transition/project';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
@@ -36,6 +37,7 @@ export function collectRenderableAudioClips(
     const originalAudioRanges = getProjectOriginalAudioRanges(project, clip);
     return {
       ...clip,
+      volume: clip.volume * getProjectTrackAudioVolume(project, clip.trackId),
       ...(audioTransitions.length ? { audioTransitions } : {}),
       originalAudioRanges,
     };

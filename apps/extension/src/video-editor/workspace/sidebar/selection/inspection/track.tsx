@@ -5,7 +5,12 @@ import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { SelectionEmptyState } from './helpers';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
-import { TrackGeneralFields, TrackLayoutFields, TrackPanelDeleteButton } from '../track/sections';
+import {
+  TrackAudioFields,
+  TrackGeneralFields,
+  TrackLayoutFields,
+  TrackPanelDeleteButton,
+} from '../track/sections';
 import { isVideoEditorPresentedTrack } from '../../../../project/operations/presented-tracks';
 
 export function InspectTrackPanel(props: WorkspaceSidebarSelectionPanelProps) {
@@ -47,6 +52,15 @@ function TrackInspectorContent(
                 onToggleTrackLock={props.onToggleTrackLock}
                 onToggleTrackVisibility={props.onToggleTrackVisibility}
               />
+            ),
+          },
+          {
+            id: 'audio',
+            semantic: 'audio',
+            visible: props.selectedTrack.kind === 'AUDIO',
+            label: translate('videoEditor.sidebar.inspectorGroupAudio'),
+            content: (
+              <TrackAudioFields project={props.project} selectedTrack={props.selectedTrack} />
             ),
           },
           {

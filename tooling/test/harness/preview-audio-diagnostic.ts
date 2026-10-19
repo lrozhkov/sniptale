@@ -1,6 +1,7 @@
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectTrack,
 } from '../../../apps/extension/src/features/video/project/factories/creation';
 import { createAudioClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
 import { syncPreviewAudioElements } from '../../../apps/extension/src/video-editor/preview/stage/runtime/audio-elements';
@@ -302,7 +303,13 @@ function rootMeanSquare(samples: Float32Array) {
 
 async function runAmplificationDiagnostic() {
   const results = [];
-  for (const volume of [1.5, 2]) {
+  for (const { volume, master } of [
+    { volume: 1.5, master: 1 },
+    { volume: 2, master: 1 },
+    { volume: 1.5, master: 2 },
+    { volume: 2, master: 2 },
+    { volume: 1.5, master: 0 },
+  ]) {
     const context = createDriverScenarioContext();
     try {
       await waitForCanPlay(context.audio);
@@ -321,7 +328,10 @@ async function runAmplificationDiagnostic() {
           audioPeaks: null,
         }
       );
-      const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset);
+      const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+      track.audioVolume = master;
+      project.tracks.push(track);
+      const clip = createAudioClipFromAsset(track.id, asset);
       clip.volume = volume;
       project.assets = [asset];
       project.clips = [clip];
@@ -343,7 +353,7 @@ async function runAmplificationDiagnostic() {
       analyser.fftSize = 4096;
       node.gain.connect(analyser);
       const deadline = performance.now() + 3000;
-      while (context.audio.currentTime < 0.2 || live.state !== 'running') {
+      while (master > 0 && (context.audio.currentTime < 0.2 || live.state !== 'running')) {
         if (performance.now() > deadline) throw new Error('Native amplified preview did not start');
         await delay(25);
       }
@@ -360,11 +370,12 @@ async function runAmplificationDiagnostic() {
       const rendered = await offline.startRendering();
       results.push({
         volume,
+        master,
         gain: node.gain.gain.value,
         elementVolume: context.audio.volume,
         previewRms,
         exportRms: rootMeanSquare(rendered.getChannelData(0).slice(9600, 13696)),
-        expectedRms: volume * rootMeanSquare(buffer.getChannelData(0).slice(9600, 13696)),
+        expectedRms: volume * master * rootMeanSquare(buffer.getChannelData(0).slice(9600, 13696)),
         unchanged: before === JSON.stringify(project),
       });
       analyser.disconnect();

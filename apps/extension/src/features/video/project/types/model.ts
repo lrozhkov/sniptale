@@ -297,7 +297,7 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4 | 5 | 6;
+  version: 2 | 3 | 4 | 5 | 6 | 7;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;

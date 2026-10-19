@@ -414,3 +414,12 @@ Preview and export multiply this attenuation separately from the manual gain env
 Splitting a target preserves its source-instance identity. Duplicating a linked group remaps targets in its copied takes. Duplicating only a take retains its explicit targets. Removing one override leaves other overrides and manual gains unchanged.
 
 Content mutations promote the project to version 6 when an override is present. Later mutations retain version 6 after removal of the last override. Versions 2–5 remain readable when this field is absent. Older project readers refuse version 6 before publication. This change does not require a physical database migration.
+
+
+## Montage audio track masters
+
+Project JSON version 7 admits optional `audioVolume` from 0 to 2 on AUDIO tracks. Omission means 1. Versions 2–6 remain readable without this field. Older readers refuse version 7. Content mutations promote the project to version 7 when a track has this field. Later mutations retain version 7 after field or track removal.
+
+Preview and export multiply the track master separately from clip gain, fades, transitions, and original attenuation. Master edits preserve authored clip fields. A zero master does not remove original attenuation bindings. Track visibility remains a separate gate. Independent EffectV1 audio retains its own gain.
+
+The existing project mutation, history, and save owners control these edits. Opening a project does not write a default master. This change does not require a physical database migration.

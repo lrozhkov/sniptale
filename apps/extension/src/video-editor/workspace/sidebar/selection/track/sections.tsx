@@ -1,3 +1,10 @@
+import {
+  getProjectTrackAudioVolume,
+  updateProjectTrackAudioVolume,
+} from '../../../../../features/video/project/timeline/track-audio';
+import type { VideoProject } from '../../../../../features/video/project/types';
+import { useVideoEditorTimelineEditingPort } from '../../../../runtime/controller/store';
+import { useAppLocale } from '../../../../../platform/i18n';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
@@ -136,6 +143,39 @@ export function TrackLayoutFields({
           onCommitValue={setHeight}
         />
       </>
+    </div>
+  );
+}
+
+/** Track master editing keeps clip gain and visibility under their existing owners. */
+export function TrackAudioFields(props: {
+  project: VideoProject;
+  selectedTrack: VideoProject['tracks'][number];
+}) {
+  useAppLocale();
+  const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
+  const change = (value: number) =>
+    updateProject((current) =>
+      current === props.project
+        ? updateProjectTrackAudioVolume(current, props.selectedTrack.id, value / 100)
+        : current
+    );
+  return (
+    <div data-ui="video-editor.inspector.track-audio" className="sniptale-parameter-stack">
+      <NumericRow
+        appearance="plain"
+        label={translate('videoEditor.sidebar.trackVolumeLabel')}
+        scrub={{ min: 0, max: 200, step: 1 }}
+        value={getProjectTrackAudioVolume(props.project, props.selectedTrack.id) * 100}
+        min={0}
+        max={200}
+        step={1}
+        precision={0}
+        unit="%"
+        disabled={props.selectedTrack.locked}
+        onPreviewValue={change}
+        onCommitValue={change}
+      />
     </div>
   );
 }

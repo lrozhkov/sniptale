@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 7])
+  for (const version of [2, 3, 4, 8])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);

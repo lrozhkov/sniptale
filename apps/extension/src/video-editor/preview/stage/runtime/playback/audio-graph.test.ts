@@ -139,3 +139,21 @@ describe('preview audio graph', () => {
   it('updates gain without changing DOM mute or volume', verifiesGainRampWithoutDomMute);
   it('fails soft when AudioContext resume rejects', verifiesResumeFailureStopsPlayback);
 });
+
+it('admits clip and master amplification up to four while retaining invalid gain protection', () => {
+  installPreviewAudioContextHarness();
+  const state = createPreviewAudioGraphState();
+  const node = ensurePreviewAudioGraphNode(state, 'master', createAudioElement());
+  if (!node) throw new Error('Missing preview graph');
+  for (const [input, expected] of [
+    [3, 3],
+    [4, 4],
+    [5, 4],
+    [-1, 0],
+    [NaN, 0],
+    [Infinity, 0],
+  ]) {
+    setPreviewAudioNodeGain(node, input!);
+    expect(node.gain.gain.value).toBe(expected);
+  }
+});

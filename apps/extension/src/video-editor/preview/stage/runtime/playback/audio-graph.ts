@@ -179,7 +179,7 @@ export function ensurePreviewAudioGraphNode(
 }
 
 export function setPreviewAudioNodeGain(node: PreviewAudioGraphNode, gain: number): void {
-  const nextGain = Math.min(2, Math.max(0, Number.isFinite(gain) ? gain : 0));
+  const nextGain = Math.min(4, Math.max(0, Number.isFinite(gain) ? gain : 0));
   const now = node.gain.context.currentTime;
 
   try {

@@ -1,5 +1,26 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-audio-track-master',
+    productionFile: 'apps/extension/src/features/video/project/timeline/track-audio.ts',
+    allowCrossOwner: true,
+    reason:
+      'Track masters affect admission, hydration, preview, scene response, export and mounted history.',
+    testFiles: [
+      'apps/extension/src/features/video/project/timeline/track-audio.test.ts',
+      'apps/extension/src/features/video/project/validation/tracks.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/mutation.test.ts',
+      'apps/extension/src/features/video/project/scene/background-audio.test.ts',
+      'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/mix/schedule.test.ts',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/playback/audio-graph.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/track/sections.test.tsx',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-text.test.ts',
+    ],
+  },
+  {
     owner: 'montage-original-audio-authoring-consumers',
     productionFile: 'apps/extension/src/features/video/project/timeline/original-audio.ts',
     reason:
