@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { Path, Textbox } from 'fabric';
+import { Path, StaticCanvas, Textbox } from 'fabric';
 import type { DrawingObject } from '../../../features/drawing/public';
 import { readEditorDrawingObject } from './metadata';
 import {
@@ -354,6 +354,35 @@ it.each(['#00000000', '#00000080', '#111827'])(
     expect(readEditorDrawingObject(object)).toMatchObject({ color, text: 'Caret' });
   }
 );
+describe.each(['ltr', 'rtl'] as const)('editing caret geometry in %s text', (direction) => {
+  it.each([0.5, 1, 2])('keeps the caret quiet and precise at zoom %s', (zoom) => {
+    const canvas = new StaticCanvas(document.createElement('canvas'), { renderOnAddRemove: false });
+    const object = new Textbox('First\nNext\n', { fontSize: 24, fontFamily: 'serif', direction });
+    canvas.setZoom(zoom);
+    canvas.add(object);
+    object.set({ scaleX: 1.5, scaleY: 1.5 });
+    applyEditorDrawingTextVisuals(object);
+    applyEditorDrawingTextVisuals(object);
+    for (const index of [0, 2, 5, 6, 10, 11]) {
+      const boundaries = object._getCursorBoundaries(index, true);
+      const baseline = Textbox.prototype.getCursorRenderingData.call(object, index, boundaries);
+      const actual = object.getCursorRenderingData(index, boundaries);
+      const multiplier = zoom * 1.5;
+      const edge = index === 0 || index === 6 ? -2 : index === 5 || index === 10 ? 2 : 0;
+      const shift = edge * (direction === 'rtl' ? -1 : 1);
+      expect(actual.width * multiplier).toBeCloseTo(1.5, 6);
+      expect(actual.height).toBeCloseTo(baseline.height * 0.8, 6);
+      expect(actual.top + actual.height / 2).toBeCloseTo(baseline.top + baseline.height / 2, 6);
+      expect(
+        (actual.left + actual.width / 2 - baseline.left - baseline.width / 2) * multiplier
+      ).toBeCloseTo(shift, 6);
+      expect(actual.color).toBe('#2563eb');
+    }
+    expect(object.text).toBe('First\nNext\n');
+    void canvas.dispose();
+  });
+});
+
 describe('Fabric drawing adapter', () => {
   it.each([
     { fontSize: 16, text: 'One', color: '#111' },

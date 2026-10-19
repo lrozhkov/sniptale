@@ -23,6 +23,7 @@ import { createObjectLabel } from '../../document/model';
 import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
+  getCursorRenderingData: Textbox['getCursorRenderingData'];
   getLineLeftOffset: Textbox['_getLineLeftOffset'];
   getTopOffset: Textbox['_getTopOffset'];
   wrapText: Textbox['_wrapText'];
@@ -259,8 +260,10 @@ function renderEditorDrawingTextStencil(
 
 export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
   textbox.cursorColor = DEFAULT_COLOR_INFO_STRONG;
+  textbox.cursorWidth = 1.5;
   if (!textboxVisualAdapters.has(textbox)) {
     const adapter: TextboxVisualAdapter = {
+      getCursorRenderingData: textbox.getCursorRenderingData.bind(textbox),
       getLineLeftOffset: textbox._getLineLeftOffset.bind(textbox),
       getTopOffset: textbox._getTopOffset.bind(textbox),
       wrapText: textbox._wrapText.bind(textbox),
@@ -269,6 +272,20 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
       stencilContext: null,
     };
     textboxVisualAdapters.set(textbox, adapter);
+    textbox.getCursorRenderingData = (selectionStart = textbox.selectionStart, boundaries) => {
+      const cursor = adapter.getCursorRenderingData(selectionStart, boundaries);
+      const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
+      const lineLength = textbox._textLines[lineIndex]?.length ?? 0;
+      const edge = lineLength === 0 ? 0 : charIndex === 0 ? -1 : charIndex === lineLength ? 1 : 0;
+      const direction = textbox.direction === 'rtl' ? -1 : 1;
+      const gap = (cursor.width / textbox.cursorWidth) * 2;
+      return {
+        ...cursor,
+        left: cursor.left + edge * direction * gap,
+        top: cursor.top + cursor.height * 0.1,
+        height: cursor.height * 0.8,
+      };
+    };
     textbox._getLineLeftOffset = (lineIndex) =>
       adapter.getLineLeftOffset(lineIndex) + DRAWING_TEXT_HORIZONTAL_PADDING / 2;
     textbox._getTopOffset = () => adapter.getTopOffset() + DRAWING_TEXT_VERTICAL_PADDING;
