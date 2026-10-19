@@ -39,6 +39,7 @@ export interface ProjectVoiceTakeAccess extends ProjectVoiceReadAccess {
 interface VoiceAttachment {
   access: ProjectVoiceTakeAccess;
   placement: string;
+  members: readonly ProjectVoiceTakePreview[];
   prepared?: PreparedProjectAsset;
   cleanup?: PreparedProjectAsset;
   receipt?: { clipId: string; assetId: string; signature: string };
@@ -169,22 +170,66 @@ export async function cleanupProjectVoiceTakePreview(
     await discardAudioStaging(preview.source.staged, preview.source.scope);
 }
 
-/** Accepts once; a failed Save retries its receipt without another paid job or insertion. */
-export async function acceptProjectVoiceTake(
+/** Each take keeps an explicit independent Montage destination. */
+export interface ProjectVoiceTakeSelection {
+  preview: ProjectVoiceTakePreview;
+  placement: VideoProjectVoicePlacement;
+}
+
+type VoiceBatchItem = ProjectVoiceTakeSelection & { attachment: VoiceAttachment };
+
+function bindVoiceBatch(
   access: ProjectVoiceTakeAccess,
-  preview: ProjectVoiceTakePreview,
-  placement: VideoProjectVoicePlacement,
+  selected: readonly ProjectVoiceTakeSelection[]
+) {
+  if (!selected.length || new Set(selected.map((item) => item.preview)).size !== selected.length)
+    throw new Error('invalid-request');
+  for (const { preview } of selected) {
+    if (preview.closed || preview.origin !== access) throw new Error('stale');
+    if (preview.accepting) throw new Error('busy');
+  }
+  const members =
+    selected.find(({ preview }) => preview.attachment)?.preview.attachment?.members ??
+    selected.map(({ preview }) => preview);
+  if (
+    members.length !== selected.length ||
+    members.some((preview, index) => preview !== selected[index]?.preview)
+  )
+    throw new Error('stale');
+  const items: VoiceBatchItem[] = selected.map(({ preview, placement }) => {
+    const destination = { ...placement };
+    const key = JSON.stringify([
+      destination.start,
+      destination.trackId,
+      destination.timelineLaneId,
+    ]);
+    const attachment = preview.attachment ?? { access, placement: key, members };
+    if (
+      attachment.access !== access ||
+      attachment.placement !== key ||
+      attachment.members !== members
+    )
+      throw new Error('stale');
+    return { preview, placement: destination, attachment };
+  });
+  for (const item of items) item.preview.attachment = item.attachment;
+  return items;
+}
+
+/** Accepts all takes in one update; failed Save retries the complete receipt without reinsertion. */
+export async function acceptProjectVoiceTakes(
+  access: ProjectVoiceTakeAccess,
+  selected: readonly ProjectVoiceTakeSelection[],
   signal: AbortSignal
 ): Promise<void> {
   signal.throwIfAborted();
-  if (preview.closed || preview.origin !== access) throw new Error('stale');
-  if (preview.accepting) throw new Error('busy');
-  const pending = applyVoiceAttachment(access, preview, placement, signal);
-  preview.accepting = pending;
+  const items = bindVoiceBatch(access, selected);
+  const pending = Promise.resolve().then(() => applyVoiceAttachments(access, items, signal));
+  for (const { preview } of items) preview.accepting = pending;
   try {
     await pending;
   } finally {
-    delete preview.accepting;
+    for (const { preview } of items) if (preview.accepting === pending) delete preview.accepting;
   }
 }
 
@@ -210,35 +255,42 @@ async function releaseUnacceptedVoice(attachment: VoiceAttachment) {
   delete attachment.cleanup;
 }
 
-async function applyVoiceAttachment(
+async function releaseVoiceBatch(items: readonly VoiceBatchItem[]) {
+  let failed = false;
+  for (const { preview, attachment } of items) {
+    try {
+      await releaseUnacceptedVoice(attachment);
+      if (preview.attachment === attachment) delete preview.attachment;
+    } catch {
+      failed = true;
+    }
+  }
+  if (failed) throw new Error('storage-failed');
+}
+
+async function applyVoiceAttachments(
   access: ProjectVoiceTakeAccess,
-  preview: ProjectVoiceTakePreview,
-  placement: VideoProjectVoicePlacement,
+  items: readonly VoiceBatchItem[],
   signal: AbortSignal
 ) {
-  const placementKey = JSON.stringify([
-    placement.start,
-    placement.trackId,
-    placement.timelineLaneId,
-  ]);
-  const attachment: VoiceAttachment = preview.attachment ?? { access, placement: placementKey };
-  if (attachment.access !== access || attachment.placement !== placementKey)
-    throw new Error('stale');
-  preview.attachment = attachment;
-  if (attachment.cleanup) await releaseUnacceptedVoice(attachment);
+  for (const { attachment } of items)
+    if (attachment.cleanup) await releaseUnacceptedVoice(attachment);
   try {
-    if (!attachment.receipt) {
-      await insertVoiceAttachment(access, preview, attachment, placement, signal);
-    }
-    const receipt = attachment.receipt;
+    const accepted = items.filter(({ attachment }) => attachment.receipt);
+    if (accepted.length && accepted.length !== items.length) throw new Error('stale');
+    if (!accepted.length) await insertVoiceAttachments(access, items, signal);
+    const projectId = items[0]!.preview.projectId;
     const matches = (project: VideoProject | null) =>
-      project?.id === preview.projectId &&
-      receipt &&
-      voiceReceiptSignature(project, attachment) === receipt.signature;
+      project?.id === projectId &&
+      items.every(
+        ({ attachment }) =>
+          attachment.receipt &&
+          voiceReceiptSignature(project, attachment) === attachment.receipt.signature
+      );
     if (!matches(access.getProject())) throw new Error('stale');
     await access.save();
     signal.throwIfAborted();
-    const saved = await getVideoProject(preview.projectId);
+    const saved = await getVideoProject(projectId);
     signal.throwIfAborted();
     if (
       saved.status !== 'ready' ||
@@ -248,47 +300,67 @@ async function applyVoiceAttachment(
     )
       throw new Error('stale');
   } catch (error) {
-    if (!attachment.receipt) {
+    if (!items.some(({ attachment }) => attachment.receipt)) {
       try {
-        await releaseUnacceptedVoice(attachment);
-        delete preview.attachment;
+        await releaseVoiceBatch(items);
       } catch {
-        // An unresolved publication keeps its handle for explicit retry or cleanup.
+        // Unresolved compensation retains exact handles for explicit retry or cleanup.
       }
     }
     throw error;
   }
 }
 
-async function insertVoiceAttachment(
+function planVoiceBatch(project: VideoProject, items: readonly VoiceBatchItem[]) {
+  let next = project;
+  const planned = items.map((item) => {
+    const { preview, attachment, placement } = item;
+    const asset = createVideoProjectAsset(
+      preview.filename,
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: attachment.prepared?.id ?? crypto.randomUUID() },
+      {
+        width: 0,
+        height: 0,
+        duration: preview.duration,
+        mimeType: preview.blob.type,
+        size: preview.blob.size,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const added = addVideoProjectVoiceTake(next, asset, preview.textSnapshot, placement);
+    if (!added) throw new Error('selection');
+    next = added.project;
+    return { ...item, asset, clip: added.clip };
+  });
+  return { project: next, items: planned };
+}
+
+async function insertVoiceAttachments(
   access: ProjectVoiceTakeAccess,
-  preview: ProjectVoiceTakePreview,
-  attachment: VoiceAttachment,
-  placement: VideoProjectVoicePlacement,
+  items: readonly VoiceBatchItem[],
   signal: AbortSignal
 ) {
   signal.throwIfAborted();
   const initial = access.getProject();
-  if (
-    preview.closed ||
-    !initial ||
-    initial.id !== preview.projectId ||
-    Date.now() >= preview.expiresAt
-  )
-    throw new Error('stale');
+  if (!initial) throw new Error('stale');
   const basis = localProjectKey(initial);
   const assertCurrent = () => {
     signal.throwIfAborted();
     const current = access.getProject();
     if (
-      preview.closed ||
       !current ||
       localProjectKey(current) !== basis ||
-      Date.now() >= preview.expiresAt
+      items.some(
+        ({ preview }) =>
+          preview.closed || preview.projectId !== current.id || Date.now() >= preview.expiresAt
+      )
     )
       throw new Error('stale');
     return current;
   };
+  assertCurrent();
   await access.save();
   const current = assertCurrent();
   const saved = await getVideoProject(current.id);
@@ -299,42 +371,33 @@ async function insertVoiceAttachment(
     localProjectKey(saved.project) !== basis
   )
     throw new Error('stale');
-  const asset = createVideoProjectAsset(
-    preview.filename,
-    'AUDIO',
-    { kind: 'project-asset', projectAssetId: attachment.prepared?.id ?? crypto.randomUUID() },
-    {
-      width: 0,
-      height: 0,
-      duration: preview.duration,
-      mimeType: preview.blob.type,
-      size: preview.blob.size,
-      hasAudio: true,
-      audioPeaks: null,
-    }
-  );
-  const planned = addVideoProjectVoiceTake(current, asset, preview.textSnapshot, placement);
-  if (!planned) throw new Error('selection');
-  if (asset.source.kind !== 'project-asset') throw new Error('invalid-request');
-  await assertLocalSource(preview);
-  assertCurrent();
-  attachment.prepared ??= await prepareProjectAsset(
-    preview.blob,
-    preview.blob.type,
-    asset.name,
-    asset.source.projectAssetId,
-    undefined,
-    undefined,
-    { publishToLibrary: false }
-  );
-  assertCurrent();
-  await attachment.prepared.publish();
-  assertCurrent();
+  const planned = planVoiceBatch(current, items);
+  for (const { preview, attachment, asset } of planned.items) {
+    if (asset.source.kind !== 'project-asset') throw new Error('invalid-request');
+    await assertLocalSource(preview);
+    assertCurrent();
+    attachment.prepared ??= await prepareProjectAsset(
+      preview.blob,
+      preview.blob.type,
+      asset.name,
+      asset.source.projectAssetId,
+      undefined,
+      undefined,
+      { publishToLibrary: false }
+    );
+    assertCurrent();
+  }
+  for (const { attachment } of items) {
+    await attachment.prepared!.publish();
+    assertCurrent();
+  }
   if (!(await isCurrentVideoProjectSnapshot(saved.project, saved.workspaceRevision)))
     throw new Error('stale');
   assertCurrent();
-  await assertLocalSource(preview);
-  assertCurrent();
+  for (const { preview } of items) {
+    await assertLocalSource(preview);
+    assertCurrent();
+  }
   access.update((project) => {
     if (localProjectKey(project) !== basis) throw new Error('stale');
     const next = applyVideoProjectMutationPatch(project, {
@@ -343,9 +406,15 @@ async function insertVoiceAttachment(
       clips: planned.project.clips,
       duration: planned.project.duration,
     });
-    attachment.receipt = { clipId: planned.clip.id, assetId: asset.id, signature: '' };
-    attachment.receipt.signature = voiceReceiptSignature(next, attachment);
+    const receipts = planned.items.map(({ clip, asset, attachment }) => {
+      const receipt = { clipId: clip.id, assetId: asset.id, signature: '' };
+      const signature = voiceReceiptSignature(next, { ...attachment, receipt });
+      return { ...receipt, signature };
+    });
+    planned.items.forEach(({ attachment }, index) => {
+      attachment.receipt = receipts[index]!;
+    });
     return next;
   });
-  if (!attachment.receipt) throw new Error('stale');
+  if (items.some(({ attachment }) => !attachment.receipt)) throw new Error('stale');
 }

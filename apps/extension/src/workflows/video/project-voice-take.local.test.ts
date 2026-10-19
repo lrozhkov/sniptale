@@ -16,7 +16,7 @@ import {
 import { discardAudioStaging } from '../../composition/persistence/assets/audio-staging';
 import { inspectReviewAudio } from '../video-review/audio-import';
 import {
-  acceptProjectVoiceTake,
+  acceptProjectVoiceTakes,
   cleanupProjectVoiceTakePreview,
   prepareProjectLocalTextVoice,
   type ProjectVoiceTakeAccess,
@@ -171,7 +171,11 @@ it.each(['microphone', 'gallery'] as const)(
     expect(preview.blob).toBe(f.file);
     expect(f.access.save).not.toHaveBeenCalled();
     expect(prepareProjectAsset).not.toHaveBeenCalled();
-    await acceptProjectVoiceTake(f.access, preview, { start: 7 }, signal());
+    await acceptProjectVoiceTakes(
+      f.access,
+      [{ preview: preview, placement: { start: 7 } }],
+      signal()
+    );
     expect(f.project().clips[0]).toMatchObject({
       startTime: 7,
       duration: 12,
@@ -260,9 +264,9 @@ it('refuses a deleted or replaced Library source before insertion', async () => 
   const f = fixture();
   const preview = await f.prepare(true);
   vi.mocked(assertLibraryAudioBindingSource).mockRejectedValueOnce(new Error('unavailable'));
-  await expect(acceptProjectVoiceTake(f.access, preview, { start: 0 }, signal())).rejects.toThrow(
-    'unavailable'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('unavailable');
   expect(prepareProjectAsset).not.toHaveBeenCalled();
   expect(f.access.update).not.toHaveBeenCalled();
 });
@@ -273,9 +277,9 @@ it('refuses source replacement during publication and releases only its own priv
   vi.mocked(assertLibraryAudioBindingSource)
     .mockResolvedValueOnce(undefined)
     .mockRejectedValueOnce(new Error('changed-source'));
-  await expect(acceptProjectVoiceTake(f.access, preview, { start: 0 }, signal())).rejects.toThrow(
-    'changed-source'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('changed-source');
   expect(f.access.update).not.toHaveBeenCalled();
   expect(f.prepared.cancel).toHaveBeenCalledOnce();
   expect(deleteProjectAsset).toHaveBeenCalledExactlyOnceWith(f.prepared.id);
@@ -289,11 +293,15 @@ it('retries Save after Library deletion without republishing or reinserting', as
   vi.mocked(f.access.save)
     .mockResolvedValueOnce(undefined)
     .mockRejectedValueOnce(new Error('save refused'));
-  await expect(acceptProjectVoiceTake(f.access, preview, { start: 4 }, signal())).rejects.toThrow(
-    'save refused'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: preview, placement: { start: 4 } }], signal())
+  ).rejects.toThrow('save refused');
   vi.mocked(assertLibraryAudioBindingSource).mockRejectedValue(new Error('deleted'));
-  await acceptProjectVoiceTake(f.access, preview, { start: 4 }, signal());
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: preview, placement: { start: 4 } }],
+    signal()
+  );
   expect(f.access.update).toHaveBeenCalledOnce();
   expect(prepareProjectAsset).toHaveBeenCalledOnce();
   expect(f.prepared.publish).toHaveBeenCalledOnce();
@@ -361,7 +369,11 @@ it('keeps the recording basis across unrelated edits and retries refusal with th
   });
   expect(inspectReviewAudio).toHaveBeenCalledOnce();
   expect(f.access.save).not.toHaveBeenCalled();
-  await acceptProjectVoiceTake(f.access, preview, { start: 3 }, signal());
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: preview, placement: { start: 3 } }],
+    signal()
+  );
   f.project().textDocuments![0]!.document.fragments[0]!.text = 'Changed after acceptance';
   expect(f.project().clips[0]).toMatchObject({
     textSnapshot: { text: { text: original.text } },

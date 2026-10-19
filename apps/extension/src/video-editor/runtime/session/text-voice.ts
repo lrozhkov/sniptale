@@ -18,7 +18,7 @@ import {
   generateProjectTextVoice,
 } from '../../../workflows/video/project-text-voice';
 import {
-  acceptProjectVoiceTake,
+  acceptProjectVoiceTakes,
   prepareProjectLocalTextVoice,
   cleanupProjectVoiceTakePreview,
   type ProjectVoiceTakeAccess,
@@ -414,7 +414,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       if (!preview || latest.current.accepted) return;
       const placement = latest.current.placement;
       await run(async (signal) => {
-        await acceptProjectVoiceTake(access, preview, placement, signal);
+        await acceptProjectVoiceTakes(access, [{ preview: preview, placement: placement }], signal);
         signal.throwIfAborted();
         if (current()) {
           if (latest.current.source === 'microphone') recording.markRetained();

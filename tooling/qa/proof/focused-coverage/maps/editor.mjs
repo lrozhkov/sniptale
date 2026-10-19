@@ -155,6 +155,7 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
       'apps/extension/src/features/video/project/text/voice-scope.test.ts',
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
@@ -198,6 +199,7 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
       'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
     ],

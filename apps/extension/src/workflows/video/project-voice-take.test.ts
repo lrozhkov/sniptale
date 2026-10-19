@@ -1,18 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  acceptProjectVoiceTake,
-  cleanupProjectVoiceTakePreview,
-  type ProjectVoiceTakeAccess,
-  type ProjectVoiceTakePreview,
-} from './project-voice-take';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
-import {
-  getVideoProject,
-  prepareProjectAsset,
-  deleteProjectAsset,
-  type PreparedProjectAsset,
-} from '../../composition/persistence/projects';
-import { isCurrentVideoProjectSnapshot } from '../../composition/persistence/projects/revision';
+import { acceptProjectVoiceTakes, cleanupProjectVoiceTakePreview } from './project-voice-take';
+import { fixture } from './project-voice-take.test-support';
+import { prepareProjectAsset, deleteProjectAsset } from '../../composition/persistence/projects';
 import { discardAudioStaging } from '../../composition/persistence/assets/audio-staging';
 
 vi.mock('../../composition/persistence/projects', () => ({
@@ -36,131 +25,6 @@ function gate() {
   });
   return { promise, release };
 }
-function fixture() {
-  let project = createEmptyVideoProject('Voice');
-  project.version = 5;
-  let durable = structuredClone(project);
-  let revision = 1;
-  let alive = true;
-  let deleted = false;
-  const order: string[] = [];
-  const prepared: PreparedProjectAsset = {
-    id: 'private-voice',
-    ref: {
-      assetId: 'physical-voice',
-      createdAt: 1,
-      location: { kind: 'opfs', objectKey: 'voice' },
-      mimeType: 'audio/mpeg',
-      sha256: null,
-      size: 4,
-    },
-    protect: vi.fn(async () => undefined),
-    publish: vi.fn(async () => {
-      order.push('publish');
-    }),
-    cancel: vi.fn(async () => undefined),
-    discard: vi.fn(async () => undefined),
-    retainForSession: vi.fn(),
-  };
-  vi.mocked(prepareProjectAsset).mockImplementation(async (_blob, _mime, _name, id) => {
-    order.push('prepare');
-    prepared.id = id!;
-    return prepared;
-  });
-  vi.mocked(getVideoProject).mockImplementation(async () =>
-    deleted
-      ? { status: 'notFound' }
-      : {
-          status: 'ready',
-          project: structuredClone(durable),
-          workspaceRevision: revision,
-        }
-  );
-  vi.mocked(isCurrentVideoProjectSnapshot).mockImplementation(
-    async (snapshot, rev) =>
-      !deleted && revision === rev && JSON.stringify(snapshot) === JSON.stringify(durable)
-  );
-  const save = vi.fn(async () => {
-    order.push('save');
-    project = { ...project, updatedAt: project.updatedAt + 1 };
-    durable = structuredClone(project);
-    revision++;
-  });
-  const update = vi.fn((updater: (current: typeof project) => typeof project) => {
-    order.push('update');
-    project = updater(project);
-  });
-  const access: ProjectVoiceTakeAccess = {
-    getProject: () => (alive ? project : null),
-    update,
-    save,
-  };
-  const preview: ProjectVoiceTakePreview = {
-    origin: access,
-    projectId: project.id,
-    filename: 'Historical words',
-    source: {
-      kind: 'speech',
-      scope: {
-        projectId: project.id,
-        projectRevision: 1,
-        projectUpdatedAt: project.updatedAt,
-        target: { kind: 'project-text', documentId: 'deleted-document', fragmentId: 'old-phrase' },
-        basisHash: `sha256:${'a'.repeat(64)}`,
-      },
-      staged: { id: 'staged', mimeType: 'audio/mpeg', size: 4 },
-    },
-    blob: new Blob(['data'], { type: 'audio/mpeg' }),
-    duration: 12,
-    url: 'blob:preview',
-    expiresAt: Date.now() + 60_000,
-    textSnapshot: {
-      version: 1,
-      documentId: 'deleted-document',
-      binding: { kind: 'project' },
-      basisHash: `sha256:${'a'.repeat(64)}`,
-      text: {
-        kind: 'ai',
-        textId: 'old-phrase',
-        revision: 1,
-        timingRevision: 1,
-        text: 'Historical words',
-        start: 1,
-        end: 2,
-        timeDomain: 'result',
-        profile: { modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' },
-      },
-    },
-  };
-  return {
-    access,
-    preview,
-    prepared,
-    save,
-    update,
-    order,
-    project: () => project,
-    durable: () => durable,
-    undo: () => {
-      project = { ...project, clips: [] };
-    },
-    edit: () => {
-      project = { ...project, name: 'Edited' };
-    },
-    remove: () => {
-      deleted = true;
-    },
-    close: () => {
-      alive = false;
-    },
-    restore: () => {
-      durable = { ...durable, name: 'Restored same tuple' };
-    },
-    recreate: () => {
-      durable = { ...durable, createdAt: durable.createdAt - 1 };
-    },
-  };
-}
 const signal = () => new AbortController().signal;
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
@@ -172,7 +36,11 @@ beforeEach(() => {
 
 it('publishes private audio before one insertion and saves a full independent long take', async () => {
   const f = fixture();
-  await acceptProjectVoiceTake(f.access, f.preview, { start: 7 }, signal());
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 7 } }],
+    signal()
+  );
   expect(f.order).toEqual(['save', 'prepare', 'publish', 'update', 'save']);
   expect(prepareProjectAsset).toHaveBeenCalledWith(
     f.preview.blob,
@@ -205,14 +73,18 @@ it('retries only Save after insertion failure and retains accepted bytes', async
   const f = fixture();
   const original = f.save.getMockImplementation()!;
   f.save.mockImplementationOnce(original).mockRejectedValueOnce(new Error('storage'));
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'storage'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('storage');
   expect(f.project().clips).toHaveLength(1);
   expect(f.prepared.cancel).not.toHaveBeenCalled();
   expect(deleteProjectAsset).not.toHaveBeenCalled();
   f.preview.expiresAt = 0;
-  await acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 0 } }],
+    signal()
+  );
   expect(f.update).toHaveBeenCalledOnce();
   expect(prepareProjectAsset).toHaveBeenCalledOnce();
   expect(f.prepared.publish).toHaveBeenCalledOnce();
@@ -220,17 +92,25 @@ it('retries only Save after insertion failure and retains accepted bytes', async
 });
 it('refuses retry after Undo, placement change, or a different mounted access', async () => {
   const f = fixture();
-  await acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 3 }, signal())).rejects.toThrow(
-    'stale'
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 0 } }],
+    signal()
   );
   await expect(
-    acceptProjectVoiceTake({ ...f.access }, f.preview, { start: 0 }, signal())
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 3 } }], signal())
+  ).rejects.toThrow('stale');
+  await expect(
+    acceptProjectVoiceTakes(
+      { ...f.access },
+      [{ preview: f.preview, placement: { start: 0 } }],
+      signal()
+    )
   ).rejects.toThrow('stale');
   f.undo();
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'stale'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('stale');
   expect(f.update).toHaveBeenCalledOnce();
   expect(deleteProjectAsset).not.toHaveBeenCalled();
 });
@@ -242,11 +122,15 @@ it('serializes acceptance while publication is pending', async () => {
     entered.release();
     await pending.promise;
   });
-  const first = acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
-  await entered.promise;
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'busy'
+  const first = acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 0 } }],
+    signal()
   );
+  await entered.promise;
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('busy');
   pending.release();
   await first;
   expect(f.update).toHaveBeenCalledOnce();
@@ -262,7 +146,11 @@ it.each(['restore', 'recreate', 'remove', 'close', 'edit'] as const)(
       entered.release();
       await pending.promise;
     });
-    const operation = acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
+    const operation = acceptProjectVoiceTakes(
+      f.access,
+      [{ preview: f.preview, placement: { start: 0 } }],
+      signal()
+    );
     await entered.promise;
     f[change]();
     pending.release();
@@ -280,7 +168,11 @@ it('does not insert when aborted during publication', async () => {
     controller.abort();
   });
   await expect(
-    acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, controller.signal)
+    acceptProjectVoiceTakes(
+      f.access,
+      [{ preview: f.preview, placement: { start: 0 } }],
+      controller.signal
+    )
   ).rejects.toThrow();
   expect(f.update).not.toHaveBeenCalled();
   expect(deleteProjectAsset).toHaveBeenCalledOnce();
@@ -293,7 +185,11 @@ it('drains a closed preview before disposing staging without inserting late', as
     entered.release();
     await pending.promise;
   });
-  const operation = acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
+  const operation = acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 0 } }],
+    signal()
+  );
   await entered.promise;
   const cleanup = cleanupProjectVoiceTakePreview(f.preview);
   pending.release();
@@ -306,9 +202,9 @@ it('retains the handle when pre-insertion cleanup fails and permits explicit cle
   const f = fixture();
   vi.mocked(f.prepared.publish).mockRejectedValueOnce(new Error('publication'));
   vi.mocked(f.prepared.cancel).mockRejectedValueOnce(new Error('cleanup'));
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'publication'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('publication');
   expect(f.preview.attachment?.cleanup).toBe(f.prepared);
   expect(f.preview.attachment?.prepared).toBeUndefined();
   await cleanupProjectVoiceTakePreview(f.preview);
@@ -319,7 +215,11 @@ it('retains the handle when pre-insertion cleanup fails and permits explicit cle
 it('refuses transfer to another mounted access before publishing or saving', async () => {
   const f = fixture();
   await expect(
-    acceptProjectVoiceTake({ ...f.access }, f.preview, { start: 0 }, signal())
+    acceptProjectVoiceTakes(
+      { ...f.access },
+      [{ preview: f.preview, placement: { start: 0 } }],
+      signal()
+    )
   ).rejects.toThrow('stale');
   expect(f.save).not.toHaveBeenCalled();
   expect(prepareProjectAsset).not.toHaveBeenCalled();
@@ -327,12 +227,12 @@ it('refuses transfer to another mounted access before publishing or saving', asy
 it('refuses expired or invalid placement before resource publication', async () => {
   const f = fixture();
   await expect(
-    acceptProjectVoiceTake(f.access, f.preview, { start: -1 }, signal())
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: -1 } }], signal())
   ).rejects.toThrow('selection');
   f.preview.expiresAt = 0;
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'stale'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('stale');
   expect(prepareProjectAsset).not.toHaveBeenCalled();
   expect(f.update).not.toHaveBeenCalled();
 });
@@ -372,16 +272,20 @@ it('finishes partial cleanup before preparing a fresh source on acceptance retry
       expect(sourceAvailable, 'retry must not reference a canceled source').toBe(true);
       update(updater);
     });
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'updater refused'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('updater refused');
   expect(f.project().clips).toHaveLength(0);
-  await expect(acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal())).rejects.toThrow(
-    'physical deletion still unavailable'
-  );
+  await expect(
+    acceptProjectVoiceTakes(f.access, [{ preview: f.preview, placement: { start: 0 } }], signal())
+  ).rejects.toThrow('physical deletion still unavailable');
   expect(f.update).toHaveBeenCalledOnce();
   expect(prepareProjectAsset).toHaveBeenCalledOnce();
-  await acceptProjectVoiceTake(f.access, f.preview, { start: 0 }, signal());
+  await acceptProjectVoiceTakes(
+    f.access,
+    [{ preview: f.preview, placement: { start: 0 } }],
+    signal()
+  );
   expect(prepareProjectAsset).toHaveBeenCalledTimes(2);
   expect(vi.mocked(prepareProjectAsset).mock.calls[1]![3]).not.toBe(
     vi.mocked(prepareProjectAsset).mock.calls[0]![3]
