@@ -376,8 +376,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Collapse',
   },
   screenshotDisable: {
-    ru: 'Закрыть',
-    en: 'Close',
+    ru: 'Очистить и закрыть',
+    en: 'Clear and close',
   },
   screenshotDisableError: {
     ru: 'Не удалось закрыть панель. Повторите попытку.',

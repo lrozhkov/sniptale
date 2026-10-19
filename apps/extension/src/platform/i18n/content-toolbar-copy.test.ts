@@ -150,8 +150,8 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Collapse',
   },
   'content.toolbar.screenshotDisable': {
-    ru: 'Закрыть',
-    en: 'Close',
+    ru: 'Очистить и закрыть',
+    en: 'Clear and close',
   },
   'content.autoBlur.autoApplyEnableHint': {
     ru: 'Автоматически размывать данные перед снимком и закрепить панель во вкладке',
