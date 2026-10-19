@@ -212,3 +212,20 @@ it('hides a cropped-out source cursor without rewriting its raw samples or focus
   expect(resolveVideoCompositionCursor(project, 1, [])).not.toBeNull();
   expect(project).toEqual(before);
 });
+
+it('hides a rounded-corner source cursor while retaining capture facts and interior visibility', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample, index) => ({
+    ...sample,
+    recordingPoint: index === 0 ? { x: 0.01, y: 0.01 } : { x: 0.5, y: 0.5 },
+  }));
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  clip.windowCornerRadius = 50;
+  clip.fitMode = 'STRETCH';
+  const before = structuredClone(project);
+  expect(resolveCursorSourcePointMapping(project, clip.id, 0)?.windowCornerRadius).toBe(50);
+  expect(resolveVideoCompositionCursor(project, 0, [])).toBeNull();
+  expect(resolveVideoCompositionCursor(project, 1, [])).not.toBeNull();
+  expect(project).toEqual(before);
+});

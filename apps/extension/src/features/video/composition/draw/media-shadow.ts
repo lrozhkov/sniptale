@@ -1,3 +1,4 @@
+import { roundedWindowRadius } from '../../project/window-geometry';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import { cameraSilhouette, type CameraAppearance } from '../../project/camera/appearance';
 import { resolveVideoMediaShadowParams } from '../canvas/media-shadow';
@@ -18,7 +19,8 @@ export function drawMediaFrameShadow(
   displayScale: number,
   appearance?: CameraAppearance,
   camera = false,
-  color?: string
+  color?: string,
+  cornerRadius = 0
 ) {
   const shadow = resolveVideoMediaShadowParams(shadowIntensity, displayScale, shadowMode, camera);
   if (!shadow) {
@@ -31,14 +33,18 @@ export function drawMediaFrameShadow(
     context.globalAlpha *= Math.max(0, Math.min(100, shadowIntensity ?? 0)) / 100;
   }
   if (shadow.paint.kind === 'outer-shadow') {
-    drawOuterMediaFrameShadow(context, shadow, frame, appearance);
+    drawOuterMediaFrameShadow(context, shadow, frame, appearance, cornerRadius);
   } else {
     context.shadowBlur = shadow.blur;
     context.shadowColor = shadow.color;
     context.shadowOffsetX = shadow.offsetX;
     context.shadowOffsetY = shadow.offsetY;
     context.fillStyle = shadow.paint.color;
-    context.fillRect(frame.x, frame.y, frame.width, frame.height);
+    if (cornerRadius > 0) {
+      context.beginPath();
+      context.roundRect(frame.x, frame.y, frame.width, frame.height, cornerRadius);
+      context.fill();
+    } else context.fillRect(frame.x, frame.y, frame.width, frame.height);
   }
   context.restore();
 }
@@ -47,7 +53,8 @@ function drawOuterMediaFrameShadow(
   context: CanvasRenderingContext2D,
   shadow: NonNullable<ReturnType<typeof resolveVideoMediaShadowParams>>,
   frame: VideoMediaShadowFrame,
-  appearance?: CameraAppearance
+  appearance?: CameraAppearance,
+  cornerRadius = 0
 ): void {
   const bleed = Math.ceil(shadow.blur + Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY) + 2);
   const lease = acquireVideoCompositionBuffer(
@@ -76,6 +83,16 @@ function drawOuterMediaFrameShadow(
     if (appearance) {
       traceCameraShape(maskContext, { ...frame, x: bleed, y: bleed }, appearance);
       maskContext.fill();
+    } else if (cornerRadius > 0) {
+      maskContext.beginPath();
+      maskContext.roundRect(
+        bleed,
+        bleed,
+        frame.width,
+        frame.height,
+        roundedWindowRadius(frame.width, frame.height, cornerRadius)
+      );
+      maskContext.fill();
     } else maskContext.fillRect(bleed, bleed, frame.width, frame.height);
     maskContext.globalCompositeOperation = 'destination-out';
     maskContext.shadowBlur = 0;
@@ -84,6 +101,16 @@ function drawOuterMediaFrameShadow(
     maskContext.fillStyle = 'rgba(0, 0, 0, 1)';
     if (appearance) {
       traceCameraShape(maskContext, { ...frame, x: bleed, y: bleed }, appearance);
+      maskContext.fill();
+    } else if (cornerRadius > 0) {
+      maskContext.beginPath();
+      maskContext.roundRect(
+        bleed,
+        bleed,
+        frame.width,
+        frame.height,
+        roundedWindowRadius(frame.width, frame.height, cornerRadius)
+      );
       maskContext.fill();
     } else maskContext.fillRect(bleed, bleed, frame.width, frame.height);
     context.drawImage(maskCanvas, frame.x - bleed, frame.y - bleed);

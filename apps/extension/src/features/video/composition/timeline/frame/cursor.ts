@@ -235,6 +235,9 @@ export function resolveCursorSourcePointMapping(
     mirrored: camera && clip.cameraMirrored === true,
     ...(camera && visual.cameraAppearance ? { cameraAppearance: visual.cameraAppearance } : {}),
     ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(!camera && clip.windowCornerRadius !== undefined
+      ? { windowCornerRadius: clip.windowCornerRadius }
+      : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
     ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),

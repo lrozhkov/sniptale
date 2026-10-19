@@ -238,3 +238,29 @@ it('applies the authored color and intensity to an exterior-only camera shadow',
   expect(context.drawImage).toHaveBeenCalledOnce();
   expect(context.fillRect).not.toHaveBeenCalled();
 });
+
+it('uses the same rounded silhouette for shadow paint and interior subtraction', () => {
+  const context = createContext();
+  const mask = context.__maskContext;
+  const roundRect = vi.fn(),
+    fill = vi.fn();
+  Object.assign(mask, { beginPath: vi.fn(), roundRect, fill });
+  drawMediaFrameShadow(
+    context,
+    50,
+    undefined,
+    { x: 10, y: 20, width: 120, height: 80 },
+    1,
+    undefined,
+    false,
+    '#11223380',
+    18
+  );
+  expect(roundRect).toHaveBeenCalledTimes(2);
+  expect(roundRect.mock.calls[0]).toEqual(roundRect.mock.calls[1]);
+  expect(roundRect.mock.calls[0]!.slice(2)).toEqual([120, 80, 18]);
+  expect(mask.fillRect).not.toHaveBeenCalled();
+  expect(fill).toHaveBeenCalledTimes(2);
+  expect(mask.globalCompositeOperation).toBe('destination-out');
+  expect(context.drawImage).toHaveBeenCalledOnce();
+});

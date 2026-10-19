@@ -505,3 +505,11 @@ Dormant image assets remain in the project asset graph. Existing save, backup an
 These settings apply to the project canvas. They do not resize clips, change source clocks or define source window layout. No database store, resource authority or asynchronous writer changes.
 
 Source deletion with user approval removes matching active and remembered image references. It preserves other variants. Active image removal restores the remembered solid variant or uses the legacy fallback.
+
+## Montage rounded media windows
+
+Project schema 15 admits `windowCornerRadius` on VIDEO and IMAGE clips. The value is a finite number from zero through 4096 in logical project pixels. An absent value keeps the rectangular window. Older schemas refuse this field. Reset retains schema 15. Reading does not add defaults or change source data.
+
+The radius applies to the visible decorated window, including its header. Rendering limits the radius to half the smaller window dimension. Source crop precedes fitting. Preview and export use the same mask. Source-point admission and continuous cursor containment use shared rounded-window geometry. Gallery retains its coordinate adapter and uses the same clearance calculation.
+
+Camera tracks retain this field without applying it. Their camera appearance remains authoritative. Ordinary track style application copies or removes the radius while retaining each target source crop. Existing project mutation, history, save, revision and resource owners retain authority. This field adds no writer, queued operation, database store or physical migration.

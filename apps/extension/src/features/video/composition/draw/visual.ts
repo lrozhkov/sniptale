@@ -1,7 +1,7 @@
 import { windowHeaderImageKey } from './window-header';
 import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
-import type { VideoCompositionVisualLayer } from '../types';
+import type { VideoCompositionActionState, VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
 import { drawFittedMediaLayer, drawCameraMediaSource } from './fitted-media';
 import { drawTextCompositionLayer } from './overlays';
@@ -218,6 +218,9 @@ function drawVideoLayer(
     fitMode: layer.clip.fitMode,
     ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
     frame,
+    ...(layer.trackRole !== 'CAMERA' && layer.clip.windowCornerRadius !== undefined
+      ? { windowCornerRadius: layer.clip.windowCornerRadius }
+      : {}),
     camera: layer.trackRole === 'CAMERA',
     ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
       ? { cameraAppearance: layer.clip.cameraAppearance }
@@ -240,90 +243,115 @@ function drawVideoLayer(
           }
         );
       }
-      drawContext.save();
-      drawContext.beginPath();
-      const visible = visibleContent ?? {
-        x: drawX,
-        y: drawY,
-        width: drawWidth,
-        height: drawHeight,
-      };
-      const contentBounds = {
-        x: Math.max(frame.x, visible.x),
-        y: Math.max(frame.y, visible.y),
-        width: Math.max(
-          0,
-          Math.min(frame.x + frame.width, visible.x + visible.width) - Math.max(frame.x, visible.x)
-        ),
-        height: Math.max(
-          0,
-          Math.min(frame.y + frame.height, visible.y + visible.height) -
-            Math.max(frame.y, visible.y)
-        ),
-      };
-      drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
-      drawContext.clip();
-      const sourceWidth =
-        source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth;
-      const sourceHeight =
-        source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight;
-      const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
-      const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
-      const sourceX = (x: number) => {
-        const projected = drawX + x * drawWidth;
-        return mirrored ? 2 * frame.x + frame.width - projected : projected;
-      };
-      for (const action of layer.actions ?? []) {
-        const point = action.point
-          ? { x: sourceX(action.point.x), y: drawY + action.point.y * drawHeight }
-          : action.renderKind === 'keystroke'
-            ? {
-                x: contentBounds.x + 12 * Math.max(0.2, actionScale),
-                y: contentBounds.y + 24 * Math.max(0.2, actionScale),
-              }
-            : null;
-        drawActionCompositionState(
-          drawContext,
-          {
-            ...action,
-            point,
-            ...(action.gestureFeedback
-              ? {
-                  gestureFeedback: {
-                    ...action.gestureFeedback,
-                    ...(action.gestureFeedback.path
-                      ? {
-                          path: action.gestureFeedback.path.map((item) => ({
-                            x: sourceX(item.x),
-                            y: drawY + item.y * drawHeight,
-                          })),
-                        }
-                      : {}),
-                    ...(action.gestureFeedback.area
-                      ? {
-                          area: {
-                            x: sourceX(
-                              action.gestureFeedback.area.x +
-                                (mirrored ? action.gestureFeedback.area.width : 0)
-                            ),
-                            y: drawY + action.gestureFeedback.area.y * drawHeight,
-                            width: action.gestureFeedback.area.width * drawWidth,
-                            height: action.gestureFeedback.area.height * drawHeight,
-                          },
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
-          },
-          null,
-          actionScale,
-          contentBounds
-        );
-      }
-      drawContext.restore();
+      drawVideoSourceActions(
+        drawContext,
+        layer,
+        frame,
+        { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+        {
+          width: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
+          height: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
+        },
+        visibleContent
+      );
     },
   });
+}
+
+function drawVideoSourceActions(
+  drawContext: CanvasRenderingContext2D,
+  layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>,
+  frame: ReturnType<typeof getScaledLayerFrame>,
+  sourceFrame: ReturnType<typeof getScaledLayerFrame>,
+  sourceSize: { width: number; height: number },
+  visibleContent?: ReturnType<typeof getScaledLayerFrame>
+) {
+  const { x: drawX, y: drawY, width: drawWidth, height: drawHeight } = sourceFrame;
+  drawContext.save();
+  drawContext.beginPath();
+  const visible = visibleContent ?? sourceFrame;
+  const contentBounds = {
+    x: Math.max(frame.x, visible.x),
+    y: Math.max(frame.y, visible.y),
+    width: Math.max(
+      0,
+      Math.min(frame.x + frame.width, visible.x + visible.width) - Math.max(frame.x, visible.x)
+    ),
+    height: Math.max(
+      0,
+      Math.min(frame.y + frame.height, visible.y + visible.height) - Math.max(frame.y, visible.y)
+    ),
+  };
+  drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
+  drawContext.clip();
+  const { width: sourceWidth, height: sourceHeight } = sourceSize;
+  const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
+  const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
+  const sourceX = (x: number) => {
+    const projected = drawX + x * drawWidth;
+    return mirrored ? 2 * frame.x + frame.width - projected : projected;
+  };
+  for (const action of layer.actions ?? []) {
+    const point = action.point
+      ? { x: sourceX(action.point.x), y: drawY + action.point.y * drawHeight }
+      : action.renderKind === 'keystroke'
+        ? {
+            x: contentBounds.x + 12 * Math.max(0.2, actionScale),
+            y: contentBounds.y + 24 * Math.max(0.2, actionScale),
+          }
+        : null;
+    drawActionCompositionState(
+      drawContext,
+      {
+        ...action,
+        point,
+        ...(action.gestureFeedback
+          ? {
+              gestureFeedback: projectVideoGestureFeedback(
+                action.gestureFeedback,
+                sourceFrame,
+                sourceX,
+                mirrored
+              ),
+            }
+          : {}),
+      },
+      null,
+      actionScale,
+      contentBounds
+    );
+  }
+  drawContext.restore();
+}
+
+function projectVideoGestureFeedback(
+  feedback: NonNullable<VideoCompositionActionState['gestureFeedback']>,
+  sourceFrame: ReturnType<typeof getScaledLayerFrame>,
+  sourceX: (x: number) => number,
+  mirrored: boolean
+) {
+  const { y: drawY, width: drawWidth, height: drawHeight } = sourceFrame;
+  return {
+    ...feedback,
+    ...(feedback.path
+      ? {
+          path: feedback.path.map((item) => ({
+            x: sourceX(item.x),
+            y: drawY + item.y * drawHeight,
+          })),
+        }
+      : {}),
+    ...(feedback.area
+      ? {
+          area: {
+            x: sourceX(feedback.area.x + (mirrored ? feedback.area.width : 0)),
+            y: drawY + feedback.area.y * drawHeight,
+            width: feedback.area.width * drawWidth,
+            height: feedback.area.height * drawHeight,
+          },
+        }
+      : {}),
+  };
 }
 
 function drawImageLayer(
@@ -347,6 +375,9 @@ function drawImageLayer(
     fitMode: layer.clip.fitMode,
     ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
     frame,
+    ...(layer.clip.windowCornerRadius === undefined
+      ? {}
+      : { windowCornerRadius: layer.clip.windowCornerRadius }),
     shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
     ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),

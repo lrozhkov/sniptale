@@ -99,6 +99,7 @@ async function renderHarness(
     root?.render(
       <MediaFrameControls
         project={project}
+        onEditMediaClip={handlers.onEditMediaClip}
         clip={clip}
         locked={locked}
         onApplyMediaClipVisualsToTrack={handlers.onApplyMediaClipVisualsToTrack ?? vi.fn()}
@@ -297,3 +298,31 @@ it.each(['VIDEO', 'IMAGE'] as const)(
     ).toBeNull();
   }
 );
+
+it('commits the shared radius row and preserves fine authored values on unchanged Enter', async () => {
+  const onEditMediaClip = vi.fn();
+  await renderHarness({ onEditMediaClip }, false, { ...createClip(), windowCornerRadius: 12.345 });
+  const label = Array.from(container!.querySelectorAll('input')).find(
+    (input) => input.getAttribute('aria-label') === 'Скругление углов'
+  );
+  expect(label).toBeDefined();
+  await act(async () => {
+    label!.focus();
+    label!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip.mock.calls.every(([, edit]) => edit.radius === 12.345)).toBe(true);
+  onEditMediaClip.mockClear();
+  await act(async () => {
+    setInputValue(label!, '24');
+    label!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).toHaveBeenCalledWith('clip-1', {
+    kind: 'window-corner-radius',
+    radius: 24,
+  });
+  await renderHarness({ onEditMediaClip }, true);
+  const locked = Array.from(container!.querySelectorAll('input')).find(
+    (input) => input.getAttribute('aria-label') === 'Скругление углов'
+  );
+  expect(locked?.disabled).toBe(true);
+});

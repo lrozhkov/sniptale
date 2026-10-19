@@ -1,3 +1,4 @@
+import { roundedWindowClearance, roundedWindowRadius } from '../../project/window-geometry';
 import { uncropMediaSourceRect, type MediaSourceCrop } from '../../project/media-crop';
 import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
@@ -147,6 +148,29 @@ export function getFittedMediaContentFrame(params: {
   });
 }
 
+/** Visible decorated bounds; cropped source pixels and headers are fitted as one plane. */
+export function getFittedMediaWindowFrame(params: {
+  sourceCrop?: MediaSourceCrop;
+  windowHeader?: WindowHeader;
+  fitMode: VideoMediaFitMode;
+  frame: MediaFrame;
+  sourceWidth: number;
+  sourceHeight: number;
+}): MediaFrame {
+  if (params.fitMode === VideoMediaFitMode.COVER) return params.frame;
+  const width = params.sourceWidth * (params.sourceCrop?.width ?? 1);
+  const height = params.sourceHeight * (params.sourceCrop?.height ?? 1);
+  const header = params.windowHeader
+    ? windowHeaderGeometry(params.windowHeader, { width, height }).height
+    : 0;
+  return getFittedMediaContentFrame({
+    fitMode: params.fitMode,
+    frame: params.frame,
+    sourceWidth: width,
+    sourceHeight: height + header,
+  });
+}
+
 export function mapSourcePointToFittedMediaFrame(params: FittedMediaPointMapping): SourcePoint {
   const frame = getFittedMediaContentFrame(params);
   const sourceWidth = Math.max(1, params.sourceWidth);
@@ -201,6 +225,7 @@ export function drawFittedMediaFrame(
 }
 
 export function drawFittedMediaLayer(params: {
+  windowCornerRadius?: number;
   sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   windowHeaderImage?: HTMLImageElement;
@@ -256,38 +281,67 @@ export function drawFittedMediaLayer(params: {
     );
   };
 
+  const roundedFrame = getFittedMediaWindowFrame(params);
+  const radius = params.camera
+    ? 0
+    : roundedWindowRadius(
+        roundedFrame.width,
+        roundedFrame.height,
+        (params.windowCornerRadius ?? 0) * params.displayScale
+      );
   drawMediaFrameShadow(
     params.context,
     params.shadowIntensity,
     params.shadowMode,
-    params.windowHeader && params.windowHeaderImage && params.fitMode !== VideoMediaFitMode.COVER
-      ? getFittedMediaContentFrame({
-          fitMode: params.fitMode,
-          frame: params.frame,
-          sourceWidth: params.sourceWidth,
-          sourceHeight:
-            params.sourceHeight +
-            windowHeaderGeometry(params.windowHeader, {
-              width: params.sourceWidth,
-              height: params.sourceHeight,
-            }).height,
-        })
-      : params.frame,
+    radius > 0
+      ? roundedFrame
+      : params.windowHeader &&
+          params.windowHeaderImage &&
+          params.fitMode !== VideoMediaFitMode.COVER
+        ? getFittedMediaContentFrame({
+            fitMode: params.fitMode,
+            frame: params.frame,
+            sourceWidth: params.sourceWidth,
+            sourceHeight:
+              params.sourceHeight +
+              windowHeaderGeometry(params.windowHeader, {
+                width: params.sourceWidth,
+                height: params.sourceHeight,
+              }).height,
+          })
+        : params.frame,
     params.displayScale,
     params.cameraAppearance,
     params.camera,
-    params.shadowColor
+    params.shadowColor,
+    radius
   );
-  if (params.windowHeaderImage) {
-    drawWindowMediaPlane(params);
-  } else if (params.cameraAppearance) {
-    const content = getFittedMediaContentFrame(params);
+  if (radius > 0) {
     params.context.save();
-    traceCameraShape(params.context, params.frame, params.cameraAppearance);
+    params.context.beginPath();
+    params.context.roundRect(
+      roundedFrame.x,
+      roundedFrame.y,
+      roundedFrame.width,
+      roundedFrame.height,
+      radius
+    );
     params.context.clip();
-    params.render(content.x, content.y, content.width, content.height);
-    params.context.restore();
-  } else drawFitted(params.render);
+  }
+  try {
+    if (params.windowHeaderImage) {
+      drawWindowMediaPlane(params);
+    } else if (params.cameraAppearance) {
+      const content = getFittedMediaContentFrame(params);
+      params.context.save();
+      traceCameraShape(params.context, params.frame, params.cameraAppearance);
+      params.context.clip();
+      params.render(content.x, content.y, content.width, content.height);
+      params.context.restore();
+    } else drawFitted(params.render);
+  } finally {
+    if (radius > 0) params.context.restore();
+  }
 }
 
 /** Rasterize adjoining edges before the clip transform, so subpixel scaling cannot open a seam. */
@@ -352,6 +406,7 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  windowCornerRadius?: number;
   sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   mirrored?: boolean;
@@ -399,6 +454,18 @@ function isInsideFrame(point: SourcePoint, frame: MediaFrame): boolean {
 function isInsideVisualFrame(point: SourcePoint, params: VisualLayerSourcePointMapping): boolean {
   const frame = cameraWindowFrame(params.frame, params.cameraAppearance?.shape ?? 'rounded');
   if (!isInsideFrame(point, frame)) return false;
+  if (!params.cameraAppearance && (params.windowCornerRadius ?? 0) > 0) {
+    const window = getFittedMediaWindowFrame(params);
+    return (
+      roundedWindowClearance(
+        [point.x - window.x, point.x - window.x],
+        [point.y - window.y, point.y - window.y],
+        window.width,
+        window.height,
+        params.windowCornerRadius ?? 0
+      ).low >= -1e-9
+    );
+  }
   if (params.cameraAppearance?.shape !== 'circle') return true;
   const x = (point.x - frame.x - frame.width / 2) / (frame.width / 2);
   const y = (point.y - frame.y - frame.height / 2) / (frame.height / 2);

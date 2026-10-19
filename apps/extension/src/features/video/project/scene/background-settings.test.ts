@@ -149,7 +149,7 @@ it('fences active and dormant metadata at schema fourteen and preserves removal'
         false
       );
   }
-  expect(isHydratableVideoProject({ ...changed, version: 15 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 16 })).toBe(false);
   expect(
     applyVideoProjectMutationPatch(changed, {
       sceneBackground: { kind: 'solid', color: '#123456' },

@@ -75,4 +75,6 @@ export type VideoProjectEffectInstancePatch = {
 };
 
 /** Original-source media edits; placement and source timing remain independent. */
-export type VideoEditorMediaClipEdit = { kind: 'source-crop'; crop: MediaSourceCrop | null };
+export type VideoEditorMediaClipEdit =
+  | { kind: 'source-crop'; crop: MediaSourceCrop | null }
+  | { kind: 'window-corner-radius'; radius: number | null };

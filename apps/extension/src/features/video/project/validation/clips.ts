@@ -208,6 +208,14 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
     return false;
 
   if (
+    value['windowCornerRadius'] !== undefined &&
+    ((value['type'] !== VideoProjectClipType.VIDEO &&
+      value['type'] !== VideoProjectClipType.IMAGE) ||
+      !isBoundedNumber(value['windowCornerRadius'], 0, 4096))
+  )
+    return false;
+
+  if (
     value['sourceCrop'] !== undefined &&
     ((value['type'] !== VideoProjectClipType.VIDEO &&
       value['type'] !== VideoProjectClipType.IMAGE) ||

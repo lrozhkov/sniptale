@@ -385,3 +385,30 @@ it.each(['PUSH', 'SLIDE'] as const)(
     }
   }
 );
+
+it('bounds rounded source corners conservatively while accepting an interior cursor path', () => {
+  const { project, region, policy } = fixture();
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+  if (!clip) throw new Error('Expected video');
+  clip.windowCornerRadius = 50;
+  clip.fitMode = 'STRETCH';
+  const geometry = createProjectWorkingZoneCameraGeometry({
+    project,
+    region,
+    policy,
+    connectedIn: false,
+    connectedOut: false,
+    bindings: new Map([['source', { focusClipId: clip.id, actualClipId: clip.id }]]),
+  });
+  const bounds = (point: { x: number; y: number }) =>
+    geometry.clearanceBounds({
+      start: 1,
+      end: 1,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+      actual: { from: point, to: point },
+    })!;
+  expect(bounds({ x: 0.01, y: 0.01 }).raster!.high).toBeLessThan(0);
+  expect(bounds({ x: 0.5, y: 0.5 }).raster!.low).toBeGreaterThan(0);
+});

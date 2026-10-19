@@ -1,6 +1,9 @@
 import { parseMediaSourceCrop } from '../../../../features/video/project/media-crop';
 import { parseColor } from '@sniptale/foundation/color';
-import { isColorString } from '../../../../features/video/project/validation/primitives';
+import {
+  isBoundedNumber,
+  isColorString,
+} from '../../../../features/video/project/validation/primitives';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
@@ -48,6 +51,16 @@ export function createClipMediaStyleActions(
         applyProjectUpdate(state, (project) => {
           const clip = project.clips.find((item) => item.id === clipId);
           if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
+          if (edit.kind === 'window-corner-radius') {
+            if (edit.radius !== null && !isBoundedNumber(edit.radius, 0, 4096)) return project;
+            const radius = edit.radius === null ? undefined : edit.radius;
+            if (radius === clip.windowCornerRadius) return project;
+            const { windowCornerRadius: _previous, ...rest } = clip;
+            const updated = radius === undefined ? rest : { ...rest, windowCornerRadius: radius };
+            return applyVideoProjectMutationPatch(project, {
+              clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
+            });
+          }
           const crop = edit.crop === null ? undefined : parseMediaSourceCrop(edit.crop);
           if (crop === null) return project;
           if (
@@ -267,7 +280,7 @@ function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, tim
     clips: project.clips.map((item) =>
       item.trackId === clip.trackId && isMediaClip(item)
         ? {
-            ...copyMediaShadowColor(item, clip),
+            ...copyMediaWindowRadius(copyMediaShadowColor(item, clip), clip),
             fitMode: clip.fitMode,
             fitScalePercent: clip.fitScalePercent ?? 100,
             shadowIntensity: normalizeVideoMediaShadowIntensity(clip.shadowIntensity),
@@ -324,5 +337,15 @@ function copyMediaShadowColor<T extends { shadowColor?: string }>(
   const copy = { ...target };
   if (source.shadowColor === undefined) delete copy.shadowColor;
   else copy.shadowColor = source.shadowColor;
+  return copy;
+}
+
+function copyMediaWindowRadius<T extends { windowCornerRadius?: number }>(
+  target: T,
+  source: { windowCornerRadius?: number }
+): T {
+  const copy = { ...target };
+  if (source.windowCornerRadius === undefined) delete copy.windowCornerRadius;
+  else copy.windowCornerRadius = source.windowCornerRadius;
   return copy;
 }

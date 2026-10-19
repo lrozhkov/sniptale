@@ -1,3 +1,4 @@
+import { roundedWindowClearance } from '../../project/window-geometry';
 import { boundCameraSourceGeometry, cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import { resolveProjectOutputTransform } from '../../project/export/output-dimensions';
@@ -10,7 +11,7 @@ import { buildProjectTransitionSegments } from '../../project/transition/project
 import { getTransitionProgress } from '../../project/transition/runtime';
 import { resolveTransitionVisualStateForRole } from '../../project/transition/visual-resolvers';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
-import { getFittedMediaContentFrame } from '../draw/fitted-media';
+import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from '../draw/fitted-media';
 import {
   resolveCursorSourcePointMapping,
   mapCursorFocusControlPoint,
@@ -194,10 +195,24 @@ function nativeSourceRasterBounds(
     mapping.frame.y + mapping.frame.height,
     content.y + (crop.y + crop.height) * content.height
   );
-  const raster = {
+  const rectangularRaster = {
     low: Math.min(x[0] - left, y[0] - top, right - x[1], bottom - y[1]),
     high: Math.min(x[1] - left, y[1] - top, right - x[0], bottom - y[0]),
   };
+  const window = getFittedMediaWindowFrame(mapping);
+  const rounded = roundedWindowClearance(
+    [x[0] - window.x, x[1] - window.x],
+    [y[0] - window.y, y[1] - window.y],
+    window.width,
+    window.height,
+    mapping.windowCornerRadius ?? 0
+  );
+  const raster = mapping.windowCornerRadius
+    ? {
+        low: Math.min(rectangularRaster.low, rounded.low),
+        high: Math.min(rectangularRaster.high, rounded.high),
+      }
+    : rectangularRaster;
   const center = {
     x: mapping.frame.x + mapping.frame.width / 2,
     y: mapping.frame.y + mapping.frame.height / 2,

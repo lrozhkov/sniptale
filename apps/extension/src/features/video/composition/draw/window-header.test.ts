@@ -136,3 +136,65 @@ it('keeps source media visible while loading and reports decode failure with a r
   ).toThrow('Window header image could not be decoded');
   expect(context.restore).toHaveBeenCalledOnce();
 });
+
+it('rounds the complete cropped header plane while keeping source coordinates below its seam', () => {
+  const plane = {
+    reset: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+    save: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    translate: vi.fn(),
+    restore: vi.fn(),
+  };
+  const canvas = { width: 0, height: 0, getContext: () => plane };
+  const context = {
+    canvas: { ownerDocument: { createElement: () => canvas } },
+    drawImage: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    clip: vi.fn(),
+  };
+  const geometry = {
+    sourceWidth: 400,
+    sourceHeight: 200,
+    sourceCrop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+    frame: { x: 20, y: 40, width: 200, height: 200 },
+    fitMode: 'STRETCH' as const,
+    windowHeader: DEFAULT_WINDOW_HEADER,
+  };
+  const render = vi.fn();
+  drawFittedMediaLayer({
+    ...geometry,
+    context: context as unknown as CanvasRenderingContext2D,
+    windowHeaderImage: { naturalHeight: 40 } as HTMLImageElement,
+    displayScale: 0.5,
+    windowCornerRadius: 24,
+    shadowIntensity: 0,
+    shadowMode: undefined,
+    render,
+  });
+  expect(context.roundRect).toHaveBeenCalledExactlyOnceWith(20, 40, 200, 200, 12);
+  expect(context.clip).toHaveBeenCalledOnce();
+  expect(context.restore).toHaveBeenCalledOnce();
+  expect(render.mock.calls[0]![1]).toBeGreaterThan(40);
+  expect(render.mock.calls[0]![4]).toBe(plane);
+  const mapping = {
+    ...geometry,
+    windowCornerRadius: 50,
+    frame: { ...geometry.frame, rotation: 0 },
+    renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+  };
+  expect(mapVisualLayerPointToSourceNormalized({ ...mapping, point: { x: 21, y: 41 } })).toBeNull();
+  const source = { x: 0.5, y: 0.5 };
+  const scene = mapSourceNormalizedPointToVisualLayer({ ...mapping, point: source });
+  expect(scene).not.toBeNull();
+  const restored = mapVisualLayerPointToSourceNormalized({ ...mapping, point: scene! });
+  expect(restored?.x).toBeCloseTo(source.x, 9);
+  expect(restored?.y).toBeCloseTo(source.y, 9);
+});

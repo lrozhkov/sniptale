@@ -1,3 +1,4 @@
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { MediaCropControls } from './media-crop';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { ReactNode } from 'react';
@@ -72,6 +73,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
     return null;
   }
 
+  const windowCornerRadius = props.clip.windowCornerRadius ?? 0;
   return (
     <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
@@ -104,6 +106,24 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         preferenceId="media-frame:videoEditor.sidebar.inspectorGroupAppearance"
         label={translate('videoEditor.sidebar.inspectorGroupAppearance')}
       >
+        <NumericRow
+          label={translate('gallery.videoReview.backgroundCornerRadius')}
+          value={windowCornerRadius}
+          min={0}
+          max={4096}
+          step={1}
+          precision={2}
+          unit="px"
+          scrub={{ min: 0, max: 100, step: 1 }}
+          disabled={props.locked || !props.onEditMediaClip}
+          normalizeValue={(value) =>
+            value === Number(windowCornerRadius.toFixed(2)) ? windowCornerRadius : value
+          }
+          onPreviewValue={() => undefined}
+          onCommitValue={(radius) =>
+            props.onEditMediaClip?.(props.clip.id, { kind: 'window-corner-radius', radius })
+          }
+        />
         <MediaShadowControls
           clipId={props.clip.id}
           disabled={props.locked}

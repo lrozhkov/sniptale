@@ -141,6 +141,9 @@ export function resolveVideoCompositionActionSourceMapping(
     fitMode: visual.fitMode,
     ...(clip.windowHeader && !camera ? { windowHeader: clip.windowHeader } : {}),
     ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(!camera && clip.windowCornerRadius !== undefined
+      ? { windowCornerRadius: clip.windowCornerRadius }
+      : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
     renderState: resolveClipTransitionVisualState(project, visual, currentTime),

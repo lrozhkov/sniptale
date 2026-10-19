@@ -411,13 +411,14 @@ it('keeps camera appearance through a partial rate-two split and independent dup
     cameraMirrored: true,
     sourceCrop: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 },
     shadowColor: '#ff008080',
+    windowCornerRadius: 24,
     cameraAppearance,
     cameraPositions,
     cameraHiddenRanges: [{ id: 'hidden', start: 4, end: 6 }],
   };
   const authored = {
     ...project,
-    version: 13 as const,
+    version: 15 as const,
     clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
   };
   const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
@@ -431,6 +432,7 @@ it('keeps camera appearance through a partial rate-two split and independent dup
         clip.cameraMirrored === true &&
         JSON.stringify(clip.sourceCrop) === JSON.stringify(mirrored.sourceCrop) &&
         clip.shadowColor === '#ff008080' &&
+        clip.windowCornerRadius === 24 &&
         clip.cameraAppearance?.shape === 'circle' &&
         JSON.stringify(clip.cameraPositions) === JSON.stringify(cameraPositions) &&
         JSON.stringify(clip.cameraHiddenRanges) === JSON.stringify(mirrored.cameraHiddenRanges)
@@ -460,6 +462,7 @@ it('keeps camera appearance through a partial rate-two split and independent dup
     cameraPositions,
     cameraHiddenRanges: mirrored.cameraHiddenRanges,
     sourceCrop: mirrored.sourceCrop,
+    windowCornerRadius: 24,
     shadowColor: '#ff008080',
     sourceStart: 1,
     sourceDuration: 8,

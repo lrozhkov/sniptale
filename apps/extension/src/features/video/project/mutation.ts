@@ -11,6 +11,14 @@ function getMutationSchemaVersion(
   project: VideoProject,
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
 ): VideoProject['version'] {
+  if (
+    project.version === 15 ||
+    (patch.clips ?? project.clips).some(
+      (clip) =>
+        (clip.type === 'VIDEO' || clip.type === 'IMAGE') && clip.windowCornerRadius !== undefined
+    )
+  )
+    return 15;
   const background = patch.sceneBackground ?? project.sceneBackground;
   if (
     project.version === 14 ||

@@ -233,3 +233,94 @@ it('passes full source and visible crop bounds to the renderer and restores a fa
   ).toThrow('Decode failed');
   expect(saves).toBe(0);
 });
+
+it.each(['CONTAIN', 'COVER', 'STRETCH'] as const)(
+  'rejects rounded %s corners in forward and inverse source geometry',
+  async (fitMode) => {
+    const {
+      getFittedMediaContentFrame,
+      getFittedMediaWindowFrame,
+      mapSourceNormalizedPointToVisualLayer,
+      mapVisualLayerPointToSourceNormalized,
+    } = await import('./fitted-media');
+    const mapping = {
+      fitMode,
+      windowCornerRadius: 40,
+      frame: { x: 20, y: 40, width: 200, height: 200, rotation: 0 },
+      sourceWidth: 400,
+      sourceHeight: 200,
+      renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+    };
+    const window = getFittedMediaWindowFrame(mapping);
+    expect(window).toEqual(
+      fitMode === 'CONTAIN' ? { x: 20, y: 90, width: 200, height: 100 } : mapping.frame
+    );
+    const content = getFittedMediaContentFrame(mapping);
+    const corner = { x: window.x + 1, y: window.y + 1 };
+    const native = {
+      x: (corner.x - content.x) / content.width,
+      y: (corner.y - content.y) / content.height,
+    };
+    expect(mapSourceNormalizedPointToVisualLayer({ ...mapping, point: native })).toBeNull();
+    expect(mapVisualLayerPointToSourceNormalized({ ...mapping, point: corner })).toBeNull();
+    const center = mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.5, y: 0.5 } });
+    expect(center).toEqual({ x: 120, y: 140 });
+    expect(mapVisualLayerPointToSourceNormalized({ ...mapping, point: center! })).toEqual({
+      x: 0.5,
+      y: 0.5,
+    });
+  }
+);
+
+it('round-trips rounded crop points through rotation and anisotropic transitions', async () => {
+  const { mapSourceNormalizedPointToVisualLayer, mapVisualLayerPointToSourceNormalized } =
+    await import('./fitted-media');
+  const mapping = {
+    fitMode: 'CONTAIN' as const,
+    windowCornerRadius: 4096,
+    sourceCrop: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 },
+    frame: { x: 20, y: 40, width: 200, height: 160, rotation: 37 },
+    sourceWidth: 400,
+    sourceHeight: 200,
+    renderState: { translateX: 12, translateY: -5, scaleX: 0.7, scaleY: 1.3 },
+  };
+  const source = { x: 0.6, y: 0.5 };
+  const scene = mapSourceNormalizedPointToVisualLayer({ ...mapping, point: source });
+  expect(scene).not.toBeNull();
+  const restored = mapVisualLayerPointToSourceNormalized({ ...mapping, point: scene! });
+  expect(restored?.x).toBeCloseTo(source.x, 9);
+  expect(restored?.y).toBeCloseTo(source.y, 9);
+  expect(
+    mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.251, y: 0.101 } })
+  ).toBeNull();
+});
+
+it('clips normal fitted pixels at the scaled visible window and restores context after draw failure', async () => {
+  const { vi } = await import('vitest');
+  const { drawFittedMediaLayer } = await import('./fitted-media');
+  const roundRect = vi.fn(),
+    restore = vi.fn(),
+    save = vi.fn();
+  const context = { save, restore, beginPath: vi.fn(), roundRect, clip: vi.fn() };
+  const render = vi.fn(() => {
+    throw new Error('Source draw failed');
+  });
+  expect(() =>
+    drawFittedMediaLayer({
+      context: context as unknown as CanvasRenderingContext2D,
+      fitMode: 'CONTAIN',
+      frame: { x: 10, y: 20, width: 200, height: 200 },
+      sourceWidth: 400,
+      sourceHeight: 200,
+      windowCornerRadius: 24,
+      displayScale: 0.5,
+      shadowIntensity: 0,
+      shadowMode: undefined,
+      render,
+    })
+  ).toThrow('Source draw failed');
+  expect(roundRect).toHaveBeenCalledWith(10, 70, 200, 100, 12);
+  expect(render).toHaveBeenCalledWith(10, 70, 200, 100);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(restore).toHaveBeenCalledTimes(1);
+});

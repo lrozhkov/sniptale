@@ -304,3 +304,27 @@ it('removes captured camera source editing while hidden and restores it at the s
   project.tracks = project.tracks.map(({ role: _role, ...track }) => track);
   expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2)).not.toBeNull();
 });
+
+it('shares normal rounded source admission with action editing and leaves camera radius dormant', async () => {
+  const { project, clip } = capturedProject();
+  clip.windowCornerRadius = 50;
+  clip.fitMode = 'STRETCH';
+  clip.transform = { ...clip.transform, x: 0, y: 0, width: 100, height: 100, rotation: 0 };
+  const occurrence = resolveVideoCompositionActions(project, 2.2)[0]!.occurrence;
+  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2);
+  expect(mapping?.windowCornerRadius).toBe(50);
+  const { mapSourceNormalizedPointToVisualLayer } = await import('../../draw/fitted-media');
+  if (!mapping) throw new Error('Expected source mapping');
+  expect(
+    mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.01, y: 0.01 } })
+  ).toBeNull();
+  expect(mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.5, y: 0.5 } })).toEqual({
+    x: 50,
+    y: 50,
+  });
+  project.tracks = project.tracks.map((track) => ({ ...track, role: 'CAMERA' }));
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2)).not.toHaveProperty(
+    'windowCornerRadius'
+  );
+  expect(clip.windowCornerRadius).toBe(50);
+});
