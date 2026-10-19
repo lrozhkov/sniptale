@@ -1,5 +1,62 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-authored-speech-queue',
+    productionFile: 'apps/extension/src/gallery/video-review/use-text-voice.ts',
+    allowCrossOwner: true,
+    reason: 'The active form and batch history prove generation policy, retention and publication.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-batch-history.integration.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-speech-queue',
+    productionFile: 'apps/extension/src/workflows/audio-jobs/speech-queue.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-batch-history.integration.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-speech-queue',
+    productionFile: 'apps/extension/src/workflows/video-review/speech-queue.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-speech-generation',
+    productionFile: 'apps/extension/src/workflows/video/project-text-voice.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors prove sequential generation, completed preview retention and cancellation.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/speech-queue.test.ts',
+      'apps/extension/src/gallery/video-review/use-speech.test.tsx',
+      'apps/extension/src/gallery/video-review/speech-batch.test.tsx',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
     owner: 'montage-recording-preview-playback',
     productionFile:
       'apps/extension/src/video-editor/runtime/session/text-voice-recording-playback.ts',
@@ -157,6 +214,7 @@ export const EDITOR_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/video/project-voice-take.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
       'apps/extension/src/features/video/project/text/voice-scope.test.ts',
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
     ],
@@ -202,6 +260,7 @@ export const EDITOR_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
     ],
   },
   {

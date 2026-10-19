@@ -644,3 +644,54 @@ it('presents one selected phrase as parameters without a redundant count or a pe
   await act(async () => root.render(<ReviewTextVoiceForm {...props} />));
   expect(host.querySelector('[aria-label="gallery.videoReview.speechGenerate"]')).not.toBeNull();
 });
+
+it('continues selected phrases after an individual failure and counts processed work', async () => {
+  let finish!: (value: ReviewTextVoicePreview) => void;
+  mocks.generate.mockImplementation(async (_session, id: string) => {
+    if (id === 'second') throw new Error('provider-failed');
+    if (id === 'third')
+      return new Promise<ReviewTextVoicePreview>((resolve) => {
+        finish = resolve;
+      });
+    return preview(id);
+  });
+  const { beforeRequest } = await render(['first', 'second', 'third']);
+  await start();
+  await approve();
+  expect(mocks.generate.mock.calls.map((call) => call[1])).toEqual(['first', 'second', 'third']);
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('2 / 3');
+  expect(host.querySelectorAll('audio')).toHaveLength(1);
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () => finish(preview('third')));
+  expect(host.querySelectorAll('audio')).toHaveLength(2);
+  expect(beforeRequest).toHaveBeenCalledOnce();
+  expect(mocks.cleanup).not.toHaveBeenCalled();
+  expect(mocks.generate).toHaveBeenCalledTimes(3);
+});
+
+it('cancels the active batch without removing its ready take or starting remaining phrases', async () => {
+  let finish!: (value: ReviewTextVoicePreview) => void;
+  mocks.generate.mockImplementation(async (_session, id: string) => {
+    if (id === 'second')
+      return new Promise<ReviewTextVoicePreview>((resolve) => {
+        finish = resolve;
+      });
+    return preview(id);
+  });
+  await render(['first', 'second', 'third']);
+  await start();
+  await approve();
+  expect(host.querySelectorAll('audio')).toHaveLength(1);
+  const requestSignal: AbortSignal = mocks.generate.mock.calls[1]![3];
+  await click('common.actions.cancel');
+  expect(requestSignal.aborted).toBe(true);
+  await act(async () => finish(preview('second')));
+  expect(mocks.generate.mock.calls.map((call) => call[1])).toEqual(['first', 'second']);
+  expect(host.querySelectorAll('audio')).toHaveLength(1);
+  expect(mocks.cleanup).toHaveBeenCalledExactlyOnceWith(
+    expect.anything(),
+    expect.objectContaining({ clipId: 'clip-second' })
+  );
+  expect(mocks.apply).not.toHaveBeenCalled();
+  expect(mocks.batch).not.toHaveBeenCalled();
+});

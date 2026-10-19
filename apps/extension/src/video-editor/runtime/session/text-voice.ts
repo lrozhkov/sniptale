@@ -14,8 +14,8 @@ import type { VideoProject } from '../../../features/video/project/types/model';
 import type { VideoProjectVoicePlacement } from '../../../features/video/project/text/authoring';
 import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
 import {
-  captureProjectTextVoice,
-  generateProjectTextVoice,
+  captureProjectTextVoiceQueue,
+  runProjectTextVoiceQueue,
 } from '../../../workflows/video/project-text-voice';
 import {
   acceptProjectVoiceTakes,
@@ -34,13 +34,19 @@ import { useProjectTextVoiceRecording } from './text-voice-recording';
 import { waitForVideoEditorSave } from './save-readiness';
 
 type VoicePreview = ProjectVoiceTakePreview;
-type VoiceCapture = Awaited<ReturnType<typeof captureProjectTextVoice>>;
+type VoiceQueue = Awaited<ReturnType<typeof captureProjectTextVoiceQueue>>;
+type VoiceCapture = VoiceQueue['items'][number]['capture'];
 interface VoiceState {
   source: 'ai' | 'microphone' | 'gallery';
   target: { documentId: string; fragmentId: string } | null;
   profile: ReviewSpeechProfile | undefined;
   catalog: AIModelSelectionBootstrapPayload | null;
-  consent: { capture: VoiceCapture; providerId: string; providerName: string } | null;
+  consent: {
+    capture: VoiceCapture;
+    queue: VoiceQueue;
+    providerId: string;
+    providerName: string;
+  } | null;
   preview: VoicePreview | null;
   placement: VideoProjectVoicePlacement;
   running: boolean;
@@ -234,15 +240,26 @@ async function prepareVoiceConsent(
   const model = catalog?.models.find((entry) => entry.id === profile.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
   if (!provider) throw new Error('model-unavailable');
-  const capture = await captureProjectTextVoice(
-    access,
-    target.documentId,
-    target.fragmentId,
-    profile,
-    signal
-  );
+  const queue = await captureProjectTextVoiceQueue(access, [target], profile, signal);
   signal.throwIfAborted();
-  return { capture, providerId: provider.id, providerName: provider.name };
+  const capture = queue.items[0]!.capture;
+  return { capture, queue, providerId: provider.id, providerName: provider.name };
+}
+
+/** Adapts the selected singleton sequence to the mounted preview retention boundary. */
+async function generateVoiceConsent(
+  access: ProjectVoiceTakeAccess,
+  consent: Pick<NonNullable<VoiceState['consent']>, 'queue' | 'providerId'>,
+  signal: AbortSignal
+) {
+  let preview: VoicePreview | undefined;
+  await runProjectTextVoiceQueue(access, consent.queue, consent.providerId, signal, {
+    ready: (value) => {
+      preview = value;
+    },
+    progress: () => {},
+  });
+  return preview;
 }
 
 async function retainVoicePreview(
@@ -406,7 +423,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       if (!consent || lifetime.preview) return;
       await run(async (signal) => {
         setState((value) => ({ ...value, consent: null }));
-        return generateProjectTextVoice(access, consent.capture, consent.providerId, signal);
+        return generateVoiceConsent(access, consent, signal);
       });
     },
     async apply() {

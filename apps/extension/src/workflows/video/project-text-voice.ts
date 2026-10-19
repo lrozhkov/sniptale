@@ -16,7 +16,12 @@ import type { ReviewSpeechProfile } from '../../features/video/review/speech-tra
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
 import { runReviewSpeechJob } from '../audio-jobs/client';
 import { decodeReviewSpeechDuration } from '../video-review/speech-audio';
-import type { ProjectVoiceReadAccess, ProjectVoiceTakePreview } from './project-voice-take';
+import {
+  cleanupProjectVoiceTakePreview,
+  type ProjectVoiceReadAccess,
+  type ProjectVoiceTakePreview,
+} from './project-voice-take';
+import { runSpeechQueue, type SpeechQueueProgress } from '../audio-jobs/speech-queue';
 
 /** One disclosed generation attempt; the caller starts a new capture after a paid terminal outcome. */
 interface ProjectTextVoiceCapture {
@@ -179,5 +184,86 @@ export async function generateProjectTextVoice(
     capture.phase = requested ? 'failed' : 'captured';
     if (staged && scope) await discardAudioStaging(staged, scope).catch(() => undefined);
     throw error;
+  }
+}
+
+/** Fragment identities are scoped by their text document. */
+interface ProjectTextVoiceSelection {
+  documentId: string;
+  fragmentId: string;
+}
+interface ProjectTextVoiceQueueItem extends ProjectTextVoiceSelection {
+  capture: ProjectTextVoiceCapture;
+}
+interface ProjectTextVoiceQueuePlan {
+  origin: ProjectVoiceReadAccess;
+  items: readonly ProjectTextVoiceQueueItem[];
+  phase: 'captured' | 'running' | 'complete' | 'failed';
+}
+
+/** Freeze the complete ordered selection and profile before disclosing any paid work. */
+export async function captureProjectTextVoiceQueue(
+  access: ProjectVoiceReadAccess,
+  selected: readonly ProjectTextVoiceSelection[],
+  profile: ReviewSpeechProfile,
+  signal: AbortSignal
+): Promise<ProjectTextVoiceQueuePlan> {
+  signal.throwIfAborted();
+  const parsed = parseReviewSpeechProfile(profile);
+  if (!selected.length || !parsed) throw new Error('invalid-request');
+  const unique = new Map(
+    selected.map((item) => [JSON.stringify([item.documentId, item.fragmentId]), { ...item }])
+  );
+  const project = access.getProject();
+  if (!project) throw new Error('stale');
+  const localProject = localProjectKey(project);
+  const items: ProjectTextVoiceQueueItem[] = [];
+  for (const item of unique.values()) {
+    const capture = await captureProjectTextVoice(
+      access,
+      item.documentId,
+      item.fragmentId,
+      parsed,
+      signal
+    );
+    if (capture.localProject !== localProject) throw new Error('stale');
+    items.push({ ...item, capture });
+  }
+  for (const item of items) assertLocal(access, item.capture);
+  return { origin: access, items, phase: 'captured' };
+}
+
+/** One consent starts one sequence; a new attempt requires a new capture of unfinished work. */
+export async function runProjectTextVoiceQueue(
+  access: ProjectVoiceReadAccess,
+  plan: ProjectTextVoiceQueuePlan,
+  approvedProviderId: string,
+  signal: AbortSignal,
+  events: {
+    ready(preview: ProjectVoiceTakePreview): void;
+    progress(progress: SpeechQueueProgress<ProjectTextVoiceQueueItem>): void;
+  }
+): Promise<void> {
+  signal.throwIfAborted();
+  if (plan.origin !== access || plan.phase !== 'captured' || !approvedProviderId.trim())
+    throw new Error('invalid-request');
+  for (const item of plan.items) assertLocal(access, item.capture);
+  plan.phase = 'running';
+  try {
+    await runSpeechQueue(
+      plan.items,
+      signal,
+      {
+        validate: (item) => assertLocal(access, item.capture),
+        generate: (item, activeSignal) =>
+          generateProjectTextVoice(access, item.capture, approvedProviderId, activeSignal),
+        cleanup: cleanupProjectVoiceTakePreview,
+      },
+      events
+    );
+    plan.phase = 'complete';
+  } catch (cause) {
+    plan.phase = 'failed';
+    throw cause;
   }
 }

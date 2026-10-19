@@ -1,3 +1,4 @@
+import { runSpeechQueue } from '../audio-jobs/speech-queue';
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
@@ -78,38 +79,29 @@ export async function runReviewSpeechQueue(
     progress(progress: ReviewSpeechQueueProgress): void;
   }
 ): Promise<void> {
-  let completed = 0;
-  for (const item of plan.items) {
-    signal.throwIfAborted();
-    const phrase = getReviewSpeechTarget(session, item.target).transcript?.phrases.find(
-      (entry) => entry.id === item.phraseId
-    );
-    if (
-      session.getSnapshot().snapshot.workspace.aggregateId !== plan.workspaceId ||
-      reviewSpeechGeometry(session, item.target) !== item.geometry ||
-      !phrase ||
-      phrase.start !== item.start ||
-      phrase.end !== item.end ||
-      phrase.revision !== item.revision ||
-      phrase.text !== item.text
-    )
-      throw new Error('stale');
-    events.progress({ completed, total: plan.items.length, current: item });
-    const preview = await generateReviewSpeech(
-      session,
-      item.target,
-      item.phraseId,
-      plan.profile,
-      signal
-    );
-    try {
-      signal.throwIfAborted();
-      events.ready(preview);
-    } catch (cause) {
-      await cleanupReviewSpeechPreview(preview).catch(() => undefined);
-      throw cause;
-    }
-    completed += 1;
-    events.progress({ completed, total: plan.items.length, current: item });
-  }
+  await runSpeechQueue<QueueItem, ReviewSpeechPreview>(
+    plan.items,
+    signal,
+    {
+      validate: (item) => {
+        const phrase = getReviewSpeechTarget(session, item.target).transcript?.phrases.find(
+          (entry) => entry.id === item.phraseId
+        );
+        if (
+          session.getSnapshot().snapshot.workspace.aggregateId !== plan.workspaceId ||
+          reviewSpeechGeometry(session, item.target) !== item.geometry ||
+          !phrase ||
+          phrase.start !== item.start ||
+          phrase.end !== item.end ||
+          phrase.revision !== item.revision ||
+          phrase.text !== item.text
+        )
+          throw new Error('stale');
+      },
+      generate: (item, activeSignal) =>
+        generateReviewSpeech(session, item.target, item.phraseId, plan.profile, activeSignal),
+      cleanup: cleanupReviewSpeechPreview,
+    },
+    events
+  );
 }
