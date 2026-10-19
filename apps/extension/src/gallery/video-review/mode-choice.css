@@ -1,0 +1,8 @@
+@layer utilities {
+  button.review-mode-choice[data-command-press]:focus-visible:not(
+      [data-focus-restoration='pointer']
+    ) {
+    outline: 1px solid var(--sniptale-color-text-secondary) !important;
+    outline-offset: 2px;
+  }
+}

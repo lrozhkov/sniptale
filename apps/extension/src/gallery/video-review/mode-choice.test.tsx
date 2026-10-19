@@ -28,6 +28,8 @@ it('offers two named choices with balanced descriptions and a later-switch hint'
         `[data-ui="gallery.videoReview.modeChoice.${mode}"]`
       )!;
       expect(button.getAttribute('aria-describedby')).toBe(`review-mode-${mode}-description`);
+      expect(button.classList.contains('review-mode-choice')).toBe(true);
+      expect(button.className).not.toContain('focus-visible:ring-');
       await act(async () => button.click());
       expect(onSelect).toHaveBeenLastCalledWith(mode);
     }

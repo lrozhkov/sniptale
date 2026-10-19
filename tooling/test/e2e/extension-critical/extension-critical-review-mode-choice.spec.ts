@@ -162,6 +162,25 @@ for (const variant of [
       const basic = chooser.locator('[data-ui="gallery.videoReview.modeChoice.basic"]');
       const advanced = chooser.locator('[data-ui="gallery.videoReview.modeChoice.advanced"]');
       await expect(basic).toBeFocused();
+      const checkNeutralFocus = async (button: typeof basic) => {
+        await expect(button).toHaveCSS('outline-style', 'solid');
+        await expect(button).toHaveCSS('outline-width', '1px');
+        const colors = await button.evaluate((node) => {
+          const style = getComputedStyle(node);
+          return {
+            outline: style.outlineColor,
+            secondary: getComputedStyle(node.querySelector('svg')!).color,
+          };
+        });
+        expect(colors.outline).toBe(colors.secondary);
+        await expect(button).toHaveCSS('box-shadow', 'none');
+      };
+      await page.keyboard.press('Tab');
+      await expect(advanced).toBeFocused();
+      await checkNeutralFocus(advanced);
+      await page.keyboard.press('Shift+Tab');
+      await expect(basic).toBeFocused();
+      await checkNeutralFocus(basic);
       await page.keyboard.press('Escape');
       await expect(chooser).toBeVisible();
       await page.screenshot({ path: info.outputPath('initial-mode-choice.png'), fullPage: false });

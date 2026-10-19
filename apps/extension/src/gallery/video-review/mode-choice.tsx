@@ -1,3 +1,4 @@
+import './mode-choice.css';
 import { ArrowLeft, ArrowRight, Layers, Scissors } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -34,11 +35,11 @@ function ModeChoiceButton({
       data-ui={`gallery.videoReview.modeChoice.${mode}`}
       aria-labelledby={`review-mode-${mode}-title`}
       aria-describedby={`review-mode-${mode}-description`}
-      className="group flex min-h-52 min-w-0 flex-col items-start gap-4 rounded-[var(--sniptale-radius-lg)]
+      className="review-mode-choice group flex min-h-52 min-w-0 flex-col items-start gap-4
+        rounded-[var(--sniptale-radius-lg)]
         border border-[var(--sniptale-color-border-soft)] bg-transparent p-5 text-left
         text-[var(--sniptale-color-text-primary)] outline-none
-        hover:bg-[var(--sniptale-color-surface-hover)]
-        focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]"
+        hover:bg-[var(--sniptale-color-surface-hover)]"
     >
       <span className="flex w-full items-center gap-3">
         <Icon
