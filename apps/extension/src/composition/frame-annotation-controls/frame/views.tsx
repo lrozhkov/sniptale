@@ -2,7 +2,7 @@ import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layou
 import type { ReactNode } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState } from 'react';
-import { CopyPlus, Eye, EyeOff } from 'lucide-react';
+import { CopyPlus, Eye, Minus } from 'lucide-react';
 
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
 import type { AnnotationTemplateTag } from '@sniptale/runtime-contracts/highlighter/annotation-template-tags';
@@ -451,7 +451,7 @@ function FramePresetRow(props: {
           title={visibilityActionLabel}
           type="button"
         >
-          {isEnabled ? <EyeOff size={15} /> : <Eye size={15} />}
+          {isEnabled ? <Minus size={15} /> : <Eye size={15} />}
         </ProductActionButton>
       </span>
     </div>

@@ -71,6 +71,7 @@ describe('JsonPreviewActions', () => {
       buttons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
+    expect(buttons[0]?.querySelector('.lucide-eye-off')).not.toBeNull();
     expect(buttons[0]?.getAttribute('title')).toBe('aiModal.hideJsonTitle');
     expect(buttons[0]?.className).not.toContain('active');
     expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
@@ -92,5 +93,6 @@ describe('JsonPreviewActions', () => {
     );
 
     expect(container?.querySelectorAll('button')).toHaveLength(1);
+    expect(container?.querySelector('.lucide-eye')).not.toBeNull();
   });
 });

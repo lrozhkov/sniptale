@@ -127,7 +127,7 @@ function queryFieldElements() {
     ),
     resizeHandle: container?.querySelector('div[style*="ns-resize"]') as HTMLDivElement,
     styleSelect: container?.querySelector<HTMLButtonElement>(
-      'button[aria-label="highlighter.editor.styleLabel"]'
+      '[role="group"][aria-label="highlighter.editor.styleLabel"] button[title="highlighter.editor.styleDashed"]'
     ),
     textarea: container?.querySelector('textarea') as HTMLTextAreaElement,
   };
@@ -274,7 +274,7 @@ describe('BorderPresetEditorFields', () => {
         ?.textContent
     ).toBe('highlighter.editor.outlineSection');
     expect(
-      container?.querySelector('[data-field-label="highlighter.editor.styleLabel"]')
+      container?.querySelector('[role="group"][aria-label="highlighter.editor.styleLabel"]')
     ).not.toBeNull();
     const widthRow = getNumericInput('highlighter.editor.widthLabel').closest<HTMLElement>(
       '[data-ui="shared.ui.compact-inspector.numeric-row"]'
@@ -365,9 +365,11 @@ describe('BorderPresetEditorFields', () => {
       '[aria-label="highlighter.editor.blurTypeLabel"]'
     );
     act(() => blurTypeSelect?.click());
-    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(
-      (option) => option.textContent
-    );
+    const options = [
+      ...container.querySelectorAll<HTMLElement>(
+        '[role="group"][aria-label="highlighter.editor.blurTypeLabel"] button'
+      ),
+    ].map((option) => option.textContent);
 
     expect(options).toEqual([
       'highlighter.editor.blurTypeGaussian',

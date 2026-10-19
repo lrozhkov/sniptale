@@ -1,3 +1,5 @@
+import { getBorderPresetPreviewStyle } from './frame/helpers';
+import { DEFAULT_BORDER_PRESET } from '../../features/highlighter/style/defaults';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -381,3 +383,11 @@ function rect(left: number, top: number, width: number, height: number): DOMRect
     toJSON: () => ({}),
   } as DOMRect;
 }
+
+it('keeps frame preset icons unfilled when the authored frame has a fill', () => {
+  const preview = getBorderPresetPreviewStyle({
+    ...DEFAULT_BORDER_PRESET,
+    fillPaint: { kind: 'solid', color: '#ff0000' },
+  });
+  expect(preview.background).toBe('transparent');
+});

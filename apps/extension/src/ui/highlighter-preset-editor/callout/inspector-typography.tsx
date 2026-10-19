@@ -18,7 +18,7 @@ import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import { CompactPaintSelector } from '../../paint-selector';
 import { translate } from '../../../platform/i18n';
-import { CompactSelect } from '../../compact-inspector-controls';
+import { SegmentedRow } from '../../compact-inspector-controls';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { InspectorFieldClear } from '../../compact-inspector-controls/text-field';
 import { CALLOUT_BACKGROUND_PRESETS, CALLOUT_TEXT_PRESETS } from './inspector-palettes';
@@ -133,18 +133,16 @@ function FontFamilyField(props: {
   value: CalloutFontFamily;
 }) {
   return (
-    <PropertyField compactLabel label={translate('content.callout.fontFamilyLabel')}>
-      <CompactSelect
-        appearance="plain"
-        aria-label={translate('content.callout.fontFamilyLabel')}
-        options={FONT_FAMILIES.map((value) => ({
-          label: translate(`content.callout.font.${value}`),
-          value,
-        }))}
-        value={props.value}
-        onChange={props.onChange}
-      />
-    </PropertyField>
+    <SegmentedRow
+      label={translate('content.callout.fontFamilyLabel')}
+      ariaLabel={translate('content.callout.fontFamilyLabel')}
+      options={FONT_FAMILIES.map((value) => ({
+        label: translate(`content.callout.font.${value}`),
+        value,
+      }))}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }
 
@@ -153,18 +151,16 @@ function DirectionField(props: {
   value: CalloutTextDirection;
 }) {
   return (
-    <PropertyField label={translate('content.callout.directionLabel')}>
-      <CompactSelect
-        appearance="plain"
-        aria-label={translate('content.callout.directionLabel')}
-        options={DIRECTIONS.map((value) => ({
-          label: translate(`content.callout.direction.${value}`),
-          value,
-        }))}
-        value={props.value}
-        onChange={props.onChange}
-      />
-    </PropertyField>
+    <SegmentedRow
+      label={translate('content.callout.directionLabel')}
+      ariaLabel={translate('content.callout.directionLabel')}
+      options={DIRECTIONS.map((value) => ({
+        label: translate(`content.callout.direction.${value}`),
+        value,
+      }))}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }
 
@@ -175,6 +171,7 @@ export function CalloutTextSettings(props: ManualContentProps) {
   return (
     <SettingsStack>
       <ColorField
+        {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}
         label={translate('content.callout.textColorLabel')}
         onChange={(textColor) => props.onChange({ style: { surface: { textColor } } })}
         palette={CALLOUT_TEXT_PRESETS}
@@ -215,30 +212,26 @@ export function CalloutTextSettings(props: ManualContentProps) {
           value={typography.direction}
           onChange={(direction) => changeTypography({ direction })}
         />
-        <PropertyField label={translate('content.callout.wordBreakLabel')}>
-          <CompactSelect
-            appearance="plain"
-            aria-label={translate('content.callout.wordBreakLabel')}
-            options={(['normal', 'break-word'] as const).map((value) => ({
-              label: translate(`content.callout.wordBreak.${value}`),
-              value,
-            }))}
-            value={typography.wordBreak}
-            onChange={(wordBreak) => changeTypography({ wordBreak })}
-          />
-        </PropertyField>
-        <PropertyField label={translate('content.callout.hyphensLabel')}>
-          <CompactSelect
-            appearance="plain"
-            aria-label={translate('content.callout.hyphensLabel')}
-            options={(['none', 'auto'] as const).map((value) => ({
-              label: translate(`content.callout.hyphens.${value}`),
-              value,
-            }))}
-            value={typography.hyphens}
-            onChange={(hyphens) => changeTypography({ hyphens })}
-          />
-        </PropertyField>
+        <SegmentedRow
+          label={translate('content.callout.wordBreakLabel')}
+          ariaLabel={translate('content.callout.wordBreakLabel')}
+          options={(['normal', 'break-word'] as const).map((value) => ({
+            label: translate(`content.callout.wordBreak.${value}`),
+            value,
+          }))}
+          value={typography.wordBreak}
+          onChange={(wordBreak) => changeTypography({ wordBreak })}
+        />
+        <SegmentedRow
+          label={translate('content.callout.hyphensLabel')}
+          ariaLabel={translate('content.callout.hyphensLabel')}
+          options={(['none', 'auto'] as const).map((value) => ({
+            label: translate(`content.callout.hyphens.${value}`),
+            value,
+          }))}
+          value={typography.hyphens}
+          onChange={(hyphens) => changeTypography({ hyphens })}
+        />
       </AdditionalSettings>
     </SettingsStack>
   );
@@ -262,6 +255,7 @@ function BadgeColorField(props: {
   customColor: string;
   label: string;
   onColorChange: (color: string) => void;
+  onNestedLayerChange?: ((open: boolean) => void) | undefined;
   onSourceChange: (source: CalloutBadgeColorSource) => void;
   palette: readonly string[];
   resolvedColor: string;
@@ -276,6 +270,7 @@ function BadgeColorField(props: {
   const sourceTitle = `${props.sourceLabel} — ${sourceName}`;
   return (
     <ColorField
+      {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}
       control={
         <ProductGlassBoldButton
           aria-label={sourceTitle}
@@ -317,33 +312,29 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
               onChange={(event) => changeBadge({ text: event.target.value })}
             />
           </PropertyField>
-          <PropertyField label={translate('content.callout.badgePlacementLabel')}>
-            <CompactSelect
-              appearance="plain"
-              aria-label={translate('content.callout.badgePlacementLabel')}
-              options={(props.settings.style.title.enabled
-                ? (['title-start', 'title-end', 'body-start'] as const)
-                : (['body-start'] as const)
-              ).map((value) => ({
-                label: translate(`content.callout.badgePlacement.${value}`),
-                value,
-              }))}
-              value={badge.placement}
-              onChange={(placement) => changeBadge({ placement })}
-            />
-          </PropertyField>
-          <PropertyField label={translate('content.callout.badgeShapeLabel')}>
-            <CompactSelect
-              appearance="plain"
-              aria-label={translate('content.callout.badgeShapeLabel')}
-              options={(['circle', 'rounded', 'square'] as const).map((value) => ({
-                label: translate(`content.callout.badgeShape.${value}`),
-                value,
-              }))}
-              value={badge.shape}
-              onChange={(shape) => changeBadge({ shape })}
-            />
-          </PropertyField>
+          <SegmentedRow
+            label={translate('content.callout.badgePlacementLabel')}
+            ariaLabel={translate('content.callout.badgePlacementLabel')}
+            options={(props.settings.style.title.enabled
+              ? (['title-start', 'title-end', 'body-start'] as const)
+              : (['body-start'] as const)
+            ).map((value) => ({
+              label: translate(`content.callout.badgePlacement.${value}`),
+              value,
+            }))}
+            value={badge.placement}
+            onChange={(placement) => changeBadge({ placement })}
+          />
+          <SegmentedRow
+            label={translate('content.callout.badgeShapeLabel')}
+            ariaLabel={translate('content.callout.badgeShapeLabel')}
+            options={(['circle', 'rounded', 'square'] as const).map((value) => ({
+              label: translate(`content.callout.badgeShape.${value}`),
+              value,
+            }))}
+            value={badge.shape}
+            onChange={(shape) => changeBadge({ shape })}
+          />
           <NumericProperty
             label={translate('content.callout.badgeSizeLabel')}
             max={64}
@@ -352,6 +343,7 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
             onChange={(size) => changeBadge({ size })}
           />
           <BadgeColorField
+            onNestedLayerChange={props.onNestedLayerChange}
             customColor={badge.backgroundColor}
             label={translate('content.callout.badgeBackgroundColor')}
             onColorChange={(backgroundColor) => changeBadge({ backgroundColor })}
@@ -362,6 +354,7 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
             sourceLabel={translate('content.callout.badgeBackgroundSource')}
           />
           <BadgeColorField
+            onNestedLayerChange={props.onNestedLayerChange}
             customColor={badge.textColor}
             label={translate('content.callout.badgeTextColor')}
             onColorChange={(textColor) => changeBadge({ textColor })}
@@ -380,6 +373,7 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
           />
           {badge.borderWidth > 0 ? (
             <BadgeColorField
+              onNestedLayerChange={props.onNestedLayerChange}
               customColor={badge.borderColor}
               label={translate('content.callout.badgeBorderColor')}
               onColorChange={(borderColor) => changeBadge({ borderColor })}
@@ -397,22 +391,20 @@ export function CalloutBadgeSettings(props: ManualContentProps) {
             value={badge.fontSize}
             onChange={(fontSize) => changeBadge({ fontSize })}
           />
-          <PropertyField label={translate('content.callout.badgeFontWeight')}>
-            <CompactSelect
-              appearance="plain"
-              aria-label={translate('content.callout.badgeFontWeight')}
-              options={(['normal', 'bold'] as const).map((value) => ({
-                label: translate(
-                  value === 'normal'
-                    ? 'content.callout.badgeFontWeightNormal'
-                    : 'content.callout.badgeFontWeightBold'
-                ),
-                value,
-              }))}
-              value={badge.fontWeight}
-              onChange={(fontWeight) => changeBadge({ fontWeight })}
-            />
-          </PropertyField>
+          <SegmentedRow
+            label={translate('content.callout.badgeFontWeight')}
+            ariaLabel={translate('content.callout.badgeFontWeight')}
+            options={(['normal', 'bold'] as const).map((value) => ({
+              label: translate(
+                value === 'normal'
+                  ? 'content.callout.badgeFontWeightNormal'
+                  : 'content.callout.badgeFontWeightBold'
+              ),
+              value,
+            }))}
+            value={badge.fontWeight}
+            onChange={(fontWeight) => changeBadge({ fontWeight })}
+          />
         </>
       ) : null}
     </>
@@ -453,25 +445,25 @@ export function CalloutTitleSettings(props: ManualContentProps) {
             onChange={(fontSize) => changeTitle({ fontSize })}
           />
           <ColorField
+            {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}
             label={translate('content.callout.titleTextColorLabel')}
             value={title.textColor}
             palette={CALLOUT_TEXT_PRESETS}
             onChange={(textColor) => changeTitle({ textColor })}
           />
-          <PropertyField label={translate('content.callout.titleFillModeLabel')}>
-            <CompactSelect
-              appearance="plain"
-              aria-label={translate('content.callout.titleFillModeLabel')}
-              options={(['separate', 'unified'] as const).map((value) => ({
-                label: translate(`content.callout.titleFillMode.${value}`),
-                value,
-              }))}
-              value={title.fillMode}
-              onChange={(fillMode) => changeTitle({ fillMode })}
-            />
-          </PropertyField>
+          <SegmentedRow
+            label={translate('content.callout.titleFillModeLabel')}
+            ariaLabel={translate('content.callout.titleFillModeLabel')}
+            options={(['separate', 'unified'] as const).map((value) => ({
+              label: translate(`content.callout.titleFillMode.${value}`),
+              value,
+            }))}
+            value={title.fillMode}
+            onChange={(fillMode) => changeTitle({ fillMode })}
+          />
           {title.fillMode === 'separate' ? (
             <CompactPaintSelector
+              {...(props.onNestedLayerChange ? { onOpenChange: props.onNestedLayerChange } : {})}
               label={translate('content.callout.titleBackgroundLabel')}
               palette={CALLOUT_BACKGROUND_PRESETS}
               title={translate('content.callout.titleBackgroundLabel')}

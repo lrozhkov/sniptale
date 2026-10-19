@@ -6,13 +6,14 @@ export function HighlighterPresetPropertyField(props: {
   children: ReactNode;
   compactLabel?: boolean;
   label: string;
+  valueMinimum?: number;
 }) {
   const inspector = useInspectorLayout();
   if (inspector)
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={160}
+        valueMinimum={props.valueMinimum ?? 140}
         dataUi="shared.highlighter-preset-editor.property-field"
       >
         {props.children}

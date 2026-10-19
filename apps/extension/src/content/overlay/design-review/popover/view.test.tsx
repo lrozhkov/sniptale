@@ -125,7 +125,17 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(closeButton?.className).toContain('cursor-pointer');
   expect(closeButton?.className).toContain('z-50');
   expect(closeButton?.className).toContain('sniptale-dismiss-button');
+  expect(closeButton?.className).not.toContain('-right-3');
+  expect(closeButton?.className).not.toContain('-top-3');
   expect(closeButton?.className).not.toContain('hover:bg-[var(--sniptale-color-surface-input)]');
+  const closeBacking = closeButton?.parentElement;
+  expect(closeBacking?.getAttribute('data-ui')).toBe('content.design-review.close-backing');
+  expect(closeBacking?.className).toContain('-right-3 -top-3');
+  expect(closeBacking?.style.borderRadius).toBe('50%');
+  expect(closeButton?.className).toContain('!h-6 !min-h-6 !w-6 !min-w-6');
+  const commentLayer = root.querySelector('[data-ui="content.design-review.comment-layer"]');
+  expect(commentLayer?.className).toContain('pt-4');
+  expect(commentLayer?.className).not.toContain('pt-10');
 });
 
 it('uses native non-layout hints for the element tag and full path', () => {

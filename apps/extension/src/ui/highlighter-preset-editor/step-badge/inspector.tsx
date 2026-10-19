@@ -5,11 +5,7 @@ import type {
   StepBadgeVisualStyle,
 } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import { ContentPopoverSection } from '@sniptale/ui/content-popover-adapter';
-import {
-  ProductGlassBoldButton,
-  ProductGlassChip,
-  ProductGlassRow,
-} from '@sniptale/ui/product-glass-controls';
+import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import {
   Braces,
   Circle,
@@ -22,7 +18,7 @@ import {
 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { CompactColorSelector } from '../../color-selector';
-import { NumericRow } from '../../compact-inspector-controls';
+import { NumericRow, SegmentedRow } from '../../compact-inspector-controls';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import {
@@ -62,6 +58,7 @@ function ColorEditor(props: {
   frame: FrameVisuals;
   label: string;
   onColorChange: (color: string) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   onSourceChange: (source: StepBadgeColorSource | StepBadgeOutlineColorSource) => void;
   outline?: boolean;
   colorRole: 'background' | 'outline' | 'text';
@@ -83,7 +80,7 @@ function ColorEditor(props: {
   const SourceIcon = SOURCE_ICONS[props.source];
   const sourceTitle = `${translate('content.stepBadge.colorSourceLabel')} — ${getSourceLabel(props.source)}`;
   return (
-    <PropertyField label={props.label}>
+    <PropertyField label={props.label} valueMinimum={178}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -101,6 +98,7 @@ function ColorEditor(props: {
             value={value}
             palette={PALETTE}
             onChange={props.onColorChange}
+            {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
           />
         </fieldset>
         <ProductGlassBoldButton
@@ -120,6 +118,7 @@ function ColorEditor(props: {
 type StepBadgeAppearanceProps = {
   frame: FrameVisuals;
   onChange: (patch: Partial<StepBadgeSettings>) => void;
+  onFloatingInteractionChange?: ((open: boolean) => void) | undefined;
   settings: StepBadgeSettings;
 };
 
@@ -131,27 +130,23 @@ export function StepBadgeSizeSection(props: StepBadgeAppearanceProps & { embedde
   const inspector = useInspectorLayout();
   const content = (
     <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>
-      <PropertyField label={translate('content.stepBadge.sizeSource')}>
-        <ProductGlassRow>
-          <ProductGlassChip
-            active={style.sizeSource === 'frame-border'}
-            onClick={() => updateStyle({ sizeSource: 'frame-border' })}
-          >
-            {translate('content.stepBadge.sizeFromFrame')}
-          </ProductGlassChip>
-          <ProductGlassChip
-            active={style.sizeSource === 'custom'}
-            onClick={() =>
-              updateStyle({
-                sizeSource: 'custom',
-                diameter: style.sizeSource === 'frame-border' ? linkedDiameter : style.diameter,
-              })
-            }
-          >
-            {translate('content.stepBadge.sizeCustom')}
-          </ProductGlassChip>
-        </ProductGlassRow>
-      </PropertyField>
+      <SegmentedRow
+        label={translate('content.stepBadge.sizeSource')}
+        ariaLabel={translate('content.stepBadge.sizeSource')}
+        options={[
+          { label: translate('content.stepBadge.sizeFromFrame'), value: 'frame-border' },
+          { label: translate('content.stepBadge.sizeCustom'), value: 'custom' },
+        ]}
+        value={style.sizeSource}
+        onChange={(sizeSource) =>
+          updateStyle({
+            sizeSource,
+            ...(sizeSource === 'custom' && style.sizeSource === 'frame-border'
+              ? { diameter: linkedDiameter }
+              : {}),
+          })
+        }
+      />
       <NumericRow
         appearance="plain"
         disabled={style.sizeSource !== 'custom'}
@@ -184,6 +179,7 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
   const content = (
     <div className={inspector ? 'sniptale-parameter-stack' : 'grid gap-2'}>
       <ColorEditor
+        onOpenChange={props.onFloatingInteractionChange}
         frame={props.frame}
         label={translate('content.stepBadge.background')}
         onColorChange={(backgroundColor) => updateStyle({ backgroundColor })}
@@ -195,6 +191,7 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
         colorRole="background"
       />
       <ColorEditor
+        onOpenChange={props.onFloatingInteractionChange}
         frame={props.frame}
         label={translate('content.stepBadge.textColor')}
         onColorChange={(textColor) => updateStyle({ textColor })}
@@ -206,6 +203,7 @@ export function StepBadgeColorSection(props: StepBadgeAppearanceProps & { embedd
         colorRole="text"
       />
       <ColorEditor
+        onOpenChange={props.onFloatingInteractionChange}
         outline
         frame={props.frame}
         label={translate('content.stepBadge.outline')}

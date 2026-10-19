@@ -49,7 +49,21 @@ export interface ContextMenuSettings {
 }
 
 export type ContentToolbarDisplayMode = 'horizontal' | 'vertical';
-export type ContentToolbarDockEdge = 'top' | 'bottom' | 'left' | 'right';
+export const CONTENT_TOOLBAR_DOCK_EDGES = [
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'left-top',
+  'left-bottom',
+  'right-top',
+  'right-bottom',
+] as const;
+export type ContentToolbarDockEdge = (typeof CONTENT_TOOLBAR_DOCK_EDGES)[number];
 
 export interface ContentToolbarPosition {
   x: number;

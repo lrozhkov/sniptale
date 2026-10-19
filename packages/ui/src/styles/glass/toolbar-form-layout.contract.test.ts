@@ -27,3 +27,16 @@ describe('glass.toolbar-form-layout contract', () => {
     expect(glassToolbarFormLayoutStylesheet).not.toContain('.sniptale-glass-color-trigger {');
   });
 });
+
+it('aligns content action toolbars with the main toolbar control geometry', () => {
+  const selector =
+    ':host .sniptale-glass-toolbar:is(.sniptale-action-toolbar, .sniptale-callout-format-toolbar) {';
+  const block = glassToolbarFormLayoutStylesheet
+    .slice(glassToolbarFormLayoutStylesheet.indexOf(selector))
+    .split('}')[0];
+  expect(block).toContain('border-radius: 4px');
+  expect(glassToolbarFormLayoutStylesheet.replace(/\s+/gu, ' ')).toContain(
+    ':host :is(.sniptale-action-toolbar, .sniptale-callout-format-toolbar) .sniptale-glass-toolbar-button'
+  );
+  expect(glassToolbarFormLayoutStylesheet).toContain('width: 32px');
+});

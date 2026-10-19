@@ -192,9 +192,14 @@
 .sniptale-content-popover.sniptale-compact-workspace[data-theme],
 .sniptale-content-popover.sniptale-compact-workspace:not([data-theme]),
 .sniptale-content-popover .sniptale-compact-workspace {
-  --sniptale-parameter-row-height: 32px;
-  --sniptale-parameter-context-space: 0px;
-  --sniptale-inspector-range-bottom: 8px;
-  --sniptale-parameter-range-hit-height: 16px;
-  --sniptale-parameter-range-hit-top: -8px;
+  --sniptale-parameter-row-height: 40px;
+  --sniptale-parameter-context-space: 8px;
+  --sniptale-inspector-range-bottom: 4px;
+  --sniptale-parameter-range-hit-height: 8px;
+  --sniptale-parameter-range-hit-top: -4px;
+}
+
+/* Annotation controls must obscure host-page text beneath their parameter labels. */
+.sniptale-content-popover.sniptale-content-appearance-surface {
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
 }

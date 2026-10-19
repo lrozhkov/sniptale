@@ -98,3 +98,70 @@ it('supports an editor coordinate space without requiring a title field', () => 
   act(() => root.render(<Harness />));
   expect(dimensions).toEqual({ width: 0, height: 0 });
 });
+
+it('measures the initial callout during layout before the browser can paint fallback dimensions', () => {
+  let layoutFinished = false;
+  let measuredBeforePaint = false;
+  let dimensions = { width: 0, height: 0 };
+  vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockImplementation(() => {
+    measuredBeforePaint = !layoutFinished;
+    return new DOMRect(0, 0, 35, 28);
+  });
+  function Harness() {
+    const editing = useFrameCalloutEditing({
+      frameId: 'new-comment',
+      htmlContent: '',
+      isEditing: true,
+      onContentChange: vi.fn(),
+      onDelete: vi.fn(),
+      onStartEditing: vi.fn(),
+      onStopEditing: vi.fn(),
+      settingsKey: 'new-comment',
+    });
+    dimensions = editing.layout.dimensions;
+    React.useLayoutEffect(() => {
+      layoutFinished = true;
+    }, []);
+    return (
+      <div ref={editing.refs.container}>
+        <div ref={editing.refs.contentEditable} contentEditable />
+      </div>
+    );
+  }
+  act(() => root.render(<Harness />));
+  expect(measuredBeforePaint).toBe(true);
+  expect(dimensions).toEqual({ width: 35, height: 28 });
+});
+
+it.each([true, false])(
+  'measures initialized content before first paint with editing=%s',
+  (isEditing) => {
+    let dimensions = { width: 0, height: 0 };
+    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLDivElement
+    ) {
+      return new DOMRect(0, 0, this.textContent ? 188 : 35, 28);
+    });
+    function Harness() {
+      const editing = useFrameCalloutEditing({
+        frameId: 'existing-comment',
+        htmlContent: '<b>Existing comment</b>',
+        isEditing,
+        onContentChange: vi.fn(),
+        onDelete: vi.fn(),
+        onStartEditing: vi.fn(),
+        onStopEditing: vi.fn(),
+        settingsKey: 'existing-comment',
+      });
+      dimensions = editing.layout.dimensions;
+      return (
+        <div ref={editing.refs.container}>
+          <div ref={editing.refs.contentEditable} contentEditable={isEditing} />
+        </div>
+      );
+    }
+    act(() => root.render(<Harness />));
+    expect(host.textContent).toBe('Existing comment');
+    expect(dimensions).toEqual({ width: 188, height: 28 });
+  }
+);

@@ -391,23 +391,21 @@ it('projects a font selected in shared callout settings into the editor DOM surf
     );
   }
 
-  await act(async () => root.render(<Harness />));
-  const editable = sceneRoot.querySelector<HTMLElement>('[contenteditable]');
-  expect(editable?.style.fontFamily).toContain('system-ui');
+  try {
+    await act(async () => root.render(<Harness />));
+    const editable = sceneRoot.querySelector<HTMLElement>('[contenteditable]');
+    expect(editable?.style.fontFamily).toContain('system-ui');
 
-  await act(async () =>
-    document
-      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.compact-select"] > button')
-      ?.click()
-  );
-  const serif = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')][1];
-  expect(serif).toBeDefined();
-  await act(async () => serif?.click());
+    const serif = document.querySelector<HTMLButtonElement>('[role="group"] button[title="Serif"]');
+    expect(serif).toBeDefined();
+    await act(async () => serif?.click());
 
-  expect(sceneRoot.querySelector<HTMLElement>('[contenteditable]')?.style.fontFamily).toContain(
-    'Georgia'
-  );
-  act(() => root.unmount());
-  document.body.replaceChildren();
-  vi.unstubAllGlobals();
+    expect(sceneRoot.querySelector<HTMLElement>('[contenteditable]')?.style.fontFamily).toContain(
+      'Georgia'
+    );
+  } finally {
+    act(() => root.unmount());
+    document.body.replaceChildren();
+    vi.unstubAllGlobals();
+  }
 });

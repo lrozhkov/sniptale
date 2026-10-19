@@ -46,16 +46,16 @@ export function useFrameCalloutEditing(args: {
     htmlContent: args.htmlContent,
     isEditing: args.isEditing,
   });
+  useCalloutEditingFocusEffect({
+    contentEditableRef,
+    htmlContent: args.htmlContent,
+    isEditing: args.isEditing,
+  });
   useCalloutMeasureEffect({
     containerRef,
     ...(args.coordinateSpace ? { coordinateSpace: args.coordinateSpace } : {}),
     setDimensions,
     settingsKey: args.settingsKey,
-  });
-  useCalloutEditingFocusEffect({
-    contentEditableRef,
-    htmlContent: args.htmlContent,
-    isEditing: args.isEditing,
   });
   useCalloutEscapeCaptureEffect({
     contentEditableRef,

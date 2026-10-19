@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Minus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, ListOrdered, Minus, Scaling, Plus, Trash2, X } from 'lucide-react';
 import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
 import {
   ProductGlassToolbar,
@@ -31,7 +31,7 @@ export function FrameAnnotationToolbarEffectButton(props: {
       menuIndicator
       title={props.label ?? commandLabels().get(`effect-${props.effectMode}`)}
     >
-      <FrameAnnotationEffectIcon mode={props.effectMode} size={18} />
+      <FrameAnnotationEffectIcon mode={props.effectMode} size={16} />
     </ProductGlassToolbarButton>
   );
 }
@@ -71,7 +71,7 @@ export function FrameAnnotationToolbarStepButton(props: {
 }) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="step-badge">
-      <ListOrdered size={17} />
+      <ListOrdered size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }
@@ -85,7 +85,7 @@ export function FrameAnnotationToolbarCalloutButton(props: {
 }) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="callout">
-      <FrameCommentIcon size={17} />
+      <FrameCommentIcon size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }
@@ -105,7 +105,7 @@ export function FrameAnnotationToolbarAddCalloutButton(props: {
       onMouseDown={props.onMouseDown}
       title={props.title}
     >
-      <AddFrameCommentIcon size={17} />
+      <AddFrameCommentIcon size={16} />
     </ProductGlassToolbarButton>
   );
 }
@@ -134,7 +134,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('decrease')}
         aria-label={labels.get('decrease')}
       >
-        <Minus size={18} />
+        <Minus size={16} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
         onClick={props.onIncrease}
@@ -142,7 +142,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('increase')}
         aria-label={labels.get('increase')}
       >
-        <Plus size={18} />
+        <Plus size={16} />
       </ProductGlassToolbarButton>
       {props.showEdit !== false ? (
         <ProductGlassToolbarButton
@@ -150,7 +150,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
           onMouseDown={props.onMouseDown}
           title={labels.get('edit')}
         >
-          <Pencil size={18} />
+          <Scaling size={16} />
         </ProductGlassToolbarButton>
       ) : null}
       {props.onCaptureVisibilityChange ? (
@@ -164,7 +164,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
             onMouseDown={props.onMouseDown}
             title={props.captureVisibilityTitle}
           >
-            {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+            {props.captureHidden ? <EyeOff size={16} /> : <Eye size={16} />}
           </ProductGlassToolbarButton>
         </>
       ) : null}
@@ -175,7 +175,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         onMouseDown={props.onMouseDown}
         title={labels.get('delete')}
       >
-        <Trash2 size={18} />
+        <Trash2 size={16} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
         className={'sniptale-dismiss-button'}
@@ -184,7 +184,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         title={labels.get('close')}
         aria-label={labels.get('close')}
       >
-        <X size={18} />
+        <X size={16} />
       </ProductGlassToolbarButton>
     </>
   );
@@ -286,7 +286,7 @@ export function FrameAnnotationFloatingToolbar(props: {
                 onClick={command(`effect-${mode}`)}
                 title={commandLabels().get(`effect-${mode}`)}
               >
-                <FrameAnnotationEffectIcon mode={mode} size={18} />
+                <FrameAnnotationEffectIcon mode={mode} size={16} />
               </ProductGlassToolbarButton>
             ))}
           </ProductGlassToolbar>

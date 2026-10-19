@@ -11,7 +11,7 @@ import {
   ProductGlassIconButton,
 } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
-import { CompactSelect } from '../../compact-inspector-controls';
+import { CompactSelect, SegmentedRow } from '../../compact-inspector-controls';
 import { CALLOUT_TEXT_PRESETS } from './inspector-palettes';
 import {
   AdditionalSettings,
@@ -40,18 +40,16 @@ function LineStyleField(props: {
   value: CalloutLineStyle;
 }) {
   return (
-    <PropertyField label={props.label}>
-      <CompactSelect
-        appearance="plain"
-        aria-label={props.label}
-        options={LINE_STYLES.map((value) => ({
-          value,
-          label: translate(`content.callout.lineStyle.${value}`),
-        }))}
-        value={props.value}
-        onChange={props.onChange}
-      />
-    </PropertyField>
+    <SegmentedRow
+      label={props.label}
+      ariaLabel={props.label}
+      options={LINE_STYLES.map((value) => ({
+        value,
+        label: translate(`content.callout.lineStyle.${value}`),
+      }))}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }
 
@@ -161,17 +159,15 @@ function LineConnectorSettings(props: ManualContentProps) {
   const connector = props.settings.style.connector;
   return (
     <SettingsStack>
-      <PropertyField label={translate('content.callout.routingLabel')}>
-        <CompactSelect
-          appearance="plain"
-          aria-label={translate('content.callout.routingLabel')}
-          options={(['straight', 'elbow', 'polyline', 'curve'] as CalloutConnectorRouting[]).map(
-            (value) => ({ value, label: translate(`content.callout.routing.${value}`) })
-          )}
-          value={connector.routing}
-          onChange={(routing) => props.onChange({ style: { connector: { routing } } })}
-        />
-      </PropertyField>
+      <SegmentedRow
+        label={translate('content.callout.routingLabel')}
+        ariaLabel={translate('content.callout.routingLabel')}
+        options={(['straight', 'elbow', 'polyline', 'curve'] as CalloutConnectorRouting[]).map(
+          (value) => ({ value, label: translate(`content.callout.routing.${value}`) })
+        )}
+        value={connector.routing}
+        onChange={(routing) => props.onChange({ style: { connector: { routing } } })}
+      />
       {connector.routing === 'curve' ? (
         <>
           <NumericProperty
@@ -203,6 +199,7 @@ function LineConnectorSettings(props: ManualContentProps) {
         </>
       ) : null}
       <BoundColorField
+        onOpenChange={props.onNestedLayerChange}
         customColor={connector.color}
         frameColors={props.frameColors}
         label={translate('content.callout.connectorColor')}
@@ -273,6 +270,7 @@ export function CalloutBorderSettings(props: ManualContentProps) {
   return (
     <SettingsStack>
       <BoundColorField
+        onOpenChange={props.onNestedLayerChange}
         customColor={surface.borderColor}
         frameColors={props.frameColors}
         label={translate('content.callout.borderColorLabel')}
@@ -311,6 +309,7 @@ export function CalloutDividerSettings(props: ManualContentProps) {
   return (
     <SettingsStack>
       <ColorField
+        onOpenChange={props.onNestedLayerChange}
         label={translate('content.callout.dividerColorLabel')}
         value={title.dividerColor}
         palette={CALLOUT_TEXT_PRESETS}
@@ -382,6 +381,7 @@ export function CalloutAccentSettings(props: ManualContentProps) {
             onChange={(side) => props.onChange({ style: { accentEdge: { side } } })}
           />
           <BoundColorField
+            onOpenChange={props.onNestedLayerChange}
             customColor={accent.color}
             frameColors={props.frameColors}
             label={translate('content.callout.accentColorLabel')}

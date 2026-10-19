@@ -286,9 +286,43 @@ async function geometry(page: Page, c: Composition) {
   await expect(heading).toHaveCSS('font-weight', '500');
   await expect(modal).toHaveCSS('border-radius', '8px');
   await interfaceFont(modal);
+  const alpha = await modal.evaluate((node) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = getComputedStyle(node).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  });
+  expect.soft(alpha, 'Content AI modal hides underlying page text').toBe(255);
+  const prompt = page.locator('#ai-prompt');
+  await prompt.click();
+  const promptFrame = await prompt.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-border-strong)';
+    node.parentElement!.append(probe);
+    const neutral = getComputedStyle(probe).color;
+    probe.remove();
+    return { neutral };
+  });
+  await expect.soft(prompt).toHaveCSS('border-color', promptFrame.neutral);
   await expect(modal.locator('.sniptale-ai-modal-context-info')).toHaveCSS('font-size', '12px');
   await expect(modal.locator('.sniptale-ai-modal-context-info')).toHaveCSS('line-height', '16px');
   await inViewport(page, modal);
+  expect(await modal.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  const promptAccessories = [
+    modal.locator('.sniptale-ai-modal-template-select'),
+    ui(page, 'content.ai-modal.prompt-voice-input'),
+    modal.locator('.sniptale-ai-modal-prompt-submit-hint'),
+  ];
+  const centers = await Promise.all(
+    promptAccessories.map(async (target) => {
+      const bounds = await target.boundingBox();
+      if (!bounds) throw new Error('Prompt accessory has no bounds');
+      return bounds.y + bounds.height / 2;
+    })
+  );
+  expect.soft(Math.max(...centers) - Math.min(...centers)).toBeLessThanOrEqual(1);
   for (const key of [
     'aiModal.openModelSettings',
     'aiModal.openPromptTemplatesSettings',
@@ -528,6 +562,16 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   expect(idlePlaceholder).not.toBe('rgba(0, 0, 0, 0)');
   await search.click();
   expect.soft(await placeholderColor()).toBe('rgba(0, 0, 0, 0)');
+  const searchFrame = search.locator('..');
+  const neutralBorder = await searchFrame.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-border-strong)';
+    node.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  await expect.soft(searchFrame).toHaveCSS('border-color', neutralBorder, { timeout: 500 });
   await search.fill('Apples');
   await expect(search).toHaveCSS('font-size', '13px');
   await expect(search).toHaveCSS('line-height', '18px');
@@ -555,7 +599,10 @@ async function dataControls(page: Page, c: Composition, info: TestInfo) {
   await checkbox.setChecked(!checked);
   await checkbox.setChecked(checked);
   const jsonToggle = modal.locator('.sniptale-ai-data-preview-toggle');
-  if ((await jsonToggle.getAttribute('aria-pressed')) !== 'true') await jsonToggle.click();
+  if ((await jsonToggle.getAttribute('aria-pressed')) === 'true') await jsonToggle.click();
+  await expect(jsonToggle.locator('.lucide-eye')).toBeVisible();
+  await jsonToggle.click();
+  await expect(jsonToggle.locator('.lucide-eye-off')).toBeVisible();
   const json = modal.locator('.sniptale-json-preview');
   await expect(json).toBeVisible();
   expect(await json.evaluate((node) => getComputedStyle(node).fontFamily)).toContain('monospace');

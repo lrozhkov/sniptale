@@ -67,7 +67,7 @@ function LinkToggle(props: {
         'hover:brightness-110 disabled:opacity-50 focus:outline-none',
         'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         props.linked
-          ? 'text-[var(--sniptale-color-accent)]'
+          ? 'text-[var(--sniptale-color-text-primary)]'
           : 'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       data-side-link={props.name}
@@ -219,18 +219,12 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
-        <div className="min-w-0">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
+        <div className={expanded ? 'col-span-2 min-w-0' : 'min-w-0'}>
           <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
         </div>
-        <LinkToggle
-          disabled={props.disabled}
-          linked={linking.model.linked}
-          name="all"
-          onClick={linking.toggleAll}
-        />
         {!expanded ? (
-          <div className="col-span-2 min-w-0">
+          <div className="min-w-0">
             <CompactSideValues
               disabled={props.disabled}
               properties={props.properties}
@@ -239,6 +233,12 @@ export function LinkedSideFields(props: {
             />
           </div>
         ) : null}
+        <LinkToggle
+          disabled={props.disabled}
+          linked={linking.model.linked}
+          name="all"
+          onClick={linking.toggleAll}
+        />
       </div>
       {expanded ? (
         <div className="grid w-full gap-1.5" data-ui="content.design-review.side-values-expanded">

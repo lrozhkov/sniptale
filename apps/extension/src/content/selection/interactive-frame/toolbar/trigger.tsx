@@ -98,7 +98,7 @@ function FrameToolbarTriggerButton(props: {
       }}
       style={frameTriggerControlStyle}
     >
-      <MoreHorizontal size={17} aria-hidden="true" style={frameTriggerIconStyle} />
+      <MoreHorizontal size={16} aria-hidden="true" style={frameTriggerIconStyle} />
     </button>
   );
 }

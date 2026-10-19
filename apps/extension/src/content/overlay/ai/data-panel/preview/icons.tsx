@@ -31,15 +31,6 @@ export function CheckboxIcon() {
   );
 }
 
-export function CodeBracketsIcon() {
-  return (
-    <ContentStrokeIcon size={13} strokeWidth="2">
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
-    </ContentStrokeIcon>
-  );
-}
-
 export function CopyIcon() {
   return (
     <ContentStrokeIcon size={12} strokeWidth="2">

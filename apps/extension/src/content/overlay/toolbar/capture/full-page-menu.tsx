@@ -81,7 +81,6 @@ function FloatingModeItems(props: Pick<FullPageMenuProps, 'onUpdate' | 'preferen
       <ProductToolbarMenuItem
         key={option.value}
         dataUi={`content.toolbar.full-page-floating.${option.value}`}
-        disabled={props.saving}
         selected={selected}
         onClick={(event) => {
           stopMenuEvent(event);
@@ -161,7 +160,7 @@ function FullPagePreferencesMenu(
         variant="capture"
       >
         <BooleanPreferenceItem
-          disabled={props.saving}
+          disabled={false}
           hint={translate('content.toolbar.fullPageLazyContentHint')}
           icon={<ImageDown aria-hidden="true" className="sniptale-popover-icon" />}
           label={translate('content.toolbar.fullPageLazyContent')}
@@ -171,7 +170,7 @@ function FullPagePreferencesMenu(
           }
         />
         <BooleanPreferenceItem
-          disabled={props.saving}
+          disabled={false}
           hint={translate('content.toolbar.fullPageFreezeMotionHint')}
           icon={<Snowflake aria-hidden="true" className="sniptale-popover-icon" />}
           label={translate('content.toolbar.fullPageFreezeMotion')}

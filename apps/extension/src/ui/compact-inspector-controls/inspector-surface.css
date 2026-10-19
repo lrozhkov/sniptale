@@ -1039,3 +1039,71 @@ input.sniptale-range[data-out-of-scale='true']::-webkit-slider-thumb {
 input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   opacity: 0;
 }
+
+/* Accepted circular selection drawing is limited to the automatic blur flow. */
+.sniptale-auto-blur-modal.sniptale-compact-workspace .sniptale-parameter-check {
+  appearance: none;
+  position: relative;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--sniptale-color-border-strong);
+  border-radius: 50%;
+  background: rgb(from var(--sniptale-color-surface-hover) r g b);
+  pointer-events: none;
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  width: 12px;
+  height: 12px;
+  background: var(--sniptale-color-accent);
+  mask: url("data:image/svg+xml,\
+%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E\
+%3Cpath d='M3 7.5 L6.5 11 L13 4.5' fill='none' stroke='black' stroke-width='1.6'\
+%20stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check:checked::after {
+  opacity: 1;
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check:indeterminate::after {
+  inset: 13px 10px;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  mask: none;
+  opacity: 1;
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check:hover:not(:disabled)::before {
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--sniptale-color-text-primary) 18%, transparent);
+}
+.sniptale-auto-blur-modal .sniptale-parameter-check:focus-visible {
+  outline-color: var(--sniptale-color-text-secondary);
+  outline-offset: 0;
+}
+@media (forced-colors: active) {
+  .sniptale-auto-blur-modal .sniptale-parameter-check::before {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .sniptale-auto-blur-modal .sniptale-parameter-check::after {
+    background: Highlight;
+  }
+}

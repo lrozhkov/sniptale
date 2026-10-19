@@ -361,7 +361,7 @@ describe('FrameSettingsPopover effect parameter composition', () => {
       if (effectMode === 'blur') {
         expect(
           popover
-            .querySelector('button[aria-haspopup="listbox"]')
+            .querySelector('[role="group"][aria-label="Тип размытия"]')
             ?.closest('.sniptale-content-popover-section')
         ).toBe(section);
       }

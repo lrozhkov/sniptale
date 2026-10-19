@@ -148,3 +148,27 @@
   font-size: 12px;
   color: var(--sniptale-color-text-dim);
 }
+
+/* Content quick actions use the same compact geometry as the adopted main toolbar. */
+:host .sniptale-glass-toolbar:is(.sniptale-action-toolbar, .sniptale-callout-format-toolbar) {
+  border-radius: 4px;
+  font-family: var(--sniptale-font-interface);
+}
+
+:host
+  :is(.sniptale-action-toolbar, .sniptale-callout-format-toolbar)
+  .sniptale-glass-toolbar-button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 4px;
+}
+
+:host
+  :is(.sniptale-action-toolbar, .sniptale-callout-format-toolbar)
+  .sniptale-glass-toolbar-button[data-menu-indicator='true']::before {
+  right: 0;
+  bottom: 0;
+  border-inline-width: 2px;
+  border-top-width: 3px;
+}

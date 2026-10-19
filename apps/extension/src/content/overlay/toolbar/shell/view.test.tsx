@@ -272,7 +272,7 @@ describe('ToolbarShellContent', () => {
 });
 
 it.each(['top', 'bottom', 'left', 'right', null] as const)(
-  'shows four pointer-transparent guides and the %s preview during docking',
+  'shows eight pointer-transparent guides and the %s preview during docking',
   (dockPreview) => {
     const markup = renderToolbarShell(true, null, 0.5, {
       isDragging: true,
@@ -282,7 +282,7 @@ it.each(['top', 'bottom', 'left', 'right', null] as const)(
     const dom = new DOMParser().parseFromString(markup, 'text/html');
     const guides = dom.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-guides"]')!;
     expect(guides.style.pointerEvents).toBe('none');
-    expect(guides.children).toHaveLength(4);
+    expect(guides.children).toHaveLength(8);
     expect(guides.querySelectorAll('[data-active="true"]')).toHaveLength(dockPreview ? 1 : 0);
     expect(
       guides.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-zone.top"]')?.style.height

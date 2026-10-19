@@ -140,8 +140,8 @@ describe('ContentSizeTooltipContent rendering', () => {
       'M9 17H7A5 5 0 0 1 7 7h2'
     );
     expect(getButton('Keep aspect ratio')?.querySelector('svg line')?.getAttribute('x1')).toBe('8');
-    expect(getButton('Keep aspect ratio')?.style.background).toContain(
-      'var(--sniptale-color-accent) 9%'
+    expect(getButton('Keep aspect ratio')?.style.background).toBe(
+      'var(--sniptale-color-surface-hover)'
     );
     expect(container?.textContent).toContain('Cancel');
     expect(container?.textContent).toContain('Apply size');
@@ -173,7 +173,7 @@ describe('ContentSizeTooltipContent rendering', () => {
     expect(confirmButton?.style.background).toBe('transparent');
     expect(confirmButton?.style.borderWidth).toBe('0px');
     expect(confirmButton?.classList).toContain('sniptale-content-size-tooltip-primary-action');
-    expect(ratioButton?.style.background).toBe('transparent');
+    expect(ratioButton?.style.background).toBe('var(--sniptale-color-surface-hover)');
     expect(ratioButton?.style.borderColor).toBe('transparent');
     expect(increaseHeightButton?.style.borderWidth).toBe('0px');
     expect(container?.querySelector('[data-ui="content-size-tooltip-divider"]')).toBeNull();
@@ -348,3 +348,28 @@ describe('ContentSizeTooltipContent empty input draft', () => {
     expect(widthInput?.value).toBe('320');
   });
 });
+
+it.each(['default', 'frame-edit'] as const)(
+  'uses interface geometry and neutral ratio state for %s',
+  (variant) => {
+    renderTooltip({ variant, maintainAspectRatio: true });
+    for (const input of [getInput('Width'), getInput('Height')]) {
+      expect(input?.style.height).toBe('32px');
+      expect(input?.style.borderRadius).toBe('4px');
+      expect(input?.style.fontSize).toBe('13px');
+      expect(input?.style.fontWeight).toBe('400');
+      expect(input?.style.fontFamily).toBe('var(--sniptale-font-interface)');
+    }
+    const ratio = getButton('Keep aspect ratio');
+    expect(ratio?.getAttribute('aria-pressed')).toBe('true');
+    expect(ratio?.style.borderRadius).toBe('4px');
+    expect(ratio?.style.background).toBe('var(--sniptale-color-surface-hover)');
+    expect(ratio?.style.color).toBe('var(--sniptale-color-text-primary)');
+    const confirm = container?.querySelector<HTMLButtonElement>(
+      '.sniptale-content-size-tooltip-primary-action'
+    );
+    expect(confirm?.style.borderRadius).toBe('4px');
+    expect(confirm?.style.background).toBe('transparent');
+    expect(confirm?.style.height).toBe('32px');
+  }
+);

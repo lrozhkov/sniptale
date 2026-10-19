@@ -264,3 +264,43 @@ it('returns recording drawing directly to navigation on the first Escape', () =>
   act(() => root.unmount());
   controller.session.dispose();
 });
+
+it('defers Escape from a focused dock positioner without clearing the drawing tool', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const { appContainer } = initializeContentUiRoots(host.attachShadow({ mode: 'open' }));
+  const root = createRoot(appContainer);
+  const controller = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  controller.session.setActiveTool('arrow');
+  const dockCancel = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <>
+          <DrawingSurface active chromeHidden={false} controller={controller} />
+          <div className="sniptale-toolbar-positioner" tabIndex={-1}>
+            <div data-ui="content.toolbar.root" data-dock-dragging="true" inert />
+          </div>
+        </>
+      )
+    );
+    window.addEventListener('keydown', dockCancel, { capture: true });
+    const positioner = appContainer.querySelector<HTMLElement>('.sniptale-toolbar-positioner')!;
+    positioner.focus();
+    act(() =>
+      positioner.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
+      )
+    );
+    expect(dockCancel).toHaveBeenCalledOnce();
+    expect(controller.session.getSnapshot().activeTool).toBe('arrow');
+  } finally {
+    window.removeEventListener('keydown', dockCancel, { capture: true });
+    act(() => root.unmount());
+    controller.session.dispose();
+  }
+});

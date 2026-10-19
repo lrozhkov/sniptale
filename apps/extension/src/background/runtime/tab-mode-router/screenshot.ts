@@ -1,4 +1,5 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createWebSnapshotViewerPorts } from '../../capture/lifecycle';
 import {
@@ -17,6 +18,7 @@ import { isScreenshotModeMessage } from './shared';
 import { openVideoRecordingSurfaceFromPopup } from '../../media/video/content-surface/start';
 import {
   getVideoRecordingTabId,
+  getVideoRecordingCaptureMode,
   hasActiveVideoRecordingSession,
   isVideoRecordingPreparationInProgress,
   isVideoRecordingStopInProgress,
@@ -27,6 +29,7 @@ function assertWorkingModeAvailableDuringRecording(
   workingMode: Extract<TabModeMessage, { type: 'ENABLE_SCREENSHOT_MODE' }>['workingMode']
 ): void {
   if (workingMode === undefined || workingMode === 'video-recording') return;
+  if (getVideoRecordingCaptureMode() === CaptureMode.SCREEN) return;
   const recordingOwnsTab = getVideoRecordingTabId() === tabId;
   if (
     recordingOwnsTab &&

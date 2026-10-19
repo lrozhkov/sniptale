@@ -1,4 +1,14 @@
-import { BufferTarget, MediaStreamAudioTrackSource, Output, WebMOutputFormat } from 'mediabunny';
+import { createLiveAudioTimestampTransform } from '../../../../apps/extension/src/offscreen/recording/encoding/live-audio-timeline';
+import {
+  AudioSample,
+  AudioSampleSource,
+  BufferTarget,
+  MediaStreamAudioTrackSource,
+  Mp4OutputFormat,
+  Output,
+  WebMOutputFormat,
+  canEncodeAudio,
+} from 'mediabunny';
 import { beginRecordingSession } from '../../../../apps/extension/src/composition/audio-recording/capture';
 import { resolveRecordingMimeType } from '../../../../apps/extension/src/composition/audio-recording/format';
 import type { RecordingSessionArgs } from '../../../../apps/extension/src/composition/audio-recording/session-types';
@@ -347,5 +357,57 @@ export async function stopAudioWithWriterStall(overflow: boolean) {
     oscillator.stop();
     track.stop();
     await audio.close();
+  }
+}
+
+/** Replays a capture-clock phase error without changing the continuous PCM payload. */
+export async function recordAudioTimestampJitter(codec: 'aac' | 'opus', genuineGap: boolean) {
+  if (!(await canEncodeAudio(codec, { numberOfChannels: 2, sampleRate: 48000 }))) {
+    return { supported: false as const };
+  }
+  const target = new BufferTarget();
+  const output = new Output({
+    target,
+    format: codec === 'aac' ? new Mp4OutputFormat() : new WebMOutputFormat(),
+  });
+  const blocks: { frames: number; timestamp: number; zeros: number; changed: number }[] = [];
+  const source = new AudioSampleSource({
+    codec,
+    bitrate: 128000,
+    transform: { process: createLiveAudioTimestampTransform() },
+    onEncodedSample(sample) {
+      const values = new Float32Array(sample.numberOfFrames);
+      sample.copyTo(values, { planeIndex: 0, format: 'f32-planar' });
+      blocks.push({
+        frames: sample.numberOfFrames,
+        timestamp: sample.timestamp,
+        zeros: values.filter((value) => value === 0).length,
+        changed: values.filter((value) => value !== 0.1875 && value !== 0).length,
+      });
+    },
+  });
+  output.addAudioTrack(source);
+  try {
+    await output.start();
+    for (let index = 0; index < 600; index += 1) {
+      const phase = genuineGap ? (index >= 210 ? 0.01 : 0) : index === 210 ? 0.0015 : 0;
+      const sample = new AudioSample({
+        data: new Float32Array(960).fill(0.1875),
+        format: 'f32-planar',
+        numberOfChannels: 2,
+        numberOfFrames: 480,
+        sampleRate: 48000,
+        timestamp: 0.37 + index * 0.01 + phase,
+      });
+      try {
+        await source.add(sample);
+      } finally {
+        sample.close();
+      }
+    }
+    await output.finalize();
+    return { supported: true as const, blocks, bytes: target.buffer?.byteLength ?? 0 };
+  } finally {
+    if (output.state !== 'finalized') await output.cancel();
   }
 }

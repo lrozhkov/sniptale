@@ -144,37 +144,37 @@ it('shows localized badge weight options in the shared editor', async () => {
     style: { ...source.style, badge: { ...source.style.badge, enabled: false } },
   };
 
-  await act(async () => {
-    root.render(
-      <CalloutPresetEditor
-        isOpen
-        isSaving={false}
-        preset={preset}
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-      />
+  try {
+    await act(async () => {
+      root.render(
+        <CalloutPresetEditor
+          isOpen
+          isSaving={false}
+          preset={preset}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+    });
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('button[aria-label="Метка"]')?.click()
     );
-  });
-  await act(async () =>
-    document.querySelector<HTMLButtonElement>('button[aria-label="Метка"]')?.click()
-  );
-  const badgeToggle = document.querySelector<HTMLButtonElement>(
-    'button[aria-label="Текстовая метка"]'
-  );
-  if (badgeToggle?.getAttribute('aria-pressed') !== 'true') {
-    await act(async () => badgeToggle?.click());
+    const badgeToggle = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Текстовая метка"]'
+    );
+    if (badgeToggle?.getAttribute('aria-pressed') !== 'true') {
+      await act(async () => badgeToggle?.click());
+    }
+    const weightChoices = document.querySelector('[role="group"][aria-label="Начертание метки"]');
+    expect(weightChoices).not.toBeNull();
+    const options = [...(weightChoices?.querySelectorAll<HTMLButtonElement>('button') ?? [])].map(
+      (option) => option.textContent
+    );
+    expect(options).toEqual(expect.arrayContaining(['Обычное', 'Жирное']));
+    expect(options.some((option) => option?.includes('badgeFontWeight'))).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
   }
-  await act(async () =>
-    document.querySelector<HTMLButtonElement>('button[aria-label="Начертание метки"]')?.click()
-  );
-
-  const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(
-    (option) => option.textContent
-  );
-  expect(options).toEqual(expect.arrayContaining(['Обычное', 'Жирное']));
-  expect(options.some((option) => option?.includes('badgeFontWeight'))).toBe(false);
-
-  await act(async () => root.unmount());
 });
 
 it('keeps a new preset draft through saving rerenders', async () => {

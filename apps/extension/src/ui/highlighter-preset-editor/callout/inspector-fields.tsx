@@ -3,11 +3,7 @@ import type {
   CalloutSettings,
   CalloutSettingsPatch,
 } from '@sniptale/runtime-contracts/highlighter/callout';
-import {
-  ProductGlassBoldButton,
-  ProductGlassChip,
-  ProductGlassRow,
-} from '@sniptale/ui/product-glass-controls';
+import { ProductGlassBoldButton } from '@sniptale/ui/product-glass-controls';
 import { ChevronDown, PaintBucket, Palette, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode, SyntheticEvent } from 'react';
@@ -17,7 +13,7 @@ import {
   type HighlighterAdditionalSettingsSection,
 } from '../../../composition/persistence/highlighter/additional-settings';
 import { CompactColorSelector } from '../../color-selector';
-import { NumericRow } from '../../compact-inspector-controls';
+import { NumericRow, SegmentedRow } from '../../compact-inspector-controls';
 import { useInspectorLayout } from '../../compact-inspector-controls/layout';
 import { HighlighterPresetPropertyField as PropertyField } from '../inspector-field';
 import {
@@ -41,11 +37,12 @@ export function ColorField(props: {
   disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   palette: readonly string[];
   value: string;
 }) {
   return (
-    <PropertyField label={props.label}>
+    <PropertyField label={props.label} valueMinimum={props.control ? 178 : 140}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -62,6 +59,7 @@ export function ColorField(props: {
             value={props.value}
             palette={props.palette}
             onChange={props.onChange}
+            {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
           />
         </fieldset>
         {props.control}
@@ -83,6 +81,7 @@ export function BoundColorField(props: {
   frameColors?: CalloutFrameColors | undefined;
   label: string;
   onColorChange: (value: string) => void;
+  onOpenChange?: ((open: boolean) => void) | undefined;
   onSourceChange: (value: CalloutColorSource) => void;
   palette: readonly string[];
   source: CalloutColorSource;
@@ -95,7 +94,7 @@ export function BoundColorField(props: {
   const sourceLabel = translate(`content.callout.colorSource.${props.source}`);
   const sourceTitle = `${translate('content.callout.colorSourceLabel')} — ${sourceLabel}`;
   return (
-    <PropertyField label={props.label}>
+    <PropertyField label={props.label} valueMinimum={178}>
       <div className="flex min-w-0 items-center gap-1.5">
         <fieldset
           className={
@@ -113,6 +112,7 @@ export function BoundColorField(props: {
             value={value}
             palette={props.palette}
             onChange={props.onColorChange}
+            {...(props.onOpenChange ? { onOpenChange: props.onOpenChange } : {})}
           />
         </fieldset>
         <ProductGlassBoldButton
@@ -242,18 +242,12 @@ export function ChoiceField<T extends string>(props: {
   value: T;
 }) {
   return (
-    <PropertyField label={props.label}>
-      <ProductGlassRow>
-        {props.options.map((option) => (
-          <ProductGlassChip
-            key={option}
-            active={option === props.value}
-            onClick={() => props.onChange(option)}
-          >
-            {props.getLabel(option)}
-          </ProductGlassChip>
-        ))}
-      </ProductGlassRow>
-    </PropertyField>
+    <SegmentedRow
+      label={props.label}
+      ariaLabel={props.label}
+      options={props.options.map((value) => ({ value, label: props.getLabel(value) }))}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }

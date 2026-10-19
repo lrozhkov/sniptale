@@ -16,6 +16,41 @@ import { waitForRecordingBegin, allowRecordingBegin } from '../start/gate';
 beforeEach(resetLiveSessionFixture);
 
 describe('source-driven live recording flow', () => {
+  it('installs an independent timestamp-only transform for each audio session', async () => {
+    const { AudioSample } = await vi.importActual<typeof import('mediabunny')>('mediabunny');
+    const first = await createSession({ audio: true });
+    const second = await createSession({ audio: true });
+    const sources = mediabunny.MediaStreamAudioTrackSource.instances;
+    expect(sources).toHaveLength(2);
+    try {
+      for (const [index, source] of sources.entries()) {
+        expect(source.options.timestampBase).toBe('synced-zero');
+        const process = source.config.transform?.process;
+        expect(process).toBeTypeOf('function');
+        const origin = index === 0 ? 0.37 : 0.8;
+        for (const offset of [0, 0.0115]) {
+          const sample = new AudioSample({
+            data: new Float32Array(480).fill(0.1875),
+            format: 'f32-planar',
+            numberOfChannels: 1,
+            numberOfFrames: 480,
+            sampleRate: 48000,
+            timestamp: origin + offset,
+          });
+          try {
+            expect(await process?.(sample)).toBe(sample);
+            expect(sample.timestamp).toBeCloseTo(origin + (offset ? 0.01 : 0), 10);
+          } finally {
+            sample.close();
+          }
+        }
+      }
+    } finally {
+      await first.session.abort();
+      await second.session.abort();
+    }
+  });
+
   it('starts primary video when optional source calibration is unavailable', async () => {
     const binding = { recordingId: 'recording-1', generation: 1, streamInstanceId: 'source' };
     const primaryBegin = waitForRecordingBegin(binding);

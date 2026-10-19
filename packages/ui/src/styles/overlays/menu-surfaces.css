@@ -91,3 +91,9 @@
     color-mix(in srgb, var(--sniptale-color-text-primary) 2%, transparent)
   );
 }
+
+/* Page content must not compete with compact command labels. */
+.sniptale-popover-menu.sniptale-content-menu-adopted,
+.sniptale-popover-menu.sniptale-drawing-options-adopted {
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1) !important;
+}

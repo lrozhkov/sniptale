@@ -125,7 +125,7 @@ function useSurfaceRuntimeSubscriptions(
     () =>
       subscribeToVideoRecordingRuntimeState((runtimeState) => {
         const identity = identityRef.current;
-        if (!identity) return;
+        if (!identity || identity.recordingId === null) return;
         const state = stateRef.current;
         const recordingId =
           runtimeState.status === VideoRecordingStatus.IDLE ? null : identity.recordingId;
