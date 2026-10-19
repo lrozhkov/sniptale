@@ -100,7 +100,7 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     border-color: transparent;
     background: transparent;
     box-shadow: none;
-    color: var(--sniptale-color-text-primary);
+    color: var(--sniptale-color-text-secondary);
     font-weight: var(--sniptale-control-font-weight);
   }
 

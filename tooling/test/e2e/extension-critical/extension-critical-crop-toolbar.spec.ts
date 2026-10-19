@@ -146,18 +146,21 @@ async function drawingSemantics(page: Page, toolbar: Locator) {
   return { tools, property, actions, gap };
 }
 
-async function checkCaptureChrome(page: Page) {
+async function checkCaptureChrome(page: Page, checkMenu = true) {
   const toolbar = page.locator('.sniptale-selection-toolbar');
   const capture = page.locator('.sniptale-selection-size-confirm-button');
   const trigger = page.locator('.sniptale-selection-capture-menu-trigger');
   await restPointer(page, toolbar);
   const idle = await Promise.all([capture, trigger].map(buttonAppearance));
+  const close = toolbar.locator('.sniptale-selection-size-cancel-button');
+  const closeIdle = await buttonAppearance(close);
   const geometry = await Promise.all([capture, trigger].map((button) => button.boundingBox()));
   await expect(capture.locator('.sniptale-selection-capture-action-label')).toHaveCSS(
     'font-weight',
     '400'
   );
   for (const state of idle) {
+    expect(state.color).toBe(closeIdle.color);
     expect(state.background).toBe('rgba(0, 0, 0, 0)');
     expect(state.border).toBe('rgba(0, 0, 0, 0)');
     expect(state.stroke).toBe('1.75px');
@@ -170,6 +173,7 @@ async function checkCaptureChrome(page: Page) {
     expect(hovered.border).toBe('rgba(0, 0, 0, 0)');
     expect(hovered.weight).toBe('450');
     expect(hovered.stroke).toBe('1.875px');
+    expect(hovered.color).not.toBe(idle[target === capture ? 0 : 1]!.color);
     expect(neighbor).toEqual(idle[target === capture ? 1 : 0]);
     await expect(capture.locator('.sniptale-selection-capture-action-label')).toHaveCSS(
       'font-weight',
@@ -181,6 +185,7 @@ async function checkCaptureChrome(page: Page) {
         expect(Math.abs(current[index]![key] - geometry[index]![key])).toBeLessThanOrEqual(1);
       }
   }
+  if (!checkMenu) return;
   await trigger.click();
   const menu = page.locator('.sniptale-selection-capture-menu');
   await expect(menu).toBeVisible();
@@ -288,22 +293,114 @@ async function checkSelectedPair(
   await page.mouse.up();
   const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
   await expect(pair).toBeVisible();
+  const panels = pair.locator('.sniptale-drawing-options-popover');
+  await expect(panels).toHaveCount(2);
+  const propertyPanel = (await panels.nth(0).boundingBox())!;
+  const actionsPanel = (await panels.nth(1).boundingBox())!;
+  expect(Math.abs(propertyPanel.height - actionsPanel.height)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(propertyPanel.y - actionsPanel.y)).toBeLessThanOrEqual(0.5);
   const toolbar = (await page.locator('.sniptale-selection-toolbar').boundingBox())!;
   expect(overlap((await pair.boundingBox())!, toolbar)).toBeLessThanOrEqual(1);
-  const bounds = (await pair.boundingBox())!;
-  const trigger = (await page
-    .locator('[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.blur"]')
-    .boundingBox())!;
+  const bounds = {
+    y: Math.min(propertyPanel.y, actionsPanel.y),
+    bottom: Math.max(propertyPanel.y + propertyPanel.height, actionsPanel.y + actionsPanel.height),
+  };
   expect(
-    Math.min(
-      Math.abs(bounds.y + bounds.height - trigger.y),
-      Math.abs(bounds.y - trigger.y - trigger.height)
-    )
+    Math.min(Math.abs(bounds.bottom - toolbar.y), Math.abs(bounds.y - toolbar.y - toolbar.height))
   ).toBeCloseTo(10, 0);
 }
 
 for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark']) {
+    test(`Crop keeps shell spacing across modes ${name} ${theme}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openCropWorkspace(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport,
+        theme
+      );
+      try {
+        for (const crop of [
+          { x: 400, y: 200, width: 500, height: 180 },
+          { x: 400, y: 8, width: 500, height: 180 },
+        ]) {
+          await selectCrop(page, crop);
+          const toolbar = page.locator('.sniptale-selection-toolbar');
+          const frame = page.locator('.sniptale-selection-final-frame');
+          let shellHeight: number | undefined;
+          for (const mode of ['resize', 'drawing', 'resize', 'drawing']) {
+            await page.locator(`[data-ui="content.crop.mode.${mode}"]`).click();
+            if (mode === 'drawing') {
+              const pencil = toolbar.locator('[data-ui="content.toolbar.drawing.pencil"]');
+              if ((await pencil.getAttribute('aria-expanded')) !== 'true') await pencil.click();
+              await expect(
+                page.locator('[data-ui="content.toolbar.drawing-options.pencil"]')
+              ).toBeVisible();
+            }
+            await restPointer(page, toolbar);
+            await expect
+              .poll(async () => {
+                const shell = (await toolbar.boundingBox())!;
+                const bounds = (await frame.boundingBox())!;
+                return Math.abs(
+                  Math.max(bounds.y - shell.y - shell.height, shell.y - bounds.y - bounds.height) -
+                    12
+                );
+              })
+              .toBeLessThanOrEqual(1);
+            const shell = (await toolbar.boundingBox())!;
+            shellHeight ??= shell.height;
+            expect(Math.abs(shell.height - shellHeight)).toBeLessThanOrEqual(0.5);
+            const action = (await toolbar
+              .locator('.sniptale-selection-size-confirm-button')
+              .boundingBox())!;
+            if (mode === 'resize') {
+              for (const input of [
+                toolbar.locator('#sniptale-width-input'),
+                toolbar.locator('#sniptale-height-input'),
+              ]) {
+                const numeric = (await input.boundingBox())!;
+                expect(Math.abs(numeric.height - action.height)).toBeLessThanOrEqual(0.5);
+                expect(Math.abs(numeric.y - action.y)).toBeLessThanOrEqual(0.5);
+              }
+            } else {
+              const panel = toolbar.locator('.sniptale-drawing-options-popover').filter({
+                has: page.locator('[data-ui="content.toolbar.drawing-options.pencil"]'),
+              });
+              await expect
+                .poll(async () => {
+                  const bounds = (await panel.boundingBox())!;
+                  const current = (await toolbar.boundingBox())!;
+                  return Math.abs(
+                    Math.max(
+                      current.y - bounds.y - bounds.height,
+                      bounds.y - current.y - current.height
+                    ) - 10
+                  );
+                })
+                .toBeLessThanOrEqual(1);
+            }
+            await page.screenshot({
+              path: info.outputPath(`shell-spacing-${crop.y}-${mode}.png`),
+              fullPage: false,
+            });
+          }
+          await checkCaptureChrome(page, false);
+          await page.locator('[data-ui="content.crop.mode.resize"]').click();
+          await page.keyboard.press('Escape');
+          await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+        }
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+
     test(`Crop toolbar pointer and keyboard chrome ${name} ${theme}`, async ({
       context,
       extensionId,
@@ -338,7 +435,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(cropSemantics.tools).toEqual(mainSemantics.tools);
         expect(cropSemantics.property).toEqual(mainSemantics.property);
         expect(cropSemantics.actions).toEqual(mainSemantics.actions);
-        expect(Math.abs(cropSemantics.gap - mainSemantics.gap)).toBeLessThanOrEqual(1);
+        expect(Math.abs(cropSemantics.gap - 10)).toBeLessThanOrEqual(1);
         for (const action of ['undo', 'redo'])
           await expect(page.locator(`[data-ui="content.crop.${action}"]`)).toHaveAttribute(
             'data-command-chrome',
@@ -415,15 +512,14 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width - 7);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height - 7);
         const shell = (await toolbar.boundingBox())!;
-        const trigger = (await pencil.boundingBox())!;
         if (scenario === 'top') {
           expect(overlap(bounds, crop)).toBeLessThanOrEqual(1);
           expect(bounds.y).toBeGreaterThan(shell.y + shell.height);
         }
         expect(
           Math.min(
-            Math.abs(bounds.y + bounds.height - trigger.y),
-            Math.abs(bounds.y - trigger.y - trigger.height)
+            Math.abs(bounds.y + bounds.height - shell.y),
+            Math.abs(bounds.y - shell.y - shell.height)
           )
         ).toBeCloseTo(10, 0);
         expect(

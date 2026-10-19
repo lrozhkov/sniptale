@@ -34,8 +34,14 @@ const resolveCropDrawingMenuLayout: NonNullable<
     clientHeight: window.innerHeight,
     scale,
   });
-  const above = anchorRect.y - 18;
-  const below = viewport.height - anchorRect.y - anchorRect.height - 18;
+  const pair = anchor.parentElement?.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.drawing-options.pair"]'
+  );
+  const pairStyle = pair ? getComputedStyle(pair) : null;
+  const upperGap = 10 - (Number.parseFloat(pairStyle?.paddingBottom ?? '0') || 0);
+  const lowerGap = 10 - (Number.parseFloat(pairStyle?.paddingTop ?? '0') || 0);
+  const above = toolbarRect.y - upperGap - 8;
+  const below = viewport.height - toolbarRect.y - toolbarRect.height - lowerGap - 8;
   const frame = toolbar
     .closest('.sniptale-selection-container')
     ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
@@ -44,8 +50,12 @@ const resolveCropDrawingMenuLayout: NonNullable<
     : null;
   const left = Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8));
   const adjacentPositions = [
-    { placement: 'up', top: anchorRect.y - menuHeight - 10, fits: above >= menuHeight },
-    { placement: 'down', top: anchorRect.y + anchorRect.height + 10, fits: below >= menuHeight },
+    { placement: 'up', top: toolbarRect.y - menuHeight - upperGap, fits: above >= menuHeight },
+    {
+      placement: 'down',
+      top: toolbarRect.y + toolbarRect.height + lowerGap,
+      fits: below >= menuHeight,
+    },
   ] as const;
   const clearPosition = cropRect
     ? adjacentPositions.find(
@@ -65,7 +75,9 @@ const resolveCropDrawingMenuLayout: NonNullable<
     y: Math.min(
       Math.max(
         8,
-        placement === 'up' ? anchorRect.y - menuHeight - 10 : anchorRect.y + anchorRect.height + 10
+        placement === 'up'
+          ? toolbarRect.y - menuHeight - upperGap
+          : toolbarRect.y + toolbarRect.height + lowerGap
       ),
       Math.max(8, viewport.height - menuHeight - 8)
     ),

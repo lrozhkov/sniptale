@@ -146,7 +146,7 @@ const menuPlacementCases = [
     crop: [300, 200, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 42, bottom: 'auto' },
+    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
   },
   {
     placement: 'up',
@@ -154,7 +154,7 @@ const menuPlacementCases = [
     crop: [300, 420, 200, 90],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 42 },
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'up',
@@ -162,7 +162,7 @@ const menuPlacementCases = [
     crop: [300, 360, 200, 200],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 'auto', bottom: 42 },
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'down',
@@ -170,7 +170,25 @@ const menuPlacementCases = [
     crop: [300, 8, 200, 100],
     height: 40,
     width: 100,
-    style: { left: -20, right: 'auto', top: 42, bottom: 'auto' },
+    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+  },
+  {
+    placement: 'up',
+    toolbar: [300, 300, 200, 50],
+    crop: [300, 360, 200, 200],
+    height: 58,
+    width: 100,
+    pairPadding: 8,
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 43 },
+  },
+  {
+    placement: 'down',
+    toolbar: [300, 18, 200, 50],
+    crop: [300, 8, 200, 100],
+    height: 58,
+    width: 100,
+    pairPadding: 8,
+    style: { left: -20, right: 'auto', top: 43, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -197,7 +215,15 @@ function checkMenuPlacement(
     frame: HTMLElement;
     toggle(): void;
   },
-  { placement, toolbar, crop, height, width, style }: (typeof menuPlacementCases)[number]
+  {
+    placement,
+    toolbar,
+    crop,
+    height,
+    width,
+    style,
+    pairPadding,
+  }: (typeof menuPlacementCases)[number]
 ) {
   vi.stubGlobal('innerWidth', 1000);
   vi.stubGlobal('innerHeight', 600);
@@ -208,6 +234,12 @@ function checkMenuPlacement(
   const [cropX = 0, cropY = 0, cropWidth = 0, cropHeight = 0] = crop;
   const anchor = document.createElement('button');
   harness.tooltip.root.append(anchor);
+  if (pairPadding) {
+    const pair = document.createElement('div');
+    pair.dataset['ui'] = 'content.toolbar.drawing-options.pair';
+    pair.style.padding = `${pairPadding}px`;
+    harness.tooltip.root.append(pair);
+  }
   vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
     new DOMRect(toolbarX + 20, toolbarY + 9, 32, 32)
   );
