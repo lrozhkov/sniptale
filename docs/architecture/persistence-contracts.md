@@ -494,7 +494,7 @@ The existing command, history, save, and resource owners retain authority. Previ
 
 ## Montage scene background variants
 
-Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–16 without these fields and refuse future versions.
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–17 without these fields and refuse future versions.
 
 The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
 
@@ -517,7 +517,7 @@ Camera tracks retain this field without applying it. Their camera appearance rem
 
 ## Montage scene background blur
 
-Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–16 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
+Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–17 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
 
 Blur applies to the complete gradient or image background after fitting and animation. Solid backgrounds retain the value without applying it. Kind changes, image replacement and source deletion preserve this common value. Remembered paint variants cannot contain blur. Clips, headers, shadows, actions and transitions retain their own rendering semantics.
 
@@ -536,3 +536,16 @@ The inspector measures the decorated window after rotation. Its editable inset l
 Ordinary fitting uses the cropped source and its header as one plane. Camera fitting keeps its existing adapter and dormant header behavior. Ordinary scale controls accept 1–300 percent. Camera scale controls retain 10–300 percent. Existing readers already admit these values. Fit percentage remains a preset hint beside freely editable transforms.
 
 Gallery and Montage share the inset calculation. Gallery retains its enabled-background policy and extra-header output size. This command uses existing mutation, history and save owners. It adds no writer, resource owner or database migration.
+
+
+## Montage motion blur phases
+
+Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–17 and refuse future versions.
+
+Reading adds no defaults. Absent phase settings retain the legacy `motionBlurAmount` behavior. An explicit phase map overrides that scalar. A missing phase in an explicit map stays disabled. Disabled settings retain their strength. The first phase edit preserves the other legacy strengths.
+
+Entrance and exit use the retained animation clock. An outgoing source region owns link blur, including edits through the selected connection. Connected entrance and exit phases do not blur. Explicit phases do not blur during a hold or an instantaneous transition. Exposure cannot sample a different camera across a hard boundary. Continuous source-bound split parts retain their shared exposure when their clocks and camera geometry agree.
+
+The existing project updater merges scalar phase edits into its current region. Invalid, repeated, missing-target and locked edits preserve project identity and history. Undo, redo, save and portable restore retain authored settings. Clip duplication copies bound motion regions with independent identities and maps connections between copied regions. It removes connections to sources outside the copied selection. Unbound scene regions remain unchanged.
+
+Mutation and clearing retain schema 17. This field adds no writer, queued operation, store or physical database migration. The existing save revision owner remains authoritative.

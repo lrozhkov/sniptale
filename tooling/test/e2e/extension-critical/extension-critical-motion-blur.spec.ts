@@ -15,7 +15,7 @@ test('motion blur preserves overlapping layer occlusion in full editor preview a
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text', '.css': 'empty' },
+    loader: { '.svg': 'text', '.css': 'empty', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const result = await page.evaluate(async (text) => {
@@ -36,7 +36,7 @@ test('quick scene exposure changes only moving phases and preserves opacity with
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text', '.css': 'empty' },
+    loader: { '.svg': 'text', '.css': 'empty', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const result = await page.evaluate(async (text) => {
@@ -180,13 +180,14 @@ for (const variant of [
         await page.screenshot({ path: info.outputPath('blur-below-1280.png'), fullPage: false });
       }
       await page.reload();
-      await open();
+      await expect(dialog).toBeVisible();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first()
         .click();
       await expect(strength).toHaveValue('20');
     } finally {
+      host.server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
       );

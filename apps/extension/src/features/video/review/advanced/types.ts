@@ -1,3 +1,4 @@
+import type { MotionBlurPhases } from '../../project/motion/blur';
 import type { Gradient, Paint } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
@@ -151,7 +152,7 @@ export interface QuickEditZoomRegion {
   perspective?: QuickEditPerspective;
   depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
-  motionBlur?: Partial<Record<'enter' | 'exit' | 'link', { enabled: boolean; strength: number }>>;
+  motionBlur?: MotionBlurPhases;
   border?: QuickEditBorder;
   /** Derived only; parser drops this projection clock before persistence admission. */
   borderClock?: {

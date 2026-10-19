@@ -1,3 +1,4 @@
+import { motionBlurSampleBounds } from '../motion/camera-interval';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import type { VideoProject } from '../../project/types/index';
 import { motionBlurSamples } from '../motion/blur';
@@ -99,12 +100,8 @@ export function resolveVideoCompositionRenderPasses(
     return createSingleVisualPassResult({ currentTime, frameOptions, overlayFrame, project });
   }
 
-  const samples = motionBlurSamples(
-    currentTime,
-    motionBlurAmount,
-    0,
-    Math.max(project.duration, currentTime)
-  );
+  const bounds = motionBlurSampleBounds(project, currentTime, motionBlurAmount);
+  const samples = motionBlurSamples(currentTime, motionBlurAmount, bounds.start, bounds.end);
   const visualPasses = samples.map(({ time, alpha }) =>
     createVisualPass({
       alpha,

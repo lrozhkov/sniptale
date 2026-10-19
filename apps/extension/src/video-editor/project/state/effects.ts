@@ -1,3 +1,4 @@
+import { editMotionBlurPhase } from '../../../features/video/project/motion/blur';
 import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
@@ -224,60 +225,66 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
     patch: Parameters<VideoEditorProjectState['updateMotionRegion']>[1]
   ) =>
     set((state) =>
-      applyProjectUpdate(state, (project) =>
-        isVideoProjectUtilityLaneLocked(project, 'camera')
-          ? project
-          : applyVideoProjectMutationPatch(project, {
-              motionRegions: (project.motionRegions ?? []).map((region) => {
-                if (region.id !== motionRegionId) {
-                  const groupId = project.motionRegions?.find((item) => item.id === motionRegionId)
-                    ?.sourceBinding?.animationGroupId;
-                  return groupId &&
-                    region.sourceBinding?.animationGroupId === groupId &&
-                    patch.incomingConnection !== undefined
-                    ? normalizeVideoProjectMotionRegion(project, {
-                        ...region,
-                        incomingConnection: patch.incomingConnection,
-                      })
-                    : region;
-                }
-                const { sourceClipId, cameraFollow, ...properties } = patch;
-                if (sourceClipId !== undefined && region.duration <= 0) return region;
-                let updated = { ...region, ...properties };
-                if (cameraFollow !== undefined) {
-                  const { cameraFollow: _previous, ...rest } = updated;
-                  updated = cameraFollow ? { ...rest, cameraFollow } : rest;
-                }
-                if (sourceClipId === null) {
-                  const { sourceBinding: _binding, ...sceneRegion } = updated;
-                  updated = sceneRegion;
-                } else if (sourceClipId !== undefined) {
-                  const source = getMotionBindingCandidates(project, updated).find(
-                    (item) => item.id === sourceClipId
-                  );
-                  if (!source) return region;
-                  updated = bindMotionRegionToClip(updated, source);
-                }
-                const clip = project.clips.find(
-                  (item) => item.id === updated.sourceBinding?.clipId
-                );
-                if (patch.duration !== undefined || patch.startTime !== undefined) {
-                  updated = {
-                    ...updated,
-                    ...constrainMotionTiming(
-                      project,
-                      region,
-                      updated,
-                      patch.duration === undefined
-                    ),
-                  };
-                  if (clip?.type === VideoProjectClipType.VIDEO)
-                    updated = bindMotionRegionToClip(updated, clip);
-                }
-                return normalizeVideoProjectMotionRegion(project, updated);
-              }),
-            })
-      )
+      applyProjectUpdate(state, (project) => {
+        if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
+        const target = project.motionRegions?.find((region) => region.id === motionRegionId);
+        const phases =
+          patch.motionBlurPhase === undefined
+            ? undefined
+            : target &&
+              editMotionBlurPhase(
+                target.motionBlur,
+                target.motionBlurAmount ?? 0,
+                patch.motionBlurPhase
+              );
+        if (
+          patch.motionBlurPhase !== undefined &&
+          (!target || phases === null || phases === target.motionBlur)
+        )
+          return project;
+        return applyVideoProjectMutationPatch(project, {
+          motionRegions: (project.motionRegions ?? []).map((region) => {
+            if (region.id !== motionRegionId) {
+              const groupId = target?.sourceBinding?.animationGroupId;
+              return groupId &&
+                region.sourceBinding?.animationGroupId === groupId &&
+                patch.incomingConnection !== undefined
+                ? normalizeVideoProjectMotionRegion(project, {
+                    ...region,
+                    incomingConnection: patch.incomingConnection,
+                  })
+                : region;
+            }
+            const { sourceClipId, cameraFollow, motionBlurPhase: _phase, ...properties } = patch;
+            if (sourceClipId !== undefined && region.duration <= 0) return region;
+            let updated = { ...region, ...properties, ...(phases ? { motionBlur: phases } : {}) };
+            if (cameraFollow !== undefined) {
+              const { cameraFollow: _previous, ...rest } = updated;
+              updated = cameraFollow ? { ...rest, cameraFollow } : rest;
+            }
+            if (sourceClipId === null) {
+              const { sourceBinding: _binding, ...sceneRegion } = updated;
+              updated = sceneRegion;
+            } else if (sourceClipId !== undefined) {
+              const source = getMotionBindingCandidates(project, updated).find(
+                (item) => item.id === sourceClipId
+              );
+              if (!source) return region;
+              updated = bindMotionRegionToClip(updated, source);
+            }
+            const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
+            if (patch.duration !== undefined || patch.startTime !== undefined) {
+              updated = {
+                ...updated,
+                ...constrainMotionTiming(project, region, updated, patch.duration === undefined),
+              };
+              if (clip?.type === VideoProjectClipType.VIDEO)
+                updated = bindMotionRegionToClip(updated, clip);
+            }
+            return normalizeVideoProjectMotionRegion(project, updated);
+          }),
+        });
+      })
     );
 }
 

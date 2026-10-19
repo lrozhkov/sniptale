@@ -1,3 +1,4 @@
+import { parseMotionBlurPhases } from './blur';
 import { parseMotionSourceBinding, projectMotionSourceBinding } from './source-binding';
 import {
   VideoMotionFocusMode,
@@ -209,9 +210,11 @@ export function normalizeVideoProjectMotionRegion(
   const incomingConnection = normalizeMotionConnection(region.incomingConnection);
   const startTime = resolveMotionStartTime(project.duration, region.startTime, duration);
   const cameraFollow = parseCameraFollowSettings(region.cameraFollow);
+  const motionBlur = parseMotionBlurPhases(region.motionBlur);
 
   return projectMotionSourceBinding(project, {
     ...(cameraFollow ? { cameraFollow } : {}),
+    ...(motionBlur ? { motionBlur } : {}),
     ...(sourceBinding ? { sourceBinding } : {}),
     ...(animation ? { animation } : {}),
     ...(incomingConnection ? { incomingConnection } : {}),

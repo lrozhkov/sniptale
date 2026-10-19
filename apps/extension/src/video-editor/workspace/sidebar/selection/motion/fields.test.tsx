@@ -1,3 +1,4 @@
+import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
@@ -99,10 +100,17 @@ describe('workspace-sidebar/selection/motion-fields', () => {
 
   it('renders motion blur through canonical slider controls', () => {
     const markup = renderToStaticMarkup(
-      <MotionBlurField motionRegionId="motion-1" panel={createPanelProps()} value={0.45} />
+      <MotionBlurField
+        phase="enter"
+        panel={createPanelProps()}
+        motionRegion={{
+          ...createVideoProjectMotionRegion(createPanelProps().project, 0),
+          motionBlurAmount: 0.45,
+        }}
+      />
     );
 
-    expect(markup).toContain('videoEditor.sidebar.motionBlurLabel');
+    expect(markup).toContain('gallery.videoReview.motionBlur');
     expect(markup).toContain('type="range"');
     expect(markup).toContain('45%');
   });

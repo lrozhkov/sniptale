@@ -198,3 +198,78 @@ it('keeps low blur strengths effective and increases exposure throughout the who
   expect(exposure(0.1)).toBeGreaterThan(0);
   expect(exposure(0.9)).toBeGreaterThan(exposure(0.6));
 });
+
+function boundaryMotion(id: string, startTime: number, duration: number, scale: number) {
+  return {
+    id,
+    startTime,
+    duration,
+    scale,
+    focusMode: VideoMotionFocusMode.MANUAL,
+    focusPoint: { x: 900, y: 300 },
+    targetAction: null,
+    easing: VideoTemporalEasing.LINEAR,
+    zoomInDuration: 0,
+    zoomOutDuration: 0,
+    motionBlurAmount: 1,
+  };
+}
+
+it.each([
+  [1.999, 'first'],
+  [2.001, 'second'],
+] as const)('keeps exposure on the represented side of an unconnected cut at %s', (time, id) => {
+  const project = createEmptyVideoProject('Hard cut', 1280, 720);
+  project.duration = 6;
+  project.motionRegions = [boundaryMotion('first', 1, 1, 3), boundaryMotion('second', 2, 1, 1.5)];
+  const result = resolveVideoCompositionRenderPasses(project, time);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.regionId === id)).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});
+
+it('keeps exposure out of an ended overlapping camera', () => {
+  const project = createEmptyVideoProject('Overlap', 1280, 720);
+  project.duration = 6;
+  project.motionRegions = [boundaryMotion('first', 1, 4, 3), boundaryMotion('second', 2, 1, 1.5)];
+  const result = resolveVideoCompositionRenderPasses(project, 3.001);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.regionId === 'first')).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});
+
+it.each([1, 1.001, 2.499, 2.5, 2.501])(
+  'keeps legacy instant exposure on its pose at %s',
+  (time) => {
+    const project = createEmptyVideoProject('Instant legacy', 1280, 720);
+    project.duration = 6;
+    project.motionRegions = [
+      {
+        ...boundaryMotion('instant', 1, 2, 3),
+        easing: VideoTemporalEasing.INSTANT,
+        zoomInDuration: 0.5,
+        zoomOutDuration: 0.5,
+      },
+    ];
+    const result = resolveVideoCompositionRenderPasses(project, time);
+    expect(
+      result.visualPasses.every(
+        (pass) => pass.frame.camera.scale === (time === 1 || time > 2.5 ? 1 : 3)
+      )
+    ).toBe(true);
+    expect(result.visualPasses).toHaveLength(1);
+  }
+);
+
+it('keeps legacy exposure before an instantaneous connection sharp', () => {
+  const project = createEmptyVideoProject('Instant legacy link', 1280, 720);
+  project.duration = 8;
+  project.motionRegions = [
+    boundaryMotion('first', 1, 2, 3),
+    {
+      ...boundaryMotion('second', 5, 2, 2),
+      incomingConnection: { fromRegionId: 'first', easing: VideoTemporalEasing.INSTANT },
+    },
+  ];
+  const result = resolveVideoCompositionRenderPasses(project, 2.999);
+  expect(result.visualPasses.every((pass) => pass.frame.camera.scale === 3)).toBe(true);
+  expect(result.visualPasses).toHaveLength(1);
+});

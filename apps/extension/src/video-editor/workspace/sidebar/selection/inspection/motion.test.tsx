@@ -63,6 +63,39 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
     expect(container!.querySelector('fieldset')!.disabled).toBe(true);
   });
+  it('edits link blur on the outgoing source and retains disabled strength', () => {
+    const props = createMotionPanelProps();
+    props.onUpdateMotionRegion = vi.fn();
+    const first = {
+      ...props.selectedMotionRegion!,
+      id: 'first',
+      startTime: 0,
+      duration: 1,
+      motionBlur: { link: { enabled: false, strength: 0.731 } },
+    };
+    const second = {
+      ...first,
+      id: 'second',
+      startTime: 3,
+      motionBlur: { link: { enabled: true, strength: 0.2 } },
+      incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
+    };
+    props.project.motionRegions = [first, second];
+    props.selection = { kind: 'motion-connection', motionRegionId: second.id };
+    act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
+    const phase = container!.querySelector('[data-phase="link"]')!;
+    expect(phase.querySelector('input[type="text"]')).toBeNull();
+    act(() => phase.querySelector<HTMLButtonElement>('[role="switch"]')!.click());
+    expect(props.onUpdateMotionRegion).toHaveBeenCalledWith(first.id, {
+      motionBlurPhase: { phase: 'link', enabled: true },
+    });
+    first.motionBlur.link.enabled = true;
+    act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
+    expect(
+      container!.querySelector<HTMLInputElement>('[data-phase="link"] input[type="text"]')?.value
+    ).toContain('73.1');
+    expect(second.motionBlur.link.strength).toBe(0.2);
+  });
   it('keeps the default zoom workflow together and moves timing and behavior to focused groups', () => {
     renderPanel(createMotionPanelProps());
 
@@ -78,8 +111,9 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     expect(container?.textContent).not.toContain('videoEditor.sidebar.motionBlurLabel');
 
     clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionZoomInLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionBlurLabel');
+    expect(container?.textContent).toContain('gallery.videoReview.zoomTransitionIn');
+    expect(container?.textContent).toContain('gallery.videoReview.motionBlur');
+    expect(container?.querySelectorAll('[data-ui="video-editor.motion.blur"]')).toHaveLength(2);
     expect(container?.textContent).toContain('videoEditor.sidebar.motionOverlayZoomLabel');
   });
 

@@ -132,11 +132,6 @@ export function MotionBehaviorFields(props: {
           panel={props.panel}
           value={props.motionRegion.overlayZoomMode}
         />
-        <MotionBlurField
-          motionRegionId={props.motionRegion.id}
-          panel={props.panel}
-          value={props.motionRegion.motionBlurAmount ?? 0}
-        />
       </InspectorDetails>
     </div>
   );
@@ -190,29 +185,35 @@ function MotionZoomFields(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <div className="sniptale-parameter-stack space-y-3">
-      <SliderField
-        label={translate('videoEditor.sidebar.motionZoomInLabel')}
-        value={props.motionRegion.zoomInDuration}
-        min={0}
-        max={5}
-        step={0.05}
-        onChange={(value) =>
-          props.panel.onUpdateMotionRegion(props.motionRegion.id, { zoomInDuration: value })
-        }
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
-      <SliderField
-        label={translate('videoEditor.sidebar.motionZoomOutLabel')}
-        value={props.motionRegion.zoomOutDuration}
-        min={0}
-        max={5}
-        step={0.05}
-        onChange={(value) =>
-          props.panel.onUpdateMotionRegion(props.motionRegion.id, { zoomOutDuration: value })
-        }
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
+    <div className="sniptale-parameter-stack space-y-1">
+      {(['enter', 'exit'] as const).map((phase) => {
+        const field = phase === 'enter' ? 'zoomInDuration' : 'zoomOutDuration';
+        return (
+          <InspectorDetails
+            key={phase}
+            preferenceId={`motion:transition:${phase}`}
+            initiallyOpen
+            label={translate(
+              phase === 'enter'
+                ? 'gallery.videoReview.zoomTransitionIn'
+                : 'gallery.videoReview.zoomTransitionOut'
+            )}
+          >
+            <SliderField
+              label={translate('gallery.videoReview.zoomTransitionDuration')}
+              value={props.motionRegion[field]}
+              min={0}
+              max={5}
+              step={0.05}
+              onChange={(value) =>
+                props.panel.onUpdateMotionRegion(props.motionRegion.id, { [field]: value })
+              }
+              formatValue={(value) => `${value.toFixed(2)} s`}
+            />
+            <MotionBlurField {...props} phase={phase} />
+          </InspectorDetails>
+        );
+      })}
     </div>
   );
 }

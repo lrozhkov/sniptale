@@ -1,3 +1,4 @@
+import { parseMotionBlurPhases } from '../motion/blur';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
 import { isRecordingInteractionMetadata } from './recording-telemetry';
 import {
@@ -220,6 +221,7 @@ export function isMotionRegion(value: unknown): boolean {
     isBoundedNumber(value['zoomInDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isBoundedNumber(value['zoomOutDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     (value['motionBlurAmount'] === undefined || isBoundedNumber(value['motionBlurAmount'], 0, 1)) &&
+    parseMotionBlurPhases(value['motionBlur']) !== null &&
     value['cameraMode'] !== 'PATH' &&
     (value['path'] === undefined || value['path'] === null) &&
     (value['overlayZoomMode'] === undefined ||

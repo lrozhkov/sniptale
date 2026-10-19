@@ -1,3 +1,8 @@
+import {
+  motionBlurPhaseSetting,
+  type MotionBlurPhase,
+} from '../../../../../features/video/project/motion/blur';
+import { ToggleField } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
@@ -86,22 +91,43 @@ export function MotionEasingField(props: {
 }
 
 export function MotionBlurField(props: {
-  motionRegionId: string;
+  motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
+  phase: MotionBlurPhase;
   panel: WorkspaceSidebarSelectionPanelProps;
-  value: number;
 }) {
+  const setting = motionBlurPhaseSetting(
+    props.motionRegion.motionBlur,
+    props.phase,
+    props.motionRegion.motionBlurAmount ?? 0
+  );
+  const edit = (patch: { enabled?: boolean; strength?: number }) =>
+    props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+      motionBlurPhase: { phase: props.phase, ...patch },
+    });
   return (
-    <SliderField
-      label={translate('videoEditor.sidebar.motionBlurLabel')}
-      value={props.value}
-      min={0}
-      max={1}
-      step={0.05}
-      onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegionId, { motionBlurAmount: value })
-      }
-      formatValue={(value) => `${Math.round(value * 100)}%`}
-    />
+    <div
+      className="sniptale-parameter-stack space-y-1"
+      data-ui="video-editor.motion.blur"
+      data-phase={props.phase}
+    >
+      <ToggleField
+        label={translate('gallery.videoReview.motionBlur')}
+        value={setting.enabled}
+        onChange={(enabled) => edit({ enabled })}
+      />
+      {setting.enabled ? (
+        <SliderField
+          label={translate('gallery.videoReview.motionBlurStrength')}
+          value={setting.strength * 100}
+          min={0}
+          max={100}
+          step={0.01}
+          scrubStep={1}
+          onChange={(strength) => edit({ strength: strength / 100 })}
+          formatValue={(value) => `${value}%`}
+        />
+      ) : null}
+    </div>
   );
 }
 

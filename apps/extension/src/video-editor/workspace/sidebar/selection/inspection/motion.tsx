@@ -1,3 +1,4 @@
+import { MotionBlurField } from '../motion/fields';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
@@ -27,6 +28,7 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
     !resolveMotionConnectionSource(props.project, destination)
   )
     return <SelectionEmptyState />;
+  const source = resolveMotionConnectionSource(props.project, destination)!;
   const connection = destination.incomingConnection;
   const locked = getVideoProjectUtilityLanes(props.project).camera.locked;
   return (
@@ -42,6 +44,7 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
             })
           }
         />
+        <MotionBlurField motionRegion={source} phase="link" panel={props} />
         <InspectorActionButton
           compact
           tone="danger"

@@ -1,3 +1,4 @@
+import { projectMotionSourceBinding } from '../../../../features/video/project/motion/source-binding';
 import {
   isProjectOriginalAudioTarget,
   remapCopiedOriginalAudioTargets,
@@ -275,6 +276,13 @@ export function duplicateProjectClipsWithResult(
     nextProject.textDocuments = documents;
   }
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
+  const motionRegions = duplicateBoundMotionRegions(
+    project,
+    placedProject,
+    duplicateClipIds,
+    duplicateActionIds
+  );
+  if (motionRegions) placedProject.motionRegions = motionRegions;
   const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
   return selectedDuplicate
     ? {
@@ -436,4 +444,47 @@ function duplicateCursorSamples(
         }),
       ].sort((a, b) => a.time - b.time),
     };
+}
+
+/** Copied source instances retain authored framing with independent region and connection identities. */
+function duplicateBoundMotionRegions(
+  original: VideoProject,
+  placed: VideoProject,
+  clipIds: ReadonlyMap<string, string>,
+  actionIds: ReadonlyMap<string, string>
+): VideoProject['motionRegions'] {
+  const selected = (original.motionRegions ?? []).filter(
+    (region) => region.sourceBinding && clipIds.has(region.sourceBinding.clipId)
+  );
+  if (selected.length === 0) return placed.motionRegions;
+  const ids = new Map(selected.map((region) => [region.id, crypto.randomUUID()]));
+  const groups = new Map<string, string>();
+  const copies = selected.map((region) => {
+    const copy = structuredClone(region);
+    const binding = copy.sourceBinding!;
+    const group = binding.animationGroupId;
+    if (group && !groups.has(group)) groups.set(group, crypto.randomUUID());
+    copy.id = ids.get(region.id)!;
+    copy.sourceBinding = {
+      ...binding,
+      clipId: clipIds.get(binding.clipId)!,
+      ...(group ? { animationGroupId: groups.get(group)! } : {}),
+    };
+    if (copy.incomingConnection) {
+      const source = ids.get(copy.incomingConnection.fromRegionId);
+      copy.incomingConnection = source
+        ? { ...copy.incomingConnection, fromRegionId: source }
+        : null;
+    }
+    if (copy.targetAction)
+      copy.targetAction = {
+        eventId: actionIds.get(copy.targetAction.eventId) ?? copy.targetAction.eventId,
+        clipId:
+          copy.targetAction.clipId === null
+            ? null
+            : (clipIds.get(copy.targetAction.clipId) ?? copy.targetAction.clipId),
+      };
+    return projectMotionSourceBinding(placed, copy);
+  });
+  return [...(placed.motionRegions ?? []), ...copies];
 }

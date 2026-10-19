@@ -1,3 +1,4 @@
+import { parseMotionBlurPhases } from '../../project/motion/blur';
 import { MAX_AUDIO_FADE_SECONDS } from '../../audio/fades';
 import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
@@ -208,24 +209,6 @@ function parseCameraTransform(value: unknown): QuickEditCameraTransform | null {
   return { scale: value['scale'], centerX: value['centerX'], centerY: value['centerY'] };
 }
 
-function parseMotionBlur(value: unknown): QuickEditZoomRegion['motionBlur'] | null {
-  if (value === undefined) return undefined;
-  if (!isRecord(value)) return null;
-  const result: NonNullable<QuickEditZoomRegion['motionBlur']> = {};
-  for (const phase of ['enter', 'exit', 'link'] as const) {
-    const setting = value[phase];
-    if (setting === undefined) continue;
-    if (
-      !isRecord(setting) ||
-      typeof setting['enabled'] !== 'boolean' ||
-      !isBoundedNumber(setting['strength'], 0, 1)
-    )
-      return null;
-    result[phase] = { enabled: setting['enabled'], strength: setting['strength'] };
-  }
-  return result;
-}
-
 function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (
     !isRecord(value) ||
@@ -245,7 +228,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
-  const motionBlur = parseMotionBlur(value['motionBlur']);
+  const motionBlur = parseMotionBlurPhases(value['motionBlur']);
   if (motionBlur === null) return null;
   const spotlight =
     value['spotlight'] === undefined ? undefined : parseQuickEditSpotlight(value['spotlight']);

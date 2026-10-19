@@ -1,3 +1,5 @@
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { createVideoProjectRestoreTransaction } from './index.test-support';
 import { expect, it, vi } from 'vitest';
 import {
@@ -563,4 +565,32 @@ it('publishes an accepted canonical project asset as permanent', async () => {
   expect(media.get('project-asset:project-asset-1')).toMatchObject({
     lifecycle: { storageClass: 'library' },
   });
+});
+
+it('restores schema17 camera phases and disabled strengths through the existing project writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntry({ id: 'phase-restore' }, { id: 'phase-restore' });
+  entry.project.duration = 4;
+  const region = {
+    ...createVideoProjectMotionRegion(entry.project, 1),
+    duration: 2,
+    motionBlur: {
+      enter: { enabled: false, strength: 0.731 },
+      exit: { enabled: true, strength: 0.8 },
+      link: { enabled: true, strength: 0.4 },
+    },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, { motionRegions: [region] });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 17, motionRegions: [region] }),
+    })
+  );
 });
