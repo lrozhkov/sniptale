@@ -469,3 +469,14 @@ The visible circle fits inside the authored pixel frame. The original frame and 
 Video-project schema 11 admits an optional crop on VIDEO camera positions. Versions 2–10 refuse this field. Readers refuse future versions. Mutations retain schema 11 after removal. An absent crop inherits the clip crop. Opening does not write defaults.
 
 Crop values follow source time and the existing position transition. Cuts and rates do not rewrite these anchors. Shape, roundness, reflection, and shadow remain clip settings. Position reset removes its crop override. Existing commands, history, save, and resource owners retain authority. Gallery and Montage share crop validation and interpolation arithmetic. Each editor retains its transition scheduling.
+
+
+### Camera hidden intervals
+
+Video-project schema 12 admits optional `cameraHiddenRanges` on VIDEO clips. Versions 2–11 refuse this field, including an empty list. Readers refuse future versions. Mutations retain schema 12 after removal. Opening does not write defaults.
+
+Each clip retains at most 512 ordered intervals with unique IDs. Source times are finite seconds from 0 to 86400. The start is less than the end. Intervals can touch but cannot overlap. Visibility includes the start and excludes the end.
+
+Only CAMERA tracks apply these intervals. Other VIDEO clips retain dormant intervals. Montage uses camera source time. Gallery uses main source time before its camera offset. Both editors share interval validation and membership. Conversion must adapt these clocks.
+
+Hidden intervals preserve camera trajectories, crops, source bytes, and audio. The inspector continues to edit hidden cameras. Cuts, rates, movement, and duplication retain source anchors. Existing commands, history, save, resource, and export owners retain authority. This change adds no writer or physical database migration.

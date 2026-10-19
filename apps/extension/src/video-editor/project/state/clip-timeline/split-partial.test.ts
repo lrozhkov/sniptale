@@ -412,10 +412,11 @@ it('keeps camera appearance through a partial rate-two split and independent dup
     shadowColor: '#ff008080',
     cameraAppearance,
     cameraPositions,
+    cameraHiddenRanges: [{ id: 'hidden', start: 4, end: 6 }],
   };
   const authored = {
     ...project,
-    version: 11 as const,
+    version: 12 as const,
     clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
   };
   const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
@@ -429,7 +430,8 @@ it('keeps camera appearance through a partial rate-two split and independent dup
         clip.cameraMirrored === true &&
         clip.shadowColor === '#ff008080' &&
         clip.cameraAppearance?.shape === 'circle' &&
-        JSON.stringify(clip.cameraPositions) === JSON.stringify(cameraPositions)
+        JSON.stringify(clip.cameraPositions) === JSON.stringify(cameraPositions) &&
+        JSON.stringify(clip.cameraHiddenRanges) === JSON.stringify(mirrored.cameraHiddenRanges)
     )
   ).toBe(true);
   expect(
@@ -454,6 +456,7 @@ it('keeps camera appearance through a partial rate-two split and independent dup
     cameraMirrored: true,
     cameraAppearance,
     cameraPositions,
+    cameraHiddenRanges: mirrored.cameraHiddenRanges,
     shadowColor: '#ff008080',
     sourceStart: 1,
     sourceDuration: 8,

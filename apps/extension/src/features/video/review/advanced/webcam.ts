@@ -1,3 +1,8 @@
+import {
+  parseCameraHiddenRanges,
+  isCameraHiddenAt,
+  type CameraHiddenRange,
+} from '../../project/camera/visibility';
 import { parseQuickEditShadow } from './shadow-validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -30,12 +35,6 @@ interface QuickEditWebcamPosition {
   transition: { type: 'none' | 'ease-in-out' | 'shrink'; duration: number };
 }
 
-interface QuickEditWebcamHiddenRange {
-  id: string;
-  start: number;
-  end: number;
-}
-
 /** Authored camera content. Disabled content still retains its immutable source. */
 export interface QuickEditWebcam {
   assetId: string;
@@ -47,7 +46,7 @@ export interface QuickEditWebcam {
   shadow?: { intensity: number; color: string };
   placement: QuickEditWebcamPlacement;
   positions: QuickEditWebcamPosition[];
-  hiddenRanges: QuickEditWebcamHiddenRange[];
+  hiddenRanges: CameraHiddenRange[];
 }
 
 const MAX_TIME = 86_400;
@@ -98,18 +97,6 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
   };
 }
 
-function parseHiddenRange(value: unknown): QuickEditWebcamHiddenRange | null {
-  if (
-    !isRecord(value) ||
-    !identity(value['id']) ||
-    !isBoundedNumber(value['start'], 0, MAX_TIME) ||
-    !isBoundedNumber(value['end'], 0, MAX_TIME) ||
-    value['start'] >= value['end']
-  )
-    return null;
-  return { id: value['id'], start: value['start'], end: value['end'] };
-}
-
 function parseItems<T extends { id: string }>(
   value: unknown,
   parse: (item: unknown) => T | null,
@@ -143,11 +130,7 @@ export function parseQuickEditWebcam(value: unknown): QuickEditWebcam | null {
     return null;
   const placement = parsePlacement(value['placement']);
   const positions = parseItems(value['positions'], parsePosition, (a, b) => a.time < b.time);
-  const hiddenRanges = parseItems(
-    value['hiddenRanges'],
-    parseHiddenRange,
-    (a, b) => a.end <= b.start
-  );
+  const hiddenRanges = parseCameraHiddenRanges(value['hiddenRanges']);
   if (!placement || !positions || !hiddenRanges) return null;
   const appearance = value['appearance'];
   const shadow = value['shadow'];
@@ -245,7 +228,7 @@ export function quickEditWebcamFrameAt(
     !Number.isFinite(cameraDuration) ||
     time < 0 ||
     time >= cameraDuration ||
-    webcam.hiddenRanges.some((range) => sourceTime >= range.start && sourceTime < range.end)
+    isCameraHiddenAt(webcam.hiddenRanges, sourceTime)
   )
     return null;
   return {

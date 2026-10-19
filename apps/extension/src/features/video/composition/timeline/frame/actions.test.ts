@@ -287,3 +287,20 @@ it('evaluates a partial rate-two camera position and its circle crop at project 
   expect(clip.sourceStart).toBe(1);
   expect(clip.playbackRate).toBe(2);
 });
+
+it('removes captured camera source editing while hidden and restores it at the source endpoint', () => {
+  const { project, clip } = capturedProject();
+  project.tracks = project.tracks.map((track) => ({ ...track, role: 'CAMERA' }));
+  clip.cameraHiddenRanges = [{ id: 'hidden', start: 2, end: 2.5 }];
+  const occurrence = resolveVideoCompositionActions(project, 2.2)[0]!.occurrence;
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 1.99)).not.toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2)).toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.4999)).toBeNull();
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.5)).not.toBeNull();
+  project.actionEvents.push({ ...manualEvent(), anchor: { kind: 'project', time: 2 } });
+  const frame = resolveVideoCompositionFrame(project, 2.2);
+  expect(frame.visualLayers).toEqual([]);
+  expect(frame.actions.map((action) => action.event.id)).toEqual(['manual']);
+  project.tracks = project.tracks.map(({ role: _role, ...track }) => track);
+  expect(resolveVideoCompositionActionSourceMapping(project, occurrence, 2.2)).not.toBeNull();
+});

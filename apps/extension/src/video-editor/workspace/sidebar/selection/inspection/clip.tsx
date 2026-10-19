@@ -1,3 +1,4 @@
+import { CameraVisibilityControls } from '../inputs/camera-visibility';
 import { InspectProjectRecognition } from './recognition';
 import { CameraAppearanceControls } from '../inputs/camera-appearance';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
@@ -270,6 +271,17 @@ function createCameraPlacementGroup(
             : { canAddCameraPosition: props.canAddCameraPosition })}
         />
         {transformContent}
+        <CameraVisibilityControls
+          key={clip.id}
+          clip={clip}
+          currentTime={props.currentTime ?? clip.startTime}
+          sourceDuration={
+            props.project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+            clip.sourceStart + clip.sourceDuration
+          }
+          disabled={locked}
+          {...(props.onEditCameraPosition ? { onEdit: props.onEditCameraPosition } : {})}
+        />
       </>
     ) : null,
     visible: isCameraClip,

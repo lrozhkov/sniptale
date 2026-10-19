@@ -1,3 +1,4 @@
+import { parseCameraHiddenRanges } from '../camera/visibility';
 import { parseColor } from '@sniptale/foundation/color';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { isCameraAppearance, isCameraCrop } from '../camera/appearance';
@@ -217,6 +218,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (
     value['cameraMirrored'] !== undefined &&
     (value['type'] !== VideoProjectClipType.VIDEO || typeof value['cameraMirrored'] !== 'boolean')
+  )
+    return false;
+
+  if (
+    value['cameraHiddenRanges'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO ||
+      parseCameraHiddenRanges(value['cameraHiddenRanges']) === null)
   )
     return false;
 

@@ -1,3 +1,4 @@
+import { isCameraHiddenAt } from './visibility';
 import {
   DEFAULT_CAMERA_APPEARANCE,
   interpolateCameraCrop,
@@ -14,6 +15,8 @@ export type CameraPositionEdit =
   | { kind: 'mirror'; mirrored: boolean }
   | { kind: 'appearance'; appearance: CameraAppearance }
   | { kind: 'crop'; crop: CameraCrop | null }
+  | { kind: 'hide'; start: number; end: number; id?: string }
+  | { kind: 'show'; id: string }
   | { kind: 'add' }
   | { kind: 'select'; id: string | null }
   | { kind: 'remove'; id: string }
@@ -113,10 +116,15 @@ export function resolveCameraVisualClip(
   clip: VideoProjectClip,
   time: number
 ): VideoProjectClip {
-  return clip.type === 'VIDEO' &&
-    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
-    ? resolveCameraClip(clip, time)
-    : clip;
+  if (
+    clip.type !== 'VIDEO' ||
+    !project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  )
+    return clip;
+  const visual = resolveCameraClip(clip, time);
+  return isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, time))
+    ? { ...visual, transform: { ...visual.transform, opacity: 0 } }
+    : visual;
 }
 
 /** Edits a destination; interpolation is only a render concern. */

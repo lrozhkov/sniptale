@@ -78,99 +78,59 @@ function isTransition(value: unknown): boolean {
   );
 }
 
-function isHydratableProjectShape(value: unknown): value is VideoProject {
+/** Minimum schema for present clip fields, independent of later shape admission. */
+function minimumClipSchemaVersion(value: unknown): number {
+  if (!isRecord(value)) return 2;
+  if (value['cameraHiddenRanges'] !== undefined) return 12;
+  if (
+    Array.isArray(value['cameraPositions']) &&
+    value['cameraPositions'].some(
+      (position: unknown) => isRecord(position) && position['crop'] !== undefined
+    )
+  )
+    return 11;
+  if (isRecord(value['cameraAppearance']) && value['cameraAppearance']['shape'] === 'circle')
+    return 10;
+  if (value['shadowColor'] !== undefined) return 9;
+  if (value['cameraMirrored'] !== undefined) return 8;
+  if (value['originalAudioMute'] !== undefined) return 6;
+  return 2;
+}
+
+/** Refuse fields that the declared reader version does not support. */
+function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
+  const version = value['version'];
   return (
-    isRecord(value) &&
-    (value['version'] === 11 ||
-      !Array.isArray(value['clips']) ||
-      value['clips'].every(
-        (clip: unknown) =>
-          !isRecord(clip) ||
-          !Array.isArray(clip['cameraPositions']) ||
-          clip['cameraPositions'].every(
-            (position: unknown) => !isRecord(position) || position['crop'] === undefined
-          )
-      )) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      !Array.isArray(value['clips']) ||
-      value['clips'].every(
-        (clip: unknown) =>
-          !isRecord(clip) ||
-          !isRecord(clip['cameraAppearance']) ||
-          clip['cameraAppearance']['shape'] !== 'circle'
-      )) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      !Array.isArray(value['clips']) ||
-      value['clips'].every(
-        (clip: unknown) => !isRecord(clip) || clip['shadowColor'] === undefined
-      )) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      value['version'] === 8 ||
-      !Array.isArray(value['clips']) ||
-      value['clips'].every(
-        (clip: unknown) => !isRecord(clip) || clip['cameraMirrored'] === undefined
-      )) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      value['version'] === 8 ||
-      value['version'] === 7 ||
-      value['version'] === 6 ||
-      value['version'] === 5 ||
-      value['version'] === 4 ||
-      value['version'] === 3 ||
-      (value['version'] === 2 &&
-        value['cursorFocusPath'] === undefined &&
-        value['actionFeedback'] === undefined)) &&
-    (value['cameraFollowDefaults'] === undefined ||
-      parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      value['version'] === 8 ||
-      value['version'] === 7 ||
-      value['version'] === 6 ||
-      value['version'] === 5 ||
-      value['version'] === 4 ||
+    isBoundedNumber(version, 2, 12) &&
+    Number.isInteger(version) &&
+    (version >= 3 ||
+      (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
+    (version >= 4 ||
       (value['cameraFollowDefaults'] === undefined &&
         (!Array.isArray(value['motionRegions']) ||
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      value['version'] === 8 ||
-      value['version'] === 7 ||
-      value['version'] === 6 ||
-      !Array.isArray(value['clips']) ||
-      value['clips'].every(
-        (clip: unknown) => !isRecord(clip) || clip['originalAudioMute'] === undefined
-      )) &&
-    (value['version'] === 11 ||
-      value['version'] === 10 ||
-      value['version'] === 9 ||
-      value['version'] === 8 ||
-      value['version'] === 7 ||
+    (version >= 5 || value['textDocuments'] === undefined) &&
+    (version >= 7 ||
       !Array.isArray(value['tracks']) ||
       value['tracks'].every(
         (track: unknown) => !isRecord(track) || track['audioVolume'] === undefined
       )) &&
+    (!Array.isArray(value['clips']) ||
+      value['clips'].every((clip: unknown) => version >= minimumClipSchemaVersion(clip)))
+  );
+}
+
+function isHydratableProjectShape(value: unknown): value is VideoProject {
+  return (
+    isRecord(value) &&
+    isProjectSchemaCompatible(value) &&
+    (value['cameraFollowDefaults'] === undefined ||
+      parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
     isString(value['id']) &&
     (value['textDocuments'] === undefined ||
-      ((value['version'] === 11 ||
-        value['version'] === 10 ||
-        value['version'] === 9 ||
-        value['version'] === 8 ||
-        value['version'] === 7 ||
-        value['version'] === 6 ||
-        value['version'] === 5) &&
-        parseVideoProjectTextDocuments(value['textDocuments']) !== null)) &&
+      parseVideoProjectTextDocuments(value['textDocuments']) !== null) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&

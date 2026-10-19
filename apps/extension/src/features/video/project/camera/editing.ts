@@ -1,3 +1,4 @@
+import { isCameraHiddenRange, MAX_CAMERA_HIDDEN_RANGES } from './visibility';
 import {
   isCameraAppearance,
   isCameraCrop,
@@ -41,6 +42,8 @@ export function editCameraPosition(
     );
   }
   if (edit.kind === 'crop') return editCameraCrop(project, clip, time, edit.crop);
+  if (edit.kind === 'hide' || edit.kind === 'show')
+    return editCameraVisibility(project, clip, edit);
   if (edit.kind === 'appearance') {
     if (!isCameraAppearance(edit.appearance)) return project;
     const current = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
@@ -205,6 +208,54 @@ function editCameraCrop(
           ...acceptedCrop,
         },
       };
+  return applyVideoProjectClipsPatch(
+    project,
+    project.clips.map((item) => (item.id === clip.id ? next : item))
+  );
+}
+
+function editCameraVisibility(
+  project: VideoProject,
+  clip: VideoProjectVideoClip,
+  edit: Extract<CameraPositionEdit, { kind: 'hide' | 'show' }>
+): VideoProject {
+  const ranges = clip.cameraHiddenRanges ?? [];
+  let next: VideoProjectVideoClip;
+  if (edit.kind === 'show') {
+    if (!ranges.some((range) => range.id === edit.id)) return project;
+    const remaining = ranges.filter((range) => range.id !== edit.id);
+    next = { ...clip };
+    if (remaining.length) next.cameraHiddenRanges = remaining;
+    else delete next.cameraHiddenRanges;
+  } else {
+    const current =
+      edit.id === undefined ? undefined : ranges.find((range) => range.id === edit.id);
+    const duration = Math.max(
+      project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+        clip.sourceStart + clip.sourceDuration,
+      ranges.at(-1)?.end ?? 0
+    );
+    if (
+      (edit.id !== undefined && !current) ||
+      !isCameraHiddenRange({ id: edit.id ?? 'candidate', start: edit.start, end: edit.end }) ||
+      edit.end > duration ||
+      (!current && ranges.length >= MAX_CAMERA_HIDDEN_RANGES) ||
+      ranges.some(
+        (range) => range.id !== current?.id && range.start < edit.end && range.end > edit.start
+      )
+    )
+      return project;
+    if (current?.start === edit.start && current.end === edit.end) return project;
+    const id = current?.id ?? crypto.randomUUID();
+    if (!current && ranges.some((range) => range.id === id)) return project;
+    next = {
+      ...clip,
+      cameraHiddenRanges: [
+        ...ranges.filter((range) => range.id !== current?.id),
+        { id, start: edit.start, end: edit.end },
+      ].sort((a, b) => a.start - b.start),
+    };
+  }
   return applyVideoProjectClipsPatch(
     project,
     project.clips.map((item) => (item.id === clip.id ? next : item))

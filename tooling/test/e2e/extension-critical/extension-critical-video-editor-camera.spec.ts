@@ -359,6 +359,12 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect.poll(mirrored).toBe(true);
       expect((await readNativeVideoProject(page))?.clips).toEqual(accepted?.clips);
       await expect
+        .poll(async () => {
+          const framePixels = await pixels(stage, frame);
+          return [framePixels.width, framePixels.height];
+        })
+        .toEqual([before.width, before.height]);
+      await expect
         .poll(async () => pixelError(before, await pixels(stage, frame), true))
         .toBeLessThan(5);
       await operate(
@@ -776,6 +782,152 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .poll(() => cropVideo.evaluate((node: HTMLVideoElement) => node.currentTime))
         .toBeCloseTo(2 + 1 / project.fps, 3);
       expect(await cropVideo.getAttribute('data-native-load-count')).toBe('0');
+
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupCamera'),
+          exact: true,
+        })
+      );
+      const visibility = page.locator('[data-ui="video-editor.camera-visibility"]');
+      const visibilitySummary = visibility.locator('summary');
+      if ((await visibilitySummary.locator('..').getAttribute('open')) === null)
+        await operate(visibilitySummary);
+      const hideInterval = visibility.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraHideInterval'),
+        exact: true,
+      });
+      const removeInterval = visibility.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraShowInterval'),
+        exact: true,
+      });
+      const hiddenRanges = async () => {
+        const camera = await readCamera();
+        return camera?.type === 'VIDEO' ? (camera.cameraHiddenRanges ?? []) : [];
+      };
+      const beforeHidden = await readCamera();
+      const beforeHiddenProject = await readNativeVideoProject(page);
+      const visiblePixels = await pixels(stage, frame);
+      await expect(hideInterval).toBeEnabled();
+      await operate(hideInterval);
+      await expect.poll(hiddenRanges).toEqual([
+        {
+          id: expect.any(String),
+          start: expect.closeTo(2 + 1 / project.fps, 6),
+          end: expect.closeTo(3 + 1 / project.fps, 6),
+        },
+      ]);
+      const authoredHidden = await hiddenRanges();
+      expect((await readNativeVideoProject(page))?.version).toBe(12);
+      const hiddenCamera = await readCamera();
+      expect(hiddenCamera).toEqual({ ...beforeHidden, cameraHiddenRanges: authoredHidden });
+      expect((await readNativeVideoProject(page))?.assets).toEqual(beforeHiddenProject?.assets);
+      expect(
+        (await readNativeVideoProject(page))?.clips.filter((clip) => clip.id !== camera.id)
+      ).toEqual(beforeHiddenProject?.clips.filter((clip) => clip.id !== camera.id));
+      await expect
+        .poll(async () => pixelError(visiblePixels, await pixels(stage, frame), false))
+        .toBeGreaterThan(5);
+      const intervalPixels = await pixels(stage, frame);
+      await opacity.scrollIntoViewIfNeeded();
+      await opacity.fill('0');
+      await opacity.press('Enter');
+      await expect
+        .poll(async () => {
+          const camera = await readCamera();
+          return camera?.type === 'VIDEO' ? camera.cameraPositions?.[0]?.transform.opacity : null;
+        })
+        .toBe(0);
+      await expect
+        .poll(async () => pixelError(intervalPixels, await pixels(stage, frame), false))
+        .toBeLessThan(1);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect
+        .poll(async () => {
+          const camera = await readCamera();
+          return camera?.type === 'VIDEO' ? camera.cameraPositions?.[0]?.transform.opacity : null;
+        })
+        .toBe(1);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(hiddenRanges).toEqual([]);
+      await expect
+        .poll(async () => pixelError(visiblePixels, await pixels(stage, frame), false))
+        .toBeLessThan(1);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+      await expect.poll(hiddenRanges).toEqual(authoredHidden);
+      await operate(removeInterval);
+      await expect.poll(hiddenRanges).toEqual([]);
+      await expect
+        .poll(async () => pixelError(visiblePixels, await pixels(stage, frame), false))
+        .toBeLessThan(1);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(hiddenRanges).toEqual(authoredHidden);
+      const endField = visibility.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraHiddenEnd'),
+        exact: true,
+      });
+      const startField = visibility.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraHiddenStart'),
+        exact: true,
+      });
+      await endField.scrollIntoViewIfNeeded();
+      await endField.fill('4');
+      await endField.press('Enter');
+      await expect.poll(hiddenRanges).toEqual([{ ...authoredHidden[0], end: 4 }]);
+      const retainedHidden = await hiddenRanges();
+      await checkInspectorPaintedFont(page, endField, 'camera-hidden');
+      await expect(hideInterval.locator('svg')).toBeVisible();
+      await expect(removeInterval.locator('svg')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('camera-hidden.png'), fullPage: false });
+      await cameraGeometry(
+        page,
+        visibility,
+        (name) => info.outputPath(name.replace('camera-mirror', 'camera-hidden')),
+        endField
+      );
+      await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+      await endField.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('camera-hidden-all.png'), fullPage: false });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await expect.poll(hiddenRanges).toEqual(retainedHidden);
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.sceneProperties'),
+          exact: true,
+        })
+      );
+      await page
+        .locator(`[data-project-timeline-clip="${camera.id}"]`)
+        .click({ modifiers: ['Control'] });
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupCamera'),
+          exact: true,
+        })
+      );
+      if ((await visibilitySummary.locator('..').getAttribute('open')) === null)
+        await operate(visibilitySummary);
+      await endField.scrollIntoViewIfNeeded();
+      await expect(endField).toHaveValue('4');
+      await expect(startField).toHaveValue((2 + 1 / project.fps).toFixed(3));
+      await expect(removeInterval).toBeEnabled();
+      await page.screenshot({
+        path: info.outputPath('camera-hidden-reopened.png'),
+        fullPage: false,
+      });
+      await writeFile(
+        info.outputPath('camera-hidden-proof.json'),
+        JSON.stringify(
+          {
+            ranges: retainedHidden,
+            difference: pixelError(visiblePixels, intervalPixels, false),
+            cameraDataRetained: true,
+          },
+          null,
+          2
+        )
+      );
 
       if (index === 0) {
         await page.setViewportSize({ width: 1200, height: 560 });

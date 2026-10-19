@@ -1,4 +1,5 @@
-import { resolveCameraClip } from '../../../project/camera/animation';
+import { isCameraHiddenAt } from '../../../project/camera/visibility';
+import { resolveCameraClip, cameraSourceTime } from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
 import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
@@ -127,6 +128,11 @@ export function resolveVideoCompositionActionSourceMapping(
   const camera = project.tracks.some(
     (track) => track.id === clip.trackId && track.role === 'CAMERA'
   );
+  if (
+    camera &&
+    isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, currentTime))
+  )
+    return null;
   const visual = camera ? resolveCameraClip(clip, currentTime) : clip;
   return {
     mirrored: camera && clip.cameraMirrored === true,

@@ -300,6 +300,16 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(
       container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
     ).not.toBeNull();
+    expect(container?.querySelector('[data-ui="video-editor.camera-visibility"]')).not.toBeNull();
+    const hide = container?.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.sidebar.cameraHideInterval"]'
+    );
+    act(() => hide?.click());
+    expect(props.onEditCameraPosition).toHaveBeenCalledWith(props.selectedClip?.id, {
+      kind: 'hide',
+      start: expect.any(Number),
+      end: expect.any(Number),
+    });
     const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
       (button) =>
         button.getAttribute('aria-label') === 'videoEditor.sidebar.cameraPlacementBottomLeft'
@@ -367,6 +377,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     renderInspectPanel(createVideoProps());
 
     expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupCamera');
+    expect(container?.querySelector('[data-ui="video-editor.camera-visibility"]')).toBeNull();
   });
 
   it('disables camera placement actions on a locked camera track', () => {
