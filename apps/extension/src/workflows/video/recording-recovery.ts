@@ -10,8 +10,13 @@ import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { remuxRecoveryRecording } from './recording-recovery-remux';
 import { runWithPersistenceMutationTransition } from '../../composition/persistence/infrastructure/mutation-barrier';
 import { releaseAssetReadyProtection } from '../../composition/persistence/assets';
+import {
+  createRecoveryProgressReporter,
+  type RecordingRecoveryProgressObserver,
+} from './recording-recovery-progress';
 
 export type { RecoveryRecording };
+export type { RecordingRecoveryProgress } from './recording-recovery-progress';
 export { deleteRecoveryRecording };
 
 /** Show inactive sources only when publication failed or both saved targets are unavailable. */
@@ -41,15 +46,21 @@ export function prepareOriginalRecordingDownload(entry: RecoveryRecording) {
 }
 
 /** Publishes a separately validated playable copy and retains every original block. */
-export function recoverRecording(entry: RecoveryRecording): Promise<string> {
+export function recoverRecording(
+  entry: RecoveryRecording,
+  onProgress?: RecordingRecoveryProgressObserver
+): Promise<string> {
+  const report = createRecoveryProgressReporter(onProgress);
+  report({ stage: 'preparing', completed: 0 });
   return withRecoveryRecording(entry.id, entry.incarnation, async (current) => {
     if (await getRecording(current.recoveryId))
       throw new Error('The recovery target already exists. The saved copy was retained.');
     return runWithPersistenceMutationTransition(async (transitionPermit) => {
       const original = await readRecoveryRecording(current.id, transitionPermit);
       try {
-        const result = await remuxRecoveryRecording(original.file, transitionPermit);
+        const result = await remuxRecoveryRecording(original.file, transitionPermit, onProgress);
         try {
+          report({ stage: 'publishing', completed: 0 });
           await saveRecordingsBatchSafely([
             {
               id: current.recoveryId,
