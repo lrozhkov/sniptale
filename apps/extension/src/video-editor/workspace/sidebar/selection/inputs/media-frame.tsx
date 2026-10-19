@@ -1,3 +1,4 @@
+import { MediaCropControls } from './media-crop';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { ReactNode } from 'react';
 import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
@@ -23,6 +24,7 @@ import { getMediaFitModeOptions } from './media-fit-options';
 type MediaFrameControlsProps = Pick<
   WorkspaceSidebarSelectionPanelProps,
   | 'project'
+  | 'onEditMediaClip'
   | 'onApplyMediaClipVisualsToTrack'
   | 'onUpdateMediaClipFitMode'
   | 'onUpdateMediaClipFitScalePercent'
@@ -31,7 +33,12 @@ type MediaFrameControlsProps = Pick<
   | 'onUpdateMediaClipShadowColor'
   | 'onUpdateMediaClipWindowHeader'
 > &
-  Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'recentColors' | 'onRememberRecentColor'>> & {
+  Partial<
+    Pick<
+      WorkspaceSidebarSelectionPanelProps,
+      'recentColors' | 'onRememberRecentColor' | 'currentTime'
+    >
+  > & {
     clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>;
     locked: boolean;
   };
@@ -68,6 +75,14 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   return (
     <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
+      <MediaCropControls
+        key={`crop:${props.clip.id}`}
+        project={props.project}
+        clip={props.clip}
+        currentTime={props.currentTime ?? props.clip.startTime}
+        disabled={props.locked}
+        onEdit={props.onEditMediaClip}
+      />
       <InspectorDetails
         preferenceId="media-frame:videoEditor.sidebar.framingFineTune"
         label={translate('videoEditor.sidebar.framingFineTune')}
@@ -237,8 +252,8 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
     'assetId' in clip ? props.project.assets.find(({ id }) => id === clip.assetId) : undefined;
   if (!asset || !('fitMode' in clip)) return null;
   const presets = getMediaFramingPresets(
-    asset.metadata.width,
-    asset.metadata.height,
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     props.project.width,
     props.project.height
   );

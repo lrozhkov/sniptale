@@ -18,6 +18,7 @@ type VideoEditorProjectClipPropertyActionKeys =
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
   | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'convertTextClipToAnnotation'

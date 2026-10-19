@@ -1,3 +1,4 @@
+import { parseMediaSourceCrop } from '../../../../features/video/project/media-crop';
 import { parseColor } from '@sniptale/foundation/color';
 import { isColorString } from '../../../../features/video/project/validation/primitives';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
@@ -37,10 +38,31 @@ export function createClipMediaStyleActions(
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
   | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
 > {
   return {
+    editMediaClip: (clipId, edit) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const clip = project.clips.find((item) => item.id === clipId);
+          if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
+          const crop = edit.crop === null ? undefined : parseMediaSourceCrop(edit.crop);
+          if (crop === null) return project;
+          if (
+            (['x', 'y', 'width', 'height'] as const).every(
+              (key) => crop?.[key] === clip.sourceCrop?.[key]
+            )
+          )
+            return project;
+          const { sourceCrop: _previous, ...rest } = clip;
+          const updated = crop === undefined ? rest : { ...rest, sourceCrop: crop };
+          return applyVideoProjectMutationPatch(project, {
+            clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
+          });
+        })
+      ),
     updateMediaClipFitMode: (clipId, fitMode, fitScalePercent) =>
       set((state) =>
         applyProjectUpdate(state, (project) =>
@@ -123,8 +145,8 @@ function resolveMediaClipFitTransform(
   }
 
   return resolveMediaClipTransformForFitMode(
-    asset.metadata.width,
-    asset.metadata.height,
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     project.width,
     project.height,
     fitMode,

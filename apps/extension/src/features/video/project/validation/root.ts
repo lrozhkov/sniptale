@@ -81,6 +81,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['sourceCrop'] !== undefined) return 13;
   if (value['cameraHiddenRanges'] !== undefined) return 12;
   if (
     Array.isArray(value['cameraPositions']) &&
@@ -101,7 +102,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 12) &&
+    isBoundedNumber(version, 2, 13) &&
     Number.isInteger(version) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&

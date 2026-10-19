@@ -1,3 +1,4 @@
+import { cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import {
   resolveProjectCursorFocusPath,
@@ -69,14 +70,21 @@ function projectCameraFrameAtTime(
   const focus = resolveProjectCursorFocus(project, time, path, region.sourceBinding?.clipId);
   const rendered = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;
   const cursor = rendered ? resolveVideoCompositionCursor(project, time, []) : null;
+  const renderedSample = rendered ? resolveCursorSample(project, time) : null;
+  const nativeCursor = renderedSample?.sourceAnchor !== undefined;
   const sample = rendered
-    ? resolveCursorSample(project, time)
+    ? renderedSample
     : resolveObservedCursorPosition(project, time, region.sourceBinding?.clipId);
-  const actual = cursor
-    ? { x: cursor.x / project.width, y: cursor.y / project.height }
-    : !rendered && sample
-      ? (sample.recordingPoint ?? { x: sample.x / project.width, y: sample.y / project.height })
-      : undefined;
+  const actual =
+    rendered && nativeCursor
+      ? cursor && sample?.recordingPoint
+        ? sample.recordingPoint
+        : undefined
+      : cursor
+        ? { x: cursor.x / project.width, y: cursor.y / project.height }
+        : !rendered && sample
+          ? (sample.recordingPoint ?? { x: sample.x / project.width, y: sample.y / project.height })
+          : undefined;
   const heldClipId = previousFocus?.sourceClipId;
   const owner = heldClipId && project.clips.find((clip) => clip.id === heldClipId);
   const held =
@@ -100,8 +108,9 @@ function projectCameraFrameAtTime(
   const segmentId = `${point.segmentId}:${sourceSegment}:${observation}`;
   const binding: ProjectCameraSourceBinding = {
     ...('sourceClipId' in point && point.sourceClipId ? { focusClipId: point.sourceClipId } : {}),
-    ...(!rendered && actualClipId ? { actualClipId } : {}),
-    ...(rendered ? { renderedCursor: true } : {}),
+    ...((!rendered || nativeCursor) && actualClipId ? { actualClipId } : {}),
+    ...(rendered && !nativeCursor ? { renderedCursor: true } : {}),
+    ...(rendered && nativeCursor ? { sourceCursor: true } : {}),
   };
   const authoredSegment = focus && path.segments.find((segment) => segment.id === focus.id);
   const frame: FollowCursorFrame = {
@@ -124,7 +133,7 @@ function retainClosingProjectFrames(
   bindings: Map<string, ProjectCameraSourceBinding>
 ) {
   const closingFrames: FollowCursorFrame[] = [];
-  if (project.cursorTrack?.captureMode !== VideoCursorCaptureMode.SEPARATE) {
+  {
     for (const clip of project.clips) {
       const time = clip.startTime + clip.duration;
       if (time <= region.startTime || time > region.startTime + region.duration) continue;
@@ -132,11 +141,19 @@ function retainClosingProjectFrames(
         (frame) => frame.time < time && bindings.get(frame.segmentId)?.actualClipId === clip.id
       );
       if (!previous) continue;
-      const sample = resolveObservedCursorPosition(project, time, clip.id, {
-        includeSourceEnd: true,
-      });
-      if (!sample) continue;
-      const precedingSample = resolveObservedCursorPosition(project, previous.time, clip.id);
+      const separate = project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE;
+      const sample = separate
+        ? resolveCursorSample(project, time, clip.id, { includeSourceEnd: true })
+        : resolveObservedCursorPosition(project, time, clip.id, { includeSourceEnd: true });
+      if (
+        !sample?.visible ||
+        (sample.observation && sample.observation !== 'observed') ||
+        !sample.recordingPoint
+      )
+        continue;
+      const precedingSample = separate
+        ? resolveCursorSample(project, previous.time, clip.id)
+        : resolveObservedCursorPosition(project, previous.time, clip.id);
       const segmentId =
         precedingSample?.captureSegment === sample.captureSegment
           ? previous.segmentId
@@ -169,7 +186,14 @@ function collectProjectCameraFrames(project: VideoProject, region: VideoProjectM
   for (const time of [
     ...(project.cursorTrack?.samples ?? []).map((sample) => sample.time),
     ...resolveProjectCursorFocusSamples(project, true).map((sample) => sample.time),
-    ...project.clips.flatMap((clip) => [clip.startTime, clip.startTime + clip.duration]),
+    ...project.clips.flatMap((clip) => [
+      clip.startTime,
+      clip.startTime + clip.duration,
+      ...(clip.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+        ? cameraSourceGeometryBreaks(clip)
+        : []),
+    ]),
   ])
     if (time >= region.startTime && time <= end) times.add(time);
   const frames: FollowCursorFrame[] = [];

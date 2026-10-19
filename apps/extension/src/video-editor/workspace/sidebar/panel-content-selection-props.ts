@@ -36,6 +36,7 @@ export function createSelectionPanelOptionalUpdateProps(
     ...(props.onUpdateMediaClipShadowColor
       ? { onUpdateMediaClipShadowColor: props.onUpdateMediaClipShadowColor }
       : {}),
+    ...(props.onEditMediaClip ? { onEditMediaClip: props.onEditMediaClip } : {}),
     ...(props.onUpdateMediaClipWindowHeader
       ? { onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader }
       : {}),

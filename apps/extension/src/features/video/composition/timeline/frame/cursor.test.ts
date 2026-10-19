@@ -181,3 +181,34 @@ it('retains source-owned closing observations without changing half-open playbac
   };
   expect(resolveObservedCursorPosition(lost, 1, clip.id, { includeSourceEnd: true })).toBeNull();
 });
+
+it('projects a separate recorded cursor through its source instance without changing capture facts', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.transform = { x: 10, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 };
+  clip.fitMode = 'STRETCH';
+  const before = structuredClone(project);
+  // Original source point (.4,.5), projected into the authored clip rectangle.
+  expect(resolveVideoCompositionCursor(project, 0.5, [])).toMatchObject({ x: 42, y: 40 });
+  expect(project).toEqual(before);
+  const manual = {
+    ...project,
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: [{ id: 'manual', time: 0, x: 7, y: 9, visible: true }],
+    },
+  };
+  expect(resolveVideoCompositionCursor(manual, 0.5, [])).toMatchObject({ x: 7, y: 9 });
+});
+
+it('hides a cropped-out source cursor without rewriting its raw samples or focus overrides', () => {
+  const project = observedProject();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  clip.sourceCrop = { x: 0.5, y: 0, width: 0.5, height: 1 };
+  const before = structuredClone(project);
+  expect(resolveVideoCompositionCursor(project, 0, [])).toBeNull();
+  expect(resolveVideoCompositionCursor(project, 1, [])).not.toBeNull();
+  expect(project).toEqual(before);
+});

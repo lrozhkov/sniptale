@@ -480,3 +480,14 @@ Each clip retains at most 512 ordered intervals with unique IDs. Source times ar
 Only CAMERA tracks apply these intervals. Other VIDEO clips retain dormant intervals. Montage uses camera source time. Gallery uses main source time before its camera offset. Both editors share interval validation and membership. Conversion must adapt these clocks.
 
 Hidden intervals preserve camera trajectories, crops, source bytes, and audio. The inspector continues to edit hidden cameras. Cuts, rates, movement, and duplication retain source anchors. Existing commands, history, save, resource, and export owners retain authority. This change adds no writer or physical database migration.
+
+
+### Montage source crop
+
+Video-project schema 13 admits optional `sourceCrop` on VIDEO and IMAGE clips. Versions 2–12 refuse this field. Readers refuse future versions. Mutations retain schema 13 after removal. Opening does not write defaults.
+
+The crop uses normalized coordinates in the original source. Both editors share crop validation and inverse rectangle geometry. Each clip retains its own crop. Crop edits preserve clip placement, scene dimensions, source clocks, audio, and immutable media. Explicit fitting uses the cropped source dimensions. Applying visual settings to a track preserves each target crop.
+
+Drawing and source-point projection use the same fitted geometry. Headers join the cropped media plane. Source points outside the crop do not project into the scene. Manual scene points remain independent. Recorded separate cursors retain their source points and easing. Camera containment uses the original source binding and exact eased interval bounds.
+
+The existing command, history, save, and resource owners retain authority. Preview seeks do not reload the source. A preview failure preserves editable metadata. This change adds no persistence writer or physical database migration.

@@ -13,6 +13,7 @@ export function createClipPropertyStyleActions(
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
   | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'convertTextClipToAnnotation'

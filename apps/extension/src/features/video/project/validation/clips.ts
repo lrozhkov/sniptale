@@ -1,3 +1,4 @@
+import { parseMediaSourceCrop } from '../media-crop';
 import { parseCameraHiddenRanges } from '../camera/visibility';
 import { parseColor } from '@sniptale/foundation/color';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
@@ -203,6 +204,14 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
     isRecord(value['cameraAppearance']) &&
     value['cameraAppearance']['shape'] === 'circle' &&
     value['type'] !== VideoProjectClipType.VIDEO
+  )
+    return false;
+
+  if (
+    value['sourceCrop'] !== undefined &&
+    ((value['type'] !== VideoProjectClipType.VIDEO &&
+      value['type'] !== VideoProjectClipType.IMAGE) ||
+      parseMediaSourceCrop(value['sourceCrop']) === null)
   )
     return false;
 

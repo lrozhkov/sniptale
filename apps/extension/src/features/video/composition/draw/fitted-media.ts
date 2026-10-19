@@ -1,3 +1,4 @@
+import { uncropMediaSourceRect, type MediaSourceCrop } from '../../project/media-crop';
 import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import {
@@ -25,7 +26,8 @@ type MediaFrameRenderer = (
   drawY: number,
   drawWidth: number,
   drawHeight: number,
-  context?: CanvasRenderingContext2D
+  context?: CanvasRenderingContext2D,
+  visibleContent?: MediaFrame
 ) => void;
 
 function shouldDrawFittedMediaDirectly(params: {
@@ -72,6 +74,7 @@ function getFittedMediaFrame(params: {
 
 /** Resolve source pixel bounds before clip rotation and transition scaling. */
 export function getFittedMediaContentFrame(params: {
+  sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
@@ -79,6 +82,17 @@ export function getFittedMediaContentFrame(params: {
   sourceHeight: number;
   sourceWidth: number;
 }): MediaFrame {
+  if (params.sourceCrop) {
+    const { sourceCrop, ...rest } = params;
+    return uncropMediaSourceRect(
+      getFittedMediaContentFrame({
+        ...rest,
+        sourceWidth: params.sourceWidth * sourceCrop.width,
+        sourceHeight: params.sourceHeight * sourceCrop.height,
+      }),
+      sourceCrop
+    );
+  }
   if (params.windowHeader) {
     const headerHeight = windowHeaderGeometry(params.windowHeader, {
       width: params.sourceWidth,
@@ -187,6 +201,7 @@ export function drawFittedMediaFrame(
 }
 
 export function drawFittedMediaLayer(params: {
+  sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   windowHeaderImage?: HTMLImageElement;
   windowHeader?: WindowHeader;
@@ -203,6 +218,28 @@ export function drawFittedMediaLayer(params: {
   sourceHeight: number;
   sourceWidth: number;
 }): void {
+  if (params.sourceCrop) {
+    const { sourceCrop, ...rest } = params;
+    drawFittedMediaLayer({
+      ...rest,
+      sourceWidth: params.sourceWidth * sourceCrop.width,
+      sourceHeight: params.sourceHeight * sourceCrop.height,
+      render: (x, y, width, height, context = params.context) => {
+        const visible = { x, y, width, height };
+        const source = uncropMediaSourceRect(visible, sourceCrop);
+        context.save();
+        try {
+          context.beginPath();
+          context.rect(x, y, width, height);
+          context.clip();
+          params.render(source.x, source.y, source.width, source.height, context, visible);
+        } finally {
+          context.restore();
+        }
+      },
+    });
+    return;
+  }
   if (params.cameraAppearance?.shape === 'circle')
     params = { ...params, frame: cameraWindowFrame(params.frame, 'circle') };
   const drawFitted = (render: MediaFrameRenderer) => {
@@ -315,6 +352,7 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   mirrored?: boolean;
   windowHeader?: WindowHeader;
@@ -373,7 +411,7 @@ export function mapSourceNormalizedPointToVisualLayer(
 ): SourcePoint | null {
   if (
     !isValidPointMapping(params) ||
-    !isInsideFrame(params.point, { x: 0, y: 0, width: 1, height: 1 })
+    !isInsideFrame(params.point, params.sourceCrop ?? { x: 0, y: 0, width: 1, height: 1 })
   )
     return null;
   const content = getFittedMediaContentFrame(params);
@@ -413,9 +451,15 @@ export function mapVisualLayerPointToSourceNormalized(
   };
   const content = getFittedMediaContentFrame(params);
   if (!isInsideVisualFrame(point, params) || !isInsideFrame(point, content)) return null;
+  const native = {
+    x: (point.x - content.x) / content.width,
+    y: (point.y - content.y) / content.height,
+  };
+  const crop = params.sourceCrop ?? { x: 0, y: 0, width: 1, height: 1 };
+  if (!isInsideFrame(native, crop)) return null;
   return {
-    x: Math.min(1, Math.max(0, (point.x - content.x) / content.width)),
-    y: Math.min(1, Math.max(0, (point.y - content.y) / content.height)),
+    x: Math.min(crop.x + crop.width, Math.max(crop.x, native.x)),
+    y: Math.min(crop.y + crop.height, Math.max(crop.y, native.y)),
   };
 }
 
@@ -427,6 +471,7 @@ function visualLayerRotation(frame: MediaFrame & { rotation: number }) {
 }
 
 interface FittedMediaPointMapping {
+  sourceCrop?: MediaSourceCrop;
   fitMode: VideoMediaFitMode;
   frame: MediaFrame;
   point: SourcePoint;

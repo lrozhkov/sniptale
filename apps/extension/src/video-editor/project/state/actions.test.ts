@@ -150,6 +150,7 @@ function expectProjectActionSurface(store: ReturnType<typeof createVideoEditorTe
     'updateMediaClipShadowIntensity',
     'updateMediaClipShadowMode',
     'updateMediaClipShadowColor',
+    'editMediaClip',
     'updateSubtitleTrackStyle',
     'updateTransitionDuration',
     'updateTransitionEasing',

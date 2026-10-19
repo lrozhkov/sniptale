@@ -35,47 +35,55 @@ it('moves source points below the header and inverses their rotated/scaled trans
   expect(restored?.y).toBeCloseTo(point.y);
 });
 
-it('paints adjoining media and header edges in one raster before the transformed destination', () => {
-  const plane = {
-    reset: vi.fn(),
-    setTransform: vi.fn(),
-    clearRect: vi.fn(),
-    drawImage: vi.fn(),
-    save: vi.fn(),
-    beginPath: vi.fn(),
-    rect: vi.fn(),
-    clip: vi.fn(),
-    translate: vi.fn(),
-    restore: vi.fn(),
-  };
-  const canvas = { width: 0, height: 0, getContext: () => plane };
-  const ownerDocument = { createElement: () => canvas };
-  const context = { canvas: { ownerDocument }, drawImage: vi.fn() };
-  const header = {
-    naturalHeight: windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 1920, height: 1080 })
-      .height,
-  };
-  const render = vi.fn();
-  drawFittedMediaLayer({
-    context: context as unknown as CanvasRenderingContext2D,
-    windowHeader: DEFAULT_WINDOW_HEADER,
-    windowHeaderImage: header as HTMLImageElement,
-    displayScale: 0.53,
-    fitMode: 'STRETCH',
-    frame: { x: 12.2, y: 4.7, width: 1000.3, height: 600.4 },
-    render,
-    shadowIntensity: 0,
-    shadowMode: undefined,
-    sourceWidth: 1920,
-    sourceHeight: 1080,
-  });
-  expect(context.drawImage).toHaveBeenCalledExactlyOnceWith(canvas, 12.2, 4.7, 1000.3, 600.4);
-  const paintedHeader = plane.drawImage.mock.calls[0]!;
-  const paintedMedia = render.mock.calls[0]!;
-  expect(paintedHeader[4]).toBe(Math.round(Number(paintedHeader[4])));
-  expect(paintedMedia[1]).toBe(4.7 + Number(paintedHeader[4]));
-  expect(paintedMedia[4]).toBe(plane);
-});
+it.each([false, true])(
+  'paints header and crop=%s in one raster before the destination',
+  (cropped) => {
+    const plane = {
+      reset: vi.fn(),
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      translate: vi.fn(),
+      restore: vi.fn(),
+    };
+    const canvas = { width: 0, height: 0, getContext: () => plane };
+    const ownerDocument = { createElement: () => canvas };
+    const context = { canvas: { ownerDocument }, drawImage: vi.fn() };
+    const header = {
+      naturalHeight: windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 1920, height: 1080 })
+        .height,
+    };
+    const render = vi.fn();
+    drawFittedMediaLayer({
+      context: context as unknown as CanvasRenderingContext2D,
+      windowHeader: DEFAULT_WINDOW_HEADER,
+      ...(cropped ? { sourceCrop: { x: 0.25, y: 0, width: 0.5, height: 1 } } : {}),
+      windowHeaderImage: header as HTMLImageElement,
+      displayScale: 0.53,
+      fitMode: 'STRETCH',
+      frame: { x: 12.2, y: 4.7, width: 1000.3, height: 600.4 },
+      render,
+      shadowIntensity: 0,
+      shadowMode: undefined,
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+    });
+    expect(context.drawImage).toHaveBeenCalledExactlyOnceWith(canvas, 12.2, 4.7, 1000.3, 600.4);
+    const paintedHeader = plane.drawImage.mock.calls[0]!;
+    const paintedMedia = render.mock.calls[0]!;
+    expect(paintedHeader[4]).toBe(Math.round(Number(paintedHeader[4])));
+    expect(paintedMedia[1]).toBe(4.7 + Number(paintedHeader[4]));
+    expect(paintedMedia[4]).toBe(plane);
+    if (cropped) {
+      expect(paintedMedia[2]).toBe(2002);
+      expect(paintedMedia[5]).toMatchObject({ x: 12.2, width: 1001 });
+    }
+  }
+);
 
 it('keeps source media visible while loading and reports decode failure with a restored canvas', () => {
   const asset = createVideoProjectAsset(

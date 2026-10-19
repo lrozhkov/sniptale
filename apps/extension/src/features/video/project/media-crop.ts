@@ -1,7 +1,7 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
 /** A rectangle normalized against the complete original media source. */
-interface MediaSourceCrop {
+export interface MediaSourceCrop {
   x: number;
   y: number;
   width: number;

@@ -124,11 +124,11 @@ describe('camera source visibility boundary', () => {
         })
       ).toBe(false);
     }
-    expect(isHydratableVideoProject({ ...project, version: 13 })).toBe(false);
+    expect(isHydratableVideoProject({ ...project, version: 14 })).toBe(false);
     const legacy = fixture();
     delete legacy.clip.cameraAppearance;
     delete legacy.clip.cameraPositions;
-    for (let version = 2; version <= 12; version++) {
+    for (let version = 2; version <= 13; version++) {
       const candidate = { ...legacy.project, version };
       const before = JSON.stringify(candidate);
       expect(isHydratableVideoProject(candidate)).toBe(true);

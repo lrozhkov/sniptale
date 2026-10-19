@@ -139,6 +139,7 @@ interface VideoEditorSidebarClipActions {
   onUpdateMediaClipShadowIntensity: VideoEditorSidebarCommands['updateMediaClipShadowIntensity'];
   onUpdateMediaClipShadowMode: VideoEditorSidebarCommands['updateMediaClipShadowMode'];
   onUpdateMediaClipShadowColor: VideoEditorSidebarCommands['updateMediaClipShadowColor'];
+  onEditMediaClip: VideoEditorSidebarCommands['editMediaClip'];
   onUpdateMediaClipWindowHeader: VideoEditorSidebarCommands['updateMediaClipWindowHeader'];
   onUpdateAnnotationClipContent: VideoEditorSidebarCommands['updateAnnotationClipContent'];
   onUpdateAnnotationClipStyle: VideoEditorSidebarCommands['updateAnnotationClipStyle'];

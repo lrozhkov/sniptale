@@ -216,6 +216,7 @@ function drawVideoLayer(
     context,
     displayScale,
     fitMode: layer.clip.fitMode,
+    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
     frame,
     camera: layer.trackRole === 'CAMERA',
     ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
@@ -226,7 +227,7 @@ function drawVideoLayer(
     ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
-    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context) => {
+    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) => {
       if (!layer.effectActionsOnly) {
         drawCameraMediaSource(
           drawContext,
@@ -241,16 +242,23 @@ function drawVideoLayer(
       }
       drawContext.save();
       drawContext.beginPath();
+      const visible = visibleContent ?? {
+        x: drawX,
+        y: drawY,
+        width: drawWidth,
+        height: drawHeight,
+      };
       const contentBounds = {
-        x: Math.max(frame.x, drawX),
-        y: Math.max(frame.y, drawY),
+        x: Math.max(frame.x, visible.x),
+        y: Math.max(frame.y, visible.y),
         width: Math.max(
           0,
-          Math.min(frame.x + frame.width, drawX + drawWidth) - Math.max(frame.x, drawX)
+          Math.min(frame.x + frame.width, visible.x + visible.width) - Math.max(frame.x, visible.x)
         ),
         height: Math.max(
           0,
-          Math.min(frame.y + frame.height, drawY + drawHeight) - Math.max(frame.y, drawY)
+          Math.min(frame.y + frame.height, visible.y + visible.height) -
+            Math.max(frame.y, visible.y)
         ),
       };
       drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
@@ -337,6 +345,7 @@ function drawImageLayer(
     context,
     displayScale,
     fitMode: layer.clip.fitMode,
+    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
     frame,
     shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,

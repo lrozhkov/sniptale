@@ -17,6 +17,7 @@ import type {
   VideoProjectTrackRole,
 } from '../../../features/video/project/types/index';
 import type {
+  VideoEditorMediaClipEdit,
   VideoEditorAudioEnvelopePatch,
   VideoEditorFadePatch,
   VideoEditorTransitionPatch,
@@ -115,6 +116,8 @@ export interface VideoEditorProjectActions
   updateMediaClipFitScalePercent: (clipId: string, fitScalePercent: number) => void;
   updateMediaClipShadowIntensity: (clipId: string, shadowIntensity: number) => void;
   updateMediaClipShadowMode: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  /** Edits source crop through the existing project history owner. */
+  editMediaClip: (clipId: string, edit: VideoEditorMediaClipEdit) => void;
   updateMediaClipShadowColor: (clipId: string, shadowColor: string) => void;
   updateMediaClipWindowHeader: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   applyMediaClipVisualsToTrack: (clipId: string) => void;

@@ -1,3 +1,4 @@
+import type { MediaSourceCrop } from '../../../features/video/project/media-crop';
 import type { VideoClipTransitionKind } from '../../../features/video/project/types/index';
 import type {
   VideoProject,
@@ -72,3 +73,6 @@ export type VideoProjectEffectInstancePatch = {
   enabled?: boolean;
   startTime?: number;
 };
+
+/** Original-source media edits; placement and source timing remain independent. */
+export type VideoEditorMediaClipEdit = { kind: 'source-crop'; crop: MediaSourceCrop | null };

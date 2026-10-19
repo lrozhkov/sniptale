@@ -125,6 +125,7 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onUpdateMediaClipShadowIntensity: store.updateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: store.updateMediaClipShadowMode,
     onUpdateMediaClipShadowColor: store.updateMediaClipShadowColor,
+    onEditMediaClip: store.editMediaClip,
     onUpdateMediaClipWindowHeader: store.updateMediaClipWindowHeader,
     onUpdateShapeStyle: store.updateShapeClipStyle,
     onUpdateSubtitleTrackStyle: store.updateSubtitleTrackStyle,

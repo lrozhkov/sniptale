@@ -161,6 +161,7 @@ const expectedKeys = {
     'updateMediaClipShadowIntensity',
     'updateMediaClipShadowMode',
     'updateMediaClipShadowColor',
+    'editMediaClip',
     'updateMediaClipWindowHeader',
     'updateMotionRegion',
     'updateProject',

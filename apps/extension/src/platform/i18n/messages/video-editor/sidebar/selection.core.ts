@@ -3,6 +3,15 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  mediaCrop: { ru: 'Кадрирование исходника', en: 'Source crop' },
+  mediaCropLeft: { ru: 'Слева', en: 'Left' },
+  mediaCropTop: { ru: 'Сверху', en: 'Top' },
+  mediaCropWidth: { ru: 'Ширина области', en: 'Area width' },
+  mediaCropHeight: { ru: 'Высота области', en: 'Area height' },
+  mediaCropPreview: {
+    ru: 'Область исходника: перетащите или используйте стрелки',
+    en: 'Source area: drag or use arrow keys',
+  },
   textDocuments: { ru: 'Текстовые документы', en: 'Text documents' },
   captionInheritDocument: { ru: 'Стиль документа', en: 'Use document style' },
   textRewriteScopeDetails: { ru: 'Размещение текста и запрос', en: 'Text placement and request' },

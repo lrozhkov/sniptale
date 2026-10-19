@@ -138,7 +138,9 @@ describe('workspace-sidebar/selection/media-frame', () => {
     await renderHarness({ onApplyMediaClipVisualsToTrack });
 
     const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
-      (button) => button.closest('[data-ui="video-editor.inspector.actions"]') !== null
+      (button) =>
+        button.closest('[data-ui="video-editor.inspector.actions"]') !== null &&
+        button.textContent?.includes('Применить к дорожке')
     );
 
     expect(container?.textContent).toContain('Вписывание');

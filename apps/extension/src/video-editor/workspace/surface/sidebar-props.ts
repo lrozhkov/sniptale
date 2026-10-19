@@ -206,6 +206,7 @@ type WorkspaceSidebarClipActionProps = Pick<
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
   | 'onUpdateMediaClipShadowColor'
+  | 'onEditMediaClip'
   | 'onUpdateMediaClipWindowHeader'
   | 'onUpdateShapeStyle'
   | 'onUpdateSubtitleTrackStyle'
@@ -241,6 +242,7 @@ function getWorkspaceSidebarClipActionProps(
     onUpdateMediaClipShadowIntensity: actions.onUpdateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: actions.onUpdateMediaClipShadowMode,
     onUpdateMediaClipShadowColor: actions.onUpdateMediaClipShadowColor,
+    onEditMediaClip: actions.onEditMediaClip,
     onUpdateMediaClipWindowHeader: actions.onUpdateMediaClipWindowHeader,
     onUpdateShapeStyle: actions.onUpdateShapeStyle,
     onUpdateSubtitleTrackStyle: (trackId, patch) =>

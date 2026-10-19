@@ -70,6 +70,7 @@ type VideoEditorProjectActionKeys =
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
   | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
   | 'applyEffectDocument'

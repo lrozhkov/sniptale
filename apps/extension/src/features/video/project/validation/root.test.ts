@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 13])
+  for (const version of [2, 3, 4, 14])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,7 +129,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 13])
+    for (const version of [2, 3, 4, 5, 6, 7, 14])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -156,7 +156,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 13])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 14])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -214,7 +214,7 @@ it('fences circle at schema ten and retains dormant camera settings without open
   expect(changed.version).toBe(10);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 13])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 14])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const parsed = parseHydratableVideoProject({ ...project, version });
@@ -256,7 +256,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   expect(changed.version).toBe(11);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 13])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 14])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     const parsed = parseHydratableVideoProject({
@@ -297,7 +297,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   ).toBe(11);
 });
 
-it.each([1, 2.5, 12.5, 13, NaN, Infinity, '12', null, undefined])(
+it.each([1, 2.5, 13.5, 14, NaN, Infinity, '12', null, undefined])(
   'refuses unsupported or malformed schema version %j',
   (version) => {
     expect(isHydratableVideoProject({ ...createEmptyVideoProject('Version'), version })).toBe(
@@ -305,3 +305,49 @@ it.each([1, 2.5, 12.5, 13, NaN, Infinity, '12', null, undefined])(
     );
   }
 );
+
+it('fences per-media source crop at schema thirteen and retains the version after reset', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'crop',
+    filename: 'crop.webm',
+    width: 640,
+    height: 360,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const crop = { x: 0.25, y: 0.1, width: 0.5, height: 0.8 };
+  const clips = project.clips.map((clip) =>
+    clip.type === 'VIDEO' ? { ...clip, sourceCrop: crop } : clip
+  );
+  const changed = applyVideoProjectMutationPatch(project, { clips });
+  expect(changed.version).toBe(13);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  for (let version = 2; version <= 12; version++)
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 14 })).toBe(false);
+  for (const sourceCrop of [
+    null,
+    [],
+    {},
+    { ...crop, x: -0.1 },
+    { ...crop, width: 0 },
+    { ...crop, height: Infinity },
+    { ...crop, x: 0.6 },
+  ]) {
+    expect(
+      isHydratableVideoProject({
+        ...changed,
+        clips: clips.map((clip) => ({ ...clip, sourceCrop })),
+      })
+    ).toBe(false);
+  }
+  const removed = applyVideoProjectMutationPatch(changed, { clips: project.clips });
+  expect(removed.version).toBe(13);
+  expect(isHydratableVideoProject(removed)).toBe(true);
+  const before = structuredClone(project);
+  for (let version = 2; version <= 13; version++)
+    expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+  expect(project).toEqual(before);
+});

@@ -151,8 +151,8 @@ it('bounds the real editable cursor curve instead of a linear approximation betw
   const bounds = boundRenderedCursorPosition(project, 0.25, 0.5)!;
   for (const time of [0.25, 0.3, 0.35, 0.4, 0.45, 0.5]) {
     const actual = resolveVideoCompositionCursor(project, time, [])!;
-    expect(actual.x).toBeGreaterThanOrEqual(bounds.minX);
-    expect(actual.x).toBeLessThanOrEqual(bounds.maxX);
+    expect(actual.x).toBeGreaterThanOrEqual(bounds.minX - 1e-9);
+    expect(actual.x).toBeLessThanOrEqual(bounds.maxX + 1e-9);
   }
   const geometry = createProjectWorkingZoneCameraGeometry({
     project,
@@ -265,3 +265,123 @@ it('retains phase cross acceleration for a moving follow pan during linear zoom'
   expect(motion.acceleration).toBeCloseTo(100 / 0.6, 6);
   expect(motion.jerk).toBeCloseTo(0, 6);
 });
+
+it('bounds the original eased source cursor at recursive proof interval edges', () => {
+  const { project, region, policy } = fixture();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source');
+  clip.transform = { ...clip.transform, x: 10, y: 20, width: 80, height: 60 };
+  clip.fitMode = 'STRETCH';
+  clip.sourceCrop = { x: 0.1, y: 0, width: 0.8, height: 1 };
+  project.cursorTrack!.samples[0]!.interpolation = VideoTemporalEasing.EASE_OUT;
+  const geometry = createProjectWorkingZoneCameraGeometry({
+    project,
+    region: { ...region, zoomInDuration: 0, zoomOutDuration: 0 },
+    policy,
+    connectedIn: false,
+    connectedOut: false,
+    bindings: new Map([['source', { actualClipId: clip.id, sourceCursor: true }]]),
+  });
+  const bounds = geometry.clearanceBounds({
+    start: 0.25,
+    end: 0.5,
+    segmentId: 'source',
+    targetScale: 2,
+    pan: { minX: 30, maxX: 30, minY: 30, maxY: 30 },
+    actual: { from: { x: 0, y: 0 }, to: { x: 0, y: 0 } },
+  })!;
+  for (const time of [0.25, 0.3, 0.4, 0.5]) {
+    const cursor = resolveVideoCompositionCursor(project, time, [])!;
+    const clearance = Math.min(
+      cursor.x * 2 - 30,
+      cursor.y * 2 - 30,
+      100 - (cursor.x * 2 - 30),
+      100 - (cursor.y * 2 - 30)
+    );
+    expect(clearance).toBeGreaterThanOrEqual(bounds.viewport!.low - 1e-9);
+    expect(clearance).toBeLessThanOrEqual(bounds.viewport!.high + 1e-9);
+  }
+});
+
+it.each(['PUSH', 'SLIDE'] as const)(
+  'bounds changing camera sizes during a %s transition',
+  async (kind) => {
+    const { resolveCursorSourcePointMapping, mapCursorFocusControlPoint } =
+      await import('../timeline/frame/cursor');
+    const { project, region, policy } = fixture();
+    const clip = project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing source');
+    project.width = 300;
+    project.height = 300;
+    project.duration = 6;
+    project.tracks = project.tracks.map((track) =>
+      track.id === clip.trackId ? { ...track, role: 'CAMERA' } : track
+    );
+    project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+      ...sample,
+      recordingPoint: { x: 0.5, y: 0.5 },
+      x: 150,
+      y: 150,
+    }));
+    clip.transform = { x: 20, y: 30, width: 80, height: 80, rotation: -20, opacity: 1 };
+    clip.fitMode = 'STRETCH';
+    clip.sourceCrop = { x: 0.2, y: 0.1, width: 0.6, height: 0.8 };
+    clip.cameraAppearance = { shape: 'circle', roundness: 0, zoom: 1.2, panX: 0, panY: 0 };
+    clip.cameraMirrored = true;
+    clip.cameraPositions = [
+      {
+        id: 'moving',
+        sourceTime: 0,
+        transform: { ...clip.transform, x: 60, width: 120, height: 60, rotation: 67 },
+        fitMode: 'STRETCH',
+        transition: { kind: 'shrink', duration: 3 },
+        crop: { zoom: 2, panX: 0.2, panY: -0.1 },
+      },
+    ];
+    project.clips = [
+      clip,
+      { ...clip, id: 'following', sourceInstanceId: 'following-instance', startTime: 3 },
+    ];
+    project.transitions = [
+      {
+        id: 'push',
+        leadingClipId: clip.id,
+        trailingClipId: 'following',
+        kind,
+        duration: 1,
+        easing: 'LINEAR',
+        direction: 'RIGHT',
+      },
+    ];
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region: { ...region, duration: 3, zoomInDuration: 0, zoomOutDuration: 0 },
+      policy,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([
+        ['source', { actualClipId: clip.id, focusClipId: clip.id, sourceCursor: true }],
+      ]),
+    });
+    const point = { x: 0.5, y: 0.5 };
+    const bounds = geometry.clearanceBounds({
+      start: 2.6,
+      end: 2.8,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 60, maxX: 60, minY: 20, maxY: 20 },
+      actual: { from: point, to: point },
+    })!;
+    expect(bounds.viewport).toBeDefined();
+    for (let index = 0; index <= 40; index++) {
+      const time = 2.6 + (0.2 * index) / 40;
+      const mapping = resolveCursorSourcePointMapping(project, clip.id, time)!;
+      const world = mapCursorFocusControlPoint(mapping, point);
+      const x = world.x * 2 - 60,
+        y = world.y * 2 - 20;
+      const clearance = Math.min(x, y, 300 - x, 300 - y);
+      expect(clearance).toBeGreaterThanOrEqual(bounds.viewport!.low - 1e-9);
+      expect(clearance).toBeLessThanOrEqual(bounds.viewport!.high + 1e-9);
+    }
+  }
+);

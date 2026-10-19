@@ -69,6 +69,7 @@ type TimelineClipAction =
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
   | 'updateMediaClipShadowColor'
+  | 'editMediaClip'
   | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack';
 

@@ -301,3 +301,99 @@ it('coordinates adjacent retained portions of the same nominal animation clock',
   expect(start.pan.x).toBeCloseTo(end.pan.x, 8);
   expect(project).toEqual(before);
 });
+
+it('projects a cropped source cursor once during camera containment and preserves native observations', async () => {
+  const { resolveVideoCompositionCursor } = await import('../timeline/frame/cursor');
+  const { project, region } = fixture();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source');
+  clip.transform = { x: 100, y: 100, width: 400, height: 300, rotation: 0, opacity: 1 };
+  clip.sourceCrop = { x: 0.5, y: 0, width: 0.5, height: 1 };
+  clip.fitMode = 'STRETCH';
+  const before = structuredClone(project);
+  const cursor = resolveVideoCompositionCursor(project, 1, [])!;
+  expect(cursor.x).toBeCloseTo(156, 9);
+  expect(cursor.y).toBeCloseTo(250, 9);
+  const camera = resolveProjectFollowingCamera(project, region, 1);
+  expect(camera.plan.status).toBe('ready');
+  const x = cursor.x * camera.targetScale - camera.pan.x,
+    y = cursor.y * camera.targetScale - camera.pan.y;
+  expect(x).toBeGreaterThanOrEqual(-0.5);
+  expect(x).toBeLessThanOrEqual(project.width + 0.5);
+  expect(y).toBeGreaterThanOrEqual(-0.5);
+  expect(y).toBeLessThanOrEqual(project.height + 0.5);
+  expect(project).toEqual(before);
+});
+
+it('does not admit stale cursor containment after an instant camera position', async () => {
+  const { resolveVideoCompositionCursor } = await import('../timeline/frame/cursor');
+  const { project, region } = fixture();
+  project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+  project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+    ...sample,
+    x: 500,
+    recordingPoint: { x: 0.5, y: 0.5 },
+  }));
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source');
+  project.tracks = project.tracks.map((track) =>
+    track.id === clip.trackId ? { ...track, role: 'CAMERA' } : track
+  );
+  clip.transform = { x: 100, y: 200, width: 200, height: 200, rotation: 0, opacity: 1 };
+  clip.fitMode = 'STRETCH';
+  clip.cameraPositions = [
+    {
+      id: 'right',
+      sourceTime: 1,
+      transform: { ...clip.transform, x: 700 },
+      fitMode: 'STRETCH',
+      transition: { kind: 'instant', duration: 0 },
+    },
+  ];
+  const cameraRegion = { ...region, scale: 2 };
+  project.motionRegions = [cameraRegion];
+  expect(isValidVideoProject(project)).toBe(true);
+  const cursor = resolveVideoCompositionCursor(project, 1.5, [])!;
+  expect(cursor.x).toBeCloseTo(800, 9);
+  const camera = resolveProjectFollowingCamera(project, cameraRegion, 1.5);
+  if (camera.plan.status === 'ready') {
+    const x = cursor.x * camera.targetScale - camera.pan.x;
+    expect(x).toBeGreaterThanOrEqual(-0.5);
+    expect(x).toBeLessThanOrEqual(project.width + 0.5);
+  } else expect(camera.plan.status).toBe('conflict');
+});
+
+it.each(['instant', 'smooth', 'shrink'] as const)(
+  'admits a feasible %s camera move after an initially hidden interval',
+  (kind) => {
+    const { project, region } = fixture();
+    project.cursorTrack!.captureMode = VideoCursorCaptureMode.SEPARATE;
+    project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+      ...sample,
+      x: 500,
+      recordingPoint: { x: 0.5, y: 0.5 },
+    }));
+    const clip = project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing source');
+    project.tracks = project.tracks.map((track) =>
+      track.id === clip.trackId ? { ...track, role: 'CAMERA' } : track
+    );
+    clip.transform = { x: 100, y: 200, width: 80, height: 80, rotation: 0, opacity: 1 };
+    clip.fitMode = 'STRETCH';
+    clip.cameraHiddenRanges = [{ id: 'opening', start: 0, end: 0.5 }];
+    clip.cameraPositions = [
+      {
+        id: 'small',
+        sourceTime: 1,
+        transform: { ...clip.transform, x: 120 },
+        fitMode: 'STRETCH',
+        transition: { kind, duration: 0.5 },
+      },
+    ];
+    const cameraRegion = { ...region, scale: 2 };
+    project.motionRegions = [cameraRegion];
+    const camera = resolveProjectFollowingCamera(project, cameraRegion, 2);
+    expect(camera.plan.status).toBe('ready');
+  }
+);

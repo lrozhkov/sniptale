@@ -1,12 +1,37 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'camera-source-geometry',
+    productionFile:
+      'apps/extension/src/features/video/composition/motion/camera-source-geometry.ts',
+    reason: 'Animated camera source bounds feed cursor rendering and continuous follow admission.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/motion/camera-source-geometry.test.ts',
+      'apps/extension/src/features/video/composition/motion/camera-geometry.test.ts',
+      'apps/extension/src/features/video/composition/motion/project-follow.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/cursor.test.ts',
+    ],
+  },
+  {
     owner: 'media-source-crop',
     productionFile: 'apps/extension/src/features/video/project/media-crop.ts',
     allowCrossOwner: true,
     reason:
-      'Source crop admission and inverse geometry feed Gallery canvas, scene, stage and render settings.',
+      'Source crop feeds both editors, Montage schema, geometry, source interactions, commands and inspector.',
     testFiles: [
       'apps/extension/src/features/video/project/media-crop.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/validation/clips.test.ts',
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/cursor.test.ts',
+      'apps/extension/src/features/video/composition/motion/project-follow.test.ts',
+      'apps/extension/src/features/video/composition/motion/camera-geometry.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-crop.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-partial.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-crop.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-crop-preview.test.tsx',
       'apps/extension/src/features/video/review/advanced/canvas.test.ts',
       'apps/extension/src/features/video/review/advanced/scene.test.ts',
       'apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts',
@@ -42,6 +67,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/project/effect-instance/apply-targets.test.ts',
       'apps/extension/src/video-editor/preview/stage/runtime/camera-transform.test.ts',
       'apps/extension/src/video-editor/project/state/clip-property/media-shadow.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-crop.test.ts',
       'apps/extension/src/features/video/project/camera/visibility.test.ts',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-visibility.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/clip.test.tsx',

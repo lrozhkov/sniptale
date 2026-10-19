@@ -65,6 +65,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
   | 'onUpdateMediaClipShadowColor'
+  | 'onEditMediaClip'
   | 'onUpdateMediaClipWindowHeader'
   | 'onUpdateMotionRegion'
   | 'onUpdateShapeStyle'

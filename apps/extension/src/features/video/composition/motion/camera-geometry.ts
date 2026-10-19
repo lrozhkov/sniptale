@@ -1,3 +1,4 @@
+import { boundCameraSourceGeometry, cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import { resolveProjectOutputTransform } from '../../project/export/output-dimensions';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
@@ -14,6 +15,7 @@ import {
   resolveCursorSourcePointMapping,
   mapCursorFocusControlPoint,
   boundRenderedCursorPosition,
+  resolveCursorSample,
 } from '../timeline/frame/cursor';
 import type { WorkingZoneCameraGeometry } from './follow-cursor';
 import {
@@ -29,6 +31,7 @@ export interface ProjectCameraSourceBinding {
   focusClipId?: string;
   actualClipId?: string;
   renderedCursor?: boolean;
+  sourceCursor?: boolean;
 }
 const product = (a: Range, b: Range): Range => {
   const values = [a[0] * b[0], a[0] * b[1], a[1] * b[0], a[1] * b[1]];
@@ -180,46 +183,85 @@ function nativeSourceRasterBounds(
   const content = getFittedMediaContentFrame(mapping);
   const x = sum([content.x, content.x], multiply(nativeX, content.width));
   const y = sum([content.y, content.y], multiply(nativeY, content.height));
+  const crop = mapping.sourceCrop ?? { x: 0, y: 0, width: 1, height: 1 };
+  const left = Math.max(mapping.frame.x, content.x + crop.x * content.width);
+  const top = Math.max(mapping.frame.y, content.y + crop.y * content.height);
+  const right = Math.min(
+    mapping.frame.x + mapping.frame.width,
+    content.x + (crop.x + crop.width) * content.width
+  );
+  const bottom = Math.min(
+    mapping.frame.y + mapping.frame.height,
+    content.y + (crop.y + crop.height) * content.height
+  );
   const raster = {
-    low: Math.min(
-      x[0] - mapping.frame.x,
-      y[0] - mapping.frame.y,
-      mapping.frame.x + mapping.frame.width - x[1],
-      mapping.frame.y + mapping.frame.height - y[1]
-    ),
-    high: Math.min(
-      x[1] - mapping.frame.x,
-      y[1] - mapping.frame.y,
-      mapping.frame.x + mapping.frame.width - x[0],
-      mapping.frame.y + mapping.frame.height - y[0]
-    ),
+    low: Math.min(x[0] - left, y[0] - top, right - x[1], bottom - y[1]),
+    high: Math.min(x[1] - left, y[1] - top, right - x[0], bottom - y[0]),
   };
   const center = {
     x: mapping.frame.x + mapping.frame.width / 2,
     y: mapping.frame.y + mapping.frame.height / 2,
   };
   const angle = (mapping.frame.rotation * Math.PI) / 180;
-  const dx = subtract(x, [center.x, center.x]),
+  const projectedX = mapping.mirrored ? subtract([2 * center.x, 2 * center.x], x) : x;
+  const dx = subtract(projectedX, [center.x, center.x]),
     dy = subtract(y, [center.y, center.y]);
   const rotatedX = subtract(multiply(dx, Math.cos(angle)), multiply(dy, Math.sin(angle)));
   const rotatedY = sum(multiply(dx, Math.sin(angle)), multiply(dy, Math.cos(angle)));
-  return { center, rotatedX, rotatedY, raster };
+  return {
+    center: { x: [center.x, center.x] as Range, y: [center.y, center.y] as Range },
+    rotatedX,
+    rotatedY,
+    raster,
+  };
+}
+
+function sourceTransitionStateAt(
+  clip: VideoProject['clips'][number],
+  transitions: readonly ReturnType<typeof buildProjectTransitionSegments>[number][],
+  time: number
+) {
+  const transition = transitions.find(
+    (item) =>
+      time >= item.start &&
+      (time < item.end || (time === item.end && time === clip.startTime + clip.duration))
+  );
+  if (!transition) return IDENTITY_TRANSITION_VISUAL_STATE;
+  const progress = time === transition.end ? 1 : getTransitionProgress(transition, time);
+  return progress === null
+    ? IDENTITY_TRANSITION_VISUAL_STATE
+    : resolveTransitionVisualStateForRole(
+        clip,
+        transition.leadingClipId === clip.id ? 'leading' : 'trailing',
+        transition,
+        progress
+      );
 }
 
 function sourceVisualLayerBounds(
   clip: VideoProject['clips'][number],
   transitions: readonly ReturnType<typeof buildProjectTransitionSegments>[number][],
-  stateAt: (time: number) => ReturnType<typeof resolveTransitionVisualStateForRole>,
   start: number,
-  end: number
+  end: number,
+  cameraBounds?: ReturnType<typeof boundCameraSourceGeometry> | null
 ) {
+  const geometryClip = cameraBounds
+    ? {
+        ...clip,
+        transform: {
+          ...clip.transform,
+          width: cameraBounds.width[1],
+          height: cameraBounds.height[1],
+        },
+      }
+    : clip;
   const middle = (start + end) / 2;
   const transition = transitions.find(
     (item) =>
       middle >= item.start &&
       (middle < item.end || (middle === item.end && middle === clip.startTime + clip.duration))
   );
-  const states = [stateAt(middle)];
+  const states = [sourceTransitionStateAt(geometryClip, transitions, middle)];
   if (transition) {
     if (
       ['RADIAL_REVEAL', 'DISPLACEMENT_WARP', 'LINEAR_WIPE', 'CARD_FLIP_REVEAL'].includes(
@@ -233,22 +275,49 @@ function sourceVisualLayerBounds(
       const progress = time === transition.end ? 1 : getTransitionProgress(transition, time);
       if (progress !== null) {
         progressValues.push(progress);
-        states.push(resolveTransitionVisualStateForRole(clip, role, transition, progress));
+        states.push(resolveTransitionVisualStateForRole(geometryClip, role, transition, progress));
       }
     }
     if (Math.min(...progressValues) <= 0.5 && Math.max(...progressValues) >= 0.5)
-      states.push(resolveTransitionVisualStateForRole(clip, role, transition, 0.5));
+      states.push(resolveTransitionVisualStateForRole(geometryClip, role, transition, 0.5));
   }
   const bounds = (key: 'translateX' | 'translateY' | 'scaleX' | 'scaleY'): Range => [
     Math.min(...states.map((state) => state[key])),
     Math.max(...states.map((state) => state[key])),
   ];
   return {
-    translateX: bounds('translateX'),
-    translateY: bounds('translateY'),
+    translateX: product(
+      bounds('translateX'),
+      cameraBounds ? [cameraBounds.width[0] / cameraBounds.width[1], 1] : [1, 1]
+    ),
+    translateY: product(
+      bounds('translateY'),
+      cameraBounds ? [cameraBounds.height[0] / cameraBounds.height[1], 1] : [1, 1]
+    ),
     scaleX: bounds('scaleX'),
     scaleY: bounds('scaleY'),
   };
+}
+
+/** Resolve the retained monotone easing at exact proof edges, before source projection. */
+function sourceCursorIntervalBounds(
+  project: VideoProject,
+  binding: ProjectCameraSourceBinding,
+  start: number,
+  end: number,
+  actual: { from: CameraPanPoint; to: CameraPanPoint }
+) {
+  const clipId = binding.actualClipId;
+  const from = binding.sourceCursor
+    ? resolveCursorSample(project, start, clipId, { includeSourceEnd: true })?.recordingPoint
+    : actual.from;
+  const to = binding.sourceCursor
+    ? resolveCursorSample(project, end, clipId, { includeSourceEnd: true })?.recordingPoint
+    : actual.to;
+  if (!from || !to) return null;
+  const nativeX: Range = [Math.min(from.x, to.x), Math.max(from.x, to.x)];
+  const nativeY: Range = [Math.min(from.y, to.y), Math.max(from.y, to.y)];
+  return { nativeX, nativeY };
 }
 
 /** Bind native source coordinates, actual clip fitting, and authored phase clocks to camera admission. */
@@ -296,27 +365,6 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       ),
     ])
   );
-  const stateAt = (clipId: string, time: number) => {
-    const clip = clips.get(clipId);
-    const transition = transitionsByClip
-      .get(clipId)
-      ?.find(
-        (item) =>
-          time >= item.start &&
-          (time < item.end ||
-            (time === item.end && clip && time === clip.startTime + clip.duration))
-      );
-    if (!clip || !transition) return IDENTITY_TRANSITION_VISUAL_STATE;
-    const progress = time === transition.end ? 1 : getTransitionProgress(transition, time);
-    return progress === null
-      ? IDENTITY_TRANSITION_VISUAL_STATE
-      : resolveTransitionVisualStateForRole(
-          clip,
-          transition.leadingClipId === clipId ? 'leading' : 'trailing',
-          transition,
-          progress
-        );
-  };
   const domain = (scale: number): CameraPanBounds => ({
     minX: 0,
     minY: 0,
@@ -328,10 +376,21 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     const binding = input.bindings.get(segmentId)!;
     const clipId = actual ? binding.actualClipId : binding.focusClipId;
     if (!clipId) return { x: point.x * window.width, y: point.y * window.height };
-    const mapping = mappings.get(clipId);
+    const clip = clips.get(clipId);
+    const camera =
+      clip?.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
+    const mapping = camera
+      ? resolveCursorSourcePointMapping(project, clipId, time)
+      : mappings.get(clipId);
     if (!mapping) return null;
     const mapped = mapCursorFocusControlPoint(
-      { ...mapping, renderState: stateAt(clipId, time) },
+      camera
+        ? mapping
+        : {
+            ...mapping,
+            renderState: sourceTransitionStateAt(clip!, transitionsByClip.get(clipId) ?? [], time),
+          },
       point
     );
     return { x: mapped.x * scaleX, y: mapped.y * scaleY };
@@ -357,14 +416,9 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     }
     if (!actual) return null;
     const clipId = binding.actualClipId;
-    const nativeX: Range = [
-      Math.min(actual.from.x, actual.to.x),
-      Math.max(actual.from.x, actual.to.x),
-    ];
-    const nativeY: Range = [
-      Math.min(actual.from.y, actual.to.y),
-      Math.max(actual.from.y, actual.to.y),
-    ];
+    const native = sourceCursorIntervalBounds(project, binding, start, end, actual);
+    if (!native) return { unavailable: true as const };
+    const { nativeX, nativeY } = native;
     if (!clipId)
       return {
         x: multiply(nativeX, window.width),
@@ -375,30 +429,27 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     const clip = clips.get(clipId);
     const mapping = mappings.get(clipId);
     if (!clip || !mapping) return null;
-    const { center, rotatedX, rotatedY, raster } = nativeSourceRasterBounds(
-      mapping,
-      nativeX,
-      nativeY
-    );
+    const camera =
+      clip.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
+    const cameraBounds = camera
+      ? boundCameraSourceGeometry({ clip, mapping, nativeX, nativeY, start, end })
+      : null;
+    const { center, rotatedX, rotatedY, raster } =
+      cameraBounds ?? nativeSourceRasterBounds(mapping, nativeX, nativeY);
     const visual = sourceVisualLayerBounds(
       clip,
       transitionsByClip.get(clipId) ?? [],
-      (time) => stateAt(clipId, time),
       start,
-      end
+      end,
+      cameraBounds
     );
     if (!visual) return null;
     const layerX = visual.scaleX,
       layerY = visual.scaleY;
     return {
-      x: multiply(
-        sum(sum([center.x, center.x], visual.translateX), product(layerX, rotatedX)),
-        scaleX
-      ),
-      y: multiply(
-        sum(sum([center.y, center.y], visual.translateY), product(layerY, rotatedY)),
-        scaleY
-      ),
+      x: multiply(sum(sum(center.x, visual.translateX), product(layerX, rotatedX)), scaleX),
+      y: multiply(sum(sum(center.y, visual.translateY), product(layerY, rotatedY)), scaleY),
       raster,
       rasterScale: [
         Math.min(layerX[0] * scaleX, layerY[0] * scaleY),
@@ -418,6 +469,12 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         (transition.start + transition.end) / 2,
         transition.end,
       ]),
+      ...project.clips.flatMap((clip) =>
+        clip.type === 'VIDEO' &&
+        project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+          ? cameraSourceGeometryBreaks(clip)
+          : []
+      ),
       ...(project.cursorTrack?.samples ?? []).map((sample) => sample.time),
     ],
     panDomain: domain,

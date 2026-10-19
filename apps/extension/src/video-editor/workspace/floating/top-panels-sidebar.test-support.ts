@@ -132,6 +132,7 @@ function createClipActions(): VideoEditorSidebarController['clipActions'] {
     onUpdateMediaClipShadowIntensity: noop(),
     onUpdateMediaClipShadowMode: noop(),
     onUpdateMediaClipShadowColor: noop(),
+    onEditMediaClip: noop(),
     onUpdateMediaClipWindowHeader: noop(),
     onUpdateShapeStyle: noop(),
     onUpdateSubtitleTrackStyle: noop(),

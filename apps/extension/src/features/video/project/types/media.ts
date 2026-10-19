@@ -1,3 +1,4 @@
+import type { MediaSourceCrop } from '../media-crop';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 
 /** Bounded, source-time amplitude envelope stored with each media asset. */
@@ -29,6 +30,8 @@ export interface VideoProjectMediaShadowFields {
 }
 
 export interface VideoProjectMediaVisualFields extends VideoProjectMediaShadowFields {
+  /** Original-source crop; clip placement and source timing remain independent. */
+  sourceCrop?: MediaSourceCrop;
   windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
   fitScalePercent?: number;

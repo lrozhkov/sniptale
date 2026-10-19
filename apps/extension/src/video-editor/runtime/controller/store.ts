@@ -107,6 +107,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateMediaClipShadowIntensity: state.updateMediaClipShadowIntensity,
     updateMediaClipShadowMode: state.updateMediaClipShadowMode,
     updateMediaClipShadowColor: state.updateMediaClipShadowColor,
+    editMediaClip: state.editMediaClip,
     updateMediaClipWindowHeader: state.updateMediaClipWindowHeader,
     updateMotionRegion: state.updateMotionRegion,
     updateProject: state.updateProject,
