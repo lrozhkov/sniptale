@@ -3,7 +3,7 @@ import { createSha256Digest } from '@sniptale/platform/security/digest';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
 import { createVideoClipFromAsset } from '../factories/clip';
 import type { VideoProjectTextDocument } from './types';
-import { createVideoProjectTextAudioScope } from './voice-scope';
+import { captureVideoProjectVoiceTextBasis, createVideoProjectTextAudioScope } from './voice-scope';
 
 vi.mock('@sniptale/platform/security/digest', async (original) => ({
   ...(await original<typeof import('@sniptale/platform/security/digest')>()),
@@ -258,6 +258,29 @@ it('rejects missing, empty, oversized, malformed and conflicting clock selection
   );
   fragment.timeDomain = 'result';
   await expect(createVideoProjectTextAudioScope(project, -1, 'script', 'phrase')).rejects.toThrow(
+    'invalid-request'
+  );
+});
+
+it('shares the exact AI basis hash with local text capture', async () => {
+  const f = fixture(true);
+  const local = await captureVideoProjectVoiceTextBasis(f.project, 'script', 'phrase');
+  const ai = await createVideoProjectTextAudioScope(f.project, 1, 'script', 'phrase');
+  expect(local.basis).toEqual(ai.basis);
+  expect(local.basisHash).toBe(ai.scope.basisHash);
+});
+
+it('keeps the 4096 speech limit separate from the 16000 local snapshot bound', async () => {
+  const f = fixture();
+  f.fragment.text = 'x'.repeat(16000);
+  await expect(
+    captureVideoProjectVoiceTextBasis(f.project, 'script', 'phrase')
+  ).resolves.toMatchObject({ basis: { fragment: { text: f.fragment.text } } });
+  await expect(createVideoProjectTextAudioScope(f.project, 1, 'script', 'phrase')).rejects.toThrow(
+    'too-large'
+  );
+  f.fragment.text += 'x';
+  await expect(captureVideoProjectVoiceTextBasis(f.project, 'script', 'phrase')).rejects.toThrow(
     'invalid-request'
   );
 });

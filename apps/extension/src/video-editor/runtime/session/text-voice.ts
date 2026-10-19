@@ -14,12 +14,15 @@ import type { VideoProject } from '../../../features/video/project/types/model';
 import type { VideoProjectVoicePlacement } from '../../../features/video/project/text/authoring';
 import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
 import {
-  acceptProjectTextVoice,
   captureProjectTextVoice,
-  cleanupProjectTextVoicePreview,
   generateProjectTextVoice,
-  type ProjectTextVoiceApplyAccess,
 } from '../../../workflows/video/project-text-voice';
+import {
+  acceptProjectVoiceTake,
+  cleanupProjectVoiceTakePreview,
+  type ProjectVoiceTakeAccess,
+  type ProjectVoiceTakePreview,
+} from '../../../workflows/video/project-voice-take';
 import {
   getCurrentVideoEditorCurrentTime,
   getCurrentVideoEditorProjectSnapshot,
@@ -28,7 +31,7 @@ import {
 } from '../controller/store';
 import { waitForVideoEditorSave } from './save-readiness';
 
-type VoicePreview = Awaited<ReturnType<typeof generateProjectTextVoice>>;
+type VoicePreview = ProjectVoiceTakePreview;
 type VoiceCapture = Awaited<ReturnType<typeof captureProjectTextVoice>>;
 interface VoiceState {
   target: { documentId: string; fragmentId: string } | null;
@@ -78,7 +81,7 @@ function voiceError(error: unknown) {
 }
 
 interface VoicePorts {
-  update: ProjectTextVoiceApplyAccess['update'];
+  update: ProjectVoiceTakeAccess['update'];
   history: {
     begin: HistoryPort['beginProjectHistoryTransaction'];
     end: HistoryPort['endProjectHistoryTransaction'];
@@ -89,8 +92,8 @@ function createVoiceAccess(
   owner: { current: VoiceLifetime },
   lifetime: VoiceLifetime,
   ports: { current: VoicePorts }
-): ProjectTextVoiceApplyAccess {
-  const access: ProjectTextVoiceApplyAccess = {
+): ProjectVoiceTakeAccess {
+  const access: ProjectVoiceTakeAccess = {
     getProject: () => {
       const value = getCurrentVideoEditorProjectSnapshot();
       return owner.current === lifetime &&
@@ -227,7 +230,7 @@ export function useVideoProjectTextVoice(project: VideoProject) {
       lifetime.mounted = false;
       lifetime.active?.abort();
       if (lifetime.preview)
-        void cleanupProjectTextVoicePreview(lifetime.preview).catch(() => undefined);
+        void cleanupProjectVoiceTakePreview(lifetime.preview).catch(() => undefined);
     };
   }, [lifetime]);
   const loadModels = useCallback(() => loadVoiceCatalog(owner, latest, setState), []);
@@ -250,7 +253,7 @@ export function useVideoProjectTextVoice(project: VideoProject) {
     async close() {
       if (!current() || lifetime.active) return;
       await run(async () => {
-        if (lifetime.preview) await cleanupProjectTextVoicePreview(lifetime.preview);
+        if (lifetime.preview) await cleanupProjectVoiceTakePreview(lifetime.preview);
         if (!current()) return;
         lifetime.preview = null;
         setState((value) => ({
@@ -307,7 +310,7 @@ export function useVideoProjectTextVoice(project: VideoProject) {
           signal
         );
         if (signal.aborted || !current()) {
-          await cleanupProjectTextVoicePreview(preview);
+          await cleanupProjectVoiceTakePreview(preview);
           return;
         }
         lifetime.preview = preview;
@@ -319,7 +322,7 @@ export function useVideoProjectTextVoice(project: VideoProject) {
       if (!preview || latest.current.accepted) return;
       const placement = latest.current.placement;
       await run(async (signal) => {
-        await acceptProjectTextVoice(access, preview, placement, signal);
+        await acceptProjectVoiceTake(access, preview, placement, signal);
         signal.throwIfAborted();
         if (current()) setState((value) => ({ ...value, accepted: true }));
       }, true);

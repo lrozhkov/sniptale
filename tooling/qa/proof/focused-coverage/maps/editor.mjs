@@ -1,5 +1,18 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'montage-voice-text-basis',
+    productionFile: 'apps/extension/src/features/video/project/text/voice-scope.ts',
+    allowCrossOwner: true,
+    reason: 'Canonical authorization and staging consumers prove the shared voice basis contract.',
+    testFiles: [
+      'apps/extension/src/features/video/project/text/voice-scope.test.ts',
+      'apps/extension/src/composition/persistence/projects/text-audio-scope.test.ts',
+      'apps/extension/src/background/ai/audio/authorization.project-text.test.ts',
+      'apps/extension/src/background/ai/audio/service.project-text.test.ts',
+      'apps/extension/src/composition/persistence/assets/audio-staging.project-text.test.ts',
+    ],
+  },
+  {
     owner: 'montage-text-phrase-inspection',
     productionFile:
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-phrase.tsx',

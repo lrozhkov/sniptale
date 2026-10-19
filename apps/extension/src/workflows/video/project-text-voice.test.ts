@@ -1,3 +1,4 @@
+import { cleanupProjectVoiceTakePreview, type ProjectVoiceReadAccess } from './project-voice-take';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../composition/persistence/projects';
 import { isCurrentVideoProjectSnapshot } from '../../composition/persistence/projects/revision';
@@ -9,12 +10,7 @@ import {
   readAudioStaging,
   discardAudioStaging,
 } from '../../composition/persistence/assets/audio-staging';
-import {
-  captureProjectTextVoice,
-  generateProjectTextVoice,
-  cleanupProjectTextVoicePreview,
-  type ProjectTextVoiceAccess,
-} from './project-text-voice';
+import { captureProjectTextVoice, generateProjectTextVoice } from './project-text-voice';
 import type { AudioStagedHandle } from '../../contracts/ai/audio';
 
 vi.mock('../../composition/persistence/projects', () => ({ getVideoProject: vi.fn() }));
@@ -89,7 +85,7 @@ function fixture() {
     durable = structuredClone(project);
     revision++;
   });
-  const access: ProjectTextVoiceAccess = { getProject: () => (opened ? project : null), save };
+  const access: ProjectVoiceReadAccess = { getProject: () => (opened ? project : null), save };
   return {
     access,
     project,
@@ -297,7 +293,7 @@ it('revokes audition URL even when stale target cleanup fails', async () => {
   const preview = await generateProjectTextVoice(f.access, await f.capture(), 'provider', signal());
   f.remove();
   vi.mocked(discardAudioStaging).mockRejectedValueOnce(new Error('storage'));
-  await expect(cleanupProjectTextVoicePreview(preview)).rejects.toThrow('storage');
+  await expect(cleanupProjectVoiceTakePreview(preview)).rejects.toThrow('storage');
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:voice');
 });
 it('blocks a restored canonical head during the last metadata admission await', async () => {
@@ -332,9 +328,9 @@ it('allows independent captures to use separate jobs and cleanup handles', async
     generateProjectTextVoice(f.access, second, 'provider', signal()),
   ]);
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
-  await cleanupProjectTextVoicePreview(previews[0]!);
-  expect(discardAudioStaging).toHaveBeenCalledExactlyOnceWith(staged, previews[0]!.scope);
-  expect(previews[1]!.staged).toEqual(other);
+  await cleanupProjectVoiceTakePreview(previews[0]!);
+  expect(discardAudioStaging).toHaveBeenCalledExactlyOnceWith(staged, previews[0]!.source.scope);
+  expect(previews[1]!.source.staged).toEqual(other);
 });
 it('refuses expired capture and missing provider without Save or request', async () => {
   const f = fixture();

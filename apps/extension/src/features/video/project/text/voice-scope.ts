@@ -18,7 +18,6 @@ function captureVoiceBasis(project: VideoProject, documentId: string, fragmentId
   const selected = entry.document.fragments.find((fragment) => fragment.id === fragmentId);
   if (!selected) throw new Error('stale');
   if (!selected.text.trim()) throw new Error('invalid-request');
-  if (selected.text.length > 4096) throw new Error('too-large');
   const basis = {
     projectId: project.id,
     projectCreatedAt: project.createdAt,
@@ -78,6 +77,17 @@ function serializeVoiceBasis(basis: ReturnType<typeof captureVoiceBasis>): strin
   });
 }
 
+/** Captures detached text and placement identity for local or generated voice takes. */
+export async function captureVideoProjectVoiceTextBasis(
+  project: VideoProject,
+  documentId: string,
+  fragmentId: string
+) {
+  const basis = captureVoiceBasis(project, documentId, fragmentId);
+  const basisHash = await createSha256Digest(serializeVoiceBasis(basis));
+  return { basis, basisHash };
+}
+
 /** Captures one authored speech basis without granting access to any source bytes. */
 export async function createVideoProjectTextAudioScope(
   project: VideoProject,
@@ -86,6 +96,7 @@ export async function createVideoProjectTextAudioScope(
   fragmentId: string
 ) {
   const basis = captureVoiceBasis(project, documentId, fragmentId);
+  if (basis.fragment.text.length > 4096) throw new Error('too-large');
   const projectUpdatedAt = project.updatedAt;
   const basisHash = await createSha256Digest(serializeVoiceBasis(basis));
   const scope = parseAudioJobScope({
