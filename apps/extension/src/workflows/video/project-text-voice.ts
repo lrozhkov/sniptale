@@ -242,6 +242,7 @@ export async function runProjectTextVoiceQueue(
   events: {
     ready(preview: ProjectVoiceTakePreview): void;
     progress(progress: SpeechQueueProgress<ProjectTextVoiceQueueItem>): void;
+    failed?(cause: unknown): void;
   }
 ): Promise<void> {
   signal.throwIfAborted();

@@ -36,9 +36,18 @@ import { waitForVideoEditorSave } from './save-readiness';
 type VoicePreview = ProjectVoiceTakePreview;
 type VoiceQueue = Awaited<ReturnType<typeof captureProjectTextVoiceQueue>>;
 type VoiceCapture = VoiceQueue['items'][number]['capture'];
+interface VoiceTarget {
+  documentId: string;
+  fragmentId: string;
+}
+interface VoiceItem extends VoiceTarget {
+  placement: VideoProjectVoicePlacement;
+  preview: VoicePreview | null;
+  selected: boolean;
+  accepted: boolean;
+}
 interface VoiceState {
   source: 'ai' | 'microphone' | 'gallery';
-  target: { documentId: string; fragmentId: string } | null;
   profile: ReviewSpeechProfile | undefined;
   catalog: AIModelSelectionBootstrapPayload | null;
   consent: {
@@ -47,11 +56,10 @@ interface VoiceState {
     providerId: string;
     providerName: string;
   } | null;
-  preview: VoicePreview | null;
-  placement: VideoProjectVoicePlacement;
+  activeId: string;
+  progress: { completed: number; total: number } | null;
   running: boolean;
   applying: boolean;
-  accepted: boolean;
   error: string | null;
 }
 interface VoiceLifetime {
@@ -59,20 +67,20 @@ interface VoiceLifetime {
   createdAt: number;
   mounted: boolean;
   active: AbortController | null;
-  preview: VoicePreview | null;
+  items: VoiceItem[];
+  batch: boolean;
+  pendingApply: { preview: VoicePreview; placement: VideoProjectVoicePlacement }[] | null;
   catalogAttempt: number;
 }
 const initialState: VoiceState = {
   source: 'ai',
-  target: null,
   profile: undefined,
   catalog: null,
   consent: null,
-  preview: null,
-  placement: { start: 0 },
+  activeId: '',
+  progress: null,
   running: false,
   applying: false,
-  accepted: false,
   error: null,
 };
 function voiceError(error: unknown) {
@@ -148,7 +156,7 @@ function runVoiceAttempt(
     if (!current() || lifetime.active) return;
     const controller = new AbortController();
     lifetime.active = controller;
-    setState((value) => ({ ...value, running: true, applying, error: null }));
+    setState((value) => ({ ...value, running: true, applying, progress: null, error: null }));
     let abort = () => {};
     const cancelled = new Promise<void>((_resolve, reject) => {
       abort = () => reject(new DOMException('Cancelled', 'AbortError'));
@@ -184,7 +192,7 @@ async function loadVoiceCatalog(
   if (
     !life.mounted ||
     life.active ||
-    life.preview ||
+    life.items.some((item) => item.preview) ||
     latest.current.consent ||
     latest.current.source !== 'ai'
   )
@@ -232,7 +240,7 @@ async function loadVoiceCatalog(
 
 async function prepareVoiceConsent(
   access: ProjectVoiceTakeAccess,
-  target: NonNullable<VoiceState['target']>,
+  selected: readonly VoiceTarget[],
   profile: ReviewSpeechProfile,
   catalog: VoiceState['catalog'],
   signal: AbortSignal
@@ -240,26 +248,43 @@ async function prepareVoiceConsent(
   const model = catalog?.models.find((entry) => entry.id === profile.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
   if (!provider) throw new Error('model-unavailable');
-  const queue = await captureProjectTextVoiceQueue(access, [target], profile, signal);
+  const queue = await captureProjectTextVoiceQueue(access, selected, profile, signal);
   signal.throwIfAborted();
   const capture = queue.items[0]!.capture;
   return { capture, queue, providerId: provider.id, providerName: provider.name };
 }
 
-/** Adapts the selected singleton sequence to the mounted preview retention boundary. */
-async function generateVoiceConsent(
-  access: ProjectVoiceTakeAccess,
-  consent: Pick<NonNullable<VoiceState['consent']>, 'queue' | 'providerId'>,
-  signal: AbortSignal
+function voiceItemKey(item: VoiceTarget) {
+  return JSON.stringify([item.documentId, item.fragmentId]);
+}
+
+function publishVoiceItems(
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  items: VoiceItem[]
 ) {
-  let preview: VoicePreview | undefined;
-  await runProjectTextVoiceQueue(access, consent.queue, consent.providerId, signal, {
-    ready: (value) => {
-      preview = value;
-    },
-    progress: () => {},
+  lifetime.items = items;
+  setState((value) => ({ ...value }));
+}
+
+/** The lifetime owns resources immediately; React receives only a presentation update. */
+function rememberVoicePreview(
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  preview: VoicePreview
+) {
+  const key = voiceItemKey({
+    documentId: preview.textSnapshot.documentId,
+    fragmentId: preview.textSnapshot.text.textId,
   });
-  return preview;
+  const item = lifetime.items.find((entry) => voiceItemKey(entry) === key);
+  if (!item || item.preview || !lifetime.mounted) return false;
+  publishVoiceItems(
+    lifetime,
+    setState,
+    lifetime.items.map((entry) => (entry === item ? { ...entry, preview } : entry))
+  );
+  return true;
 }
 
 async function retainVoicePreview(
@@ -269,18 +294,85 @@ async function retainVoicePreview(
   signal: AbortSignal,
   setState: Dispatch<SetStateAction<VoiceState>>
 ) {
-  if (signal.aborted || owner.current !== lifetime || !lifetime.mounted) {
+  if (
+    signal.aborted ||
+    owner.current !== lifetime ||
+    !rememberVoicePreview(lifetime, setState, preview)
+  )
     await cleanupProjectVoiceTakePreview(preview);
-    return;
+}
+
+async function generateVoiceBatch(
+  access: ProjectVoiceTakeAccess,
+  lifetime: VoiceLifetime,
+  consent: NonNullable<VoiceState['consent']>,
+  signal: AbortSignal,
+  setState: Dispatch<SetStateAction<VoiceState>>
+) {
+  await runProjectTextVoiceQueue(access, consent.queue, consent.providerId, signal, {
+    ready: (preview) => {
+      if (
+        signal.aborted ||
+        !access.getProject() ||
+        !rememberVoicePreview(lifetime, setState, preview)
+      )
+        throw new Error('stale');
+    },
+    progress: ({ completed, total }) => {
+      if (!signal.aborted && access.getProject())
+        setState((value) => ({ ...value, progress: { completed, total } }));
+    },
+    failed: (cause) => {
+      if (!signal.aborted && access.getProject())
+        setState((value) => ({ ...value, error: voiceError(cause) }));
+    },
+  });
+}
+
+async function applyVoiceBatch(
+  access: ProjectVoiceTakeAccess,
+  lifetime: VoiceLifetime,
+  signal: AbortSignal,
+  setState: Dispatch<SetStateAction<VoiceState>>
+) {
+  lifetime.pendingApply ??= lifetime.items.flatMap((item) =>
+    item.selected && item.preview && !item.accepted
+      ? [{ preview: item.preview, placement: { ...item.placement } }]
+      : []
+  );
+  const selected = lifetime.pendingApply;
+  try {
+    await acceptProjectVoiceTakes(access, selected, signal);
+  } catch (cause) {
+    if (!selected.some((entry) => entry.preview.attachment)) lifetime.pendingApply = null;
+    throw cause;
   }
-  lifetime.preview = preview;
-  setState((value) => ({ ...value, preview }));
+  signal.throwIfAborted();
+  if (!access.getProject()) throw new Error('stale');
+  publishVoiceItems(
+    lifetime,
+    setState,
+    lifetime.items.map((item) =>
+      selected.some((entry) => entry.preview === item.preview)
+        ? { ...item, accepted: true, selected: false }
+        : item
+    )
+  );
+  lifetime.pendingApply = null;
+}
+
+async function releaseVoiceItems(lifetime: VoiceLifetime) {
+  for (const item of lifetime.items)
+    if (item.preview) await cleanupProjectVoiceTakePreview(item.preview);
+  lifetime.items = [];
+  lifetime.batch = false;
+  lifetime.pendingApply = null;
 }
 
 async function prepareVoiceSelection(
   selection: Parameters<typeof prepareProjectLocalTextVoice>[0]['selection'],
   access: ProjectVoiceTakeAccess,
-  state: Pick<VoiceState, 'target' | 'source' | 'consent'>,
+  state: Pick<VoiceState, 'source' | 'consent'> & { target: VoiceTarget | null },
   run: (work: (signal: AbortSignal) => Promise<VoicePreview>) => ReturnType<typeof runVoiceAttempt>
 ) {
   const { target, source, consent } = state;
@@ -296,6 +388,108 @@ async function prepareVoiceSelection(
     })
   );
   if (!prepared) throw new Error('failed');
+}
+
+function openVoiceSelection(
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  documentId: string,
+  selection: string | readonly string[]
+) {
+  if (lifetime.active || lifetime.items.length) return;
+  const ids = [...new Set(typeof selection === 'string' ? [selection] : selection)];
+  if (!ids.length) return;
+  const start = getCurrentVideoEditorCurrentTime();
+  lifetime.batch = typeof selection !== 'string';
+  lifetime.items = ids.map((fragmentId) => ({
+    documentId,
+    fragmentId,
+    placement: { start },
+    preview: null,
+    selected: true,
+    accepted: false,
+  }));
+  setState((value) => ({
+    ...value,
+    activeId: '',
+    consent: null,
+    error: null,
+    source: lifetime.batch ? 'ai' : value.source,
+  }));
+}
+
+function toggleVoiceItem(
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  documentId: string,
+  fragmentId: string
+) {
+  const key = voiceItemKey({ documentId, fragmentId });
+  publishVoiceItems(
+    lifetime,
+    setState,
+    lifetime.items.map((item) =>
+      voiceItemKey(item) === key && !item.accepted ? { ...item, selected: !item.selected } : item
+    )
+  );
+}
+
+function changeVoicePlacement(
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  active: VoiceItem,
+  placement: VideoProjectVoicePlacement
+) {
+  publishVoiceItems(
+    lifetime,
+    setState,
+    lifetime.items.map((item) =>
+      item === active ? { ...item, placement: { ...placement } } : item
+    )
+  );
+}
+
+async function prepareVoiceBatch(
+  access: ProjectVoiceTakeAccess,
+  lifetime: VoiceLifetime,
+  state: Pick<VoiceState, 'profile' | 'catalog' | 'consent'>,
+  signal: AbortSignal,
+  setState: Dispatch<SetStateAction<VoiceState>>
+) {
+  const selected = lifetime.items.filter(
+    (item) => item.selected && !item.preview && !item.accepted
+  );
+  if (!state.profile || !selected.length || state.consent || lifetime.pendingApply) return;
+  const consent = await prepareVoiceConsent(access, selected, state.profile, state.catalog, signal);
+  if (access.getProject()) setState((value) => ({ ...value, consent }));
+}
+
+/** Close owns raw-take admission and complete preview release before resetting the view. */
+async function closeVoiceSelection(
+  owner: { current: VoiceLifetime },
+  lifetime: VoiceLifetime,
+  setState: Dispatch<SetStateAction<VoiceState>>,
+  source: VoiceState['source'],
+  dismiss: ReturnType<typeof useProjectTextVoiceRecording>['dismiss']
+) {
+  const current = () => owner.current === lifetime && lifetime.mounted;
+  if (!current() || lifetime.active) return;
+  const discard = () =>
+    runVoiceAttempt(
+      owner,
+      lifetime,
+      setState,
+      async () => {
+        await releaseVoiceItems(lifetime);
+        if (current()) setState((value) => ({ ...value, activeId: '', consent: null }));
+      },
+      false
+    );
+  if (source === 'microphone')
+    dismiss(() => {
+      void discard();
+    });
+  else await discard();
 }
 
 /** One mounted inspector owns consent, audition resources, placement and acceptance lifetime. */
@@ -316,7 +510,9 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       createdAt: project.createdAt,
       mounted: true,
       active: null,
-      preview: null,
+      items: [],
+      batch: false,
+      pendingApply: null,
       catalogAttempt: 0,
     }),
     [project.id, project.createdAt]
@@ -331,67 +527,62 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
     return () => {
       lifetime.mounted = false;
       lifetime.active?.abort();
-      if (lifetime.preview)
-        void cleanupProjectVoiceTakePreview(lifetime.preview).catch(() => undefined);
+      for (const item of lifetime.items)
+        if (item.preview) void cleanupProjectVoiceTakePreview(item.preview).catch(() => undefined);
     };
   }, [lifetime]);
+  const active =
+    lifetime.items.find((item) => voiceItemKey(item) === state.activeId) ?? lifetime.items[0];
+  const target = active ? { documentId: active.documentId, fragmentId: active.fragmentId } : null;
+  const preview = active?.preview ?? null;
   const recording = useProjectTextVoiceRecording({
     access,
-    target: state.target,
-    enabled: !!state.target && state.source === 'microphone',
-    accepted: state.accepted,
-    startTime: state.placement.start,
+    target,
+    enabled: !lifetime.batch && lifetime.items.length === 1 && state.source === 'microphone',
+    accepted: active?.accepted ?? false,
+    startTime: active?.placement.start ?? 0,
     parentVisible,
-    onPrepared(preview) {
-      if (!current() || lifetime.preview) return false;
-      lifetime.preview = preview;
-      setState((value) => ({ ...value, preview }));
-      return true;
+    onPrepared(value) {
+      return (
+        current() &&
+        !lifetime.items.some((item) => item.preview) &&
+        rememberVoicePreview(lifetime, setState, value)
+      );
     },
   });
   const loadModels = useCallback(() => loadVoiceCatalog(owner, latest, setState), []);
   const run = (work: (signal: AbortSignal) => Promise<void | VoicePreview>, applying = false) =>
     runVoiceAttempt(owner, lifetime, setState, work, applying);
+  const editable = () => current() && !lifetime.active && !lifetime.pendingApply;
+  const acquired = () => lifetime.items.some((item) => item.preview);
   return {
     ...state,
+    target,
+    preview,
+    items: lifetime.items,
+    batch: lifetime.batch,
+    placement: active?.placement ?? { start: 0 },
+    accepted: active?.accepted ?? false,
+    pendingApply: !!lifetime.pendingApply,
     inspectorVisible: parentVisible,
     recording,
     loadModels,
-    open(documentId: string, fragmentId: string) {
-      if (!current() || lifetime.active || lifetime.preview) return;
-      setState((value) => ({
-        ...value,
-        target: { documentId, fragmentId },
-        consent: null,
-        placement: { start: getCurrentVideoEditorCurrentTime() },
-        accepted: false,
-        error: null,
-      }));
+    open(documentId: string, selection: string | readonly string[]) {
+      if (current()) openVoiceSelection(lifetime, setState, documentId, selection);
     },
-    async close() {
-      if (!current() || lifetime.active) return;
-      const discard = () =>
-        run(async () => {
-          if (lifetime.preview) await cleanupProjectVoiceTakePreview(lifetime.preview);
-          if (!current()) return;
-          lifetime.preview = null;
-          setState((value) => ({
-            ...value,
-            target: null,
-            preview: null,
-            consent: null,
-            accepted: false,
-          }));
-        });
-      if (latest.current.source === 'microphone')
-        recording.dismiss(() => {
-          void discard();
-        });
-      else await discard();
+    close: () =>
+      closeVoiceSelection(owner, lifetime, setState, latest.current.source, recording.dismiss),
+    focusItem(documentId: string, fragmentId: string) {
+      if (current())
+        setState((value) => ({ ...value, activeId: voiceItemKey({ documentId, fragmentId }) }));
+    },
+    toggleItem(documentId: string, fragmentId: string) {
+      if (editable() && !latest.current.consent)
+        toggleVoiceItem(lifetime, setState, documentId, fragmentId);
     },
     changeSource(source: VoiceState['source']) {
-      if (source === latest.current.source) return;
-      if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
+      if (source === latest.current.source || lifetime.batch) return;
+      if (!editable() || acquired() || latest.current.consent) return;
       const change = () => {
         if (current()) setState((value) => ({ ...value, source, error: null }));
       };
@@ -399,44 +590,46 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       else change();
     },
     async prepareLocal(selection: Parameters<typeof prepareProjectLocalTextVoice>[0]['selection']) {
-      if (lifetime.preview) throw new Error('busy');
-      await prepareVoiceSelection(selection, access, latest.current, run);
+      if (acquired() || lifetime.batch || lifetime.items.length !== 1) throw new Error('busy');
+      await prepareVoiceSelection(
+        selection,
+        access,
+        {
+          source: latest.current.source,
+          consent: latest.current.consent,
+          target,
+        },
+        run
+      );
     },
     changeProfile(profile: ReviewSpeechProfile) {
-      if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
+      if (!editable() || acquired() || latest.current.consent) return;
       setState((value) => ({ ...value, profile, error: null }));
     },
     changePlacement(placement: VideoProjectVoicePlacement) {
-      if (!current() || lifetime.active || lifetime.preview?.attachment?.receipt) return;
-      setState((value) => ({ ...value, placement, error: null }));
+      if (editable() && active && !active.accepted)
+        changeVoicePlacement(lifetime, setState, active, placement);
     },
     async prepare() {
-      const { target, profile, catalog } = latest.current;
-      if (!target || !profile || lifetime.preview || latest.current.consent) return;
-      await run(async (signal) => {
-        const consent = await prepareVoiceConsent(access, target, profile, catalog, signal);
-        if (current()) setState((value) => ({ ...value, consent }));
-      });
+      await run((signal) => prepareVoiceBatch(access, lifetime, latest.current, signal, setState));
     },
     async start() {
       const consent = latest.current.consent;
-      if (!consent || lifetime.preview) return;
+      if (!consent || lifetime.pendingApply) return;
       await run(async (signal) => {
-        setState((value) => ({ ...value, consent: null }));
-        return generateVoiceConsent(access, consent, signal);
+        setState((value) => ({ ...value, consent: null, progress: null }));
+        await generateVoiceBatch(access, lifetime, consent, signal, setState);
       });
     },
     async apply() {
-      const preview = lifetime.preview;
-      if (!preview || latest.current.accepted) return;
-      const placement = latest.current.placement;
+      if (
+        !lifetime.pendingApply &&
+        !lifetime.items.some((item) => item.selected && item.preview && !item.accepted)
+      )
+        return;
       await run(async (signal) => {
-        await acceptProjectVoiceTakes(access, [{ preview: preview, placement: placement }], signal);
-        signal.throwIfAborted();
-        if (current()) {
-          if (latest.current.source === 'microphone') recording.markRetained();
-          setState((value) => ({ ...value, accepted: true }));
-        }
+        await applyVoiceBatch(access, lifetime, signal, setState);
+        if (current() && latest.current.source === 'microphone') recording.markRetained();
       }, true);
     },
     cancel() {

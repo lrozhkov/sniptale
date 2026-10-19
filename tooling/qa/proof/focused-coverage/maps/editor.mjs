@@ -225,7 +225,10 @@ export const EDITOR_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
     allowCrossOwner: true,
     reason: 'Mounted voice sessions exercise the actual panel and its local and AI controls.',
-    testFiles: ['apps/extension/src/video-editor/runtime/session/text-voice.test.tsx'],
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+    ],
   },
   {
     owner: 'media-library-search-typography',
@@ -256,6 +259,9 @@ export const EDITOR_OWNER_MAPPINGS = [
     reason: 'Mounted local and AI consumers retain the common take acceptance and Save contracts.',
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice-recording.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/video-editor/workspace/floating/inspector-stack.test.tsx',
       'apps/extension/src/workflows/video/project-voice-take.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.batch.test.ts',
       'apps/extension/src/workflows/video/project-voice-take.local.test.ts',

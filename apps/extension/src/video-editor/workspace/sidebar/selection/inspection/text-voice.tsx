@@ -4,13 +4,14 @@ import { ArrowLeft, Check, FolderOpen, LoaderCircle, Play, Square } from 'lucide
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
 import { SpeechSynthesisProfileFields } from '../../../../../ui/video-text/speech/profile';
-import { SegmentedRow, SelectField } from '../../../../../ui/compact-inspector-controls';
+import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectTextVoiceController } from '../../../../runtime/session/text-voice';
 import { InspectorActionButton } from '../shared/actions';
 import { AudioRecordingDownloadButton } from '../../../../../composition/audio-recording/dialog/controls';
 import { AudioLibrarySelection } from '../../../../../composition/audio-library/selection';
 import { ProjectTextVoiceRecording } from './text-voice-recording';
 import { NumberInput } from '../inputs/number';
+import { ProjectTextVoiceBatch, projectVoiceItemText } from './text-voice-batch';
 
 /** Montage supplies explicit result-clock placement independently of text source ranges. */
 export function ProjectTextVoicePanel(props: {
@@ -20,12 +21,19 @@ export function ProjectTextVoicePanel(props: {
 }) {
   const { operation: op } = props;
   const { source } = op;
-  const fragment = props.project.textDocuments
-    ?.find((entry) => entry.id === op.target?.documentId)
-    ?.document.fragments.find((entry) => entry.id === op.target?.fragmentId);
-  const text =
-    op.preview?.textSnapshot.text.text ?? op.consent?.capture.basis.fragment.text ?? fragment?.text;
-  const locked = op.running || op.recording.session.isSaving || !!op.preview || !!op.consent;
+  const active = op.items.find(
+    (item) => item.documentId === op.target?.documentId && item.fragmentId === op.target.fragmentId
+  );
+  const text = active ? projectVoiceItemText(props.project, active, op.consent) : '';
+  const pending = op.items.filter((item) => item.selected && !item.preview && !item.accepted);
+  const hasText =
+    pending.length > 0 &&
+    pending.every((item) => !!projectVoiceItemText(props.project, item, null).trim());
+  const locked =
+    op.running ||
+    op.recording.session.isSaving ||
+    op.items.some((item) => !!item.preview) ||
+    !!op.consent;
   return (
     <section
       data-ui="video-editor.text-voice.panel"
@@ -47,38 +55,40 @@ export function ProjectTextVoicePanel(props: {
           {translate('gallery.videoReview.speechSynthesis')}
         </span>
       </div>
-      <blockquote
-        className={[
-          'max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs select-text',
-          'font-[family-name:var(--sniptale-font-document-sans)]',
-        ].join(' ')}
-        data-ui="video-editor.text-voice.text"
-      >
-        {text}
-      </blockquote>
-      <SegmentedRow
-        value={source}
-        ariaLabel={translate('gallery.videoReview.textVoiceSource')}
-        columns={3}
-        options={[
-          { value: 'ai', label: translate('gallery.videoReview.textVoiceAI'), disabled: locked },
-          {
-            value: 'microphone',
-            label: translate('gallery.videoReview.textVoiceMicrophone'),
-            disabled: locked,
-          },
-          {
-            value: 'gallery',
-            label: translate('gallery.videoReview.textVoiceGallery'),
-            disabled: locked,
-          },
-        ]}
-        onChange={op.changeSource}
-      />
-      <VoiceSourceControls operation={op} hasText={!!fragment?.text.trim()} />
+      {!op.batch ? <VoiceText text={text} /> : null}
+      {!op.batch ? (
+        <SegmentedRow
+          value={source}
+          ariaLabel={translate('gallery.videoReview.textVoiceSource')}
+          columns={3}
+          options={[
+            { value: 'ai', label: translate('gallery.videoReview.textVoiceAI'), disabled: locked },
+            {
+              value: 'microphone',
+              label: translate('gallery.videoReview.textVoiceMicrophone'),
+              disabled: locked,
+            },
+            {
+              value: 'gallery',
+              label: translate('gallery.videoReview.textVoiceGallery'),
+              disabled: locked,
+            },
+          ]}
+          onChange={op.changeSource}
+        />
+      ) : null}
+      <VoiceSourceControls operation={op} hasText={hasText} />
+      {op.batch ? (
+        <>
+          <ProjectTextVoiceBatch project={props.project} operation={op} />
+          {!op.consent ? <VoiceText text={text} /> : null}
+          <VoiceRequest operation={op} hasText={hasText} />
+        </>
+      ) : null}
       {op.preview ? (
         <>
           <VoiceAudition
+            key={op.preview.url}
             url={op.preview.url}
             duration={op.preview.duration}
             focusOnMount={source !== 'ai'}
@@ -101,9 +111,9 @@ export function ProjectTextVoicePanel(props: {
               <Check size={14} aria-hidden="true" />
               {translate('videoEditor.sidebar.textVoiceSaved')}
             </div>
-          ) : (
+          ) : !op.batch ? (
             <InspectorActionButton
-              disabled={op.running}
+              disabled={op.running || !!op.consent}
               onClick={() => {
                 void op.apply();
               }}
@@ -114,11 +124,39 @@ export function ProjectTextVoicePanel(props: {
                   : 'gallery.videoReview.speechApply'
               )}
             </InspectorActionButton>
-          )}
+          ) : null}
         </>
+      ) : null}
+      {op.batch &&
+      (op.pendingApply ||
+        op.items.some((item) => item.preview && item.selected && !item.accepted)) ? (
+        <InspectorActionButton
+          disabled={op.running || !!op.consent}
+          onClick={() => {
+            void op.apply();
+          }}
+        >
+          {translate(
+            op.items.some((item) => item.preview?.attachment?.receipt && !item.accepted)
+              ? 'gallery.videoReview.speechRetrySave'
+              : 'gallery.videoReview.speechApplySelected'
+          )}
+        </InspectorActionButton>
       ) : null}
       <VoiceRequestStatus operation={op} />
     </section>
+  );
+}
+
+function VoiceText({ text }: { text: string }) {
+  return (
+    <blockquote
+      className="max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs select-text"
+      style={{ fontFamily: 'var(--sniptale-font-document-sans)' }}
+      data-ui="video-editor.text-voice.text"
+    >
+      {text}
+    </blockquote>
   );
 }
 
@@ -132,7 +170,11 @@ function VoiceSourceControls({
 }) {
   const { loadModels, source } = op;
   const pauseTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
-  const locked = op.running || op.recording.session.isSaving || !!op.preview || !!op.consent;
+  const locked =
+    op.running ||
+    op.recording.session.isSaving ||
+    op.items.some((item) => !!item.preview) ||
+    !!op.consent;
   useEffect(() => {
     if (source === 'ai') void loadModels();
   }, [loadModels, source]);
@@ -160,7 +202,7 @@ function VoiceSourceControls({
           {translate('gallery.videoReview.speechReloadModels')}
         </InspectorActionButton>
       ) : null}
-      <VoiceRequest operation={op} hasText={hasText} />
+      {!op.batch ? <VoiceRequest operation={op} hasText={hasText} /> : null}
     </>
   ) : !op.preview ? (
     <AudioLibrarySelection
@@ -195,7 +237,7 @@ function VoicePlacement({
   const tracks = project.tracks.filter((track) => track.kind === 'AUDIO' && !track.locked);
   const track = tracks.find((entry) => entry.id === op.placement.trackId);
   const lanes = track?.logicalLanes ?? [{ id: 'line-1' }];
-  const locked = op.running || !!op.preview?.attachment?.receipt;
+  const locked = op.running || op.pendingApply || op.accepted;
   return (
     <fieldset disabled={locked} className="sniptale-parameter-stack min-w-0">
       <NumberInput
@@ -209,8 +251,9 @@ function VoicePlacement({
         disabled={locked}
         onChange={(start) => op.changePlacement({ ...op.placement, start })}
       />
-      <SelectField
+      <SegmentedRow
         label={translate('videoEditor.sidebar.textVoiceTrack')}
+        ariaLabel={translate('videoEditor.sidebar.textVoiceTrack')}
         value={op.placement.trackId ?? ''}
         options={[
           { value: '', label: translate('videoEditor.sidebar.textVoiceNewTrack') },
@@ -227,8 +270,9 @@ function VoicePlacement({
         }}
       />
       {track && lanes.length > 1 ? (
-        <SelectField
+        <SegmentedRow
           label={translate('videoEditor.sidebar.textVoiceLane')}
+          ariaLabel={translate('videoEditor.sidebar.textVoiceLane')}
           value={op.placement.timelineLaneId ?? 'line-1'}
           options={lanes.map((lane, index) => ({ value: lane.id, label: String(index + 1) }))}
           onChange={(timelineLaneId) => op.changePlacement({ ...op.placement, timelineLaneId })}
@@ -355,14 +399,20 @@ function VoiceRequest({
             </InspectorActionButton>
           </div>
         </div>
-      ) : !op.preview && !op.running ? (
+      ) : !op.running &&
+        !op.pendingApply &&
+        op.items.some((item) => item.selected && !item.preview && !item.accepted) ? (
         <InspectorActionButton
           disabled={!op.profile || !hasText}
           onClick={() => {
             void op.prepare();
           }}
         >
-          {translate('gallery.videoReview.speechGenerate')}
+          {translate(
+            op.batch
+              ? 'gallery.videoReview.speechGenerateSelected'
+              : 'gallery.videoReview.speechGenerate'
+          )}
         </InspectorActionButton>
       ) : null}
     </>
@@ -375,6 +425,11 @@ function VoiceRequestStatus({ operation: op }: { operation: VideoProjectTextVoic
         <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
           <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
           {translate('gallery.videoReview.speechWorking')}
+          {op.progress ? (
+            <span className="tabular-nums">
+              {op.progress.completed} / {op.progress.total}
+            </span>
+          ) : null}
           {!op.applying ? (
             <InspectorActionButton onClick={op.cancel}>
               {translate('common.actions.cancel')}

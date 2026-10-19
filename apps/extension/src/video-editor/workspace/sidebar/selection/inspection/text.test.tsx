@@ -11,6 +11,10 @@ import { createReviewCaptionSettings } from '../../../../../features/video/revie
 import { useVideoEditorStore } from '../../../../state/store';
 import { InspectProjectTextPanel } from './text';
 import {
+  useVideoProjectTextVoice,
+  type VideoProjectTextVoiceController,
+} from '../../../../runtime/session/text-voice';
+import {
   useVideoProjectTextRewrite,
   type VideoProjectTextRewriteController,
 } from '../../../../runtime/session/text-rewrite';
@@ -299,4 +303,47 @@ it('identifies document caption inheritance and retains complete phrase text on 
   expect(fragment().style).toEqual(createReviewCaptionSettings().style);
   act(() => header.click());
   expect(host.querySelector<HTMLButtonElement>('article > button')!.title).toBe(phrase);
+});
+
+let voiceOperation: VideoProjectTextVoiceController;
+function VoiceHarness({ visible = true }: { visible?: boolean }) {
+  const project = useVideoEditorStore((state) => state.project)!;
+  voiceOperation = useVideoProjectTextVoice(project);
+  return visible ? <InspectProjectTextPanel project={project} voice={voiceOperation} /> : null;
+}
+it('opens the selected speech scope without rewrite and restores the batch trigger on Back', async () => {
+  create();
+  type('First chosen phrase');
+  click('videoEditor.sidebar.newProjectText');
+  type('Second chosen phrase');
+  await act(async () => root.render(<VoiceHarness />));
+  click('gallery.videoReview.speechBatch');
+  const checks = host.querySelectorAll<HTMLInputElement>('article input[type="checkbox"]');
+  expect(checks).toHaveLength(2);
+  act(() => checks[0]!.click());
+  expect(host.textContent).toContain('Selected: 1');
+  click('gallery.videoReview.textFragmentSelectFound');
+  expect(host.textContent).toContain('Selected: 2');
+  click('gallery.videoReview.speechGenerateSelected');
+  expect(voiceOperation.batch).toBe(true);
+  expect(voiceOperation.items).toHaveLength(2);
+  expect(host.querySelector('[data-ui="video-editor.text-voice.batch"]')).not.toBeNull();
+  await act(async () => root.render(<VoiceHarness visible={false} />));
+  await act(async () => root.render(<VoiceHarness />));
+  await act(async () => click('gallery.videoReview.textVoiceBack'));
+  expect(voiceOperation.target).toBeNull();
+  expect(document.activeElement).toBe(host.querySelector('[data-project-text-voice="selected"]'));
+});
+
+it('restores the single voice trigger after remount and leaves its phrase collapsed', async () => {
+  create();
+  type('Single chosen phrase');
+  await act(async () => root.render(<VoiceHarness />));
+  const trigger = () => host.querySelector<HTMLButtonElement>('[data-project-text-voice]')!;
+  act(() => trigger().click());
+  await act(async () => root.render(<VoiceHarness visible={false} />));
+  await act(async () => root.render(<VoiceHarness />));
+  await act(async () => click('gallery.videoReview.textVoiceBack'));
+  expect(document.activeElement).toBe(trigger());
+  expect(host.querySelector('article > button')?.getAttribute('aria-expanded')).toBe('false');
 });

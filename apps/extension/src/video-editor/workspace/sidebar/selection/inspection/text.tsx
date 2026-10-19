@@ -25,12 +25,15 @@ export function InspectProjectTextPanel({
   voice?: VideoProjectTextVoiceController | undefined;
 }) {
   const editor = useProjectTextEditing(project);
-  const [choice, setChoice] = useState('');
+  const [choice, setChoice] = useState(voice?.target?.documentId ?? '');
   const [opened, setOpened] = useState('');
   const [created, setCreated] = useState('');
   const [limit, setLimit] = useState(50);
-  const [batch, setBatch] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
+  // A category remount restores the invoking scope from its still-mounted operation.
+  const [batch, setBatch] = useState(!!voice?.target && voice.batch);
+  const [selected, setSelected] = useState<string[]>(
+    () => voice?.items.map((item) => item.fragmentId) ?? []
+  );
   const focus = useTextRewriteFocus(voice?.target ?? rewrite?.target);
   const documents = project.textDocuments ?? [];
   const entry = documents.find((item) => item.id === choice) ?? documents[0];
@@ -46,22 +49,19 @@ export function InspectProjectTextPanel({
   };
   const targetEntry = documents.find((document) => document.id === rewrite?.target?.documentId);
   const add = () => {
-    const fragmentId = crypto.randomUUID();
-    const documentId = entry?.binding.kind === 'project' ? entry.id : crypto.randomUUID();
-    const accepted = editor.accept((current) =>
-      addVideoProjectManualText(current, {
-        documentId,
-        fragmentId,
-        start: editor.playback.time,
-        ...(entry?.binding.kind === 'project' ? { target: entry } : {}),
-      })
-    );
-    if (accepted) {
-      setChoice(documentId);
-      setOpened(fragmentId);
-      setCreated(fragmentId);
+    const added = createManualProjectText(editor, entry);
+    if (added) {
+      setChoice(added.documentId);
+      setOpened(added.fragmentId);
+      setCreated(added.fragmentId);
       setLimit(2_000);
     }
+  };
+  const openVoice = (ids: string | string[]) => {
+    if (!entry || !voice) return;
+    editor.endTyping();
+    focus.rememberTrigger(typeof ids === 'string' ? `voice:${ids}` : 'voice:selected');
+    voice.open(entry.id, ids);
   };
   return (
     <div ref={focus.surface} data-ui="video-editor.text.panel" className="min-w-0 space-y-3 pe-2">
@@ -70,7 +70,10 @@ export function InspectProjectTextPanel({
           project={project}
           operation={voice}
           onClose={() => {
-            if (voice.target) focus.rememberTrigger(`voice:${voice.target.fragmentId}`);
+            if (voice.target)
+              focus.rememberTrigger(
+                voice.batch ? 'voice:selected' : `voice:${voice.target.fragmentId}`
+              );
             focus.requestRestore();
             void voice.close();
           }}
@@ -109,14 +112,15 @@ export function InspectProjectTextPanel({
                 }}
               />
               <DocumentCaptions entry={entry} editor={editor} />
-              {rewrite ? (
+              {rewrite || voice ? (
                 <TextRewriteCommands
                   ids={entry.document.fragments.map((fragment) => fragment.id)}
                   selectedIds={selectedIds}
                   batch={batch}
                   onBatchChange={() => setBatch(!batch)}
                   onSelectedChange={setSelected}
-                  onRewrite={openRewrite}
+                  onRewrite={rewrite ? openRewrite : undefined}
+                  onVoice={voice ? () => openVoice(selectedIds) : undefined}
                 />
               ) : null}
               {!entry.document.fragments.length && (
@@ -134,11 +138,7 @@ export function InspectProjectTextPanel({
                   setCreated('');
                   setOpened(opened === id ? '' : id);
                 }}
-                onVoice={(id) => {
-                  editor.endTyping();
-                  focus.rememberTrigger(`voice:${id}`);
-                  voice?.open(entry.id, id);
-                }}
+                onVoice={openVoice}
                 onSelect={(id) =>
                   setSelected((current) =>
                     current.includes(id)
@@ -163,6 +163,24 @@ export function InspectProjectTextPanel({
       )}
     </div>
   );
+}
+
+/** Commit one manual phrase before publishing its editor selection. */
+function createManualProjectText(
+  editor: ReturnType<typeof useProjectTextEditing>,
+  entry: VideoProjectTextDocument | undefined
+) {
+  const fragmentId = crypto.randomUUID();
+  const documentId = entry?.binding.kind === 'project' ? entry.id : crypto.randomUUID();
+  const accepted = editor.accept((current) =>
+    addVideoProjectManualText(current, {
+      documentId,
+      fragmentId,
+      start: editor.playback.time,
+      ...(entry?.binding.kind === 'project' ? { target: entry } : {}),
+    })
+  );
+  return accepted ? { documentId, fragmentId } : null;
 }
 
 function ProjectTextDocumentChoice(props: {
@@ -199,18 +217,21 @@ function TextRewriteCommands(props: {
   batch: boolean;
   onBatchChange(): void;
   onSelectedChange(ids: string[]): void;
-  onRewrite(ids: string[], wholeDocument: boolean, source: string): void;
+  onRewrite?: ((ids: string[], wholeDocument: boolean, source: string) => void) | undefined;
+  onVoice?: (() => void) | undefined;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <InspectorActionButton
-        data-project-text-rewrite="all"
-        disabled={!props.ids.length}
-        onClick={() => props.onRewrite(props.ids, true, 'all')}
-      >
-        <WandSparkles size={14} aria-hidden="true" />
-        {translate('gallery.videoReview.textRewriteAll')}
-      </InspectorActionButton>
+      {props.onRewrite ? (
+        <InspectorActionButton
+          data-project-text-rewrite="all"
+          disabled={!props.ids.length}
+          onClick={() => props.onRewrite?.(props.ids, true, 'all')}
+        >
+          <WandSparkles size={14} aria-hidden="true" />
+          {translate('gallery.videoReview.textRewriteAll')}
+        </InspectorActionButton>
+      ) : null}
       <InspectorActionButton
         tone="toggle"
         active={props.batch}
@@ -233,13 +254,24 @@ function TextRewriteCommands(props: {
           <InspectorActionButton onClick={() => props.onSelectedChange([])}>
             {translate('gallery.videoReview.speechDeselectAll')}
           </InspectorActionButton>
-          <InspectorActionButton
-            data-project-text-rewrite="selected"
-            disabled={!props.selectedIds.length}
-            onClick={() => props.onRewrite(props.selectedIds, false, 'selected')}
-          >
-            {translate('gallery.videoReview.textRewriteSelected')}
-          </InspectorActionButton>
+          {props.onRewrite ? (
+            <InspectorActionButton
+              data-project-text-rewrite="selected"
+              disabled={!props.selectedIds.length}
+              onClick={() => props.onRewrite?.(props.selectedIds, false, 'selected')}
+            >
+              {translate('gallery.videoReview.textRewriteSelected')}
+            </InspectorActionButton>
+          ) : null}
+          {props.onVoice ? (
+            <InspectorActionButton
+              data-project-text-voice="selected"
+              disabled={!props.selectedIds.length}
+              onClick={props.onVoice}
+            >
+              {translate('gallery.videoReview.speechGenerateSelected')}
+            </InspectorActionButton>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -320,13 +352,11 @@ function ProjectTextPhrases(props: {
           focus={props.created === fragment.id}
           onToggle={() => props.onToggle(fragment.id)}
           {...(props.voice ? { onVoice: () => props.onVoice(fragment.id) } : {})}
+          batch={props.batch}
+          selected={props.selected.includes(fragment.id)}
+          onSelect={() => props.onSelect(fragment.id)}
           {...(props.rewrite
-            ? {
-                onRewrite: () => props.onRewrite([fragment.id], false, fragment.id),
-                batch: props.batch,
-                selected: props.selected.includes(fragment.id),
-                onSelect: () => props.onSelect(fragment.id),
-              }
+            ? { onRewrite: () => props.onRewrite([fragment.id], false, fragment.id) }
             : {})}
         />
       ))}

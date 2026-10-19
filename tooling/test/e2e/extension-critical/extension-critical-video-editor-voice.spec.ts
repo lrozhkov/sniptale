@@ -745,3 +745,291 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
     });
   }
 }
+
+async function holdSecondBatchRequest(page: Page) {
+  await page.evaluate(() => {
+    const connect = chrome.runtime.connect.bind(chrome.runtime);
+    let starts = 0;
+    Reflect.set(window, 'batchSpeechStarts', 0);
+    Object.assign(chrome.runtime, {
+      connect: (options: { name?: string } = {}) => {
+        const port = connect(options);
+        const post = port.postMessage.bind(port);
+        port.postMessage = (message: unknown) => {
+          if (
+            typeof message === 'object' &&
+            message !== null &&
+            Reflect.get(message, 'type') === 'start' &&
+            Reflect.get(message, 'operation') === 'speech'
+          ) {
+            Reflect.set(window, 'batchSpeechStarts', ++starts);
+            if (starts === 2) return;
+          }
+          post(message);
+        };
+        return port;
+      },
+    });
+  });
+}
+async function checkBatchTextFont(page: Page, element: Locator) {
+  await element.scrollIntoViewIfNeeded();
+  await element.evaluate((node) => node.setAttribute('data-batch-text-font', 'true'));
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('DOM.enable');
+    await session.send('CSS.enable');
+    const { root } = await session.send('DOM.getDocument');
+    const { nodeId } = await session.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: '[data-batch-text-font]',
+    });
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    const family = await element.evaluate((node) => getComputedStyle(node).fontFamily);
+    expect(
+      fonts.some(
+        (font) => font.isCustomFont && font.familyName === 'Golos Text VF' && font.glyphCount > 0
+      ),
+      JSON.stringify({ fonts, family })
+    ).toBe(true);
+  } finally {
+    await session.detach();
+    await element.evaluate((node) => node.removeAttribute('data-batch-text-font'));
+  }
+}
+for (const variant of [
+  { size: PRIMARY_BROWSER_VIEWPORTS[0].size, locale: 'en', theme: 'dark' },
+  { size: PRIMARY_BROWSER_VIEWPORTS[1].size, locale: 'ru', theme: 'light' },
+] as const) {
+  test(`Montage batch voice inspector ${variant.size.width} ${variant.locale}`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ ...variant.size });
+    await page.emulateMedia({ colorScheme: variant.theme });
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    const phrases = ['Batch first overflow. Привет, мир!', 'Batch second. Łukasz 中文'];
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+        runtimeResponses: { AI_SETTINGS_QUERY: textModelResponse },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.goto(
+        `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?id=beta-v1-recording&theme=${variant.theme}`
+      );
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await installSpeechPortFixture(page);
+      await holdSecondBatchRequest(page);
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.sceneProperties'),
+          exact: true,
+        })
+      );
+      const category = page.getByRole('button', {
+        name: label('videoEditor.sidebar.textDocuments'),
+        exact: true,
+      });
+      await operate(category);
+      const text = page.locator('[data-ui="video-editor.text.panel"]');
+      for (const phrase of phrases) {
+        await operate(
+          text.getByRole('button', {
+            name: label('videoEditor.sidebar.newProjectText'),
+            exact: true,
+          })
+        );
+        const editor = text.getByRole('textbox', {
+          name: label('gallery.videoReview.speechText'),
+          exact: true,
+        });
+        await editor.fill(phrase);
+        await editor.press('Tab');
+        const end = text.getByRole('textbox', {
+          name: label('gallery.videoReview.textFragmentEnd'),
+          exact: true,
+        });
+        await end.fill('1');
+        await end.press('Tab');
+      }
+      await expect
+        .poll(async () =>
+          (await readProject(page))?.textDocuments?.[0]?.document.fragments.map((item) => item.text)
+        )
+        .toEqual(phrases);
+      const before = await readProject(page);
+      await operate(
+        text.getByRole('button', { name: label('gallery.videoReview.speechBatch'), exact: true })
+      );
+      await operate(
+        text.getByRole('button', {
+          name: label('gallery.videoReview.textFragmentSelectFound'),
+          exact: true,
+        })
+      );
+      await operate(text.locator('[data-project-text-voice="selected"]'));
+      const voice = page.locator('[data-ui="video-editor.text-voice.panel"]');
+      const scope = voice.locator('[data-ui="video-editor.text-voice.batch"]');
+      await expect(scope.locator('[data-project-voice-take]')).toHaveCount(2);
+      await voice.locator('.sniptale-ai-model-selector-trigger').click();
+      await page.getByRole('button', { name: 'Fixture speech', exact: true }).click();
+      await chooseInspectorValue(page, voice, label('gallery.videoReview.speechFormat'), 'WAV');
+      const generate = voice.getByRole('button', {
+        name: label('gallery.videoReview.speechGenerateSelected'),
+        exact: true,
+      });
+      await operate(generate);
+      for (const phrase of phrases) await expect(scope).toContainText(phrase);
+      expect(await countRequests(page)).toBe(0);
+      await scope.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('batch-consent.png'), fullPage: false });
+      const approve = () =>
+        operate(
+          voice.getByRole('button', {
+            name: label('gallery.videoReview.speechConsentContinue'),
+            exact: true,
+          })
+        );
+      await approve();
+      await expect
+        .poll(() => page.evaluate(() => Reflect.get(window, 'batchSpeechStarts')))
+        .toBe(2);
+      await expect(voice.getByRole('status')).toContainText('1 / 2');
+      await expect(voice.locator('audio')).toHaveCount(1);
+      await voice.getByRole('status').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('batch-partial.png'), fullPage: false });
+      await operate(
+        voice.getByRole('button', { name: label('common.actions.cancel'), exact: true })
+      );
+      await expect(generate).toBeEnabled();
+      await operate(generate);
+      await expect(scope).toContainText(phrases[1]!);
+      await expect(scope).not.toContainText(phrases[0]!);
+      expect(await countRequests(page)).toBe(1);
+      await approve();
+      await expect.poll(() => countRequests(page)).toBe(2);
+      await expect(generate).toHaveCount(0);
+      const rows = scope.locator('[data-project-voice-take]');
+      await expect(rows).toHaveCount(2);
+      const position = voice.getByRole('textbox', {
+        name: label('videoEditor.sidebar.textVoicePosition'),
+        exact: true,
+      });
+      for (let index = 0; index < phrases.length; index++) {
+        await operate(rows.nth(index).getByRole('button'));
+        await expect
+          .poll(() => voice.locator('audio').evaluate((node) => node.duration))
+          .toBe(index === 0 ? 3 : 1);
+        await operate(
+          voice.getByRole('button', {
+            name: label('gallery.videoReview.speechPreview'),
+            exact: true,
+          })
+        );
+        await expect.poll(() => voice.locator('audio').evaluate((node) => node.paused)).toBe(false);
+        await operate(
+          voice.getByRole('button', {
+            name: label('videoEditor.sidebar.textVoiceStop'),
+            exact: true,
+          })
+        );
+        await position.fill(String(index === 0 ? 6 : 20));
+        await position.press('Tab');
+      }
+      await checkBatchTextFont(page, rows.first().locator('[data-project-voice-text]'));
+      await checkBatchTextFont(page, voice.locator('[data-ui="video-editor.text-voice.text"]'));
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupCanvas'),
+          exact: true,
+        })
+      );
+      await operate(category);
+      await expect(position).toHaveValue('20');
+      if (variant.locale === 'ru')
+        await verifyVoiceLayout(page, voice, (name) => info.outputPath(`batch-${name}`));
+      await refuseTakeSave(page);
+      await operate(
+        voice.getByRole('button', {
+          name: label('gallery.videoReview.speechApplySelected'),
+          exact: true,
+        })
+      );
+      const retry = voice.getByRole('button', {
+        name: label('gallery.videoReview.speechRetrySave'),
+        exact: true,
+      });
+      await expect(retry).toBeEnabled();
+      await expect(position).toBeDisabled();
+      await expect(rows.locator('input[type=checkbox]').first()).toBeDisabled();
+      await page.keyboard.press('Escape');
+      await retry.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('batch-save-retry.png'), fullPage: false });
+      await page.evaluate(() => {
+        const allow: unknown = Reflect.get(window, 'allowVoiceSave');
+        if (typeof allow !== 'function') throw new Error('Missing Save fixture');
+        allow();
+      });
+      await operate(retry);
+      await expect(voice).toContainText(label('videoEditor.sidebar.textVoiceSaved'));
+      const accepted = await readProject(page);
+      const takes = accepted?.clips.filter((clip) => clip.type === 'AUDIO' && clip.textSnapshot);
+      expect(takes?.map((clip) => [clip.startTime, clip.duration])).toEqual([
+        [6, 3],
+        [20, 1],
+      ]);
+      expect(new Set(takes?.map((clip) => clip.trackId)).size).toBe(2);
+      expect(accepted?.clips.filter((clip) => !takes?.some((take) => take.id === clip.id))).toEqual(
+        before?.clips
+      );
+      expect(await countRequests(page)).toBe(2);
+      await page.screenshot({ path: info.outputPath('batch-accepted.png'), fullPage: false });
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect
+        .poll(
+          async () =>
+            (await readProject(page))?.clips.filter(
+              (clip) => clip.type === 'AUDIO' && clip.textSnapshot
+            ).length
+        )
+        .toBe(0);
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+      await expect
+        .poll(async () =>
+          (await readProject(page))?.clips
+            .filter((clip) => clip.type === 'AUDIO' && clip.textSnapshot)
+            .map((clip) => clip.id)
+        )
+        .toEqual(takes?.map((clip) => clip.id));
+      await operate(
+        voice.getByRole('button', { name: label('gallery.videoReview.textVoiceBack'), exact: true })
+      );
+      await expect(text.locator('[data-project-text-voice="selected"]')).toBeFocused();
+      await page.setViewportSize({ width: 1200, height: 560 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+      await page.setViewportSize({ ...variant.size });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      expect(
+        (await readProject(page))?.clips.filter((clip) =>
+          takes?.some((take) => take.id === clip.id)
+        )
+      ).toEqual(takes);
+      expect(errors).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

@@ -380,19 +380,23 @@ it('previews and stops speech, selects an existing lane and cancels consent with
   const audio = host.querySelector('audio')!;
   await act(async () => audio.dispatchEvent(new Event('error')));
   expect(host.textContent).toContain(translate('videoEditor.sidebar.textVoiceAuditionFailed'));
-  await click('videoEditor.sidebar.textVoiceTrack');
-  await act(async () =>
-    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      .find((entry) => entry.textContent?.includes('Voice lane'))!
-      .click()
-  );
+  await act(async () => {
+    const choice = host.querySelector<HTMLElement>(
+      `[role="group"][aria-label="${translate('videoEditor.sidebar.textVoiceTrack')}"]`
+    )!;
+    [...choice.querySelectorAll<HTMLButtonElement>('button')]
+      .find((entry) => entry.textContent === 'Voice lane')!
+      .click();
+  });
   expect(operation.placement.trackId).toBe('audio');
-  await click('videoEditor.sidebar.textVoiceLane');
-  await act(async () =>
-    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      .find((entry) => entry.textContent?.trim() === '2')!
-      .click()
-  );
+  await act(async () => {
+    const choice = host.querySelector<HTMLElement>(
+      `[role="group"][aria-label="${translate('videoEditor.sidebar.textVoiceLane')}"]`
+    )!;
+    [...choice.querySelectorAll<HTMLButtonElement>('button')]
+      .find((entry) => entry.textContent === '2')!
+      .click();
+  });
   expect(operation.placement.timelineLaneId).toBe('alternate');
   await act(async () => operation.apply());
   expect(durable.clips[0]).toMatchObject({
@@ -556,4 +560,206 @@ it('records a microphone take through the mounted panel and accepts it with the 
   });
   await act(async () => operation.close());
   expect(operation.target).toBeNull();
+});
+
+async function mountBatch(count = 2) {
+  const project = structuredClone(useVideoEditorStore.getState().project!);
+  const fragments = project.textDocuments![0]!.document.fragments;
+  for (let index = 1; index < count; index++)
+    fragments.push({
+      ...fragments[0]!,
+      id: `phrase-${index}`,
+      text: `Independent phrase ${index}`,
+      start: index * 2 + 1,
+      end: index * 2 + 2,
+    });
+  act(() => useVideoEditorStore.getState().setProject(project));
+  let urls = 0;
+  vi.mocked(URL.createObjectURL).mockImplementation(() => `blob:batch-${++urls}`);
+  vi.mocked(runReviewSpeechJob).mockImplementation(async (request) => {
+    if (request.operation !== 'speech' || !('phraseId' in request)) throw new Error('fixture');
+    return {
+      type: 'audio',
+      staged: { id: `staged-${request.phraseId}`, size: 4, mimeType: 'audio/mpeg' },
+    };
+  });
+  await act(async () => root.render(<Harness />));
+  await act(async () => operation.loadModels());
+  await act(async () =>
+    operation.open(
+      'script',
+      fragments.map((entry) => entry.id)
+    )
+  );
+}
+it('accepts selected full takes as one frozen batch and retries Save without duplicate history', async () => {
+  await mountBatch();
+  vi.mocked(decodeReviewSpeechDuration).mockResolvedValueOnce(12).mockResolvedValueOnce(9);
+  await act(async () => operation.prepare());
+  expect(operation.consent?.queue.items.map((item) => item.capture.basis.fragment.text)).toEqual([
+    'Speak this',
+    'Independent phrase 1',
+  ]);
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  await act(async () => operation.start());
+  expect(operation.items.map((item) => item.preview?.duration)).toEqual([12, 9]);
+  expect(operation.progress).toEqual({ completed: 2, total: 2 });
+  await act(async () => operation.changePlacement({ start: 6 }));
+  await act(async () => operation.focusItem('script', 'phrase-1'));
+  await act(async () => operation.changePlacement({ start: 20 }));
+  const previews = operation.items.map((item) => item.preview);
+  await act(async () => root.render(<Harness visible={false} />));
+  expect(operation.items.map((item) => item.preview)).toEqual(previews);
+  await act(async () => root.render(<Harness />));
+  const save = vi.mocked(waitForVideoEditorSave).getMockImplementation()!;
+  vi.mocked(waitForVideoEditorSave).mockImplementation(async (...args) => {
+    if (useVideoEditorStore.getState().project!.clips.some((clip) => 'textSnapshot' in clip))
+      throw new Error('write-conflict');
+    await save(...args);
+  });
+  await act(async () => operation.apply());
+  expect(operation.error).toBe('storage-failed');
+  expect(operation.pendingApply).toBe(true);
+  const clips = useVideoEditorStore.getState().project!.clips;
+  expect(clips).toHaveLength(2);
+  expect(clips.map((clip) => [clip.startTime, clip.duration])).toEqual([
+    [6, 12],
+    [20, 9],
+  ]);
+  expect(new Set(clips.map((clip) => clip.trackId)).size).toBe(2);
+  await act(async () => {
+    operation.changePlacement({ start: 50 });
+    operation.toggleItem('script', 'phrase');
+  });
+  expect(operation.placement.start).toBe(20);
+  expect(operation.items.every((item) => item.selected)).toBe(true);
+  const position = host.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('videoEditor.sidebar.textVoicePosition')}"]`
+  )!;
+  expect(position.disabled).toBe(true);
+  vi.mocked(waitForVideoEditorSave).mockImplementation(save);
+  await act(async () => operation.apply());
+  expect(operation.items.every((item) => item.accepted)).toBe(true);
+  expect(operation.items.some((item) => item.selected)).toBe(false);
+  expect(operation.pendingApply).toBe(false);
+  expect(durable.clips.map((clip) => clip.id)).toEqual(clips.map((clip) => clip.id));
+  expect(durable.duration).toBe(29);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
+  expect(prepareProjectAsset).toHaveBeenCalledTimes(2);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(0);
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(2);
+  await act(async () => operation.close());
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+it('retains the ready take on cancel and admits only an explicitly approved unfinished retry', async () => {
+  await mountBatch();
+  const entered = gate<void>();
+  const late = gate<Awaited<ReturnType<typeof runReviewSpeechJob>>>();
+  const request = vi.mocked(runReviewSpeechJob).getMockImplementation()!;
+  vi.mocked(runReviewSpeechJob).mockImplementation(async (...args) => {
+    if (vi.mocked(runReviewSpeechJob).mock.calls.length === 2) {
+      entered.resolve();
+      return late.promise;
+    }
+    return request(...args);
+  });
+  await act(async () => operation.prepare());
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = operation.start();
+    await entered.promise;
+  });
+  const first = operation.items[0]!.preview;
+  expect(first).not.toBeNull();
+  expect(operation.progress).toEqual({ completed: 1, total: 2 });
+  await act(async () => operation.cancel());
+  await pending;
+  await act(async () => operation.prepare());
+  expect(operation.consent?.queue.items.map((item) => item.fragmentId)).toEqual(['phrase-1']);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(2);
+  await act(async () => operation.start());
+  expect(operation.items[0]!.preview).toBe(first);
+  expect(operation.items[1]!.preview).not.toBeNull();
+  await act(async () =>
+    late.resolve({ type: 'audio', staged: { id: 'late-old', size: 4, mimeType: 'audio/mpeg' } })
+  );
+  await vi.waitFor(() =>
+    expect(discardAudioStaging).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'late-old' }),
+      expect.anything()
+    )
+  );
+  expect(operation.items[0]!.preview).toBe(first);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+});
+it('continues after a failed phrase and requires fresh consent for unfinished text', async () => {
+  await mountBatch(3);
+  const request = vi.mocked(runReviewSpeechJob).getMockImplementation()!;
+  vi.mocked(runReviewSpeechJob).mockImplementation(async (...args) => {
+    if (vi.mocked(runReviewSpeechJob).mock.calls.length === 2) throw new Error('interrupted');
+    return request(...args);
+  });
+  await act(async () => operation.prepare());
+  await act(async () => operation.start());
+  expect(operation.items.map((item) => !!item.preview)).toEqual([true, false, true]);
+  expect(operation.progress).toEqual({ completed: 3, total: 3 });
+  expect(operation.error).toBe('failed');
+  await act(async () => operation.prepare());
+  expect(operation.consent?.queue.items.map((item) => item.fragmentId)).toEqual(['phrase-1']);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
+  await act(async () => operation.start());
+  expect(operation.items.every((item) => item.preview)).toBe(true);
+  expect(runReviewSpeechJob).toHaveBeenCalledTimes(4);
+});
+it('keeps a one-item batch invocation in AI mode and does not accept an empty scope', async () => {
+  await act(async () => root.render(<Harness />));
+  await act(async () => operation.loadModels());
+  await act(async () => operation.open('script', []));
+  expect(operation.target).toBeNull();
+  await act(async () => operation.open('script', ['phrase']));
+  expect(operation.batch).toBe(true);
+  await act(async () => operation.changeSource('microphone'));
+  expect(operation.source).toBe('ai');
+  expect(host.querySelector('[data-ui="video-editor.text-voice.batch"]')).not.toBeNull();
+});
+
+it('allows correcting a refused batch destination after complete pre-insertion cleanup', async () => {
+  await mountBatch();
+  act(() =>
+    useVideoEditorStore.getState().updateProject((project) => ({
+      ...project,
+      tracks: [
+        ...project.tracks,
+        {
+          id: 'voice-line',
+          name: 'Voice',
+          order: 1,
+          kind: 'AUDIO',
+          locked: false,
+          visible: true,
+          logicalLanes: [{ id: 'line-1' }],
+        },
+      ],
+    }))
+  );
+  await act(async () => operation.prepare());
+  await act(async () => operation.start());
+  const placement = { start: 0, trackId: 'voice-line', timelineLaneId: 'line-1' };
+  await act(async () => operation.changePlacement(placement));
+  await act(async () => operation.focusItem('script', 'phrase-1'));
+  await act(async () => operation.changePlacement(placement));
+  await act(async () => operation.apply());
+  expect(operation.error).toBe('selection');
+  expect(operation.pendingApply).toBe(false);
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(0);
+  await act(async () => operation.changePlacement({ ...placement, start: 12 }));
+  await act(async () => operation.apply());
+  expect(operation.items.every((item) => item.accepted)).toBe(true);
+  expect(operation.items.some((item) => item.selected)).toBe(false);
+  expect(durable.clips.map((clip) => clip.startTime)).toEqual([0, 12]);
 });
