@@ -46,6 +46,7 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       copyElement: vi.fn(async () => true),
       copyPath: vi.fn(async () => undefined),
       delete: vi.fn(),
+      text: { edit: vi.fn(), reset: vi.fn() },
       resetValue: vi.fn(),
       selectAction: vi.fn(),
       setSettingsOpen: vi.fn(),
@@ -70,6 +71,7 @@ function createController(): ReturnType<typeof useDesignReviewController> {
       defaultValues: {},
       draftPatch: { declarations: [] },
       modifiedProperties: [],
+      text: { editable: true, modified: false, preview: 'Heading', resettable: false },
       selection: {
         domPath: 'html > body > button',
         element,

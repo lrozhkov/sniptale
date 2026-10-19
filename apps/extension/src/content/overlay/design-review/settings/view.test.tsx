@@ -20,6 +20,7 @@ const actions: DesignReviewActions = {
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -36,6 +37,7 @@ const state: DesignReviewViewState = {
   defaultValues: { color: 'rgb(0, 0, 0)', height: '40px', width: '120px' },
   draftPatch: { declarations: [] },
   modifiedProperties: [],
+  text: { editable: true, modified: false, preview: 'Heading', resettable: false },
   selection: {
     domPath: 'html > body > main > h1:nth-of-type(1)',
     element: document.createElement('h1'),

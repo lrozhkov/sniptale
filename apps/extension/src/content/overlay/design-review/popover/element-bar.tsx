@@ -1,9 +1,10 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Check, ClipboardCopy, Pencil, Trash2 } from 'lucide-react';
+import { Check, ClipboardCopy, Pencil, RotateCcw, TextCursorInput, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
 import { describeDesignReviewElement } from './element-label';
+import type { DesignReviewTextViewState } from '../types';
 
 function useElementCopyFeedback(element: Element | undefined, copy: () => Promise<boolean>) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'copied'>('idle');
@@ -49,8 +50,11 @@ export function DesignReviewElementBar(props: {
   onCopyPath: () => void;
   onDeleteRequest: () => void;
   onSettingsOpenChange: (open: boolean) => void;
+  onEditText: () => void;
+  onResetText: () => void;
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
+  text: DesignReviewTextViewState;
 }) {
   const selection = props.selection;
   const copy = useElementCopyFeedback(selection?.element, props.onCopyElement);
@@ -71,9 +75,27 @@ export function DesignReviewElementBar(props: {
       >
         {selection.tagName.toUpperCase()}
       </span>
-      <strong className="max-w-32 truncate text-xs">
-        {selection.textPreview || selection.tagName}
+      <strong
+        className="max-w-32 truncate text-xs"
+        data-ui="content.design-review.element-text"
+        title={props.text.modified ? translate('content.designReview.textModified') : undefined}
+      >
+        {props.text.preview || selection.tagName}
       </strong>
+      {props.text.modified ? (
+        <ContentToolbarButton
+          tone="utility"
+          type="button"
+          className="!h-6 !w-6 shrink-0 !p-0"
+          dataUi="content.design-review.reset-text"
+          disabled={!props.text.resettable}
+          aria-label={translate('content.designReview.resetText')}
+          title={translate('content.designReview.resetText')}
+          onClick={props.onResetText}
+        >
+          <RotateCcw size={12} />
+        </ContentToolbarButton>
+      ) : null}
       <button
         type="button"
         className={[
@@ -100,6 +122,13 @@ export function DesignReviewElementBar(props: {
       <span className="sr-only" role="status">
         {copy.status === 'copied' ? translate('content.designReview.elementCopied') : ''}
       </span>
+      <ElementActionButton
+        disabled={!props.text.editable}
+        label={translate('content.designReview.editText')}
+        onClick={props.onEditText}
+      >
+        <TextCursorInput size={16} />
+      </ElementActionButton>
       <ElementActionButton
         active={props.settingsOpen}
         expanded={props.settingsOpen}

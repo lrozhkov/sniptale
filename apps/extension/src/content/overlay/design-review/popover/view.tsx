@@ -222,6 +222,9 @@ export function DesignReviewPopover(props: {
             hasFeedback={props.state.comment.marker !== null}
             onCopyElement={props.actions.copyElement}
             onCopyPath={() => void props.actions.copyPath()}
+            onEditText={props.actions.text.edit}
+            onResetText={props.actions.text.reset}
+            text={props.state.text}
             onDeleteRequest={() => {
               props.actions.setSettingsOpen(false);
               view.setDeleteRequested((requested) => !requested);

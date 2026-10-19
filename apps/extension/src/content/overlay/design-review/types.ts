@@ -15,6 +15,7 @@ export interface DesignReviewViewState {
   modifiedProperties: PageStyleProperty[];
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
+  text: DesignReviewTextViewState;
   sideFieldLinks?: Record<string, boolean>;
   values: PageStyleDeclarationValueMap;
   voice: DesignReviewCommentVoiceViewState;
@@ -36,9 +37,17 @@ export interface DesignReviewActions {
   selectAction: (action: BrowserDesignReviewAction) => void;
   setSideFieldLinked?: (fieldKey: string, linked: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  text: { edit: () => void; reset: () => void };
   updateValue: (property: PageStyleProperty, value: string) => void;
   updateValues: (updates: Array<{ property: PageStyleProperty; value: string }>) => void;
   voice: DesignReviewCommentVoiceActions;
+}
+
+export interface DesignReviewTextViewState {
+  editable: boolean;
+  modified: boolean;
+  preview: string;
+  resettable: boolean;
 }
 
 interface DesignReviewCommentActions {

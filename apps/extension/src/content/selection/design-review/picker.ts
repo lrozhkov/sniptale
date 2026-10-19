@@ -34,6 +34,7 @@ export interface DesignReviewSelection {
 }
 
 export interface DesignReviewPickerRuntime {
+  setTextEditing: (editing: boolean) => void;
   setMeasurementsEnabled: (enabled: boolean) => void;
   setMeasurementsExpanded: (expanded: boolean) => void;
   dismissSelection: () => void;
@@ -48,6 +49,7 @@ interface DesignReviewPickerArgs {
 }
 
 interface DesignReviewPickerInteractionState {
+  editingText: boolean;
   framedElement: Element | null;
   inspectorPointerGestureStarted: boolean;
   selectedElement: Element | null;
@@ -110,7 +112,7 @@ function claimPageClick(event: MouseEvent): void {
 }
 
 function refreshPickerFrame(state: DesignReviewPickerInteractionState): void {
-  if (state.framedElement?.isConnected) {
+  if (!state.editingText && state.framedElement?.isConnected) {
     showDesignReviewFrame(state.framedElement);
   } else {
     hideDesignReviewFrame();
@@ -229,15 +231,17 @@ function handleInaccessibleIframeSelection(
 /** Owns trusted page picking for the active Design Review mode. */
 export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignReviewPickerRuntime {
   const state: DesignReviewPickerInteractionState = {
+    editingText: false,
     framedElement: null,
     inspectorPointerGestureStarted: false,
     selectedElement: null,
   };
   const measurements = createDesignReviewMeasurements();
-  const cleanupCursor = mountDesignReviewCursor();
+  let cleanupCursor = mountDesignReviewCursor();
   const cleanupMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mousemove',
     (event, iframe) => {
+      if (state.editingText) return;
       handlePickerMouseMove(state, event, iframe);
       if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
         measurements.hover(state.selectedElement ?? resolveSelectablePageElement(event, iframe));
@@ -247,6 +251,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupLeave = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mouseleave',
     () => {
+      if (state.editingText) return;
       handlePickerMouseLeave(state);
       measurements.hover(state.selectedElement);
     },
@@ -255,6 +260,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'click',
     (event, iframe) => {
+      if (state.editingText) return;
       handlePickerClick(state, args, event, iframe);
       if (isTrustedMouseEvent(event)) measurements.hover(state.selectedElement);
     },
@@ -262,7 +268,9 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   );
   const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
     'pointerdown',
-    (event) => handlePickerPointerDown(state, event),
+    (event) => {
+      if (!state.editingText) handlePickerPointerDown(state, event);
+    },
     { capture: true }
   );
   const cleanupScroll = addEventListenerToAllWindowsDynamic<Event>(
@@ -276,6 +284,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupKeydown = addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
     (event) => {
+      if (state.editingText) return;
       if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
@@ -301,11 +310,21 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     { capture: true }
   );
   const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
+    if (state.editingText) return;
     handleInaccessibleIframeSelection(state, args, iframe);
     measurements.hover(state.selectedElement);
   });
 
   return {
+    setTextEditing: (editing) => {
+      if (state.editingText === editing) return;
+      state.editingText = editing;
+      state.inspectorPointerGestureStarted = false;
+      cleanupCursor();
+      cleanupCursor = editing ? () => undefined : mountDesignReviewCursor();
+      measurements.hover(editing ? null : state.selectedElement);
+      refreshPickerFrame(state);
+    },
     dismissSelection: () => {
       dismissPickerSelection(state);
       measurements.hover(null);

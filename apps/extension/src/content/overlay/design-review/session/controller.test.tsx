@@ -7,6 +7,10 @@ import type { PageStyleSelectionSnapshot } from '../../../selection/design-revie
 
 const controllerMocks = vi.hoisted(() => ({
   closeComment: vi.fn(() => true),
+  canEditText: vi.fn(() => true),
+  canResetText: vi.fn(() => false),
+  editText: vi.fn(() => true),
+  resetText: vi.fn(() => true),
   dismissSelection: vi.fn(),
   dismissRequestHandler: null as (() => boolean) | null,
   registerDismissRequestHandler: vi.fn((handler: () => boolean) => {
@@ -33,10 +37,15 @@ const selection: PageStyleSelectionSnapshot = {
 };
 const designReviewModeState = {
   enabled: true,
+  editingText: false,
   selection: { anchor: { x: 20, y: 30 }, snapshot: selection },
 };
 
 vi.mock('../../../selection/design-review', () => ({
+  canEditDesignReviewText: controllerMocks.canEditText,
+  canResetDesignReviewText: controllerMocks.canResetText,
+  startDesignReviewTextEditing: controllerMocks.editText,
+  resetDesignReviewText: controllerMocks.resetText,
   DesignReviewModeState: undefined,
   disableDesignReviewMode: vi.fn(),
   dismissDesignReviewSelection: controllerMocks.dismissSelection,
@@ -121,6 +130,8 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   controllerMocks.closeComment.mockReturnValue(true);
   controllerMocks.voiceActive = false;
+  designReviewModeState.editingText = false;
+  target.textContent = 'Save';
   host = document.createElement('div');
   document.body.append(host, target);
   root = createRoot(host);
@@ -146,6 +157,32 @@ it('autosaves and closes the inspector through the picker outside-dismiss reques
   expect(controllerMocks.stopVoiceInput).toHaveBeenCalledTimes(2);
   expect(controllerMocks.dismissSelection).toHaveBeenCalledOnce();
   expect(latest?.inspectorOpen).toBe(false);
+});
+
+it('finishes the comment before text editing and hides only the inspector during input', async () => {
+  act(() => latest?.actions.text.edit());
+  expect(controllerMocks.editText).toHaveBeenCalledOnce();
+  expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
+  designReviewModeState.editingText = true;
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(false);
+  expect(latest?.enabled).toBe(true);
+  target.textContent = 'Changed';
+  designReviewModeState.editingText = false;
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(true);
+  expect(latest?.viewState.text.preview).toBe('Changed');
+});
+
+it('preserves a failed comment draft before either text action', () => {
+  controllerMocks.closeComment.mockReturnValue(false);
+  act(() => {
+    latest?.actions.text.edit();
+    latest?.actions.text.reset();
+  });
+  expect(controllerMocks.editText).not.toHaveBeenCalled();
+  expect(controllerMocks.resetText).not.toHaveBeenCalled();
+  expect(latest?.inspectorOpen).toBe(true);
 });
 
 it('keeps the inspector open and selected when automatic save fails', () => {

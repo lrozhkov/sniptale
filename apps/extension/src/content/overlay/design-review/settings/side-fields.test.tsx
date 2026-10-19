@@ -17,6 +17,7 @@ function createState(values: DesignReviewViewState['values']): DesignReviewViewS
     defaultValues: { ...values },
     draftPatch: { declarations: [] },
     modifiedProperties: [],
+    text: { editable: true, modified: false, preview: 'Heading', resettable: false },
     selection: null,
     settingsOpen: true,
     values,

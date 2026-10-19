@@ -11,9 +11,13 @@ import type { BrowserDesignReviewAction } from '../../../parser/page-preparation
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
   dismissDesignReviewSelection,
+  canEditDesignReviewText,
+  canResetDesignReviewText,
   getDesignReviewModeState,
   openDesignReviewTarget,
   registerDesignReviewInspectorDismissRequestHandler,
+  resetDesignReviewText,
+  startDesignReviewTextEditing,
   subscribeToDesignReviewMode,
 } from '../../../selection/design-review';
 import { usePageStyleDraftState } from './draft';
@@ -26,9 +30,42 @@ import {
   serializeDesignReviewRecord,
 } from '../runtime/record';
 import { copyDesignReviewText } from './clipboard';
+import { flushPendingPageStyleHistory } from '../runtime/actions';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../../platform/i18n';
 
 interface UseDesignReviewControllerParams {
   enabled: boolean;
+}
+
+function createDesignReviewTextActions(args: {
+  target: Element | null;
+  closeComment(): boolean;
+  stopVoiceInput(): void;
+  setSettingsOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  return {
+    edit: () => {
+      if (!args.target || !args.closeComment()) return;
+      args.stopVoiceInput();
+      try {
+        flushPendingPageStyleHistory();
+        if (startDesignReviewTextEditing()) args.setSettingsOpen(false);
+      } catch {
+        showToast(translate('content.designReview.textEditFailed'), 'error');
+      }
+    },
+    reset: () => {
+      if (!args.target || !args.closeComment()) return;
+      args.stopVoiceInput();
+      try {
+        flushPendingPageStyleHistory();
+        resetDesignReviewText(args.target);
+      } catch {
+        showToast(translate('content.designReview.textResetFailed'), 'error');
+      }
+    },
+  };
 }
 
 function useDesignReviewPopoverDismissal(args: {
@@ -150,6 +187,12 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
         }
       },
       setSettingsOpen,
+      text: createDesignReviewTextActions({
+        target: selection?.element ?? null,
+        closeComment,
+        stopVoiceInput,
+        setSettingsOpen,
+      }),
       setSideFieldLinked: draftState.setSideFieldLinked,
       updateValue: valueActions.updateValue,
       updateValues: valueActions.updateValues,
@@ -158,7 +201,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
         stop: stopVoiceInput,
       },
     },
-    inspectorOpen: popoverOpen,
+    inspectorOpen: popoverOpen && !modeState.editingText,
     enabled: params.enabled && modeState.enabled,
     panel: {
       close: () => setPanelOpen(false),
@@ -175,6 +218,12 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       modifiedProperties: draftState.modifiedProperties,
       selection,
       settingsOpen,
+      text: {
+        editable: Boolean(selection && canEditDesignReviewText(selection.element)),
+        modified: Boolean(record?.textChange),
+        preview: selection?.element.textContent?.trim().slice(0, 80) ?? '',
+        resettable: Boolean(selection && canResetDesignReviewText(selection.element)),
+      },
       sideFieldLinks: draftState.sideFieldLinks,
       values: draftState.values,
       voice: comment.view.voice,

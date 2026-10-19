@@ -21,6 +21,9 @@ const base = {
   onCopyPath: vi.fn(),
   onDeleteRequest: vi.fn(),
   onSettingsOpenChange: vi.fn(),
+  onEditText: vi.fn(),
+  onResetText: vi.fn(),
+  text: { editable: true, modified: false, preview: 'Heading', resettable: false },
   selection,
   settingsOpen: false,
 };
@@ -43,6 +46,46 @@ function copyButton() {
     'button[aria-label="Копировать данные элемента"]'
   )!;
 }
+
+it('offers targeted text editing and a compact reset only for modified text', () => {
+  const copy = vi.fn(async () => true);
+  act(() => root.render(<DesignReviewElementBar {...base} onCopyElement={copy} />));
+  const edit = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Изменить текст элемента"]'
+  )!;
+  expect(edit.disabled).toBe(false);
+  act(() => edit.click());
+  expect(base.onEditText).toHaveBeenCalledOnce();
+  expect(container.querySelector('[data-ui="content.design-review.reset-text"]')).toBeNull();
+  act(() =>
+    root.render(
+      <DesignReviewElementBar
+        {...base}
+        onCopyElement={copy}
+        text={{ editable: false, modified: true, preview: 'Changed heading', resettable: true }}
+      />
+    )
+  );
+  expect(
+    container.querySelector('[data-ui="content.design-review.element-text"]')?.textContent
+  ).toBe('Changed heading');
+  expect(edit.disabled).toBe(true);
+  const reset = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.design-review.reset-text"]'
+  )!;
+  act(() => reset.click());
+  expect(base.onResetText).toHaveBeenCalledOnce();
+  act(() =>
+    root.render(
+      <DesignReviewElementBar
+        {...base}
+        onCopyElement={copy}
+        text={{ editable: false, modified: true, preview: 'Changed heading', resettable: false }}
+      />
+    )
+  );
+  expect(reset.disabled).toBe(true);
+});
 
 it('confirms only successful copying on the icon and clears transient feedback', async () => {
   const copy = vi.fn(async () => true);

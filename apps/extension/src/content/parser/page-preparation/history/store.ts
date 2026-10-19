@@ -15,10 +15,13 @@ import { createHistoryStoreCommitApi } from './transactions';
 import { resetHistoryScope } from './scoped-reset';
 import { applyScopedSnapshotDelta } from './snapshot-delta';
 import { hasDomMutationChanges } from './dom-delta';
+import { hasExactHistoryLocatorBinding } from './dom-locators';
 import type {
   PagePreparationChangeScope,
   PagePreparationHistoryBridge,
   PagePreparationHistoryState,
+  PagePreparationDomElement,
+  PageDomElementState,
 } from './types';
 
 const HISTORY_APPLIED_EVENT = 'sniptale-page-preparation-history-applied';
@@ -38,6 +41,23 @@ function createHistoryStoreMutationApi(state: HistoryStoreRuntimeState) {
 
 function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
   return {
+    /** Reads the original rich-text baseline from applied canonical text history. */
+    getTextBaseline(target: PagePreparationDomElement): PageDomElementState | null {
+      if (!target.isConnected) return null;
+      for (const entry of state.past) {
+        if (entry.scope !== 'content-editing') continue;
+        const patch = entry.domBatch?.patches.find(
+          (candidate) =>
+            candidate.target === target && candidate.before.html !== candidate.after.html
+        );
+        if (patch) {
+          return hasExactHistoryLocatorBinding(target, patch.locator)
+            ? { html: patch.before.html, attributes: { ...patch.before.attributes } }
+            : null;
+        }
+      }
+      return null;
+    },
     getState(): PagePreparationHistoryState {
       return readHistoryState(state);
     },
