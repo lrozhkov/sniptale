@@ -1,5 +1,8 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
-import { addWindowEventListenerToAllWindowsDynamic } from '../../platform/frame';
+import {
+  addWindowEventListenerToAllWindowsDynamic,
+  mountStyleInAccessibleDocuments,
+} from '../../platform/frame';
 import {
   isTrustedKeyboardEvent,
   isTrustedMouseEvent,
@@ -59,6 +62,19 @@ export function createQuickEditTargetSession(args: {
     }
   }
   try {
+    cleanups.push(
+      mountStyleInAccessibleDocuments({
+        styleId: 'sniptale-quick-edit-target-style',
+        textContent: `
+          .sniptale-editing,
+          .sniptale-editing:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            cursor: text !important;
+          }
+        `,
+      })
+    );
     overlayActions.createBlockingOverlay();
     actions.makeElementEditable(target);
     cleanups.push(

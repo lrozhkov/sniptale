@@ -37,6 +37,25 @@ async function beginTextEdit(page: Page, target: Locator): Promise<void> {
   await expect(popover).toHaveCount(0);
   await expect(target).toHaveAttribute('contenteditable', 'true');
   await expect(target).toBeFocused();
+  await expect(target).toHaveCSS('outline-style', 'none');
+  await expect(target).toHaveCSS('box-shadow', 'none');
+  const activeFrame = page.locator('.sniptale-quick-edit-active-frame');
+  await expect(activeFrame).toBeVisible();
+  await expect(activeFrame).toHaveCSS('border-top-width', '1px');
+  await expect(activeFrame).toHaveCSS('border-top-style', 'dashed');
+  await expect(activeFrame).toHaveCSS('box-shadow', 'none');
+  const targetBounds = await target.boundingBox();
+  const frameBounds = await activeFrame.boundingBox();
+  if (!targetBounds || !frameBounds) throw new Error('Active edit frame has no rendered bounds');
+  const expectedBounds = {
+    x: targetBounds.x - 4,
+    y: targetBounds.y - 4,
+    width: targetBounds.width + 8,
+    height: targetBounds.height + 8,
+  };
+  for (const edge of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(frameBounds[edge] - expectedBounds[edge])).toBeLessThanOrEqual(1);
+  }
   await expect(target).not.toHaveCSS('cursor', /none|crosshair|url\(/u);
   await expect
     .poll(() =>

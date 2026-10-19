@@ -335,9 +335,13 @@ test('content block editing switches on one click and preserves committed text',
     const bounds = (await block.boundingBox())!;
     await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await expect(block).toHaveAttribute('contenteditable', 'true');
+    await expect(block).toBeFocused();
+    await expect(block).toHaveCSS('outline-style', 'none');
+    await expect(block).toHaveCSS('box-shadow', 'none');
     await expect(block).toHaveCSS('cursor', 'text');
     const activeFrame = page.locator('.sniptale-quick-edit-active-frame');
     await expect(activeFrame).toHaveCSS('border-top-width', '1px');
+    await expect(activeFrame).toHaveCSS('border-top-style', 'dashed');
     await expect(activeFrame).toHaveCSS('box-shadow', 'none');
     await block.fill(`Edited ${index}`);
     await page.mouse.click(bounds.x + 25, bounds.y + 12);
@@ -348,7 +352,10 @@ test('content block editing switches on one click and preserves committed text',
       await expect(previous).toHaveText(`Edited ${index - 1}`);
     }
   }
-  await page.screenshot({ path: testInfo.outputPath('content-editing-thin-frame.png') });
+  await page.screenshot({
+    path: testInfo.outputPath('content-editing-thin-frame.png'),
+    fullPage: false,
+  });
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
   for (let index = 0; index < 3; index += 1) {

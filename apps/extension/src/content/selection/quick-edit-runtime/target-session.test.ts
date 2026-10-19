@@ -46,6 +46,37 @@ function start(target?: HTMLElement) {
   return { element, onFinish, onError };
 }
 
+it('mounts focus suppression only for managed text and restores source presentation on completion', () => {
+  const target = document.createElement('p');
+  target.style.cssText = 'outline: 3px solid red; box-shadow: 0 0 2px blue;';
+  const sourceStyle = target.getAttribute('style');
+  const { element } = start(target);
+  const style = document.getElementById('sniptale-quick-edit-target-style');
+  expect(style?.textContent).toContain('.sniptale-editing:focus');
+  expect(style?.textContent).toContain('outline: none !important');
+  expect(style?.textContent).toContain('box-shadow: none !important');
+  expect(style?.textContent).not.toContain('body');
+  expect(element.getAttribute('style')).toBe(sourceStyle);
+  active?.finish();
+  expect(document.getElementById('sniptale-quick-edit-target-style')).toBeNull();
+  expect(element.getAttribute('style')).toBe(sourceStyle);
+});
+
+it('releases temporary styling after activation fails', () => {
+  const target = document.createElement('p');
+  target.textContent = 'Original';
+  document.body.append(target);
+  vi.spyOn(target, 'focus').mockImplementation(() => {
+    throw new Error('Focus failed');
+  });
+  expect(() =>
+    createQuickEditTargetSession({ target, onFinish: vi.fn(), onError: vi.fn() })
+  ).toThrow('Focus failed');
+  expect(document.getElementById('sniptale-quick-edit-target-style')).toBeNull();
+  expect(target.classList.contains('sniptale-editing')).toBe(false);
+  expect(policy.shield).toHaveBeenLastCalledWith(false);
+});
+
 it.each(['Enter', 'Escape'])('commits %s once and releases target and input shield', (key) => {
   const { element, onFinish, onError } = start();
   element.textContent = 'Changed';
@@ -145,6 +176,7 @@ it('settles and releases resources when the target is removed', async () => {
   expect(pagePreparationHistory.cancelTransaction).toHaveBeenCalled();
   expect(pagePreparationHistory.commitTransaction).not.toHaveBeenCalled();
   expect(policy.shield).toHaveBeenLastCalledWith(false);
+  expect(document.getElementById('sniptale-quick-edit-target-style')).toBeNull();
 });
 
 it('reports commit refusal and finishes without leaving an open interaction', () => {
@@ -156,6 +188,7 @@ it('reports commit refusal and finishes without leaving an open interaction', ()
   expect(onFinish).toHaveBeenCalledOnce();
   expect(policy.shield).toHaveBeenLastCalledWith(false);
   expect(element.classList.contains('sniptale-editing')).toBe(false);
+  expect(document.getElementById('sniptale-quick-edit-target-style')).toBeNull();
 });
 
 it('refuses unsupported, detached, already editable and broad container targets', () => {
