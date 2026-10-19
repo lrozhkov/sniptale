@@ -37,7 +37,7 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('serializes independent page instances and preserves disjoint settings patches', async () => {
+it('serializes independent page instances and preserves Crop with disjoint settings patches', async () => {
   let persisted: Record<string, unknown> = { imageFormat: 'png', imageQuality: 100 };
   let releaseFirstWrite: (() => void) | undefined;
   const firstWrite = new Promise<void>((resolve) => {
@@ -55,7 +55,7 @@ it('serializes independent page instances and preserves disjoint settings patche
 
   const imagePatch = firstPage.patchSettings({
     imageFormat: 'webp',
-    contentToolbar: { dockEdge: 'right-bottom' },
+    contentToolbar: { dockEdge: 'right-bottom', cropMode: 'resize' },
   });
   await vi.waitFor(() => expect(storage.set).toHaveBeenCalledTimes(1));
   const qualityPatch = secondPage.patchSettings({
@@ -69,7 +69,7 @@ it('serializes independent page instances and preserves disjoint settings patche
   expect(persisted).toMatchObject({
     imageFormat: 'webp',
     imageQuality: 85,
-    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true },
+    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true, cropMode: 'resize' },
   });
 });
 
@@ -164,7 +164,7 @@ function controlledGate() {
   return { promise, release };
 }
 
-it('completes an in-flight corner write before a queued reset', async () => {
+it('completes an in-flight Crop and corner write before a queued reset', async () => {
   let persisted: Record<string, unknown> = {};
   const entered = controlledGate();
   const releaseWrite = controlledGate();
@@ -177,7 +177,9 @@ it('completes an in-flight corner write before a queued reset', async () => {
     persisted = items.sniptale_settings;
   });
   const page = await import('./index');
-  const write = page.patchSettings({ contentToolbar: { dockEdge: 'top-right' } });
+  const write = page.patchSettings({
+    contentToolbar: { dockEdge: 'top-right', cropMode: 'resize' },
+  });
   await entered.promise;
   const reset = page.resetSettingsToDefaults();
   releaseWrite.release();
@@ -187,9 +189,9 @@ it('completes an in-flight corner write before a queued reset', async () => {
   );
 });
 
-it('recreates the settings key only with a new accepted dock after deletion', async () => {
+it('recreates the settings key only with a new accepted Crop and dock choice after deletion', async () => {
   let persisted: Record<string, unknown> = {
-    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true },
+    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true, cropMode: 'resize' },
   };
   const entered = controlledGate();
   const releaseDelete = controlledGate();
@@ -205,17 +207,22 @@ it('recreates the settings key only with a new accepted dock after deletion', as
   const page = await import('./index');
   const deletion = page.clearSettings();
   await entered.promise;
-  const recreation = page.patchSettings({ contentToolbar: { dockEdge: 'left-top' } });
+  const recreation = page.patchSettings({
+    contentToolbar: { dockEdge: 'left-top', cropMode: 'drawing' },
+  });
   releaseDelete.release();
   await Promise.all([deletion, recreation]);
   expect((await page.loadSettings()).contentToolbar).toMatchObject({
     dockEdge: 'left-top',
     compactMenus: false,
+    cropMode: 'drawing',
   });
 });
 
-it('retains the accepted dock after failure and permits retry', async () => {
-  let persisted: Record<string, unknown> = { contentToolbar: { dockEdge: 'left-top' } };
+it('retains accepted Crop and dock preferences after failure and permits retry', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: { dockEdge: 'left-top', cropMode: 'resize' },
+  };
   storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
   storage.set
     .mockRejectedValueOnce(new Error('write refused'))
@@ -224,9 +231,61 @@ it('retains the accepted dock after failure and permits retry', async () => {
     });
   const page = await import('./index');
   await expect(
-    page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom' } })
+    page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing' } })
   ).rejects.toThrow('write refused');
   expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('left-top');
-  await page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom' } });
+  expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('resize');
+  await page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing' } });
   expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('right-bottom');
+  expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('drawing');
+});
+
+it('completes an in-flight Crop choice before a settings replacement', async () => {
+  let persisted: Record<string, unknown> = {};
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const write = page.patchSettings({ contentToolbar: { cropMode: 'resize' } });
+  await entered.promise;
+  const defaults = page.createDefaultSettings();
+  const replacement = page.saveSettings({
+    ...defaults,
+    contentToolbar: { ...defaults.contentToolbar!, cropMode: 'drawing' },
+  });
+  releaseWrite.release();
+  await Promise.all([write, replacement]);
+  expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('drawing');
+});
+
+it('retains the last rapid Crop choice through the existing settings queue', async () => {
+  let persisted: Record<string, unknown> = { contentToolbar: { dockEdge: 'bottom-left' } };
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const first = page.patchSettings({ contentToolbar: { cropMode: 'resize' } });
+  await entered.promise;
+  const second = page.patchSettings({ contentToolbar: { cropMode: 'drawing' } });
+  const third = page.patchSettings({ contentToolbar: { cropMode: 'resize' } });
+  releaseWrite.release();
+  await Promise.all([first, second, third]);
+  expect((await page.loadSettings()).contentToolbar).toMatchObject({
+    cropMode: 'resize',
+    dockEdge: 'bottom-left',
+  });
 });

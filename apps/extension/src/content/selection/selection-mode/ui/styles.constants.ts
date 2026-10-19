@@ -2,7 +2,7 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
   .sniptale-selection-mode-switch {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 0;
     padding: 0;
     border-radius: 4px;
     background: var(--sniptale-color-surface-input);
@@ -14,21 +14,24 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     justify-content: center;
     width: var(--sniptale-toolbar-button-size);
     height: var(--sniptale-toolbar-button-size);
-    padding: 0;
+    padding: 2px;
     border: 0;
     border-radius: 4px;
     background: transparent;
+    background-clip: content-box;
     color: var(--sniptale-color-text-secondary);
     cursor: pointer;
   }
 
   .sniptale-selection-toolbar .sniptale-selection-mode-option:hover {
     background: var(--sniptale-color-surface-hover);
+    background-clip: content-box;
     color: var(--sniptale-color-text-primary-strong);
   }
 
   .sniptale-selection-toolbar .sniptale-selection-mode-option[aria-pressed='true'] {
     background: var(--sniptale-color-surface-panel);
+    background-clip: content-box;
     color: var(--sniptale-color-text-primary-strong);
   }
 

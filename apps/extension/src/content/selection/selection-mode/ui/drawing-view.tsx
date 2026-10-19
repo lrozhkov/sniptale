@@ -1,14 +1,14 @@
-import { BrushCleaning, Crop, Eraser, PenLine } from 'lucide-react';
+import { Crop, PenLine, Redo2, Undo2 } from 'lucide-react';
+import { useEffect, useReducer } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
-import type { DrawingTool } from '../../../../features/drawing/public';
 import {
   projectClientRectToContentUi,
   readContentUiScaleCompensation,
   resolveContentUiViewport,
 } from '@sniptale/ui/floating-interactions/scale';
-import { placeSelectionFloatingSurface } from './floating-placement';
+import type { CropDrawingHistory } from './drawing-history';
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import {
   useDrawingSessionSnapshot,
@@ -20,45 +20,39 @@ import {
   type ToolbarDrawingControlsOwner,
 } from '../../../overlay/toolbar/controls/drawing';
 
-export type CropDrawingInteraction = DrawingTool | 'eraser';
-
 const resolveCropDrawingMenuLayout: NonNullable<
   ToolbarDrawingControlsOwner['resolveMenuLayout']
 > = ({ anchor, menuWidth, menuHeight }) => {
   const toolbar = anchor.closest<HTMLElement>('.sniptale-selection-toolbar');
-  const frame = toolbar
-    ?.closest('.sniptale-selection-container')
-    ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
-  if (!toolbar || !frame) return null;
+  if (!toolbar) return null;
   const scale = readContentUiScaleCompensation(anchor);
   const anchorRect = projectClientRectToContentUi(anchor.getBoundingClientRect(), scale);
   const toolbarRect = projectClientRectToContentUi(toolbar.getBoundingClientRect(), scale);
-  const cropRect = projectClientRectToContentUi(frame.getBoundingClientRect(), scale);
   const viewport = resolveContentUiViewport({
     clientWidth: window.innerWidth,
     clientHeight: window.innerHeight,
     scale,
   });
-  const position = placeSelectionFloatingSurface({
-    anchor: toolbarRect,
-    exclusion: cropRect,
-    protectedRect: toolbarRect,
-    width: menuWidth,
-    height: menuHeight,
-    viewport,
-  });
-  const placement =
-    position.y + menuHeight <= toolbarRect.y
-      ? 'up'
-      : position.y >= toolbarRect.y + toolbarRect.height
-        ? 'down'
-        : 'side';
-  const leftSide = placement === 'side' && position.x + menuWidth <= toolbarRect.x;
+  const above = toolbarRect.y - 18;
+  const below = viewport.height - toolbarRect.y - toolbarRect.height - 18;
+  const placement = above >= menuHeight || (below < menuHeight && above >= below) ? 'up' : 'down';
+  const position = {
+    x: Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8)),
+    y: Math.min(
+      Math.max(
+        8,
+        placement === 'up'
+          ? toolbarRect.y - menuHeight - 10
+          : toolbarRect.y + toolbarRect.height + 10
+      ),
+      Math.max(8, viewport.height - menuHeight - 8)
+    ),
+  };
   return {
     placement,
     style: {
-      left: leftSide ? 'auto' : position.x - anchorRect.x,
-      right: leftSide ? anchorRect.x + anchorRect.width - position.x - menuWidth : 'auto',
+      left: position.x - anchorRect.x,
+      right: 'auto',
       top: placement === 'up' ? 'auto' : position.y - anchorRect.y,
       bottom:
         placement === 'up' ? anchorRect.y + anchorRect.height - position.y - menuHeight : 'auto',
@@ -70,50 +64,55 @@ const resolveCropDrawingMenuLayout: NonNullable<
 
 function DrawingToolbar(props: {
   controller: ContentDrawingController;
+  history: CropDrawingHistory;
   drawing: boolean;
-  interaction: CropDrawingInteraction;
   modeSlot: HTMLElement;
   controlsSlot: HTMLElement;
   onModeChange(drawing: boolean): void;
-  onInteractionChange(interaction: CropDrawingInteraction): void;
 }) {
   useAppLocale();
+  const [, refresh] = useReducer((revision: number) => revision + 1, 0);
+  useEffect(() => {
+    const unsubscribeHistory = props.history.subscribe(refresh);
+    const unsubscribePending = props.controller.subscribePendingTextChange?.(refresh);
+    return () => {
+      unsubscribeHistory();
+      unsubscribePending?.();
+    };
+  }, [props.history, props.controller]);
   const snapshot = useDrawingSessionSnapshot(props.controller.session);
+  const history = props.history.getState();
+  const pendingText = props.controller.hasPendingTextChange?.() ?? false;
   const resizeLabel = translate('content.toolbar.cropResizeMode');
   const drawingLabel = translate('content.toolbar.cropDrawingMode');
   const owner: ToolbarDrawingControlsOwner = {
-    activeTool: props.interaction === 'eraser' ? null : snapshot.activeTool,
+    activeTool: snapshot.activeTool,
     persistOptionsDisclosure: true,
     preferredMenuPlacement: 'up',
     resolveMenuLayout: resolveCropDrawingMenuLayout,
     showActions: true,
-    onToolActivated: props.onInteractionChange,
-    renderActions: (snapshot) => (
+    onToolActivated: refresh,
+    renderActions: () => (
       <>
         <ContentToolbarButton
           type="button"
-          active={props.interaction === 'eraser'}
-          aria-pressed={props.interaction === 'eraser'}
-          aria-label={translate('content.toolbar.recordingDrawingEraser')}
-          title={translate('content.toolbar.recordingDrawingEraser')}
-          dataUi="content.crop.eraser"
-          onClick={() => {
-            props.controller.finalizeInteraction();
-            props.onInteractionChange('eraser');
-          }}
+          disabled={!history.canUndo && !pendingText}
+          aria-label={translate('editor.toolbar.undo')}
+          title={translate('editor.toolbar.undo')}
+          dataUi="content.crop.undo"
+          onClick={() => props.history.undo()}
         >
-          <Eraser size={18} />
+          <Undo2 size={18} />
         </ContentToolbarButton>
         <ContentToolbarButton
           type="button"
-          tone="danger"
-          disabled={snapshot.document.objects.length === 0}
-          aria-label={translate('content.toolbar.drawingClear')}
-          title={translate('content.toolbar.drawingClear')}
-          dataUi="content.crop.clear"
-          onClick={() => props.controller.session.clear()}
+          disabled={!history.canRedo || pendingText}
+          aria-label={translate('editor.toolbar.redo')}
+          title={translate('editor.toolbar.redo')}
+          dataUi="content.crop.redo"
+          onClick={() => props.history.redo()}
         >
-          <BrushCleaning size={18} />
+          <Redo2 size={18} />
         </ContentToolbarButton>
       </>
     ),
@@ -173,8 +172,9 @@ function DrawingToolbar(props: {
 export function createCropDrawingView(options: {
   container: HTMLElement;
   controller: ContentDrawingController;
+  history: CropDrawingHistory;
   onModeChange(drawing: boolean): void;
-  onInteractionChange(interaction: CropDrawingInteraction): void;
+  onExitDrawing(): void;
 }) {
   const layer = document.createElement('div');
   layer.dataset['ui'] = 'content.crop.drawing-layer';
@@ -190,30 +190,27 @@ export function createCropDrawingView(options: {
     layer,
     render(state: {
       drawing: boolean;
-      interaction: CropDrawingInteraction;
       slots: { mode: HTMLElement; controls: HTMLElement } | null;
     }) {
       layer.style.pointerEvents = state.drawing ? 'auto' : 'none';
-      layer.style.cursor = state.drawing && state.interaction === 'eraser' ? 'crosshair' : '';
       flushSync(() => {
         root.render(
           <>
             <DrawingSurface
               controller={options.controller}
-              active={state.drawing && state.interaction !== 'eraser'}
+              active={state.drawing}
               chromeHidden={false}
               showSelectionChrome={state.drawing}
-              onExit={() => options.onModeChange(false)}
+              onExit={options.onExitDrawing}
             />
             {state.slots ? (
               <DrawingToolbar
                 controller={options.controller}
+                history={options.history}
                 drawing={state.drawing}
-                interaction={state.interaction}
                 modeSlot={state.slots.mode}
                 controlsSlot={state.slots.controls}
                 onModeChange={options.onModeChange}
-                onInteractionChange={options.onInteractionChange}
               />
             ) : null}
           </>

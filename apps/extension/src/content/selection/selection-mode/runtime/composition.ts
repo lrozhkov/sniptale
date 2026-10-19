@@ -25,6 +25,43 @@ import {
 import { createSelectionModeRuntimeSetup } from './setup';
 import { adjustSelectionPadding } from '../interaction/selection/padding';
 import { createSelectionDrawingRuntime } from '../ui/drawing';
+import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'ContentSelectionMode' });
+
+function createCropModePreferences() {
+  let pendingMutation = Promise.resolve();
+  return {
+    save(drawing: boolean): void {
+      pendingMutation = patchSettings({
+        contentToolbar: { cropMode: drawing ? 'drawing' : 'resize' },
+      }).then(
+        () => undefined,
+        (error) => {
+          logger.error('Failed to save Crop mode preference', error);
+        }
+      );
+    },
+    prepare(prepareUi: () => Promise<void>) {
+      let initialDrawing = true;
+      return {
+        get initialDrawing() {
+          return initialDrawing;
+        },
+        prepare: async () => {
+          await prepareUi();
+          await pendingMutation;
+          try {
+            initialDrawing = (await loadSettings()).contentToolbar?.cropMode !== 'resize';
+          } catch {
+            initialDrawing = true;
+          }
+        },
+      };
+    },
+  };
+}
 
 type SelectionModeEvents = ReturnType<typeof createSelectionModeEventsBridge>;
 type SelectionModeHandlers = ReturnType<typeof createSelectionModeEventHandlers>;
@@ -34,6 +71,11 @@ export interface SelectionModeRuntime {
   disableSelectionMode: () => void;
   enableSelectionMode: (options?: SelectionModeActivationOptions) => Promise<CaptureArea>;
   isSelectionModeActive: () => boolean;
+}
+
+interface SelectionModeRuntimeArgs {
+  cleanup: () => void;
+  session: SelectionModeSession;
 }
 
 function watchSelectionModeFrozenViewport(
@@ -49,14 +91,12 @@ function watchSelectionModeFrozenViewport(
   };
 }
 
-export function createSelectionModeRuntime(args: {
-  cleanup: () => void;
-  session: SelectionModeSession;
-}): SelectionModeRuntime {
+export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): SelectionModeRuntime {
   let events: SelectionModeEvents;
   let handlers: SelectionModeHandlers;
   let drawing: ReturnType<typeof createSelectionDrawingRuntime> | null = null;
   let publishDrawingSnapshot: SelectionModeActivationOptions['onDrawingSnapshot'];
+  const cropModePreferences = createCropModePreferences();
 
   const getEvents = () => events;
   const getHandlers = () => (drawing?.isDrawing() ? null : handlers);
@@ -152,8 +192,9 @@ export function createSelectionModeRuntime(args: {
     },
     disableSelectionMode: () =>
       disableSelectionModeApi({ cleanup: args.cleanup, session: args.session }),
-    enableSelectionMode: (options) =>
-      enableSelectionModeApi({
+    enableSelectionMode: (options) => {
+      const preparation = cropModePreferences.prepare(uiRuntime.prepare);
+      return enableSelectionModeApi({
         cleanup: args.cleanup,
         createHoverElements: () => uiRuntime.createHoverElements(),
         createOverlayContainer: () => {
@@ -166,12 +207,14 @@ export function createSelectionModeRuntime(args: {
             publishDrawingSnapshot = options?.onDrawingSnapshot;
             drawing = createSelectionDrawingRuntime({
               container,
+              initialDrawing: preparation.initialDrawing,
+              onModeChange: cropModePreferences.save,
               onLayout: () => getEvents().updateFinalFrame(),
             });
           }
         },
         enableCursor: () => enableSelectionModeCursor(args.session),
-        prepareUi: () => uiRuntime.prepare(),
+        prepareUi: preparation.prepare,
         ...(options === undefined ? {} : { options }),
         session: args.session,
         setupEventListeners: () => {
@@ -182,7 +225,8 @@ export function createSelectionModeRuntime(args: {
           });
           watchSelectionModeFrozenViewport(args.session, () => getEvents().cancelSelection());
         },
-      }),
+      });
+    },
     isSelectionModeActive: () => isSelectionModeActiveApi(args.session.isActive),
   };
 }

@@ -140,6 +140,13 @@ beforeEach(() => {
 });
 
 describe('selection-mode ui frame updates', () => {
+  it('keeps a full-height crop toolbar inside the crop instead of a remote side region', () => {
+    const dom = createDom();
+    vi.spyOn(dom.sizePanel!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 50));
+    updateFinalFrame(dom, { x: 8, y: 8, width: 500, height: 704 });
+    expect(setContentSizeTooltipPositionMock).toHaveBeenCalledWith(dom.sizePanel, { x: 18, y: 18 });
+  });
+
   it('creates and reuses the drag-size label while updating frame geometry', () => {
     const dom = createDom();
 
@@ -211,7 +218,7 @@ describe('selection-mode ui frame updates', () => {
     expect(syncSelectionToolbarCompactControlsChromeMock).toHaveBeenCalledWith(dom.sizeTooltip);
     expect(setContentSizeTooltipPositionMock).toHaveBeenCalledWith(dom.sizePanel, {
       x: 100,
-      y: 60,
+      y: 58,
     });
     expect(dom.finalOverlay?.querySelector('.sniptale-shade-top')?.getAttribute('style')).toContain(
       'height: 120px'

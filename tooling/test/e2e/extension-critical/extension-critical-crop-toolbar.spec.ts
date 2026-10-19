@@ -95,6 +95,7 @@ async function checkCaptureChrome(page: Page) {
 }
 
 async function checkDimensionField(page: Page) {
+  await page.locator('[data-ui="content.crop.mode.resize"]').click();
   const input = page.locator('#sniptale-width-input');
   await input.click();
   await input.fill('1000');
@@ -181,9 +182,15 @@ async function checkSelectedPair(
   await page.mouse.up();
   const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
   await expect(pair).toBeVisible();
-  await expect.poll(async () => overlap((await pair.boundingBox())!, crop)).toBeLessThanOrEqual(1);
   const toolbar = (await page.locator('.sniptale-selection-toolbar').boundingBox())!;
   expect(overlap((await pair.boundingBox())!, toolbar)).toBeLessThanOrEqual(1);
+  const bounds = (await pair.boundingBox())!;
+  expect(
+    Math.min(
+      Math.abs(bounds.y + bounds.height - toolbar.y),
+      Math.abs(bounds.y - toolbar.y - toolbar.height)
+    )
+  ).toBeCloseTo(10, 0);
 }
 
 for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -230,7 +237,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
   }
 
   for (const scenario of ['top', 'side', 'full'] as const) {
-    test(`Crop floating tools avoid selection ${name} ${scenario}`, async ({
+    test(`Crop floating tools stay anchored ${name} ${scenario}`, async ({
       context,
       extensionId,
       hostOrigin,
@@ -263,26 +270,22 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
             return overlap(bounds, shell);
           })
           .toBeLessThanOrEqual(1);
-        if (scenario !== 'full') {
-          await expect
-            .poll(async () => overlap((await surface.boundingBox())!, crop))
-            .toBeLessThanOrEqual(1);
-          expect(overlap((await toolbar.boundingBox())!, crop)).toBeLessThanOrEqual(1);
-        }
         const bounds = (await surface.boundingBox())!;
         expect(bounds.x).toBeGreaterThanOrEqual(7);
         expect(bounds.y).toBeGreaterThanOrEqual(7);
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width - 7);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height - 7);
         const shell = (await toolbar.boundingBox())!;
-        const expectedSide =
-          bounds.y + bounds.height <= shell.y
-            ? 'up'
-            : bounds.y >= shell.y + shell.height
-              ? 'down'
-              : bounds.x < shell.x
-                ? 'left'
-                : 'right';
+        expect(
+          Math.min(
+            Math.abs(bounds.y + bounds.height - shell.y),
+            Math.abs(bounds.y - shell.y - shell.height)
+          )
+        ).toBeCloseTo(10, 0);
+        expect(
+          Math.abs(bounds.x - Math.min(Math.max(shell.x, 8), viewport.width - bounds.width - 8))
+        ).toBeLessThanOrEqual(1);
+        const expectedSide = bounds.y + bounds.height <= shell.y ? 'up' : 'down';
         await expect(pencil).toHaveAttribute('data-menu-side', expectedSide);
         await page.screenshot({
           path: info.outputPath('crop-floating-tools.png'),

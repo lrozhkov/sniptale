@@ -71,6 +71,7 @@ export interface ContentToolbarPosition {
 }
 
 export interface ContentToolbarPreferences {
+  cropMode?: 'drawing' | 'resize';
   /** Legacy absence uses docking at the top edge. */
   freePlacement?: boolean;
   dockEdge?: ContentToolbarDockEdge;

@@ -1,103 +1,13 @@
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
-import {
-  createDrawingSession,
-  findDrawingObjectsIntersectingPath,
-  type DrawingPoint,
-} from '../../../../features/drawing/public';
 import type { ContentDrawingCaptureSnapshot } from '../../../drawing/capture';
 import {
   createContentDrawingController,
   synchronizeContentDrawingPreferences,
   type ContentDrawingController,
 } from '../../../drawing/controller';
-import { getDrawingViewportProjection, toDrawingScenePoint } from '../../../drawing/surface';
-import { isTrustedKeyboardEvent } from '../../../platform/trusted-events';
-import { createCropDrawingView, type CropDrawingInteraction } from './drawing-view';
-
-function bindCropDrawingEraser(options: {
-  layer: HTMLElement;
-  controller: ContentDrawingController;
-  isActive(): boolean;
-  onExit(): void;
-}) {
-  let pointerId: number | null = null;
-  let path: DrawingPoint[] = [];
-  const cancel = () => {
-    pointerId = null;
-    path = [];
-  };
-  const finalize = () => {
-    if (pointerId === null) return;
-    const touched = findDrawingObjectsIntersectingPath(
-      options.controller.session.getSnapshot().document.objects,
-      path
-    );
-    options.controller.session.deleteObjects(touched.map((object) => object.id));
-    cancel();
-  };
-  const down = (event: PointerEvent) => {
-    if (
-      !options.isActive() ||
-      event.button !== 0 ||
-      !event.composedPath().includes(options.layer) ||
-      event
-        .composedPath()
-        .some((target) => target instanceof Element && target.matches('button, input, textarea'))
-    )
-      return;
-    pointerId = event.pointerId;
-    path = [toDrawingScenePoint(event, options.controller.getScrollRoot())];
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  const move = (event: PointerEvent) => {
-    if (pointerId !== event.pointerId) return;
-    path.push(toDrawingScenePoint(event, options.controller.getScrollRoot()));
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  const up = (event: PointerEvent) => {
-    if (pointerId !== event.pointerId) return;
-    path.push(toDrawingScenePoint(event, options.controller.getScrollRoot()));
-    finalize();
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  const escape = (event: KeyboardEvent) => {
-    if (
-      !options.isActive() ||
-      event.key !== 'Escape' ||
-      event.defaultPrevented ||
-      !isTrustedKeyboardEvent(event) ||
-      event
-        .composedPath()
-        .some(
-          (target) => target instanceof Element && target.matches('input, textarea, [role="menu"]')
-        )
-    )
-      return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    options.onExit();
-  };
-  document.addEventListener('pointerdown', down, true);
-  document.addEventListener('pointermove', move, true);
-  document.addEventListener('pointerup', up, true);
-  document.addEventListener('pointercancel', cancel, true);
-  window.addEventListener('keydown', escape, true);
-  return {
-    finalize,
-    cancel,
-    dispose() {
-      cancel();
-      document.removeEventListener('pointerdown', down, true);
-      document.removeEventListener('pointermove', move, true);
-      document.removeEventListener('pointerup', up, true);
-      document.removeEventListener('pointercancel', cancel, true);
-      window.removeEventListener('keydown', escape, true);
-    },
-  };
-}
+import { getDrawingViewportProjection } from '../../../drawing/surface';
+import { createCropDrawingView } from './drawing-view';
+import { createCropDrawingHistory } from './drawing-history';
 
 function mountCropToolbarSlots(tooltip: ContentSizeTooltipDom) {
   const sizingChildren = Array.from(tooltip.root.children).filter(
@@ -148,47 +58,54 @@ function projectCropFrameDrawingMode(container: HTMLElement, drawing: boolean) {
 
 export function createSelectionDrawingRuntime(options: {
   container: HTMLElement;
+  initialDrawing: boolean;
+  onModeChange(drawing: boolean): void;
   onLayout(): void;
 }) {
+  const history = createCropDrawingHistory();
   const controller: ContentDrawingController = {
-    ...createContentDrawingController(createDrawingSession({ onDocumentCommit: () => true })),
+    ...createContentDrawingController(history.session),
     prepareActivation: () => true,
   };
   const stopPreferences = synchronizeContentDrawingPreferences(controller);
   const view = createCropDrawingView({
     container: options.container,
     controller,
-    onModeChange: setDrawing,
-    onInteractionChange(next) {
-      interaction = next;
-      render();
+    history: {
+      getState: history.getState,
+      subscribe: history.subscribe,
+      undo() {
+        controller.finalizeInteraction();
+        history.undo();
+      },
+      redo() {
+        controller.finalizeInteraction();
+        history.redo();
+      },
     },
+    onModeChange(next) {
+      if (disposed) return;
+      setDrawing(next);
+      options.onModeChange(next);
+    },
+    onExitDrawing: () => setDrawing(false),
   });
   let drawing = false;
   let disposed = false;
-  let interaction: CropDrawingInteraction = 'select';
   let toolbar: ContentSizeTooltipDom | null = null;
   let slots: ReturnType<typeof mountCropToolbarSlots> | null = null;
   let observedSize = '';
-  const eraser = bindCropDrawingEraser({
-    layer: view.layer,
-    controller,
-    isActive: () => drawing && interaction === 'eraser',
-    onExit: () => setDrawing(false),
-  });
 
   const render = () => {
     if (disposed) return;
-    view.render({ drawing, interaction, slots });
+    view.render({ drawing, slots });
   };
 
   function setDrawing(next: boolean) {
     if (disposed || drawing === next) return;
     if (next && !controller.prepareActivation()) return;
     controller.finalizeInteraction();
-    eraser.cancel();
     drawing = next;
-    if (next) interaction = controller.session.getSnapshot().activeTool;
     slots?.projectDrawing(drawing);
     projectCropFrameDrawingMode(options.container, drawing);
     render();
@@ -215,11 +132,13 @@ export function createSelectionDrawingRuntime(options: {
   return {
     attachToolbar(next: ContentSizeTooltipDom) {
       if (disposed) return;
-      setDrawing(false);
+      const nextDrawing = toolbar === null ? options.initialDrawing : drawing;
       observer?.disconnect();
       slots?.dispose();
       toolbar = next;
       slots = mountCropToolbarSlots(next);
+      slots.projectDrawing(drawing);
+      setDrawing(nextDrawing);
       observedSize = '';
       observer?.observe(next.root);
       render();
@@ -228,7 +147,6 @@ export function createSelectionDrawingRuntime(options: {
     isDrawing: () => drawing,
     finalize(): ContentDrawingCaptureSnapshot {
       controller.finalizeInteraction();
-      eraser.finalize();
       return {
         objects: controller.session.getSnapshot().document.objects,
         projection: getDrawingViewportProjection(controller.getScrollRoot()),
@@ -240,7 +158,6 @@ export function createSelectionDrawingRuntime(options: {
       setDrawing(false);
       disposed = true;
       observer?.disconnect();
-      eraser.dispose();
       window.removeEventListener('resize', refreshLayout);
       view.dispose();
       slots?.dispose();

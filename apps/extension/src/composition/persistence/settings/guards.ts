@@ -113,6 +113,9 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   }
 
   const freePlacement = value['freePlacement'];
+  const cropMode = value['cropMode'];
+  if (cropMode !== undefined && cropMode !== 'drawing' && cropMode !== 'resize')
+    return INVALID_FIELD;
   const rawDockEdge = value['dockEdge'];
   const dockEdge = CONTENT_TOOLBAR_DOCK_EDGES.find((edge) => edge === rawDockEdge);
   if (freePlacement !== undefined && !isBoolean(freePlacement)) return INVALID_FIELD;
@@ -134,6 +137,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
         };
 
   return {
+    ...(cropMode === undefined ? {} : { cropMode }),
     ...(freePlacement === undefined ? {} : { freePlacement }),
     ...(dockEdge === undefined ? {} : { dockEdge }),
     displayMode: displayMode ?? 'horizontal',

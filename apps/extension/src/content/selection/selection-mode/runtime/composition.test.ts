@@ -9,6 +9,9 @@ import type { SelectionModeRuntimeActionsArgs } from './setup';
 
 const mocks = vi.hoisted(() => ({
   createDrawingRuntime: vi.fn(),
+  loadSettings: vi.fn(),
+  patchSettings: vi.fn(),
+  logError: vi.fn(),
   createEventHandlers: vi.fn(),
   createEventsBridge: vi.fn(),
   createRuntimeSetup: vi.fn(),
@@ -24,6 +27,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../ui/drawing', () => ({ createSelectionDrawingRuntime: mocks.createDrawingRuntime }));
+vi.mock('../../../../composition/persistence/settings', () => ({
+  loadSettings: mocks.loadSettings,
+  patchSettings: mocks.patchSettings,
+}));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ error: mocks.logError }),
+}));
 
 vi.mock('../../frame-runtime/selection-frame-visual', () => ({
   getSelectionFrameVisual: mocks.getSelectionFrameVisual,
@@ -142,11 +152,166 @@ function createScenario() {
   };
 }
 
-describe('selection-mode runtime composition', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.enableSelectionModeApi.mockReset();
+  mocks.loadSettings.mockResolvedValue({ contentToolbar: {} });
+  mocks.patchSettings.mockResolvedValue({});
+});
+
+describe('Crop preference lifecycle', () => {
+  it('waits for an accepted Crop preference write before reopening and loading its mode', async () => {
+    let finishSave!: () => void;
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    mocks.patchSettings.mockReturnValueOnce(saving);
+    mocks.enableSelectionModeApi.mockImplementation(async (args) => {
+      await args.prepareUi();
+      args.createOverlayContainer();
+    });
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    await scenario.runtime.enableSelectionMode();
+    mocks.createDrawingRuntime.mock.calls.at(-1)![0].onModeChange(false);
+    let readBeforeSave = false;
+    let saved = false;
+    mocks.loadSettings.mockImplementationOnce(async () => {
+      readBeforeSave = !saved;
+      return { contentToolbar: { cropMode: saved ? 'resize' : 'drawing' } };
+    });
+    const reopening = scenario.runtime.enableSelectionMode();
+    await Promise.resolve();
+    await Promise.resolve();
+    saved = true;
+    finishSave();
+    await reopening;
+    expect(readBeforeSave).toBe(false);
+    expect(mocks.createDrawingRuntime).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDrawing: false })
+    );
   });
 
+  it('allows reopening after a pending preference save fails', async () => {
+    let failSave!: (cause: Error) => void;
+    mocks.patchSettings.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        failSave = reject;
+      })
+    );
+    mocks.enableSelectionModeApi.mockImplementation(async (args) => {
+      await args.prepareUi();
+      args.createOverlayContainer();
+    });
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    await scenario.runtime.enableSelectionMode();
+    mocks.createDrawingRuntime.mock.calls.at(-1)![0].onModeChange(false);
+    const reopening = scenario.runtime.enableSelectionMode();
+    failSave(new Error('write refused'));
+    await reopening;
+    expect(mocks.createDrawingRuntime).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDrawing: true })
+    );
+    expect(mocks.logError).toHaveBeenCalledWith(
+      'Failed to save Crop mode preference',
+      expect.any(Error)
+    );
+  });
+
+  it.each([undefined, 'drawing', 'resize'])(
+    'loads Crop mode %s without writing on activation or disposal',
+    async (cropMode) => {
+      mocks.loadSettings.mockResolvedValue({ contentToolbar: { cropMode } });
+      mocks.createDrawingRuntime.mockReturnValue({ isDrawing: () => false, dispose: vi.fn() });
+      mocks.enableSelectionModeApi.mockImplementationOnce(async (args) => {
+        await args.prepareUi();
+        args.createOverlayContainer();
+      });
+      const scenario = createScenario();
+      scenario.session.dom.overlayContainer = document.createElement('div');
+      await scenario.runtime.enableSelectionMode();
+      expect(mocks.createDrawingRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialDrawing: cropMode !== 'resize',
+          onModeChange: expect.any(Function),
+        })
+      );
+      scenario.runtime.cleanupEffects();
+      expect(mocks.patchSettings).not.toHaveBeenCalled();
+    }
+  );
+
+  it('saves explicit rapid choices and reports failed saves without changing the drawing runtime', async () => {
+    const drawing = { isDrawing: () => true, dispose: vi.fn() };
+    mocks.createDrawingRuntime.mockReturnValue(drawing);
+    mocks.enableSelectionModeApi.mockImplementationOnce(async (args) => {
+      await args.prepareUi();
+      args.createOverlayContainer();
+    });
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    await scenario.runtime.enableSelectionMode();
+    const onModeChange = mocks.createDrawingRuntime.mock.calls.at(-1)![0].onModeChange;
+    mocks.patchSettings.mockRejectedValueOnce(new Error('write refused'));
+    onModeChange(false);
+    await Promise.resolve();
+    expect(mocks.logError).toHaveBeenCalledWith(
+      'Failed to save Crop mode preference',
+      expect.any(Error)
+    );
+    expect(drawing.dispose).not.toHaveBeenCalled();
+    onModeChange(true);
+    onModeChange(false);
+    expect(mocks.patchSettings.mock.calls).toEqual([
+      [{ contentToolbar: { cropMode: 'resize' } }],
+      [{ contentToolbar: { cropMode: 'drawing' } }],
+      [{ contentToolbar: { cropMode: 'resize' } }],
+    ]);
+  });
+
+  it('keeps delayed preference reads local to each activation', async () => {
+    let resolveOlder!: (value: object) => void;
+    mocks.loadSettings
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOlder = resolve;
+        })
+      )
+      .mockResolvedValueOnce({ contentToolbar: { cropMode: 'resize' } });
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    scenario.runtime.enableSelectionMode();
+    scenario.runtime.enableSelectionMode();
+    const older = mocks.enableSelectionModeApi.mock.calls.at(-2)![0];
+    const newer = mocks.enableSelectionModeApi.mock.calls.at(-1)![0];
+    const olderPreparation = older.prepareUi();
+    await newer.prepareUi();
+    resolveOlder({ contentToolbar: { cropMode: 'drawing' } });
+    await olderPreparation;
+    newer.createOverlayContainer();
+    expect(mocks.createDrawingRuntime).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDrawing: false })
+    );
+  });
+
+  it('opens Drawing when settings cannot be read without saving a fallback', async () => {
+    mocks.loadSettings.mockRejectedValueOnce(new Error('storage unavailable'));
+    mocks.enableSelectionModeApi.mockImplementationOnce(async (args) => {
+      await args.prepareUi();
+      args.createOverlayContainer();
+    });
+    const scenario = createScenario();
+    scenario.session.dom.overlayContainer = document.createElement('div');
+    await scenario.runtime.enableSelectionMode();
+    expect(mocks.createDrawingRuntime).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialDrawing: true })
+    );
+    expect(mocks.patchSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe('selection-mode runtime composition', () => {
   it('yields crop gestures while drawing and snapshots committed work before confirmation cleanup', async () => {
     let active = false;
     const snapshot = {

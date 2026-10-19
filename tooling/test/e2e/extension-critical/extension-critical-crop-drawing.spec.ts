@@ -37,6 +37,47 @@ async function readCapturedPixels(page: Page) {
   });
 }
 
+async function readMainDrawingPixels(page: Page) {
+  return page
+    .locator('[data-ui="content.drawing.surface"]')
+    .first()
+    .evaluate((surface) => {
+      const canvas = surface.querySelector<HTMLCanvasElement>('canvas.sniptale-drawing-canvas');
+      if (!canvas?.width || !canvas.height) return 0;
+      const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      for (let offset = 3; offset < pixels.length; offset += 4) if (pixels[offset]) count++;
+      return count;
+    });
+}
+
+async function openImmediateCrop(page: Page) {
+  await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+  await page
+    .locator('[data-ui="content.toolbar.timer-menu"]')
+    .getByText('No delay', { exact: true })
+    .click();
+  await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+  await expect(page.locator('.sniptale-selection-container')).toBeVisible();
+  await stroke(page, { x: 400, y: 200 }, { x: 1000, y: 420 });
+  await expect(page.locator('.sniptale-selection-toolbar')).toBeVisible();
+  const bounds = await page.locator('.sniptale-selection-final-frame').boundingBox();
+  expect(bounds).toEqual({ x: 400, y: 200, width: 600, height: 220 });
+}
+
+async function readStoredCropMode(popup: Page) {
+  return popup.evaluate(async () => {
+    const stored = await chrome.storage.sync.get('sniptale_settings');
+    const settings: unknown = stored['sniptale_settings'];
+    if (!settings || typeof settings !== 'object' || !('contentToolbar' in settings)) return null;
+    const toolbar = settings.contentToolbar;
+    if (!toolbar || typeof toolbar !== 'object' || !('cropMode' in toolbar)) return null;
+    return toolbar.cropMode === 'drawing' || toolbar.cropMode === 'resize'
+      ? toolbar.cropMode
+      : null;
+  });
+}
+
 async function checkKeyboardDrawingMenuGap(page: Page) {
   const options = page.locator('.sniptale-drawing-options-popover').first();
   const toolbar = page.locator('.sniptale-selection-toolbar');
@@ -52,7 +93,107 @@ async function checkKeyboardDrawingMenuGap(page: Page) {
     .toBeLessThanOrEqual(-9);
 }
 
+async function checkCropUndoRedo(page: Page) {
+  const undo = page.locator('[data-ui="content.crop.undo"]');
+  const redo = page.locator('[data-ui="content.crop.redo"]');
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(undo).toBeDisabled();
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(redo).toBeDisabled();
+  const pencil = page.locator(
+    '[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.pencil"]'
+  );
+  await pencil.click();
+  if (await page.locator('[data-ui="content.toolbar.drawing-options.pencil"]').isVisible())
+    await pencil.click();
+  await stroke(page, { x: 530, y: 305 }, { x: 790, y: 305 });
+  await page
+    .locator('[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.text"]')
+    .click();
+  await page.mouse.click(540, 245);
+  await page.locator('[data-ui="content.drawing.text-input"]').fill('Crop text');
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(page.locator('[data-ui="content.drawing.text-object"]')).toHaveCount(0);
+  await redo.click();
+  await expect(page.locator('[data-ui="content.drawing.text-object"]')).toContainText('Crop text');
+  await page.locator('[data-ui="content.crop.mode.resize"]').click();
+  await expect(page.locator('[data-ui="content.drawing.text-object"]')).toContainText('Crop text');
+  await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+}
+
 for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop remembers its mode and restores normal drawing at ${viewport.width}`, async ({
+    hostOrigin,
+  }, info) => {
+    const launched = await launchExtensionBrowser({ viewport });
+    const { context, extensionId } = launched;
+    try {
+      for (const expectedMode of ['drawing', 'resize', 'drawing'] as const) {
+        const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+        try {
+          await page.evaluate(() => {
+            const paragraph = document.createElement('p');
+            paragraph.textContent = 'Drawing must work over ordinary page text after Crop closes.';
+            paragraph.style.cssText =
+              'position:absolute;left:480px;top:270px;width:400px;font:24px sans-serif';
+            document.body.append(paragraph);
+          });
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+          const mainPencil = page.locator('[data-ui="content.toolbar.drawing.pencil"]').first();
+          await mainPencil.click();
+          if (await page.locator('.sniptale-drawing-options-popover').isVisible())
+            await mainPencil.click();
+          await openImmediateCrop(page);
+          const toolbar = page.locator('.sniptale-selection-toolbar');
+          await expect(toolbar).toHaveAttribute('data-crop-mode', expectedMode);
+          const nextMode = expectedMode === 'drawing' ? 'resize' : 'drawing';
+          await page.locator(`[data-ui="content.crop.mode.${nextMode}"]`).click();
+          await expect(toolbar).toHaveAttribute('data-crop-mode', nextMode);
+          await expect.poll(() => readStoredCropMode(popup)).toBe(nextMode);
+          await page.bringToFront();
+          if (nextMode === 'drawing') {
+            const cropPencil = page.locator(
+              '[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.pencil"]'
+            );
+            await cropPencil.click();
+            if (
+              await page.locator('[data-ui="content.toolbar.drawing-options.pencil"]').isVisible()
+            )
+              await cropPencil.click();
+            await stroke(page, { x: 550, y: 300 }, { x: 780, y: 300 });
+            await expect(page.locator('[data-ui="content.crop.undo"]')).toBeEnabled();
+          }
+          for (
+            let attempt = 0;
+            attempt < 5 && (await page.locator('.sniptale-selection-container').count());
+            attempt++
+          ) {
+            await page.keyboard.press('Escape');
+          }
+          await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+          const before = await readMainDrawingPixels(page);
+          await stroke(page, { x: 550, y: 300 }, { x: 780, y: 300 });
+          await expect.poll(() => readMainDrawingPixels(page)).toBeGreaterThan(before + 100);
+          expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+          await expect.poll(() => readStoredCropMode(popup)).toBe(nextMode);
+          await page.screenshot({
+            path: info.outputPath(`crop-${expectedMode}-recovered.png`),
+            fullPage: false,
+          });
+        } finally {
+          await popup.close();
+          await page.close();
+        }
+      }
+    } finally {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    }
+  });
+
   test(`Crop switches Resize and Drawing and captures annotations at ${viewport.width}`, async ({
     hostOrigin,
   }, info) => {
@@ -98,6 +239,12 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(toggle).toBeVisible();
         await expect(resizeMode).toBeVisible();
         await expect(drawingMode).toBeVisible();
+        await expect(drawingMode).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator('[data-ui="content.crop.undo"]')).toBeDisabled();
+        await expect(page.locator('[data-ui="content.crop.redo"]')).toBeDisabled();
+        await expect(page.locator('[data-ui="content.crop.eraser"]')).toHaveCount(0);
+        await expect(page.locator('[data-ui="content.crop.clear"]')).toHaveCount(0);
+        await resizeMode.click();
         await expect(resizeMode).toHaveAttribute('aria-pressed', 'true');
         await expect(drawingMode).toHaveAttribute('aria-pressed', 'false');
         await expect(resizeMode).toHaveCSS('border-top-width', '0px');
@@ -191,22 +338,7 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(frame).toHaveCSS('width', '340px');
         await drawingMode.click();
         await expect(toolbar).toHaveAttribute('data-crop-mode', 'drawing');
-        await page.locator('[data-ui="content.crop.eraser"]').click();
-        await stroke(page, { x: 455, y: 292 }, { x: 465, y: 308 });
-        await pencil.click();
-        if (await options.isVisible()) await pencil.click();
-        await stroke(page, { x: 530, y: 305 }, { x: 790, y: 305 });
-        await page
-          .locator('[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.text"]')
-          .click();
-        await page.mouse.click(540, 245);
-        const input = page.locator('[data-ui="content.drawing.text-input"]');
-        await input.fill('Crop text');
-        await resizeMode.click();
-        await expect(page.locator('[data-ui="content.drawing.text-object"]')).toContainText(
-          'Crop text'
-        );
-        await drawingMode.click();
+        await checkCropUndoRedo(page);
         await page
           .locator('[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.blur"]')
           .click();
@@ -218,8 +350,12 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         });
         const captureTrigger = page.locator('.sniptale-selection-capture-menu-trigger');
         const captureMenu = page.locator('[data-ui="content.selection.capture-action-menu"]');
-        for (const eraser of [false, true]) {
-          if (eraser) await page.locator('[data-ui="content.crop.eraser"]').click();
+        for (const mode of ['blur', 'select']) {
+          await page
+            .locator(
+              `[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.${mode}"]`
+            )
+            .click();
           await captureTrigger.click();
           await expect(captureMenu).toBeVisible();
           await page.keyboard.press('Escape');
@@ -259,8 +395,9 @@ for (const { size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
         await expect(page.locator('.sniptale-selection-container')).toBeVisible();
         await stroke(page, { x: 400, y: 10 }, { x: 720, y: 30 });
-        await drawingMode.click();
-        await expect(page.locator('[data-ui="content.crop.clear"]')).toBeDisabled();
+        await expect(drawingMode).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.locator('[data-ui="content.crop.undo"]')).toBeDisabled();
+        await expect(page.locator('[data-ui="content.crop.redo"]')).toBeDisabled();
         await expect(options).toBeVisible();
         await expect(pencil).toHaveAttribute('data-menu-side', 'down');
         expect((await options.boundingBox())!.y).toBeGreaterThan((await toolbar.boundingBox())!.y);
