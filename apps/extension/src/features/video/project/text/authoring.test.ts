@@ -4,6 +4,7 @@ import { createVideoClipFromAsset } from '../factories/clip';
 import { editReviewTextFragment } from '../../review/text-document';
 import {
   applyVideoProjectTextEdit,
+  addVideoProjectVoiceTake,
   addVideoProjectManualText,
   videoProjectTextPlayhead,
 } from './authoring';
@@ -124,4 +125,141 @@ it('does not guess native time in gaps or conflicting placements and respects so
       target: source,
     })
   ).toEqual({ ok: false, reason: 'stale' });
+});
+
+function voiceAsset() {
+  return createVideoProjectAsset(
+    'Historical phrase',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'voice' },
+    {
+      duration: 12,
+      width: 0,
+      height: 0,
+      mimeType: 'audio/mpeg',
+      size: 4,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+}
+function voiceSnapshot() {
+  return {
+    version: 1 as const,
+    documentId: 'removed-document',
+    binding: { kind: 'project' as const },
+    basisHash: `sha256:${'a'.repeat(64)}`,
+    text: {
+      kind: 'ai' as const,
+      textId: 'removed-phrase',
+      revision: 1,
+      timingRevision: 1,
+      text: 'Historical phrase',
+      start: 1,
+      end: 2,
+      timeDomain: 'result' as const,
+      profile: { modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' as const },
+    },
+  };
+}
+it('adds the complete voice take to a separate track without moving existing content', () => {
+  const { project } = fixture();
+  const before = structuredClone(project);
+  const snapshot = voiceSnapshot();
+  const accepted = addVideoProjectVoiceTake(project, voiceAsset(), snapshot, { start: 7 });
+  expect(accepted).not.toBeNull();
+  expect(accepted!.project.duration).toBe(19);
+  expect(accepted!.project.tracks).toHaveLength(project.tracks.length + 1);
+  expect(accepted!.clip).toMatchObject({
+    type: 'AUDIO',
+    startTime: 7,
+    duration: 12,
+    sourceDuration: 12,
+    playbackRate: 1,
+  });
+  expect(accepted!.clip.textSnapshot).toEqual(snapshot);
+  snapshot.text.text = 'New words';
+  expect(accepted!.clip.textSnapshot?.text.text).toBe('Historical phrase');
+  expect(project).toEqual(before);
+});
+it('uses an explicit audio lane and refuses overlap without ripple or overwrite', () => {
+  const initial = addVideoProjectVoiceTake(fixture().project, voiceAsset(), voiceSnapshot(), {
+    start: 7,
+  })!;
+  const trackId = initial.clip.trackId;
+  const overlapping = voiceAsset();
+  expect(
+    addVideoProjectVoiceTake(initial.project, overlapping, voiceSnapshot(), { start: 8, trackId })
+  ).toBeNull();
+  const later = addVideoProjectVoiceTake(initial.project, overlapping, voiceSnapshot(), {
+    start: 19,
+    trackId,
+  });
+  expect(later!.project.tracks).toEqual(initial.project.tracks);
+  expect(later!.project.clips.find((clip) => clip.id === initial.clip.id)).toEqual(initial.clip);
+  expect(later!.clip.startTime).toBe(19);
+  const multiple = {
+    ...initial.project,
+    tracks: initial.project.tracks.map((track) =>
+      track.id === trackId
+        ? { ...track, logicalLanes: [{ id: 'line-1' }, { id: 'line-2' }] }
+        : track
+    ),
+  };
+  expect(
+    addVideoProjectVoiceTake(multiple, voiceAsset(), voiceSnapshot(), {
+      start: 8,
+      trackId,
+      timelineLaneId: 'line-2',
+    })!.clip.timelineLaneId
+  ).toBe('line-2');
+});
+it('rejects locked, missing, non-audio or unknown-lane destinations', () => {
+  const initial = addVideoProjectVoiceTake(fixture().project, voiceAsset(), voiceSnapshot(), {
+    start: 0,
+  })!;
+  const locked = {
+    ...initial.project,
+    tracks: initial.project.tracks.map((track) => ({ ...track, locked: true })),
+  };
+  for (const project of [locked, initial.project]) {
+    expect(
+      addVideoProjectVoiceTake(project, voiceAsset(), voiceSnapshot(), {
+        start: 20,
+        trackId: project.tracks[0]!.id,
+      })
+    ).toBeNull();
+  }
+  expect(
+    addVideoProjectVoiceTake(initial.project, voiceAsset(), voiceSnapshot(), {
+      start: 20,
+      trackId: 'missing',
+    })
+  ).toBeNull();
+  expect(
+    addVideoProjectVoiceTake(initial.project, voiceAsset(), voiceSnapshot(), {
+      start: 20,
+      trackId: initial.clip.trackId,
+      timelineLaneId: 'unknown',
+    })
+  ).toBeNull();
+});
+it('preserves short audio duration and admits no invalid placement or snapshot', () => {
+  const { project } = fixture();
+  const asset = voiceAsset();
+  asset.metadata.duration = 0.01;
+  expect(
+    addVideoProjectVoiceTake(project, asset, voiceSnapshot(), { start: 0 })!.clip.duration
+  ).toBe(0.01);
+  for (const start of [-1, NaN, Infinity, 86_400]) {
+    expect(addVideoProjectVoiceTake(project, asset, voiceSnapshot(), { start })).toBeNull();
+  }
+  expect(
+    addVideoProjectVoiceTake(
+      project,
+      asset,
+      { ...voiceSnapshot(), basisHash: 'invalid' },
+      { start: 0 }
+    )
+  ).toBeNull();
 });
