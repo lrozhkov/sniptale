@@ -13,11 +13,29 @@ async function checkEditorFillBounds(page: Page) {
     const border = document.querySelector<SVGPolygonElement>(
       '[data-ui="editor.canvas.selection-chrome"] polygon'
     )!;
-    const box = border.getBoundingClientRect();
+    const matrix = border.getScreenCTM()!;
+    const corners = Array.from(border.points).map((point) =>
+      new DOMPoint(point.x, point.y).matrixTransform(matrix)
+    );
+    const origin = corners[0]!;
+    const width = Math.hypot(corners[1]!.x - origin.x, corners[1]!.y - origin.y);
+    const height = Math.hypot(corners[3]!.x - origin.x, corners[3]!.y - origin.y);
+    const horizontal = {
+      x: (corners[1]!.x - origin.x) / width,
+      y: (corners[1]!.y - origin.y) / width,
+    };
+    const vertical = {
+      x: (corners[3]!.x - origin.x) / height,
+      y: (corners[3]!.y - origin.y) / height,
+    };
     const canvasBox = canvas.getBoundingClientRect();
     const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
     let painted = 0;
     let overflow = 0;
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
     for (let row = 0; row < canvas.height; row += 1) {
       for (let column = 0; column < canvas.width; column += 1) {
         const offset = (row * canvas.width + column) * 4;
@@ -28,21 +46,76 @@ async function checkEditorFillBounds(page: Page) {
         )
           continue;
         painted += 1;
-        const x = canvasBox.x + (column * canvasBox.width) / canvas.width;
-        const y = canvasBox.y + (row * canvasBox.height) / canvas.height;
-        if (
-          x < box.x - 1 ||
-          x > box.x + box.width + 1 ||
-          y < box.y - 1 ||
-          y > box.y + box.height + 1
-        )
-          overflow += 1;
+        const x = canvasBox.x + ((column + 0.5) * canvasBox.width) / canvas.width - origin.x;
+        const y = canvasBox.y + ((row + 0.5) * canvasBox.height) / canvas.height - origin.y;
+        const localX = x * horizontal.x + y * horizontal.y;
+        const localY = x * vertical.x + y * vertical.y;
+        left = Math.min(left, localX);
+        right = Math.max(right, localX);
+        top = Math.min(top, localY);
+        bottom = Math.max(bottom, localY);
+        if (localX < -1 || localX > width + 1 || localY < -1 || localY > height + 1) overflow += 1;
       }
     }
-    return { painted, overflow };
+    return {
+      painted,
+      overflow,
+      gaps: { left, top, right: width - right, bottom: height - bottom },
+    };
   });
   expect(result.painted).toBeGreaterThan(100);
   expect(result.overflow).toBe(0);
+  return result.gaps;
+}
+
+async function rotateEditorText(page: Page, degrees: number) {
+  let measured = 0;
+  for (let adjustment = 0; adjustment < 5; adjustment += 1) {
+    const geometry = await page
+      .locator('[data-ui="editor.canvas.selection-chrome"]')
+      .evaluate((node) => {
+        const polygon = node.querySelector('polygon')!;
+        const matrix = polygon.getScreenCTM()!;
+        const points = Array.from(polygon.points).map((point) =>
+          new DOMPoint(point.x, point.y).matrixTransform(matrix)
+        );
+        const center = { x: points[0]!.x, y: points[0]!.y };
+        const icon = node.querySelector('g[transform]')!;
+        const handle = new DOMPoint(0, 0).matrixTransform(icon.getScreenCTM()!);
+        const angle = Math.atan2(points[1]!.y - points[0]!.y, points[1]!.x - points[0]!.x);
+        return { center, handle: { x: handle.x, y: handle.y }, angle };
+      });
+    const delta = (degrees * Math.PI) / 180 - geometry.angle;
+    const offset = {
+      x: geometry.handle.x - geometry.center.x,
+      y: geometry.handle.y - geometry.center.y,
+    };
+    await page.mouse.move(geometry.handle.x, geometry.handle.y);
+    await page.keyboard.down('Control');
+    await page.mouse.down();
+    await page.mouse.move(
+      geometry.center.x + offset.x * Math.cos(delta) - offset.y * Math.sin(delta),
+      geometry.center.y + offset.x * Math.sin(delta) + offset.y * Math.cos(delta),
+      { steps: 8 }
+    );
+    await page.mouse.up();
+    await page.keyboard.up('Control');
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    measured = await page
+      .locator('[data-ui="editor.canvas.selection-chrome"] polygon')
+      .evaluate((polygon: SVGPolygonElement) => {
+        const start = polygon.points.getItem(0);
+        const end = polygon.points.getItem(1);
+        return (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
+      });
+    if (Math.abs(measured - degrees) < 0.25) return;
+  }
+  expect(measured).toBeCloseTo(degrees, 0);
 }
 
 async function setTextAlpha(page: Page, percent: number) {
@@ -344,6 +417,24 @@ for (const viewport of [
               .filter((object) => object['sniptaleType'] === 'text').length
         )
       ).toBe(1);
+      const baseline = await checkEditorFillBounds(page);
+      for (const degrees of [5, 45]) {
+        await rotateEditorText(page, degrees);
+        for (const alpha of [100, 0]) {
+          await setTextAlpha(page, alpha);
+          const gaps = await checkEditorFillBounds(page);
+          for (const edge of ['left', 'top', 'right', 'bottom'] as const) {
+            expect(
+              Math.abs(gaps[edge] - baseline[edge]),
+              `${degrees} degrees, alpha ${alpha}, ${edge}`
+            ).toBeLessThanOrEqual(1);
+          }
+          await page.screenshot({
+            path: info.outputPath(`selection-${degrees}-${alpha}.png`),
+            fullPage: false,
+          });
+        }
+      }
     } finally {
       await page.close();
     }
