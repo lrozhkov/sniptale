@@ -839,13 +839,8 @@ for (const variant of [
       await expect(voice).toBeVisible();
       await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
       await expect(voice.locator('svg.animate-spin')).toHaveCount(0);
-      const format = voice.getByRole('button', {
-        name: label('gallery.videoReview.speechFormat'),
-        exact: true,
-      });
-      await format.click();
-      await page.getByRole('option', { name: 'MP3', exact: true }).click();
-      await expect(format).toBeFocused();
+      await chooseInspectorValue(page, voice, label('gallery.videoReview.speechFormat'), 'MP3');
+      await expect(voice.getByRole('button', { name: 'MP3', exact: true })).toBeFocused();
       const initialInspectorWidth = await dialog
         .locator('.review-inspector-scroll')
         .evaluate((element) => Number.parseFloat(getComputedStyle(element).width));

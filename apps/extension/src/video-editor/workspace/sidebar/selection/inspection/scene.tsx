@@ -76,6 +76,7 @@ function createSceneGroups(
           key={props.project.id}
           project={props.project}
           {...(props.textRewrite ? { rewrite: props.textRewrite } : {})}
+          {...(props.textVoice ? { voice: props.textVoice } : {})}
         />
       ),
     },

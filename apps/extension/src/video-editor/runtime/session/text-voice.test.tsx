@@ -1,0 +1,388 @@
+// @vitest-environment jsdom
+import { ProjectTextVoicePanel } from '../../workspace/sidebar/selection/inspection/text-voice';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
+import { translate } from '../../../platform/i18n';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import {
+  getVideoProject,
+  prepareProjectAsset,
+  deleteProjectAsset,
+} from '../../../composition/persistence/projects';
+import { isCurrentVideoProjectSnapshot } from '../../../composition/persistence/projects/revision';
+import {
+  readAudioStaging,
+  discardAudioStaging,
+} from '../../../composition/persistence/assets/audio-staging';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { runReviewSpeechJob } from '../../../workflows/audio-jobs/client';
+import { decodeReviewSpeechDuration } from '../../../workflows/video-review/speech-audio';
+import { useVideoEditorStore } from '../../state/store';
+import { waitForVideoEditorSave } from './save-readiness';
+import { useVideoProjectTextVoice, type VideoProjectTextVoiceController } from './text-voice';
+
+vi.mock('../../../composition/persistence/projects', () => ({
+  getVideoProject: vi.fn(),
+  prepareProjectAsset: vi.fn(),
+  deleteProjectAsset: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/projects/revision', () => ({
+  isCurrentVideoProjectSnapshot: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/assets/audio-staging', () => ({
+  readAudioStaging: vi.fn(),
+  discardAudioStaging: vi.fn(),
+}));
+vi.mock('../../../workflows/ai-settings/query', () => ({
+  requestAIModelSelectionBootstrap: vi.fn(),
+}));
+vi.mock('../../../workflows/audio-jobs/client', () => ({ runReviewSpeechJob: vi.fn() }));
+vi.mock('../../../workflows/video-review/speech-audio', () => ({
+  decodeReviewSpeechDuration: vi.fn(),
+}));
+vi.mock('./save-readiness', () => ({ waitForVideoEditorSave: vi.fn() }));
+
+function gate<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+let root: ReturnType<typeof createRoot>;
+let host: HTMLDivElement;
+let original: ReturnType<typeof useVideoEditorStore.getState>;
+let operation: VideoProjectTextVoiceController;
+let durable: NonNullable<ReturnType<typeof useVideoEditorStore.getState>['project']>;
+let revision: number;
+function Harness({ visible = true }: { visible?: boolean }) {
+  const project = useVideoEditorStore((state) => state.project)!;
+  operation = useVideoProjectTextVoice(project);
+  return visible && operation.target ? (
+    <InspectorLayout>
+      <ProjectTextVoicePanel
+        project={project}
+        operation={operation}
+        onClose={() => {
+          void operation.close();
+        }}
+      />
+    </InspectorLayout>
+  ) : null;
+}
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:voice');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    this.dispatchEvent(new Event('pause'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    this.dispatchEvent(new Event('play'));
+    return Promise.resolve();
+  });
+  original = useVideoEditorStore.getState();
+  const project = createEmptyVideoProject('Voice');
+  project.version = 5;
+  project.duration = 3;
+  project.textDocuments = [
+    {
+      id: 'script',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            text: 'Speak this',
+            originalText: '',
+            start: 1,
+            end: 2,
+            revision: 1,
+            timingRevision: 2,
+            timeDomain: 'result',
+            alignment: 'manual',
+            showInVideo: true,
+          },
+        ],
+      },
+    },
+  ];
+  useVideoEditorStore.getState().setProject(project);
+  durable = structuredClone(useVideoEditorStore.getState().project!);
+  revision = 1;
+  vi.mocked(getVideoProject).mockImplementation(async () => ({
+    status: 'ready',
+    project: structuredClone(durable),
+    workspaceRevision: revision,
+  }));
+  vi.mocked(isCurrentVideoProjectSnapshot).mockImplementation(
+    async (snapshot, rev) =>
+      rev === revision && JSON.stringify(snapshot) === JSON.stringify(durable)
+  );
+  vi.mocked(waitForVideoEditorSave).mockImplementation(async () => {
+    durable = structuredClone(useVideoEditorStore.getState().project!);
+    revision++;
+  });
+  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue({
+    chromeAiEnabled: false,
+    defaultModelId: 'model',
+    globalSystemPrompt: '',
+    providers: [
+      {
+        id: 'provider',
+        name: 'Provider',
+        connectionType: 'openai-compatible',
+        hasStoredApiKey: true,
+        createdAt: 1,
+        destinationKind: 'external',
+      },
+    ],
+    models: [
+      {
+        id: 'model',
+        modelCode: 'speech',
+        displayName: 'Speech',
+        providerId: 'provider',
+        operation: 'speech',
+        audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+      },
+    ],
+  });
+  vi.mocked(runReviewSpeechJob).mockResolvedValue({
+    type: 'audio',
+    staged: { id: 'staged', size: 4, mimeType: 'audio/mpeg' },
+  });
+  vi.mocked(readAudioStaging).mockResolvedValue(
+    new File(['data'], 'voice.mp3', { type: 'audio/mpeg' })
+  );
+  vi.mocked(decodeReviewSpeechDuration).mockResolvedValue(12);
+  vi.mocked(discardAudioStaging).mockResolvedValue(undefined);
+  vi.mocked(deleteProjectAsset).mockResolvedValue(undefined);
+  vi.mocked(prepareProjectAsset).mockImplementation(async (_blob, _mime, _name, id) => ({
+    id: id!,
+    ref: {
+      assetId: 'physical',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'voice' },
+      mimeType: 'audio/mpeg',
+      size: 4,
+      sha256: null,
+    },
+    protect: vi.fn(async () => undefined),
+    publish: vi.fn(async () => undefined),
+    cancel: vi.fn(async () => undefined),
+    discard: vi.fn(async () => undefined),
+    retainForSession: vi.fn(),
+  }));
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+});
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  useVideoEditorStore.setState(original, true);
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+async function mount() {
+  await act(async () => root.render(<Harness />));
+  await act(async () => operation.loadModels());
+  await act(async () => operation.open('script', 'phrase'));
+}
+async function generate() {
+  await act(async () => operation.prepare());
+  expect(operation.consent?.capture.basis.fragment.text).toBe('Speak this');
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  await act(async () => operation.start());
+}
+it('retains a hidden preview and accepts its full take with one Undo and Redo', async () => {
+  await mount();
+  await generate();
+  const preview = operation.preview;
+  expect(preview).not.toBeNull();
+  await act(async () => root.render(<Harness visible={false} />));
+  expect(operation.preview).toBe(preview);
+  await act(async () => root.render(<Harness />));
+  const position = host.querySelector<HTMLInputElement>(
+    `input[aria-label="${translate('videoEditor.sidebar.textVoicePosition')}"]`
+  )!;
+  await act(async () => {
+    position.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(position, '6');
+    position.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () =>
+    position.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    )
+  );
+  await act(async () => operation.apply());
+  expect(operation.accepted).toBe(true);
+  expect(durable.clips).toHaveLength(1);
+  expect(durable.clips[0]).toMatchObject({ startTime: 6, duration: 12 });
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(0);
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(1);
+  await click('gallery.videoReview.textVoiceBack');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:voice');
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+it('preserves the take and surfaces a conflicting Save without a second generation', async () => {
+  await mount();
+  await generate();
+  const preview = operation.preview;
+  const realSave = vi.mocked(waitForVideoEditorSave).getMockImplementation()!;
+  vi.mocked(waitForVideoEditorSave).mockImplementation(async (...args) => {
+    if (useVideoEditorStore.getState().project!.clips.length) throw new Error('write-conflict');
+    await realSave(...args);
+  });
+  await act(async () => operation.apply());
+  expect(operation.error).toBe('storage-failed');
+  expect(operation.preview).toBe(preview);
+  expect(preview?.attachment?.receipt).toBeDefined();
+  act(() => operation.changePlacement({ start: 8 }));
+  expect(operation.placement.start).toBe(0);
+  vi.mocked(waitForVideoEditorSave).mockImplementation(realSave);
+  await act(async () => operation.apply());
+  expect(operation.accepted).toBe(true);
+  expect(durable.clips).toHaveLength(1);
+  expect(runReviewSpeechJob).toHaveBeenCalledOnce();
+  expect(prepareProjectAsset).toHaveBeenCalledOnce();
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
+});
+it('disposes a late generation after unmount without inserting', async () => {
+  await mount();
+  await act(async () => operation.prepare());
+  const entered = gate<void>();
+  const response = gate<Awaited<ReturnType<typeof runReviewSpeechJob>>>();
+  vi.mocked(runReviewSpeechJob).mockImplementationOnce(async () => {
+    entered.resolve();
+    return response.promise;
+  });
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = operation.start();
+    await entered.promise;
+  });
+  await act(async () => root.render(null));
+  await act(async () => {
+    response.resolve({ type: 'audio', staged: { id: 'late', mimeType: 'audio/mpeg', size: 4 } });
+    await pending;
+  });
+  expect(discardAudioStaging).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'late' }),
+    expect.anything()
+  );
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(0);
+});
+it('rejects an old session after the same project identity is recreated', async () => {
+  await mount();
+  await act(async () => operation.prepare());
+  const old = operation;
+  const project = useVideoEditorStore.getState().project!;
+  act(() =>
+    useVideoEditorStore.getState().setProject({ ...project, createdAt: project.createdAt + 1 })
+  );
+  await act(async () => old.start());
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  expect(operation.target).toBeNull();
+  expect(operation.preview).toBeNull();
+});
+it('refuses an occupied history lease and keeps the preview for retry', async () => {
+  await mount();
+  await generate();
+  const lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
+  await act(async () => operation.apply());
+  expect(operation.error).toBe('busy');
+  expect(operation.preview).not.toBeNull();
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(0);
+  if (lease) act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => operation.apply());
+  expect(operation.accepted).toBe(true);
+});
+
+async function click(key: Parameters<typeof translate>[0]) {
+  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) =>
+      node.getAttribute('aria-label') === translate(key) ||
+      node.textContent?.trim() === translate(key)
+  );
+  if (!button) throw new Error(`Missing command ${key}`);
+  await act(async () => button.click());
+}
+it('previews and stops speech, selects an existing lane and cancels consent without a paid job', async () => {
+  await mount();
+  await act(async () => operation.prepare());
+  await click('common.actions.cancel');
+  expect(operation.consent).toBeNull();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  act(() =>
+    useVideoEditorStore.getState().updateProject((project) => ({
+      ...project,
+      tracks: [
+        {
+          id: 'audio',
+          name: 'Voice lane',
+          order: 0,
+          kind: 'AUDIO',
+          locked: false,
+          visible: true,
+          logicalLanes: [{ id: 'line-1' }, { id: 'alternate' }],
+        },
+      ],
+    }))
+  );
+  await generate();
+  await click('gallery.videoReview.speechPreview');
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalledOnce();
+  await click('videoEditor.sidebar.textVoiceStop');
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+  const audio = host.querySelector('audio')!;
+  await act(async () => audio.dispatchEvent(new Event('error')));
+  expect(host.textContent).toContain(translate('videoEditor.sidebar.textVoiceAuditionFailed'));
+  await click('videoEditor.sidebar.textVoiceTrack');
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((entry) => entry.textContent?.includes('Voice lane'))!
+      .click()
+  );
+  expect(operation.placement.trackId).toBe('audio');
+  await click('videoEditor.sidebar.textVoiceLane');
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((entry) => entry.textContent?.trim() === '2')!
+      .click()
+  );
+  expect(operation.placement.timelineLaneId).toBe('alternate');
+  await act(async () => operation.apply());
+  expect(durable.clips[0]).toMatchObject({
+    trackId: 'audio',
+    timelineLaneId: 'alternate',
+    duration: 12,
+  });
+});
+it('shows a model reload after catalog failure and keeps the form available', async () => {
+  vi.mocked(requestAIModelSelectionBootstrap).mockRejectedValueOnce(new Error('offline'));
+  await act(async () => root.render(<Harness />));
+  await act(async () => operation.open('script', 'phrase'));
+  expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('gallery.videoReview.speechMissingModel')
+  );
+  await click('gallery.videoReview.speechReloadModels');
+  expect(operation.catalog?.models).toHaveLength(1);
+  await click('gallery.videoReview.textVoiceBack');
+  expect(operation.target).toBeNull();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+});

@@ -1,3 +1,5 @@
+import { ProjectTextVoicePanel } from './text-voice';
+import type { VideoProjectTextVoiceController } from '../../../../runtime/session/text-voice';
 import { useEffect, useRef, useState } from 'react';
 import { Plus, WandSparkles } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
@@ -16,9 +18,11 @@ import type { VideoProjectTextRewriteController } from '../../../../runtime/sess
 export function InspectProjectTextPanel({
   project,
   rewrite,
+  voice,
 }: {
   project: VideoProject;
   rewrite?: VideoProjectTextRewriteController | undefined;
+  voice?: VideoProjectTextVoiceController | undefined;
 }) {
   const editor = useProjectTextEditing(project);
   const [choice, setChoice] = useState('');
@@ -27,7 +31,7 @@ export function InspectProjectTextPanel({
   const [limit, setLimit] = useState(50);
   const [batch, setBatch] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
-  const focus = useTextRewriteFocus(rewrite?.target);
+  const focus = useTextRewriteFocus(voice?.target ?? rewrite?.target);
   const documents = project.textDocuments ?? [];
   const entry = documents.find((item) => item.id === choice) ?? documents[0];
   const selectedIds =
@@ -61,7 +65,17 @@ export function InspectProjectTextPanel({
   };
   return (
     <div ref={focus.surface} data-ui="video-editor.text.panel" className="min-w-0 space-y-3 pe-2">
-      {rewrite?.target ? (
+      {voice?.target ? (
+        <ProjectTextVoicePanel
+          project={project}
+          operation={voice}
+          onClose={() => {
+            if (voice.target) focus.rememberTrigger(`voice:${voice.target.fragmentId}`);
+            focus.requestRestore();
+            void voice.close();
+          }}
+        />
+      ) : rewrite?.target ? (
         <ProjectTextRewritePanel
           project={project}
           operation={rewrite}
@@ -110,33 +124,29 @@ export function InspectProjectTextPanel({
                   {translate('gallery.videoReview.textFragmentEmpty')}
                 </p>
               )}
-              {entry.document.fragments.slice(0, limit).map((fragment, index) => (
-                <ProjectTextPhrase
-                  key={JSON.stringify([entry.id, fragment.id])}
-                  {...{ project, entry, fragment, editor }}
-                  next={entry.document.fragments[index + 1]}
-                  expanded={opened === fragment.id}
-                  focus={created === fragment.id}
-                  onToggle={() => {
-                    editor.endTyping();
-                    setCreated('');
-                    setOpened(opened === fragment.id ? '' : fragment.id);
-                  }}
-                  {...(rewrite
-                    ? {
-                        onRewrite: () => openRewrite([fragment.id], false, fragment.id),
-                        batch,
-                        selected: selected.includes(fragment.id),
-                        onSelect: () =>
-                          setSelected((current) =>
-                            current.includes(fragment.id)
-                              ? current.filter((id) => id !== fragment.id)
-                              : [...current, fragment.id]
-                          ),
-                      }
-                    : {})}
-                />
-              ))}
+              <ProjectTextPhrases
+                {...{ project, entry, editor, limit, opened, created, batch, selected }}
+                voice={!!voice}
+                rewrite={!!rewrite}
+                onRewrite={openRewrite}
+                onToggle={(id) => {
+                  editor.endTyping();
+                  setCreated('');
+                  setOpened(opened === id ? '' : id);
+                }}
+                onVoice={(id) => {
+                  editor.endTyping();
+                  focus.rememberTrigger(`voice:${id}`);
+                  voice?.open(entry.id, id);
+                }}
+                onSelect={(id) =>
+                  setSelected((current) =>
+                    current.includes(id)
+                      ? current.filter((entry) => entry !== id)
+                      : [...current, id]
+                  )
+                }
+              />
               {entry.document.fragments.length > limit && (
                 <InspectorActionButton onClick={() => setLimit(limit + 50)}>
                   {translate('gallery.videoReview.textFragmentMore')}
@@ -247,7 +257,7 @@ function documentLabel(project: VideoProject, entry: VideoProjectTextDocument, i
 }
 
 /** Restores the invoking phrase command when the rewrite inspector closes. */
-function useTextRewriteFocus(target: VideoProjectTextRewriteController['target'] | undefined) {
+function useTextRewriteFocus(target: object | null | undefined) {
   const surface = useRef<HTMLDivElement>(null);
   const trigger = useRef('all');
   const restoreFocus = useRef(false);
@@ -255,11 +265,17 @@ function useTextRewriteFocus(target: VideoProjectTextRewriteController['target']
     if (target || !restoreFocus.current) return;
     restoreFocus.current = false;
     const buttons = [
-      ...(surface.current?.querySelectorAll<HTMLElement>('[data-project-text-rewrite]') ?? []),
+      ...(surface.current?.querySelectorAll<HTMLElement>(
+        '[data-project-text-rewrite], [data-project-text-voice]'
+      ) ?? []),
     ];
     (
-      buttons.find((button) => button.dataset['projectTextRewrite'] === trigger.current) ??
-      buttons[0]
+      buttons.find(
+        (button) =>
+          (button.dataset['projectTextVoice']
+            ? `voice:${button.dataset['projectTextVoice']}`
+            : button.dataset['projectTextRewrite']) === trigger.current
+      ) ?? buttons[0]
     )?.focus();
   }, [target]);
   return {
@@ -271,4 +287,49 @@ function useTextRewriteFocus(target: VideoProjectTextRewriteController['target']
       restoreFocus.current = true;
     },
   };
+}
+
+/** Phrase rendering retains editing and selection authority in the text panel. */
+function ProjectTextPhrases(props: {
+  project: VideoProject;
+  entry: VideoProjectTextDocument;
+  editor: ReturnType<typeof useProjectTextEditing>;
+  limit: number;
+  opened: string;
+  created: string;
+  batch: boolean;
+  selected: string[];
+  voice: boolean;
+  rewrite: boolean;
+  onToggle(id: string): void;
+  onVoice(id: string): void;
+  onSelect(id: string): void;
+  onRewrite(ids: string[], wholeDocument: boolean, source: string): void;
+}) {
+  return (
+    <>
+      {props.entry.document.fragments.slice(0, props.limit).map((fragment, index) => (
+        <ProjectTextPhrase
+          key={JSON.stringify([props.entry.id, fragment.id])}
+          project={props.project}
+          entry={props.entry}
+          fragment={fragment}
+          editor={props.editor}
+          next={props.entry.document.fragments[index + 1]}
+          expanded={props.opened === fragment.id}
+          focus={props.created === fragment.id}
+          onToggle={() => props.onToggle(fragment.id)}
+          {...(props.voice ? { onVoice: () => props.onVoice(fragment.id) } : {})}
+          {...(props.rewrite
+            ? {
+                onRewrite: () => props.onRewrite([fragment.id], false, fragment.id),
+                batch: props.batch,
+                selected: props.selected.includes(fragment.id),
+                onSelect: () => props.onSelect(fragment.id),
+              }
+            : {})}
+        />
+      ))}
+    </>
+  );
 }

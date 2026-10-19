@@ -11,6 +11,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     WorkspaceSidebarProps,
     | 'recognition'
     | 'textRewrite'
+    | 'textVoice'
     | 'onImportImage'
     | 'gridSettings'
     | 'typingProject'
@@ -145,6 +146,7 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     ...(props.onImportImage ? { onImportImage: props.onImportImage } : {}),
     ...(props.recognition ? { recognition: props.recognition } : {}),
     ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
+    ...(props.textVoice ? { textVoice: props.textVoice } : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,

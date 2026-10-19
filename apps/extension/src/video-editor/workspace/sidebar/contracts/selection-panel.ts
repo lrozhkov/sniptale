@@ -15,6 +15,7 @@ import type { WorkspaceSidebarProps } from './props';
 export interface WorkspaceSidebarSelectionPanelProps {
   recognition?: WorkspaceSidebarProps['recognition'];
   textRewrite?: WorkspaceSidebarProps['textRewrite'];
+  textVoice?: WorkspaceSidebarProps['textVoice'];
   typingProject?: VideoProject;
   recordingTelemetry?: WorkspaceSidebarProps['recordingTelemetry'];
   onApplyTypingCompression?: WorkspaceSidebarProps['onApplyTypingCompression'];

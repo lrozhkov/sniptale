@@ -4,6 +4,7 @@ import type { WorkspaceSidebarProps } from './props';
 type WorkspaceSidebarPanelContentPropKeys =
   | 'recognition'
   | 'textRewrite'
+  | 'textVoice'
   | 'activeProjectId'
   | 'gridSettings'
   | 'inspectorMode'

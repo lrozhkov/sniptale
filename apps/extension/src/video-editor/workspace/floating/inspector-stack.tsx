@@ -1,3 +1,4 @@
+import { useVideoProjectTextVoice } from '../../runtime/session/text-voice';
 import { useVideoProjectTextRewrite } from '../../runtime/session/text-rewrite';
 import { ExportSettingsPanel } from '../../export/dialog';
 import { useVideoProjectRecognition } from '../../runtime/session/recognition';
@@ -80,6 +81,7 @@ function VideoEditorFloatingInspectorContent({
   const sidebarProps = getWorkspaceSidebarProps(controller);
   const recognition = useVideoProjectRecognition(sidebarProps.project);
   const textRewrite = useVideoProjectTextRewrite(sidebarProps.project);
+  const textVoice = useVideoProjectTextVoice(sidebarProps.project);
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
@@ -158,6 +160,7 @@ function VideoEditorFloatingInspectorContent({
             {...sidebarProps}
             recognition={recognition}
             textRewrite={textRewrite}
+            textVoice={textVoice}
             inputRefs={sidebarState.inputRefs}
             projectsOpen={sidebarState.projectsOpen}
             recordingsOpen={sidebarState.recordingsOpen}

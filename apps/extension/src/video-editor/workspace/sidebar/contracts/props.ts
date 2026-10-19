@@ -1,3 +1,4 @@
+import type { VideoProjectTextVoiceController } from '../../../runtime/session/text-voice';
 import type { VideoProjectTextRewriteController } from '../../../runtime/session/text-rewrite';
 import type { VideoProjectRecognitionController } from '../../../runtime/session/recognition';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
@@ -45,6 +46,7 @@ import type { ProjectListItem, RecordingListItem } from '../../../library/contra
 export interface WorkspaceSidebarProps {
   recognition?: VideoProjectRecognitionController;
   textRewrite?: VideoProjectTextRewriteController;
+  textVoice?: VideoProjectTextVoiceController;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];

@@ -1,6 +1,24 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  textVoicePosition: { ru: 'Позиция в проекте', en: 'Project position' },
+  textVoiceTrack: { ru: 'Аудиодорожка', en: 'Audio track' },
+  textVoiceNewTrack: { ru: 'Новая дорожка', en: 'New track' },
+  textVoiceLane: { ru: 'Линия', en: 'Lane' },
+  textVoiceStop: { ru: 'Остановить прослушивание', en: 'Stop preview' },
+  textVoiceSaved: { ru: 'Озвучка сохранена', en: 'Speech saved' },
+  textVoicePlacementConflict: {
+    ru: 'В этом месте дорожка занята или заблокирована. Выберите другую позицию, линию или новую дорожку.',
+    en: 'This track position is occupied or locked. Choose another position, lane or a new track.',
+  },
+  textVoiceStale: {
+    ru: 'Проект или выбранная фраза изменились. Закройте результат и повторите действие для текущего проекта.',
+    en: 'The project or selected phrase changed. Close this result and start again for the current project.',
+  },
+  textVoiceAuditionFailed: {
+    ru: 'Не удалось воспроизвести дубль. Повторите прослушивание.',
+    en: 'The take could not play. Try previewing it again.',
+  },
   textRewriteSaveDisclosure: {
     ru: 'Текущий проект сохраняется перед запросом. Звук, видео и эффекты остаются локально.',
     en: 'The current project is saved before the request. Audio, video and effects stay local.',

@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, LocateFixed, Merge, Scissors, Trash2, WandSparkles } from 'lucide-react';
+import {
+  ChevronDown,
+  LocateFixed,
+  Merge,
+  Scissors,
+  Trash2,
+  Volume2,
+  WandSparkles,
+} from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import type { VideoProjectTextDocument } from '../../../../../features/video/project/text/types';
 import { videoProjectTextPlayhead } from '../../../../../features/video/project/text/authoring';
@@ -29,6 +37,7 @@ export function ProjectTextPhrase(props: {
   focus: boolean;
   onToggle(): void;
   onRewrite?(): void;
+  onVoice?(): void;
   batch?: boolean;
   selected?: boolean;
   onSelect?(): void;
@@ -93,17 +102,12 @@ export function ProjectTextPhrase(props: {
           )}
         </span>
       </button>
-      {props.onRewrite ? (
-        <InspectorActionButton
-          iconOnly
-          data-project-text-rewrite={fragment.id}
-          title={translate('gallery.videoReview.textRewriteTitle')}
-          aria-label={translate('gallery.videoReview.textRewriteTitle')}
-          onClick={props.onRewrite}
-        >
-          <WandSparkles size={14} aria-hidden="true" />
-        </InspectorActionButton>
-      ) : null}
+      <ProjectTextPhraseCommands
+        fragmentId={fragment.id}
+        text={fragment.text}
+        {...(props.onRewrite ? { onRewrite: props.onRewrite } : {})}
+        {...(props.onVoice ? { onVoice: props.onVoice } : {})}
+      />
       {props.expanded && (
         <div className="w-full min-w-0 space-y-2">
           <TextareaField
@@ -250,6 +254,46 @@ function TextPhraseActions(props: {
           <Trash2 size={14} />
         </InspectorActionButton>
       </div>
+    </>
+  );
+}
+
+function ProjectTextPhraseCommands({
+  fragmentId,
+  text,
+  onRewrite,
+  onVoice,
+}: {
+  fragmentId: string;
+  text: string;
+  onRewrite?(): void;
+  onVoice?(): void;
+}) {
+  return (
+    <>
+      {onRewrite ? (
+        <InspectorActionButton
+          iconOnly
+          data-project-text-rewrite={fragmentId}
+          title={translate('gallery.videoReview.textRewriteTitle')}
+          aria-label={translate('gallery.videoReview.textRewriteTitle')}
+          onClick={onRewrite}
+        >
+          <WandSparkles size={14} aria-hidden="true" />
+        </InspectorActionButton>
+      ) : null}
+      {onVoice ? (
+        <InspectorActionButton
+          iconOnly
+          data-project-text-voice={fragmentId}
+          title={translate('gallery.videoReview.speechGenerate')}
+          aria-label={translate('gallery.videoReview.speechGenerate')}
+          disabled={!text.trim()}
+          onClick={onVoice}
+        >
+          <Volume2 size={14} aria-hidden="true" />
+        </InspectorActionButton>
+      ) : null}
     </>
   );
 }

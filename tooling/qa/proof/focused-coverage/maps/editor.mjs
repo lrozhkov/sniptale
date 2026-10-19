@@ -1,5 +1,15 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'montage-text-phrase-inspection',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-phrase.tsx',
+    reason: 'Mounted text consumers prove phrase editing, navigation and rewrite command behavior.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-rewrite.test.tsx',
+    ],
+  },
+  {
     owner: 'gallery-review-opening-and-feedback',
     productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
     reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
