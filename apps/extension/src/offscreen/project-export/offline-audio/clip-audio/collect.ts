@@ -1,3 +1,4 @@
+import { getClipGainRange } from '../../../../features/video/project/timeline/audio';
 import { getProjectTrackAudioVolume } from '../../../../features/video/project/timeline/track-audio';
 import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
 import { buildProjectTransitionSegments } from '../../../../features/video/project/transition/project';
@@ -26,6 +27,7 @@ export function collectRenderableAudioClips(
   );
   const segments = buildProjectTransitionSegments(project);
   const preparedMediaClips = mediaClips.map((clip) => {
+    const gain = getClipGainRange(clip);
     const audioTransitions = segments
       .filter((segment) => segment.leadingClipId === clip.id || segment.trailingClipId === clip.id)
       .map((segment) => ({
@@ -37,7 +39,11 @@ export function collectRenderableAudioClips(
     const originalAudioRanges = getProjectOriginalAudioRanges(project, clip);
     return {
       ...clip,
-      volume: clip.volume * getProjectTrackAudioVolume(project, clip.trackId),
+      volume: getProjectTrackAudioVolume(project, clip.trackId),
+      audioGainStart: gain.start,
+      audioGainEnd: gain.end,
+      volumeEnvelopeStart: gain.start,
+      volumeEnvelopeEnd: gain.end,
       ...(audioTransitions.length ? { audioTransitions } : {}),
       originalAudioRanges,
       audioFadePhase: { offset: 0, duration: clip.duration },

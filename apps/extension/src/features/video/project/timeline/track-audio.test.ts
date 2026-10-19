@@ -32,7 +32,9 @@ function fixture() {
     }
   );
   const clip = createAudioClipFromAsset(track.id, asset);
-  clip.volume = 1.5;
+  clip.volume = 1;
+  clip.audioGainStart = clip.audioGainEnd = 1.5;
+  clip.volumeEnvelopeStart = clip.volumeEnvelopeEnd = 1.5;
   clip.fadeInMs = clip.fadeOutMs = 0;
   const neighbor = { ...clip, id: 'neighbor', trackId: other.id };
   project.assets = [asset];

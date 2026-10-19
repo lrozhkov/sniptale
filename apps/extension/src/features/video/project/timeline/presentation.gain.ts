@@ -1,3 +1,4 @@
+import { getClipGainRange } from './audio';
 import { getAudioFadeFactor } from '../../audio/fades';
 import { getProjectTrackAudioVolume } from './track-audio';
 import { getProjectOriginalAudioRanges } from './original-audio';
@@ -34,13 +35,11 @@ export function getClipAudioGain(clip: VideoProjectClip, currentTime: number): n
   const clipDurationMs = Math.max(0, clip.duration * 1000);
   const localTimeMs = clampNumber((currentTime - clip.startTime) * 1000, 0, clipDurationMs);
   const progress = clipDurationMs <= 0 ? 0 : clampNumber(localTimeMs / clipDurationMs, 0, 1);
-  const envelopeGain =
-    (clip.volumeEnvelopeStart ?? 1) +
-    ((clip.volumeEnvelopeEnd ?? 1) - (clip.volumeEnvelopeStart ?? 1)) * progress;
+  const range = getClipGainRange(clip);
+  const envelopeGain = range.start + (range.end - range.start) * progress;
 
   return clampNumber(
-    clip.volume *
-      envelopeGain *
+    envelopeGain *
       getAudioFadeFactor(
         { duration: clip.duration, fadeIn: clip.fadeInMs / 1000, fadeOut: clip.fadeOutMs / 1000 },
         currentTime - clip.startTime

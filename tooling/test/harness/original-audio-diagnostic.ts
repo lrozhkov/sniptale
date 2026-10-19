@@ -44,6 +44,8 @@ export async function runOriginalAudioDiagnostic() {
   const take = createAudioClipFromAsset(track.id, voiceAsset, 1);
   take.duration = take.sourceDuration = 2;
   take.volume = 0;
+  take.audioGainStart = take.audioGainEnd = 0;
+  take.volumeEnvelopeStart = take.volumeEnvelopeEnd = 0;
   take.originalAudioMute = {
     volume: 0.5,
     targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],

@@ -47,6 +47,8 @@ function fixture() {
   take.duration = 2;
   take.sourceDuration = 2;
   take.volume = 0;
+  take.audioGainStart = take.audioGainEnd = 0;
+  take.volumeEnvelopeStart = take.volumeEnvelopeEnd = 0;
   take.originalAudioMute = {
     volume: 0.25,
     targets: [{ assetId: source.assetId, sourceInstanceId: source.sourceInstanceId }],

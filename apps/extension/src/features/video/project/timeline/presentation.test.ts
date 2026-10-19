@@ -1,3 +1,4 @@
+import { hydrateVideoProject } from '../hydration';
 import { describe, expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
 import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
@@ -174,3 +175,42 @@ function verifyStableCompositeValues(): void {
   expect(getClipCompositeVisualOpacity(project, clip, 2)).toBeCloseTo(0.5);
   expect(getClipCompositeAudioGain(project, clip, 3)).toBeCloseTo(1.2);
 }
+
+it.each([
+  { volume: 4, volumeEnvelopeStart: 0.5, volumeEnvelopeEnd: 0.5, expected: 1 },
+  {
+    volume: 4,
+    volumeEnvelopeStart: 0.5,
+    volumeEnvelopeEnd: 0.5,
+    audioGainStart: 0.3,
+    audioGainEnd: 0.3,
+    expected: 0.3,
+  },
+  {
+    volume: 3,
+    volumeEnvelopeStart: 0.25,
+    volumeEnvelopeEnd: 0.75,
+    audioGainStart: 1.5,
+    expected: 1.5,
+  },
+  { volume: 0.5, volumeEnvelopeStart: 4, volumeEnvelopeEnd: 4, expected: 1 },
+  {
+    volume: 4,
+    volumeEnvelopeStart: 0.5,
+    volumeEnvelopeEnd: 0.5,
+    audioGainStart: 3,
+    audioGainEnd: 4,
+    expected: 2,
+  },
+])('interprets admitted gain consistently before and after hydration: %j', (values) => {
+  const { expected, ...gain } = values;
+  const clip = createVideoClip({ ...gain, fadeInMs: 0, fadeOutMs: 0 });
+  const project = createProject([clip]);
+  const before = JSON.stringify(project);
+  const opened = hydrateVideoProject(project);
+  for (const time of [clip.startTime, clip.startTime + 2, clip.startTime + clip.duration]) {
+    expect(getClipAudioGain(clip, time)).toBeCloseTo(expected, 12);
+    expect(getClipAudioGain(opened.clips[0]!, time)).toBeCloseTo(expected, 12);
+  }
+  expect(JSON.stringify(project)).toBe(before);
+});

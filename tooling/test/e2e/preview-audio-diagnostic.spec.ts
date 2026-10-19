@@ -237,3 +237,62 @@ test('audio fades preserve overlap geometry and partial phase in native PCM', as
     );
   }
 });
+
+test('admitted legacy gain agrees before and after opening in native preview and export', async ({
+  page,
+}, info) => {
+  const { origin, server } = await startHostServer();
+  try {
+    await page.goto(`${origin}/tooling/test/harness/preview-audio-diagnostic.html`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForFunction(
+      () => typeof window.__sniptalePreviewAudioDiagnostic?.runLegacyGain === 'function'
+    );
+    const result: unknown = await page.evaluate(async () => {
+      const diagnostic = window.__sniptalePreviewAudioDiagnostic;
+      if (!diagnostic) throw new Error('Diagnostic unavailable');
+      return diagnostic.runLegacyGain();
+    });
+    await writeFile(info.outputPath('legacy-gain.json'), JSON.stringify(result, null, 2));
+    const record = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null && !Array.isArray(value);
+    if (!Array.isArray(result) || result.length !== 10)
+      throw new Error('Invalid legacy gain diagnostic');
+    for (const value of result) {
+      const row: unknown = value;
+      if (
+        !record(row) ||
+        typeof row.gain !== 'number' ||
+        typeof row.expectedGain !== 'number' ||
+        typeof row.previewRms !== 'number' ||
+        typeof row.expectedPreviewRms !== 'number' ||
+        !Array.isArray(row.exported)
+      )
+        throw new Error('Invalid legacy gain row');
+      expect.soft(row.gain, `${row.label} ${row.mode} gain`).toBeCloseTo(row.expectedGain, 6);
+      expect
+        .soft(Math.abs(row.previewRms - row.expectedPreviewRms), `${row.label} ${row.mode} preview`)
+        .toBeLessThan(Math.max(1e-4, row.expectedPreviewRms * 0.05));
+      for (const item of row.exported) {
+        const range: unknown = item;
+        if (
+          !record(range) ||
+          typeof range.actualRms !== 'number' ||
+          typeof range.expectedRms !== 'number'
+        )
+          throw new Error('Invalid legacy export range');
+        expect
+          .soft(
+            Math.abs(range.actualRms - range.expectedRms),
+            `${row.label} ${row.mode} export ${range.start}`
+          )
+          .toBeLessThan(1e-4);
+      }
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

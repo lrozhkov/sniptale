@@ -69,6 +69,8 @@ export async function runAudioFadeDiagnostic() {
       sourceDuration: 4 * rate,
       playbackRate: rate,
       volume: 1,
+      audioGainStart: 0.8,
+      audioGainEnd: 0.4,
       volumeEnvelopeStart: 0.8,
       volumeEnvelopeEnd: 0.4,
       fadeInMs: 3000,

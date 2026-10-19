@@ -1,3 +1,5 @@
+import { hydrateVideoProject } from '../../../apps/extension/src/features/video/project/hydration';
+import { assertExportReadyVideoProject } from '../../../apps/extension/src/features/video/project/validation/root';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
@@ -45,6 +47,7 @@ type PreviewAudioDiagnosticResult = {
 };
 
 type PreviewAudioDiagnosticApi = {
+  runLegacyGain: typeof runLegacyGainDiagnostic;
   runAudioFades: typeof runAudioFadeDiagnostic;
   runAmplification: typeof runAmplificationDiagnostic;
   runOriginalAudio: typeof runOriginalAudioDiagnostic;
@@ -285,6 +288,7 @@ function runOnce(): Promise<PreviewAudioDiagnosticResult> {
 
 window.__sniptalePreviewAudioDiagnostic = {
   getLastResult: () => lastResult,
+  runLegacyGain: runLegacyGainDiagnostic,
   runAudioFades: runAudioFadeDiagnostic,
   runOriginalAudio: runOriginalAudioDiagnostic,
   runAmplification: runAmplificationDiagnostic,
@@ -335,7 +339,9 @@ async function runAmplificationDiagnostic() {
       track.audioVolume = master;
       project.tracks.push(track);
       const clip = createAudioClipFromAsset(track.id, asset);
-      clip.volume = volume;
+      clip.volume = 1;
+      clip.audioGainStart = clip.audioGainEnd = volume;
+      clip.volumeEnvelopeStart = clip.volumeEnvelopeEnd = volume;
       project.assets = [asset];
       project.clips = [clip];
       project.duration = 2;
@@ -385,6 +391,154 @@ async function runAmplificationDiagnostic() {
     } finally {
       cleanupDriverScenario(context);
     }
+  }
+  return results;
+}
+
+/** Uses the admitted export contract and native preview graph before and after opening. */
+async function runLegacyGainDiagnostic() {
+  const cases = [
+    { label: 'legacy-volume', volume: 4, start: 0.5, end: 0.5, expected: 1 },
+    {
+      label: 'absolute-priority',
+      volume: 4,
+      start: 0.5,
+      end: 0.5,
+      absoluteStart: 0.3,
+      absoluteEnd: 0.3,
+      expected: 0.3,
+    },
+    {
+      label: 'one-absolute-endpoint',
+      volume: 3,
+      start: 0.25,
+      end: 0.75,
+      absoluteStart: 1.5,
+      expected: 1.5,
+    },
+    { label: 'legacy-envelope', volume: 0.5, start: 4, end: 4, expected: 1 },
+    {
+      label: 'absolute-bound',
+      volume: 4,
+      start: 0.5,
+      end: 0.5,
+      absoluteStart: 3,
+      absoluteEnd: 4,
+      expected: 2,
+    },
+  ];
+  const results = [];
+  for (const input of cases) {
+    const raw = createEmptyVideoProject('Legacy gain diagnostic');
+    raw.version = 7;
+    raw.duration = 2;
+    const track = createVideoProjectTrack('Music', 1, 'AUDIO');
+    track.audioVolume = 1.5;
+    const asset = createVideoProjectAsset(
+      'Sine',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'sine' },
+      {
+        width: 0,
+        height: 0,
+        duration: 2,
+        mimeType: 'audio/wav',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const clip = createAudioClipFromAsset(track.id, asset);
+    delete clip.audioGainStart;
+    delete clip.audioGainEnd;
+    clip.volume = input.volume;
+    clip.volumeEnvelopeStart = input.start;
+    clip.volumeEnvelopeEnd = input.end;
+    if (typeof input.absoluteStart === 'number') clip.audioGainStart = input.absoluteStart;
+    if (typeof input.absoluteEnd === 'number') clip.audioGainEnd = input.absoluteEnd;
+    raw.tracks.push(track);
+    raw.assets = [asset];
+    raw.clips = [clip];
+    assertExportReadyVideoProject(raw);
+    const original = JSON.stringify(raw);
+    for (const [mode, project] of [
+      ['raw', raw],
+      ['opened', hydrateVideoProject(raw)],
+    ] as const) {
+      const context = createDriverScenarioContext();
+      try {
+        await waitForCanPlay(context.audio);
+        const current = project.clips[0];
+        if (!current || current.type !== 'AUDIO') throw new Error('Missing admitted audio');
+        syncPreviewAudioElements({
+          audioRefs: { current: { [current.id]: context.audio } },
+          audioGraphState: context.state,
+          currentTime: 0,
+          isPlaying: true,
+          mediaSyncState: createPreviewMediaSyncState(),
+          project,
+          syncedClips: [current],
+        });
+        const node = context.state.nodesByClipId.get(current.id);
+        const live = context.state.audioContext;
+        if (!node || !live) throw new Error('Native preview graph unavailable');
+        const analyser = live.createAnalyser();
+        analyser.fftSize = 4096;
+        node.gain.connect(analyser);
+        const deadline = performance.now() + 3000;
+        while (context.audio.currentTime < 0.2 || live.state !== 'running') {
+          if (performance.now() > deadline) throw new Error('Legacy preview did not start');
+          await delay(25);
+        }
+        const samples = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(samples);
+        const buffer = await live.decodeAudioData(
+          await (await fetch(context.audio.src)).arrayBuffer()
+        );
+        const sourceRms = rootMeanSquare(buffer.getChannelData(0).slice(9600, 13696));
+        const exported = [];
+        for (const [start, end] of [
+          [0, 2],
+          [0.25, 1.25],
+        ] as const) {
+          const offline = new OfflineAudioContext(
+            1,
+            Math.round((end - start) * DIAGNOSTIC_SAMPLE_RATE),
+            DIAGNOSTIC_SAMPLE_RATE
+          );
+          for (const renderable of collectRenderableAudioClips(project, {
+            rangeStartSeconds: start,
+            rangeEndSeconds: end,
+          }))
+            await scheduleOfflineAudioClipMix(offline, renderable, buffer);
+          const rendered = await offline.startRendering();
+          const from = Math.round((0.5 - start) * DIAGNOSTIC_SAMPLE_RATE);
+          const sourceFrom = Math.round(0.5 * DIAGNOSTIC_SAMPLE_RATE);
+          exported.push({
+            start,
+            end,
+            actualRms: rootMeanSquare(rendered.getChannelData(0).slice(from, from + 4096)),
+            expectedRms:
+              input.expected *
+              1.5 *
+              rootMeanSquare(buffer.getChannelData(0).slice(sourceFrom, sourceFrom + 4096)),
+          });
+        }
+        results.push({
+          label: input.label,
+          mode,
+          gain: node.gain.gain.value,
+          expectedGain: input.expected * 1.5,
+          previewRms: rootMeanSquare(samples),
+          expectedPreviewRms: sourceRms * input.expected * 1.5,
+          exported,
+        });
+        analyser.disconnect();
+      } finally {
+        cleanupDriverScenario(context);
+      }
+    }
+    if (JSON.stringify(raw) !== original) throw new Error('Legacy source changed');
   }
   return results;
 }

@@ -81,9 +81,20 @@ export const LOCAL_OWNER_MAPPINGS = [
   },
   {
     owner: 'montage-composite-audio-consumers',
+    allowCrossOwner: true,
     productionFile: 'apps/extension/src/features/video/project/timeline/presentation.gain.ts',
-    reason: 'Composite gain drives both preview audio and the audio-reactive scene background.',
+    reason:
+      'Canonical gain drives preview, scene response, offline mixing and realtime export after unchanged project admission.',
     testFiles: [
+      'apps/extension/src/features/video/project/timeline/audio.test.ts',
+      'apps/extension/src/features/video/project/timeline/track-audio.test.ts',
+      'apps/extension/src/features/video/project/hydration/clip.test.ts',
+      'apps/extension/src/features/video/project/hydration/index.test.ts',
+      'apps/extension/src/composition/persistence/project-export-inputs/index.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/mix/schedule.test.ts',
+      'apps/extension/src/offscreen/project-export/media-playback/playback.test.ts',
+      'apps/extension/src/video-editor/preview/stage/runtime/audio.test.tsx',
       'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
       'apps/extension/src/features/video/project/timeline/presentation.test.ts',
       'apps/extension/src/features/video/project/timeline/presentation.transitions.test.ts',

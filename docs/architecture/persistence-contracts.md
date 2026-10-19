@@ -432,3 +432,10 @@ Gallery and Montage share the audio fade limit and linear envelope geometry. Aud
 Gallery adapters preserve source-time phases. Montage adapters preserve result-time phases. Overlapping fades use the minimum of both ramps. Independent gain stages multiply manual envelopes, fades, original attenuation, and transitions.
 
 The offscreen collector derives `audioFadePhase` for each renderable media clip. It replaces imported properties with canonical phase data. Partial exports retain authored fade durations and advance the phase offset. This field belongs only to the export plan. It adds no durable field or persistence writer.
+
+
+## Montage media gain interpretation
+
+Preview and export use the existing `getClipGainRange` rule for media clips. Each explicit absolute endpoint takes priority over legacy multiplier fields. An absent endpoint uses the legacy volume and envelope. The existing rule bounds each legacy factor and final endpoint from 0 to 2.
+
+Export derives canonical endpoints in a temporary media plan before range cropping. The plan multiplies track volume once, separately from fades, original attenuation and transitions. Opening and direct export interpret admitted legacy projects consistently. Rendering does not rewrite the supplied project or its durable gain fields. EffectV1 audio plans retain their independent gain semantics.
