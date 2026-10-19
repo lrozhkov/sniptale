@@ -1,3 +1,4 @@
+import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
 import { buildProjectTransitionSegments } from '../../../../features/video/project/transition/project';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { resolveEffectRuntimeAudioPlans } from '../../../../features/video/composition/effect-runtime/audio/plan';
@@ -32,7 +33,12 @@ export function collectRenderableAudioClips(
         easing: segment.transition.easing,
         incoming: segment.trailingClipId === clip.id,
       }));
-    return audioTransitions.length ? { ...clip, audioTransitions } : clip;
+    const originalAudioRanges = getProjectOriginalAudioRanges(project, clip);
+    return {
+      ...clip,
+      ...(audioTransitions.length ? { audioTransitions } : {}),
+      originalAudioRanges,
+    };
   });
   const clips: OfflineAudioRenderableClip[] = [
     ...preparedMediaClips,
@@ -73,6 +79,17 @@ export function clipAudioClipToExportRange(
             start: transition.start - range.start,
             end: transition.end - range.start,
           })),
+        }
+      : {}),
+    ...(clip.originalAudioRanges
+      ? {
+          originalAudioRanges: clip.originalAudioRanges.flatMap((cell) => {
+            const start = Math.max(cell.start, overlapStart),
+              end = Math.min(cell.end, overlapEnd);
+            return end > start
+              ? [{ ...cell, start: start - range.start, end: end - range.start }]
+              : [];
+          }),
         }
       : {}),
     startTime: overlapStart - range.start,

@@ -1,3 +1,4 @@
+import { composeSourceAudioRanges } from '../../audio/source-attenuation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { projectReviewVoiceover } from '../voiceover-edits';
 import type {
@@ -130,41 +131,14 @@ export function originalAudioRangeViews(
   return ranges;
 }
 
-type GainEvent = { at: number; volume: number; direction: -1 | 1; manual: boolean };
-
-/** Produces disjoint gain cells, composing manual gain and minimum overlapping attenuation. */
+/** Playback identities remain private to the Gallery projection. */
 function originalAudioPlaybackRanges(
   views: readonly ReviewOriginalAudioRangeView[]
 ): QuickEditOriginalAudioRange[] {
-  const events: GainEvent[] = views.flatMap((range) => [
-    { at: range.start, volume: range.volume, direction: 1, manual: range.origin === 'manual' },
-    { at: range.end, volume: range.volume, direction: -1, manual: range.origin === 'manual' },
-  ]);
-  events.sort((a, b) => a.at - b.at || a.direction - b.direction);
-  const active = new Map<number, number>();
-  const ranges: QuickEditOriginalAudioRange[] = [];
-  let manualGain = 1;
-  let index = 0;
-  while (index < events.length) {
-    const at = events[index]!.at;
-    while (index < events.length && events[index]!.at === at) {
-      const event = events[index++]!;
-      if (event.manual) manualGain = event.direction === 1 ? event.volume : 1;
-      else {
-        const count = (active.get(event.volume) ?? 0) + event.direction;
-        if (count === 0) active.delete(event.volume);
-        else active.set(event.volume, count);
-      }
-    }
-    const end = events[index]?.at;
-    const attenuation = active.has(0) ? 0 : Math.min(1, ...active.keys());
-    const volume = manualGain * attenuation;
-    if (end === undefined || end <= at || volume === 1) continue;
-    const previous = ranges.at(-1);
-    if (previous?.end === at && previous.volume === volume) previous.end = end;
-    else ranges.push({ id: `source-envelope:${ranges.length}`, start: at, end, volume });
-  }
-  return ranges;
+  return composeSourceAudioRanges(
+    views.filter((range) => range.origin === 'manual'),
+    views.filter((range) => range.origin !== 'manual')
+  ).map((range, index) => ({ ...range, id: `source-envelope:${index}` }));
 }
 
 /** Playback-only envelope; the authored ranges and bindings remain the document authority. */

@@ -227,6 +227,11 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  /** Independent attenuation follows this take; targets confer no resource ownership. */
+  originalAudioMute?: {
+    volume: number;
+    targets: { assetId: string; sourceInstanceId: string }[];
+  };
   /** Accepted speech keeps its original text even after that text or source is removed. */
   textSnapshot?: VideoProjectVoiceTextSnapshot;
   /** Stable text/speech placement identity; split retains it and duplicate replaces it. */
@@ -292,7 +297,7 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4 | 5;
+  version: 2 | 3 | 4 | 5 | 6;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;

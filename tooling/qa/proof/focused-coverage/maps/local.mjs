@@ -1,5 +1,28 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'source-audio-attenuation-consumers',
+    productionFile: 'apps/extension/src/features/video/audio/source-attenuation.ts',
+    reason: 'The shared interval policy must preserve Gallery projection, rendering and export.',
+    testFiles: [
+      'apps/extension/src/features/video/audio/source-attenuation.test.ts',
+      'apps/extension/src/features/video/review/advanced/original-audio-mutes.test.ts',
+      'apps/extension/src/features/video/review/advanced/effective.test.ts',
+      'apps/extension/src/workflows/video-review/audio-render.test.ts',
+      'apps/extension/src/workflows/video-review/export-lifecycle-audio.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-composite-audio-consumers',
+    productionFile: 'apps/extension/src/features/video/project/timeline/presentation.gain.ts',
+    reason: 'Composite gain drives both preview audio and the audio-reactive scene background.',
+    testFiles: [
+      'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/features/video/project/timeline/presentation.test.ts',
+      'apps/extension/src/features/video/project/timeline/presentation.transitions.test.ts',
+      'apps/extension/src/features/video/project/scene/background-audio.test.ts',
+    ],
+  },
+  {
     owner: 'preference-initialization-consumer',
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/preference-service/browser-io.ts',
@@ -730,6 +753,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Media identity admission shares clip validation with project parser and camera contracts.',
     testFiles: [
+      'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/features/video/project/validation/clips.test.ts',
       'apps/extension/src/features/video/project/validation/project.test.ts',
       'apps/extension/src/features/video/project/camera/appearance.test.ts',
@@ -741,6 +766,8 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/features/video/project/validation/root.ts',
     reason: 'Video project boundary validation is covered by parser and transitive boundary tests.',
     testFiles: [
+      'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/offscreen/project-export/service/root.test.ts',
       'apps/extension/src/contracts/messaging/video/validators.project-export.test.ts',
       'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',

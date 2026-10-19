@@ -404,3 +404,11 @@ Gallery track controls use advanced schema23, mediaLibrary27 and database32. The
 Tour Appearance owns the optional global `stage.windowHeader`. Every image slide uses this header. Optional `imagePlacement` retains the bitmap center and scale independently from timed cameras. Original source dimensions and normalized targets remain unchanged.
 
 Database34 and scenarioProjects8 admit these fields through a metadata-only upgrade. The upgrade preserves current projects, saved history, media and editor documents. Earlier writers refuse the newer contract before mutation. Ordinary reads do not write missing defaults. The existing Scenario aggregate writer owns saves, revision refusal and recovery. Portable Scenario JSON retains header PNG data and source placement through the existing codec.
+
+## Montage original audio
+
+Montage stores original-audio attenuation in project JSON version 6. Each attenuation override belongs to one audio take. The take records a volume from 0 to 1 and exact project-local asset and source-instance targets. These targets do not acquire resource ownership or storage access. Unresolved targets remain inert.
+
+Preview and export multiply this attenuation separately from the manual gain envelope. Overlapping overrides use their minimum volume. Each override follows the current result interval of its audio take. Splitting a target preserves its source-instance identity. Duplicating a linked group remaps targets in its copied takes. Duplicating only a take retains its explicit targets. Removing one override leaves other overrides and manual gains unchanged.
+
+Content mutations promote the project to version 6 when an override is present. Later mutations retain version 6 after removal of the last override. Versions 2–5 remain readable when this field is absent. Older project readers refuse version 6 before publication. This change does not require a physical database migration.

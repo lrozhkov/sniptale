@@ -79,3 +79,49 @@ test('preview audio graph does not churn media drivers during browser playback',
     });
   }
 });
+
+test('original audio attenuation agrees with preview and selected-range native PCM', async ({
+  page,
+}) => {
+  const { origin, server } = await startHostServer();
+  try {
+    await page.goto(`${origin}/tooling/test/harness/preview-audio-diagnostic.html`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForFunction(
+      () => typeof window.__sniptalePreviewAudioDiagnostic?.runOriginalAudio === 'function'
+    );
+    const result: unknown = await page.evaluate(async () => {
+      const diagnostic = window.__sniptalePreviewAudioDiagnostic;
+      if (!diagnostic) throw new Error('Diagnostic unavailable');
+      return diagnostic.runOriginalAudio();
+    });
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null && !Array.isArray(value);
+    if (!isRecord(result) || !Array.isArray(result.full) || !Array.isArray(result.partial))
+      throw new Error('Invalid audio diagnostic result');
+    expect(result.unchanged).toBe(true);
+    expect(result.full).toHaveLength(6);
+    expect(result.partial).toHaveLength(5);
+    for (const row of [...result.full, ...result.partial]) {
+      const sample: unknown = row;
+      if (
+        !isRecord(sample) ||
+        typeof sample.rmsError !== 'number' ||
+        typeof sample.actual !== 'number' ||
+        typeof sample.expected !== 'number'
+      )
+        throw new Error('Invalid PCM sample');
+      expect(sample.rmsError, `PCM at ${sample.time}`).toBeLessThan(1e-4);
+      expect(Math.abs(sample.actual - sample.expected)).toBeLessThan(1e-4);
+    }
+    const silent: unknown = result.full.find((row: unknown) => isRecord(row) && row.time === 4.25);
+    if (!isRecord(silent)) throw new Error('Missing full attenuation sample');
+    expect(silent.previewGain).toBe(0);
+    expect(silent.actual).toBeCloseTo(0.02, 4);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

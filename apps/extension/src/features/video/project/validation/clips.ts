@@ -149,8 +149,50 @@ function isEmbeddedShapeAsset(value: unknown): boolean {
   );
 }
 
+function hasOriginalAudioMute(value: Record<string, unknown>): boolean {
+  const mute = value['originalAudioMute'];
+  if (mute === undefined) return true;
+  if (
+    value['type'] !== VideoProjectClipType.AUDIO ||
+    !isRecord(mute) ||
+    Object.keys(mute).some((key) => !['volume', 'targets'].includes(key)) ||
+    !isUnitInterval(mute['volume']) ||
+    !Array.isArray(mute['targets']) ||
+    !mute['targets'].length ||
+    mute['targets'].length > 512
+  )
+    return false;
+  const identities = new Set<string>();
+  return mute['targets'].every((target: unknown) => {
+    if (
+      !isRecord(target) ||
+      Object.keys(target).some((key) => !['assetId', 'sourceInstanceId'].includes(key))
+    )
+      return false;
+    const assetId = target['assetId'],
+      sourceInstanceId = target['sourceInstanceId'];
+    if (
+      typeof assetId !== 'string' ||
+      !assetId ||
+      assetId.trim() !== assetId ||
+      assetId.length > 256 ||
+      typeof sourceInstanceId !== 'string' ||
+      !sourceInstanceId ||
+      sourceInstanceId.trim() !== sourceInstanceId ||
+      sourceInstanceId.length > 256 ||
+      (assetId === value['assetId'] &&
+        sourceInstanceId === (value['sourceInstanceId'] ?? value['id']))
+    )
+      return false;
+    const key = JSON.stringify([assetId, sourceInstanceId]);
+    if (identities.has(key)) return false;
+    identities.add(key);
+    return true;
+  });
+}
+
 export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
-  if (!isRecord(value) || !hasBaseClipFields(value)) {
+  if (!isRecord(value) || !hasBaseClipFields(value) || !hasOriginalAudioMute(value)) {
     return false;
   }
 

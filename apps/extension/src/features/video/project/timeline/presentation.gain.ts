@@ -1,3 +1,5 @@
+import { getProjectOriginalAudioRanges } from './original-audio';
+import { sourceAudioAttenuationAtTime } from '../../audio/source-attenuation';
 import { clampNumber } from './basics';
 import type { VideoProject, VideoProjectClip } from '../types/index';
 import {
@@ -57,6 +59,7 @@ export function getClipCompositeAudioGain(
 ): number {
   return clampNumber(
     getClipAudioGain(clip, currentTime) *
+      sourceAudioAttenuationAtTime(getProjectOriginalAudioRanges(project, clip), currentTime) *
       resolveClipTransitionAudioMultiplier(project, clip, currentTime),
     0,
     2

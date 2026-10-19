@@ -1,3 +1,4 @@
+import { runOriginalAudioDiagnostic } from './original-audio-diagnostic';
 import {
   cleanupPreviewAudioGraph,
   createPreviewAudioGraphState,
@@ -33,6 +34,7 @@ type PreviewAudioDiagnosticResult = {
 };
 
 type PreviewAudioDiagnosticApi = {
+  runOriginalAudio: typeof runOriginalAudioDiagnostic;
   getLastResult: () => PreviewAudioDiagnosticResult | null;
   run: () => Promise<PreviewAudioDiagnosticResult>;
 };
@@ -270,6 +272,7 @@ function runOnce(): Promise<PreviewAudioDiagnosticResult> {
 
 window.__sniptalePreviewAudioDiagnostic = {
   getLastResult: () => lastResult,
+  runOriginalAudio: runOriginalAudioDiagnostic,
   run: runOnce,
 };
 

@@ -1,3 +1,7 @@
+import {
+  isProjectOriginalAudioTarget,
+  remapCopiedOriginalAudioTargets,
+} from '../../../../features/video/project/timeline/original-audio';
 import { duplicateVideoProjectTextDocuments } from '../../../../features/video/project/text/duplication';
 import { isTextSourceClip } from '../../../../features/video/project/text/projection';
 import { cursorFocusOverrideId } from '../../../../features/video/project/cursor-focus-path/authoring';
@@ -74,7 +78,8 @@ export function splitProjectClipsAtTimeWithResult(
     const source =
       isSourceTimedClip(item) &&
       !item.sourceInstanceId &&
-      project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding))
+      (project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
+        isProjectOriginalAudioTarget(project, item))
         ? { ...item, sourceInstanceId: item.id }
         : item;
     const splitClips = splitProjectClip(source, offsets.get(item.id) ?? 0, secondGroupId);
@@ -195,6 +200,11 @@ export function duplicateProjectClipsWithResult(
       return [item, duplicate];
     }),
   });
+  nextProject.clips = remapCopiedOriginalAudioTargets(
+    nextProject.clips,
+    new Set(duplicateIds),
+    sourceInstances
+  );
   nextProject.actionEvents = [
     ...project.actionEvents,
     ...project.actionEvents.flatMap((event) => {
@@ -380,6 +390,7 @@ function duplicateSourceInstance(
     isSourceTimedClip(duplicate) &&
     item.type === duplicate.type &&
     (item.sourceInstanceId ||
+      isProjectOriginalAudioTarget(project, item) ||
       project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
       project.cursorFocusPath?.segments.some(
         (segment) =>

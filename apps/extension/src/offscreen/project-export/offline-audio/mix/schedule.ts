@@ -51,9 +51,10 @@ export async function scheduleOfflineAudioClipMix(
   const gain = offlineContext.createGain();
   gain.gain.setValueAtTime(0, 0);
   source.connect(gain);
+  const output = connectOriginalAudioAttenuation(offlineContext, gain, clip);
   if (clip.audioTransitions?.length) {
     const transitionGain = offlineContext.createGain();
-    gain.connect(transitionGain);
+    output.connect(transitionGain);
     transitionGain.connect(offlineContext.destination);
     transitionGain.gain.setValueAtTime(1, 0);
     for (const transition of clip.audioTransitions) {
@@ -80,7 +81,7 @@ export async function scheduleOfflineAudioClipMix(
       }
     }
   } else {
-    gain.connect(offlineContext.destination);
+    output.connect(offlineContext.destination);
   }
 
   const clipStart = Math.max(0, clip.startTime);
@@ -114,4 +115,24 @@ export async function scheduleOfflineAudioClipMix(
 
   source.start(clipStart, rate === 1 ? clip.sourceStart : 0, clip.sourceDuration / rate);
   source.stop(clipEnd);
+}
+
+/** A separate stage preserves the manual envelope and its fade/transition automation. */
+function connectOriginalAudioAttenuation(
+  context: OfflineAudioContext,
+  input: GainNode,
+  clip: OfflineAudioRenderableClip
+): GainNode {
+  if (!clip.originalAudioRanges?.length) return input;
+  const output = context.createGain();
+  input.connect(output);
+  output.gain.setValueAtTime(1, 0);
+  for (const range of clip.originalAudioRanges) {
+    const start = Math.max(0, clip.startTime, range.start);
+    const end = Math.min(clip.startTime + clip.duration, range.end);
+    if (end <= start) continue;
+    output.gain.setValueAtTime(range.volume, start);
+    output.gain.setValueAtTime(1, end);
+  }
+  return output;
 }

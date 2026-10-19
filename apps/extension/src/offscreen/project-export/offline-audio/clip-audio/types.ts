@@ -1,3 +1,4 @@
+import type { AudioGainRange } from '../../../../features/video/audio/source-attenuation';
 import type {
   VideoProjectAudioClip,
   VideoProjectVideoClip,
@@ -10,6 +11,7 @@ export type OfflineAudioRenderableClip = (
   | VideoProjectAudioClip
   | EffectRuntimeAudioPlan
 ) & {
+  originalAudioRanges?: AudioGainRange[];
   /** Export-local automation; never persisted in the project. */
   audioTransitions?: {
     start: number;

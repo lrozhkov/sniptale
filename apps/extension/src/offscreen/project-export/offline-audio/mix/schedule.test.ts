@@ -1,3 +1,8 @@
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../../features/video/project/factories/creation';
+import { createAudioClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 
 const { clampClipPlaybackRateMock } = vi.hoisted(() => ({
@@ -10,6 +15,7 @@ vi.mock('../../../../features/video/project/timeline', async (importOriginal) =>
 }));
 
 class FakeOfflineAudioContext {
+  gains: Array<NonNullable<FakeOfflineAudioContext['lastGain']>> = [];
   destination = { id: 'destination' };
   lastGain: null | {
     connect: ReturnType<typeof vi.fn>;
@@ -47,6 +53,7 @@ class FakeOfflineAudioContext {
         setValueAtTime: vi.fn(),
       },
     };
+    this.gains.push(this.lastGain);
     return this.lastGain;
   }
 }
@@ -208,3 +215,50 @@ it.each(['LINEAR', 'EASE_IN_OUT'] as const)(
     );
   }
 );
+
+it('uses a separate attenuation stage before crossfade and preserves manual automation', async () => {
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+    OfflineAudioContext;
+  const project = createEmptyVideoProject('Mix');
+  const asset = createVideoProjectAsset(
+    'Audio',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'local' },
+    {
+      width: 0,
+      height: 0,
+      duration: 4,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = {
+    ...createAudioClipFromAsset(project.tracks[0]!.id, asset),
+    volume: 0.8,
+    volumeEnvelopeEnd: 0.5,
+    originalAudioRanges: [
+      { start: 1, end: 2, volume: 0.5 },
+      { start: 2, end: 3, volume: 0.25 },
+    ],
+    audioTransitions: [{ start: 3, end: 4, incoming: false, easing: 'LINEAR' as const }],
+  };
+  await scheduleOfflineAudioClipMix(context, clip, createAudioBuffer(1, 48000, 192000));
+  expect(context.gains).toHaveLength(3);
+  const [manual, attenuation, transition] = context.gains;
+  expect(manual?.connect).toHaveBeenCalledWith(attenuation);
+  expect(attenuation?.connect).toHaveBeenCalledWith(transition);
+  expect(transition?.connect).toHaveBeenCalledWith(context.destination);
+  expect(attenuation?.gain.setValueAtTime.mock.calls).toEqual([
+    [1, 0],
+    [0.5, 1],
+    [1, 2],
+    [0.25, 2],
+    [1, 3],
+  ]);
+  expect(attenuation?.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(manual?.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 0);
+  expect(manual?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.4, 4);
+});

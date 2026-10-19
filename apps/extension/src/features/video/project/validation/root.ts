@@ -81,7 +81,8 @@ function isTransition(value: unknown): boolean {
 function isHydratableProjectShape(value: unknown): value is VideoProject {
   return (
     isRecord(value) &&
-    (value['version'] === 5 ||
+    (value['version'] === 6 ||
+      value['version'] === 5 ||
       value['version'] === 4 ||
       value['version'] === 3 ||
       (value['version'] === 2 &&
@@ -89,16 +90,22 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
         value['actionFeedback'] === undefined)) &&
     (value['cameraFollowDefaults'] === undefined ||
       parseCameraFollowSettings(value['cameraFollowDefaults']) !== null) &&
-    (value['version'] === 5 ||
+    (value['version'] === 6 ||
+      value['version'] === 5 ||
       value['version'] === 4 ||
       (value['cameraFollowDefaults'] === undefined &&
         (!Array.isArray(value['motionRegions']) ||
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
+    (value['version'] === 6 ||
+      !Array.isArray(value['clips']) ||
+      value['clips'].every(
+        (clip: unknown) => !isRecord(clip) || clip['originalAudioMute'] === undefined
+      )) &&
     isString(value['id']) &&
     (value['textDocuments'] === undefined ||
-      (value['version'] === 5 &&
+      ((value['version'] === 6 || value['version'] === 5) &&
         parseVideoProjectTextDocuments(value['textDocuments']) !== null)) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&

@@ -1,3 +1,4 @@
+import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -9,6 +10,7 @@ import {
   createVideoClipFromAsset,
 } from '../../../../features/video/project/factories/clip';
 import {
+  VideoClipLinkMode,
   VideoProjectAssetType,
   VideoTimelinePlacementMode,
   VideoTrackKind,
@@ -156,4 +158,97 @@ it('refuses the complete duplicate when retained text would exceed the shared bu
   expect(duplicateProjectClipsWithResult(project, clip.id)).toBeNull();
   expect(duplicateProjectClipsWithResult(project, clip.id)).toBeNull();
   expect(project).toEqual(before);
+});
+
+function withOriginalBinding(audio: boolean) {
+  const { project, clip } = fixture(audio);
+  delete project.textDocuments;
+  delete clip.sourceInstanceId;
+  project.version = 6;
+  const track = createVideoProjectTrack('Voice', 2, 'AUDIO');
+  project.tracks.push(track);
+  const asset = { ...project.assets[0]!, id: 'voice-asset', type: VideoProjectAssetType.AUDIO };
+  project.assets.push(asset);
+  const take = createAudioClipFromAsset(track.id, asset, 2);
+  take.duration = 6;
+  take.sourceDuration = 6;
+  take.originalAudioMute = {
+    volume: 0.25,
+    targets: [{ assetId: clip.assetId, sourceInstanceId: clip.id }],
+  };
+  project.clips.push(take);
+  return { project, clip, take };
+}
+
+it.each([false, true])(
+  'retains a targeted legacy instance across source split without text (audio=%s)',
+  (audio) => {
+    const { project, clip } = withOriginalBinding(audio);
+    const before = structuredClone(project);
+    const result = splitProjectClipsAtTimeWithResult(project, clip.id, 5)!;
+    const sources = result.project.clips.filter(
+      (item) => item.type === clip.type && item.assetId === clip.assetId
+    );
+    expect(
+      sources.map((item) => ('sourceInstanceId' in item ? item.sourceInstanceId : null))
+    ).toEqual([clip.id, clip.id]);
+    expect(sources.map((item) => getProjectOriginalAudioRanges(result.project, item))).toEqual([
+      [{ start: 2, end: 5, volume: 0.25 }],
+      [{ start: 5, end: 8, volume: 0.25 }],
+    ]);
+    expect(isExportReadyVideoProject(result.project)).toBe(true);
+    expect(project).toEqual(before);
+  }
+);
+
+it('projects voice cuts and subsequent move and speed changes from current result geometry', () => {
+  const { project, clip, take } = withOriginalBinding(false);
+  const result = splitProjectClipsAtTimeWithResult(project, take.id, 5)!;
+  expect(getProjectOriginalAudioRanges(result.project, clip)).toEqual([
+    { start: 2, end: 8, volume: 0.25 },
+  ]);
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(result.project);
+  store.getState().moveClip(result.trailingClipId, 9);
+  store.getState().updateClipPlaybackRate(result.trailingClipId, 2);
+  const changed = store.getState().project!;
+  expect(getProjectOriginalAudioRanges(changed, clip)).toEqual([
+    { start: 2, end: 5, volume: 0.25 },
+    { start: 9, end: 10, volume: 0.25 },
+  ]);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+});
+
+it('remaps copied voice targets after linked source duplication and keeps original bindings', () => {
+  const { project, clip, take } = withOriginalBinding(false);
+  clip.groupId = take.groupId = 'linked';
+  clip.linkMode = take.linkMode = VideoClipLinkMode.LINKED;
+  const before = structuredClone(project);
+  const result = duplicateProjectClipsWithResult(project, clip.id)!;
+  const copiedSource = result.project.clips.find(
+    (item) => item.id !== clip.id && item.type === 'VIDEO'
+  );
+  const copiedTake = result.project.clips.find(
+    (item) => item.id !== take.id && item.type === 'AUDIO'
+  );
+  if (!copiedSource || copiedSource.type !== 'VIDEO' || !copiedTake || copiedTake.type !== 'AUDIO')
+    throw new Error('Missing copies');
+  expect(copiedSource.sourceInstanceId).toBeTruthy();
+  expect(copiedSource.sourceInstanceId).not.toBe(clip.id);
+  expect(copiedTake.originalAudioMute?.targets).toEqual([
+    { assetId: clip.assetId, sourceInstanceId: copiedSource.sourceInstanceId },
+  ]);
+  expect(result.project.clips.find((item) => item.id === take.id)).toEqual(take);
+  expect(isExportReadyVideoProject(result.project)).toBe(true);
+  expect(project).toEqual(before);
+});
+
+it('keeps explicit targets when only the voice take is copied', () => {
+  const { project, take } = withOriginalBinding(false);
+  const result = duplicateProjectClipsWithResult(project, take.id)!;
+  const copies = result.project.clips.filter((item) => item.type === 'AUDIO');
+  expect(copies).toHaveLength(2);
+  expect(
+    copies.map((item) => (item.type === 'AUDIO' ? item.originalAudioMute : undefined))
+  ).toEqual([take.originalAudioMute, take.originalAudioMute]);
 });

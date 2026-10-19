@@ -12,6 +12,13 @@ function getMutationSchemaVersion(
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
 ): VideoProject['version'] {
   if (
+    project.version === 6 ||
+    (patch.clips ?? project.clips).some(
+      (clip) => clip.type === 'AUDIO' && clip.originalAudioMute !== undefined
+    )
+  )
+    return 6;
+  if (
     project.version === 5 ||
     project.textDocuments !== undefined ||
     patch.textDocuments !== undefined
