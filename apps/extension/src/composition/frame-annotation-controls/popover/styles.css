@@ -1,17 +1,21 @@
 .sniptale-settings-popover-header {
   display: flex;
-  min-height: 22px;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
   padding-bottom: 4px;
   cursor: default !important;
   user-select: none;
 }
 
-.sniptale-content-popover--compact .sniptale-settings-popover-header {
-  min-height: 22px;
+.sniptale-settings-popover-heading {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
 }
 
 .sniptale-settings-popover-header[data-draggable='true'] {
@@ -24,7 +28,7 @@
 }
 
 .sniptale-settings-popover-header .sniptale-toolbar-menu-title {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   cursor: inherit !important;
@@ -43,88 +47,78 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: 78%;
   cursor: default !important;
 }
 
-.sniptale-settings-popover-mode-action {
-  min-height: 22px;
-  padding: 2px 7px;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--sniptale-color-text-secondary);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  white-space: nowrap;
-  max-width: 112px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer !important;
-}
-
-.sniptale-settings-popover-destructive-action {
-  min-height: 22px;
-  padding: 2px 7px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--sniptale-color-text-dim);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  white-space: nowrap;
-  max-width: 88px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer !important;
-}
-
-.sniptale-settings-popover-destructive-action:hover,
-.sniptale-settings-popover-destructive-action:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-danger) 34%,
-    var(--sniptale-color-border-soft) 66%
-  );
-  background: color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);
-  color: var(--sniptale-color-danger);
-  outline: none;
-}
-
-.sniptale-settings-popover-mode-action:hover,
-.sniptale-settings-popover-mode-action:focus-visible {
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 38%,
-    var(--sniptale-color-border-soft) 62%
-  );
-  background: color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent);
-  color: var(--sniptale-color-accent);
-  outline: none;
-}
-
-.sniptale-settings-popover-close {
+.sniptale-settings-popover-source-switch {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--sniptale-color-surface-input);
+}
+
+.sniptale-settings-popover-source-option {
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-secondary);
+  font: 400 12px / 20px var(--sniptale-font-interface);
+  white-space: nowrap;
+  cursor: pointer !important;
+}
+
+.sniptale-settings-popover-source-option:hover {
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-settings-popover-source-option[aria-pressed='true'] {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+}
+
+.sniptale-settings-popover-header .sniptale-settings-popover-icon-action {
+  display: inline-flex;
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
+  box-shadow: none;
   color: var(--sniptale-color-text-secondary);
   cursor: pointer !important;
 }
 
-.sniptale-settings-popover-close:hover,
-.sniptale-settings-popover-close:focus-visible {
+.sniptale-settings-popover-header .sniptale-settings-popover-icon-action:hover {
   color: var(--sniptale-color-text-primary);
-  background: var(--sniptale-color-surface-input);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.sniptale-settings-popover-header
+  :is(.sniptale-settings-popover-icon-action, .sniptale-settings-popover-source-option):focus {
+  outline: none;
+}
+
+.sniptale-settings-popover-header
+  :is(
+    .sniptale-settings-popover-icon-action,
+    .sniptale-settings-popover-source-option
+  ):focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
 }
 
 /* Embedded annotation chrome opts in without changing the rendered page annotation. */
@@ -159,9 +153,6 @@
 }
 
 .sniptale-content-appearance-surface .sniptale-settings-popover-header {
-  align-items: flex-start;
-  min-height: 32px;
-  gap: 8px;
   padding-bottom: 0;
 }
 
@@ -171,43 +162,6 @@
   display: flex;
   align-items: center;
   min-height: 32px;
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-self: flex-start;
-  gap: 4px;
-  max-width: 100%;
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action {
-  max-width: none;
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions > button {
-  flex-shrink: 0;
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  min-height: 32px;
-  padding: 0 8px;
-  border-radius: 4px;
-  color: var(--sniptale-color-text-secondary);
-  font: 500 13px / 18px var(--sniptale-font-interface);
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-close {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action:hover,
-.sniptale-content-appearance-surface .sniptale-settings-popover-mode-action:focus-visible {
-  border-color: var(--sniptale-color-border-soft);
-  color: var(--sniptale-color-text-primary);
-  background: var(--sniptale-color-surface-hover);
 }
 
 .sniptale-content-appearance-surface .sniptale-glass-preset-name {

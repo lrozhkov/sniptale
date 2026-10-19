@@ -7,6 +7,7 @@ import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
+import '../../../../apps/extension/src/composition/frame-annotation-controls/popover/styles.css';
 import { EDITOR_BOOTSTRAP_EVENT } from '@sniptale/ui/branding';
 import type { EditorBootstrapPayload } from '../../../../apps/extension/src/workflows/editor/bootstrap';
 import { initializeAppTheme } from '../../../../apps/extension/src/ui/theme/index';

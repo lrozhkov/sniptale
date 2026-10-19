@@ -14,8 +14,8 @@ export const contentCalloutMessages = defineMessageSource({
   modeManual: { ru: 'Вручную', en: 'Manual' },
   switchToManual: { ru: 'Настроить', en: 'Customize' },
   switchToPresets: { ru: 'Шаблоны', en: 'Templates' },
-  templateSourceFrame: { ru: 'Взять с рамки', en: 'Use frame' },
-  templateSourceForced: { ru: 'Взять шаблон', en: 'Use default' },
+  templateSourceFrame: { ru: 'Рамка', en: 'Frame' },
+  templateSourceForced: { ru: 'По умолчанию', en: 'Default' },
   templateSourceFrameHint: {
     ru: 'Переключить на шаблон выноски из настроек рамки.',
     en: 'Switch to the callout template from the frame settings.',

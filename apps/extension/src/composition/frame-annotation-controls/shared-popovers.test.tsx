@@ -343,10 +343,17 @@ it('runs the shared draggable header actions without leaking pointer events', ()
         closeLabel="Close"
         context="element"
         destructiveAction={{ label: 'Disable', onClick: destructive }}
-        sourceAction={{
-          description: 'Use the template linked to the frame',
-          label: 'From frame',
-          onClick: source,
+        sourceControl={{
+          value: 'forced',
+          onChange: source,
+          options: [
+            {
+              value: 'frame-default',
+              description: 'Use the template linked to the frame',
+              label: 'Frame',
+            },
+            { value: 'forced', description: 'Use default template', label: 'Default' },
+          ],
         }}
         drag={{
           isDragging: true,
@@ -365,6 +372,15 @@ it('runs the shared draggable header actions without leaking pointer events', ()
   );
   expect(action).toHaveBeenCalledOnce();
   expect(destructive).toHaveBeenCalledOnce();
+  expect(source).toHaveBeenCalledOnce();
+  expect(source).toHaveBeenCalledWith('frame-default');
+  const sourceButtons = host?.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="shared.annotation-template-source"] button'
+  );
+  expect(sourceButtons).toHaveLength(2);
+  expect(sourceButtons?.[0]?.getAttribute('aria-pressed')).toBe('false');
+  expect(sourceButtons?.[1]?.getAttribute('aria-pressed')).toBe('true');
+  act(() => sourceButtons?.[1]?.click());
   expect(source).toHaveBeenCalledOnce();
   expect(host?.querySelector('[title="Use the template linked to the frame"]')).not.toBeNull();
   expect(close).toHaveBeenCalledOnce();

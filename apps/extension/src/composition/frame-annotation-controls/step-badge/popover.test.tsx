@@ -74,7 +74,9 @@ it('projects optional template-source and reorder controls through the future po
     )
   );
 
-  const source = portal.querySelector<HTMLButtonElement>('.sniptale-settings-popover-mode-action');
+  const source = portal.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.annotation-template-source"] button[aria-pressed="false"]'
+  );
   act(() => source?.click());
   expect(onSourceChange).toHaveBeenCalledWith('forced');
   expect(
