@@ -13,7 +13,7 @@ import { resolveOverlayComments } from '../../features/video/review/comments';
 import { ReviewPreviewInspector } from './preview-inspector';
 import { useReviewPreviewPreferences } from './use-preview-preferences';
 import { useReviewMusicImport } from './music-import';
-import { MusicLibraryDrawer } from './music-library';
+import { AudioLibraryPicker } from '../../composition/audio-library/picker';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
 import { ReviewPreviewBinding } from './preview-binding';
 import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
@@ -278,7 +278,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           </div>
         </div>
       </div>
-      {music.drawer && <MusicLibraryDrawer {...music.drawer} />}
+      {music.drawer && <AudioLibraryPicker {...music.drawer} />}
     </>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from '../../../workflows/video/project-text-voice';
 import {
   acceptProjectVoiceTake,
+  prepareProjectLocalTextVoice,
   cleanupProjectVoiceTakePreview,
   type ProjectVoiceTakeAccess,
   type ProjectVoiceTakePreview,
@@ -34,6 +35,7 @@ import { waitForVideoEditorSave } from './save-readiness';
 type VoicePreview = ProjectVoiceTakePreview;
 type VoiceCapture = Awaited<ReturnType<typeof captureProjectTextVoice>>;
 interface VoiceState {
+  source: 'ai' | 'gallery';
   target: { documentId: string; fragmentId: string } | null;
   profile: ReviewSpeechProfile | undefined;
   catalog: AIModelSelectionBootstrapPayload | null;
@@ -54,6 +56,7 @@ interface VoiceLifetime {
   catalogAttempt: number;
 }
 const initialState: VoiceState = {
+  source: 'ai',
   target: null,
   profile: undefined,
   catalog: null,
@@ -146,9 +149,11 @@ function runVoiceAttempt(
     });
     try {
       await Promise.race([work(controller.signal), cancelled]);
+      return true;
     } catch (error) {
       if (current() && !controller.signal.aborted)
         setState((value) => ({ ...value, error: voiceError(error) }));
+      return false;
     } finally {
       controller.signal.removeEventListener('abort', abort);
       if (current() && lifetime.active === controller) {
@@ -165,11 +170,24 @@ async function loadVoiceCatalog(
   setState: Dispatch<SetStateAction<VoiceState>>
 ) {
   const life = owner.current;
-  if (!life.mounted || life.active || life.preview || latest.current.consent) return;
+  if (
+    !life.mounted ||
+    life.active ||
+    life.preview ||
+    latest.current.consent ||
+    latest.current.source !== 'ai'
+  )
+    return;
   const attempt = ++life.catalogAttempt;
   try {
     const catalog = await requestAIModelSelectionBootstrap('speech');
-    if (owner.current !== life || !life.mounted || attempt !== life.catalogAttempt) return;
+    if (
+      owner.current !== life ||
+      !life.mounted ||
+      attempt !== life.catalogAttempt ||
+      latest.current.source !== 'ai'
+    )
+      return;
     const providers = catalog.providers.filter(
       (entry) => entry.connectionType === 'openai-compatible'
     );
@@ -191,9 +209,35 @@ async function loadVoiceCatalog(
       };
     });
   } catch {
-    if (owner.current === life && life.mounted && attempt === life.catalogAttempt)
+    if (
+      owner.current === life &&
+      life.mounted &&
+      attempt === life.catalogAttempt &&
+      latest.current.source === 'ai'
+    )
       setState((value) => ({ ...value, error: 'model-unavailable' }));
   }
+}
+
+async function prepareVoiceConsent(
+  access: ProjectVoiceTakeAccess,
+  target: NonNullable<VoiceState['target']>,
+  profile: ReviewSpeechProfile,
+  catalog: VoiceState['catalog'],
+  signal: AbortSignal
+): Promise<NonNullable<VoiceState['consent']>> {
+  const model = catalog?.models.find((entry) => entry.id === profile.modelId);
+  const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
+  if (!provider) throw new Error('model-unavailable');
+  const capture = await captureProjectTextVoice(
+    access,
+    target.documentId,
+    target.fragmentId,
+    profile,
+    signal
+  );
+  signal.throwIfAborted();
+  return { capture, providerId: provider.id, providerName: provider.name };
 }
 
 /** One mounted inspector owns consent, audition resources, placement and acceptance lifetime. */
@@ -265,6 +309,32 @@ export function useVideoProjectTextVoice(project: VideoProject) {
         }));
       });
     },
+    changeSource(source: VoiceState['source']) {
+      if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
+      setState((value) => ({ ...value, source, error: null }));
+    },
+    async prepareLocal(selection: Parameters<typeof prepareProjectLocalTextVoice>[0]['selection']) {
+      const { target, source } = latest.current;
+      if (!target || source !== 'gallery' || lifetime.preview || latest.current.consent)
+        throw new Error('busy');
+      const prepared = await run(async (signal) => {
+        const preview = await prepareProjectLocalTextVoice({
+          access,
+          documentId: target.documentId,
+          fragmentId: target.fragmentId,
+          selection,
+          kind: 'gallery',
+          signal,
+        });
+        if (signal.aborted || !current()) {
+          await cleanupProjectVoiceTakePreview(preview);
+          return;
+        }
+        lifetime.preview = preview;
+        setState((value) => ({ ...value, preview }));
+      });
+      if (!prepared) throw new Error('failed');
+    },
     changeProfile(profile: ReviewSpeechProfile) {
       if (!current() || lifetime.active || lifetime.preview || latest.current.consent) return;
       setState((value) => ({ ...value, profile, error: null }));
@@ -276,26 +346,9 @@ export function useVideoProjectTextVoice(project: VideoProject) {
     async prepare() {
       const { target, profile, catalog } = latest.current;
       if (!target || !profile || lifetime.preview || latest.current.consent) return;
-      const model = catalog?.models.find((entry) => entry.id === profile.modelId);
-      const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
-      if (!provider) {
-        if (current()) setState((value) => ({ ...value, error: 'model-unavailable' }));
-        return;
-      }
       await run(async (signal) => {
-        const capture = await captureProjectTextVoice(
-          access,
-          target.documentId,
-          target.fragmentId,
-          profile,
-          signal
-        );
-        signal.throwIfAborted();
-        if (current())
-          setState((value) => ({
-            ...value,
-            consent: { capture, providerId: provider.id, providerName: provider.name },
-          }));
+        const consent = await prepareVoiceConsent(access, target, profile, catalog, signal);
+        if (current()) setState((value) => ({ ...value, consent }));
       });
     },
     async start() {

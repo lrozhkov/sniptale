@@ -2,12 +2,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { MusicLibraryDrawer, type MusicLibraryDrawerProps } from './music-library';
-import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
+import { AudioLibraryPicker, type AudioLibraryPickerProps } from './picker';
+import type { MediaLibraryItem } from '../persistence/media-library/contracts';
 
 const io = vi.hoisted(() => ({ media: vi.fn(), views: vi.fn() }));
-vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.media }));
-vi.mock('../../composition/persistence/gallery-saved-views', () => ({
+vi.mock('../persistence/media-library', () => ({ listMediaLibrary: io.media }));
+vi.mock('../persistence/gallery-saved-views', () => ({
   listGallerySavedViews: io.views,
 }));
 vi.mock('../../platform/i18n', () => ({
@@ -35,7 +35,7 @@ const item: MediaLibraryItem = {
 };
 let root: Root;
 let host: HTMLDivElement;
-let props: MusicLibraryDrawerProps;
+let props: AudioLibraryPickerProps;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
@@ -78,7 +78,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 async function render() {
-  await act(async () => root.render(<MusicLibraryDrawer {...props} />));
+  await act(async () => root.render(<AudioLibraryPicker {...props} />));
 }
 function button(label: string) {
   const node = [...document.querySelectorAll('button')].find(

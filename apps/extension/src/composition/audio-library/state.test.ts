@@ -2,13 +2,13 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
-import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
-import { useMusicLibraryState } from './music-library-state';
+import type { MediaLibraryItem } from '../persistence/media-library/contracts';
+import type { GallerySavedView } from '../persistence/gallery-saved-views';
+import { useAudioLibraryState } from './state';
 
 const io = vi.hoisted(() => ({ media: vi.fn(), views: vi.fn() }));
-vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.media }));
-vi.mock('../../composition/persistence/gallery-saved-views', () => ({
+vi.mock('../persistence/media-library', () => ({ listMediaLibrary: io.media }));
+vi.mock('../persistence/gallery-saved-views', () => ({
   listGallerySavedViews: io.views,
 }));
 let root: Root;
@@ -21,9 +21,9 @@ afterEach(async () => {
 async function mount() {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   root = createRoot(document.createElement('div'));
-  let current!: ReturnType<typeof useMusicLibraryState>;
+  let current!: ReturnType<typeof useAudioLibraryState>;
   function Harness() {
-    current = useMusicLibraryState();
+    current = useAudioLibraryState();
     return null;
   }
   await act(async () => root.render(createElement(Harness)));

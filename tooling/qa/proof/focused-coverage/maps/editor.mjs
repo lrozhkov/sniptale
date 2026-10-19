@@ -1,5 +1,47 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'montage-text-voice-panel',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
+    allowCrossOwner: true,
+    reason: 'Mounted voice sessions exercise the actual panel and its local and AI controls.',
+    testFiles: ['apps/extension/src/video-editor/runtime/session/text-voice.test.tsx'],
+  },
+  {
+    owner: 'media-library-search-typography',
+    productionFile: 'apps/extension/src/ui/media-library-header.tsx',
+    allowCrossOwner: true,
+    reason: 'The shared header and its resource adapters preserve typed queries and filtering.',
+    testFiles: [
+      'apps/extension/src/ui/media-library-header.test.tsx',
+      'apps/extension/src/composition/background-resources/library.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-library.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-audio-library-selection',
+    productionFile: 'apps/extension/src/composition/audio-library/selection.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Shared selection and the Gallery adapter prove audition identity, cancellation and preparation.',
+    testFiles: [
+      'apps/extension/src/composition/audio-library/selection.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-gallery.test.tsx',
+    ],
+  },
+  {
+    owner: 'montage-text-voice-session',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
+    allowCrossOwner: true,
+    reason: 'Mounted local and AI consumers retain the common take acceptance and Save contracts.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/workflows/video/project-voice-take.test.ts',
+      'apps/extension/src/workflows/video/project-voice-take.local.test.ts',
+      'apps/extension/src/workflows/video/project-text-voice.test.ts',
+    ],
+  },
+  {
     owner: 'montage-voice-text-basis',
     productionFile: 'apps/extension/src/features/video/project/text/voice-scope.ts',
     allowCrossOwner: true,

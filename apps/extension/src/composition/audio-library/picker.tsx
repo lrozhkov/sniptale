@@ -8,13 +8,13 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
-import { formatDurationLabel } from '../../composition/audio-recording/format';
+import type { MediaLibraryItem } from '../persistence/media-library/contracts';
+import { formatDurationLabel } from '../audio-recording/format';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { useMusicLibraryState } from './music-library-state';
+import { useAudioLibraryState } from './state';
 
 /** Callbacks retain ownership of playback, durable insertion, cancellation and successful closure. */
-export interface MusicLibraryDrawerProps {
+export interface AudioLibraryPickerProps {
   label?: string;
   anchor: HTMLElement | null;
   onClose(): void;
@@ -30,7 +30,7 @@ export interface MusicLibraryDrawerProps {
 }
 
 /** Native modal traps focus; its children use the existing product drawer and theme owners. */
-export function MusicLibraryDrawer(props: MusicLibraryDrawerProps) {
+export function AudioLibraryPicker(props: AudioLibraryPickerProps) {
   useAppLocale();
   const dialog = useRef<HTMLDialogElement>(null);
   const theme = useResolvedPortalTheme(props.anchor);
@@ -73,8 +73,8 @@ export function MusicLibraryDrawer(props: MusicLibraryDrawerProps) {
   );
 }
 
-function MusicLibraryContent(props: MusicLibraryDrawerProps) {
-  const state = useMusicLibraryState();
+function MusicLibraryContent(props: AudioLibraryPickerProps) {
+  const state = useAudioLibraryState();
   const pending = useRef(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState(false);
@@ -168,7 +168,7 @@ function MusicLibraryContent(props: MusicLibraryDrawerProps) {
 function MusicLibraryHeader(props: {
   label: string;
   state: Pick<
-    ReturnType<typeof useMusicLibraryState>,
+    ReturnType<typeof useAudioLibraryState>,
     'views' | 'viewId' | 'setViewId' | 'query' | 'setQuery' | 'setComposing' | 'applyQuery'
   >;
   busy: string | null;

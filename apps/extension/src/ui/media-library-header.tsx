@@ -49,6 +49,7 @@ export function MediaLibraryHeader(props: {
               <input
                 type="search"
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none
+                  font-[family-name:var(--sniptale-font-document-sans)]
                   placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent"
                 aria-label={props.searchLabel}
                 placeholder={props.searchLabel}

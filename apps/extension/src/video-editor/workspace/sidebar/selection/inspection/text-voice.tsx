@@ -1,12 +1,13 @@
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, LoaderCircle, Play, Square } from 'lucide-react';
+import { ArrowLeft, Check, FolderOpen, LoaderCircle, Play, Square } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
 import { SpeechSynthesisProfileFields } from '../../../../../ui/video-text/speech/profile';
-import { SelectField } from '../../../../../ui/compact-inspector-controls';
+import { SegmentedRow, SelectField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectTextVoiceController } from '../../../../runtime/session/text-voice';
 import { InspectorActionButton } from '../shared/actions';
+import { AudioLibrarySelection } from '../../../../../composition/audio-library/selection';
 import { NumberInput } from '../inputs/number';
 
 /** Montage supplies explicit result-clock placement independently of text source ranges. */
@@ -16,10 +17,7 @@ export function ProjectTextVoicePanel(props: {
   onClose(): void;
 }) {
   const { operation: op } = props;
-  const { loadModels } = op;
-  useEffect(() => {
-    void loadModels();
-  }, [loadModels]);
+  const { source } = op;
   const fragment = props.project.textDocuments
     ?.find((entry) => entry.id === op.target?.documentId)
     ?.document.fragments.find((entry) => entry.id === op.target?.fragmentId);
@@ -56,30 +54,28 @@ export function ProjectTextVoicePanel(props: {
       >
         {text}
       </blockquote>
-      <fieldset disabled={locked} className="min-w-0">
-        <SpeechSynthesisProfileFields
-          catalog={op.catalog}
-          profile={op.profile}
-          onChange={op.changeProfile}
-          onOpenModels={() => {
-            void op.loadModels();
-          }}
-          preferenceId="project-text-voice.profile.advanced"
-        />
-      </fieldset>
-      {!op.catalog?.models.length && !locked ? (
-        <InspectorActionButton
-          onClick={() => {
-            void op.loadModels();
-          }}
-        >
-          {translate('gallery.videoReview.speechReloadModels')}
-        </InspectorActionButton>
-      ) : null}
-      <VoiceRequest operation={op} hasText={!!fragment?.text.trim()} />
+      <SegmentedRow
+        value={source}
+        ariaLabel={translate('gallery.videoReview.textVoiceSource')}
+        columns={2}
+        options={[
+          { value: 'ai', label: translate('gallery.videoReview.textVoiceAI'), disabled: locked },
+          {
+            value: 'gallery',
+            label: translate('gallery.videoReview.textVoiceGallery'),
+            disabled: locked,
+          },
+        ]}
+        onChange={op.changeSource}
+      />
+      <VoiceSourceControls operation={op} hasText={!!fragment?.text.trim()} />
       {op.preview ? (
         <>
-          <VoiceAudition url={op.preview.url} duration={op.preview.duration} />
+          <VoiceAudition
+            url={op.preview.url}
+            duration={op.preview.duration}
+            focusOnMount={source === 'gallery'}
+          />
           <VoicePlacement project={props.project} operation={op} />
           {op.accepted ? (
             <div role="status" className="flex items-center gap-2 text-xs">
@@ -104,6 +100,67 @@ export function ProjectTextVoicePanel(props: {
       ) : null}
       <VoiceRequestStatus operation={op} />
     </section>
+  );
+}
+
+/** Each source keeps its own parameters and acquisition controls within the common take panel. */
+function VoiceSourceControls({
+  operation: op,
+  hasText,
+}: {
+  operation: VideoProjectTextVoiceController;
+  hasText: boolean;
+}) {
+  const { loadModels, source } = op;
+  const pauseTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
+  const locked = op.running || !!op.preview || !!op.consent;
+  useEffect(() => {
+    if (source === 'ai') void loadModels();
+  }, [loadModels, source]);
+  return source === 'ai' ? (
+    <>
+      <fieldset disabled={locked} className="min-w-0">
+        <SpeechSynthesisProfileFields
+          catalog={op.catalog}
+          profile={op.profile}
+          onChange={op.changeProfile}
+          onOpenModels={() => {
+            void op.loadModels();
+          }}
+          preferenceId="project-text-voice.profile.advanced"
+        />
+      </fieldset>
+      {!op.catalog?.models.length && !locked ? (
+        <InspectorActionButton
+          onClick={() => {
+            void op.loadModels();
+          }}
+        >
+          {translate('gallery.videoReview.speechReloadModels')}
+        </InspectorActionButton>
+      ) : null}
+      <VoiceRequest operation={op} hasText={hasText} />
+    </>
+  ) : !op.preview ? (
+    <AudioLibrarySelection
+      onSelect={op.prepareLocal}
+      onClose={op.cancel}
+      onBeforePreview={() => pauseTimeline(false)}
+      trigger={(open) => (
+        <InspectorActionButton
+          disabled={op.running}
+          onClick={open}
+          aria-label={translate('gallery.videoReview.textVoiceChooseAudio')}
+        >
+          <FolderOpen size={14} aria-hidden="true" />
+          {translate('gallery.videoReview.textVoiceChooseAudio')}
+        </InspectorActionButton>
+      )}
+    />
+  ) : (
+    <div className="truncate text-xs" title={op.preview.filename}>
+      {op.preview.filename}
+    </div>
   );
 }
 
@@ -160,7 +217,19 @@ function VoicePlacement({
   );
 }
 
-function VoiceAudition({ url, duration }: { url: string; duration: number }) {
+function VoiceAudition({
+  url,
+  duration,
+  focusOnMount,
+}: {
+  url: string;
+  duration: number;
+  focusOnMount: boolean;
+}) {
+  const surface = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusOnMount) surface.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  }, [url, focusOnMount]);
   const locale = useAppLocale();
   const setPlayingTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
   const audio = useRef<HTMLAudioElement>(null);
@@ -176,7 +245,7 @@ function VoiceAudition({ url, duration }: { url: string; duration: number }) {
     playing ? 'videoEditor.sidebar.textVoiceStop' : 'gallery.videoReview.speechPreview'
   );
   return (
-    <div className="space-y-2">
+    <div ref={surface} className="space-y-2">
       <audio
         ref={audio}
         src={url}

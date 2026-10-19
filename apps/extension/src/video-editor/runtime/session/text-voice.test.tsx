@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { inspectReviewAudio } from '../../../workflows/video-review/audio-import';
 import { ProjectTextVoicePanel } from '../../workspace/sidebar/selection/inspection/text-voice';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { translate } from '../../../platform/i18n';
@@ -23,6 +24,16 @@ import { useVideoEditorStore } from '../../state/store';
 import { waitForVideoEditorSave } from './save-readiness';
 import { useVideoProjectTextVoice, type VideoProjectTextVoiceController } from './text-voice';
 
+vi.mock('../../../workflows/video-review/audio-import', async (original) => ({
+  ...(await original<typeof import('../../../workflows/video-review/audio-import')>()),
+  inspectReviewAudio: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/media-library', () => ({
+  listMediaLibrary: vi.fn(async () => []),
+}));
+vi.mock('../../../composition/persistence/gallery-saved-views', () => ({
+  listGallerySavedViews: vi.fn(async () => []),
+}));
 vi.mock('../../../composition/persistence/projects', () => ({
   getVideoProject: vi.fn(),
   prepareProjectAsset: vi.fn(),
@@ -74,6 +85,15 @@ function Harness({ visible = true }: { visible?: boolean }) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(inspectReviewAudio).mockResolvedValue(12);
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value: vi.fn(),
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:voice');
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
@@ -385,4 +405,88 @@ it('shows a model reload after catalog failure and keeps the form available', as
   await click('gallery.videoReview.textVoiceBack');
   expect(operation.target).toBeNull();
   expect(runReviewSpeechJob).not.toHaveBeenCalled();
+});
+
+it('prepares local audio without AI and retries only Save after insertion', async () => {
+  await mount();
+  await click('gallery.videoReview.textVoiceGallery');
+  expect(operation.source).toBe('gallery');
+  expect(host.querySelector('.sniptale-ai-model-selector-trigger')).toBeNull();
+  vi.mocked(waitForVideoEditorSave).mockClear();
+  await click('gallery.videoReview.textVoiceChooseAudio');
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const file = new File(['data'], 'Local original.wav', { type: 'audio/wav' });
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(document.querySelector('dialog')).toBeNull();
+  expect(host.textContent).toContain(file.name);
+  expect(operation.preview?.textSnapshot.text.kind).toBe('gallery');
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+  expect(waitForVideoEditorSave).not.toHaveBeenCalled();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+  await act(async () => root.render(<Harness visible={false} />));
+  expect(operation.preview?.blob).toBe(file);
+  await act(async () => root.render(<Harness />));
+  vi.mocked(waitForVideoEditorSave)
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('conflict'));
+  await act(async () => operation.apply());
+  expect(operation.error).toBe('storage-failed');
+  expect(useVideoEditorStore.getState().project!.clips).toHaveLength(1);
+  await click('gallery.videoReview.speechRetrySave');
+  expect(operation.accepted).toBe(true);
+  expect(durable.clips).toHaveLength(1);
+  expect(durable.clips[0]).toMatchObject({
+    duration: 12,
+    textSnapshot: { text: { kind: 'gallery' } },
+  });
+  expect(prepareProjectAsset).toHaveBeenCalledOnce();
+  expect(runReviewSpeechJob).not.toHaveBeenCalled();
+});
+
+it('disposes a late local preparation after unmount without inserting', async () => {
+  await mount();
+  await click('gallery.videoReview.textVoiceGallery');
+  const decode = gate<number>();
+  vi.mocked(inspectReviewAudio).mockReturnValueOnce(decode.promise);
+  let pending!: Promise<void>;
+  act(() => {
+    pending = operation.prepareLocal({
+      kind: 'file',
+      file: new File(['data'], 'Late.wav', { type: 'audio/wav' }),
+    });
+  });
+  const outcome = pending.catch(() => undefined);
+  await vi.waitFor(() => expect(inspectReviewAudio).toHaveBeenCalledOnce());
+  await act(async () => root.render(null));
+  await act(async () => {
+    decode.resolve(12);
+    await outcome;
+  });
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+});
+
+it('keeps a late AI catalog failure out of the local source state', async () => {
+  const catalog = gate<Awaited<ReturnType<typeof requestAIModelSelectionBootstrap>>>();
+  vi.mocked(requestAIModelSelectionBootstrap).mockReturnValueOnce(
+    catalog.promise.then(() => {
+      throw new Error('offline');
+    })
+  );
+  await act(async () => root.render(<Harness />));
+  await act(async () => operation.open('script', 'phrase'));
+  await click('gallery.videoReview.textVoiceGallery');
+  expect(operation.error).toBeNull();
+  await act(async () =>
+    catalog.resolve({
+      providers: [],
+      models: [],
+      chromeAiEnabled: false,
+      defaultModelId: null,
+      globalSystemPrompt: '',
+    })
+  );
+  expect(operation.source).toBe('gallery');
+  expect(operation.error).toBeNull();
 });
