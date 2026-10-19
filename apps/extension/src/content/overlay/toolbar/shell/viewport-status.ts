@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { setScreenshotSurfaceBinding } from '../../viewport-selector/capability';
+import { createScreenshotSurfaceStatusBindingUpdater } from '../../viewport-selector/capability';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -12,14 +12,16 @@ export function useToolbarViewportStatus(params: {
   const { setCurrentViewport } = params;
 
   useEffect(() => {
+    let disposed = false;
     const checkViewportStatus = async () => {
+      const updateBinding = createScreenshotSurfaceStatusBindingUpdater();
       try {
         const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
           type: MessageType.SCREENSHOT_MODE_STATUS,
         });
-        setCurrentViewport(response?.success ? (response.viewport ?? null) : null);
+        if (disposed) return;
         if (response?.success) {
-          setScreenshotSurfaceBinding({
+          const applied = updateBinding({
             token: response.enabled ? (response.surfaceCapabilityToken ?? null) : null,
             ...(response.surfaceLeaseGeneration === undefined
               ? {}
@@ -28,12 +30,17 @@ export function useToolbarViewportStatus(params: {
               ? {}
               : { operationGeneration: response.surfaceOperationGeneration }),
           });
+          if (!applied) return;
         }
+        setCurrentViewport(response?.success ? (response.viewport ?? null) : null);
       } catch (error) {
         logger.error('Failed to check screenshot mode status', error);
       }
     };
 
     void checkViewportStatus();
+    return () => {
+      disposed = true;
+    };
   }, [setCurrentViewport]);
 }
