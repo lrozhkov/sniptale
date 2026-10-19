@@ -1,4 +1,8 @@
-import { roundedWindowClearance, roundedWindowRadius } from '../../project/window-geometry';
+import {
+  decoratedMediaSourceSize,
+  roundedWindowClearance,
+  roundedWindowRadius,
+} from '../../project/window-geometry';
 import { uncropMediaSourceRect, type MediaSourceCrop } from '../../project/media-crop';
 import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
@@ -160,14 +164,12 @@ export function getFittedMediaWindowFrame(params: {
   if (params.fitMode === VideoMediaFitMode.COVER) return params.frame;
   const width = params.sourceWidth * (params.sourceCrop?.width ?? 1);
   const height = params.sourceHeight * (params.sourceCrop?.height ?? 1);
-  const header = params.windowHeader
-    ? windowHeaderGeometry(params.windowHeader, { width, height }).height
-    : 0;
+  const source = decoratedMediaSourceSize(width, height, params.windowHeader);
   return getFittedMediaContentFrame({
     fitMode: params.fitMode,
     frame: params.frame,
-    sourceWidth: width,
-    sourceHeight: height + header,
+    sourceWidth: source.width,
+    sourceHeight: source.height,
   });
 }
 

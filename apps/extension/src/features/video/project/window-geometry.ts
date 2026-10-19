@@ -1,3 +1,4 @@
+import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 type Range = readonly [number, number];
 
 /** Clamp a logical radius to the visible decorated window. */
@@ -29,4 +30,49 @@ export function roundedWindowClearance(
     low: -distance(ax[1] - width / 2 + radius, ay[1] - height / 2 + radius),
     high: -distance(ax[0] - width / 2 + radius, ay[0] - height / 2 + radius),
   };
+}
+
+/** Source pixels and their header form one plane before output fitting. */
+export function decoratedMediaSourceSize(width: number, height: number, header?: WindowHeader) {
+  return {
+    width,
+    height: height + (header ? windowHeaderGeometry(header, { width, height }).height : 0),
+  };
+}
+
+/** Inset a canvas without collapsing either available axis below one pixel. */
+export function insetMediaCanvas(output: { width: number; height: number }, padding: number) {
+  const x = Math.min(padding, output.width / 2),
+    y = Math.min(padding, output.height / 2);
+  return {
+    x,
+    y,
+    width: Math.max(1, output.width - 2 * x),
+    height: Math.max(1, output.height - 2 * y),
+  };
+}
+
+/** Measure the nearest canvas edge after rotating a decorated window about its clip pivot. */
+export function mediaWindowPadding(
+  output: { width: number; height: number },
+  frame: { x: number; y: number; width: number; height: number },
+  rotation = 0,
+  pivot = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 }
+) {
+  const radians = (rotation * Math.PI) / 180,
+    c = Math.cos(radians),
+    s = Math.sin(radians);
+  const corners = [
+    [frame.x, frame.y],
+    [frame.x + frame.width, frame.y],
+    [frame.x, frame.y + frame.height],
+    [frame.x + frame.width, frame.y + frame.height],
+  ].map(([x, y]) => ({
+    x: pivot.x + (x! - pivot.x) * c - (y! - pivot.y) * s,
+    y: pivot.y + (x! - pivot.x) * s + (y! - pivot.y) * c,
+  }));
+  return Math.max(
+    0,
+    Math.min(...corners.flatMap(({ x, y }) => [x, y, output.width - x, output.height - y]))
+  );
 }

@@ -26,8 +26,15 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/features/video/project/window-geometry.ts',
     allowCrossOwner: true,
     reason:
-      'Rounded window containment serves both editors, Montage rendering, source interactions and admission.',
+      'Window geometry serves both editors, framing, crop/header rendering, source interactions and admission.',
     testFiles: [
+      'apps/extension/src/features/video/project/factories/clip.test.ts',
+      'apps/extension/src/features/video/project/factories/framing-presets.test.ts',
+      'apps/extension/src/features/video/review/advanced/scene.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-padding.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/constraints.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-layout.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-crop.test.tsx',
       'apps/extension/src/features/video/project/window-geometry.test.ts',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/features/video/project/validation/clips.test.ts',

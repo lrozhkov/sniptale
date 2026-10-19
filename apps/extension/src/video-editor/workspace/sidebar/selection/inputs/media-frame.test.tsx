@@ -326,3 +326,24 @@ it('commits the shared radius row and preserves fine authored values on unchange
   );
   expect(locked?.disabled).toBe(true);
 });
+
+it('offers scalar padding and preserves unchanged rounded geometry', async () => {
+  const clip = createClip();
+  const onEditMediaClip = vi.fn();
+  await renderHarness({ onEditMediaClip }, false, clip);
+  const input =
+    container!.querySelector<HTMLInputElement>('input[aria-label="Отступ"]') ??
+    container!.querySelector<HTMLInputElement>('input[aria-label="Padding"]');
+  expect(input).toBeTruthy();
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).not.toHaveBeenCalled();
+  await act(async () => {
+    setInputValue(input!, '40');
+  });
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(onEditMediaClip).toHaveBeenLastCalledWith(clip.id, { kind: 'padding', padding: 40 });
+});

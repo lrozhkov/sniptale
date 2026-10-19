@@ -1,9 +1,14 @@
+import { getFittedMediaWindowFrame } from '../../../../../features/video/composition/draw/fitted-media';
+import { mediaWindowPadding } from '../../../../../features/video/project/window-geometry';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { MediaCropControls } from './media-crop';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
 import type { ReactNode } from 'react';
 import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
-import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
+import {
+  maximumMediaPadding,
+  getMediaFramingPresets,
+} from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
@@ -77,6 +82,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   return (
     <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
+      <MediaPaddingControl {...props} />
       <MediaCropControls
         key={`crop:${props.clip.id}`}
         project={props.project}
@@ -96,6 +102,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           onUpdateMediaClipFitMode={props.onUpdateMediaClipFitMode}
         />
         <MediaFitScaleControls
+          min={1}
           clipId={props.clip.id}
           disabled={props.locked}
           fitScalePercent={props.clip.fitScalePercent ?? 100}
@@ -170,13 +177,13 @@ export function MediaFitScaleControls(
   props: Pick<
     MediaFrameFieldProps,
     'clipId' | 'disabled' | 'fitScalePercent' | 'onUpdateMediaClipFitScalePercent'
-  >
+  > & { min?: number }
 ) {
   return (
     <SliderField
       label={translate('videoEditor.sidebar.fitScalePercentLabel')}
       value={props.fitScalePercent}
-      min={10}
+      min={props.min ?? 10}
       max={300}
       step={1}
       disabled={props.disabled}
@@ -275,7 +282,8 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
     asset.metadata.width * (clip.sourceCrop?.width ?? 1),
     asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     props.project.width,
-    props.project.height
+    props.project.height,
+    clip.windowHeader
   );
   const labels = [
     translate('videoEditor.sidebar.framingWhole'),
@@ -373,5 +381,46 @@ function FramingPresetButton(props: {
         {props.children}
       </span>
     </button>
+  );
+}
+
+function MediaPaddingControl(props: MediaFrameControlsProps) {
+  const clip = props.clip;
+  if (!('assetId' in clip) || !('fitMode' in clip)) return null;
+  const asset = props.project.assets.find((asset) => asset.id === clip.assetId);
+  if (!asset || asset.metadata.width <= 0 || asset.metadata.height <= 0) return null;
+  const frame = getFittedMediaWindowFrame({
+    frame: clip.transform,
+    fitMode: clip.fitMode,
+    sourceWidth: asset.metadata.width,
+    sourceHeight: asset.metadata.height,
+    ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+    ...(clip.windowHeader ? { windowHeader: clip.windowHeader } : {}),
+  });
+  const max = maximumMediaPadding(props.project.width, props.project.height);
+  const padding = Math.min(
+    max,
+    mediaWindowPadding(props.project, frame, clip.transform.rotation, {
+      x: clip.transform.x + clip.transform.width / 2,
+      y: clip.transform.y + clip.transform.height / 2,
+    })
+  );
+  return (
+    <NumericRow
+      label={translate('gallery.videoReview.backgroundPadding')}
+      value={padding}
+      min={0}
+      max={max}
+      step={1}
+      precision={2}
+      unit="px"
+      disabled={props.locked || !props.onEditMediaClip}
+      normalizeValue={(value) => (value === Number(padding.toFixed(2)) ? padding : value)}
+      onPreviewValue={() => undefined}
+      onCommitValue={(value) => {
+        if (value !== padding)
+          props.onEditMediaClip?.(clip.id, { kind: 'padding', padding: value });
+      }}
+    />
   );
 }

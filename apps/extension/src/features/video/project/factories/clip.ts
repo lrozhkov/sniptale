@@ -1,3 +1,5 @@
+import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
+import { decoratedMediaSourceSize } from '../window-geometry';
 import {
   DEFAULT_CLIP_FADE_MS,
   DEFAULT_CLIP_VOLUME,
@@ -144,8 +146,12 @@ export function resolveMediaClipTransformForFitMode(
   projectWidth: number,
   projectHeight: number,
   fitMode: VideoMediaFitMode,
-  fitScalePercent = 100
+  fitScalePercent = 100,
+  windowHeader?: WindowHeader
 ): VideoProjectTransform {
+  const decorated = decoratedMediaSourceSize(sourceWidth, sourceHeight, windowHeader);
+  sourceWidth = decorated.width;
+  sourceHeight = decorated.height;
   const scaleMultiplier = Math.max(0.01, fitScalePercent / 100);
 
   if (fitMode === VideoMediaFitMode.STRETCH) {

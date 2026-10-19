@@ -1,5 +1,15 @@
+import {
+  DEFAULT_WINDOW_HEADER,
+  windowHeaderGeometry,
+} from '@sniptale/runtime-contracts/window-header';
 import { expect, it } from 'vitest';
-import { roundedWindowClearance, roundedWindowRadius } from './window-geometry';
+import {
+  decoratedMediaSourceSize,
+  insetMediaCanvas,
+  mediaWindowPadding,
+  roundedWindowClearance,
+  roundedWindowRadius,
+} from './window-geometry';
 
 it('clamps window radius without changing its visible bounds', () => {
   expect(roundedWindowRadius(200, 100, 4096)).toBe(50);
@@ -25,4 +35,48 @@ it('encloses every sampled signed clearance with conservative interval bounds', 
       expect(distance.low).toBeGreaterThanOrEqual(bounds.low - 1e-9);
       expect(distance.high).toBeLessThanOrEqual(bounds.high + 1e-9);
     }
+});
+
+it('keeps Gallery inset behavior including one-pixel collapse and fractional padding', () => {
+  expect(insetMediaCanvas({ width: 320, height: 180 }, 12.25)).toEqual({
+    x: 12.25,
+    y: 12.25,
+    width: 295.5,
+    height: 155.5,
+  });
+  expect(insetMediaCanvas({ width: 320, height: 180 }, 4096)).toEqual({
+    x: 160,
+    y: 90,
+    width: 1,
+    height: 1,
+  });
+  expect(insetMediaCanvas({ width: 320, height: 180 }, 0)).toEqual({
+    x: 0,
+    y: 0,
+    width: 320,
+    height: 180,
+  });
+});
+
+it('measures rotated windows about the actual clip pivot and admits off-canvas placement as zero inset', () => {
+  const output = { width: 320, height: 180 };
+  expect(mediaWindowPadding(output, { x: 100, y: 40, width: 120, height: 100 })).toBe(40);
+  expect(mediaWindowPadding(output, { x: 100, y: 40, width: 120, height: 100 }, 90)).toBeCloseTo(
+    30
+  );
+  expect(mediaWindowPadding(output, { x: -1, y: 40, width: 120, height: 100 })).toBe(0);
+  const result = mediaWindowPadding(output, { x: 100, y: 40, width: 80, height: 100 }, 90, {
+    x: 160,
+    y: 90,
+  });
+  expect(result).toBeCloseTo(30);
+});
+
+it('decorates already-cropped source dimensions with the canonical header exactly once', () => {
+  const source = { width: 80, height: 90 };
+  expect(decoratedMediaSourceSize(80, 90)).toEqual(source);
+  expect(decoratedMediaSourceSize(80, 90, DEFAULT_WINDOW_HEADER)).toEqual({
+    width: 80,
+    height: 90 + windowHeaderGeometry(DEFAULT_WINDOW_HEADER, source).height,
+  });
 });

@@ -1,3 +1,4 @@
+import { resolveMediaPaddingLayout } from '../../../../features/video/project/factories/framing-presets';
 import { parseMediaSourceCrop } from '../../../../features/video/project/media-crop';
 import { parseColor } from '@sniptale/foundation/color';
 import {
@@ -51,6 +52,7 @@ export function createClipMediaStyleActions(
         applyProjectUpdate(state, (project) => {
           const clip = project.clips.find((item) => item.id === clipId);
           if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
+          if (edit.kind === 'padding') return updateMediaPadding(project, clip, edit.padding);
           if (edit.kind === 'window-corner-radius') {
             if (edit.radius !== null && !isBoundedNumber(edit.radius, 0, 4096)) return project;
             const radius = edit.radius === null ? undefined : edit.radius;
@@ -157,14 +159,19 @@ function resolveMediaClipFitTransform(
     return clip.transform;
   }
 
-  return resolveMediaClipTransformForFitMode(
+  const isCamera =
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
+  const transform = resolveMediaClipTransformForFitMode(
     asset.metadata.width * (clip.sourceCrop?.width ?? 1),
     asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     project.width,
     project.height,
     fitMode,
-    fitScalePercent
+    fitScalePercent,
+    isCamera ? undefined : clip.windowHeader
   );
+  return isCamera ? transform : { ...transform, opacity: clip.transform.opacity };
 }
 
 function updateMediaClipVisuals(
@@ -195,10 +202,17 @@ function updateMediaClipVisuals(
     project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
   const position = isCamera ? activeCameraPosition(clip, time) : undefined;
   const fitMode = patch.fitMode ?? position?.fitMode ?? clip.fitMode;
+  const scaleLimits = isCamera
+    ? VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent
+    : VIDEO_CLIP_PROPERTY_LIMITS.ordinaryMediaFitScalePercent;
   const fitScalePercent =
     patch.fitScalePercent === undefined
-      ? normalizeMediaFitScalePercent(clip.fitScalePercent ?? 100)
-      : normalizeMediaFitScalePercent(patch.fitScalePercent, clip.fitScalePercent ?? 100);
+      ? normalizeMediaFitScalePercent(clip.fitScalePercent ?? 100, 100, scaleLimits)
+      : normalizeMediaFitScalePercent(
+          patch.fitScalePercent,
+          clip.fitScalePercent ?? 100,
+          scaleLimits
+        );
   const shadowIntensity =
     patch.shadowIntensity === undefined
       ? normalizeVideoMediaShadowIntensity(clip.shadowIntensity)
@@ -247,14 +261,16 @@ function updateMediaClipVisuals(
   });
 }
 
-function normalizeMediaFitScalePercent(value: number, fallback = 100): number {
+function normalizeMediaFitScalePercent(
+  value: number,
+  fallback = 100,
+  limits: { min: number; max: number } = VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent
+): number {
   if (!Number.isFinite(value)) {
-    return Number.isFinite(fallback)
-      ? clampVideoPropertyNumber(fallback, VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent)
-      : 100;
+    return Number.isFinite(fallback) ? clampVideoPropertyNumber(fallback, limits) : 100;
   }
 
-  return clampVideoPropertyNumber(value, VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent);
+  return clampVideoPropertyNumber(value, limits);
 }
 
 function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, time: number) {
@@ -348,4 +364,37 @@ function copyMediaWindowRadius<T extends { windowCornerRadius?: number }>(
   if (source.windowCornerRadius === undefined) delete copy.windowCornerRadius;
   else copy.windowCornerRadius = source.windowCornerRadius;
   return copy;
+}
+
+function updateMediaPadding(project: VideoProject, clip: MediaClip, padding: number) {
+  if (
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  )
+    return project;
+  const asset = getAssetById(project, clip.assetId);
+  if (!asset) return project;
+  const layout = resolveMediaPaddingLayout(
+    asset.metadata.width * (clip.sourceCrop?.width ?? 1),
+    asset.metadata.height * (clip.sourceCrop?.height ?? 1),
+    project.width,
+    project.height,
+    padding,
+    clip.windowHeader
+  );
+  if (!layout) return project;
+  const transform = { ...layout.transform, opacity: clip.transform.opacity };
+  if (
+    clip.fitMode === layout.fitMode &&
+    clip.fitScalePercent === layout.fitScalePercent &&
+    (['x', 'y', 'width', 'height', 'rotation', 'opacity'] as const).every(
+      (key) => clip.transform[key] === transform[key]
+    )
+  )
+    return project;
+  return applyVideoProjectMutationPatch(project, {
+    clips: project.clips.map((item) =>
+      item.id === clip.id ? { ...clip, ...layout, transform } : item
+    ),
+  });
 }

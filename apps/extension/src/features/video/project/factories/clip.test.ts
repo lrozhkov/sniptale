@@ -1,3 +1,7 @@
+import {
+  DEFAULT_WINDOW_HEADER,
+  windowHeaderGeometry,
+} from '@sniptale/runtime-contracts/window-header';
 import { expect, it } from 'vitest';
 
 import {
@@ -183,4 +187,16 @@ it('resolves all shared fit modes into canvas transforms', () => {
     x: 0,
     y: 0,
   });
+});
+
+it('optional header fitting equals fitting the decorated plane and retains old no-header callers', () => {
+  const header = windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 80, height: 90 }).height;
+  for (const mode of Object.values(VideoMediaFitMode)) {
+    expect(
+      resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode, 73, DEFAULT_WINDOW_HEADER)
+    ).toEqual(resolveMediaClipTransformForFitMode(80, 90 + header, 320, 180, mode, 73));
+    expect(resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode)).toEqual(
+      resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode, 100, undefined)
+    );
+  }
 });

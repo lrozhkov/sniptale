@@ -526,3 +526,13 @@ The existing project updater applies scalar blur edits to the current background
 Both editors use the same edge-padded Canvas filter. Montage converts project pixels to output pixels once. Its temporary raster limits each side to 2048 pixels and the filter radius to 128 pixels. Three exclusive surfaces require less than 64 MiB. The existing pool owns allocation and release. Failed filtering releases surfaces and fails only the affected rendering operation. Export publishes static cache entries only after successful drawing.
 
 Static background rasters retain one exclusive pool lease for at most one second. Cache identity includes paint, output dimensions, blur scale and decoded image identity and size. Changes release the previous lease before allocation. Animated gradients bypass this cache. Expiry clears the image reference. Failed drawing does not publish a cache entry.
+
+## Montage media padding and decorated fitting
+
+Padding is an explicit framing command for one ordinary VIDEO or IMAGE clip. The existing transform owns its placement. The command adds no persisted padding field or schema version. It preserves source crop, header, opacity, timing, effects and other clips. Explicit fitting centers the window and resets rotation. Later placement remains free.
+
+The inspector measures the decorated window after rotation. Its editable inset leaves at least one available canvas pixel. Impossible values fail without changing history. Unchanged rounded input preserves exact placement. Invalid, locked, missing-source and CAMERA edits retain the current project. Repeated equal commands add no history entry.
+
+Ordinary fitting uses the cropped source and its header as one plane. Camera fitting keeps its existing adapter and dormant header behavior. Ordinary scale controls accept 1–300 percent. Camera scale controls retain 10–300 percent. Existing readers already admit these values. Fit percentage remains a preset hint beside freely editable transforms.
+
+Gallery and Montage share the inset calculation. Gallery retains its enabled-background policy and extra-header output size. This command uses existing mutation, history and save owners. It adds no writer, resource owner or database migration.

@@ -1,3 +1,4 @@
+import { insetMediaCanvas } from '../../project/window-geometry';
 import { uncropMediaSourceRect } from '../../project/media-crop';
 import {
   evaluateReviewFollowCursor,
@@ -60,14 +61,7 @@ export function computeQuickEditContentRect(
   background: QuickEditBackgroundSettings
 ): QuickEditRect {
   const padding = background.enabled ? background.layout.padding : 0;
-  const x = Math.min(padding, output.width / 2);
-  const y = Math.min(padding, output.height / 2);
-  return {
-    x,
-    y,
-    width: Math.max(1, output.width - 2 * x),
-    height: Math.max(1, output.height - 2 * y),
-  };
+  return insetMediaCanvas(output, padding);
 }
 
 type SceneInput = Omit<QuickEditCameraSceneInput, 'output'> & {

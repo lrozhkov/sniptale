@@ -664,3 +664,25 @@ it('preserves continuous off-center camera paths in both zoom directions at 30 F
     }
   }
 });
+
+it('shares inset geometry while retaining Gallery background-enabled and disabled policy', async () => {
+  const { insetMediaCanvas } = await import('../../project/window-geometry');
+  const { computeQuickEditContentRect } = await import('./scene');
+  for (const padding of [0, 12.25, 40, 4096]) {
+    const output = { width: 320, height: 180 };
+    expect(
+      computeQuickEditContentRect(output, {
+        enabled: true,
+        type: 'solid',
+        color: '#123456',
+        layout: { padding, cornerRadius: 0 },
+      })
+    ).toEqual(insetMediaCanvas(output, padding));
+    expect(
+      computeQuickEditContentRect(output, {
+        enabled: false,
+        rememberedLayout: { padding, cornerRadius: 0 },
+      })
+    ).toEqual(insetMediaCanvas(output, 0));
+  }
+});

@@ -11,6 +11,7 @@ export const VIDEO_CLIP_PROPERTY_LIMITS = {
   annotationTargetSize: { max: 7680, min: 0 },
   fadeMs: { max: 5000, min: 0 },
   fitScalePercent: { max: 300, min: 10 },
+  ordinaryMediaFitScalePercent: { max: 300, min: 1 },
   shapeRadius: { max: 100, min: 0 },
   shapeStrokeWidth: { max: 32, min: 0 },
   textBorderWidth: { max: 32, min: 0 },
