@@ -1,3 +1,4 @@
+import { hasCurrentOriginalAudioTargets } from '../../../features/video/project/timeline/original-audio';
 import {
   useCallback,
   useEffect,
@@ -329,6 +330,20 @@ async function generateVoiceBatch(
   });
 }
 
+function canApplyVoiceItems(project: VideoProject | null, lifetime: VoiceLifetime) {
+  if (lifetime.pendingApply) return true;
+  const selected = lifetime.items.filter((item) => item.selected && item.preview && !item.accepted);
+  return (
+    !!project &&
+    selected.length > 0 &&
+    selected.every(
+      (item) =>
+        !item.placement.originalAudioMute ||
+        hasCurrentOriginalAudioTargets(project, item.placement.originalAudioMute)
+    )
+  );
+}
+
 async function applyVoiceBatch(
   access: ProjectVoiceTakeAccess,
   lifetime: VoiceLifetime,
@@ -337,7 +352,7 @@ async function applyVoiceBatch(
 ) {
   lifetime.pendingApply ??= lifetime.items.flatMap((item) =>
     item.selected && item.preview && !item.accepted
-      ? [{ preview: item.preview, placement: { ...item.placement } }]
+      ? [{ preview: item.preview, placement: structuredClone(item.placement) }]
       : []
   );
   const selected = lifetime.pendingApply;
@@ -444,7 +459,7 @@ function changeVoicePlacement(
     lifetime,
     setState,
     lifetime.items.map((item) =>
-      item === active ? { ...item, placement: { ...placement } } : item
+      item === active ? { ...item, placement: structuredClone(placement) } : item
     )
   );
 }
@@ -564,6 +579,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
     placement: active?.placement ?? { start: 0 },
     accepted: active?.accepted ?? false,
     pendingApply: !!lifetime.pendingApply,
+    canApply: canApplyVoiceItems(access.getProject(), lifetime),
     inspectorVisible: parentVisible,
     recording,
     loadModels,
@@ -622,11 +638,7 @@ export function useVideoProjectTextVoice(project: VideoProject, parentVisible = 
       });
     },
     async apply() {
-      if (
-        !lifetime.pendingApply &&
-        !lifetime.items.some((item) => item.selected && item.preview && !item.accepted)
-      )
-        return;
+      if (!canApplyVoiceItems(access.getProject(), lifetime)) return;
       await run(async (signal) => {
         await applyVoiceBatch(access, lifetime, signal, setState);
         if (current() && latest.current.source === 'microphone') recording.markRetained();

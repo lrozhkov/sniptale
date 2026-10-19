@@ -1,3 +1,4 @@
+import { OriginalAudioPlacementFields } from '../inputs/original-audio';
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Check, FolderOpen, LoaderCircle, Play, Square } from 'lucide-react';
@@ -113,7 +114,7 @@ export function ProjectTextVoicePanel(props: {
             </div>
           ) : !op.batch ? (
             <InspectorActionButton
-              disabled={op.running || !!op.consent}
+              disabled={op.running || !!op.consent || !op.canApply}
               onClick={() => {
                 void op.apply();
               }}
@@ -131,7 +132,7 @@ export function ProjectTextVoicePanel(props: {
       (op.pendingApply ||
         op.items.some((item) => item.preview && item.selected && !item.accepted)) ? (
         <InspectorActionButton
-          disabled={op.running || !!op.consent}
+          disabled={op.running || !!op.consent || !op.canApply}
           onClick={() => {
             void op.apply();
           }}
@@ -261,13 +262,20 @@ function VoicePlacement({
         ]}
         onChange={(id) => {
           const selected = tracks.find((entry) => entry.id === id);
+          const { trackId: _track, timelineLaneId: _lane, ...placement } = op.placement;
           op.changePlacement({
-            start: op.placement.start,
+            ...placement,
             ...(selected
               ? { trackId: selected.id, timelineLaneId: selected.logicalLanes?.[0]?.id ?? 'line-1' }
               : {}),
           });
         }}
+      />
+      <OriginalAudioPlacementFields
+        project={project}
+        value={op.placement.originalAudioMute}
+        disabled={locked}
+        onChange={(originalAudioMute) => op.changePlacement({ ...op.placement, originalAudioMute })}
       />
       {track && lanes.length > 1 ? (
         <SegmentedRow

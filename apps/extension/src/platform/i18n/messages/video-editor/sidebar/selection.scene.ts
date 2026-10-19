@@ -1,6 +1,14 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  originalAudioRestore: { ru: 'Восстановить оригинал', en: 'Restore original' },
+  originalAudio: { ru: 'Оригинал', en: 'Original audio' },
+  originalAudioKeep: { ru: 'Оставить', en: 'Keep' },
+  originalAudioAttenuate: { ru: 'Приглушить', en: 'Attenuate' },
+  originalAudioMute: { ru: 'Выключить', en: 'Mute' },
+  originalAudioSources: { ru: 'Исходники', en: 'Sources' },
+  originalAudioLevel: { ru: 'Уровень оригинала', en: 'Original level' },
+  originalAudioMissingSource: { ru: 'Недоступный исходник', en: 'Unavailable source' },
   textVoicePosition: { ru: 'Позиция в проекте', en: 'Project position' },
   textVoiceTrack: { ru: 'Аудиодорожка', en: 'Audio track' },
   textVoiceNewTrack: { ru: 'Новая дорожка', en: 'New track' },

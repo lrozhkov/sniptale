@@ -1,3 +1,5 @@
+import { createVideoProjectAsset } from '../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../features/video/project/factories/clip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   acceptProjectVoiceTakes,
@@ -310,4 +312,46 @@ it('waits for batch compensation when a member preview closes during publication
   expect(f.preview.closed).not.toBe(true);
   await acceptProjectVoiceTakes(f.access, [f.selections[0]!], signal());
   expect(f.project().clips).toHaveLength(1);
+});
+
+it('retains different explicit original choices for each batch take through one Save receipt retry', async () => {
+  const f = batchFixture();
+  const asset = createVideoProjectAsset(
+    'Original',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'original' },
+    {
+      width: 640,
+      height: 360,
+      duration: 8,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const source = createVideoClipFromAsset(f.project().tracks[0]!.id, asset, 640, 360);
+  f.project().assets.push(asset);
+  f.project().clips.push(source);
+  const selected = f.selections.map((item, index) => ({
+    ...item,
+    placement: {
+      ...item.placement,
+      originalAudioMute: {
+        volume: index === 0 ? 0.25 : 0,
+        targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],
+      },
+    },
+  }));
+  const save = f.save.getMockImplementation()!;
+  f.save.mockImplementationOnce(save).mockRejectedValueOnce(new Error('storage'));
+  await expect(acceptProjectVoiceTakes(f.access, selected, signal())).rejects.toThrow('storage');
+  await acceptProjectVoiceTakes(f.access, selected, signal());
+  expect(
+    f
+      .project()
+      .clips.flatMap((clip) => (clip.type === 'AUDIO' ? [clip.originalAudioMute?.volume] : []))
+  ).toEqual([0.25, 0]);
+  expect(f.update).toHaveBeenCalledOnce();
+  expect(prepareProjectAsset).toHaveBeenCalledTimes(2);
 });

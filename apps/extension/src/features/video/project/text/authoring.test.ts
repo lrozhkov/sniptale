@@ -263,3 +263,61 @@ it('preserves short audio duration and admits no invalid placement or snapshot',
     )
   ).toBeNull();
 });
+
+it('admits only explicit current original targets and freezes them separately from the text snapshot', () => {
+  const { project } = fixture();
+  const asset = voiceAsset();
+  const source = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    { ...asset, id: 'source-asset', type: 'VIDEO' },
+    640,
+    360
+  );
+  project.assets.push({ ...asset, id: source.assetId, type: 'VIDEO' });
+  project.clips.push(source);
+  const originalAudioMute = {
+    volume: 0.25,
+    targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],
+  };
+  const added = addVideoProjectVoiceTake(project, asset, voiceSnapshot(), {
+    start: 0,
+    originalAudioMute,
+  });
+  expect(added).not.toBeNull();
+  expect(added?.project.version).toBe(6);
+  expect(added?.clip.originalAudioMute).toEqual(originalAudioMute);
+  const snapshot = voiceSnapshot();
+  expect(
+    addVideoProjectVoiceTake(
+      project,
+      asset,
+      {
+        ...snapshot,
+        binding: { kind: 'source', assetId: source.assetId, sourceInstanceId: source.id },
+        text: { ...snapshot.text, timeDomain: 'source' },
+      },
+      { start: 0, originalAudioMute }
+    )
+  ).not.toBeNull();
+  originalAudioMute.targets[0]!.sourceInstanceId = 'changed';
+  expect(added?.clip.originalAudioMute?.targets[0]?.sourceInstanceId).toBe(source.id);
+  for (const invalid of [
+    { ...originalAudioMute, targets: [] },
+    originalAudioMute,
+    { ...originalAudioMute, volume: -1 },
+    {
+      volume: 0,
+      targets: Array.from({ length: 513 }, (_, index) => ({
+        assetId: source.assetId,
+        sourceInstanceId: `instance-${index}`,
+      })),
+    },
+  ]) {
+    expect(
+      addVideoProjectVoiceTake(project, asset, voiceSnapshot(), {
+        start: 0,
+        originalAudioMute: invalid,
+      })
+    ).toBeNull();
+  }
+});

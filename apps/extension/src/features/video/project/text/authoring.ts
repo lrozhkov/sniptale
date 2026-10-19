@@ -1,3 +1,5 @@
+import { hasCurrentOriginalAudioTargets } from '../timeline/original-audio';
+import { isVideoProjectClip } from '../validation/clips';
 import { applyVideoProjectMutationPatch } from '../mutation';
 import type { VideoProject } from '../types/model';
 import {
@@ -25,6 +27,10 @@ export interface VideoProjectVoicePlacement {
   start: number;
   trackId?: string;
   timelineLaneId?: string;
+  originalAudioMute?: Extract<
+    VideoProject['clips'][number],
+    { type: 'AUDIO' }
+  >['originalAudioMute'];
 }
 
 /** Adds an independent take without trimming it or changing existing montage content. */
@@ -50,7 +56,9 @@ export function addVideoProjectVoiceTake(
     placement.start < 0 ||
     placement.start + duration > MAX_VIDEO_PROJECT_DURATION_SECONDS ||
     project.assets.some((entry) => entry.id === asset.id) ||
-    (!placement.trackId && placement.timelineLaneId)
+    (!placement.trackId && placement.timelineLaneId) ||
+    (placement.originalAudioMute !== undefined &&
+      !hasCurrentOriginalAudioTargets(project, placement.originalAudioMute))
   )
     return null;
   const track = placement.trackId
@@ -81,7 +89,11 @@ export function addVideoProjectVoiceTake(
     duration,
     sourceDuration: duration,
     textSnapshot,
+    ...(placement.originalAudioMute
+      ? { originalAudioMute: structuredClone(placement.originalAudioMute) }
+      : {}),
   };
+  if (!isVideoProjectClip(clip)) return null;
   return {
     clip,
     project: applyVideoProjectMutationPatch(project, {

@@ -237,9 +237,26 @@ it('retains a hidden preview and accepts its full take with one Undo and Redo', 
   await generate();
   const preview = operation.preview;
   expect(preview).not.toBeNull();
+  const originalAudioMute = {
+    volume: 0.25,
+    targets: [{ assetId: 'missing-source', sourceInstanceId: 'original-instance' }],
+  };
+  await act(async () => operation.changePlacement({ start: 0, originalAudioMute }));
+  originalAudioMute.targets[0]!.sourceInstanceId = 'mutated-input';
+  expect(operation.placement.originalAudioMute?.targets[0]?.sourceInstanceId).toBe(
+    'original-instance'
+  );
+  expect(operation.canApply).toBe(false);
+  await act(async () => operation.apply());
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
   await act(async () => root.render(<Harness visible={false} />));
   expect(operation.preview).toBe(preview);
   await act(async () => root.render(<Harness />));
+  expect(operation.placement.originalAudioMute?.targets[0]?.sourceInstanceId).toBe(
+    'original-instance'
+  );
+  await act(async () => operation.changePlacement({ start: 0 }));
+  expect(operation.canApply).toBe(true);
   const position = host.querySelector<HTMLInputElement>(
     `input[aria-label="${translate('videoEditor.sidebar.textVoicePosition')}"]`
   )!;

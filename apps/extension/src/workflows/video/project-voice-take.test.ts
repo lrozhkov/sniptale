@@ -1,3 +1,5 @@
+import { createVideoProjectAsset } from '../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../features/video/project/factories/clip';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { acceptProjectVoiceTakes, cleanupProjectVoiceTakePreview } from './project-voice-take';
 import { fixture } from './project-voice-take.test-support';
@@ -292,4 +294,93 @@ it('finishes partial cleanup before preparing a fresh source on acceptance retry
   );
   expect(f.prepared.publish).toHaveBeenCalledOnce();
   expect(f.durable().clips).toHaveLength(1);
+});
+
+function originalSelection() {
+  const f = fixture();
+  const asset = createVideoProjectAsset(
+    'Original',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'original-source' },
+    {
+      width: 640,
+      height: 360,
+      duration: 8,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const source = createVideoClipFromAsset(f.project().tracks[0]!.id, asset, 640, 360);
+  f.project().assets.push(asset);
+  f.project().clips.push(source);
+  const placement = {
+    start: 0,
+    originalAudioMute: {
+      volume: 0.25,
+      targets: [{ assetId: source.assetId, sourceInstanceId: source.id }],
+    },
+  };
+  return { ...f, source, placement, selected: [{ preview: f.preview, placement }] };
+}
+
+it('freezes original choices before the Save barrier and rejects a changed retry without reinsertion', async () => {
+  const f = originalSelection();
+  const saved = gate(),
+    entered = gate();
+  const save = f.save.getMockImplementation()!;
+  f.save.mockImplementationOnce(async () => {
+    entered.release();
+    await saved.promise;
+    await save();
+  });
+  const accepting = acceptProjectVoiceTakes(f.access, f.selected, signal());
+  await entered.promise;
+  f.placement.originalAudioMute.targets[0]!.sourceInstanceId = 'late-input-mutation';
+  f.placement.originalAudioMute.volume = 0;
+  saved.release();
+  await accepting;
+  const accepted = f.project().clips.find((clip) => clip.type === 'AUDIO');
+  expect(accepted).toMatchObject({
+    originalAudioMute: { volume: 0.25, targets: [{ sourceInstanceId: f.source.id }] },
+  });
+  await expect(acceptProjectVoiceTakes(f.access, f.selected, signal())).rejects.toThrow('stale');
+  expect(f.update).toHaveBeenCalledOnce();
+  expect(prepareProjectAsset).toHaveBeenCalledOnce();
+});
+
+it('refuses target removal during Save without publishing a new take and permits explicit fresh retry', async () => {
+  const f = originalSelection();
+  const entered = gate(),
+    saved = gate();
+  const save = f.save.getMockImplementation()!;
+  f.save.mockImplementationOnce(async () => {
+    entered.release();
+    await saved.promise;
+    await save();
+  });
+  const accepting = acceptProjectVoiceTakes(f.access, f.selected, signal());
+  await entered.promise;
+  f.access.update((current) => ({ ...current, clips: [] }));
+  saved.release();
+  await expect(accepting).rejects.toThrow('stale');
+  expect(prepareProjectAsset).not.toHaveBeenCalled();
+  expect(f.project().clips).toEqual([]);
+  f.access.update((current) => ({ ...current, clips: [f.source] }));
+  await acceptProjectVoiceTakes(f.access, f.selected, signal());
+  expect(f.project().clips.some((clip) => clip.type === 'AUDIO')).toBe(true);
+});
+
+it('retains exact original choices through failed Save and retries no preparation or insertion', async () => {
+  const f = originalSelection();
+  const save = f.save.getMockImplementation()!;
+  f.save.mockImplementationOnce(save).mockRejectedValueOnce(new Error('storage'));
+  await expect(acceptProjectVoiceTakes(f.access, f.selected, signal())).rejects.toThrow('storage');
+  await acceptProjectVoiceTakes(f.access, f.selected, signal());
+  expect(f.update).toHaveBeenCalledOnce();
+  expect(prepareProjectAsset).toHaveBeenCalledOnce();
+  expect(f.durable().clips.find((clip) => clip.type === 'AUDIO')).toMatchObject({
+    originalAudioMute: f.placement.originalAudioMute,
+  });
 });

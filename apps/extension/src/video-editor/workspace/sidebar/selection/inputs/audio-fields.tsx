@@ -1,3 +1,4 @@
+import { ProjectOriginalAudioEditor } from './original-audio';
 import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
 import { InspectorActionButton } from '../shared/actions';
@@ -60,12 +61,25 @@ export function renderAudioFields(
 ) {
   const clip = props.selectedClip;
   if (!clip || !isAudioClip(clip)) return null;
-  return renderSharedAudioFields({
-    clip,
-    disabled: !areProjectClipsEditable(props.project, [clip.id]),
-    onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
-    onUpdateClipVolume: props.onUpdateClipVolume,
-  });
+  return (
+    <>
+      {' '}
+      {renderSharedAudioFields({
+        clip,
+        disabled: !areProjectClipsEditable(props.project, [clip.id]),
+        onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
+        onUpdateClipVolume: props.onUpdateClipVolume,
+      })}
+      {clip.originalAudioMute ? (
+        <ProjectOriginalAudioEditor
+          key={clip.id}
+          project={props.project}
+          clip={clip}
+          disabled={!areProjectClipsEditable(props.project, [clip.id])}
+        />
+      ) : null}
+    </>
+  );
 }
 
 export function renderClipLinkFields(

@@ -1,5 +1,31 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-original-audio-authoring-consumers',
+    productionFile: 'apps/extension/src/features/video/project/timeline/original-audio.ts',
+    reason:
+      'Original audio identities and track gates affect authoring, preview, export and source editing.',
+    testFiles: [
+      'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/features/video/project/text/authoring.test.ts',
+      'apps/extension/src/features/video/project/timeline/presentation.test.ts',
+      'apps/extension/src/features/video/project/scene/background-audio.test.ts',
+      'apps/extension/src/features/video/project/timeline/overwrite.helpers.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/mix/schedule.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-text.test.ts',
+    ],
+  },
+  {
+    owner: 'montage-original-audio-placement-controls',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
+    reason: 'The speech panel composes original source selection with mounted placement and Apply.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/original-audio.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+    ],
+  },
+  {
     owner: 'source-audio-attenuation-consumers',
     productionFile: 'apps/extension/src/features/video/audio/source-attenuation.ts',
     reason: 'The shared interval policy must preserve Gallery projection, rendering and export.',

@@ -197,11 +197,12 @@ function bindVoiceBatch(
   )
     throw new Error('stale');
   const items: VoiceBatchItem[] = selected.map(({ preview, placement }) => {
-    const destination = { ...placement };
+    const destination = structuredClone(placement);
     const key = JSON.stringify([
       destination.start,
       destination.trackId,
       destination.timelineLaneId,
+      destination.originalAudioMute,
     ]);
     const attachment = preview.attachment ?? { access, placement: key, members };
     if (

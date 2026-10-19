@@ -1,3 +1,4 @@
+import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types/model';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -46,6 +47,171 @@ async function operate(button: Locator) {
   await expect(button).toBeInViewport();
   await button.click();
 }
+async function verifyOriginalSourceTextFit(
+  page: Page,
+  owner: Locator,
+  capture: (name: string) => string
+) {
+  const filename = owner.locator('label span.block').first();
+  const initial = await filename.evaluate((node) => ({
+    text: node.textContent,
+    style: node.getAttribute('style'),
+  }));
+  const rail = page.locator('[data-ui="video-editor.inspector.sections"] nav').first();
+  const railBefore = await rail.boundingBox();
+  try {
+    await filename.evaluate((node) => {
+      if (!(node instanceof HTMLElement)) throw new Error('Expected source name');
+      node.textContent =
+        'Long original filename. Привет Łukasz 中文 ' + 'recording-source-'.repeat(10) + '.webm';
+      node.style.fontSize = `${parseFloat(getComputedStyle(node).fontSize) * 2}px`;
+      node.style.lineHeight = '1.3';
+    });
+    await filename.scrollIntoViewIfNeeded();
+    const fit = await filename.evaluate((node) => ({
+      fits: node.scrollWidth <= node.clientWidth + 1,
+      height: node.getBoundingClientRect().height,
+      line: parseFloat(getComputedStyle(node).lineHeight),
+    }));
+    expect(fit.fits).toBe(true);
+    expect(fit.height).toBeGreaterThan(fit.line);
+    const railAfter = await rail.boundingBox();
+    expect(railAfter?.x).toBe(railBefore?.x);
+    expect(railAfter?.y).toBe(railBefore?.y);
+    await page.screenshot({ path: capture('original-audio-long-source.png'), fullPage: false });
+  } finally {
+    await filename.evaluate((node, state) => {
+      node.textContent = state.text;
+      if (state.style === null) node.removeAttribute('style');
+      else node.setAttribute('style', state.style);
+    }, initial);
+  }
+}
+
+async function configureOriginalAudio(
+  page: Page,
+  voice: Locator,
+  project: VideoProject,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  volume: number,
+  capture: (name: string) => string
+) {
+  const owner = voice.locator('[data-ui="video-editor.original-audio.placement"]');
+  await chooseInspectorValue(
+    page,
+    owner,
+    label('videoEditor.sidebar.originalAudio'),
+    label(
+      volume === 0
+        ? 'videoEditor.sidebar.originalAudioMute'
+        : 'videoEditor.sidebar.originalAudioAttenuate'
+    )
+  );
+  const sources = owner.getByRole('group', {
+    name: label('videoEditor.sidebar.originalAudioSources'),
+    exact: true,
+  });
+  const checkbox = sources.getByRole('checkbox').first();
+  await expect(checkbox).not.toBeChecked();
+  await operate(checkbox);
+  await expect(checkbox).toBeChecked();
+  const source = project.clips.find(
+    (clip) =>
+      (clip.type === 'VIDEO' || clip.type === 'AUDIO') &&
+      (clip.type !== 'VIDEO' || !clip.muted) &&
+      project.assets.find((asset) => asset.id === clip.assetId)?.metadata.hasAudio
+  );
+  if (!source || (source.type !== 'AUDIO' && source.type !== 'VIDEO'))
+    throw new Error('Missing original sound source');
+  if (volume > 0) {
+    const level = owner.getByRole('textbox', {
+      name: label('videoEditor.sidebar.originalAudioLevel'),
+      exact: true,
+    });
+    await level.fill(String(volume * 100));
+    await level.press('Tab');
+    await checkInspectorPaintedFont(page, level, 'original-audio-level');
+  }
+  await checkInspectorPaintedFont(
+    page,
+    sources.locator('label span.block').first(),
+    'original-audio-source'
+  );
+  await owner.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: capture('original-audio-placement.png'), fullPage: false });
+  if (page.viewportSize()?.width === 1280 && volume > 0)
+    await verifyOriginalSourceTextFit(page, owner, capture);
+  return {
+    volume,
+    targets: [{ assetId: source.assetId, sourceInstanceId: source.sourceInstanceId ?? source.id }],
+  };
+}
+
+async function verifyOriginalAudioRestore(
+  page: Page,
+  take: Extract<VideoProject['clips'][number], { type: 'AUDIO' }>,
+  label: (key: Parameters<typeof translate>[0]) => string,
+  capture: (name: string) => string
+) {
+  await operate(
+    page.getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+  );
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]'));
+  const target = page.locator(`[data-project-timeline-clip="${take.id}"]`);
+  await target.scrollIntoViewIfNeeded();
+  await target.click({ modifiers: ['Control'] });
+  const summary = page.locator('summary').filter({
+    has: page.getByRole('heading', {
+      name: label('videoEditor.sidebar.originalAudio'),
+      exact: true,
+    }),
+  });
+  if ((await summary.locator('..').getAttribute('open')) === null) await operate(summary);
+  const owner = page.locator('[data-ui="video-editor.original-audio.existing"]');
+  const level = owner.getByRole('textbox', {
+    name: label('videoEditor.sidebar.originalAudioLevel'),
+    exact: true,
+  });
+  await level.fill('45');
+  await level.press('Tab');
+  await expect
+    .poll(async () => {
+      const clip = (await readProject(page))?.clips.find((clip) => clip.id === take.id);
+      return clip?.type === 'AUDIO' ? clip.originalAudioMute?.volume : undefined;
+    })
+    .toBe(0.45);
+  await owner.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: capture('original-audio-existing.png'), fullPage: false });
+  const { originalAudioMute: _mute, ...manual } = take;
+  await operate(
+    owner.getByRole('button', {
+      name: label('videoEditor.sidebar.originalAudioRestore'),
+      exact: true,
+    })
+  );
+  const volume = page
+    .locator('[data-section="audio"]')
+    .getByRole('textbox', { name: label('videoEditor.sidebar.volumeLabel'), exact: true });
+  await expect(volume).toBeFocused();
+  await expect
+    .poll(async () => (await readProject(page))?.clips.find((clip) => clip.id === take.id))
+    .toEqual(manual);
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+  await expect
+    .poll(async () => {
+      const clip = (await readProject(page))?.clips.find((clip) => clip.id === take.id);
+      return clip?.type === 'AUDIO' ? clip.originalAudioMute?.volume : undefined;
+    })
+    .toBe(0.45);
+  await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+  await expect
+    .poll(async () => (await readProject(page))?.clips.find((clip) => clip.id === take.id))
+    .toEqual(manual);
+  await page.reload();
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  expect((await readProject(page))?.clips.find((clip) => clip.id === take.id)).toEqual(manual);
+}
+
 async function refuseTakeSave(page: Page) {
   await page.evaluate(() => {
     const put = IDBObjectStore.prototype.put;
@@ -625,6 +791,17 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
             .locator('audio')
             .evaluate((node: HTMLAudioElement) => node.paused && node.currentTime === 0)
         ).toBe(true);
+        const originalAudioMute =
+          input === 'ai' || input === 'file'
+            ? await configureOriginalAudio(
+                page,
+                voice,
+                before!,
+                label,
+                input === 'ai' ? 0.3 : 0,
+                (name) => info.outputPath(name)
+              )
+            : undefined;
         if (variant.locale === 'ru')
           await verifyVoiceLayout(page, voice, (name) => info.outputPath(name));
         const position = voice.getByRole('textbox', {
@@ -706,6 +883,11 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
             },
           },
         });
+        expect(take?.type === 'AUDIO' ? take.originalAudioMute : undefined).toEqual(
+          originalAudioMute
+            ? { ...originalAudioMute, volume: expect.closeTo(originalAudioMute.volume, 12) }
+            : undefined
+        );
         expect(accepted?.clips.filter((clip) => clip.id !== take?.id)).toEqual(before?.clips);
         expect(accepted?.tracks).toHaveLength(
           (before?.tracks.length ?? 0) + (existingTrack ? 0 : 1)
@@ -729,6 +911,14 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
           ).toBe(true);
+          const workspace = page.locator('[data-ui="video-editor.workspace.root"]');
+          expect(await workspace.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(
+            true
+          );
+          await workspace.evaluate((node) => {
+            node.scrollLeft = node.scrollWidth;
+          });
+          expect(await workspace.evaluate((node) => node.scrollLeft > 0)).toBe(true);
           await page.screenshot({
             path: info.outputPath('voice-text-edited-narrow.png'),
             fullPage: false,
@@ -738,6 +928,9 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
         await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
         const reopened = await readProject(page);
         expect(reopened?.clips.find((clip) => clip.id === take?.id)).toEqual(take);
+        await page.setViewportSize({ ...variant.size });
+        if (originalAudioMute && take?.type === 'AUDIO')
+          await verifyOriginalAudioRestore(page, take, label, (name) => info.outputPath(name));
         expect(errors).toEqual([]);
       } finally {
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -943,6 +1136,9 @@ for (const variant of [
             exact: true,
           })
         );
+        await configureOriginalAudio(page, voice, before!, label, index === 0 ? 0.3 : 0, (name) =>
+          info.outputPath(`batch-${index}-${name}`)
+        );
         await position.fill(String(index === 0 ? 6 : 20));
         await position.press('Tab');
       }
@@ -988,6 +1184,9 @@ for (const variant of [
         [6, 3],
         [20, 1],
       ]);
+      expect(
+        takes?.map((clip) => (clip.type === 'AUDIO' ? clip.originalAudioMute?.volume : undefined))
+      ).toEqual([expect.closeTo(0.3, 12), 0]);
       expect(new Set(takes?.map((clip) => clip.trackId)).size).toBe(2);
       expect(accepted?.clips.filter((clip) => !takes?.some((take) => take.id === clip.id))).toEqual(
         before?.clips
