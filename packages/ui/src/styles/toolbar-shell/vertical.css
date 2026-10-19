@@ -205,3 +205,16 @@
   border-top-color: transparent;
   border-left-color: var(--sniptale-color-accent);
 }
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-menu-side='left']
+  .sniptale-btn[data-menu-indicator='true']::before {
+  left: 2px;
+  right: auto;
+  transform: rotate(180deg);
+}
+
+.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-menu-side='left']
+  .sniptale-btn.sniptale-full-page-chevron
+  svg {
+  transform: rotate(90deg);
+}

@@ -91,6 +91,17 @@ export function ToolbarShellContent(props: {
             dragging={derivedState.isDragging}
             dataUi="content.toolbar.root"
             data-display-mode={derivedState.displayMode}
+            data-menu-side={
+              derivedState.freePlacement
+                ? undefined
+                : derivedState.displayMode === 'vertical'
+                  ? derivedState.position.x * uiScale < window.innerWidth / 2
+                    ? 'right'
+                    : 'left'
+                  : derivedState.position.y * uiScale < window.innerHeight / 2
+                    ? 'down'
+                    : 'up'
+            }
             data-dock-dragging={
               derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
             }

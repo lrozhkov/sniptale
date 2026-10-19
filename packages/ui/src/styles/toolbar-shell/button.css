@@ -80,6 +80,19 @@
   opacity: 1;
 }
 
+.sniptale-content-toolbar-adopted[data-menu-side='up']
+  .sniptale-btn[data-menu-indicator='true']::before {
+  top: 2px;
+  bottom: auto;
+  transform: rotate(180deg);
+}
+
+.sniptale-content-toolbar-adopted[data-menu-side='up']
+  .sniptale-btn.sniptale-full-page-chevron
+  svg {
+  transform: rotate(180deg);
+}
+
 .sniptale-toolbar-menu-item > svg,
 .sniptale-toolbar-menu-item > .sniptale-toolbar-mode-icon {
   width: 18px;
