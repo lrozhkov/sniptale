@@ -137,6 +137,22 @@ function createTooltip(container: HTMLElement): ContentSizeTooltipDom {
 
 const menuPlacementCases = [
   {
+    placement: 'down',
+    toolbar: [300, 300, 200, 50],
+    crop: [300, 200, 200, 90],
+    height: 40,
+    width: 100,
+    style: { left: -20, right: 'auto', top: 51, bottom: 'auto' },
+  },
+  {
+    placement: 'up',
+    toolbar: [300, 500, 200, 50],
+    crop: [300, 400, 200, 90],
+    height: 40,
+    width: 100,
+    style: { left: -20, right: 'auto', top: 'auto', bottom: 51 },
+  },
+  {
     placement: 'up',
     toolbar: [300, 300, 200, 50],
     crop: [300, 360, 200, 200],

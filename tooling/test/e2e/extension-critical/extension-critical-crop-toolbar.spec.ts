@@ -276,6 +276,10 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width - 7);
         expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height - 7);
         const shell = (await toolbar.boundingBox())!;
+        if (scenario === 'top') {
+          expect(overlap(bounds, crop)).toBeLessThanOrEqual(1);
+          expect(bounds.y).toBeGreaterThan(shell.y + shell.height);
+        }
         expect(
           Math.min(
             Math.abs(bounds.y + bounds.height - shell.y),

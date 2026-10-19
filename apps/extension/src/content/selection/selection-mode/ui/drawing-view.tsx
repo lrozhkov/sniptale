@@ -35,9 +35,32 @@ const resolveCropDrawingMenuLayout: NonNullable<
   });
   const above = toolbarRect.y - 18;
   const below = viewport.height - toolbarRect.y - toolbarRect.height - 18;
-  const placement = above >= menuHeight || (below < menuHeight && above >= below) ? 'up' : 'down';
+  const frame = toolbar
+    .closest('.sniptale-selection-container')
+    ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
+  const cropRect = frame
+    ? projectClientRectToContentUi(frame.getBoundingClientRect(), scale)
+    : null;
+  const left = Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8));
+  const adjacentPositions = [
+    { placement: 'up', top: toolbarRect.y - menuHeight - 10, fits: above >= menuHeight },
+    { placement: 'down', top: toolbarRect.y + toolbarRect.height + 10, fits: below >= menuHeight },
+  ] as const;
+  const clearPosition = cropRect
+    ? adjacentPositions.find(
+        (candidate) =>
+          candidate.fits &&
+          (left + menuWidth <= cropRect.x ||
+            left >= cropRect.x + cropRect.width ||
+            candidate.top + menuHeight <= cropRect.y ||
+            candidate.top >= cropRect.y + cropRect.height)
+      )
+    : undefined;
+  const placement =
+    clearPosition?.placement ??
+    (above >= menuHeight || (below < menuHeight && above >= below) ? 'up' : 'down');
   const position = {
-    x: Math.min(Math.max(8, toolbarRect.x), Math.max(8, viewport.width - menuWidth - 8)),
+    x: left,
     y: Math.min(
       Math.max(
         8,
