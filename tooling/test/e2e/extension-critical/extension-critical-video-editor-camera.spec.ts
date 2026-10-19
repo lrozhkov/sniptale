@@ -118,7 +118,12 @@ async function shadowRing(
   }, frame);
 }
 
-async function cameraGeometry(page: Page, owner: Locator, capture: (name: string) => string) {
+async function cameraGeometry(
+  page: Page,
+  owner: Locator,
+  capture: (name: string) => string,
+  focus?: Locator
+) {
   const closeMaterials = page.locator('[data-ui="video-editor.materials.close"]');
   if (await closeMaterials.isVisible()) await operate(closeMaterials);
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
@@ -134,7 +139,8 @@ async function cameraGeometry(page: Page, owner: Locator, capture: (name: string
     await expect.poll(async () => Math.round((await inspector.boundingBox())!.width)).toBe(width);
     const before = await rail.boundingBox();
     const colorRow = owner.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
-    if (await colorRow.count()) await colorRow.scrollIntoViewIfNeeded();
+    if (focus) await focus.scrollIntoViewIfNeeded();
+    else if (await colorRow.count()) await colorRow.scrollIntoViewIfNeeded();
     else await owner.locator('[aria-pressed]').first().scrollIntoViewIfNeeded();
     expect(
       await owner.evaluate((node) => {
@@ -165,7 +171,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   test(`camera window retains source pixels and montage placement ${viewport.size.width} ${locale}`, async ({
     page,
   }, info) => {
-    test.setTimeout(150000);
+    test.setTimeout(180000);
     await page.setViewportSize({ ...viewport.size });
     await page.emulateMedia({ colorScheme: theme });
     const host = await startHostServer();
@@ -215,6 +221,23 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           height: clip.transform.height * 8,
         },
       }));
+      project.clips = project.clips.map((clip) =>
+        clip.type === 'VIDEO' &&
+        project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+          ? {
+              ...clip,
+              cameraPositions: [
+                {
+                  id: 'native-position',
+                  sourceTime: 2,
+                  transform: { ...clip.transform },
+                  fitMode: clip.fitMode,
+                  transition: { kind: 'instant' as const, duration: 0 },
+                },
+              ],
+            }
+          : clip
+      );
       Object.assign(project, hydrateVideoProject(project));
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
@@ -628,6 +651,132 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         cameraAppearance: { shape: 'circle' },
       });
       await page.screenshot({ path: info.outputPath('circle-reopened.png'), fullPage: false });
+      const selectDestination = async () => {
+        await operate(
+          page.getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupCamera'),
+            exact: true,
+          })
+        );
+        await operate(
+          page.getByRole('button', {
+            name: label('videoEditor.sidebar.cameraPosition'),
+            exact: true,
+          })
+        );
+        await operate(page.getByRole('option', { name: '0:02.000', exact: true }));
+        await operate(
+          page.getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupStyle'),
+            exact: true,
+          })
+        );
+        if ((await crop.locator('..').getAttribute('open')) === null) await operate(crop);
+      };
+      await selectDestination();
+      const cropVideo = owner.locator('video');
+      await expect
+        .poll(() => cropVideo.evaluate((node: HTMLVideoElement) => node.currentTime))
+        .toBeCloseTo(2, 3);
+      const zoom = owner.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraCropZoom'),
+        exact: true,
+      });
+      await zoom.scrollIntoViewIfNeeded();
+      await expect(zoom).toHaveValue('100');
+      const destinationBefore = await readCamera();
+      const beforeCropPixels = await pixels(stage, frame);
+      const positionCrop = async () => {
+        const camera = await readCamera();
+        return camera?.type === 'VIDEO' ? (camera.cameraPositions?.[0]?.crop ?? null) : null;
+      };
+      await zoom.fill('200');
+      await zoom.press('Enter');
+      await expect.poll(positionCrop).toEqual({ zoom: 2, panX: 0, panY: 0 });
+      expect((await readNativeVideoProject(page))?.version).toBe(11);
+      const positionCamera = await readCamera();
+      expect(positionCamera?.cameraAppearance).toEqual(destinationBefore?.cameraAppearance);
+      expect(positionCamera?.transform).toEqual(destinationBefore?.transform);
+      await expect
+        .poll(
+          async () => circleMaskError(await pixels(stage, frame), beforeCropPixels).insideDifference
+        )
+        .toBeGreaterThan(5);
+      const cropPixels = circleMaskError(await pixels(stage, frame), beforeCropPixels);
+      expect(cropPixels.outsideError).toBeLessThan(1);
+      await writeFile(
+        info.outputPath('position-crop-pixels.json'),
+        JSON.stringify(cropPixels, null, 2)
+      );
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(positionCrop).toBeNull();
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]'));
+      await expect.poll(positionCrop).toEqual({ zoom: 2, panX: 0, panY: 0 });
+      const resetCrop = owner.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraCropResetPosition'),
+        exact: true,
+      });
+      await resetCrop.scrollIntoViewIfNeeded();
+      await checkInspectorPaintedFont(page, zoom, 'camera-position-crop');
+      await expect(resetCrop.locator('svg')).toBeVisible();
+      await operate(resetCrop);
+      await expect.poll(positionCrop).toBeNull();
+      await expect(resetCrop).toBeDisabled();
+      await operate(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]'));
+      await expect.poll(positionCrop).toEqual({ zoom: 2, panX: 0, panY: 0 });
+      await expect(resetCrop).toBeEnabled();
+      await zoom.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('position-crop.png'), fullPage: false });
+      await cameraGeometry(
+        page,
+        owner,
+        (name) => info.outputPath(name.replace('camera-mirror', 'position-crop')),
+        zoom
+      );
+      await operate(page.locator('[data-ui="video-editor.inspector.presentation-toggle"]'));
+      await zoom.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('position-crop-all.png'), fullPage: false });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      await expect.poll(positionCrop).toEqual({ zoom: 2, panX: 0, panY: 0 });
+      await operate(
+        page.getByRole('button', {
+          name: label('videoEditor.sidebar.sceneProperties'),
+          exact: true,
+        })
+      );
+      await page
+        .locator(`[data-project-timeline-clip="${camera.id}"]`)
+        .click({ modifiers: ['Control'] });
+      await selectDestination();
+      await zoom.scrollIntoViewIfNeeded();
+      await expect(zoom).toHaveValue('200');
+      await expect(resetCrop).toBeEnabled();
+      await page.screenshot({
+        path: info.outputPath('position-crop-reopened.png'),
+        fullPage: false,
+      });
+      await expect
+        .poll(() =>
+          cropVideo.evaluate((node: HTMLVideoElement) => node.readyState >= 2 && !node.seeking)
+        )
+        .toBe(true);
+      await cropVideo.evaluate((node: HTMLVideoElement) => {
+        const load = node.load.bind(node);
+        node.dataset['nativeLoadCount'] = '0';
+        node.load = () => {
+          node.dataset['nativeLoadCount'] = String(Number(node.dataset['nativeLoadCount']) + 1);
+          load();
+        };
+      });
+      await operate(
+        page.getByRole('button', { name: label('videoEditor.timeline.nextFrame'), exact: true })
+      );
+      await expect
+        .poll(() => cropVideo.evaluate((node: HTMLVideoElement) => node.currentTime))
+        .toBeCloseTo(2 + 1 / project.fps, 3);
+      expect(await cropVideo.getAttribute('data-native-load-count')).toBe('0');
+
       if (index === 0) {
         await page.setViewportSize({ width: 1200, height: 560 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

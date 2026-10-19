@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 11])
+  for (const version of [2, 3, 4, 12])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,7 +129,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 11])
+    for (const version of [2, 3, 4, 5, 6, 7, 12])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -156,7 +156,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 11])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 12])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -214,7 +214,7 @@ it('fences circle at schema ten and retains dormant camera settings without open
   expect(changed.version).toBe(10);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 11])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 12])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const parsed = parseHydratableVideoProject({ ...project, version });
@@ -226,4 +226,73 @@ it('fences circle at schema ten and retains dormant camera settings without open
       isHydratableVideoProject({ ...changed, clips: [{ ...clip, type, cameraAppearance }] })
     ).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(10);
+});
+
+it('fences positional camera crops at schema eleven and keeps inherited data absent', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } = await import('./root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'position-crop',
+    filename: 'source.webm',
+    width: 160,
+    height: 90,
+    duration: 6,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  const position = {
+    id: 'crop',
+    sourceTime: 2,
+    transform: { ...clip.transform },
+    fitMode: clip.fitMode,
+    transition: { kind: 'instant' as const, duration: 0 },
+  };
+  const crop = { zoom: 2, panX: 0.5, panY: -0.5 };
+  const changed = applyVideoProjectMutationPatch(project, {
+    clips: [{ ...clip, cameraPositions: [{ ...position, crop }] }],
+  });
+  expect(changed.version).toBe(11);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 12])
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+    const parsed = parseHydratableVideoProject({
+      ...project,
+      version,
+      clips: [{ ...clip, cameraPositions: [position] }],
+    });
+    expect(parsed).not.toBeNull();
+    const camera = parsed?.clips[0];
+    if (camera?.type !== 'VIDEO') throw new Error('Expected video');
+    expect(camera.cameraPositions![0]).not.toHaveProperty('crop');
+    expect(camera).not.toHaveProperty('cameraAppearance');
+  }
+  for (const invalid of [
+    null,
+    {},
+    { ...crop, zoom: 0 },
+    { ...crop, zoom: Infinity },
+    { ...crop, panX: 2 },
+    { ...crop, panY: NaN },
+  ])
+    expect(
+      isHydratableVideoProject({
+        ...changed,
+        clips: [{ ...clip, cameraPositions: [{ ...position, crop: invalid }] }],
+      })
+    ).toBe(false);
+  for (const type of ['IMAGE', 'AUDIO'])
+    expect(
+      isHydratableVideoProject({
+        ...changed,
+        clips: [{ ...clip, type, cameraPositions: [{ ...position, crop }] }],
+      })
+    ).toBe(false);
+  expect(
+    applyVideoProjectMutationPatch(changed, { clips: [{ ...clip, cameraPositions: [position] }] })
+      .version
+  ).toBe(11);
 });

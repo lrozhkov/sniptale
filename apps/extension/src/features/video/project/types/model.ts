@@ -1,4 +1,4 @@
-import type { CameraAppearance } from '../camera/appearance';
+import type { CameraAppearance, CameraCrop } from '../camera/appearance';
 import type { VideoProjectVoiceTextSnapshot } from '../text/types';
 import type { VideoMediaFitMode } from './media';
 import type {
@@ -30,6 +30,8 @@ import type {
 } from '../effect-instance/types';
 
 interface CameraPosition {
+  /** An absent destination crop inherits the clip-wide source framing. */
+  crop?: CameraCrop;
   id: string;
   /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
   sourceTime: number;
@@ -299,7 +301,7 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  version: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;

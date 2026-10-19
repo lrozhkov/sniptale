@@ -386,7 +386,7 @@ it.each(['boundary', 'click', 'dwell'] as const)(
   }
 );
 
-it('keeps camera reflection through a partial rate-two split and independent duplicate', () => {
+it('keeps camera appearance through a partial rate-two split and independent duplicate', async () => {
   const { project, screen, camera, cameraTrack } = setup(1, 4);
   cameraTrack.role = 'CAMERA';
   const cameraAppearance = {
@@ -396,10 +396,26 @@ it('keeps camera reflection through a partial rate-two split and independent dup
     panX: 0.2,
     panY: -0.1,
   };
-  const mirrored = { ...camera, cameraMirrored: true, shadowColor: '#ff008080', cameraAppearance };
+  const cameraPositions = [
+    {
+      id: 'crop',
+      sourceTime: 4,
+      transform: { ...camera.transform },
+      fitMode: camera.fitMode,
+      transition: { kind: 'smooth' as const, duration: 2 },
+      crop: { zoom: 3, panX: -0.5, panY: 0.5 },
+    },
+  ];
+  const mirrored = {
+    ...camera,
+    cameraMirrored: true,
+    shadowColor: '#ff008080',
+    cameraAppearance,
+    cameraPositions,
+  };
   const authored = {
     ...project,
-    version: 10 as const,
+    version: 11 as const,
     clips: project.clips.map((clip) => (clip.id === camera.id ? mirrored : clip)),
   };
   const split = splitProjectClipsAtTimeWithResult(authored, camera.id, 3);
@@ -412,7 +428,8 @@ it('keeps camera reflection through a partial rate-two split and independent dup
         clip.type === 'VIDEO' &&
         clip.cameraMirrored === true &&
         clip.shadowColor === '#ff008080' &&
-        clip.cameraAppearance?.shape === 'circle'
+        clip.cameraAppearance?.shape === 'circle' &&
+        JSON.stringify(clip.cameraPositions) === JSON.stringify(cameraPositions)
     )
   ).toBe(true);
   expect(
@@ -423,6 +440,12 @@ it('keeps camera reflection through a partial rate-two split and independent dup
     [1, 4, 2],
     [5, 4, 2],
   ]);
+  const { resolveCameraClip } = await import('../../../../features/video/project/camera/animation');
+  const right = cameraClips.find((clip) => clip.startTime === 3);
+  if (right?.type !== 'VIDEO') throw new Error('Expected right camera fragment');
+  expect(resolveCameraClip(right, 3.25).cameraAppearance).toEqual(
+    resolveCameraClip(mirrored, 3.25).cameraAppearance
+  );
   const duplicate = duplicateProjectClipsWithResult(authored, camera.id);
   expect(duplicate).not.toBeNull();
   expect(
@@ -430,6 +453,7 @@ it('keeps camera reflection through a partial rate-two split and independent dup
   ).toMatchObject({
     cameraMirrored: true,
     cameraAppearance,
+    cameraPositions,
     shadowColor: '#ff008080',
     sourceStart: 1,
     sourceDuration: 8,

@@ -173,13 +173,19 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0);
+  const sourceTime = useRef(props.sourceTime);
+  useEffect(() => {
+    sourceTime.current = props.sourceTime;
+    const media = video.current;
+    if (media && media.readyState >= 1) media.currentTime = props.sourceTime;
+  }, [props.sourceTime]);
   useEffect(() => {
     const media = video.current;
     if (!media) return;
     setReady(false);
     setFailed(false);
     const seek = () => {
-      media.currentTime = props.sourceTime;
+      media.currentTime = sourceTime.current;
     };
     const loaded = () => {
       setReady(true);
@@ -205,7 +211,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       media.removeAttribute('src');
       media.load();
     };
-  }, [props.url, props.sourceTime]);
+  }, [props.url]);
   useEffect(() => {
     const target = canvas.current,
       media = video.current;

@@ -1,5 +1,20 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'montage-camera-source-trajectory',
+    productionFile: 'apps/extension/src/features/video/project/camera/animation.ts',
+    allowCrossOwner: true,
+    reason:
+      'Camera trajectories and source crops share evaluation with inverse canvas edits and media commands.',
+    testFiles: [
+      'apps/extension/src/features/video/project/camera/animation.test.ts',
+      'apps/extension/src/features/video/project/camera/appearance.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-partial.test.ts',
+      'apps/extension/src/video-editor/preview/stage/runtime/camera-transform.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-property/media-shadow.test.ts',
+    ],
+  },
+  {
     owner: 'montage-media-shadow-color',
     productionFile: 'apps/extension/src/video-editor/project/state/clip-property/media.ts',
     allowCrossOwner: true,

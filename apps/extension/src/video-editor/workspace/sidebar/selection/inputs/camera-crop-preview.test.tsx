@@ -198,3 +198,28 @@ it('uses a square circle preview and retains mirrored pan semantics', () => {
   pointer('pointerup', 25, 10);
   expect(p.onChange).toHaveBeenCalledExactlyOnceWith({ ...p.appearance, panX: 0.12 });
 });
+
+it('seeks the latest source time without reloading the same camera source', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} />));
+  const video = ready();
+  Object.defineProperty(video, 'readyState', { value: 2, configurable: true });
+  const count = load.mock.calls.length;
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={3} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  expect(video.currentTime).toBe(3);
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={4} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  expect(video.currentTime).toBe(4);
+});
+
+it('uses the latest requested time when camera metadata arrives late', () => {
+  const p = props();
+  act(() => root.render(<CameraCropPreview {...p} />));
+  const video = container.querySelector('video')!;
+  const count = load.mock.calls.length;
+  act(() => root.render(<CameraCropPreview {...p} sourceTime={3} />));
+  expect(load).toHaveBeenCalledTimes(count);
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(3);
+});

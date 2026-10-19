@@ -245,7 +245,7 @@ it.each(['halo', 'path', 'area'] as const)(
   }
 );
 
-it('evaluates a partial rate-two camera position and its circle crop at project time', () => {
+it('evaluates a partial rate-two camera position and its circle crop at project time', async () => {
   const { project, clip } = capturedProject();
   project.tracks[0]!.role = 'CAMERA';
   clip.transform = { x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 };
@@ -259,6 +259,7 @@ it('evaluates a partial rate-two camera position and its circle crop at project 
     {
       id: 'move',
       sourceTime: 2,
+      crop: { zoom: 2, panX: 0.4, panY: -0.2 },
       transform: { ...clip.transform, x: 100, width: 160, height: 80 },
       fitMode: 'CONTAIN',
       transition: { kind: 'smooth', duration: 1 },
@@ -270,8 +271,18 @@ it('evaluates a partial rate-two camera position and its circle crop at project 
   expect(mapping).toMatchObject({
     frame: { x: 60, y: 20, width: 120, height: 60 },
     fitMode: 'COVER',
-    cameraAppearance: clip.cameraAppearance,
+    cameraAppearance: { ...clip.cameraAppearance, zoom: 1.5, panX: 0.2, panY: -0.1 },
   });
+  if (!mapping) throw new Error('Expected source mapping');
+  const { mapSourceNormalizedPointToVisualLayer, mapVisualLayerPointToSourceNormalized } =
+    await import('../../draw/fitted-media');
+  const point = mapSourceNormalizedPointToVisualLayer({ ...mapping, point: { x: 0.5, y: 0.5 } });
+  expect(point?.x).toBeCloseTo(114.75, 8);
+  expect(point?.y).toBeCloseTo(51.5, 8);
+  if (!point) throw new Error('Expected visible source point');
+  const source = mapVisualLayerPointToSourceNormalized({ ...mapping, point });
+  expect(source?.x).toBeCloseTo(0.5, 8);
+  expect(source?.y).toBeCloseTo(0.5, 8);
   expect(clip.transform).toEqual({ x: 20, y: 20, width: 80, height: 40, rotation: 0, opacity: 1 });
   expect(clip.sourceStart).toBe(1);
   expect(clip.playbackRate).toBe(2);

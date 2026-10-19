@@ -281,3 +281,23 @@ it('shares an inscribed circle without rewriting placement and keeps appearance 
   for (const point of points) expect(Math.hypot(point.x - 100, point.y - 50)).toBeCloseTo(50, 8);
   expect(clip).not.toHaveProperty('cameraAppearance');
 });
+
+it('shares bounded source crop validation and transition arithmetic', async () => {
+  const { isCameraCrop, interpolateCameraCrop } = await import('./appearance');
+  const from = { zoom: 1, panX: -1, panY: 1 };
+  const to = { zoom: 4, panX: 1, panY: -1 };
+  expect(isCameraCrop(from)).toBe(true);
+  expect(isCameraCrop(to)).toBe(true);
+  for (const value of [
+    null,
+    {},
+    { ...from, zoom: 0 },
+    { ...from, zoom: Infinity },
+    { ...from, panX: NaN },
+    { ...from, panY: 2 },
+  ])
+    expect(isCameraCrop(value)).toBe(false);
+  expect(interpolateCameraCrop(from, to, 0)).toEqual(from);
+  expect(interpolateCameraCrop(from, to, 0.5)).toEqual({ zoom: 2.5, panX: 0, panY: 0 });
+  expect(interpolateCameraCrop(from, to, 1)).toEqual(to);
+});

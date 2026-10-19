@@ -1,12 +1,16 @@
 import { isBoundedNumber, isRecord } from '../validation/primitives';
 
-/** Clip-wide framing is independent of the camera's animated scene transform. */
-export interface CameraAppearance {
-  shape: 'rounded' | 'soft' | 'ellipse' | 'circle';
-  roundness: number;
+/** Source framing is independent of the camera window and source clock. */
+export interface CameraCrop {
   zoom: number;
   panX: number;
   panY: number;
+}
+
+/** Shape is clip-wide; a position can override source framing. */
+export interface CameraAppearance extends CameraCrop {
+  shape: 'rounded' | 'soft' | 'ellipse' | 'circle';
+  roundness: number;
 }
 
 export const DEFAULT_CAMERA_APPEARANCE: CameraAppearance = {
@@ -25,9 +29,7 @@ export function isCameraAppearance(value: unknown): value is CameraAppearance {
       value['shape'] === 'ellipse' ||
       value['shape'] === 'circle') &&
     isBoundedNumber(value['roundness'], 0, 100) &&
-    isBoundedNumber(value['zoom'], 1, 4) &&
-    isBoundedNumber(value['panX'], -1, 1) &&
-    isBoundedNumber(value['panY'], -1, 1)
+    isCameraCrop(value)
   );
 }
 
@@ -84,4 +86,27 @@ export function cameraSilhouette(width: number, height: number, appearance: Came
       y: frame.y + (frame.height / 2) * (1 + Math.sign(s) * Math.abs(s) ** (2 / exponent)),
     };
   });
+}
+
+/** Admit source framing independently of clip-wide shape. */
+export function isCameraCrop(value: unknown): value is CameraCrop {
+  return (
+    isRecord(value) &&
+    isBoundedNumber(value['zoom'], 1, 4) &&
+    isBoundedNumber(value['panX'], -1, 1) &&
+    isBoundedNumber(value['panY'], -1, 1)
+  );
+}
+
+/** Mix crop values with the caller's evaluated transition weight. */
+export function interpolateCameraCrop(
+  from: CameraCrop,
+  to: CameraCrop,
+  weight: number
+): CameraCrop {
+  return {
+    zoom: from.zoom + (to.zoom - from.zoom) * weight,
+    panX: from.panX + (to.panX - from.panX) * weight,
+    panY: from.panY + (to.panY - from.panY) * weight,
+  };
 }

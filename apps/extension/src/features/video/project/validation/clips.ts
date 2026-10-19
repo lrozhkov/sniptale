@@ -1,6 +1,6 @@
 import { parseColor } from '@sniptale/foundation/color';
 import { parseWindowHeader } from '@sniptale/runtime-contracts/window-header';
-import { isCameraAppearance } from '../camera/appearance';
+import { isCameraAppearance, isCameraCrop } from '../camera/appearance';
 import type { VideoProjectClip } from '../types/index';
 import {
   VideoClipLinkMode,
@@ -82,6 +82,7 @@ function hasCameraPositions(value: unknown): boolean {
       !isBoundedNumber(item['sourceTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) ||
       typeof item['sourceTime'] !== 'number' ||
       item['sourceTime'] <= previous ||
+      (item['crop'] !== undefined && !isCameraCrop(item['crop'])) ||
       !isTransform(item['transform']) ||
       !isRecord(item['transform']) ||
       Number(item['transform']['width']) <= 0 ||
@@ -216,6 +217,15 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   if (
     value['cameraMirrored'] !== undefined &&
     (value['type'] !== VideoProjectClipType.VIDEO || typeof value['cameraMirrored'] !== 'boolean')
+  )
+    return false;
+
+  if (
+    value['type'] !== VideoProjectClipType.VIDEO &&
+    Array.isArray(value['cameraPositions']) &&
+    value['cameraPositions'].some(
+      (position: unknown) => isRecord(position) && position['crop'] !== undefined
+    )
   )
     return false;
 

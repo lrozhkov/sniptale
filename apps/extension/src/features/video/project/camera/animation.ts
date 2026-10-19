@@ -1,4 +1,9 @@
-import type { CameraAppearance } from './appearance';
+import {
+  DEFAULT_CAMERA_APPEARANCE,
+  interpolateCameraCrop,
+  type CameraAppearance,
+  type CameraCrop,
+} from './appearance';
 import type { VideoProjectClip, VideoProjectVideoClip, VideoProject } from '../types';
 import type { VideoProjectTransform } from '../types/layout';
 import type { VideoMediaFitMode } from '../types/media';
@@ -8,6 +13,7 @@ type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[numb
 export type CameraPositionEdit =
   | { kind: 'mirror'; mirrored: boolean }
   | { kind: 'appearance'; appearance: CameraAppearance }
+  | { kind: 'crop'; crop: CameraCrop | null }
   | { kind: 'add' }
   | { kind: 'select'; id: string | null }
   | { kind: 'remove'; id: string }
@@ -34,12 +40,19 @@ export function resolveCameraClip(
 ): VideoProjectVideoClip {
   const sourceTime = cameraSourceTime(clip, time);
   const positions = clip.cameraPositions ?? [];
+  const appearance = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+  const hasCrop = positions.some((position) => position.crop !== undefined);
   let visual = clip;
   for (let index = 0; index < positions.length; index += 1) {
     const position = positions[index];
     if (!position || position.sourceTime > sourceTime) break;
     const evaluationTime = Math.min(sourceTime, positions[index + 1]?.sourceTime ?? Infinity);
-    visual = interpolateCameraPosition(visual, position, evaluationTime);
+    visual = interpolateCameraPosition(
+      visual,
+      position,
+      evaluationTime,
+      hasCrop ? appearance : undefined
+    );
   }
   return visual;
 }
@@ -47,15 +60,29 @@ export function resolveCameraClip(
 function interpolateCameraPosition(
   clip: VideoProjectVideoClip,
   position: CameraPosition,
-  sourceTime: number
+  sourceTime: number,
+  baseAppearance?: CameraAppearance
 ): VideoProjectVideoClip {
   const from = clip.transform;
   const duration = position.transition.kind === 'instant' ? 0 : position.transition.duration;
   const progress =
     duration > 0 ? Math.min(1, Math.max(0, (sourceTime - position.sourceTime) / duration)) : 1;
   if (progress === 0) return clip;
-  if (progress >= 1) return { ...clip, transform: position.transform, fitMode: position.fitMode };
   const eased = progress * progress * (3 - 2 * progress);
+  const appearance = baseAppearance
+    ? {
+        cameraAppearance: {
+          ...baseAppearance,
+          ...interpolateCameraCrop(
+            clip.cameraAppearance ?? baseAppearance,
+            position.crop ?? baseAppearance,
+            eased
+          ),
+        },
+      }
+    : {};
+  if (progress >= 1)
+    return { ...clip, ...appearance, transform: position.transform, fitMode: position.fitMode };
   const mix = (a: number, b: number) => a + (b - a) * eased;
   const scale =
     position.transition.kind === 'shrink' ? 1 - 0.55 * Math.sin(Math.PI * progress) ** 2 : 1;
@@ -63,6 +90,7 @@ function interpolateCameraPosition(
   const height = mix(from.height, position.transform.height) * scale;
   return {
     ...clip,
+    ...appearance,
     // Crop during the move; corner presets end at the source aspect ratio.
     fitMode: 'COVER',
     transform: {

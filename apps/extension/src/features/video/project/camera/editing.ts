@@ -1,4 +1,9 @@
-import { isCameraAppearance, DEFAULT_CAMERA_APPEARANCE } from './appearance';
+import {
+  isCameraAppearance,
+  isCameraCrop,
+  DEFAULT_CAMERA_APPEARANCE,
+  type CameraCrop,
+} from './appearance';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import type { VideoProject, VideoProjectVideoClip } from '../types';
 import {
@@ -35,6 +40,7 @@ export function editCameraPosition(
       )
     );
   }
+  if (edit.kind === 'crop') return editCameraCrop(project, clip, time, edit.crop);
   if (edit.kind === 'appearance') {
     if (!isCameraAppearance(edit.appearance)) return project;
     const current = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
@@ -57,6 +63,7 @@ export function editCameraPosition(
   if (edit.kind === 'add') {
     if (!canAddCameraPosition(project, clipId, time)) return project;
     const visual = resolveCameraClip(clip, time);
+    const crop = visual.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
     const duration =
       Math.max(0, Math.min(0.5, clip.startTime + clip.duration - 1 / project.fps - time)) *
       (clip.playbackRate ?? 1);
@@ -64,6 +71,9 @@ export function editCameraPosition(
       ...positions,
       {
         id: crypto.randomUUID(),
+        ...(positions.some((position) => position.crop !== undefined)
+          ? { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }
+          : {}),
         sourceTime: cameraSourceTime(clip, time),
         transform: { ...visual.transform },
         fitMode: visual.fitMode,
@@ -156,5 +166,47 @@ function updatePositionTiming(
             : {}),
         }
       : item
+  );
+}
+
+function editCameraCrop(
+  project: VideoProject,
+  clip: VideoProjectVideoClip,
+  time: number,
+  crop: CameraCrop | null
+): VideoProject {
+  const position = activeCameraPosition(clip, time);
+  const current = position?.crop ?? clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+  if (
+    crop === null
+      ? !position?.crop
+      : !isCameraCrop(crop) ||
+        (current.zoom === crop.zoom && current.panX === crop.panX && current.panY === crop.panY)
+  )
+    return project;
+  const acceptedCrop =
+    crop === null ? undefined : { zoom: crop.zoom, panX: crop.panX, panY: crop.panY };
+  const next = position
+    ? {
+        ...clip,
+        cameraPositions:
+          clip.cameraPositions?.map((item) => {
+            if (item.id !== position.id) return item;
+            const changed = { ...item };
+            if (acceptedCrop === undefined) delete changed.crop;
+            else changed.crop = acceptedCrop;
+            return changed;
+          }) ?? [],
+      }
+    : {
+        ...clip,
+        cameraAppearance: {
+          ...(clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE),
+          ...acceptedCrop,
+        },
+      };
+  return applyVideoProjectClipsPatch(
+    project,
+    project.clips.map((item) => (item.id === clip.id ? next : item))
   );
 }

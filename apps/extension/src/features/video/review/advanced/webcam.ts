@@ -4,6 +4,9 @@ import {
   DEFAULT_CAMERA_APPEARANCE,
   cameraWindowFrame,
   isCameraAppearance,
+  isCameraCrop,
+  interpolateCameraCrop,
+  type CameraCrop,
   type CameraAppearance,
 } from '../../project/camera/appearance';
 import { isBoundedNumber } from '../../project/validation/primitives';
@@ -16,7 +19,7 @@ export interface QuickEditWebcamPlacement {
   height: number;
 }
 
-export type QuickEditWebcamCrop = Pick<CameraAppearance, 'zoom' | 'panX' | 'panY'>;
+export type QuickEditWebcamCrop = CameraCrop;
 
 interface QuickEditWebcamPosition {
   id: string;
@@ -85,7 +88,7 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
   )
     return null;
   const crop = value['crop'];
-  if (crop !== undefined && !isWebcamCrop(crop)) return null;
+  if (crop !== undefined && !isCameraCrop(crop)) return null;
   return {
     ...(crop === undefined ? {} : { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }),
     id: value['id'],
@@ -276,16 +279,6 @@ export function quickEditWebcamBounds(
   };
 }
 
-/** Optional per-position framing inherits the base crop in existing projects. */
-function isWebcamCrop(value: unknown): value is QuickEditWebcamCrop {
-  return (
-    isRecord(value) &&
-    isBoundedNumber(value['zoom'], 1, 4) &&
-    isBoundedNumber(value['panX'], -1, 1) &&
-    isBoundedNumber(value['panY'], -1, 1)
-  );
-}
-
 /** Crop follows the same source-clock transition as the camera's scene placement. */
 export function quickEditWebcamCropAt(webcam: QuickEditWebcam, time: number): QuickEditWebcamCrop {
   const index = webcam.positions.findLastIndex((position) => position.time <= time);
@@ -307,11 +300,7 @@ export function quickEditWebcamCropAt(webcam: QuickEditWebcam, time: number): Qu
       ? 1
       : Math.min(1, Math.max(0, (time - current.time) / duration));
   const eased = progress * progress * (3 - 2 * progress);
-  return {
-    zoom: previous.zoom + (next.zoom - previous.zoom) * eased,
-    panX: previous.panX + (next.panX - previous.panX) * eased,
-    panY: previous.panY + (next.panY - previous.panY) * eased,
-  };
+  return interpolateCameraCrop(previous, next, eased);
 }
 
 /** Move one anchor without crossing adjacent anchors or changing its content. */
