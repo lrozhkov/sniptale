@@ -1,9 +1,9 @@
-import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
+import type { RenderResources } from './render-resources';
 /** Replicate edge pixels before filtering so source-over never reveals the sharp scene at edges. */
-export function drawReviewBlurredScene(
+export function drawEdgePaddedBlur(
   context: CanvasRenderingContext2D,
-  source: HTMLCanvasElement,
-  scratch: HTMLCanvasElement | null,
+  source: HTMLCanvasElement | OffscreenCanvas,
+  scratch: HTMLCanvasElement | OffscreenCanvas | null,
   radius: number,
   resources?: RenderResources
 ) {
@@ -19,7 +19,7 @@ export function drawReviewBlurredScene(
     if (scratch.width !== width) scratch.width = width;
     if (scratch.height !== height) scratch.height = height;
     const copy = scratch.getContext('2d');
-    if (!copy) throw new Error('Spotlight compositor is unavailable.');
+    if (!copy || !('drawImage' in copy)) throw new Error('Spotlight compositor is unavailable.');
     copy.clearRect(0, 0, width, height);
     const columns = [
       { source: 0, size: 1, target: 0, span: pad },

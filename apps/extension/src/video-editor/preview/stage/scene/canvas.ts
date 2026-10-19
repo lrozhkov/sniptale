@@ -129,6 +129,7 @@ function clearPreviewSceneCanvas(params: {
   params.context.clearRect(0, 0, params.canvas.width, params.canvas.height);
   params.context.setTransform(params.dpr, 0, 0, params.dpr, 0, 0);
   drawSceneBackground({
+    projectScale: params.bounds.width / params.project.width,
     context: params.context,
     currentTime: params.currentTime ?? 0,
     audioEnvelope: resolveSceneBackgroundAudioEnvelope(params.project, params.currentTime ?? 0),

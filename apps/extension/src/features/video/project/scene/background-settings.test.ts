@@ -149,7 +149,7 @@ it('fences active and dormant metadata at schema fourteen and preserves removal'
         false
       );
   }
-  expect(isHydratableVideoProject({ ...changed, version: 16 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 17 })).toBe(false);
   expect(
     applyVideoProjectMutationPatch(changed, {
       sceneBackground: { kind: 'solid', color: '#123456' },
@@ -157,4 +157,67 @@ it('fences active and dormant metadata at schema fourteen and preserves removal'
   ).toBe(14);
   for (let version = 2; version <= 14; version++)
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+});
+
+it('retains common blur through kind changes without putting it in paint memory', () => {
+  let project = {
+    backgroundColor: '#123456',
+    sceneBackground: {
+      ...createSceneGradientBackground(),
+      blur: 18,
+    } as VideoProjectSceneBackground,
+  };
+  for (const kind of ['image', 'solid', 'gradient'] as const) {
+    const next = resolveSceneBackgroundKind(project.sceneBackground, kind, 'background-image')!;
+    expect(next.blur).toBe(18);
+    project = syncProjectSceneBackground(project, next);
+    expect(project.sceneBackground.blur).toBe(18);
+    for (const variant of Object.values(project.sceneBackground.remembered ?? {}))
+      expect(variant).not.toHaveProperty('blur');
+  }
+  const reset = syncProjectSceneBackground(project, { kind: 'solid', color: '#abcdef', blur: 0 });
+  expect(reset.sceneBackground.blur).toBe(0);
+  expect(
+    syncProjectSceneBackground(project, { kind: 'solid', color: '#abcdef' }).sceneBackground.blur
+  ).toBe(18);
+});
+
+it('admits bounded common blur only at schema sixteen and keeps absent legacy values absent', () => {
+  const base = createEmptyVideoProject('Blur');
+  for (const blur of [0, 0.000123, 18, 25]) {
+    const sceneBackground = { ...createSceneGradientBackground(), blur };
+    const changed = applyVideoProjectMutationPatch(base, { sceneBackground });
+    expect(changed.version).toBe(16);
+    expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
+    for (let version = 2; version <= 15; version++)
+      expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 17 })).toBe(false);
+    expect(
+      applyVideoProjectMutationPatch(changed, {
+        sceneBackground: { kind: 'solid', color: '#123456' },
+      }).version
+    ).toBe(16);
+  }
+  for (const blur of [-1, 25.01, NaN, Infinity, '4', null])
+    expect(parseSceneBackgroundSettings({ kind: 'solid', color: '#123456', blur })).toBeNull();
+  for (const kind of ['solid', 'gradient', 'image'] as const) {
+    const variant =
+      kind === 'solid'
+        ? { kind, color: '#123456' }
+        : kind === 'image'
+          ? { kind, assetId: 'image' }
+          : createSceneGradientBackground();
+    expect(
+      parseSceneBackgroundSettings({
+        kind: 'solid',
+        color: '#123456',
+        remembered: { [kind]: { ...variant, blur: 1 } },
+      })
+    ).toBeNull();
+  }
+  for (let version = 2; version <= 16; version++) {
+    const legacy = { ...base, version };
+    expect(isHydratableVideoProject(legacy)).toBe(true);
+    expect(getProjectSceneBackground(legacy)).not.toHaveProperty('blur');
+  }
 });

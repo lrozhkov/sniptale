@@ -307,56 +307,59 @@ it('removes text bound to explicitly deleted sources while retaining independent
   expect(project).toEqual(before);
 });
 
-it.each(['dormant', 'active', 'other-image'] as const)(
-  'removes only deleted background refs and keeps %s variants',
-  (mode) => {
-    const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
-    const { project, removed, kept } = fixture(source);
-    project.version = 14;
-    project.clips = [];
-    const image = {
-      ...removed,
-      type: 'IMAGE' as const,
-      metadata: { ...removed.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
-    };
-    const otherImage = {
-      ...image,
-      id: 'other-image',
-      source: { kind: 'project-asset' as const, projectAssetId: 'other-source' },
-    };
-    project.assets = [image, kept, otherImage];
-    const gradient = {
-      ...createSceneGradientBackground('#123456ff'),
-      animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
-    };
-    const solid = { kind: 'solid' as const, color: '#abcdef' };
-    const remembered = {
-      solid,
-      gradient,
-      image: {
-        kind: 'image' as const,
-        assetId: mode === 'other-image' ? otherImage.id : image.id,
-        imageFit: 'contain' as const,
-      },
-    };
-    project.sceneBackground =
-      mode === 'dormant'
-        ? { ...gradient, remembered }
-        : { kind: 'image', assetId: image.id, imageFit: 'cover', remembered };
-    expect(isExportReadyVideoProject(project)).toBe(true);
-    const before = structuredClone(project);
-    const result = removeVideoProjectLibrarySources(project, [source]);
-    expect(result.version).toBe(14);
-    expect(result.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
-    expect(result.sceneBackground?.remembered?.image).toEqual(
-      mode === 'other-image' ? remembered.image : undefined
-    );
-    if (mode === 'dormant') expect(result.sceneBackground).toMatchObject(gradient);
-    else expect(result.sceneBackground).toMatchObject(solid);
-    expect(result.assets).toEqual([kept, otherImage]);
-    expect(result.tracks).toEqual(project.tracks);
-    expect(project).toEqual(before);
-    expect(isExportReadyVideoProject(result)).toBe(true);
-    expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
-  }
-);
+it.each(
+  ([undefined, 18] as const).flatMap((blur) =>
+    (['dormant', 'active', 'other-image'] as const).map((mode) => ({ mode, blur }))
+  )
+)('removes only deleted background refs and keeps %s variants', ({ mode, blur }) => {
+  const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = blur === undefined ? 14 : 16;
+  project.clips = [];
+  const image = {
+    ...removed,
+    type: 'IMAGE' as const,
+    metadata: { ...removed.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const otherImage = {
+    ...image,
+    id: 'other-image',
+    source: { kind: 'project-asset' as const, projectAssetId: 'other-source' },
+  };
+  project.assets = [image, kept, otherImage];
+  const gradient = {
+    ...createSceneGradientBackground('#123456ff'),
+    animation: { mode: 'breathe' as const, speed: 42, intensity: 61 },
+  };
+  const solid = { kind: 'solid' as const, color: '#abcdef' };
+  const remembered = {
+    solid,
+    gradient,
+    image: {
+      kind: 'image' as const,
+      assetId: mode === 'other-image' ? otherImage.id : image.id,
+      imageFit: 'contain' as const,
+    },
+  };
+  project.sceneBackground =
+    mode === 'dormant'
+      ? { ...gradient, remembered }
+      : { kind: 'image', assetId: image.id, imageFit: 'cover', remembered };
+  if (blur !== undefined) project.sceneBackground.blur = blur;
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.version).toBe(blur === undefined ? 14 : 16);
+  expect(result.sceneBackground?.blur).toBe(blur);
+  expect(result.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
+  expect(result.sceneBackground?.remembered?.image).toEqual(
+    mode === 'other-image' ? remembered.image : undefined
+  );
+  if (mode === 'dormant') expect(result.sceneBackground).toMatchObject(gradient);
+  else expect(result.sceneBackground).toMatchObject(solid);
+  expect(result.assets).toEqual([kept, otherImage]);
+  expect(result.tracks).toEqual(project.tracks);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+});

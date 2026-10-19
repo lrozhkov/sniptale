@@ -587,10 +587,14 @@ it('purges a secondary source from a text-capable project and retains independen
   expect(harness.complete).toHaveBeenCalledTimes(1);
 });
 
-it.each(['dormant', 'active'] as const)(
+it.each(
+  ([undefined, 18] as const).flatMap((blur) =>
+    (['dormant', 'active'] as const).map((mode) => ({ mode, blur }))
+  )
+)(
   'purges a confirmed %s background source without losing unrelated variants',
-  async (mode) => {
-    const entry = createVideoProjectEntryWithMediaClip({ version: 14 });
+  async ({ mode, blur }) => {
+    const entry = createVideoProjectEntryWithMediaClip({ version: blur === undefined ? 14 : 16 });
     const originalAsset = entry.project.assets[0]!;
     const image = {
       ...originalAsset,
@@ -618,6 +622,7 @@ it.each(['dormant', 'active'] as const)(
       mode === 'dormant'
         ? { ...gradient, remembered }
         : { kind: 'image', assetId: image.id, remembered };
+    if (blur !== undefined) entry.project.sceneBackground.blur = blur;
     rows.get('video_projects')!.clear();
     rows.get('video_projects')!.set(entry.id, entry);
     rows.get('media_library')!.set(mediaId, {
@@ -648,7 +653,8 @@ it.each(['dormant', 'active'] as const)(
     ]);
     const saved = rows.get('video_projects')!.get(entry.id) as typeof entry;
     expect(saved.workspaceRevision).toBe(1);
-    expect(saved.project.version).toBe(14);
+    expect(saved.project.version).toBe(blur === undefined ? 14 : 16);
+    expect(saved.project.sceneBackground?.blur).toBe(blur);
     expect(saved.project.assets).toEqual([]);
     expect(saved.project.sceneBackground).toMatchObject({ remembered: { solid, gradient } });
     expect(saved.project.sceneBackground?.remembered?.image).toBeUndefined();

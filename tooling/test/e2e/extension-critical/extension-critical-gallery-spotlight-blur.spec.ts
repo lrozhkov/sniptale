@@ -19,7 +19,7 @@ test('Spotlight export blur suppresses detail uniformly at canvas edges', async 
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text' },
+    loader: { '.svg': 'text', '.woff2': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const samples = await page.evaluate(async (text) => {

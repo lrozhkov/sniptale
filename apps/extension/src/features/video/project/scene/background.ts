@@ -1,3 +1,5 @@
+import { acquireVideoCompositionBuffer } from '../../composition/canvas/buffer-pool';
+import { drawEdgePaddedBlur } from '../../composition/canvas/edge-padded-blur';
 import { parseSceneBackgroundSettings, retainSceneBackgroundVariants } from './background-settings';
 import { DEFAULT_VIDEO_PROJECT_BACKGROUND } from '../defaults';
 import {
@@ -124,15 +126,18 @@ export function getProjectSceneBackgroundImageAssetId(
   return sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? sceneBackground.assetId : null;
 }
 
-export function drawSceneBackground(params: {
+interface SceneBackgroundDraw {
   context: CanvasRenderingContext2D;
   currentTime?: number;
+  projectScale?: number;
   audioEnvelope?: number;
   height: number;
   loadedImages?: Record<string, HTMLImageElement>;
   sceneBackground: VideoProjectSceneBackground;
   width: number;
-}) {
+}
+
+function drawSharpSceneBackground(params: SceneBackgroundDraw) {
   switch (params.sceneBackground.kind) {
     case VideoSceneBackgroundKind.SOLID:
       params.context.fillStyle = params.sceneBackground.color;
@@ -166,5 +171,148 @@ export function drawSceneBackground(params: {
         params.sceneBackground.imageFit ?? 'cover'
       );
     }
+  }
+}
+
+type BackgroundRasterLease = NonNullable<ReturnType<typeof acquireVideoCompositionBuffer>>;
+interface BackgroundRasterCache {
+  image: HTMLImageElement | undefined;
+  key: string;
+  lease: BackgroundRasterLease | null;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const backgroundRasters = new WeakMap<CanvasRenderingContext2D, BackgroundRasterCache>();
+
+function releaseBackgroundRaster(entry: BackgroundRasterCache) {
+  clearTimeout(entry.timer);
+  entry.lease?.release();
+  entry.lease = null;
+  entry.image = undefined;
+  entry.key = '';
+}
+
+function staticRasterKey(
+  params: SceneBackgroundDraw,
+  radius: number,
+  image: HTMLImageElement | undefined
+): string | null {
+  const { remembered: _memory, blur: _blur, ...paint } = params.sceneBackground;
+  if (
+    paint.kind === 'solid' ||
+    (paint.kind === 'gradient' && paint.animation?.mode && paint.animation.mode !== 'none')
+  )
+    return null;
+  return JSON.stringify([
+    params.width,
+    params.height,
+    radius,
+    paint,
+    image?.naturalWidth,
+    image?.naturalHeight,
+  ]);
+}
+
+/** Filter only the scene paint; foreground layers keep their own rendering semantics. */
+export function drawSceneBackground(params: SceneBackgroundDraw) {
+  const radius = (params.sceneBackground.blur ?? 0) * (params.projectScale ?? 1);
+  const image =
+    params.sceneBackground.kind === 'image'
+      ? params.loadedImages?.[params.sceneBackground.assetId]
+      : undefined;
+  const key = radius > 0 ? staticRasterKey(params, radius, image) : null;
+  const previous = backgroundRasters.get(params.context);
+  if (key && previous?.lease && previous.key === key && previous.image === image) {
+    try {
+      params.context.drawImage(previous.lease.canvas, 0, 0, params.width, params.height);
+    } catch (error) {
+      releaseBackgroundRaster(previous);
+      backgroundRasters.delete(params.context);
+      throw error;
+    }
+    return;
+  }
+  if (previous) {
+    releaseBackgroundRaster(previous);
+    backgroundRasters.delete(params.context);
+  }
+  if (params.sceneBackground.kind === VideoSceneBackgroundKind.SOLID || radius === 0) {
+    drawSharpSceneBackground(params);
+    return;
+  }
+  const lease = drawBlurredSceneBackground(params, radius);
+  if (!key) {
+    lease.release();
+    return;
+  }
+  const entry: BackgroundRasterCache = {
+    key,
+    image,
+    lease,
+    timer: setTimeout(() => releaseBackgroundRaster(entry), 1000),
+  };
+  backgroundRasters.set(params.context, entry);
+}
+
+function drawBlurredSceneBackground(
+  params: SceneBackgroundDraw,
+  radius: number
+): BackgroundRasterLease {
+  if (!Number.isFinite(radius) || radius < 0 || params.width <= 0 || params.height <= 0)
+    throw new Error('Invalid scene background dimensions.');
+  const scale = Math.min(1, 2048 / Math.max(params.width, params.height), 128 / radius);
+  const width = Math.max(1, Math.round(params.width * scale));
+  const height = Math.max(1, Math.round(params.height * scale));
+  const rasterRadius = Math.min(128, radius * scale);
+  const pad = Math.ceil(rasterRadius * 3) + 2;
+  const leases: NonNullable<ReturnType<typeof acquireVideoCompositionBuffer>>[] = [];
+  const acquire = (w: number, h: number) => {
+    const lease = acquireVideoCompositionBuffer(w, h, params.context.canvas?.ownerDocument);
+    if (!lease) throw new Error('Scene background compositor is unavailable.');
+    leases.push(lease);
+    return lease.canvas;
+  };
+  let result: BackgroundRasterLease | undefined;
+  try {
+    const source = acquire(width, height);
+    const filtered = acquire(width, height);
+    const scratch = acquire(width + pad * 2, height + pad * 2);
+    const sourceContext = source.getContext('2d');
+    const filteredContext = filtered.getContext('2d');
+    const scratchContext = scratch.getContext('2d');
+    if (
+      !sourceContext ||
+      !('drawImage' in sourceContext) ||
+      !filteredContext ||
+      !('drawImage' in filteredContext) ||
+      !scratchContext ||
+      !('drawImage' in scratchContext)
+    )
+      throw new Error('Scene background compositor is unavailable.');
+    for (const context of [sourceContext, filteredContext, scratchContext]) {
+      context.reset?.();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = 'source-over';
+      context.filter = 'none';
+      context.clearRect(
+        0,
+        0,
+        context === scratchContext ? scratch.width : width,
+        context === scratchContext ? scratch.height : height
+      );
+    }
+    drawSharpSceneBackground({
+      ...params,
+      context: sourceContext as CanvasRenderingContext2D,
+      width,
+      height,
+    });
+    drawEdgePaddedBlur(filteredContext as CanvasRenderingContext2D, source, scratch, rasterRadius);
+    params.context.drawImage(filtered, 0, 0, params.width, params.height);
+    result = leases[1]!;
+    return result;
+  } finally {
+    for (const lease of leases) if (lease !== result) lease.release();
   }
 }

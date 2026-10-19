@@ -1,4 +1,12 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { acquireVideoCompositionBuffer } from '../../composition/canvas/buffer-pool';
+vi.mock('../../composition/canvas/buffer-pool', () => ({ acquireVideoCompositionBuffer: vi.fn() }));
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
+  vi.mocked(acquireVideoCompositionBuffer).mockReset();
+});
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -112,4 +120,233 @@ it.each([
   });
   expect(context.drawImage).toHaveBeenCalledWith(image, ...expected);
   expect(context.fillRect).toHaveBeenCalledWith(0, 0, 200, 100);
+});
+
+function mockSurfaces() {
+  const surfaces: {
+    canvas: OffscreenCanvas;
+    context: CanvasRenderingContext2D;
+    release: ReturnType<typeof vi.fn>;
+  }[] = [];
+  vi.mocked(acquireVideoCompositionBuffer).mockImplementation((width, height) => {
+    const context = {
+      ...createContext(),
+      filter: 'none',
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+    };
+    const canvas = {
+      width,
+      height,
+      getContext: vi.fn(() => context),
+    } as unknown as OffscreenCanvas;
+    const release = vi.fn();
+    surfaces.push({ canvas, context, release });
+    return { canvas, release };
+  });
+  return surfaces;
+}
+
+it('scales blur once into the raster and releases every exclusive surface after drawing', () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  drawSceneBackground({
+    context,
+    sceneBackground: { kind: 'image', assetId: 'image', imageFit: 'contain', blur: 8 },
+    width: 200,
+    height: 100,
+    projectScale: 0.5,
+  });
+  expect(surfaces.map(({ canvas }) => [canvas.width, canvas.height])).toEqual([
+    [200, 100],
+    [200, 100],
+    [228, 128],
+  ]);
+  expect(surfaces[0]!.context.fillRect).toHaveBeenCalledWith(0, 0, 200, 100);
+  expect(surfaces[1]!.context.drawImage).toHaveBeenCalledWith(surfaces[2]!.canvas, -14, -14);
+  expect(context.drawImage).toHaveBeenCalledWith(surfaces[1]!.canvas, 0, 0, 200, 100);
+  vi.advanceTimersByTime(1000);
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+});
+
+it('bounds raster, kernel and total scratch memory for tiny projects exported to large canvases', () => {
+  const surfaces = mockSurfaces();
+  drawSceneBackground({
+    context: createContext(),
+    sceneBackground: { kind: 'image', assetId: 'image', blur: 25 },
+    width: 8192,
+    height: 8192,
+    projectScale: 8192,
+  });
+  expect(surfaces).toHaveLength(3);
+  for (const { canvas } of surfaces.slice(0, 2))
+    expect(Math.max(canvas.width, canvas.height)).toBeLessThanOrEqual(2048);
+  expect(Math.max(surfaces[2]!.canvas.width, surfaces[2]!.canvas.height)).toBeLessThanOrEqual(2820);
+  expect(
+    surfaces.reduce((bytes, { canvas }) => bytes + canvas.width * canvas.height * 4, 0)
+  ).toBeLessThan(64 * 1024 * 1024);
+});
+
+it('keeps solid and zero-blur backgrounds on the allocation-free sharp path', () => {
+  const context = createContext();
+  for (const sceneBackground of [
+    { kind: 'solid' as const, color: '#abcdef', blur: 25 },
+    { kind: 'image' as const, assetId: 'image', blur: 0 },
+  ])
+    drawSceneBackground({ context, sceneBackground, width: 200, height: 100 });
+  expect(acquireVideoCompositionBuffer).not.toHaveBeenCalled();
+  expect(context.fillRect).toHaveBeenCalledTimes(2);
+});
+
+it.each([1, 2, 3])(
+  'releases earlier surfaces when allocation %s fails without a sharp fallback',
+  (failure) => {
+    const surfaces = mockSurfaces(),
+      context = createContext();
+    const allocate = vi.mocked(acquireVideoCompositionBuffer).getMockImplementation()!;
+    let call = 0;
+    vi.mocked(acquireVideoCompositionBuffer).mockImplementation((...args) =>
+      ++call === failure ? null : allocate(...args)
+    );
+    expect(() =>
+      drawSceneBackground({
+        context,
+        sceneBackground: { kind: 'image', assetId: 'image', blur: 8 },
+        width: 200,
+        height: 100,
+      })
+    ).toThrow('Scene background compositor is unavailable.');
+    for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(context.fillRect).not.toHaveBeenCalled();
+  }
+);
+
+it('releases every surface after native draw failure and restores filtering', () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  vi.mocked(context.drawImage).mockImplementation(() => {
+    throw new Error('native draw failed');
+  });
+  expect(() =>
+    drawSceneBackground({
+      context,
+      sceneBackground: { kind: 'image', assetId: 'image', blur: 8 },
+      width: 200,
+      height: 100,
+    })
+  ).toThrow('native draw failed');
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+  expect(surfaces[1]!.context.filter).toBe('none');
+});
+
+it('reuses a static raster and returns its lease after one second without retaining the image', () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  const params = {
+    context,
+    width: 200,
+    height: 100,
+    sceneBackground: { kind: 'image' as const, assetId: 'image', blur: 8 },
+  };
+  drawSceneBackground(params);
+  expect(surfaces).toHaveLength(3);
+  expect(surfaces[1]!.release).not.toHaveBeenCalled();
+  drawSceneBackground({ ...params, currentTime: 50, audioEnvelope: 1 });
+  expect(surfaces).toHaveLength(3);
+  expect(context.drawImage).toHaveBeenCalledTimes(2);
+  vi.advanceTimersByTime(1000);
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+  drawSceneBackground(params);
+  expect(surfaces).toHaveLength(6);
+});
+
+it('invalidates static rasters for blur, fit, dimensions, image identity and decoded image size', () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  const image = { naturalWidth: 100, naturalHeight: 50 } as HTMLImageElement;
+  const params = {
+    context,
+    width: 200,
+    height: 100,
+    loadedImages: { image },
+    sceneBackground: { kind: 'image' as const, assetId: 'image', blur: 8 },
+  };
+  drawSceneBackground(params);
+  const updates = [
+    { ...params, sceneBackground: { ...params.sceneBackground, blur: 4 } },
+    { ...params, sceneBackground: { ...params.sceneBackground, imageFit: 'contain' as const } },
+    { ...params, width: 300 },
+    { ...params, loadedImages: { image: { ...image } as HTMLImageElement } },
+  ];
+  for (const [index, next] of updates.entries()) {
+    drawSceneBackground(next);
+    expect(surfaces).toHaveLength((index + 2) * 3);
+    expect(surfaces[index * 3 + 1]!.release).toHaveBeenCalledOnce();
+  }
+  drawSceneBackground(params);
+  Object.defineProperty(image, 'naturalWidth', { value: 200 });
+  drawSceneBackground(params);
+  expect(surfaces).toHaveLength(21);
+  drawSceneBackground({ ...params, sceneBackground: { ...params.sceneBackground, blur: 0 } });
+  expect(surfaces.at(-2)!.release).toHaveBeenCalledOnce();
+});
+
+it('does not cache animation and releases prior static paint before dynamic rendering', async () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  const background = (await import('./background-gradient')).createSceneGradientBackground();
+  const params = { context, width: 200, height: 100, sceneBackground: { ...background, blur: 8 } };
+  drawSceneBackground(params);
+  for (const currentTime of [1, 2])
+    drawSceneBackground({
+      ...params,
+      currentTime,
+      sceneBackground: {
+        ...params.sceneBackground,
+        animation: { mode: 'rotate', speed: 80, intensity: 70 },
+      },
+    });
+  expect(surfaces).toHaveLength(9);
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+});
+
+it('releases a cached raster on destination failure and retries cleanly', () => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  const params = {
+    context,
+    width: 200,
+    height: 100,
+    sceneBackground: { kind: 'image' as const, assetId: 'image', blur: 8 },
+  };
+  drawSceneBackground(params);
+  vi.mocked(context.drawImage).mockImplementationOnce(() => {
+    throw new Error('destination failed');
+  });
+  expect(() => drawSceneBackground(params)).toThrow('destination failed');
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+  drawSceneBackground(params);
+  expect(surfaces).toHaveLength(6);
+});
+
+it.each([0, 1, 2])('releases all leases when surface %s has no 2d compositor', (failure) => {
+  const surfaces = mockSurfaces(),
+    context = createContext();
+  const allocate = vi.mocked(acquireVideoCompositionBuffer).getMockImplementation()!;
+  vi.mocked(acquireVideoCompositionBuffer).mockImplementation((...args) => {
+    const lease = allocate(...args)!;
+    if (surfaces.length - 1 === failure) vi.mocked(lease.canvas.getContext).mockReturnValue(null);
+    return lease;
+  });
+  expect(() =>
+    drawSceneBackground({
+      context,
+      width: 200,
+      height: 100,
+      sceneBackground: { kind: 'image', assetId: 'image', blur: 8 },
+    })
+  ).toThrow('Scene background compositor is unavailable.');
+  for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
+  expect(context.drawImage).not.toHaveBeenCalled();
 });

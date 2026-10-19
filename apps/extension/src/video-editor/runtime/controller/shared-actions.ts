@@ -1,3 +1,5 @@
+import type { VideoEditorSceneBackgroundEdit } from '../../contracts/commands/patches';
+import { isRecord, isBoundedNumber } from '../../../features/video/project/validation/primitives';
 import { parseSceneBackgroundSettings } from '../../../features/video/project/scene/background-settings';
 import { getMotionInsertionRange } from '../../../features/video/project/motion/placement';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
@@ -17,7 +19,6 @@ import {
   VideoProjectSourceKind,
   type VideoProjectActionPreset,
   type VideoProjectCursorTrack,
-  type VideoProjectSceneBackground,
 } from '../../../features/video/project/types/index';
 import type { VideoTimelinePlacementMode } from '../../../features/video/project/types/index';
 import type {
@@ -267,11 +268,20 @@ function createProjectPresentationUpdaters(store: WorkspaceProjectUpdaterStore) 
         height,
       }));
     },
-    setSceneBackground(sceneBackground: VideoProjectSceneBackground) {
+    setSceneBackground(sceneBackground: VideoEditorSceneBackgroundEdit) {
       const parsed = parseSceneBackgroundSettings(sceneBackground);
-      if (!parsed) return;
+      const blur =
+        isRecord(sceneBackground) &&
+        Object.keys(sceneBackground).length === 1 &&
+        isBoundedNumber(sceneBackground['blur'], 0, 25)
+          ? sceneBackground['blur']
+          : null;
+      if (!parsed && blur === null) return;
       store.updateProject((project) => {
-        const next = syncProjectSceneBackground(project, parsed);
+        const next = syncProjectSceneBackground(
+          project,
+          parsed ?? { ...getProjectSceneBackground(project), ...(blur !== null ? { blur } : {}) }
+        );
         const imageIds = [
           ...(next.sceneBackground.kind === 'image' ? [next.sceneBackground.assetId] : []),
           ...(next.sceneBackground.remembered?.image

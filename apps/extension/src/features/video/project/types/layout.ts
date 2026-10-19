@@ -173,4 +173,4 @@ export type VideoProjectSceneBackground = (
   | VideoProjectSolidBackground
   | VideoProjectGradientBackground
   | VideoProjectImageBackground
-) & { remembered?: VideoProjectBackgroundVariants };
+) & { blur?: number; remembered?: VideoProjectBackgroundVariants };

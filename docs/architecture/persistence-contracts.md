@@ -494,7 +494,7 @@ The existing command, history, save, and resource owners retain authority. Previ
 
 ## Montage scene background variants
 
-Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–13 without these fields and refuse future schema 15.
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–16 without these fields and refuse future versions.
 
 The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
 
@@ -513,3 +513,16 @@ Project schema 15 admits `windowCornerRadius` on VIDEO and IMAGE clips. The valu
 The radius applies to the visible decorated window, including its header. Rendering limits the radius to half the smaller window dimension. Source crop precedes fitting. Preview and export use the same mask. Source-point admission and continuous cursor containment use shared rounded-window geometry. Gallery retains its coordinate adapter and uses the same clearance calculation.
 
 Camera tracks retain this field without applying it. Their camera appearance remains authoritative. Ordinary track style application copies or removes the radius while retaining each target source crop. Existing project mutation, history, save, revision and resource owners retain authority. This field adds no writer, queued operation, database store or physical migration.
+
+
+## Montage scene background blur
+
+Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–16 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
+
+Blur applies to the complete gradient or image background after fitting and animation. Solid backgrounds retain the value without applying it. Kind changes, image replacement and source deletion preserve this common value. Remembered paint variants cannot contain blur. Clips, headers, shadows, actions and transitions retain their own rendering semantics.
+
+The existing project updater applies scalar blur edits to the current background. Undo, redo and save use existing snapshots and revision authority. Invalid edits and repeated equal edits preserve project identity and history. This field adds no writer, queued operation, store or physical database migration.
+
+Both editors use the same edge-padded Canvas filter. Montage converts project pixels to output pixels once. Its temporary raster limits each side to 2048 pixels and the filter radius to 128 pixels. Three exclusive surfaces require less than 64 MiB. The existing pool owns allocation and release. Failed filtering releases surfaces and fails only the affected rendering operation. Export publishes static cache entries only after successful drawing.
+
+Static background rasters retain one exclusive pool lease for at most one second. Cache identity includes paint, output dimensions, blur scale and decoded image identity and size. Changes release the previous lease before allocation. Animated gradients bypass this cache. Expiry clears the image reference. Failed drawing does not publish a cache entry.

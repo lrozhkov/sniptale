@@ -93,7 +93,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 15) &&
+    isBoundedNumber(version, 2, 16) &&
     Number.isInteger(version) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
@@ -103,6 +103,9 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
           value['motionRegions'].every(
             (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
           )))) &&
+    (version >= 16 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['blur'] === undefined) &&
     (version >= 14 ||
       !isRecord(value['sceneBackground']) ||
       (value['sceneBackground']['remembered'] === undefined &&

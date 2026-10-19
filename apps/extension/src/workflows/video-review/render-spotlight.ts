@@ -6,7 +6,7 @@ import {
   projectQuickEditPoint,
   type QuickEditHomography,
 } from '../../features/video/review/advanced/spatial-geometry';
-import { drawReviewBlurredScene } from './spotlight-blur';
+import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
 import {
@@ -31,7 +31,7 @@ export function drawReviewSpotlight(
   try {
     context.clip(new Path2D(quickEditSpotlightPath(canvas, frame)), 'evenodd');
     if (frame.blur > 0 && (scratch || resources)) {
-      drawReviewBlurredScene(context, canvas, scratch, frame.blur, resources);
+      drawEdgePaddedBlur(context, canvas, scratch, frame.blur, resources);
     }
     if (frame.dim > 0) {
       context.fillStyle = `rgba(0,0,0,${frame.dim})`;
@@ -326,7 +326,7 @@ export function drawReviewSpotlights(
     if (masks.radius > 0) {
       const layer = maskCanvas(canvas, 'spotlight.layer', resources);
       try {
-        drawReviewBlurredScene(layer.context, canvas, scratch, masks.radius, resources);
+        drawEdgePaddedBlur(layer.context, canvas, scratch, masks.radius, resources);
         layer.context.globalCompositeOperation = 'destination-in';
         layer.context.drawImage(masks.blur, 0, 0);
         context.drawImage(layer.canvas, 0, 0);

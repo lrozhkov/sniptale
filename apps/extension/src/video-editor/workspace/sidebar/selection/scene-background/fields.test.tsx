@@ -182,7 +182,9 @@ function SceneBackgroundHarness(props: SceneBackgroundFieldProps) {
       sceneBackground={sceneBackground}
       onSetSceneBackground={(nextBackground) => {
         props.onSetSceneBackground(nextBackground);
-        setSceneBackground(nextBackground);
+        setSceneBackground((current) =>
+          'kind' in nextBackground ? nextBackground : { ...current, blur: nextBackground.blur }
+        );
       }}
     />
   );
@@ -242,4 +244,34 @@ it('edits image fit through measured choices and preserves the asset and remembe
     getKindOption('videoEditor.sidebar.sceneBackgroundImageContain')?.getAttribute('aria-pressed')
   ).toBe('true');
   expect(props.onResetSceneBackgroundPreview).toHaveBeenCalled();
+});
+
+it('shows the shared blur control for image and gradient, hides it on solid and commits only the scalar', async () => {
+  const props = createProps();
+  renderBackgroundHarness({
+    ...props,
+    sceneBackground: { kind: 'image', assetId: 'asset-2', blur: 0.000123 },
+  });
+  const input = container?.querySelector<HTMLInputElement>(
+    'input[aria-label="editor.scene.backgroundBlurAmount"]'
+  );
+  expect(input).toBeTruthy();
+  await act(async () => {
+    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(input?.value).toBe('0');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '18');
+    input?.dispatchEvent(new Event('input', { bubbles: true }));
+    input?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await act(async () => {
+    input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith({ blur: 18 });
+  expect(props.onResetSceneBackgroundPreview).toHaveBeenCalled();
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundSolid');
+  expect(
+    container?.querySelector('input[aria-label="editor.scene.backgroundBlurAmount"]')
+  ).toBeNull();
 });

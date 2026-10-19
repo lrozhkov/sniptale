@@ -1,11 +1,15 @@
 import type { MediaSourceCrop } from '../../../features/video/project/media-crop';
 import type { VideoClipTransitionKind } from '../../../features/video/project/types/index';
 import type {
+  VideoProjectSceneBackground,
   VideoProject,
   VideoProjectMotionRegion,
   VideoProjectTransition,
 } from '../../../features/video/project/types/index';
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
+
+/** Replace the paint or edit its common blur under the current project authority. */
+export type VideoEditorSceneBackgroundEdit = VideoProjectSceneBackground | { blur: number };
 
 export type VideoEditorAudioEnvelopePatch = {
   volumeEnvelopeEnd?: number;

@@ -1,5 +1,27 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'edge-padded-background-blur',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/edge-padded-blur.ts',
+    allowCrossOwner: true,
+    reason: 'Shared filtering serves Gallery spotlight and scene backgrounds in both editors.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/edge-padded-blur.test.ts',
+      'apps/extension/src/workflows/video-review/scene-background.test.ts',
+      'apps/extension/src/workflows/video-review/render-spotlight.test.ts',
+      'apps/extension/src/workflows/video-review/render-settings.test.ts',
+      'apps/extension/src/features/video/project/scene/background-settings.test.ts',
+      'apps/extension/src/features/video/project/scene/background.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/shared-actions.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/canvas.test.tsx',
+      'apps/extension/src/offscreen/project-export/renderer/background.test.ts',
+      'apps/extension/src/features/video/project/library-source-removal.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.save.test.ts',
+    ],
+  },
+  {
     owner: 'media-window-geometry',
     productionFile: 'apps/extension/src/features/video/project/window-geometry.ts',
     allowCrossOwner: true,

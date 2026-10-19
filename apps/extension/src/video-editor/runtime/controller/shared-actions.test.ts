@@ -161,3 +161,68 @@ it('records variant and fit edits through actual history and keeps retries as no
   expect(store.getState().project?.sceneBackground).toEqual(gradient.sceneBackground);
   store.setState(store.getInitialState(), true);
 });
+
+it('merges scalar blur with latest paint and image settings under the project updater', async () => {
+  const project = createEmptyVideoProject('Latest background');
+  const store = createStore(project);
+  let pending: ((current: VideoProject) => VideoProject) | undefined;
+  store.updateProject = (updater) => {
+    pending = updater;
+  };
+  const actions = createWorkspaceProjectUpdaters(store);
+  actions.setSceneBackground({ blur: 12.5 });
+  project.sceneBackground = {
+    ...(
+      await import('../../../features/video/project/scene/background-gradient')
+    ).createSceneGradientBackground('#111111ff'),
+    animation: { mode: 'drift', speed: 72, intensity: 61 },
+    remembered: { solid: { kind: 'solid', color: '#123456' } },
+  };
+  project.name = 'Latest unrelated edit';
+  const latest = structuredClone(project);
+  const next = pending!(project);
+  expect(next.sceneBackground).toEqual({ ...latest.sceneBackground, blur: 12.5 });
+  expect(next.name).toBe(latest.name);
+  expect(project).toEqual(latest);
+  project.sceneBackground = { kind: 'image', assetId: 'image', imageFit: 'contain' };
+  project.assets = [
+    { ...createProject([createVideoClip()]).assets[0]!, id: 'image', type: 'IMAGE' },
+  ];
+  expect(pending!(project).sceneBackground).toMatchObject({
+    kind: 'image',
+    assetId: 'image',
+    imageFit: 'contain',
+    blur: 12.5,
+  });
+});
+
+it('records blur through actual history, refuses invalid edits and keeps retries as no-ops', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createEmptyVideoProject('Blur history'));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.setSceneBackground({ blur: 12.5 });
+  const accepted = store.getState().project!,
+    history = store.getState().projectHistory;
+  expect(accepted.version).toBe(16);
+  for (const value of [
+    { blur: 12.5 },
+    { blur: -1 },
+    { blur: 26 },
+    { blur: NaN },
+    { blur: null },
+    { blur: 4, extra: true },
+    null,
+  ])
+    Reflect.apply(actions.setSceneBackground, actions, [value]);
+  expect(store.getState().project).toBe(accepted);
+  expect(store.getState().projectHistory).toBe(history);
+  actions.setSceneBackground({ blur: 0 });
+  expect(store.getState().project?.sceneBackground?.blur).toBe(0);
+  expect(store.getState().project?.version).toBe(16);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground?.blur).toBe(12.5);
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground?.blur).toBe(0);
+  store.setState(store.getInitialState(), true);
+});

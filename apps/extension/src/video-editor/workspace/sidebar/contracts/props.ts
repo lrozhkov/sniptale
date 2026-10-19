@@ -1,3 +1,4 @@
+import type { VideoEditorSceneBackgroundEdit } from '../../../contracts/commands/patches';
 import type { VideoEditorMediaClipEdit } from '../../../contracts/commands/patches';
 import type { VideoProjectTextVoiceController } from '../../../runtime/session/text-voice';
 import type { VideoProjectTextRewriteController } from '../../../runtime/session/text-rewrite';
@@ -95,7 +96,7 @@ export interface WorkspaceSidebarProps {
   onToggleTrackLock?: (trackId: string) => void;
   onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;
-  onSetSceneBackground: (sceneBackground: NonNullable<VideoProject['sceneBackground']>) => void;
+  onSetSceneBackground: (sceneBackground: VideoEditorSceneBackgroundEdit) => void;
   onStartActionPointPlacement?: (eventId: string, clipId: string | null) => void;
   onStartMotionAreaPlacement?: (motionRegionId: string) => void;
   onStartMotionFocusPlacement?: (motionRegionId: string) => void;

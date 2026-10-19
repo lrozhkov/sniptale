@@ -1,4 +1,4 @@
-import { drawReviewBlurredScene } from './spotlight-blur';
+import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -197,7 +197,7 @@ it('reuses the padded surface between video frames and refreshes its pixels', ()
   const context = { filter: 'none', drawImage: vi.fn() };
   const source = { width: 100, height: 80 } as HTMLCanvasElement;
   for (let frame = 0; frame < 2; frame++)
-    drawReviewBlurredScene(
+    drawEdgePaddedBlur(
       context as unknown as CanvasRenderingContext2D,
       source,
       scratch as unknown as HTMLCanvasElement,
@@ -214,7 +214,7 @@ it('fails the blur composition when its backing context is unavailable', () => {
   const scratch = { width: 140, height: 120, getContext: () => null };
   const context = { drawImage: vi.fn() };
   expect(() =>
-    drawReviewBlurredScene(
+    drawEdgePaddedBlur(
       context as unknown as CanvasRenderingContext2D,
       { width: 100, height: 80 } as HTMLCanvasElement,
       scratch as unknown as HTMLCanvasElement,
@@ -366,7 +366,7 @@ it('admits exact padded blur scratch and releases it after a failed draw', () =>
     },
   };
   expect(() =>
-    drawReviewBlurredScene(
+    drawEdgePaddedBlur(
       context as unknown as CanvasRenderingContext2D,
       { width: 100, height: 80 } as HTMLCanvasElement,
       null,

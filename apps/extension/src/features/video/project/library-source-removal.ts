@@ -130,7 +130,11 @@ function removeSourceBackground(
     ? (remembered?.solid ?? { kind: 'solid' as const, color: project.backgroundColor })
     : active;
   return {
-    sceneBackground: { ...next, ...(remembered !== undefined ? { remembered } : {}) },
+    sceneBackground: {
+      ...next,
+      ...(background.blur !== undefined ? { blur: background.blur } : {}),
+      ...(remembered !== undefined ? { remembered } : {}),
+    },
     ...(removedActive && next.kind === 'solid' ? { backgroundColor: next.color } : {}),
   };
 }

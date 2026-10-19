@@ -1,3 +1,4 @@
+import type { VideoEditorSceneBackgroundEdit } from '../../../contracts/commands/patches';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type {
@@ -12,7 +13,6 @@ import type {
   VideoProject,
   VideoProjectActionPreset,
   VideoProjectCursorTrack,
-  VideoProjectSceneBackground,
 } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -88,7 +88,7 @@ interface VideoEditorSidebarProjectActions {
   onToggleTrackVisibility: VideoEditorSidebarCommands['toggleTrackVisibility'];
   onResizeProject: (width: number, height: number) => void;
   onSetCursorCaptureMode: (captureMode: VideoProjectCursorTrack['captureMode']) => void;
-  onSetSceneBackground: (sceneBackground: VideoProjectSceneBackground) => void;
+  onSetSceneBackground: (sceneBackground: VideoEditorSceneBackgroundEdit) => void;
   onPreviewSceneBackground: VideoEditorWorkspaceState['sceneBackgroundColors']['setPreview'];
   onRememberRecentColor: VideoEditorWorkspaceState['sceneBackgroundColors']['rememberRecentColor'];
   onResetSceneBackgroundPreview: VideoEditorWorkspaceState['sceneBackgroundColors']['resetPreview'];

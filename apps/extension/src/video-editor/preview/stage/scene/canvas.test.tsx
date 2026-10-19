@@ -70,6 +70,7 @@ it('prepares the preview canvas and redraws the scene background', () => {
   expect(prepared).not.toBeNull();
   expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
   expect(drawSceneBackgroundMock).toHaveBeenCalledWith({
+    projectScale: 1,
     audioEnvelope: 0,
     context,
     currentTime: 0,
@@ -117,4 +118,37 @@ it('caps EffectV1 preview raster to the physical viewport while retaining logica
       stage: null,
     })
   ).toBe(0.25);
+});
+
+it('converts authored background pixels to preview coordinates before applying DPR', () => {
+  const project = createEmptyVideoProject('Preview blur');
+  project.width = 640;
+  project.height = 360;
+  project.sceneBackground = { kind: 'solid', color: '#123456', blur: 12 };
+  const context = { setTransform: vi.fn(), clearRect: vi.fn() };
+  const canvas = {
+    clientWidth: 320,
+    clientHeight: 180,
+    width: 640,
+    height: 360,
+    getContext: () => context,
+  } as unknown as HTMLCanvasElement;
+  const prepared = resolvePreparedPreviewSceneCanvas({
+    canvas,
+    project,
+    imageBank: {},
+    stage: null,
+    shouldClearCanvas: true,
+    previewRasterSize: { width: 640, height: 360 },
+  });
+  expect(prepared?.dpr).toBe(2);
+  expect(drawSceneBackgroundMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      width: 320,
+      height: 180,
+      projectScale: 0.5,
+      sceneBackground: { kind: 'solid' },
+    })
+  );
+  expect(context.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
 });

@@ -1,3 +1,4 @@
+import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { useEffect, useState } from 'react';
 import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
 import { resolveSceneBackgroundKind } from '../../../../../features/video/project/scene/background-settings';
@@ -14,6 +15,7 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
   useEffect(() => {
     if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
   }, [props.sceneBackground.kind]);
+  const blur = props.sceneBackground.blur ?? 0;
   return (
     <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
       <OptionButtonsField
@@ -31,6 +33,23 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
         <ImageBackgroundEditor {...props} />
       ) : (
         <SceneBackgroundEditor {...props} />
+      )}
+      {!imageRequested && props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID && (
+        <NumericRow
+          label={translate('editor.scene.backgroundBlurAmount')}
+          value={blur}
+          min={0}
+          max={25}
+          step={1}
+          precision={2}
+          unit="px"
+          normalizeValue={(value) => (value === Number(blur.toFixed(2)) ? blur : value)}
+          onPreviewValue={() => undefined}
+          onCommitValue={(value) => {
+            props.onSetSceneBackground({ blur: value });
+            props.onResetSceneBackgroundPreview();
+          }}
+        />
       )}
     </div>
   );
