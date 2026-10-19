@@ -215,3 +215,27 @@ it('extends voiceover trim through Speed boundaries using native samples and a f
     playbackRate: 1,
   });
 });
+
+it('preserves independent voice tempo and source timing when authoring long audio fades', () => {
+  const clip = {
+    ...createQuickEditAudioClip({
+      id: 'voice',
+      assetId: 'voice',
+      timelineStart: 2,
+      duration: 80,
+      endMax: 100,
+    }),
+    tempo: 2,
+    sourceOffset: 3,
+  };
+  const next = updateQuickEditAudioClip(clip, { fadeIn: 12, fadeOut: 90 });
+  expect(next).toMatchObject({
+    tempo: 2,
+    sourceOffset: 3,
+    timelineStart: 2,
+    duration: 80,
+    fadeIn: 12,
+    fadeOut: 60,
+  });
+  expect(clip).toMatchObject({ fadeIn: 0, fadeOut: 0 });
+});

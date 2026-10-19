@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
 import { startHostServer } from './support/host-server';
@@ -177,6 +178,58 @@ test('actual preview media sync preserves amplification and agrees with native e
       expect(Math.abs(row.previewRms - row.exportRms)).toBeLessThan(
         Math.max(1e-4, row.expectedRms * 0.05)
       );
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+test('audio fades preserve overlap geometry and partial phase in native PCM', async ({
+  page,
+}, info) => {
+  const { origin, server } = await startHostServer();
+  try {
+    await page.goto(`${origin}/tooling/test/harness/preview-audio-diagnostic.html`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForFunction(
+      () => typeof window.__sniptalePreviewAudioDiagnostic?.runAudioFades === 'function'
+    );
+    const result: unknown = await page.evaluate(async () => {
+      const diagnostic = window.__sniptalePreviewAudioDiagnostic;
+      if (!diagnostic) throw new Error('Diagnostic unavailable');
+      return diagnostic.runAudioFades();
+    });
+    await writeFile(info.outputPath('fade-pcm.json'), JSON.stringify(result, null, 2));
+    if (!Array.isArray(result) || result.length !== 14) throw new Error('Invalid fade result');
+    for (const value of result) {
+      const scenario: unknown = value;
+      if (
+        typeof scenario !== 'object' ||
+        !scenario ||
+        !('rows' in scenario) ||
+        !Array.isArray(scenario.rows) ||
+        !('owner' in scenario) ||
+        !('rate' in scenario)
+      )
+        throw new Error('Invalid fade scenario');
+      expect(scenario.rows.length).toBeGreaterThan(0);
+      for (const value of scenario.rows) {
+        const row: unknown = value;
+        if (
+          typeof row !== 'object' ||
+          !row ||
+          !('rmsError' in row) ||
+          typeof row.rmsError !== 'number' ||
+          !('time' in row)
+        )
+          throw new Error('Invalid fade sample');
+        expect
+          .soft(row.rmsError, `${scenario.owner} rate ${scenario.rate} time ${row.time}`)
+          .toBeLessThan(1e-4);
+      }
     }
   } finally {
     await new Promise<void>((resolve, reject) =>

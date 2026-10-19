@@ -1,3 +1,4 @@
+import { buildAudioFadeEnvelope } from '../../../../features/video/audio/fades';
 import { renderTempoBuffer } from '../../../../features/video/audio/tempo-buffer';
 import { getTransitionProgress } from '../../../../features/video/project/transition/runtime';
 import { clampClipPlaybackRate } from '../../../../features/video/project/timeline';
@@ -51,7 +52,8 @@ export async function scheduleOfflineAudioClipMix(
   const gain = offlineContext.createGain();
   gain.gain.setValueAtTime(0, 0);
   source.connect(gain);
-  const output = connectOriginalAudioAttenuation(offlineContext, gain, clip);
+  const faded = connectAudioFade(offlineContext, gain, clip);
+  const output = connectOriginalAudioAttenuation(offlineContext, faded, clip);
   if (clip.audioTransitions?.length) {
     const transitionGain = offlineContext.createGain();
     output.connect(transitionGain);
@@ -86,32 +88,11 @@ export async function scheduleOfflineAudioClipMix(
 
   const clipStart = Math.max(0, clip.startTime);
   const clipEnd = Math.max(clipStart, clip.startTime + clip.duration);
-  const fadeInSeconds = Math.max(0, clip.fadeInMs / 1000);
-  const fadeOutSeconds = Math.max(0, clip.fadeOutMs / 1000);
-  const fadeInEnd = Math.min(clipEnd, clipStart + fadeInSeconds);
-  const fadeOutStart = Math.max(clipStart, clipEnd - fadeOutSeconds);
   const envelopeGainStart = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipStart);
-  const envelopeGainFadeInEnd = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, fadeInEnd);
-  const envelopeGainFadeOutStart = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, fadeOutStart);
   const envelopeGainEnd = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipEnd);
-
-  gain.gain.setValueAtTime(0, clipStart);
-  if (envelopeGainStart > 0 || envelopeGainFadeInEnd > 0 || envelopeGainEnd > 0) {
-    if (fadeInSeconds > 0 && fadeInEnd > clipStart) {
-      gain.gain.linearRampToValueAtTime(envelopeGainFadeInEnd, fadeInEnd);
-    } else {
-      gain.gain.setValueAtTime(envelopeGainStart, clipStart);
-    }
-
-    gain.gain.setValueAtTime(envelopeGainFadeInEnd, fadeInEnd);
-    if (fadeOutSeconds > 0 && fadeOutStart < clipEnd) {
-      gain.gain.linearRampToValueAtTime(envelopeGainFadeOutStart, fadeOutStart);
-      gain.gain.linearRampToValueAtTime(0, clipEnd);
-    } else {
-      gain.gain.linearRampToValueAtTime(envelopeGainEnd, clipEnd);
-    }
-  }
-  gain.gain.setValueAtTime(0, clipEnd);
+  gain.gain.setValueAtTime(envelopeGainStart, clipStart);
+  if (envelopeGainStart > 0 || envelopeGainEnd > 0)
+    gain.gain.linearRampToValueAtTime(envelopeGainEnd, clipEnd);
 
   source.start(clipStart, rate === 1 ? clip.sourceStart : 0, clip.sourceDuration / rate);
   source.stop(clipEnd);
@@ -134,5 +115,31 @@ function connectOriginalAudioAttenuation(
     output.gain.setValueAtTime(range.volume, start);
     output.gain.setValueAtTime(1, end);
   }
+  return output;
+}
+
+/** Separate linear stages preserve the exact product of manual gain and fade. */
+function connectAudioFade(
+  context: OfflineAudioContext,
+  input: GainNode,
+  clip: OfflineAudioRenderableClip
+): GainNode {
+  if (clip.fadeInMs <= 0 && clip.fadeOutMs <= 0) return input;
+  const output = context.createGain();
+  input.connect(output);
+  const start = Math.max(0, clip.startTime);
+  const points = buildAudioFadeEnvelope({
+    duration: clip.audioFadePhase?.duration ?? clip.duration,
+    offset: clip.audioFadePhase?.offset ?? 0,
+    fadeIn: clip.fadeInMs / 1000,
+    fadeOut: clip.fadeOutMs / 1000,
+    intervalDuration: clip.duration,
+    elapsed: Math.max(0, start - clip.startTime),
+  });
+  points.forEach(([local, factor], index) => {
+    const at = clip.startTime + local;
+    if (index === 0) output.gain.setValueAtTime(factor, at);
+    else output.gain.linearRampToValueAtTime(factor, at);
+  });
   return output;
 }

@@ -1,3 +1,5 @@
+import { getAudioFadeLimitSeconds } from '../../../../features/video/audio/fades';
+import { isAudioClip } from '../../../../features/video/project/timeline';
 import { applyVideoProjectClipsPatch } from '../../../../features/video/project/mutation';
 import type {
   VideoProject,
@@ -6,6 +8,8 @@ import type {
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import {
   applyProjectUpdate,
+  areClipTracksEditable,
+  getClipOperationIds,
   isSourceTimedClip,
   resolveEditableClipOperation,
   updateSourceTimedClipTiming,
@@ -33,14 +37,17 @@ function createClipFadeActions(
     updateClipFades: (clipId, patch) =>
       set((state) =>
         applyProjectUpdate(state, (project) => {
-          const operation = resolveEditableClipOperation(project, clipId);
-          if (!operation) {
-            return project;
-          }
+          const clip = project.clips.find((item) => item.id === clipId);
+          if (!clip) return project;
+          const audio = isAudioClip(clip);
+          const ids = audio ? [clipId] : getClipOperationIds(project, clipId);
+          if (!areClipTracksEditable(project, ids)) return project;
 
-          return applyEditableClipPatch(project, operation.clipIdSet, (item) => {
+          return applyEditableClipPatch(project, new Set(ids), (item) => {
             const maxFadeMs = Math.min(
-              VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.max,
+              audio
+                ? getAudioFadeLimitSeconds(item.duration) * 1000
+                : VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.max,
               Math.max(VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.min, item.duration * 1000)
             );
             const fadeLimit = { max: maxFadeMs, min: VIDEO_CLIP_PROPERTY_LIMITS.fadeMs.min };

@@ -349,3 +349,19 @@ it('does not interpret retained clip transcript replacements as another playback
   });
   expect(source).toEqual(before);
 });
+
+it('retains source-phase fade crossings after tempo changes and midclip resume', () => {
+  const points = buildQuickEditClipEnvelope({
+    entry: entry({
+      volume: 0.5,
+      fadeIn: 6,
+      fadeOut: 4,
+      playbackRate: 2,
+      fadePhase: { offset: 1, duration: 8 },
+    }),
+    duration: 3.5,
+    elapsed: 0.5,
+  });
+  expect(points.map(([time]) => time)).toEqual([0.5, 1.5, 1.9, 2.5, 3.5]);
+  expect(points[2]?.[1]).toBeCloseTo(0.4, 12);
+});

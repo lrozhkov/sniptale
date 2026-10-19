@@ -172,6 +172,7 @@ function createStandardClipGroups(
             <ClipFadeFields
               audio
               clipId={clip.id}
+              duration={clip.duration}
               fadeInMs={clip.fadeInMs}
               fadeOutMs={clip.fadeOutMs}
               locked={runtime.selectedTrackLocked}
@@ -197,6 +198,7 @@ function createStandardClipGroups(
       content: (
         <ClipFadeFields
           clipId={clip.id}
+          duration={clip.duration}
           fadeInMs={clip.fadeInMs}
           fadeOutMs={clip.fadeOutMs}
           locked={runtime.selectedTrackLocked}

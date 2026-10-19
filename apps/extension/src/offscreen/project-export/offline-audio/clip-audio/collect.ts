@@ -40,6 +40,7 @@ export function collectRenderableAudioClips(
       volume: clip.volume * getProjectTrackAudioVolume(project, clip.trackId),
       ...(audioTransitions.length ? { audioTransitions } : {}),
       originalAudioRanges,
+      audioFadePhase: { offset: 0, duration: clip.duration },
     };
   });
   const clips: OfflineAudioRenderableClip[] = [
@@ -99,8 +100,10 @@ export function clipAudioClipToExportRange(
     sourceStart:
       clip.sourceStart + getSourceTimedClipSourceOffset(clip, overlapStart - clip.startTime),
     sourceDuration: getSourceTimedClipSourceOffset(clip, overlapDuration),
-    fadeInMs: overlapStart > clip.startTime ? 0 : Math.min(clip.fadeInMs, overlapDuration * 1000),
-    fadeOutMs: overlapEnd < clipEnd ? 0 : Math.min(clip.fadeOutMs, overlapDuration * 1000),
+    audioFadePhase: {
+      offset: (clip.audioFadePhase?.offset ?? 0) + overlapStart - clip.startTime,
+      duration: clip.audioFadePhase?.duration ?? clip.duration,
+    },
     ...buildOptionalGainPatch(
       'audioGainStart',
       interpolateGain(clip.audioGainStart, clip.audioGainEnd, startProgress)

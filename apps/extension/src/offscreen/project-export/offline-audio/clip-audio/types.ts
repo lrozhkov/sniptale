@@ -11,6 +11,8 @@ export type OfflineAudioRenderableClip = (
   | VideoProjectAudioClip
   | EffectRuntimeAudioPlan
 ) & {
+  /** Authored result-time phase. The collector replaces imported properties. */
+  audioFadePhase?: { offset: number; duration: number };
   originalAudioRanges?: AudioGainRange[];
   /** Export-local automation; never persisted in the project. */
   audioTransitions?: {

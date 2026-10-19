@@ -1,5 +1,26 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'shared-video-audio-fades',
+    productionFile: 'apps/extension/src/features/video/audio/fades.ts',
+    allowCrossOwner: true,
+    reason: 'Fade geometry and limits affect Gallery and Montage authoring, preview and export.',
+    testFiles: [
+      'apps/extension/src/features/video/audio/fades.test.ts',
+      'apps/extension/src/features/video/review/advanced/audio.test.ts',
+      'apps/extension/src/features/video/review/advanced/audio-plan.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/features/video/project/timeline/presentation.test.ts',
+      'apps/extension/src/gallery/video-review/audio-editor.test.tsx',
+      'apps/extension/src/video-editor/project/state/clip-property/timing.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/clip-timing.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/timing-fields.test.tsx',
+      'apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/mix/schedule.test.ts',
+      'apps/extension/src/workflows/video-review/audio-render.test.ts',
+    ],
+  },
+
+  {
     owner: 'montage-audio-track-master',
     productionFile: 'apps/extension/src/features/video/project/timeline/track-audio.ts',
     allowCrossOwner: true,

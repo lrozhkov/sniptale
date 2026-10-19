@@ -1,3 +1,4 @@
+import { getAudioFadeLimitSeconds } from '../../../../../features/video/audio/fades';
 import { DetailItem, DetailList } from '../shared/panel';
 import { InspectorDetails } from '../shared/details';
 import { ClipSourceRangeControls } from './source-range';
@@ -72,6 +73,7 @@ export function ClipTimingControls(props: ClipTimingControlsProps) {
 
 export function ClipFadeFields(props: {
   audio?: boolean;
+  duration: number;
   clipId: string;
   fadeInMs: number;
   fadeOutMs: number;
@@ -88,7 +90,9 @@ export function ClipFadeFields(props: {
         )}
         value={props.fadeInMs / 1000}
         min={0}
-        max={5}
+        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
+        scrubMax={Math.min(5, props.duration)}
+        scrubValue={props.fadeInMs / 1000}
         step={0.05}
         disabled={props.locked}
         formatValue={(value) => `${value.toFixed(2)} s`}
@@ -104,7 +108,9 @@ export function ClipFadeFields(props: {
         )}
         value={props.fadeOutMs / 1000}
         min={0}
-        max={5}
+        max={props.audio ? getAudioFadeLimitSeconds(props.duration) : Math.min(5, props.duration)}
+        scrubMax={Math.min(5, props.duration)}
+        scrubValue={props.fadeOutMs / 1000}
         step={0.05}
         disabled={props.locked}
         formatValue={(value) => `${value.toFixed(2)} s`}

@@ -221,3 +221,17 @@ it.each(['voiceover', 'music'] as const)('exposes an independent tempo only for 
   act(() => field!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ tempo: 1 });
 });
+
+it('bounds a short audio fade to its duration', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'short',
+    assetId: 'music',
+    timelineStart: 0,
+    duration: 2,
+    endMax: 2,
+  });
+  const { field } = renderEditor(clip);
+  setValue(field('audioFadeIn'), '12');
+  act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(onPatch).toHaveBeenLastCalledWith({ fadeIn: 2 });
+});

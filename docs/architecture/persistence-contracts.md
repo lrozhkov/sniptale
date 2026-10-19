@@ -423,3 +423,12 @@ Project JSON version 7 admits optional `audioVolume` from 0 to 2 on AUDIO tracks
 Preview and export multiply the track master separately from clip gain, fades, transitions, and original attenuation. Master edits preserve authored clip fields. A zero master does not remove original attenuation bindings. Track visibility remains a separate gate. Independent EffectV1 audio retains its own gain.
 
 The existing project mutation, history, and save owners control these edits. Opening a project does not write a default master. This change does not require a physical database migration.
+
+
+## Audio fade authoring and export phase
+
+Gallery and Montage share the audio fade limit and linear envelope geometry. Audio fields accept up to 60 seconds, bounded by clip duration. Visual fade commands retain their five-second limit. An AUDIO fade command changes only its selected clip. Visual commands retain their existing linked operation.
+
+Gallery adapters preserve source-time phases. Montage adapters preserve result-time phases. Overlapping fades use the minimum of both ramps. Independent gain stages multiply manual envelopes, fades, original attenuation, and transitions.
+
+The offscreen collector derives `audioFadePhase` for each renderable media clip. It replaces imported properties with canonical phase data. Partial exports retain authored fade durations and advance the phase offset. This field belongs only to the export plan. It adds no durable field or persistence writer.

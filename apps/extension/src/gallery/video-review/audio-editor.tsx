@@ -1,3 +1,4 @@
+import { getAudioFadeLimitSeconds } from '../../features/video/audio/fades';
 import {
   reviewInspectorActions,
   ReviewInspectorSections,
@@ -79,7 +80,7 @@ export function ReviewAudioClipEditor(props: {
               )}
               unit="s"
               min={0}
-              max={Math.min(60, props.clip.duration)}
+              max={getAudioFadeLimitSeconds(props.clip.duration)}
               scrubMax={Math.min(5, props.clip.duration)}
               step={0.1}
               precision={2}

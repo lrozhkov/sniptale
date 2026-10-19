@@ -1,3 +1,4 @@
+import { buildAudioFadeEnvelope } from '../../audio/fades';
 import type { QuickEditAudioClip } from './types';
 import type { ActionSoundSampleId } from '../action-audio-catalog';
 import { iterateReviewActionAudioCues, type ReviewActionAudioPlan } from '../action-audio';
@@ -118,30 +119,15 @@ export function buildQuickEditClipEnvelope(args: {
   duration: number;
   elapsed: number;
 }): QuickEditAudioEnvelope {
-  const { volume, fadeIn, fadeOut } = args.entry;
-  const duration = Math.max(0, args.duration);
-  const elapsed = Math.min(Math.max(0, args.elapsed), duration);
-  const rate = args.entry.playbackRate ?? 1;
-  const phaseOffset = args.entry.fadePhase?.offset ?? 0;
-  const phaseDuration = args.entry.fadePhase?.duration ?? duration;
-  const gainAt = (time: number) => {
-    const phase = phaseOffset + time * rate;
-    let gain = volume;
-    if (fadeIn > 0 && phase < fadeIn) gain = Math.min(gain, (volume * phase) / fadeIn);
-    if (fadeOut > 0 && phaseDuration - phase < fadeOut)
-      gain = Math.min(gain, (volume * (phaseDuration - phase)) / fadeOut);
-    return Math.max(0, gain);
-  };
-  const points: [number, number][] = [[elapsed, gainAt(elapsed)]];
-  const fadeInEnd = (fadeIn - phaseOffset) / rate;
-  if (fadeIn > 0 && fadeInEnd < duration && fadeInEnd > elapsed)
-    points.push([fadeInEnd, gainAt(fadeInEnd)]);
-  const fadeOutStart = (phaseDuration - fadeOut - phaseOffset) / rate;
-  if (fadeOut > 0 && fadeOutStart > elapsed && fadeOutStart > 0 && fadeOutStart < duration)
-    points.push([fadeOutStart, gainAt(fadeOutStart)]);
-  // The scheduled source stops at the clip end; only an authored fade lowers its gain.
-  points.push([duration, gainAt(duration)]);
-  return points;
+  return buildAudioFadeEnvelope({
+    duration: args.entry.fadePhase?.duration ?? Math.max(0, args.duration),
+    fadeIn: args.entry.fadeIn,
+    fadeOut: args.entry.fadeOut,
+    intervalDuration: args.duration,
+    elapsed: args.elapsed,
+    offset: args.entry.fadePhase?.offset ?? 0,
+    rate: args.entry.playbackRate ?? 1,
+  }).map(([time, factor]) => [time, args.entry.volume * factor] as const);
 }
 
 export interface QuickEditClipSchedule {

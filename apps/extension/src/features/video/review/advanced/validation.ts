@@ -1,3 +1,4 @@
+import { MAX_AUDIO_FADE_SECONDS } from '../../audio/fades';
 import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
 import { parseReviewActionAudio } from './action-audio';
@@ -425,8 +426,8 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME) ||
     typeof value['muted'] !== 'boolean' ||
-    !isBoundedNumber(value['fadeIn'], 0, MAX_QUICK_EDIT_TRANSITION) ||
-    !isBoundedNumber(value['fadeOut'], 0, MAX_QUICK_EDIT_TRANSITION)
+    !isBoundedNumber(value['fadeIn'], 0, MAX_AUDIO_FADE_SECONDS) ||
+    !isBoundedNumber(value['fadeOut'], 0, MAX_AUDIO_FADE_SECONDS)
   )
     return null;
   const sourceAnchor =

@@ -8,6 +8,7 @@ import { syncPreviewAudioElements } from '../../../apps/extension/src/video-edit
 import { createPreviewMediaSyncState } from '../../../apps/extension/src/video-editor/preview/stage/media/sync';
 import { collectRenderableAudioClips } from '../../../apps/extension/src/offscreen/project-export/offline-audio/clip-audio/collect';
 import { scheduleOfflineAudioClipMix } from '../../../apps/extension/src/offscreen/project-export/offline-audio/mix/schedule';
+import { runAudioFadeDiagnostic } from './audio-fade-diagnostic';
 import { runOriginalAudioDiagnostic } from './original-audio-diagnostic';
 import {
   cleanupPreviewAudioGraph,
@@ -44,6 +45,7 @@ type PreviewAudioDiagnosticResult = {
 };
 
 type PreviewAudioDiagnosticApi = {
+  runAudioFades: typeof runAudioFadeDiagnostic;
   runAmplification: typeof runAmplificationDiagnostic;
   runOriginalAudio: typeof runOriginalAudioDiagnostic;
   getLastResult: () => PreviewAudioDiagnosticResult | null;
@@ -283,6 +285,7 @@ function runOnce(): Promise<PreviewAudioDiagnosticResult> {
 
 window.__sniptalePreviewAudioDiagnostic = {
   getLastResult: () => lastResult,
+  runAudioFades: runAudioFadeDiagnostic,
   runOriginalAudio: runOriginalAudioDiagnostic,
   runAmplification: runAmplificationDiagnostic,
   run: runOnce,

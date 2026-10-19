@@ -1,6 +1,6 @@
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types/model';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
+import { readNativeVideoProject as readProject } from '../support/native-video-project';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
@@ -14,34 +14,6 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-async function readProject(page: Page) {
-  const values = await page.evaluate(
-    () =>
-      new Promise<unknown[]>((resolve, reject) => {
-        const request = indexedDB.open('sniptale-db');
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          const db = request.result;
-          const read = db.transaction('video_projects').objectStore('video_projects').getAll();
-          read.onerror = () => {
-            db.close();
-            reject(read.error);
-          };
-          read.onsuccess = () => {
-            db.close();
-            resolve(read.result);
-          };
-        };
-      })
-  );
-  return values
-    .flatMap((value) =>
-      typeof value === 'object' && value !== null && 'project' in value
-        ? [parseHydratableVideoProject(value.project)]
-        : []
-    )
-    .find((value) => value !== null);
-}
 async function operate(button: Locator) {
   await button.scrollIntoViewIfNeeded();
   await expect(button).toBeInViewport();

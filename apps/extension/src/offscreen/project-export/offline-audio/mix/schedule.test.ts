@@ -123,11 +123,13 @@ it('schedules fades and playback bounds for an offline mix clip', async () => {
   expect(clampClipPlaybackRateMock).toHaveBeenCalledWith(1.25);
   expect(context.lastSource?.stop).toHaveBeenCalledWith(3);
   expect(context.lastGain?.gain.setValueAtTime).toHaveBeenCalledWith(0, 1);
-  expect(context.lastGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.73125, 1.1);
-  expect(context.lastGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
-    0.40312499999999996,
-    2.85
-  );
+  expect(context.gains).toHaveLength(2);
+  const [manual, fade] = context.gains;
+  expect(manual?.connect).toHaveBeenCalledWith(fade);
+  expect(manual?.gain.setValueAtTime).toHaveBeenCalledWith(0.75, 1);
+  expect(manual?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.375, 3);
+  expect(fade?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1, 1.1);
+  expect(fade?.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 3);
 });
 
 it('uses immediate gain changes for muted clips without fades', async () => {

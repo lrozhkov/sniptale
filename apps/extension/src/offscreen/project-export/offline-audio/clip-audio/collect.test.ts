@@ -109,8 +109,9 @@ it('clips audio render ranges and interpolates gain envelopes for partial export
       audioGainEnd: 0.625,
       audioGainStart: 0.875,
       duration: 2,
-      fadeInMs: 0,
-      fadeOutMs: 0,
+      fadeInMs: 900,
+      fadeOutMs: 800,
+      audioFadePhase: { offset: 1, duration: 4 },
       sourceDuration: 4,
       sourceStart: 12,
       startTime: 0,
@@ -348,3 +349,45 @@ it('projects AUDIO masters once for full and partial export while preserving cli
   track.audioVolume = 0;
   expect(collectRenderableAudioClips(project).map((clip) => clip.volume)).toEqual([0, 1.5]);
 });
+
+it.each([null, 'invalid', { offset: -200, duration: 1 }, { offset: 0, duration: 10000 }])(
+  'replaces imported export-only fade phase %j',
+  (injected) => {
+    const project = createEmptyVideoProject('Imported fade');
+    const asset = createVideoProjectAsset(
+      'Music',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'music' },
+      {
+        width: 0,
+        height: 0,
+        duration: 8,
+        mimeType: 'audio/wav',
+        size: 10,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const clip = createAudioClipFromAsset(project.tracks[0]!.id, asset);
+    project.assets = [asset];
+    project.duration = 8;
+    const serialized: unknown = JSON.parse(
+      JSON.stringify({ ...project, clips: [{ ...clip, fadeInMs: 6000, audioFadePhase: injected }] })
+    );
+    const imported = parseHydratableVideoProject(serialized);
+    if (!imported) throw new Error('Expected supported project');
+    getAssetByIdMock.mockReturnValue(asset);
+    const before = JSON.stringify(imported);
+    const full = collectRenderableAudioClips(imported)[0];
+    expect(full?.audioFadePhase).toEqual({ offset: 0, duration: 8 });
+    const partial = full && clipAudioClipToExportRange(full, { start: 1, end: 7 });
+    const nested = partial && clipAudioClipToExportRange(partial, { start: 1, end: 4 });
+    expect(nested).toMatchObject({
+      audioFadePhase: { offset: 2, duration: 8 },
+      fadeInMs: 6000,
+      sourceStart: 2,
+      duration: 3,
+    });
+    expect(JSON.stringify(imported)).toBe(before);
+  }
+);

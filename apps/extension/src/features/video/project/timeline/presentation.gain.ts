@@ -1,3 +1,4 @@
+import { getAudioFadeFactor } from '../../audio/fades';
 import { getProjectTrackAudioVolume } from './track-audio';
 import { getProjectOriginalAudioRanges } from './original-audio';
 import { sourceAudioAttenuationAtTime } from '../../audio/source-attenuation';
@@ -37,7 +38,16 @@ export function getClipAudioGain(clip: VideoProjectClip, currentTime: number): n
     (clip.volumeEnvelopeStart ?? 1) +
     ((clip.volumeEnvelopeEnd ?? 1) - (clip.volumeEnvelopeStart ?? 1)) * progress;
 
-  return clampNumber(clip.volume * envelopeGain * getClipFadeMultiplier(clip, currentTime), 0, 2);
+  return clampNumber(
+    clip.volume *
+      envelopeGain *
+      getAudioFadeFactor(
+        { duration: clip.duration, fadeIn: clip.fadeInMs / 1000, fadeOut: clip.fadeOutMs / 1000 },
+        currentTime - clip.startTime
+      ),
+    0,
+    2
+  );
 }
 
 export function getClipCompositeVisualOpacity(
