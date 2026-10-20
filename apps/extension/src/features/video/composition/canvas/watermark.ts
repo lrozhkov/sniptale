@@ -2,13 +2,14 @@ import {
   resolveQuickEditWatermarkBounds,
   resolveQuickEditWatermarkTile,
   type QuickEditWatermarkSettings,
-} from '../../features/video/project/scene/watermark';
-import type {
-  RenderCanvasLease,
-  RenderResources,
-} from '../../features/video/composition/canvas/render-resources';
-import { resolveReviewAssetBytes } from './asset-bytes';
-import { QuickEditExportUnavailable } from './export-unavailable';
+} from '../../project/scene/watermark';
+import type { RenderCanvasLease, RenderResources } from './render-resources';
+
+/** The caller owns byte access and asset failure classification. */
+export interface WatermarkAssets {
+  read(assetId: string): Promise<Blob | null>;
+  unavailable(): Error;
+}
 
 type Size = { width: number; height: number };
 type Raster = { scaleX: number; scaleY: number; resources: RenderResources };
@@ -16,13 +17,13 @@ const MAX_CACHE_PIXELS = 4_194_304;
 const MAX_LOGO_PIXELS = 16_000_000;
 
 /** Prepared final-canvas pixels shared by Gallery preview and full/fragment export. */
-export interface ReviewWatermarkRenderer {
+export interface WatermarkRenderer {
   bounds: { x: number; y: number; width: number; height: number };
   draw(context: CanvasRenderingContext2D): void;
   dispose(): void;
 }
 
-function emptyRenderer(): ReviewWatermarkRenderer {
+function emptyRenderer(): WatermarkRenderer {
   return { bounds: { x: 0, y: 0, width: 0, height: 0 }, draw() {}, dispose() {} };
 }
 
@@ -193,30 +194,30 @@ function paintText(
 
 async function readWatermarkBitmap(
   assetId: string,
-  readAsset: typeof resolveReviewAssetBytes,
+  assets: WatermarkAssets,
   signal?: AbortSignal
 ): Promise<ImageBitmap> {
   try {
-    const blob = await readAsset(assetId);
+    const blob = await assets.read(assetId);
     signal?.throwIfAborted();
-    if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
+    if (!blob) throw assets.unavailable();
     return await createImageBitmap(blob);
   } catch (failure) {
     signal?.throwIfAborted();
     if (failure instanceof Error && failure.name === 'AbortError') throw failure;
-    throw new QuickEditExportUnavailable(['asset-missing']);
+    throw assets.unavailable();
   }
 }
 
 async function paintImage(
   settings: QuickEditWatermarkSettings,
   output: Size,
-  readAsset: typeof resolveReviewAssetBytes,
+  assets: WatermarkAssets,
   signal?: AbortSignal,
   raster?: Raster
 ) {
   const image = settings.image;
-  if (!image) throw new QuickEditExportUnavailable(['asset-missing']);
+  if (!image) throw assets.unavailable();
   const reservation = raster?.resources.bytes(
     'watermark-source-bitmap',
     image.width * image.height * 4
@@ -224,7 +225,7 @@ async function paintImage(
   let bitmap: ImageBitmap | undefined;
   let cache: RenderCanvasLease | undefined;
   try {
-    bitmap = await readWatermarkBitmap(image.assetId, readAsset, signal);
+    bitmap = await readWatermarkBitmap(image.assetId, assets, signal);
     signal?.throwIfAborted();
     if (
       bitmap.width !== image.width ||
@@ -233,7 +234,7 @@ async function paintImage(
       bitmap.height > 4096 ||
       bitmap.width * bitmap.height > MAX_LOGO_PIXELS
     )
-      throw new QuickEditExportUnavailable(['asset-missing']);
+      throw assets.unavailable();
     const width = output.width * image.size;
     const bounds = resolveQuickEditWatermarkBounds(settings, output, {
       width,
@@ -304,13 +305,13 @@ function prepareTextCache(settings: QuickEditWatermarkSettings, output: Size, ra
 }
 
 /** Resource preparation occurs once per immutable settings/output snapshot, never per video frame. */
-export async function createReviewWatermarkRenderer(
+export async function createWatermarkRenderer(
   settings: QuickEditWatermarkSettings | undefined,
   output: Size,
+  assets: WatermarkAssets,
   signal?: AbortSignal,
-  readAsset: typeof resolveReviewAssetBytes = resolveReviewAssetBytes,
   raster?: Raster
-): Promise<ReviewWatermarkRenderer> {
+): Promise<WatermarkRenderer> {
   signal?.throwIfAborted();
   if (
     !settings ||
@@ -345,7 +346,7 @@ export async function createReviewWatermarkRenderer(
       cache = text.cache;
       painted = text.painted;
     } else {
-      const image = await paintImage(settings, output, readAsset, signal, raster);
+      const image = await paintImage(settings, output, assets, signal, raster);
       cache = image.cache;
       painted = image.painted;
     }
@@ -363,7 +364,7 @@ function rendererFromCache(
   output: Size,
   signal?: AbortSignal,
   raster?: Raster
-): ReviewWatermarkRenderer {
+): WatermarkRenderer {
   const { canvas } = cache;
   const sampled = raster ? { width: canvas.width, height: canvas.height } : painted;
   signal?.throwIfAborted();
@@ -424,7 +425,7 @@ function rendererFromCache(
 }
 
 /** Measures once before orchestration admits the exact cache and optional decoded-image storage. */
-export async function measureReviewWatermark(
+export async function measureWatermark(
   settings: QuickEditWatermarkSettings | undefined,
   output: Size,
   signal: AbortSignal,
@@ -489,7 +490,7 @@ export async function measureReviewWatermark(
     kind: captured.mode === 'image' ? ('image' as const) : ('text' as const),
     cache,
     source,
-    async paint(readAsset: typeof resolveReviewAssetBytes = resolveReviewAssetBytes) {
+    async paint(assets: WatermarkAssets) {
       signal.throwIfAborted();
       let lease: RenderCanvasLease | undefined;
       try {
@@ -497,7 +498,7 @@ export async function measureReviewWatermark(
           lease = createCache(painted, capturedRaster);
           paintText(lease.context, captured.text, measured, capturedRaster);
         } else
-          lease = (await paintImage(captured, canonical, readAsset, signal, capturedRaster)).cache;
+          lease = (await paintImage(captured, canonical, assets, signal, capturedRaster)).cache;
         signal.throwIfAborted();
         return rendererFromCache(lease, painted, captured, canonical, signal, capturedRaster);
       } catch (failure) {

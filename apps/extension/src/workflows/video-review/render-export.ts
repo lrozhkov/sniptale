@@ -3,7 +3,7 @@ import type { ReviewFrameExportInput } from './render-export-input';
 import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { createReviewPresentationMain } from './presentation-main';
-import type { ReviewWatermarkRenderer } from './render-watermark';
+import type { WatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
@@ -89,7 +89,7 @@ export async function writeReviewFrames(
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
-  let watermark: ReviewWatermarkRenderer | null = null;
+  let watermark: WatermarkRenderer | null = null;
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
   try {
     source = await reviewExportPhase(args.signal, 'decode', () =>
@@ -495,7 +495,7 @@ export async function renderRenderWindowFrames(
     transitions?: readonly ReviewCutTransitionPlan[];
     transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
     webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
-    watermark?: ReviewWatermarkRenderer | null;
+    watermark?: WatermarkRenderer | null;
     captions?: Awaited<ReturnType<typeof prepareReviewFinalCaptions>>;
     videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
     resultDuration: number;

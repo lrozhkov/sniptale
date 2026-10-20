@@ -43,12 +43,12 @@ vi.mock('./cut-transition-frames', async (original) => ({
   paintReviewCutTransition: io.transition,
   paintReviewCutBlackout: io.blackout,
 }));
-vi.mock('./render-watermark', () => ({
-  createReviewWatermarkRenderer: io.watermark,
-  measureReviewWatermark: async (...args: unknown[]) => ({
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+  measureWatermark: async (...args: unknown[]) => ({
     cache: null,
     source: null,
-    paint: (readAsset: unknown) => io.watermark(args[0], args[1], args[2], readAsset, args[3]),
+    paint: (assets: unknown) => io.watermark(args[0], args[1], assets, args[2], args[3]),
   }),
 }));
 vi.mock('./window-header', async (original) => ({

@@ -1,3 +1,4 @@
+import { reviewWatermarkAssets } from './asset-bytes';
 import type { InputAudioTrack } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 import {
@@ -17,12 +18,12 @@ import {
   type ReviewPresentationMainInput,
 } from './presentation-main';
 import { createReviewPresentationMedia } from './presentation-media';
-import { createReviewWatermarkRenderer } from './render-watermark';
+import { createWatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import { createPreviewRenderResources } from './preview-render-resources';
 
 type Main = Awaited<ReturnType<typeof createReviewPresentationMain>>;
 type Media = Awaited<ReturnType<typeof createReviewPresentationMedia>>;
-type Watermark = Awaited<ReturnType<typeof createReviewWatermarkRenderer>>;
+type Watermark = Awaited<ReturnType<typeof createWatermarkRenderer>>;
 
 /** Frozen planner output and the matching main composition snapshot. */
 export interface ReviewPresentationRendererInput {
@@ -168,11 +169,11 @@ class PresentationRenderer {
     }
     if (Object.keys(this.media).length)
       this.watermark = this.adopt(
-        await createReviewWatermarkRenderer(
+        await createWatermarkRenderer(
           this.args.main.effective.watermark,
           this.args.main.dimensions.canonical,
-          signal,
-          this.args.main.readAsset
+          reviewWatermarkAssets(this.args.main.readAsset),
+          signal
         )
       );
     this.assertLive();

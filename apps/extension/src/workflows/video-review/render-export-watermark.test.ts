@@ -8,7 +8,9 @@ const painting = vi.hoisted(() => ({
   dispose: vi.fn(),
   prepare: vi.fn(),
 }));
-vi.mock('./render-watermark', () => ({ createReviewWatermarkRenderer: painting.prepare }));
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: painting.prepare,
+}));
 vi.mock('./render-key-animation', () => ({ drawReviewKeys: () => painting.order.push('keys') }));
 vi.mock('./cut-transition-frames', async (original) => ({
   ...(await original<typeof import('./cut-transition-frames')>()),
@@ -30,8 +32,8 @@ it('prepares once and paints after keys before whole-frame blackout for every ex
   expect(painting.prepare).toHaveBeenCalledWith(
     args.advanced.watermark,
     { width: 320, height: 180 },
-    args.signal,
-    args.readProjectAsset
+    expect.objectContaining({ read: args.readProjectAsset, unavailable: expect.any(Function) }),
+    args.signal
   );
   expect(painting.order).toEqual(
     Array.from({ length: state.encoded.length }, () => ['keys', 'watermark', 'blackout']).flat()

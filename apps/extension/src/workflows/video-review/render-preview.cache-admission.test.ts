@@ -16,9 +16,9 @@ vi.mock('./window-header', async (original) => ({
 }));
 vi.mock('./scene-frame', () => ({ drawReviewSceneFrame: vi.fn() }));
 vi.mock('./render-scene-overlays', () => ({ drawReviewSceneOverlays: vi.fn() }));
-vi.mock('./render-watermark', () => ({
-  createReviewWatermarkRenderer: io.watermark,
-  measureReviewWatermark: async () => ({ cache: null, source: null, paint: vi.fn() }),
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+  measureWatermark: async () => ({ cache: null, source: null, paint: vi.fn() }),
 }));
 vi.mock('./scene-background', () => ({ createReviewBackgroundPainter: io.background }));
 vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({

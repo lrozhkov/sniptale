@@ -1,7 +1,8 @@
+import { reviewWatermarkAssets } from '../../../../workflows/video-review/asset-bytes';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createReviewWatermarkRenderer, measureReviewWatermark } from './render-watermark';
-import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
-import type { QuickEditWatermarkSettings } from '../../features/video/project/scene/watermark';
+import { createWatermarkRenderer, measureWatermark } from './watermark';
+import type { RenderResources } from './render-resources';
+import type { QuickEditWatermarkSettings } from '../../project/scene/watermark';
 
 function settings(): QuickEditWatermarkSettings {
   return {
@@ -64,7 +65,11 @@ afterEach(() => {
 });
 it('loads the selected bundled face and actual text once before measuring and reuses its painted surface', async () => {
   const value = settings();
-  const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const painter = await createWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    reviewWatermarkAssets()
+  );
   expect(load).toHaveBeenCalledWith('700 24px "Sniptale Text"', value.text.value);
   expect(contexts[0]!.font).toBe('700 24px "Sniptale Text"');
   expect(load.mock.invocationCallOrder[0]).toBeLessThan(
@@ -84,7 +89,7 @@ it('loads the selected bundled face and actual text once before measuring and re
 it('refuses an unavailable bundled face instead of exporting fallback text', async () => {
   load.mockResolvedValue([]);
   await expect(
-    createReviewWatermarkRenderer(settings(), { width: 1920, height: 1080 })
+    createWatermarkRenderer(settings(), { width: 1920, height: 1080 }, reviewWatermarkAssets())
   ).rejects.toThrow();
   expect(contexts.every((context) => vi.mocked(context.measureText).mock.calls.length === 0)).toBe(
     true
@@ -96,7 +101,11 @@ it('keeps None, image acquisition and empty text resource free', async () => {
     { ...settings(), mode: 'image' as const },
     { ...settings(), text: { ...settings().text, value: '' } },
   ]) {
-    const renderer = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+    const renderer = await createWatermarkRenderer(
+      value,
+      { width: 1920, height: 1080 },
+      reviewWatermarkAssets()
+    );
     renderer.dispose();
   }
   expect(load).not.toHaveBeenCalled();
@@ -109,15 +118,15 @@ it('loads a logo once, retains its alpha and closes the bitmap after rasterizati
     vi.fn(async () => bitmap)
   );
   const read = vi.fn(async () => new Blob(['image'], { type: 'image/png' }));
-  const renderer = await createReviewWatermarkRenderer(
+  const renderer = await createWatermarkRenderer(
     {
       ...settings(),
       mode: 'image',
       image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 0.4 },
     },
     { width: 3840, height: 2160 },
-    undefined,
-    read
+    reviewWatermarkAssets(read),
+    undefined
   );
   expect(read).toHaveBeenCalledOnce();
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -132,7 +141,12 @@ it('fails missing logo and rejects excessive decoded dimensions', async () => {
     image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 1 },
   };
   await expect(
-    createReviewWatermarkRenderer(value, { width: 1920, height: 1080 }, undefined, async () => null)
+    createWatermarkRenderer(
+      value,
+      { width: 1920, height: 1080 },
+      reviewWatermarkAssets(async () => null),
+      undefined
+    )
   ).rejects.toThrow();
   const bitmap = { width: 8000, height: 8000, close: vi.fn() };
   vi.stubGlobal(
@@ -140,11 +154,11 @@ it('fails missing logo and rejects excessive decoded dimensions', async () => {
     vi.fn(async () => bitmap)
   );
   await expect(
-    createReviewWatermarkRenderer(
+    createWatermarkRenderer(
       value,
       { width: 1920, height: 1080 },
-      undefined,
-      async () => new Blob(['x'])
+      reviewWatermarkAssets(async () => new Blob(['x'])),
+      undefined
     )
   ).rejects.toThrow();
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -154,7 +168,11 @@ it('wraps without truncation and paints repeated instances from one bounded cach
   value.layout = 'tiled';
   value.text.value = 'ABCD\nEFGH';
   value.text.wrapWidth = 0.03;
-  const renderer = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const renderer = await createWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    reviewWatermarkAssets()
+  );
   expect(
     vi
       .mocked(contexts[0]!.fillText)
@@ -176,7 +194,7 @@ it.each([
 ])(
   'keeps painted glyph and shadow bounds inside the final $width×$height canvas',
   async (output) => {
-    const renderer = await createReviewWatermarkRenderer(settings(), output);
+    const renderer = await createWatermarkRenderer(settings(), output, reviewWatermarkAssets());
     expect(renderer.bounds.x).toBeGreaterThanOrEqual(0);
     expect(renderer.bounds.y).toBeGreaterThanOrEqual(0);
     expect(renderer.bounds.x + renderer.bounds.width).toBeLessThanOrEqual(output.width);
@@ -194,7 +212,11 @@ it.each([
     const value = settings();
     value.text.font = font;
     value.text.weight = 'normal';
-    const renderer = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+    const renderer = await createWatermarkRenderer(
+      value,
+      { width: 1920, height: 1080 },
+      reviewWatermarkAssets()
+    );
     expect(load).toHaveBeenCalledWith(`400 24px ${family}`, value.text.value);
     expect(contexts[0]!.font).toBe(`400 24px ${family}`);
     renderer.dispose();
@@ -216,11 +238,11 @@ it('closes a late bitmap and never paints when resource acquisition is cancelled
     image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 1 },
   };
   await expect(
-    createReviewWatermarkRenderer(
+    createWatermarkRenderer(
       value,
       { width: 1920, height: 1080 },
-      controller.signal,
-      async () => new Blob(['x'])
+      reviewWatermarkAssets(async () => new Blob(['x'])),
+      controller.signal
     )
   ).rejects.toMatchObject({ name: 'AbortError' });
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -231,9 +253,10 @@ it('closes a late bitmap and never paints when resource acquisition is cancelled
 });
 it('releases the cache on abort and makes later draw calls harmless', async () => {
   const controller = new AbortController();
-  const renderer = await createReviewWatermarkRenderer(
+  const renderer = await createWatermarkRenderer(
     settings(),
     { width: 1920, height: 1080 },
+    reviewWatermarkAssets(),
     controller.signal
   );
   controller.abort();
@@ -266,7 +289,12 @@ it.each(['missing', 'read', 'decode', 'dimensions'] as const)(
       return failure === 'missing' ? null : new Blob(['image']);
     };
     await expect(
-      createReviewWatermarkRenderer(value, { width: 1920, height: 1080 }, undefined, read)
+      createWatermarkRenderer(
+        value,
+        { width: 1920, height: 1080 },
+        reviewWatermarkAssets(read),
+        undefined
+      )
     ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable', reasons: ['asset-missing'] });
     expect(contexts.every((context) => vi.mocked(context.drawImage).mock.calls.length === 0)).toBe(
       true
@@ -284,14 +312,14 @@ it('preserves cancellation when an aborted asset read also rejects', async () =>
     image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 1 },
   };
   await expect(
-    createReviewWatermarkRenderer(
+    createWatermarkRenderer(
       value,
       { width: 1920, height: 1080 },
-      controller.signal,
-      async () => {
+      reviewWatermarkAssets(async () => {
         controller.abort();
         throw new Error('Read interrupted');
-      }
+      }),
+      controller.signal
     )
   ).rejects.toMatchObject({ name: 'AbortError' });
 });
@@ -308,11 +336,11 @@ it('does not misclassify image cache geometry failures as missing assets', async
     image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 1 },
   };
   await expect(
-    createReviewWatermarkRenderer(
+    createWatermarkRenderer(
       value,
       { width: 100000, height: 100000 },
-      undefined,
-      async () => new Blob(['image'])
+      reviewWatermarkAssets(async () => new Blob(['image'])),
+      undefined
     )
   ).rejects.toThrow('Watermark cache budget exceeded.');
   expect(bitmap.close).toHaveBeenCalledOnce();
@@ -347,14 +375,18 @@ it('keeps canonical wrapping and tiled destinations while scaling only the manag
   value.layout = 'tiled';
   value.text.value = 'ABCD\nEFGH';
   value.text.wrapWidth = 0.03;
-  const baseline = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const baseline = await createWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    reviewWatermarkAssets()
+  );
   const baselineSurface = { ...surfaces[0]! };
   const baselinePaint = vi.mocked(contexts[0]!.fillText).mock.calls;
   const { resources, releases } = managedResources();
-  const renderer = await createReviewWatermarkRenderer(
+  const renderer = await createWatermarkRenderer(
     value,
     { width: 1920, height: 1080 },
-    undefined,
+    reviewWatermarkAssets(undefined),
     undefined,
     { scaleX: 0.5, scaleY: 0.25, resources }
   );
@@ -417,15 +449,15 @@ it.each(['success', 'decode', 'dimensions', 'abort', 'cache', 'paint'] as const)
         return lease;
       };
     }
-    const preparation = createReviewWatermarkRenderer(
+    const preparation = createWatermarkRenderer(
       {
         ...settings(),
         mode: 'image',
         image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 0.4 },
       },
       { width: 1920, height: 1080 },
+      reviewWatermarkAssets(async () => new Blob(['image'])),
       controller.signal,
-      async () => new Blob(['image']),
       { scaleX: 0.25, scaleY: 0.25, resources }
     );
     if (outcome === 'success') {
@@ -445,10 +477,10 @@ it.each([0, -1, NaN, Infinity])(
   async (scaleX) => {
     const { resources } = managedResources();
     await expect(
-      createReviewWatermarkRenderer(
+      createWatermarkRenderer(
         settings(),
         { width: 1920, height: 1080 },
-        undefined,
+        reviewWatermarkAssets(undefined),
         undefined,
         { scaleX, scaleY: 1, resources }
       )
@@ -460,11 +492,11 @@ it.each([0, -1, NaN, Infinity])(
 it('releases a managed text cache on abort and does not draw or release twice', async () => {
   const { resources, releases } = managedResources();
   const controller = new AbortController();
-  const renderer = await createReviewWatermarkRenderer(
+  const renderer = await createWatermarkRenderer(
     settings(),
     { width: 1920, height: 1080 },
+    reviewWatermarkAssets(undefined),
     controller.signal,
-    undefined,
     { scaleX: 0.5, scaleY: 0.5, resources }
   );
   controller.abort();
@@ -477,10 +509,10 @@ it('releases a managed text cache on abort and does not draw or release twice', 
 it('releases the measurement lease when canonical text metrics exceed their existing budget', async () => {
   const { resources, releases } = managedResources();
   await expect(
-    createReviewWatermarkRenderer(
+    createWatermarkRenderer(
       settings(),
       { width: 1000000, height: 1000000 },
-      undefined,
+      reviewWatermarkAssets(undefined),
       undefined,
       { scaleX: 0.1, scaleY: 0.1, resources }
     )
@@ -492,7 +524,7 @@ it('releases the measurement lease when canonical text metrics exceed their exis
 it('measures once and exposes rounded allocation before painting the captured canonical text', async () => {
   const { resources, releases } = managedResources();
   const value = settings();
-  const measured = await measureReviewWatermark(
+  const measured = await measureWatermark(
     value,
     { width: 1920, height: 1080 },
     new AbortController().signal,
@@ -504,7 +536,7 @@ it('measures once and exposes rounded allocation before painting the captured ca
   expect(Object.isFrozen(measured.cache)).toBe(true);
   const calls = vi.mocked(contexts[0]!.measureText).mock.calls.length;
   value.text.value = 'changed';
-  const painter = await measured.paint();
+  const painter = await measured.paint(reviewWatermarkAssets());
   expect(resources.canvas).toHaveBeenLastCalledWith('watermark-cache', measured.cache);
   expect(vi.mocked(contexts[0]!.measureText).mock.calls).toHaveLength(calls);
   expect(contexts[1]!.fillText).not.toHaveBeenCalledWith(
@@ -520,7 +552,7 @@ it('exposes image source storage without decoding and rejects painting an aborte
   const { resources } = managedResources();
   const controller = new AbortController();
   const read = vi.fn();
-  const measured = await measureReviewWatermark(
+  const measured = await measureWatermark(
     {
       ...settings(),
       mode: 'image',
@@ -541,7 +573,7 @@ it('exposes image source storage without decoding and rejects painting an aborte
   expect(resources.canvas).not.toHaveBeenCalled();
   expect(resources.bytes).not.toHaveBeenCalled();
   controller.abort();
-  await expect(measured.paint(read)).rejects.toThrow();
+  await expect(measured.paint(reviewWatermarkAssets(read))).rejects.toThrow();
   expect(read).not.toHaveBeenCalled();
 });
 
@@ -549,7 +581,11 @@ it('draws strikethrough with the same text alpha, alignment and raster transform
   const value = settings();
   value.text.strike = true;
   value.text.value = 'Latin\nКириллица';
-  const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const painter = await createWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    reviewWatermarkAssets()
+  );
   const context = contexts[0]!;
   const glyphs = vi.mocked(context.fillText).mock.calls;
   const strokes = vi.mocked(context.fillRect).mock.calls;
@@ -568,8 +604,29 @@ it('draws strikethrough with the same text alpha, alignment and raster transform
 it('loads and paints italic with the same font description in preview and export', async () => {
   const value = settings();
   value.text.italic = true;
-  const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const painter = await createWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    reviewWatermarkAssets()
+  );
   expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Text"', value.text.value);
   expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Text"');
   painter.dispose();
+});
+
+it('uses the supplied byte reader and preserves its asset failure classification', async () => {
+  const failure = new Error('Caller asset unavailable');
+  const read = vi.fn(async () => null);
+  const unavailable = vi.fn(() => failure);
+  const value = {
+    ...settings(),
+    mode: 'image' as const,
+    image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 1 },
+  };
+  await expect(
+    createWatermarkRenderer(value, { width: 1920, height: 1080 }, { read, unavailable })
+  ).rejects.toBe(failure);
+  expect(read).toHaveBeenCalledExactlyOnceWith('project-asset:logo');
+  expect(unavailable).toHaveBeenCalled();
+  expect(surfaces).toHaveLength(0);
 });

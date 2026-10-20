@@ -28,7 +28,9 @@ const io = vi.hoisted(() => ({
 }));
 vi.mock('./presentation-main', () => ({ createReviewPresentationMain: io.main }));
 vi.mock('./presentation-media', () => ({ createReviewPresentationMedia: io.media }));
-vi.mock('./render-watermark', () => ({ createReviewWatermarkRenderer: io.watermark }));
+vi.mock('../../features/video/composition/canvas/watermark', () => ({
+  createWatermarkRenderer: io.watermark,
+}));
 
 /** Small software raster oracle; native browser composition has separate integration proof. */
 class Raster {

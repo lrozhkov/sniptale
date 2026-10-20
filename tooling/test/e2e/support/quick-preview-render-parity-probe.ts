@@ -1,3 +1,4 @@
+import { reviewWatermarkAssets } from '../../../../apps/extension/src/workflows/video-review/asset-bytes';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import {
   calculatePreviewRenderAllocation,
@@ -12,7 +13,7 @@ import { createReviewPreviewRenderer } from '../../../../apps/extension/src/work
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
 import { drawReviewKeys } from '../../../../apps/extension/src/workflows/video-review/render-key-animation';
-import { createReviewWatermarkRenderer } from '../../../../apps/extension/src/workflows/video-review/render-watermark';
+import { createWatermarkRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/watermark';
 import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
@@ -294,11 +295,11 @@ async function reference(
         }
       )
     : null;
-  const watermark = await createReviewWatermarkRenderer(
+  const watermark = await createWatermarkRenderer(
     scene.watermark,
     size,
+    reviewWatermarkAssets(undefined),
     signal,
-    undefined,
     scale === 1
       ? undefined
       : { scaleX: scale, scaleY: backing.height / size.height, resources: textOwner.resources }
