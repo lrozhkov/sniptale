@@ -1,5 +1,20 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'video-focus-appearance',
+    productionFile: 'apps/extension/src/features/video/project/scene/focus-appearance.ts',
+    allowCrossOwner: true,
+    reason:
+      'Spotlight and border admission retain Gallery scene, edit, persistence and backup contracts.',
+    testFiles: [
+      'apps/extension/src/features/video/review/advanced/focus.test.ts',
+      'apps/extension/src/features/video/review/advanced/border.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/features/video/review/advanced/migration.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/focus-compatibility.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/backup-restore.test.ts',
+    ],
+  },
+  {
     owner: 'source-key-feedback',
     productionPrefix: 'apps/extension/src/features/video/project/action-feedback/',
     allowCrossOwner: true,

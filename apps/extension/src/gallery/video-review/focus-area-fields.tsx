@@ -1,5 +1,6 @@
+import { clampQuickEditSpotlightArea } from '../../features/video/project/scene/focus-appearance';
 import { translate } from '../../platform/i18n';
-import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
+
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 export function ReviewFocusRoundness(props: {

@@ -1,3 +1,7 @@
+import {
+  parseQuickEditBorder,
+  parseQuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
 import { parseMotionBlurPhases } from '../../project/motion/blur';
 import { MAX_AUDIO_FADE_SECONDS } from '../../audio/fades';
 import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
@@ -20,12 +24,12 @@ import {
   parseCameraDepth as parseQuickEditDepth,
 } from '../../project/motion/spatial';
 import { parseReviewClickAnimations } from './click-animation';
-import { parseQuickEditBorder } from './border';
+
 import { quickEditFocusConflicts } from './focus-layout';
 import { parseOriginalAudioRanges } from './original-audio';
 import { parseOriginalAudioMutes, validOriginalAudioMuteBindings } from './original-audio-mutes';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
-import { parseQuickEditSpotlight } from './focus';
+
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
 import { isBoundedNumber, isUnitInterval } from '../../project/validation/primitives';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';

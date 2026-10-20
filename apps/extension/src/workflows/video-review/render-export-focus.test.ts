@@ -1,8 +1,11 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import {
   computeQuickEditSceneLayout,

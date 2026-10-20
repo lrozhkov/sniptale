@@ -1,6 +1,7 @@
+import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { ReviewDetails } from './controls';
 import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
@@ -192,7 +193,8 @@ it('restores nested disclosure choices after another object and a fresh editor m
 });
 
 it('disables dormant Spotlight conversion when revival would overlap an active Zoom', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   advanced.zoom.regions = [
@@ -224,7 +226,8 @@ it('disables dormant Spotlight conversion when revival would overlap an active Z
 });
 
 it('routes Border numeric drafts through the panel and cancels without a durable mutation', async () => {
-  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const { createQuickEditBorder } =
+    await import('../../features/video/project/scene/focus-appearance');
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   const region = {

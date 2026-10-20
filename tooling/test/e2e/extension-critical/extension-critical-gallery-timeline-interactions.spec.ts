@@ -1,3 +1,4 @@
+import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { replaceNativeReviewWorkspace } from '../support/native-review-workspace';
@@ -12,7 +13,7 @@ import {
   type ReviewTextDocument,
 } from '../../../../apps/extension/src/features/video/review/text-document';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
-import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
+
 import { readReviewAnnotationEffectDocument } from '../../../../apps/extension/src/features/video/review/annotation-effects/validation';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';

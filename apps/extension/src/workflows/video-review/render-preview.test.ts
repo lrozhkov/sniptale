@@ -910,7 +910,9 @@ it('admits the full output dissolve scratch and endpoint overlays before acquiri
   snapshot.zoomRegions = [
     {
       ...createQuickEditZoomRegion({ id: 'border', at: 2, duration: 2 }),
-      border: (await import('../../features/video/review/advanced/border')).createQuickEditBorder(),
+      border: (
+        await import('../../features/video/project/scene/focus-appearance')
+      ).createQuickEditBorder(),
     },
   ];
   const prepared = await renderer.prepare(snapshot, dimensions, new AbortController().signal);

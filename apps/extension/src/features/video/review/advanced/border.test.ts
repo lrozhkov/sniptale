@@ -1,15 +1,15 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+  parseQuickEditBorder,
+} from '../../project/scene/focus-appearance';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { expect, it } from 'vitest';
-import {
-  createQuickEditBorder,
-  evaluateQuickEditBordersAtTime,
-  parseQuickEditBorder,
-  quickEditBorderPath,
-} from './border';
+import { evaluateQuickEditBordersAtTime, quickEditBorderPath } from './border';
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
-import { createQuickEditSpotlight, evaluateQuickEditSpotlightsAtTime } from './focus';
+import { evaluateQuickEditSpotlightsAtTime } from './focus';
 import {
   quickEditFocusConflicts,
   resolveQuickEditFocusLink,

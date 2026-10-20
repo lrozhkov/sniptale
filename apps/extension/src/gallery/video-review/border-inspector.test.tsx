@@ -1,9 +1,10 @@
+import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+
 import {
   createQuickEditZoomRegion,
   updateQuickEditZoomRegion,

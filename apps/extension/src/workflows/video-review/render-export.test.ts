@@ -1,9 +1,10 @@
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { drawReviewSceneFrame } from './scene-frame';
 import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import { drawReviewSpotlights } from './render-spotlight';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';

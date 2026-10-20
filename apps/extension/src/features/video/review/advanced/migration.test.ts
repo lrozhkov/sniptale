@@ -1,4 +1,5 @@
-import { createQuickEditBorder } from './border';
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
+
 import { reviewSpeechTextSignature } from '../speech-transcript';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';

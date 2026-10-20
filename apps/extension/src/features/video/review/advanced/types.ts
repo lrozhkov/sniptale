@@ -91,32 +91,6 @@ export interface QuickEditCameraTransform {
  * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
  * matching the shared ReviewTimeMap coordinate domain.
  */
-/** An opening normalized over the decorated window; outside effects cover the composed scene. */
-export interface QuickEditSpotlight {
-  area: { x: number; y: number; width: number; height: number };
-  effect: 'dim' | 'blur';
-  strength: number;
-  blur: number;
-  roundness: number;
-  reveal: 'fade' | 'contract';
-  exitReveal: 'fade' | 'contract';
-}
-
-/** Window-normalized annotation, including decoration; transitions own immediate entrance/exit. */
-export interface QuickEditBorder {
-  area: { x: number; y: number; width: number; height: number };
-  color: string;
-  width: number;
-  roundness: number;
-  style: 'solid' | 'dashed' | 'dotted';
-  reveal: 'fade' | 'draw' | 'draw-ccw';
-  exitReveal: 'fade' | 'erase' | 'erase-ccw';
-  loop: boolean;
-  motion: 'clockwise' | 'counterclockwise' | 'pulse' | 'ripple';
-  period: number;
-  segmentPercent: number;
-}
-
 export interface QuickEditZoomRegion {
   cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   /** Explicit local camera policy; absence inherits the scene cursor-focus mode. */
@@ -134,7 +108,7 @@ export interface QuickEditZoomRegion {
   depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
   motionBlur?: MotionBlurPhases;
-  border?: QuickEditBorder;
+  border?: import('../../project/scene/focus-appearance').QuickEditBorder;
   /** Derived only; parser drops this projection clock before persistence admission. */
   borderClock?: {
     offset: number;
@@ -143,7 +117,7 @@ export interface QuickEditZoomRegion {
     enter: QuickEditZoomTransition;
     exit: QuickEditZoomTransition;
   };
-  spotlight?: QuickEditSpotlight;
+  spotlight?: import('../../project/scene/focus-appearance').QuickEditSpotlight;
   id: string;
   start: number;
   end: number;

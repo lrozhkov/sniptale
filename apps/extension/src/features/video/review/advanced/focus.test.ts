@@ -1,10 +1,11 @@
-import type { QuickEditSpotlight } from './types';
-import { expect, it } from 'vitest';
 import {
+  type QuickEditSpotlight,
   createQuickEditSpotlight,
-  evaluateQuickEditSpotlightAtTime,
   parseQuickEditSpotlight,
-} from './focus';
+} from '../../project/scene/focus-appearance';
+
+import { expect, it } from 'vitest';
+import { evaluateQuickEditSpotlightAtTime } from './focus';
 import {
   createQuickEditZoomRegion,
   resolveQuickEditZoomLink,

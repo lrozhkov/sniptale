@@ -1,6 +1,7 @@
+import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
-import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';

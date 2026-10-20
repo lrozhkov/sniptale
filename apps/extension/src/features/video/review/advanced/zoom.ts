@@ -1,3 +1,7 @@
+import {
+  type QuickEditBorder,
+  type QuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
 import { fitCameraTransitionDurations } from '../../project/motion/transitions';
 import {
   parseCameraPerspective as parseQuickEditPerspective,
@@ -9,8 +13,6 @@ import {
   resolveQuickEditFocusLink,
 } from './focus-layout';
 import type {
-  QuickEditSpotlight,
-  QuickEditBorder,
   QuickEditZoomLinkEasing,
   QuickEditZoomRegion,
   QuickEditZoomTransition,

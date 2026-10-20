@@ -68,10 +68,11 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     };
     await button('gallery.videoReview.advancedEditing').click();
     await button('gallery.videoReview.scene').click();
-    await button('gallery.videoReview.windowHeader').click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.windowHeaderBrowser'), exact: true })
-      .click();
+    await button('gallery.videoReview.windowHeaderBrowser').click();
+    await expect(button('gallery.videoReview.windowHeaderBrowser')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await button('gallery.videoReview.backgroundSolid').click();
     await number('gallery.videoReview.backgroundPadding', '8');
     await number('gallery.videoReview.backgroundShadow', '80');

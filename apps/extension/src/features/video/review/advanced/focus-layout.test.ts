@@ -1,13 +1,13 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
 import { expect, it } from 'vitest';
 import type { QuickEditZoomRegion } from './types';
 const unlink = ({ linkTo: _link, ...region }: QuickEditZoomRegion) => region;
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
-import {
-  createQuickEditSpotlight,
-  evaluateQuickEditSpotlightsAtTime,
-  evaluateQuickEditSpotlightAtTime,
-} from './focus';
-import { createQuickEditBorder } from './border';
+import { evaluateQuickEditSpotlightsAtTime, evaluateQuickEditSpotlightAtTime } from './focus';
+
 import { resolveQuickEditFocusLink } from './focus-layout';
 import { evaluateQuickEditCameraAtTime } from './scene';
 

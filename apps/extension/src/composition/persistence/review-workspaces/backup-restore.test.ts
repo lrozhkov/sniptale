@@ -1,7 +1,8 @@
+import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { annotation, workspace, snapshotDatabase } from './backup-restore.test-support';
 import { workspaceStorageHead, workspaceStorageRows } from './storage-format';
 import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
-import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';

@@ -1,10 +1,11 @@
+import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { reviewStagePickRegions, ReviewStageFocusTargets } from './stage-focus';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 it('picks the authored region after cut and speed slices, excluding cut-hidden and dormant regions', () => {

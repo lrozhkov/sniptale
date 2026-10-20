@@ -1,65 +1,7 @@
+import { type QuickEditSpotlight } from '../../project/scene/focus-appearance';
 import { resolveQuickEditFocusLink } from './focus-layout';
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { isBoundedNumber } from '../../project/validation/primitives';
 import { sampleQuickEditFocusAtTime, type QuickEditRect } from './scene';
-import type { QuickEditSpotlight, QuickEditZoomRegion } from './types';
-
-/** Validates persisted window coordinates and bounded scene effects without coercion. */
-export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | null {
-  if (!isRecord(value) || !isRecord(value['area'])) return null;
-  const area = value['area'];
-  if (
-    !isBoundedNumber(area['x'], 0, 1) ||
-    !isBoundedNumber(area['y'], 0, 1) ||
-    !isBoundedNumber(area['width'], 0.01, 1) ||
-    !isBoundedNumber(area['height'], 0.01, 1) ||
-    area['x'] + area['width'] > 1.0000001 ||
-    area['y'] + area['height'] > 1.0000001 ||
-    (value['effect'] !== 'dim' && value['effect'] !== 'blur') ||
-    !isBoundedNumber(value['strength'], 0, 1) ||
-    !isBoundedNumber(value['blur'], 0, 40) ||
-    !isBoundedNumber(value['roundness'], 0, 0.5) ||
-    (value['reveal'] !== 'fade' && value['reveal'] !== 'contract') ||
-    (value['exitReveal'] !== undefined &&
-      value['exitReveal'] !== 'fade' &&
-      value['exitReveal'] !== 'contract')
-  )
-    return null;
-  return {
-    area: { x: area['x'], y: area['y'], width: area['width'], height: area['height'] },
-    effect: value['effect'],
-    strength: value['strength'],
-    blur: value['blur'],
-    roundness: value['roundness'],
-    reveal: value['reveal'],
-    exitReveal: value['exitReveal'] ?? value['reveal'],
-  };
-}
-
-/** Stable, centered starting point for a new spotlight. */
-export function createQuickEditSpotlight(): QuickEditSpotlight {
-  return {
-    area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
-    effect: 'dim',
-    strength: 0.65,
-    blur: 12,
-    roundness: 0.04,
-    reveal: 'fade',
-    exitReveal: 'fade',
-  };
-}
-
-/** Clamp a dragged or numerically edited opening within the decorated window. */
-export function clampQuickEditSpotlightArea(area: QuickEditRect): QuickEditRect {
-  const width = Math.max(0.01, Math.min(1, area.width));
-  const height = Math.max(0.01, Math.min(1, area.height));
-  return {
-    width,
-    height,
-    x: Math.max(0, Math.min(1 - width, area.x)),
-    y: Math.max(0, Math.min(1 - height, area.y)),
-  };
-}
+import type { QuickEditZoomRegion } from './types';
 
 /** Pixel-space mask sample; blur is already scaled to the output canvas. */
 export interface QuickEditSpotlightFrame {

@@ -1,11 +1,9 @@
+import { type QuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { ReviewFocusRoundness, ReviewFocusAreaFields } from './focus-area-fields';
 import { RotateCw, RotateCcw } from 'lucide-react';
 import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
-import type {
-  QuickEditBorder,
-  QuickEditZoomRegion,
-} from '../../features/video/review/advanced/types';
+import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
 import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';

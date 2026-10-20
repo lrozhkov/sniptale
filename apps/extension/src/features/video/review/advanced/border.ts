@@ -1,77 +1,7 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { normalizePaintColor } from '@sniptale/foundation/paint';
-import { isBoundedNumber } from '../../project/validation/primitives';
-import { parseQuickEditSpotlight, createQuickEditSpotlight } from './focus';
+import { type QuickEditBorder } from '../../project/scene/focus-appearance';
 import { fitQuickEditZoomTransitions } from './zoom';
 import type { QuickEditRect } from './scene';
-import type { QuickEditBorder, QuickEditZoomRegion } from './types';
-
-/** Stable annotation defaults in authored scene pixels. */
-export function createQuickEditBorder(): QuickEditBorder {
-  return {
-    area: createQuickEditSpotlight().area,
-    color: '#ff8800ff',
-    width: 3,
-    roundness: 0.04,
-    style: 'solid',
-    reveal: 'fade',
-    exitReveal: 'fade',
-    loop: false,
-    motion: 'clockwise',
-    period: 2,
-    segmentPercent: 100,
-  };
-}
-
-/** Strict persisted annotation admission; no derived clock is accepted here. */
-export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
-  if (!isRecord(value)) return null;
-  const area = parseQuickEditSpotlight({
-    ...createQuickEditSpotlight(),
-    area: value['area'],
-  })?.area;
-  const color = typeof value['color'] === 'string' ? normalizePaintColor(value['color']) : null;
-  if (
-    !area ||
-    !color ||
-    color !== value['color'] ||
-    !isBoundedNumber(value['width'], 1, 24) ||
-    !isBoundedNumber(value['roundness'], 0, 0.5) ||
-    !isBoundedNumber(value['period'], 0.5, 20) ||
-    ('segmentPercent' in value && !isBoundedNumber(value['segmentPercent'], 1, 100)) ||
-    ('motion' in value &&
-      value['motion'] !== 'clockwise' &&
-      value['motion'] !== 'counterclockwise' &&
-      value['motion'] !== 'pulse' &&
-      value['motion'] !== 'ripple') ||
-    typeof value['loop'] !== 'boolean' ||
-    (value['style'] !== 'solid' && value['style'] !== 'dashed' && value['style'] !== 'dotted') ||
-    (value['reveal'] !== 'fade' && value['reveal'] !== 'draw' && value['reveal'] !== 'draw-ccw') ||
-    (value['exitReveal'] !== 'fade' &&
-      value['exitReveal'] !== 'erase' &&
-      value['exitReveal'] !== 'erase-ccw')
-  )
-    return null;
-  return {
-    area,
-    color,
-    width: value['width'],
-    roundness: value['roundness'],
-    period: value['period'],
-    segmentPercent: typeof value['segmentPercent'] === 'number' ? value['segmentPercent'] : 25,
-    // Retain authored history: normalizing this flag can collapse a stored toggle into a no-op.
-    loop: value['loop'],
-    motion:
-      value['motion'] === 'pulse' ||
-      value['motion'] === 'ripple' ||
-      value['motion'] === 'counterclockwise'
-        ? value['motion']
-        : 'clockwise',
-    style: value['style'],
-    reveal: value['reveal'],
-    exitReveal: value['exitReveal'],
-  };
-}
+import type { QuickEditZoomRegion } from './types';
 
 export interface QuickEditBorderFrame {
   id: string;

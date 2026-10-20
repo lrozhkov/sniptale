@@ -1,3 +1,7 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { readNativeReviewWorkspace, replaceNativeReviewWorkspace } from './native-review-workspace';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import type { Page } from '@playwright/test';
@@ -7,8 +11,7 @@ import {
   reviewAdvancedContentBaseline,
 } from '../../../../apps/extension/src/features/video/review/document';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
-import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
-import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/review/advanced/border';
+
 import type {
   ReviewEdit,
   ReviewOperation,

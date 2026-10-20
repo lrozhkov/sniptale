@@ -1,3 +1,4 @@
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { act, useContext } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
@@ -5,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 import { ReviewSpotlightInspector } from './spotlight-inspector';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
@@ -217,7 +218,8 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
 });
 
 it('keeps spotlight settings when the active type is selected again', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   const change = vi.fn();
   await act(async () =>
     root.render(
@@ -241,7 +243,8 @@ it('keeps spotlight settings when the active type is selected again', async () =
 });
 
 it('edits spotlight strength, area, reveal, rounding and blur through shared controls', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   let spotlight = createQuickEditSpotlight();
   const change = vi.fn((patch: QuickEditZoomRegionPatch) => {
     if (patch.spotlight) spotlight = patch.spotlight;
@@ -449,7 +452,8 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
 });
 
 it('preserves the source area when switching Spotlight to Border and blocks conflicting Zoom', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   const spotlight = {
     ...createQuickEditSpotlight(),
     roundness: 0.21,
@@ -490,7 +494,8 @@ it('preserves the source area when switching Spotlight to Border and blocks conf
 
 it('previews Border width without history writes, commits once, and cancels with Escape', async () => {
   const { ReviewBorderInspector } = await import('./border-inspector');
-  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const { createQuickEditBorder } =
+    await import('../../features/video/project/scene/focus-appearance');
   const onChange = vi.fn();
   const onPreview = vi.fn();
   act(() =>
@@ -618,7 +623,8 @@ it('edits only outgoing link exposure in the selected transition inspector', asy
 });
 
 it('orders spotlight roundness before precise area and makes both animation phases disclosures', async () => {
-  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const { createQuickEditSpotlight } =
+    await import('../../features/video/project/scene/focus-appearance');
   await act(async () =>
     root.render(
       <ReviewZoomInspector

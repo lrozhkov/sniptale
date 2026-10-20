@@ -1,5 +1,6 @@
+import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
-import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {

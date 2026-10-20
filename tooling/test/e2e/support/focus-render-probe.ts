@@ -1,9 +1,7 @@
+import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { createReviewSpotlightMasks } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
 import { drawReviewBorders } from '../../../../apps/extension/src/workflows/video-review/render-border';
-import {
-  createQuickEditBorder,
-  evaluateQuickEditBordersAtTime,
-} from '../../../../apps/extension/src/features/video/review/advanced/border';
+import { evaluateQuickEditBordersAtTime } from '../../../../apps/extension/src/features/video/review/advanced/border';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 
 export function probe() {

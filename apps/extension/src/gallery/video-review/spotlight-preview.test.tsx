@@ -1,3 +1,7 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { ReviewStageFocusControl } from './stage-focus';
@@ -10,7 +14,7 @@ import type {
   QuickEditWindowHeader,
 } from '../../features/video/review/advanced/types';
 import * as focusEvaluation from '../../features/video/review/advanced/focus';
-import { createQuickEditBorder } from '../../features/video/review/advanced/border';
+
 import { drawReviewBorders } from '../../workflows/video-review/render-border';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -18,7 +22,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewFocusArea } from './focus-area';
 import { ReviewSpotlightPreview } from './spotlight-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
 vi.mock('../../workflows/video-review/render-border', () => ({ drawReviewBorders: vi.fn() }));

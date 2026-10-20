@@ -1,3 +1,7 @@
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { reviewWatermarkAssets } from '../../../../apps/extension/src/workflows/video-review/asset-bytes';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import {
@@ -29,8 +33,7 @@ import {
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { createCanvasComment } from '../../../../apps/extension/src/features/video/review/comments';
-import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/review/advanced/border';
-import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/review/advanced/focus';
+
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
 import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';

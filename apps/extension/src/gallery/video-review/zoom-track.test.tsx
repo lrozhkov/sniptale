@@ -1,3 +1,4 @@
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import { act } from 'react';
@@ -8,7 +9,6 @@ import type { QuickEditZoomRegion } from '../../features/video/review/advanced/t
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createTrackProjection } from './track-projection';
 import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
 vi.mock('../../platform/i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../platform/i18n')>();
@@ -665,7 +665,8 @@ it('offers the immediate Spotlight neighbor instead of a stored link across it',
 });
 
 it('offers no Border links or camera link across an intervening camera', async () => {
-  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const { createQuickEditBorder } =
+    await import('../../features/video/project/scene/focus-appearance');
   renderTrack(
     [
       { ...zoom('a', 0, 2), border: createQuickEditBorder() },
@@ -686,7 +687,8 @@ it('offers no Border links or camera link across an intervening camera', async (
 });
 
 it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', async () => {
-  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const { createQuickEditBorder } =
+    await import('../../features/video/project/scene/focus-appearance');
   const track = renderTrack(
     [
       zoom('camera-a', 0, 2),
@@ -704,7 +706,8 @@ it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', asy
 it.each(['zoom', 'spotlight'] as const)(
   'does not offer a %s link across an installed focus of another type',
   async (kind) => {
-    const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+    const { createQuickEditBorder } =
+      await import('../../features/video/project/scene/focus-appearance');
     const endpoint = (id: string, start: number, end: number) => ({
       ...zoom(id, start, end),
       ...(kind === 'spotlight' ? { spotlight: createQuickEditSpotlight() } : {}),
