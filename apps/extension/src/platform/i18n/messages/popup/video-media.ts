@@ -33,17 +33,21 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Не удалось подтвердить доступ. Повторите запрос или откройте раздел «Разрешения» в настройках.',
     en: 'Device access could not be confirmed. Request access again or open Permissions in Settings.',
   },
-  mediaRequestAccess: {
-    ru: 'Разрешить доступ',
-    en: 'Allow access',
+  mediaPermissionsHelp: {
+    ru: 'На странице разрешений появится запрос браузера. Подтвердите доступ и вернитесь к записи.',
+    en: 'The browser will ask for access on the Permissions page. Allow access, then return to recording.',
   },
   mediaOpenPermissions: {
     ru: 'Открыть разрешения',
     en: 'Open Permissions',
   },
-  mediaRequestPending: {
-    ru: 'Запрашиваю доступ…',
-    en: 'Requesting access…',
+  mediaOpeningPermissions: {
+    ru: 'Открываю разрешения…',
+    en: 'Opening Permissions…',
+  },
+  mediaPermissionsNavigationFailed: {
+    ru: 'Не удалось открыть разрешения. Повторите попытку.',
+    en: 'Could not open Permissions. Try again.',
   },
   mediaCheckingAccess: {
     ru: 'Проверяю доступ…',

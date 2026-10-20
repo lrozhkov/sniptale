@@ -60,6 +60,45 @@ beforeEach(() => {
 });
 
 describe('extension page settings helpers', () => {
+  it.each(['microphone', 'camera'] as const)(
+    'opens a one-shot %s request on the Permissions page',
+    async (permission) => {
+      const { openSettingsPage, SETTINGS_MEDIA_ACCESS_QUERY_PARAM } = await import('./index');
+      await openSettingsPage({ route: { section: 'native-app' }, requestMediaAccess: permission });
+      const url = new URL(browserTabsCreateMock.mock.calls[0]![0].url);
+      expect(url.searchParams.get('section')).toBe('access-data');
+      expect(url.searchParams.get('view')).toBe('permissions');
+      expect(url.searchParams.getAll(SETTINGS_MEDIA_ACCESS_QUERY_PARAM)).toEqual([permission]);
+    }
+  );
+
+  it('reuses an existing Settings tab for the targeted permission request', async () => {
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9 }]);
+    const { openSettingsPage } = await import('./index');
+    await openSettingsPage({ requestMediaAccess: 'camera' });
+    expect(browserTabsUpdateMock).toHaveBeenCalledExactlyOnceWith(7, {
+      active: true,
+      url: `${SETTINGS_PAGE_URL}?section=access-data&view=permissions&requestMediaAccess=camera`,
+    });
+    expect(browserWindowsUpdateMock).toHaveBeenCalledExactlyOnceWith(9, { focused: true });
+  });
+
+  it.each([
+    ['microphone', 'chrome://settings/content/microphone'],
+    ['camera', 'chrome://settings/content/camera'],
+  ] as const)('opens the fixed %s browser permission settings', async (permission, url) => {
+    const { openMediaPermissionSettingsPage } = await import('./index');
+    await openMediaPermissionSettingsPage(permission);
+    expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({ url });
+  });
+
+  it('propagates browser permission settings navigation failure', async () => {
+    const error = new Error('navigation unavailable');
+    browserTabsCreateMock.mockRejectedValueOnce(error);
+    const { openMediaPermissionSettingsPage } = await import('./index');
+    await expect(openMediaPermissionSettingsPage('microphone')).rejects.toBe(error);
+  });
+
   it('identifies extension-owned settings page urls', expectOwnedSettingsPageIdentity);
 
   it('opens the settings page through the shared browser tabs seam', async () => {

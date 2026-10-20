@@ -11,6 +11,8 @@ import {
   type SettingsRoute,
 } from './settings-route/codec';
 
+export const SETTINGS_MEDIA_ACCESS_QUERY_PARAM = 'requestMediaAccess';
+
 export function buildSettingsPageUrl(route?: SettingsRoute): string {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/settings/index.html'));
   return route ? buildSettingsRouteUrl(url, route).toString() : url.toString();
@@ -116,8 +118,17 @@ async function openSettingsUrl(url: string): Promise<void> {
   await browserTabs.create({ url });
 }
 
-export async function openSettingsPage(options: { route?: SettingsRoute } = {}): Promise<void> {
-  await openSettingsUrl(buildSettingsPageUrl(options.route));
+export async function openSettingsPage(
+  options: { route?: SettingsRoute; requestMediaAccess?: 'microphone' | 'camera' } = {}
+): Promise<void> {
+  const route = options.requestMediaAccess
+    ? ({ section: 'access-data', view: 'permissions' } as const)
+    : options.route;
+  const url = new URL(buildSettingsPageUrl(route));
+  if (options.requestMediaAccess) {
+    url.searchParams.set(SETTINGS_MEDIA_ACCESS_QUERY_PARAM, options.requestMediaAccess);
+  }
+  await openSettingsUrl(url.toString());
 }
 
 export async function openExtensionShortcutsPage(): Promise<void> {
@@ -127,6 +138,17 @@ export async function openExtensionShortcutsPage(): Promise<void> {
 export async function openExtensionDetailsPage(): Promise<void> {
   const extensionId = new URL(runtimeInfo.getURL('')).host;
   await browserTabs.create({ url: `chrome://extensions/?id=${encodeURIComponent(extensionId)}` });
+}
+
+/** Opens the fixed browser settings surface for a blocked recording device permission. */
+export async function openMediaPermissionSettingsPage(
+  permission: 'microphone' | 'camera'
+): Promise<void> {
+  const url =
+    permission === 'microphone'
+      ? 'chrome://settings/content/microphone'
+      : 'chrome://settings/content/camera';
+  await browserTabs.create({ url });
 }
 
 export async function openLegacySettingsPage(section: LegacySettingsSection): Promise<void> {

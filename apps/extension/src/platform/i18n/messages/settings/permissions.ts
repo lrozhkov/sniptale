@@ -331,4 +331,12 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Обновить статусы',
     en: 'Refresh statuses',
   },
+  openBrowserSettingsButton: {
+    ru: 'Настройки браузера',
+    en: 'Open browser settings',
+  },
+  openBrowserSettingsFailed: {
+    ru: 'Не удалось открыть настройки браузера. Откройте настройки камеры или микрофона в браузере и разрешите доступ для Sniptale.',
+    en: 'Could not open browser settings. Open the camera or microphone settings in your browser and allow access for Sniptale.',
+  },
 });

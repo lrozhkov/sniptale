@@ -1,10 +1,15 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import type { PopupMediaDeviceOption } from '../media-devices/index';
+import type { PopupMediaDeviceOption, PopupMediaPermissionName } from '../media-devices/index';
 import type { TranslationKey } from '../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { translate } from '../../../platform/i18n/popup';
-import { getPopupMediaAccessErrorKey, PopupMediaAccessError } from '../media-devices';
+import {
+  getPopupMediaAccessErrorKey,
+  PopupMediaAccessError,
+  readPopupMediaAccessState,
+} from '../media-devices';
+import { openSettingsPage } from '../../../platform/navigation/extension-pages';
 
 type RefreshMediaDevicesParams<TDevice extends PopupMediaDeviceOption> = {
   refreshOwner: symbol;
@@ -16,6 +21,10 @@ type RefreshMediaDevicesParams<TDevice extends PopupMediaDeviceOption> = {
 };
 
 const mediaDeviceRefreshSequences = new Map<symbol, number>();
+const pendingMediaPermissionHandoffs = new WeakMap<
+  Dispatch<SetStateAction<VideoRecordingSettings>>,
+  Set<PopupMediaPermissionName>
+>();
 
 function isCurrentRefresh(owner: symbol, sequence: number): boolean {
   return mediaDeviceRefreshSequences.get(owner) === sequence;
@@ -98,6 +107,28 @@ async function acquireVerifiedMediaDevices<TDevice extends PopupMediaDeviceOptio
   return refreshDevices();
 }
 
+async function handOffMissingMediaPermission(
+  permissionName: PopupMediaPermissionName,
+  setVideoSettings: Dispatch<SetStateAction<VideoRecordingSettings>>
+): Promise<boolean> {
+  if ((await readPopupMediaAccessState(permissionName)) === 'granted') return false;
+  const pending =
+    pendingMediaPermissionHandoffs.get(setVideoSettings) ?? new Set<PopupMediaPermissionName>();
+  if (pending.has(permissionName)) return true;
+  pending.add(permissionName);
+  pendingMediaPermissionHandoffs.set(setVideoSettings, pending);
+  try {
+    await openSettingsPage({
+      route: { section: 'access-data', view: 'permissions' },
+      requestMediaAccess: permissionName,
+    });
+  } finally {
+    pending.delete(permissionName);
+    if (pending.size === 0) pendingMediaPermissionHandoffs.delete(setVideoSettings);
+  }
+  return true;
+}
+
 export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOption>(
   params: ToggleMediaDeviceParams<TDevice>
 ): Promise<void> {
@@ -123,6 +154,10 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
   setStartError(null);
 
   try {
+    const permissionName = enabledKey === 'microphoneEnabled' ? 'microphone' : 'camera';
+    if (await handOffMissingMediaPermission(permissionName, setVideoSettings)) {
+      return;
+    }
     const selectedDeviceId = videoSettings[deviceIdKey] ?? null;
     const devices = await acquireVerifiedMediaDevices(selectedDeviceId, params);
 

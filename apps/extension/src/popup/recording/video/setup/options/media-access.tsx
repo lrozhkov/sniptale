@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyRound, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
@@ -11,8 +11,6 @@ import {
   type PopupMediaAccessState,
   type PopupMediaPermissionName,
 } from '../../../media-devices';
-import { requestMicrophonePermission } from '../../../microphone';
-import { requestWebcamPermission } from '../../../webcam';
 
 function useMediaAccess(
   permissionName: PopupMediaPermissionName,
@@ -23,7 +21,7 @@ function useMediaAccess(
   const [pending, setPending] = useState(false);
   const [navigationFailed, setNavigationFailed] = useState(false);
   const mounted = useRef(false);
-  const requestPending = useRef(false);
+  const navigationPending = useRef(false);
   const observationRevision = useRef(0);
   const observedAccess = useRef<PopupMediaAccessState>('unknown');
   const onGrantedRef = useRef(onGranted);
@@ -41,11 +39,7 @@ function useMediaAccess(
       observedAccess.current = current;
       setAccess(current);
       setChecking(false);
-      if (
-        current === 'granted' &&
-        (previous === 'prompt' || previous === 'denied') &&
-        !requestPending.current
-      ) {
+      if (current === 'granted' && (previous === 'prompt' || previous === 'denied')) {
         void Promise.resolve()
           .then(() => (disposed ? undefined : onGrantedRef.current?.()))
           .catch(() => undefined);
@@ -71,51 +65,29 @@ function useMediaAccess(
     };
   }, [permissionName]);
 
-  const request = async (deviceId: string | null) => {
-    if (requestPending.current) return;
-    requestPending.current = true;
-    observationRevision.current += 1;
-    setPending(true);
-    let granted = false;
-    try {
-      if (permissionName === 'microphone') await requestMicrophonePermission(deviceId);
-      else await requestWebcamPermission(deviceId);
-      granted = true;
-      if (!mounted.current) return;
-      observationRevision.current += 1;
-      observedAccess.current = 'granted';
-      setAccess('granted');
-      await onGrantedRef.current?.();
-    } catch (error) {
-      if (mounted.current && !granted) {
-        const state = error instanceof PopupMediaAccessError ? error.state : 'unknown';
-        observedAccess.current = state;
-        setAccess(state);
-      }
-    } finally {
-      requestPending.current = false;
-      if (mounted.current) {
-        setChecking(false);
-        setPending(false);
-      }
-    }
-  };
-
   const openPermissions = async () => {
+    if (navigationPending.current) return;
+    navigationPending.current = true;
+    setPending(true);
     setNavigationFailed(false);
     try {
-      await openSettingsPage({ route: { section: 'access-data', view: 'permissions' } });
+      await openSettingsPage({
+        route: { section: 'access-data', view: 'permissions' },
+        requestMediaAccess: permissionName,
+      });
     } catch {
       if (mounted.current) setNavigationFailed(true);
+    } finally {
+      navigationPending.current = false;
+      if (mounted.current) setPending(false);
     }
   };
 
-  return { access, checking, pending, navigationFailed, request, openPermissions };
+  return { access, checking, pending, navigationFailed, openPermissions };
 }
 
 export function MediaAccessBoundary({
   children,
-  deviceId,
   enabled = true,
   label,
   onGranted,
@@ -129,8 +101,7 @@ export function MediaAccessBoundary({
   permissionName: PopupMediaPermissionName;
 }) {
   const media = useMediaAccess(permissionName, onGranted);
-  if (!enabled && media.access !== 'denied') return null;
-  if (media.access === 'granted') return children;
+  if (media.access === 'granted') return enabled ? children : null;
   const requiredKey =
     permissionName === 'microphone'
       ? 'popup.video.microphonePermissionRequired'
@@ -141,7 +112,7 @@ export function MediaAccessBoundary({
       : null;
   const message = media.checking
     ? translate('popup.video.mediaCheckingAccess')
-    : translate(!enabled ? 'popup.video.mediaAccessBlocked' : (failureKey ?? requiredKey));
+    : translate(failureKey ?? requiredKey);
 
   return (
     <div className="mt-2 min-w-0" data-ui={`popup.video.${permissionName}-access`}>
@@ -153,19 +124,10 @@ export function MediaAccessBoundary({
           {message}
         </span>
       </div>
+      <p className="mt-1 text-[11px] text-[var(--sniptale-color-text-secondary)]">
+        {translate('popup.video.mediaPermissionsHelp')}
+      </p>
       <div className="mt-1 flex min-w-0 flex-wrap gap-1">
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={media.pending}
-          onClick={() => void media.request(deviceId)}
-          data-ui={`popup.video.${permissionName}-request-access`}
-        >
-          <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-          {translate(
-            media.pending ? 'popup.video.mediaRequestPending' : 'popup.video.mediaRequestAccess'
-          )}
-        </ProductActionButton>
         <ProductActionButton
           compact
           tone="secondary"
@@ -174,12 +136,16 @@ export function MediaAccessBoundary({
           data-ui={`popup.video.${permissionName}-open-permissions`}
         >
           <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-          {translate('popup.video.mediaOpenPermissions')}
+          {translate(
+            media.pending
+              ? 'popup.video.mediaOpeningPermissions'
+              : 'popup.video.mediaOpenPermissions'
+          )}
         </ProductActionButton>
       </div>
       {media.navigationFailed ? (
         <p className="text-[11px] text-[var(--sniptale-color-text-secondary)]" role="alert">
-          {translate('popup.video.mediaAccessUnconfirmed')}
+          {translate('popup.video.mediaPermissionsNavigationFailed')}
         </p>
       ) : null}
     </div>

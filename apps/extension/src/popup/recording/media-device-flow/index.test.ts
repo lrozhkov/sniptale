@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
   VideoQuality,
@@ -18,6 +18,127 @@ import {
   requestMicrophonePermission,
   resolveMicrophoneDeviceId,
 } from '../microphone';
+
+const { readAccessStateMock, openSettingsPageMock } = vi.hoisted(() => ({
+  readAccessStateMock: vi.fn(),
+  openSettingsPageMock: vi.fn(),
+}));
+
+vi.mock('../media-devices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../media-devices')>()),
+  readPopupMediaAccessState: readAccessStateMock,
+}));
+
+vi.mock('../../../platform/navigation/extension-pages', () => ({
+  openSettingsPage: openSettingsPageMock,
+}));
+
+beforeEach(() => {
+  readAccessStateMock.mockReset().mockResolvedValue('granted');
+  openSettingsPageMock.mockReset().mockResolvedValue(undefined);
+});
+
+it.each([
+  { enabledKey: 'microphoneEnabled', deviceIdKey: 'microphoneDeviceId', kind: 'microphone' },
+  { enabledKey: 'webcamEnabled', deviceIdKey: 'webcamDeviceId', kind: 'camera' },
+] as const)(
+  'hands off non-granted $kind access without acquiring devices or changing settings',
+  async ({ enabledKey, deviceIdKey, kind }) => {
+    const settings = createSettings();
+    const setVideoSettings = vi.fn();
+    const setStartError = vi.fn();
+    const requestPermission = vi.fn();
+    const refreshDevices = vi.fn();
+    for (const state of ['prompt', 'denied', 'unknown'] as const) {
+      readAccessStateMock.mockResolvedValueOnce(state);
+      await togglePopupMediaDevice({
+        videoSettings: settings,
+        setVideoSettings,
+        setStartError,
+        requestPermission,
+        refreshDevices,
+        enabledKey,
+        deviceIdKey,
+        noDevicesError: 'no devices',
+        accessErrorKey: 'popup.video.microphoneAccessError',
+        resolveDeviceId: resolvePopupMediaDeviceId,
+      });
+      expect(readAccessStateMock).toHaveBeenLastCalledWith(kind);
+      expect(openSettingsPageMock).toHaveBeenLastCalledWith({
+        route: { section: 'access-data', view: 'permissions' },
+        requestMediaAccess: kind,
+      });
+    }
+    expect(openSettingsPageMock).toHaveBeenCalledTimes(3);
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(refreshDevices).not.toHaveBeenCalled();
+    expect(setVideoSettings).not.toHaveBeenCalled();
+    expect(setStartError.mock.calls).toEqual([[null], [null], [null]]);
+    expect(settings).toEqual(createSettings());
+  }
+);
+
+it.each([
+  { enabledKey: 'microphoneEnabled', deviceIdKey: 'microphoneDeviceId' },
+  { enabledKey: 'webcamEnabled', deviceIdKey: 'webcamDeviceId' },
+] as const)(
+  'keeps a failed $enabledKey navigation retryable without acquiring or changing the saved device',
+  async ({ enabledKey, deviceIdKey }) => {
+    readAccessStateMock.mockResolvedValue('prompt');
+    openSettingsPageMock.mockRejectedValueOnce(new Error('tab unavailable'));
+    const setVideoSettings = vi.fn();
+    const setStartError = vi.fn();
+    const requestPermission = vi.fn();
+    const params = {
+      videoSettings: createSettings(),
+      setVideoSettings,
+      setStartError,
+      requestPermission,
+      refreshDevices: vi.fn(),
+      enabledKey,
+      deviceIdKey,
+      noDevicesError: 'no devices',
+      accessErrorKey: 'popup.video.microphoneAccessError' as const,
+      resolveDeviceId: resolvePopupMediaDeviceId,
+    };
+    await togglePopupMediaDevice(params);
+    expect(setStartError).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
+    expect(setStartError).not.toHaveBeenCalledWith(expect.stringContaining('tab unavailable'));
+    await togglePopupMediaDevice(params);
+    expect(openSettingsPageMock).toHaveBeenCalledTimes(2);
+    expect(setStartError).toHaveBeenLastCalledWith(null);
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(setVideoSettings).not.toHaveBeenCalled();
+  }
+);
+
+it('opens one targeted Settings handoff for repeated clicks while navigation is pending', async () => {
+  readAccessStateMock.mockResolvedValue('prompt');
+  const navigation = createDeferred<void>();
+  openSettingsPageMock.mockReturnValueOnce(navigation.promise);
+  const params = {
+    videoSettings: createSettings(),
+    setVideoSettings: vi.fn(),
+    setStartError: vi.fn(),
+    requestPermission: vi.fn(),
+    refreshDevices: vi.fn(),
+    enabledKey: 'microphoneEnabled' as const,
+    deviceIdKey: 'microphoneDeviceId' as const,
+    noDevicesError: 'no devices',
+    accessErrorKey: 'popup.video.microphoneAccessError' as const,
+    resolveDeviceId: resolvePopupMediaDeviceId,
+  };
+  const firstClick = togglePopupMediaDevice(params);
+  await vi.waitFor(() => expect(openSettingsPageMock).toHaveBeenCalledOnce());
+  await togglePopupMediaDevice(params);
+  expect(openSettingsPageMock).toHaveBeenCalledOnce();
+  navigation.resolve();
+  await firstClick;
+  await togglePopupMediaDevice(params);
+  expect(openSettingsPageMock).toHaveBeenCalledTimes(2);
+  expect(params.setVideoSettings).not.toHaveBeenCalled();
+  expect(params.requestPermission).not.toHaveBeenCalled();
+});
 
 it.each(['granted', 'denied'] as const)(
   'verifies a replacement microphone after the saved device disappears: %s',
