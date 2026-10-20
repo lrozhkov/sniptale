@@ -73,6 +73,10 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
   });
 
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  expect(container?.textContent).not.toContain('popup.video.outputAspectNotice');
+  for (const button of container?.querySelectorAll('[role="group"] button') ?? []) {
+    expect(button.classList.contains('h-8')).toBe(true);
+  }
   const mp4Button = buttons.find((button) => button.textContent === 'MP4');
   const fourKButton = buttons.find((button) => button.textContent === '2160p (4K)');
   const manageButton = buttons.find(

@@ -16,7 +16,7 @@ import { formatKnownWebcamActualSettings } from '../../webcam-actual-settings';
 type WebcamQualityOption<TValue extends string> = { label: string; value: TValue };
 
 const QUALITY_OPTION_BASE_CLASS_NAME =
-  'min-h-7 min-w-0 flex-1 rounded-[7px] px-2 py-1 text-center text-xs font-medium transition-colors';
+  'h-8 min-h-8 min-w-0 flex-1 rounded-[6px] px-2 text-center text-xs font-normal transition-colors';
 const QUALITY_OPTION_ACTIVE_CLASS_NAME = [
   'bg-[var(--sniptale-color-surface-hover)]',
   'text-[var(--sniptale-color-text-primary)]',
@@ -105,7 +105,7 @@ export function WebcamQualityOptionGroup<TValue extends string>({
   options: Array<WebcamQualityOption<TValue>>;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-1">
       <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {translate(labelKey)}
       </div>

@@ -55,7 +55,7 @@ export function OutputSettingsPanel(props: {
   const unsupportedReason = translate('popup.video.outputResourceUnsupported');
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <OutputOptionGroup
         activeValue={outputProfile.quality}
         label={translate('popup.video.qualityLabel')}
@@ -110,14 +110,11 @@ export function OutputSettingsPanel(props: {
           {unsupportedReason}
         </p>
       )}
-      <p className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-muted-strong)]">
-        {translate('popup.video.outputAspectNotice')}
-      </p>
       <button
         type="button"
         className={[
-          'min-h-8 rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-2',
-          'text-xs font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
+          'min-h-8 rounded-[6px] px-2',
+          'text-xs font-normal text-[var(--sniptale-color-text-secondary)] transition-colors',
           'hover:bg-[var(--sniptale-color-surface-hover)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
@@ -138,7 +135,7 @@ function OutputOptionGroup<TValue extends string | number>(props: {
   options: Array<OutputOption<TValue>>;
 }) {
   return (
-    <div role="group" aria-label={props.label} className="grid gap-1.5">
+    <div role="group" aria-label={props.label} className="grid gap-1">
       <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {props.label}
       </div>
@@ -149,7 +146,7 @@ function OutputOptionGroup<TValue extends string | number>(props: {
             type="button"
             aria-pressed={option.value === props.activeValue}
             className={[
-              'min-h-8 min-w-0 max-w-full flex-[1_0_auto] rounded-[6px] px-2 py-1',
+              'h-8 min-h-8 min-w-0 max-w-full flex-[1_0_auto] rounded-[6px] px-2',
               'text-center text-xs font-normal transition-colors',
               option.value === props.activeValue
                 ? [

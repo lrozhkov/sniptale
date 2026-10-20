@@ -8,6 +8,7 @@ import { MediaStreamVideo } from '../../../../features/video/recording/media-str
 import { translate } from '../../../../platform/i18n/popup';
 import { getPopupRuntimeServices } from '../../../runtime-services';
 import type { VideoActiveMediaSelection } from './media-status';
+import { MicrophoneMeter } from '../microphone-meter';
 
 const ICE_GATHERING_TIMEOUT_MS = 3_000;
 let nextPeerGeneration = 0;
@@ -65,27 +66,17 @@ export function VideoCountdownReadiness(props: CountdownReadinessProps) {
 function CountdownMicrophoneMeter({ state }: { state: VideoRecordingRuntimeState }) {
   const activity = state.microphoneActivity;
   const ready = activity?.status === 'ready';
-  const level = ready ? Math.round(Math.max(0, Math.min(1, activity.level)) * 100) : 0;
   return (
     <div className="min-w-0">
       <div className="mb-1 text-[11px] text-[var(--sniptale-color-text-muted-strong)]">
         {translate('popup.video.countdownMicrophoneLevel')}
       </div>
       {ready ? (
-        <div
-          role="meter"
-          data-ui="popup.video-active.microphone-meter"
-          aria-label={translate('popup.video.countdownMicrophoneLevel')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={level}
-          className="h-1.5 overflow-hidden rounded-full bg-[var(--sniptale-color-border-soft)]"
-        >
-          <div
-            className="h-full bg-[var(--sniptale-color-accent)]"
-            style={{ width: `${level}%` }}
-          />
-        </div>
+        <MicrophoneMeter
+          dataUi="popup.video-active.microphone-meter"
+          label={translate('popup.video.countdownMicrophoneLevel')}
+          level={activity.level}
+        />
       ) : (
         <p className="text-[11px] text-[var(--sniptale-color-text-muted-strong)]">
           {translate('popup.video.countdownMicrophoneUnavailable')}

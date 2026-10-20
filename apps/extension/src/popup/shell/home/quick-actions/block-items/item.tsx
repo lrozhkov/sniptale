@@ -70,8 +70,7 @@ function QuickActionListItemIcon({
         'text-[var(--sniptale-color-text-secondary)]',
         'transition-[scale,color] duration-180 ease-out motion-reduce:transition-none',
         'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
-        'group-hover:text-[var(--sniptale-color-accent)]',
-        'group-focus-visible:text-[var(--sniptale-color-accent)]'
+        'motion-reduce:group-hover:scale-100 motion-reduce:group-focus-visible:scale-100'
       )}
     >
       <DynamicIcon

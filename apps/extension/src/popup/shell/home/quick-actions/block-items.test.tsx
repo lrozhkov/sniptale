@@ -84,6 +84,9 @@ it('renders enabled items across supported density variants and triggers the act
     expect(
       button?.querySelector('[data-testid="dynamic-icon"]')?.parentElement?.className
     ).toContain('group-hover:scale-110');
+    expect(
+      button?.querySelector('[data-testid="dynamic-icon"]')?.parentElement?.className
+    ).not.toContain('color-accent');
     expectDensityMeta(density);
 
     act(() => {

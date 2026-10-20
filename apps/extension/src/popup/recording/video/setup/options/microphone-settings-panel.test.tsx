@@ -197,6 +197,9 @@ it('does not commit settings when applyConstraints fails', async () => {
 
 it('patches the recording microphone gain from the settings slider', async () => {
   const { onSettingsChange } = await renderPanel();
+  expect(container?.querySelector('input[type="range"]')?.className).toContain(
+    '[--sniptale-range-track-height:3px]!'
+  );
 
   act(() => {
     const slider = container?.querySelector<HTMLInputElement>('input[type="range"]');

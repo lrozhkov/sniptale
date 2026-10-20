@@ -150,8 +150,8 @@ export const popupVideoMediaMessages = defineMessageSource({
     en: 'Auto gain',
   },
   microphoneGainLabel: {
-    ru: 'Громкость микрофона для записи',
-    en: 'Microphone volume for recording',
+    ru: 'Громкость записи',
+    en: 'Recording volume',
   },
   microphoneStatusApplied: {
     ru: 'Применено',

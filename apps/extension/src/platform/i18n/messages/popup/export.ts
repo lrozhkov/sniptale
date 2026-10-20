@@ -119,8 +119,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Package contents',
   },
   dataTypesSectionDescription: {
-    ru: 'Выберите веб-копию, данные, файлы и диагностику для пакета.',
-    en: 'Choose the Web copy, data, files, and diagnostics for the package.',
+    ru: 'Веб-копия, данные, файлы и диагностика.',
+    en: 'Web copy, data, files, and diagnostics.',
   },
   settingsAction: { ru: 'Настройка', en: 'Settings' },
   packageCaptureSettingsTitle: {
@@ -128,16 +128,16 @@ export const popupExportMessages = defineMessageSource({
     en: 'Snapshot settings',
   },
   packageCaptureSettingsDescription: {
-    ru: 'Настройте подготовку страницы и безопасные пределы вложений.',
-    en: 'Configure page preparation and safe attachment limits.',
+    ru: 'Подготовка страницы и лимиты файлов.',
+    en: 'Page preparation and file limits.',
   },
   captureLazyContentLabel: {
     ru: 'Загружать содержимое при прокрутке',
     en: 'Load content while scrolling',
   },
   captureLazyContentDescription: {
-    ru: 'Предварительно пройти страницу, чтобы появились отложенные изображения и блоки.',
-    en: 'Warm up the page so deferred images and sections can appear.',
+    ru: 'Прокрутить страницу перед снимком.',
+    en: 'Scroll the page before capture.',
   },
   captureFreezeMotionLabel: {
     ru: 'Остановить анимации',
@@ -175,8 +175,8 @@ export const popupExportMessages = defineMessageSource({
   resourceLimitTotalSizeLabel: { ru: 'Общий размер', en: 'Total size' },
   resourceLimitMiB: { ru: 'МБ', en: 'MiB' },
   resourceLimitsHelp: {
-    ru: 'Ресурсы сверх лимита пропускаются с предупреждением, а пакет продолжает собираться.',
-    en: 'Resources over a limit are skipped with a warning while package creation continues.',
+    ru: 'Файлы сверх лимита пропускаются с предупреждением.',
+    en: 'Files over a limit are skipped with a warning.',
   },
   packageDestinationHtml: { ru: 'Скачать HTML', en: 'Download HTML' },
   packageDestinationHtmlDescription: {
@@ -207,8 +207,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Download the complete page package as a ZIP archive.',
   },
   packageDestinationDownloadShortDescription: {
-    ru: 'Полный пакет ZIP',
-    en: 'Complete ZIP package',
+    ru: 'Для хранения и обмена',
+    en: 'Keep or share the files',
   },
   packageDestinationLibrary: {
     ru: 'В библиотеку',
@@ -219,8 +219,8 @@ export const popupExportMessages = defineMessageSource({
     en: 'Save the Web copy and open the Web Snapshot.',
   },
   packageDestinationLibraryShortDescription: {
-    ru: 'Снимок в библиотеке',
-    en: 'Snapshot in Library',
+    ru: 'Вернуться к странице позже',
+    en: 'Revisit the page later',
   },
   packagePresetLabel: {
     ru: 'Быстрый выбор',
@@ -449,16 +449,16 @@ export const popupExportMessages = defineMessageSource({
     en: 'Attachments',
   },
   includeFilesDescription: {
-    ru: 'Явные ссылки скачивания и поддерживаемые вложения страницы',
-    en: 'Explicit download links and supported page attachments',
+    ru: 'Ссылки скачивания и поддерживаемые вложения',
+    en: 'Download links and supported attachments',
   },
   includeImagesLabel: {
     ru: 'Изображения',
     en: 'Images',
   },
   includeImagesDescription: {
-    ru: 'Обычные изображения и оригиналы из поддерживаемых превью',
-    en: 'Ordinary images and originals from supported previews',
+    ru: 'Изображения и доступные оригиналы превью',
+    en: 'Images and available preview originals',
   },
   includeBasicLogsLabel: {
     ru: 'Журнал экспорта',

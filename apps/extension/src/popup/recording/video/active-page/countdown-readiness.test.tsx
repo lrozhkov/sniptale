@@ -138,7 +138,7 @@ afterEach(() => {
 
 it('shows the microphone level and negotiates a receive-only camera from the prepared capability', async () => {
   await render();
-  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('45');
+  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('88');
   expect(sendRuntimeMessage).toHaveBeenCalledWith({ type: VideoMessageType.GET_RECORDING_STATE });
   const peer = requiredAt(MockPeer.instances, 0);
   expect(peer.addTransceiver).toHaveBeenCalledExactlyOnceWith('video', { direction: 'recvonly' });
@@ -164,7 +164,7 @@ it('updates signal values without restarting the camera peer', async () => {
       microphoneActivity: { status: 'ready', level: 0.8, warning: false },
     },
   });
-  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('80');
+  expect(container.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('97');
   expect(MockPeer.instances).toHaveLength(1);
   expect(offerCalls()).toHaveLength(1);
 });

@@ -52,7 +52,7 @@ export function WebcamSettingsPanel({
   };
 
   return (
-    <div className="grid gap-2.5">
+    <div className="grid gap-2">
       {embeddedPresentationAvailable && presentation ? (
         <WebcamPlacementControl presentation={presentation} onChange={updatePresentation} />
       ) : null}
@@ -66,7 +66,7 @@ export function WebcamSettingsPanel({
           onChange={updatePresentation}
         />
       ) : null}
-      <div className="text-[11px] font-medium text-[var(--sniptale-color-text-secondary)]">
+      <div className="text-[11px] font-normal text-[var(--sniptale-color-text-secondary)]">
         {formatActualSettings(previewState.settings)}
       </div>
       <WebcamQualityOptionGroup
@@ -121,7 +121,7 @@ function WebcamEmbeddedPresentationControls({
   onChange: (patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>) => void;
 }) {
   return (
-    <div className="grid gap-2.5 border-b border-[var(--sniptale-color-border-soft)] pb-2.5">
+    <div className="grid gap-2 border-b border-[var(--sniptale-color-border-soft)] pb-2">
       <WebcamQualityOptionGroup
         activeValue={presentation.shape}
         labelKey="popup.video.webcamPresentationShapeLabel"
@@ -174,19 +174,20 @@ function WebcamPresentationRange(props: {
   value: number;
 }) {
   return (
-    <label className="grid gap-1.5">
+    <label className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-x-3">
       <span
         className={[
-          'flex items-center justify-between gap-2 text-[10px] font-medium',
-          'text-[var(--sniptale-color-text-muted-strong)]',
+          'col-span-2 text-xs font-normal leading-4',
+          'text-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
       >
-        <span>{props.label}</span>
-        <span className="tabular-nums text-[var(--sniptale-color-text-primary)]">
-          {props.value}%
-        </span>
+        {props.label}
       </span>
       <ProductRange
+        className={[
+          '[--sniptale-range-shell-height:28px]! [--sniptale-range-track-height:3px]!',
+          '[--sniptale-range-thumb-size:14px]!',
+        ].join(' ')}
         min={String(props.min)}
         max={String(props.max)}
         step="1"
@@ -194,6 +195,9 @@ function WebcamPresentationRange(props: {
         aria-label={props.label}
         onChange={(event) => props.onChange(Number(event.currentTarget.value))}
       />
+      <span className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+        {props.value}%
+      </span>
     </label>
   );
 }

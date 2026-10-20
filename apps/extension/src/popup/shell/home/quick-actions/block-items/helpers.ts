@@ -12,13 +12,13 @@ interface QuickActionItemState {
 
 export const disabledQuickActionListItemClassName = [
   'cursor-not-allowed',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]',
+  'bg-transparent',
   'text-[var(--sniptale-color-text-dim)]',
   'opacity-55',
 ].join(' ');
 
 export const enabledQuickActionListItemClassName = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_88%,transparent)]',
+  'bg-transparent',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
