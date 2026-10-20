@@ -83,7 +83,6 @@ function VideoRecordingSurfaceSlot(props: {
       />
       <EmbeddedRecordingCamera
         enabled={Boolean(
-          videoMode &&
           recording?.state.surfaceSessionId &&
           recording.state.cameraEnabled &&
           !recording.state.cameraPreviewSuppressed &&
