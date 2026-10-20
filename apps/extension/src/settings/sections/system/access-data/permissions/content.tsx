@@ -291,6 +291,7 @@ function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
 export function PermissionsSectionContent(props: {
   onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
   mediaNavigationFailed?: boolean;
+  mediaEnableFailed?: boolean;
   onRefresh: () => void;
   onRequestPermission: (id: string) => void;
   onRevokePermission?: (id: string) => void;
@@ -322,6 +323,11 @@ export function PermissionsSectionContent(props: {
           {props.mediaNavigationFailed ? (
             <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
               {translate('settings.permissions.openBrowserSettingsFailed')}
+            </p>
+          ) : null}
+          {props.mediaEnableFailed ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('settings.permissions.enableRecordingDeviceFailed')}
             </p>
           ) : null}
           <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />

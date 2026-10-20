@@ -38,7 +38,8 @@ function createPermission(id: string, state: PermissionInfo['state']): Permissio
 async function renderContent(
   view: 'optional' | 'required' = 'optional',
   permissions?: PermissionInfo[],
-  mediaNavigationFailed = false
+  mediaNavigationFailed = false,
+  mediaEnableFailed = false
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -68,6 +69,7 @@ async function renderContent(
           onRefresh={onRefresh}
           onOpenMediaSettings={onOpenMediaSettings}
           mediaNavigationFailed={mediaNavigationFailed}
+          mediaEnableFailed={mediaEnableFailed}
           onRequestPermission={onRequestPermission}
           onRevokePermission={onRevokePermission}
           view={view}
@@ -81,6 +83,14 @@ async function renderContent(
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+});
+
+it('shows localized recording enable failure with granted permission intact', async () => {
+  await renderContent('optional', [createPermission('microphone', 'granted')], false, true);
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'settings.permissions.enableRecordingDeviceFailed'
+  );
+  expect(container?.textContent).toContain('settings.permissions.statusGranted');
 });
 
 it.each(['microphone', 'camera'])('offers browser recovery for denied %s', async (permission) => {

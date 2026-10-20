@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   requestCamera: vi.fn(),
   openSettings: vi.fn(),
 }));
-vi.mock('../../../../../platform/i18n/popup', () => ({ translate: (key: string) => key }));
 vi.mock('../../../../../platform/navigation/extension-pages', () => ({
   openSettingsPage: mocks.openSettings,
 }));
@@ -23,10 +22,11 @@ vi.mock('../../../media-devices', async (importOriginal) => ({
 vi.mock('../../../microphone', () => ({ requestMicrophonePermission: mocks.requestMicrophone }));
 vi.mock('../../../webcam', () => ({ requestWebcamPermission: mocks.requestCamera }));
 import { MediaAccessBoundary } from './media-access';
+import type { PopupMediaAccessState } from '../../../media-devices';
 
 let root: Root;
 let container: HTMLDivElement;
-let change: (state: 'granted' | 'denied' | 'prompt') => void;
+let change: (state: PopupMediaAccessState) => void;
 let unsubscribe: () => void;
 
 beforeEach(() => {
@@ -38,7 +38,6 @@ beforeEach(() => {
     change = listener;
     return unsubscribe;
   });
-  mocks.openSettings.mockResolvedValue(undefined);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -53,115 +52,68 @@ async function render(node: ReactNode) {
 }
 function boundary(permissionName: 'microphone' | 'camera', onGranted = vi.fn(), enabled = true) {
   return (
-    <MediaAccessBoundary
-      permissionName={permissionName}
-      deviceId="saved-device"
-      label={permissionName}
-      enabled={enabled}
-      onGranted={onGranted}
-    >
+    <MediaAccessBoundary permissionName={permissionName} enabled={enabled} onGranted={onGranted}>
       <span data-ready>Selected device</span>
     </MediaAccessBoundary>
   );
 }
-async function openPermissions(permissionName: 'microphone' | 'camera') {
-  await act(async () =>
-    container
-      .querySelector<HTMLButtonElement>(
-        `[data-ui="popup.video.${permissionName}-open-permissions"]`
-      )
-      ?.click()
-  );
-}
 
 it.each(['microphone', 'camera'] as const)(
-  'keeps navigation-only recovery visible for a disabled %s with prompt access',
+  'renders no permission notice or recovery action for %s',
   async (permissionName) => {
-    await render(boundary(permissionName, vi.fn(), false));
-    expect(container.querySelector('button')).not.toBeNull();
-    await openPermissions(permissionName);
-    expect(mocks.openSettings).toHaveBeenCalledWith({
-      route: { section: 'access-data', view: 'permissions' },
-      requestMediaAccess: permissionName,
-    });
+    for (const enabled of [false, true]) {
+      for (const access of [
+        'prompt',
+        'denied',
+        'unknown',
+        'no-device',
+        'device-busy',
+        'unavailable',
+      ]) {
+        mocks.read.mockResolvedValue(access);
+        await render(
+          <div key={`${enabled}-${access}`}>{boundary(permissionName, vi.fn(), enabled)}</div>
+        );
+        expect(container.textContent).toBe('');
+        expect(
+          container.querySelector('button, [role="status"], [role="alert"], [data-ui]')
+        ).toBeNull();
+      }
+    }
+    expect(mocks.openSettings).not.toHaveBeenCalled();
     expect(mocks.requestMicrophone).not.toHaveBeenCalled();
     expect(mocks.requestCamera).not.toHaveBeenCalled();
-    expect(container.querySelector('[data-ready]')).toBeNull();
   }
 );
-it('offers only Settings navigation rather than an ineffective popup capture request', async () => {
-  await render(boundary('microphone'));
-  expect(container.querySelectorAll('button')).toHaveLength(1);
-  expect(container.querySelector('[data-ui="popup.video.microphone-request-access"]')).toBeNull();
-  expect(container.textContent).toContain('popup.video.mediaPermissionsHelp');
-  expect(container.textContent).toContain('popup.video.microphonePermissionRequired');
-  await openPermissions('microphone');
-  expect(container.querySelector('[data-ready]')).toBeNull();
-  expect(mocks.requestMicrophone).not.toHaveBeenCalled();
-});
-it('preserves a blocked camera selection while navigating to Permissions', async () => {
-  mocks.read.mockResolvedValue('denied');
-  const refresh = vi.fn();
-  await render(boundary('camera', refresh));
-  expect(container.textContent).toContain('popup.video.cameraPermissionDenied');
-  await openPermissions('camera');
-  expect(refresh).not.toHaveBeenCalled();
-  expect(mocks.requestCamera).not.toHaveBeenCalled();
-  expect(container.querySelector('[data-ready]')).toBeNull();
-});
+it.each(['microphone', 'camera'] as const)(
+  'keeps disabled %s invisible even with granted access',
+  async (permissionName) => {
+    mocks.read.mockResolvedValue('granted');
+    await render(boundary(permissionName, vi.fn(), false));
+    expect(container.childElementCount).toBe(0);
+  }
+);
 it('keeps disabled devices off after an external grant', async () => {
   mocks.read.mockResolvedValue('denied');
   const refresh = vi.fn().mockResolvedValue(undefined);
   await render(boundary('microphone', refresh, false));
   await act(async () => change('granted'));
   expect(refresh).toHaveBeenCalledOnce();
-  expect(container.querySelector('[data-ready]')).toBeNull();
-  expect(container.textContent).toBe('');
+  expect(container.childElementCount).toBe(0);
   expect(mocks.requestMicrophone).not.toHaveBeenCalled();
 });
-it('keeps disabled unknown access actionable and contains navigation failure with retry', async () => {
-  mocks.read.mockResolvedValue('unknown');
-  mocks.openSettings.mockRejectedValueOnce(new Error('private failure'));
-  await render(boundary('camera', vi.fn(), false));
-  await openPermissions('camera');
-  expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-    'popup.video.mediaPermissionsNavigationFailed'
-  );
-  expect(container.textContent).not.toContain('private failure');
-  await openPermissions('camera');
-  expect(mocks.openSettings).toHaveBeenCalledTimes(2);
-  expect(container.querySelector('[role="alert"]')).toBeNull();
-  expect(mocks.requestCamera).not.toHaveBeenCalled();
-});
-it('prevents duplicate navigation and exposes pending state until completion', async () => {
-  let finishNavigation!: () => void;
-  mocks.openSettings.mockReturnValue(
-    new Promise<void>((resolve) => {
-      finishNavigation = resolve;
-    })
-  );
-  await render(boundary('camera'));
-  await openPermissions('camera');
-  expect(container.querySelector('button')?.disabled).toBe(true);
-  expect(container.textContent).toContain('popup.video.mediaOpeningPermissions');
-  await openPermissions('camera');
-  expect(mocks.openSettings).toHaveBeenCalledOnce();
-  await act(async () => finishNavigation());
-  expect(container.querySelector('button')?.disabled).toBe(false);
-});
-it('keeps navigation available even while the initial permission query is unresolved', async () => {
+it('renders nothing while the initial permission query is unresolved', async () => {
   mocks.read.mockReturnValue(new Promise(() => undefined));
-  await render(boundary('camera', vi.fn(), false));
-  expect(container.textContent).toContain('popup.video.mediaCheckingAccess');
-  await openPermissions('camera');
-  expect(mocks.openSettings).toHaveBeenCalledOnce();
+  await render(boundary('camera'));
+  expect(container.childElementCount).toBe(0);
+  expect(mocks.openSettings).not.toHaveBeenCalled();
 });
 it('refreshes on browser permission changes and focus without starting a request', async () => {
   mocks.read.mockResolvedValue('granted');
   await render(boundary('microphone'));
   expect(container.querySelector('[data-ready]')).not.toBeNull();
   act(() => change('denied'));
-  expect(container.querySelector('[data-ready]')).toBeNull();
+  expect(container.childElementCount).toBe(0);
   mocks.read.mockResolvedValue('granted');
   await act(async () => window.dispatchEvent(new Event('focus')));
   expect(container.querySelector('[data-ready]')).not.toBeNull();
@@ -193,6 +145,13 @@ it('retains an external grant when advisory inventory refresh fails', async () =
   expect(container.querySelector('[data-ready]')).not.toBeNull();
   expect(refresh).toHaveBeenCalledOnce();
 });
+it('retains granted access when a later advisory read is unknown', async () => {
+  mocks.read.mockResolvedValue('granted');
+  await render(boundary('camera'));
+  mocks.read.mockResolvedValue('unknown');
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(container.querySelector('[data-ready]')).not.toBeNull();
+});
 it('ignores an older permission query that finishes after a permission change', async () => {
   let finishRead!: (state: string) => void;
   mocks.read.mockReturnValue(
@@ -205,27 +164,21 @@ it('ignores an older permission query that finishes after a permission change', 
   await act(async () => finishRead('denied'));
   expect(container.querySelector('[data-ready]')).not.toBeNull();
 });
-it('retires delayed subscriptions and ignores navigation that completes after unmount', async () => {
+it('retires delayed subscriptions and ignores permission changes after unmount', async () => {
   let finishSubscription!: (stop: () => void) => void;
-  let finishNavigation!: () => void;
-  mocks.subscribe.mockReturnValue(
-    new Promise<() => void>((resolve) => {
+  mocks.subscribe.mockImplementation((_kind, listener) => {
+    change = listener;
+    return new Promise<() => void>((resolve) => {
       finishSubscription = resolve;
-    })
-  );
-  mocks.openSettings.mockReturnValue(
-    new Promise<void>((_resolve, reject) => {
-      finishNavigation = () => reject(new Error('navigation failed'));
-    })
-  );
+    });
+  });
   const refresh = vi.fn();
   await render(boundary('microphone', refresh));
-  await openPermissions('microphone');
   act(() => root.unmount());
   root = createRoot(container);
   await act(async () => {
     finishSubscription(unsubscribe);
-    finishNavigation();
+    change('granted');
     window.dispatchEvent(new Event('focus'));
   });
   expect(unsubscribe).toHaveBeenCalledOnce();

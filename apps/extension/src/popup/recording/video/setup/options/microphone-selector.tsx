@@ -21,9 +21,7 @@ export function VideoMicrophoneSelector({
 }) {
   return (
     <MediaAccessBoundary
-      deviceId={settings.microphoneDeviceId}
       enabled={settings.microphoneEnabled}
-      label={translate('popup.video.microphoneRowLabel')}
       permissionName="microphone"
       onGranted={onRefreshDevices}
     >

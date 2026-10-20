@@ -4,13 +4,24 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { startRecordingHandler } from './start-recording';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-const { openCameraRecorderPage, requestMicrophonePermission, requestWebcamPermission } = vi.hoisted(
-  () => ({
-    openCameraRecorderPage: vi.fn(),
-    requestMicrophonePermission: vi.fn(),
-    requestWebcamPermission: vi.fn(),
-  })
-);
+const {
+  openCameraRecorderPage,
+  openSettingsPage,
+  readPopupMediaAccessState,
+  requestMicrophonePermission,
+  requestWebcamPermission,
+} = vi.hoisted(() => ({
+  openCameraRecorderPage: vi.fn(),
+  openSettingsPage: vi.fn(),
+  readPopupMediaAccessState: vi.fn(),
+  requestMicrophonePermission: vi.fn(),
+  requestWebcamPermission: vi.fn(),
+}));
+
+vi.mock('../../recording/media-devices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/media-devices')>()),
+  readPopupMediaAccessState,
+}));
 
 vi.mock('../../recording/microphone', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../recording/microphone')>()),
@@ -25,6 +36,7 @@ vi.mock('../../recording/webcam', async (importOriginal) => ({
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages')>()),
   openCameraRecorderPage,
+  openSettingsPage,
 }));
 
 const defaultSettings = {
@@ -87,6 +99,8 @@ function buildStartMessage(captureMode: CaptureMode, viewportPresetId: string | 
 
 function resetStartRecordingMocks() {
   vi.clearAllMocks();
+  readPopupMediaAccessState.mockReset().mockResolvedValue('granted');
+  openSettingsPage.mockReset().mockResolvedValue(undefined);
   installChromeMocks();
 }
 
@@ -252,6 +266,82 @@ async function verifiesControlledCursorPreservedForTabCapture() {
 
 function runStartRecordingHandlerSuite() {
   beforeEach(resetStartRecordingMocks);
+
+  it.each([
+    { captureMode: CaptureMode.TAB, permissionName: 'microphone', state: 'prompt' },
+    { captureMode: CaptureMode.CAMERA, permissionName: 'microphone', state: 'denied' },
+    { captureMode: CaptureMode.TAB, permissionName: 'camera', state: 'unknown' },
+    { captureMode: CaptureMode.CAMERA, permissionName: 'camera', state: 'prompt' },
+  ])(
+    'opens Settings for missing $permissionName access in $captureMode mode',
+    async ({ captureMode, permissionName, state }) => {
+      let resolveAccess: ((value: string) => void) | undefined;
+      readPopupMediaAccessState.mockReturnValueOnce(
+        new Promise<string>((resolve) => {
+          resolveAccess = resolve;
+        })
+      );
+      const completion = startRecordingHandler(
+        createStartArgs({
+          captureMode,
+          videoSettings: {
+            ...defaultSettings,
+            microphoneEnabled: permissionName === 'microphone',
+            webcamEnabled: captureMode !== CaptureMode.CAMERA,
+          },
+        })
+      );
+      expect(openSettingsPage).not.toHaveBeenCalled();
+      expect(runtimeSendMessage).not.toHaveBeenCalled();
+      resolveAccess?.(state);
+      await completion;
+      expect(readPopupMediaAccessState).toHaveBeenCalledExactlyOnceWith(permissionName);
+      expect(openSettingsPage).toHaveBeenCalledExactlyOnceWith({
+        requestMediaAccess: permissionName,
+        route: { section: 'access-data', view: 'permissions' },
+      });
+      expect(requestMicrophonePermission).not.toHaveBeenCalled();
+      expect(requestWebcamPermission).not.toHaveBeenCalled();
+      expect(runtimeSendMessage).not.toHaveBeenCalled();
+      expect(openCameraRecorderPage).not.toHaveBeenCalled();
+      expect(setIsStartPending).not.toHaveBeenCalledWith(true);
+      expect(setStartError).not.toHaveBeenCalled();
+    }
+  );
+
+  it('shows a start error when permission recovery navigation fails', async () => {
+    readPopupMediaAccessState.mockResolvedValueOnce('denied');
+    openSettingsPage.mockRejectedValueOnce(new Error('navigation failed'));
+    await startRecordingHandler(
+      createStartArgs({
+        videoSettings: { ...defaultSettings, microphoneEnabled: true },
+      })
+    );
+    expect(openSettingsPage).toHaveBeenCalledTimes(1);
+    expect(requestMicrophonePermission).not.toHaveBeenCalled();
+    expect(runtimeSendMessage).not.toHaveBeenCalled();
+    expect(setIsStartPending).toHaveBeenCalledWith(false);
+    expect(setRecordingControlCapability).toHaveBeenCalledWith(null);
+    expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  });
+
+  it('checks camera access before acquiring an already granted microphone', async () => {
+    readPopupMediaAccessState.mockResolvedValueOnce('granted').mockResolvedValueOnce('denied');
+    await startRecordingHandler(
+      createStartArgs({
+        videoSettings: { ...defaultSettings, microphoneEnabled: true, webcamEnabled: true },
+      })
+    );
+    expect(readPopupMediaAccessState.mock.calls).toEqual([['microphone'], ['camera']]);
+    expect(openSettingsPage).toHaveBeenCalledExactlyOnceWith({
+      requestMediaAccess: 'camera',
+      route: { section: 'access-data', view: 'permissions' },
+    });
+    expect(requestMicrophonePermission).not.toHaveBeenCalled();
+    expect(requestWebcamPermission).not.toHaveBeenCalled();
+    expect(runtimeSendMessage).not.toHaveBeenCalled();
+    expect(setIsStartPending).not.toHaveBeenCalledWith(true);
+  });
 
   it('preserves selected devices while permission redacts the inventory', async () => {
     await startRecordingHandler(

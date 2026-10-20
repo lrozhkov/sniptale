@@ -339,4 +339,8 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Не удалось открыть настройки браузера. Откройте настройки камеры или микрофона в браузере и разрешите доступ для Sniptale.',
     en: 'Could not open browser settings. Open the camera or microphone settings in your browser and allow access for Sniptale.',
   },
+  enableRecordingDeviceFailed: {
+    ru: 'Не удалось включить устройство для записи. Откройте панель записи и включите микрофон или камеру ещё раз.',
+    en: 'Could not enable the recording device. Open the recording panel and turn on the microphone or camera again.',
+  },
 });

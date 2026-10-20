@@ -28,9 +28,7 @@ export function VideoWebcamSelector({
 }) {
   return (
     <MediaAccessBoundary
-      deviceId={settings.webcamDeviceId ?? null}
       enabled={settings.webcamEnabled || required}
-      label={translate('popup.video.webcamRowLabel')}
       permissionName="camera"
       onGranted={onRefreshDevices}
     >

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext, type CDPSession } from '@playwright/test';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -11,6 +11,274 @@ import {
 } from '../support/recording-action';
 
 const START = '[data-ui="popup.video-setup.start-recording-button"]';
+const PERMISSION_NOTICES =
+  '[data-ui$="-access"], [data-ui$="-open-permissions"], [data-ui$="-request-access"]';
+
+function deviceToggle(name: 'microphone' | 'camera') {
+  return `button[data-ui="popup.icon-state-button"][aria-label="${name === 'microphone' ? 'Microphone' : 'Camera'}"]`;
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const name of ['microphone', 'camera'] as const) {
+    test(`action popup enables only ${name} after a native Settings grant ${viewport.name}`, async ({}, info) => {
+      const launched = await launchExtensionBrowser({
+        viewport: viewport.size,
+        fakeMediaDevices: true,
+        autoGrantMediaPermissions: false,
+      });
+      const { context, browser, extensionId } = launched;
+      const session = await browser.newBrowserCDPSession();
+      const origin = `chrome-extension://${extensionId}`;
+      const preferences = {
+        ...DEFAULT_VIDEO_SETTINGS,
+        microphoneEnabled: false,
+        webcamEnabled: false,
+        microphoneDeviceId: 'saved-microphone',
+        webcamDeviceId: 'saved-camera',
+        systemAudioEnabled: false,
+        microphoneGain: 0.75,
+        countdownSeconds: 5,
+      };
+      try {
+        for (const permission of ['microphone', 'camera']) {
+          await session.send('Browser.setPermission', {
+            origin,
+            permission: { name: permission },
+            setting: 'prompt',
+          });
+        }
+        const seed = await openRealPopup(context, extensionId);
+        await seed.evaluate(async (settings) => {
+          await chrome.storage.local.set({
+            sniptale_video_settings: settings,
+            sniptale_video_ui_state: { captureMode: 'SCREEN', viewportPresetId: null },
+            'sniptale-locale-preference': 'en',
+          });
+        }, preferences);
+        await seed.close();
+        await context.addInitScript(() => {
+          const original = navigator.mediaDevices?.getUserMedia.bind(navigator.mediaDevices);
+          if (!original) return;
+          Reflect.set(globalThis, '__permissionRequests', []);
+          Reflect.set(globalThis, '__nativePermissionGranted', false);
+          const gate = new Promise<void>((resolve) => {
+            Reflect.set(globalThis, '__releasePermissionRequest', resolve);
+          });
+          navigator.mediaDevices.getUserMedia = async (constraints) => {
+            const requests: unknown = Reflect.get(globalThis, '__permissionRequests');
+            if (Array.isArray(requests)) {
+              requests.push({
+                audio: Boolean(constraints?.audio),
+                video: Boolean(constraints?.video),
+              });
+            }
+            await gate;
+            const stream = await original(constraints);
+            Reflect.set(
+              globalThis,
+              '__nativePermissionGranted',
+              stream.getTracks().some((track) => track.readyState === 'live')
+            );
+            return stream;
+          };
+        });
+        const target = await context.newPage();
+        await target.goto('about:blank');
+        await target.bringToFront();
+        const popupTarget = await triggerExtensionAction(context, extensionId, target);
+        await clickPopupControl(
+          context,
+          session,
+          popupTarget,
+          '[data-ui="popup.app.tabs"] button[data-page="video"]'
+        );
+        expect(
+          await evaluateInTarget(
+            context,
+            popupTarget,
+            `document.querySelectorAll(${JSON.stringify(PERMISSION_NOTICES)}).length`
+          )
+        ).toBe(0);
+        const opened = context.waitForEvent('page');
+        await clickPopupControl(context, session, popupTarget, deviceToggle(name));
+        const settings = await opened;
+        await settings.waitForURL(/settings.*permissions/);
+        await expect
+          .poll(() => settings.evaluate(() => Reflect.get(globalThis, '__permissionRequests')))
+          .toEqual([{ audio: name === 'microphone', video: name === 'camera' }]);
+        expect(
+          await settings.evaluate(
+            async () =>
+              (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+          )
+        ).toEqual(preferences);
+        await session.send('Browser.setPermission', {
+          origin,
+          permission: { name },
+          setting: 'granted',
+        });
+        await settings.evaluate(() => {
+          const release: unknown = Reflect.get(globalThis, '__releasePermissionRequest');
+          if (typeof release !== 'function')
+            throw new Error('Native permission request gate is unavailable');
+          release();
+        });
+        await expect
+          .poll(() => settings.evaluate(() => Reflect.get(globalThis, '__nativePermissionGranted')))
+          .toBe(true);
+        const enabledPreferences = {
+          ...preferences,
+          [name === 'microphone' ? 'microphoneEnabled' : 'webcamEnabled']: true,
+        };
+        await expect
+          .poll(() =>
+            settings.evaluate(
+              async () =>
+                (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+            )
+          )
+          .toEqual(enabledPreferences);
+        await expect(
+          settings
+            .locator(`[data-ui="settings.permissions.${name}"]`)
+            .getByText('Granted', { exact: true })
+        ).toBeVisible();
+        await settings.screenshot({
+          path: info.outputPath(`native-${name}-grant-settings.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await target.bringToFront();
+        const reopenedTarget = await triggerExtensionAction(context, extensionId, target);
+        await clickPopupControl(
+          context,
+          session,
+          reopenedTarget,
+          '[data-ui="popup.app.tabs"] button[data-page="video"]'
+        );
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              reopenedTarget,
+              `document.querySelector(${JSON.stringify(deviceToggle(name))})?.getAttribute('aria-pressed')`
+            )
+          )
+          .toBe('true');
+        const otherName = name === 'microphone' ? 'camera' : 'microphone';
+        expect(
+          await evaluateInTarget(
+            context,
+            reopenedTarget,
+            `document.querySelector(${JSON.stringify(deviceToggle(otherName))})?.getAttribute('aria-pressed')`
+          )
+        ).toBe('false');
+        expect(
+          await evaluateInTarget(
+            context,
+            reopenedTarget,
+            `document.querySelectorAll(${JSON.stringify(PERMISSION_NOTICES)}).length`
+          )
+        ).toBe(0);
+        expect(await sendRuntimeMessage(settings, { type: 'GET_RECORDING_STATE' })).toMatchObject({
+          success: true,
+          state: { status: 'IDLE' },
+        });
+        expect(
+          await settings.evaluate(
+            async () =>
+              (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+          )
+        ).toEqual(enabledPreferences);
+        await settings.bringToFront();
+        const popup = await openRealPopup(context, extensionId);
+        await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
+        await expect(popup.locator(deviceToggle(name))).toHaveAttribute('aria-pressed', 'true');
+        await expect(popup.locator(PERMISSION_NOTICES)).toHaveCount(0);
+        await popup.screenshot({
+          path: info.outputPath(`native-${name}-grant-reopened-popup.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+      } finally {
+        await session.detach();
+        await closeExtensionBrowser(launched);
+      }
+    });
+  }
+}
+
+async function clickPopupControl(
+  context: BrowserContext,
+  session: CDPSession,
+  popupTarget: string,
+  selector: string
+) {
+  await expect
+    .poll(() =>
+      evaluateInTarget(
+        context,
+        popupTarget,
+        `Boolean(document.querySelector(${JSON.stringify(selector)}))`
+      )
+    )
+    .toBe(true);
+  const point = z
+    .object({ x: z.number(), y: z.number() })
+    .parse(
+      await evaluateInTarget(
+        context,
+        popupTarget,
+        `(()=>{const element=document.querySelector(${JSON.stringify(selector)});element.scrollIntoView({block:'center'});const rect=element.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2}})()`
+      )
+    );
+  const attached = await session.send('Target.attachToTarget', {
+    targetId: popupTarget,
+    flatten: false,
+  });
+  try {
+    for (const type of ['mousePressed', 'mouseReleased']) {
+      const commandId = type === 'mousePressed' ? 1 : 2;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let removeListener = () => {};
+      const reply = new Promise<void>((resolve, reject) => {
+        const listener = (event: { sessionId: string; message: string }) => {
+          if (event.sessionId !== attached.sessionId) return;
+          try {
+            const result = z
+              .object({ id: z.number().optional(), error: z.unknown().optional() })
+              .parse(JSON.parse(event.message));
+            if (result.id !== commandId) return;
+            if (result.error)
+              reject(new Error(`Action popup input failed: ${JSON.stringify(result.error)}`));
+            else resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        removeListener = () => session.off('Target.receivedMessageFromTarget', listener);
+        session.on('Target.receivedMessageFromTarget', listener);
+        timeout = setTimeout(() => reject(new Error('Action popup input reply timed out')), 10000);
+      });
+      try {
+        await session.send('Target.sendMessageToTarget', {
+          sessionId: attached.sessionId,
+          message: JSON.stringify({
+            id: commandId,
+            method: 'Input.dispatchMouseEvent',
+            params: { type, ...point, button: 'left', clickCount: 1 },
+          }),
+        });
+        await reply;
+      } finally {
+        clearTimeout(timeout);
+        removeListener();
+      }
+    }
+  } finally {
+    await session.send('Target.detachFromTarget', { sessionId: attached.sessionId });
+  }
+}
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   test(`recording access refusal and compact confirmation ${viewport.name}`, async ({}, info) => {
@@ -51,20 +319,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await popup.close();
       popup = await openRealPopup(context, extensionId);
       await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
-      const microphone = popup.locator('[data-ui="popup.video.microphone-access"]');
-      const camera = popup.locator('[data-ui="popup.video.camera-access"]');
-      await expect(microphone).toContainText('Microphone access is blocked');
-      await expect(camera).toContainText('Camera access is blocked');
+      await expect(popup.locator(PERMISSION_NOTICES)).toHaveCount(0);
+      await expect(
+        popup.getByRole('button', { name: 'Open Permissions', exact: true })
+      ).toHaveCount(0);
+      await expect(popup.getByText('Microphone access is blocked', { exact: false })).toHaveCount(
+        0
+      );
+      await expect(popup.getByText('Camera access is blocked', { exact: false })).toHaveCount(0);
       await expect(popup.getByText('Microphone 1', { exact: true })).toHaveCount(0);
       await expect(popup.getByText('Camera 1', { exact: true })).toHaveCount(0);
       await expect(popup.locator('[data-ui$="-request-access"]')).toHaveCount(0);
       await popup.setViewportSize({ width: 392, height: 560 });
-      await microphone
-        .locator('[data-ui="popup.video.microphone-open-permissions"]')
-        .scrollIntoViewIfNeeded();
-      await expect(
-        microphone.locator('[data-ui="popup.video.microphone-open-permissions"]')
-      ).toBeVisible();
+      await expect(popup.locator(PERMISSION_NOTICES)).toHaveCount(0);
       expect(await popup.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         392
       );
@@ -74,24 +341,24 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         animations: 'disabled',
       });
       await popup.setViewportSize(viewport.size);
+      const opened = context.waitForEvent('page');
       await popup.locator(START).click();
+      const settingsPage = await opened;
+      await settingsPage.waitForURL(/settings.*permissions/);
       await expect(popup.getByText('Microphone access is blocked', { exact: false })).toHaveCount(
-        2
+        0
       );
-      expect(await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' })).toMatchObject({
-        success: true,
-        state: { status: 'IDLE' },
-      });
+      expect(await sendRuntimeMessage(settingsPage, { type: 'GET_RECORDING_STATE' })).toMatchObject(
+        {
+          success: true,
+          state: { status: 'IDLE' },
+        }
+      );
       await popup.screenshot({
         path: info.outputPath('recording-access-denied.png'),
         fullPage: false,
         animations: 'disabled',
       });
-
-      const opened = context.waitForEvent('page');
-      await microphone.locator('[data-ui="popup.video.microphone-open-permissions"]').click();
-      const settingsPage = await opened;
-      await settingsPage.waitForURL(/settings.*permissions/);
       const microphoneCard = settingsPage.locator('[data-ui="settings.permissions.microphone"]');
       await expect(
         microphoneCard.getByRole('button', { name: 'Open browser settings' })
@@ -109,9 +376,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       });
       await settingsPage.close();
       await access('granted');
-      await popup.bringToFront();
-      await expect(microphone).toHaveCount(0);
-      await expect(camera).toHaveCount(0);
+      await popup.close();
+      popup = await openRealPopup(context, extensionId);
+      await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
+      await expect(popup.locator(PERMISSION_NOTICES)).toHaveCount(0);
       await expect(popup.getByText('Microphone access is blocked', { exact: false })).toHaveCount(
         0
       );
@@ -132,7 +400,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
               .microphoneDeviceId
         )
       ).toBe('');
-      const microphoneToggle = popup.getByRole('button', { name: 'Microphone', exact: true });
+      const microphoneToggle = popup.locator(deviceToggle('microphone'));
+      await expect(microphoneToggle).toHaveAttribute('aria-pressed', 'true');
       await microphoneToggle.click();
       await expect(microphoneToggle).toHaveAttribute('aria-pressed', 'false');
       await microphoneToggle.click();
@@ -290,85 +559,27 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       for (const name of ['microphone', 'camera']) {
         await target.bringToFront();
         const popupTarget = await triggerExtensionAction(context, extensionId, target);
-        const clickPopupControl = async (selector: string) => {
-          await expect
-            .poll(() =>
-              evaluateInTarget(
-                context,
-                popupTarget,
-                `Boolean(document.querySelector(${JSON.stringify(selector)}))`
-              )
-            )
-            .toBe(true);
-          const point = z
-            .object({ x: z.number(), y: z.number() })
-            .parse(
-              await evaluateInTarget(
-                context,
-                popupTarget,
-                `(()=>{const element=document.querySelector(${JSON.stringify(selector)});element.scrollIntoView({block:'center'});const rect=element.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2}})()`
-              )
-            );
-          const attached = await session.send('Target.attachToTarget', {
-            targetId: popupTarget,
-            flatten: false,
-          });
-          try {
-            for (const type of ['mousePressed', 'mouseReleased']) {
-              const commandId = type === 'mousePressed' ? 1 : 2;
-              let timeout: ReturnType<typeof setTimeout> | undefined;
-              let removeListener = () => {};
-              const reply = new Promise<void>((resolve, reject) => {
-                const listener = (event: { sessionId: string; message: string }) => {
-                  if (event.sessionId !== attached.sessionId) return;
-                  try {
-                    const result = z
-                      .object({ id: z.number().optional(), error: z.unknown().optional() })
-                      .parse(JSON.parse(event.message));
-                    if (result.id !== commandId) return;
-                    if (result.error)
-                      reject(
-                        new Error(`Action popup input failed: ${JSON.stringify(result.error)}`)
-                      );
-                    else resolve();
-                  } catch (error) {
-                    reject(error);
-                  }
-                };
-                removeListener = () => {
-                  session.off('Target.receivedMessageFromTarget', listener);
-                };
-                session.on('Target.receivedMessageFromTarget', listener);
-                timeout = setTimeout(
-                  () => reject(new Error('Action popup input reply timed out')),
-                  10000
-                );
-              });
-              try {
-                await session.send('Target.sendMessageToTarget', {
-                  sessionId: attached.sessionId,
-                  message: JSON.stringify({
-                    id: commandId,
-                    method: 'Input.dispatchMouseEvent',
-                    params: { type, ...point, button: 'left', clickCount: 1 },
-                  }),
-                });
-                await reply;
-              } finally {
-                clearTimeout(timeout);
-                removeListener();
-              }
-            }
-          } finally {
-            await session.send('Target.detachFromTarget', { sessionId: attached.sessionId });
-          }
-        };
-        await clickPopupControl('[data-ui="popup.app.tabs"] button[data-page="video"]');
+        await clickPopupControl(
+          context,
+          session,
+          popupTarget,
+          '[data-ui="popup.app.tabs"] button[data-page="video"]'
+        );
+        expect(
+          await evaluateInTarget(
+            context,
+            popupTarget,
+            `document.querySelectorAll(${JSON.stringify(PERMISSION_NOTICES)}).length`
+          )
+        ).toBe(0);
         const previousPages = context.pages().length;
         const opened = settings
           ? settings.waitForEvent('domcontentloaded').then(() => settings!)
           : context.waitForEvent('page');
         await clickPopupControl(
+          context,
+          session,
+          popupTarget,
           `button[data-ui="popup.icon-state-button"][aria-label="${name === 'microphone' ? 'Microphone' : 'Camera'}"]`
         );
         const previousSettings = settings;

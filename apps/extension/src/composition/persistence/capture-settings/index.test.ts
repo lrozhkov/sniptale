@@ -303,4 +303,45 @@ describe('video', () => {
     expect(stored.qualityProfiles).toEqual([profile]);
     await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: false });
   });
+
+  it('merges a granted microphone enable with a concurrent device and preference writer', async () => {
+    let stored = { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: false, webcamEnabled: false };
+    let releaseFirstWrite!: () => void;
+    let markFirstWriteStarted!: () => void;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    const firstWriteReleased = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    let writeCount = 0;
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        markFirstWriteStarted();
+        await firstWriteReleased;
+      }
+      stored = items.sniptale_video_settings as typeof stored;
+    });
+    const preferenceWrite = patchVideoSettings({
+      microphoneDeviceId: 'new-mic',
+      webcamDeviceId: 'new-camera',
+      warnWithoutMicrophone: false,
+    });
+    await firstWriteStarted;
+    const grantWrite = mutateVideoSettings((current) => ({ ...current, microphoneEnabled: true }));
+    releaseFirstWrite();
+    await Promise.all([preferenceWrite, grantWrite]);
+    expect(stored).toEqual({
+      ...DEFAULT_VIDEO_SETTINGS,
+      microphoneEnabled: true,
+      webcamEnabled: false,
+      microphoneDeviceId: 'new-mic',
+      webcamDeviceId: 'new-camera',
+      warnWithoutMicrophone: false,
+    });
+  });
 });

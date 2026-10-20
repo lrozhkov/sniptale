@@ -1,7 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { RuntimeResponseByType } from '../../../contracts/messaging/contracts/runtime-message';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { openCameraRecorderPage } from '../../../platform/navigation/extension-pages';
+import {
+  openCameraRecorderPage,
+  openSettingsPage,
+} from '../../../platform/navigation/extension-pages';
 import { translate } from '../../../platform/i18n/popup';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -22,6 +25,10 @@ import {
 } from '../../recording/webcam';
 import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
 import { getPopupRuntimeServices } from '../../runtime-services';
+import {
+  readPopupMediaAccessState,
+  type PopupMediaPermissionName,
+} from '../../recording/media-devices';
 
 type StartRecordingArgs = {
   targetTabId?: number | null;
@@ -84,10 +91,22 @@ function sanitizeRecordingSettings(
   };
 }
 
+async function hasCapturePermission(permissionName: PopupMediaPermissionName): Promise<boolean> {
+  if ((await readPopupMediaAccessState(permissionName)) === 'granted') return true;
+  await openSettingsPage({
+    requestMediaAccess: permissionName,
+    route: { section: 'access-data', view: 'permissions' },
+  });
+  return false;
+}
+
 async function ensureCapturePermissions(
   settings: VideoRecordingSettings,
   setStartError: Dispatch<SetStateAction<string | null>>
 ): Promise<boolean> {
+  if (settings.microphoneEnabled && !(await hasCapturePermission('microphone'))) return false;
+  if (settings.webcamEnabled && !(await hasCapturePermission('camera'))) return false;
+
   if (settings.microphoneEnabled) {
     try {
       await requestMicrophonePermission(settings.microphoneDeviceId);
