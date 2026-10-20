@@ -35,8 +35,10 @@ function PostRecordActionButton({
         'transition-colors motion-reduce:transition-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-        'bg-[var(--sniptale-color-surface-input)]',
-        'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
+        prominent
+          ? 'bg-[var(--sniptale-color-surface-input)] text-[var(--sniptale-color-text-primary)]'
+          : 'bg-transparent text-[var(--sniptale-color-text-secondary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       title={label}
       onClick={onClick}
@@ -45,7 +47,12 @@ function PostRecordActionButton({
         aria-hidden="true"
         className={
           prominent
-            ? 'h-6 w-6 shrink-0 stroke-[1.75] text-[var(--sniptale-color-accent)]'
+            ? [
+                'h-6 w-6 shrink-0 scale-100 stroke-[1.75] text-[var(--sniptale-color-accent)]',
+                'transition-transform duration-180 ease-out motion-reduce:transition-none',
+                'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
+                'motion-reduce:group-hover:scale-100 motion-reduce:group-focus-visible:scale-100',
+              ].join(' ')
             : 'h-4 w-4 shrink-0'
         }
       />

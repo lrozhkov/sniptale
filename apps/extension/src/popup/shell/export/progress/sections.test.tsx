@@ -73,6 +73,8 @@ async function verifyActiveProgressState() {
   expect(container?.textContent).toContain('Первое предупреждение');
   expect(container?.textContent).not.toContain('Остановить сбор');
   expect(container?.querySelector('button')).toBeNull();
+  expect(container?.querySelectorAll('svg[class*="color-success"]')).toHaveLength(0);
+  expect(container?.querySelectorAll('[data-status="done"] svg')).toHaveLength(0);
   expect(props.onCancel).not.toHaveBeenCalled();
 }
 
@@ -154,6 +156,8 @@ async function verifyCompletedState() {
   expect(container?.querySelector('[title="export.zip"]')?.textContent).toContain('export.zip');
   expect(container?.textContent).not.toContain('Можно снова запустить экспорт');
   expect(container?.querySelector('button')).toBeNull();
+  expect(container?.querySelectorAll('svg[class*="color-success"]')).toHaveLength(1);
+  expect(container?.querySelectorAll('[data-status="done"] svg')).toHaveLength(0);
 }
 
 async function verifyFailedState() {

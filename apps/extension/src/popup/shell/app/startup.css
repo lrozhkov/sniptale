@@ -141,6 +141,10 @@ body {
   transition: color 160ms ease;
 }
 
+.popup-react-shell__tabs :is(.tabler-tools, .tabler-world-down) g {
+  stroke-width: inherit;
+}
+
 .popup-react-shell__tab-icon {
   position: relative;
   width: 19px;

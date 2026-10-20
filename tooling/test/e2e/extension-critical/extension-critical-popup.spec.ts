@@ -41,6 +41,110 @@ const MENU_STARTUP = {
   lastExportDestination: 'export',
 } as const;
 
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`popup result secondary actions and header strokes ${viewport.name} ${theme}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {
+        apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+        runtimeResponses: {
+          [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+          [VideoMessageType.GET_RECORDING_STATE]: {
+            success: true,
+            recordingHealth: 'healthy',
+            state: createRecordingRuntimeState(VideoRecordingStatus.IDLE),
+            postRecordResult: {
+              primaryRecordingId: 'result-1',
+              projectId: null,
+              recordingId: 'result-1',
+            },
+          },
+        },
+        storage: {
+          'sniptale-theme-preference': theme,
+          sniptale_popup_startup: {
+            selection: 'video',
+            lastPage: 'video',
+            lastExportDestination: 'export',
+          },
+        },
+      });
+      await openPopupHarness(page, hostOrigin);
+      await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+      const header = page.locator('[data-ui="popup.app.tabs"]');
+      const referenceStroke = await header
+        .locator('button[data-page="screenshots"] svg path')
+        .first()
+        .evaluate((node) => getComputedStyle(node).strokeWidth);
+      expect(referenceStroke).toBe('1.8px');
+      for (const route of ['tools', 'export']) {
+        expect(
+          await header
+            .locator(`button[data-page="${route}"] svg :is(g,path)`)
+            .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).strokeWidth))
+        ).toEqual(expect.arrayContaining([referenceStroke]));
+        expect(
+          await header
+            .locator(`button[data-page="${route}"] svg :is(g,path)`)
+            .evaluateAll((nodes) =>
+              nodes.every((node) => getComputedStyle(node).strokeWidth === '1.8px')
+            )
+        ).toBe(true);
+      }
+      const primary = page.getByRole('button', {
+        name: translate('popup.video.postRecordQuickEdit', 'ru'),
+        exact: true,
+      });
+      await expect(primary).toBeVisible();
+      for (const key of [
+        'postRecordOpenGallery',
+        'postRecordDownload',
+        'postRecordClose',
+      ] as const) {
+        const action = page.getByRole('button', {
+          name: translate(`popup.video.${key}`, 'ru'),
+          exact: true,
+        });
+        await expect(action).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      }
+      for (const key of ['postRecordQuickEdit', 'postRecordOpenEditor'] as const) {
+        const action = page.getByRole('button', {
+          name: translate(`popup.video.${key}`, 'ru'),
+          exact: true,
+        });
+        const icon = action.locator('svg');
+        const before = await action.boundingBox();
+        await expect(icon).toHaveCSS('scale', '1');
+        await action.hover();
+        await expect(icon).toHaveCSS('scale', '1.1');
+        expect(await action.boundingBox()).toEqual(before);
+        await page.mouse.move(1, 1);
+        await expect(icon).toHaveCSS('scale', '1');
+      }
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await primary.hover();
+      await expect(primary.locator('svg')).toHaveCSS('scale', '1');
+      await page.mouse.move(1, 1);
+      await page.screenshot({
+        path: info.outputPath('result-secondary-actions.png'),
+        fullPage: false,
+      });
+      await header.locator('button[data-page="export"]').click();
+      await expect(header.locator('button[data-page="export"]')).toHaveAttribute(
+        'data-active',
+        'true'
+      );
+      await expect(header.locator('button[data-page="export"] svg g').first()).toHaveCSS(
+        'stroke-width',
+        '1.8px'
+      );
+    });
+  }
+}
+
 for (const route of ['screenshots', 'video', 'export'] as const) {
   test(`popup ${route} primary command keeps its target fixed through hover and press`, async ({
     page,

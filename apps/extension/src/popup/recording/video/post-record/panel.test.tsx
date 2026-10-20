@@ -126,7 +126,19 @@ it('matches Main capture tiles for editor actions and keeps the other result com
       expect(button.className).toContain('flex-col');
       expect(button.querySelector('svg')?.getAttribute('class')).toContain('h-6 w-6');
       expect(button.querySelector('svg')?.getAttribute('class')).toContain('color-accent');
+      expect(button.querySelector('svg')?.getAttribute('class')).toContain('group-hover:scale-110');
+      expect(button.querySelector('svg')?.getAttribute('class')).toContain(
+        'motion-reduce:group-hover:scale-100'
+      );
     } else {
+      if (
+        ['postRecordOpenGallery', 'postRecordDownload', 'postRecordClose'].some(
+          (key) => button.textContent === `popup.video.${key}`
+        )
+      ) {
+        expect(button.className).toContain('bg-transparent');
+      }
+      expect(button.className).not.toContain('bg-[var(--sniptale-color-surface-input)]');
       expect(button.querySelector('svg')?.getAttribute('class')).not.toMatch(/scale-|color-accent/);
     }
   }

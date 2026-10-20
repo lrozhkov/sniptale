@@ -23,7 +23,7 @@ import type { ExportProgressSectionProps } from './types';
 
 function ExportStepIcon({ status }: Pick<PopupExportProgressStep, 'status'>) {
   if (status === 'done') {
-    return <CheckCircle2 className="h-4 w-4 text-[var(--sniptale-color-success)]" />;
+    return null;
   }
 
   if (status === 'error') {
