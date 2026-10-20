@@ -8,7 +8,7 @@ describe('popup-action-button.styles', () => {
     const galleryClassName = getPopupActionButtonRootClassName('gallery', false);
 
     expect(primaryClassName).toContain('border-none');
-    expect(primaryClassName).toContain('bg-[var(--sniptale-color-surface-hover)]');
+    expect(primaryClassName).toContain('bg-[var(--sniptale-color-surface-input)]');
     expect(primaryClassName).toContain('var(--sniptale-color-text-primary-strong)');
     expect(primaryClassName).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
     expect(primaryClassName).not.toContain(

@@ -18,6 +18,8 @@ it('uses the shared popup value typography for selection summaries', () => {
   );
 
   expect(markup).toContain('text-[11px] font-medium leading-4');
+  expect(markup).toContain('min-w-0 rounded-[6px]');
+  expect(markup).toContain('justify-center rounded-[6px]');
   expect(markup).toContain('title="Full current page title"');
 });
 

@@ -72,6 +72,8 @@ describe('ExportSelectionSectionShell', () => {
     );
 
     expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.className).toContain('rounded-[6px]');
+    expect(settingsButton.className).toContain('rounded-[6px]');
     expect(heading?.className).toContain('text-[12px]');
     expect(heading?.className).toContain('font-medium');
     expect(heading?.className).not.toContain('uppercase');

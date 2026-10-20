@@ -30,7 +30,7 @@ export function PostRecordDeleteButton({
       type="button"
       disabled={disabled}
       className={[
-        'flex h-10 w-full items-center justify-center gap-2 rounded-md px-2 text-xs font-medium',
+        'flex h-10 w-full items-center justify-center gap-2 rounded-[6px] px-2 text-xs font-normal',
         'transition-colors duration-200 motion-reduce:transition-none focus-visible:outline-none',
         'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         'disabled:cursor-not-allowed disabled:opacity-50',

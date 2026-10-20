@@ -31,7 +31,7 @@ export function ScreenshotModeSelector(props: {
     },
   ];
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-1.5 [container-type:inline-size]">
       {options.map((option) => {
         const disabledReason = option.mode === 'tab' ? props.tabDisabledReason : null;
         return (

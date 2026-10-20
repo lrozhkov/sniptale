@@ -6,24 +6,27 @@ import {
 } from './content';
 
 const COMPACT_BUTTON_CLASS_NAME =
-  'relative flex h-12 min-h-12 w-full min-w-0 items-center justify-center overflow-hidden';
+  'relative flex h-10 min-h-10 w-full min-w-0 items-center justify-center overflow-hidden';
 
-const COMPACT_BUTTON_SURFACE_CLASS_NAME = 'rounded-[6px] px-0 outline-none transition-all';
+const COMPACT_BUTTON_SURFACE_CLASS_NAME =
+  'rounded-[6px] px-0 outline-none transition-colors duration-150';
 
 const DEFAULT_BUTTON_CLASS_NAME =
-  'relative flex h-12 min-h-12 min-w-0 items-center gap-2 overflow-hidden';
+  'relative flex h-10 min-h-10 min-w-0 items-center gap-1.5 overflow-hidden';
 
-const DEFAULT_BUTTON_SURFACE_CLASS_NAME =
-  'rounded-[6px] px-2 text-[13px] font-normal leading-tight hover:font-medium focus-visible:font-medium';
+const DEFAULT_BUTTON_SURFACE_CLASS_NAME = [
+  'rounded-[6px] px-2 text-[13px] font-normal leading-tight',
+  'enabled:hover:font-medium enabled:focus-visible:font-medium',
+].join(' ');
 
 const DEFAULT_BUTTON_INTERACTION_CLASS_NAME = [
-  'group outline-none transition-all focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
-  'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+  'group outline-none transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
+  'focus-visible:outline-solid focus-visible:outline-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 const COMPACT_BUTTON_INTERACTION_CLASS_NAME = [
   'group focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
-  'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+  'focus-visible:outline-solid focus-visible:outline-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 interface PopupActionButtonVariantProps {
@@ -115,8 +118,16 @@ function renderDefaultContent(props: PopupActionButtonVariantProps) {
     <span
       className={
         props.centered
-          ? 'flex min-w-0 flex-none items-center justify-between gap-2.5'
-          : 'flex min-w-0 flex-1 items-center justify-between gap-2.5'
+          ? [
+              'flex min-w-0 flex-none items-center justify-between gap-2.5',
+              'transition-transform duration-100 group-[:enabled:active]:translate-y-px',
+              'motion-reduce:group-[:enabled:active]:translate-y-0 motion-reduce:transition-none',
+            ].join(' ')
+          : [
+              'flex min-w-0 flex-1 items-center justify-between gap-2.5',
+              'transition-transform duration-100 group-[:enabled:active]:translate-y-px',
+              'motion-reduce:group-[:enabled:active]:translate-y-0 motion-reduce:transition-none',
+            ].join(' ')
       }
     >
       <PopupActionButtonDefaultContent

@@ -18,6 +18,9 @@ describe('popup quick action block helper styling', () => {
     expect(getQuickActionListButtonClassName('compact')).toContain('min-h-[48px]');
     expect(getQuickActionListButtonClassName('dense')).toContain('min-h-[40px]');
     expect(getQuickActionListButtonClassName('tight')).toContain('min-h-[28px]');
+    for (const density of ['regular', 'compact', 'dense', 'tight'] as const) {
+      expect(getQuickActionListButtonClassName(density)).toContain('rounded-[6px]');
+    }
 
     expect(getQuickActionListIconClassName('regular')).toContain('h-9');
     expect(getQuickActionListIconClassName('compact')).toContain('h-9');

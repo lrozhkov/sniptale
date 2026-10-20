@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, CSSProperties } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -26,7 +26,8 @@ const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 tex
   ' '
 );
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
-  'pointer-events-none absolute inset-y-0 left-[38px] right-2 flex min-w-0 items-center text-left',
+  'pointer-events-none absolute inset-y-0 left-[38px] flex min-w-0 items-center text-left',
+  'w-[calc((100cqw-12px)*var(--popup-mode-expanded-grow)/(var(--popup-mode-expanded-grow)+2)-48px)]',
 ].join(' ');
 const MODE_ICON_CLASS_NAME = [
   'absolute h-[19px] w-[19px]',
@@ -70,10 +71,7 @@ function getButtonClassName(
 function getCompactLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     COMPACT_LAYER_BASE_CLASS_NAME,
-    animate &&
-      (active
-        ? 'transition-none'
-        : 'transition-opacity delay-300 duration-150 ease-out motion-reduce:transition-none'),
+    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
     active ? 'opacity-0' : 'opacity-100'
   );
 }
@@ -81,10 +79,7 @@ function getCompactLayerClassName(active: boolean, animate: boolean): string {
 function getExpandedLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
-    animate &&
-      (active
-        ? 'transition-opacity delay-300 duration-150 ease-out motion-reduce:transition-none'
-        : 'transition-none'),
+    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
     active ? 'opacity-100' : 'opacity-0'
   );
 }
@@ -101,12 +96,16 @@ export function PopupExpandingModeButton({
   compact = false,
   onClick,
 }: PopupExpandingModeButtonProps) {
+  const textLayoutStyle: CSSProperties & { '--popup-mode-expanded-grow': number } = {
+    '--popup-mode-expanded-grow': compact ? 2.2 : 1.9,
+  };
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
       className={getButtonClassName(active, animate, disabled, compact)}
+      style={textLayoutStyle}
       disabled={disabled}
       onClick={onClick}
       title={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
@@ -122,7 +121,12 @@ export function PopupExpandingModeButton({
         )}
       />
       <span aria-hidden="true" className={getCompactLayerClassName(active, animate)}>
-        <span className="absolute inset-x-1 bottom-[6px] line-clamp-2 text-[10px] font-normal leading-tight">
+        <span
+          className={[
+            'absolute bottom-[6px] left-1/2 -translate-x-1/2 line-clamp-2 text-[10px] font-normal leading-tight',
+            'w-[calc((100cqw-12px)/(var(--popup-mode-expanded-grow)+2)-8px)]',
+          ].join(' ')}
+        >
           {label}
         </span>
       </span>

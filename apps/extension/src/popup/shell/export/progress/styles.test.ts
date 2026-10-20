@@ -19,6 +19,15 @@ import {
 } from './styles';
 
 describe('progress styles', () => {
+  it('keeps ordinary progress surfaces neutral while preserving status colors', () => {
+    expect(progressHeaderClassName).not.toContain('gradient');
+    expect(progressHeaderClassName).not.toContain('accent');
+    expect(exportSectionContainerClassName).not.toContain('accent');
+    expect(progressStepActiveClassName).toContain('accent');
+    expect(progressStepDoneClassName).toContain('success');
+    expect(progressStepErrorClassName).toContain('danger');
+  });
+
   it('exports stable class names for all progress view building blocks', () => {
     expect(progressHeaderClassName).toContain('rounded-[6px]');
     expect(progressDescriptionClassName).toContain('text-[11px]');

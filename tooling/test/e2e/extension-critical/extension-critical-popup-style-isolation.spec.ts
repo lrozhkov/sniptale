@@ -284,12 +284,13 @@ async function inspectModeTextAnimation(page: Page, locale: AppLocale, info: Tes
             (layer) => ({
               opacity: Number(getComputedStyle(layer).opacity),
               text: layer.textContent,
+              textWidth: layer.firstElementChild?.getBoundingClientRect().width,
             })
           ),
         }));
       };
-      const result = { start: snapshot(0), middle: snapshot(150), end: snapshot(1_000) };
-      snapshot(150);
+      const result = { start: snapshot(0), middle: snapshot(75), end: snapshot(1_000) };
+      snapshot(75);
       return result;
     });
     await page.screenshot({ path: info.outputPath(`${key}-transition.png`), fullPage: false });
@@ -306,9 +307,12 @@ async function inspectModeTextAnimation(page: Page, locale: AppLocale, info: Tes
       expect(middle.width).toBeGreaterThan(Math.min(start.width, end.width));
       expect(middle.width).toBeLessThan(Math.max(start.width, end.width));
       expect(
-        middle.layers.map((layer) => layer.opacity),
-        `${key}: copy must not reflow visibly`
-      ).toEqual([0, 0]);
+        middle.layers.some((layer) => layer.opacity > 0 && layer.opacity < 1),
+        `${key}: copy crossfades while width changes`
+      ).toBe(true);
+      for (let layer = 0; layer < end.layers.length; layer += 1) {
+        expect(middle.layers[layer]!.textWidth).toBeCloseTo(end.layers[layer]!.textWidth!, 1);
+      }
       expect(end.layers.map((layer) => layer.opacity)).toEqual(end.active ? [0, 1] : [1, 0]);
     }
     await info.attach(`${key}-animation`, {
@@ -728,7 +732,7 @@ for (const locale of ['ru', 'en'] as const) {
             ].join(', ')
           );
           if (await primary.count()) {
-            await expect(primary).toHaveCSS('height', '48px');
+            await expect(primary).toHaveCSS('height', '40px');
             await expect(primary).toHaveCSS('border-radius', '6px');
             await expect(primary).toHaveCSS('justify-content', 'center');
           }

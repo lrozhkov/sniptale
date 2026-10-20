@@ -23,17 +23,15 @@ export function PopupActionButtonIcon({
   return (
     <span
       className={[
-        'inline-flex h-5 w-5 shrink-0 items-center justify-center',
-        'transition-transform duration-200 ease-out',
-        'group-hover:scale-110 group-focus-visible:scale-110',
-        'group-disabled:scale-100 motion-reduce:transition-none',
+        'inline-flex h-4 w-4 shrink-0 items-center justify-center',
+        'transition-transform duration-100 group-[:enabled:active]:translate-y-px',
+        'motion-reduce:group-[:enabled:active]:translate-y-0 motion-reduce:transition-none',
       ].join(' ')}
     >
       <Icon
         className={cx(
-          'h-[18px] w-[18px] stroke-[1.75] transition-[color,filter,stroke-width]',
-          'group-hover:stroke-2 group-focus-visible:stroke-2',
-          'group-hover:brightness-110 group-focus-visible:brightness-110 group-disabled:brightness-100',
+          'h-4 w-4 stroke-[1.75] transition-[color,stroke-width] duration-150',
+          'group-[:enabled:hover]:stroke-2 group-[:enabled:focus-visible]:stroke-2',
           disabled ? 'text-[var(--sniptale-color-text-dim)]' : iconClassName
         )}
       />

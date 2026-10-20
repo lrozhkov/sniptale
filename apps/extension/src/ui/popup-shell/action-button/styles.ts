@@ -7,25 +7,19 @@ const POPUP_ACTION_BUTTON_DISABLED_CLASS_NAME = [
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_PRIMARY_CLASS_NAME = [
-  'border-none bg-[var(--sniptale-color-surface-hover)]',
+  'border-none bg-[var(--sniptale-color-surface-input)]',
   'text-[var(--sniptale-color-text-primary)] shadow-none',
-  [
-    'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,',
-    'var(--sniptale-color-surface-hover))]',
-  ].join(''),
-  [
-    'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,',
-    'var(--sniptale-color-surface-hover))]',
-  ].join(''),
+  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,transparent)]',
+  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,transparent)]',
   'hover:text-[var(--sniptale-color-text-primary-strong)]',
-  'focus-visible:text-[var(--sniptale-color-text-primary-strong)] active:translate-y-px',
+  'focus-visible:text-[var(--sniptale-color-text-primary-strong)]',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME = [
   'border-none bg-transparent',
   'text-[var(--sniptale-color-text-secondary)] shadow-none',
   'hover:bg-transparent focus-visible:bg-transparent',
-  'hover:text-[var(--sniptale-color-text-primary)] active:translate-y-px',
+  'hover:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_DANGER_CLASS_NAME = [
@@ -33,7 +27,6 @@ const POPUP_ACTION_BUTTON_DANGER_CLASS_NAME = [
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_18%,transparent)]',
   'hover:text-[var(--sniptale-color-danger)] focus-visible:text-[var(--sniptale-color-danger)]',
-  'active:translate-y-px',
 ].join(' ');
 
 export function getPopupActionButtonRootClassName(tone: PopupActionButtonTone, disabled: boolean) {

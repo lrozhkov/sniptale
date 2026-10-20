@@ -41,6 +41,80 @@ const MENU_STARTUP = {
   lastExportDestination: 'export',
 } as const;
 
+for (const route of ['screenshots', 'video', 'export'] as const) {
+  test(`popup ${route} primary command keeps its target fixed through hover and press`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await page.setViewportSize({ width: 392, height: 560 });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+      runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+      storage: {
+        sniptale_popup_startup: {
+          selection:
+            route === 'screenshots'
+              ? 'screenshots:tab'
+              : route === 'export'
+                ? 'export:download'
+                : 'video',
+          lastPage: route,
+          lastExportDestination: 'export',
+        },
+      },
+    });
+    await openPopupHarness(page, hostOrigin);
+    await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+    const action =
+      route === 'screenshots'
+        ? page.getByRole('button', {
+            name: translate('popup.home.captureButtonLabel', 'ru'),
+            exact: true,
+          })
+        : page.locator(
+            route === 'video'
+              ? '[data-ui="popup.video-setup.start-recording-button"]'
+              : '[data-ui="popup.export.export-button"]'
+          );
+    await expect(action).toBeEnabled();
+    await expect(action).toHaveCSS('height', '40px');
+    const resting = await action.boundingBox();
+    const background = await action.evaluate((node) => getComputedStyle(node).backgroundColor);
+    await action.hover();
+    await expect
+      .poll(() => action.evaluate((node) => getComputedStyle(node).backgroundColor))
+      .not.toBe(background);
+    await expect(action).toHaveCSS('outline-style', 'none');
+    const icon = action.locator(':scope > span').first();
+    const before = await icon.boundingBox();
+    await page.mouse.down();
+    await expect.poll(async () => (await icon.boundingBox())!.y - before!.y).toBeCloseTo(1, 1);
+    expect(await action.boundingBox()).toEqual(resting);
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await expect.poll(async () => (await icon.boundingBox())!.y - before!.y).toBeCloseTo(0, 1);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await action.hover();
+    await page.mouse.down();
+    expect(await icon.boundingBox()).toEqual(before);
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(action).toBeFocused();
+    await expect(action).toHaveCSS('outline-style', 'solid');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await action.evaluate((node) => {
+      (node as HTMLButtonElement).disabled = true;
+    });
+    const disabled = await icon.boundingBox();
+    await page.mouse.move(resting!.x + resting!.width / 2, resting!.y + resting!.height / 2);
+    await page.mouse.down();
+    expect(await icon.boundingBox()).toEqual(disabled);
+    await page.mouse.up();
+  });
+}
+
 for (const route of ['screenshots', 'menu', 'tools', 'export'] as const) {
   test(`popup ${route} failure retains its action inside the fixed popup`, async ({
     page,
@@ -603,7 +677,7 @@ test('popup mode keeps one icon while expanding a hovered option', async ({ page
   );
 });
 
-test('video mode descriptions stay stable while visible and readable after the width transition', async ({
+test('video mode descriptions crossfade immediately without reflow during the width transition', async ({
   page,
   hostOrigin,
 }) => {
@@ -618,6 +692,11 @@ test('video mode descriptions stay stable while visible and readable after the w
   const screenLabel = translate('popup.video.modeScreenLabel', 'ru');
   const screen = page.getByRole('button', { name: screenLabel, exact: true });
   await expect(screen).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__sniptaleHarness?.getStorageState()['sniptale_video_ui_state'])
+    )
+    .toMatchObject({ captureMode: CaptureMode.TAB });
   await screen.click();
   await expect(screen).toHaveAttribute('aria-pressed', 'true');
   const samples = await screen.evaluate(async (button) => {
@@ -625,11 +704,13 @@ test('video mode descriptions stay stable while visible and readable after the w
     if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');
     const layer = button.lastElementChild;
     if (!(layer instanceof HTMLElement)) throw new Error('Expanded mode layer is unavailable');
-    const frames: { height: number; opacity: number }[] = [];
+    const frames: { height: number; width: number; buttonWidth: number; opacity: number }[] = [];
     for (let frame = 0; frame < 24; frame += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       frames.push({
         height: description.getBoundingClientRect().height,
+        width: description.getBoundingClientRect().width,
+        buttonWidth: button.getBoundingClientRect().width,
         opacity: Number(getComputedStyle(layer).opacity),
       });
     }
@@ -642,9 +723,17 @@ test('video mode descriptions stay stable while visible and readable after the w
   const visibleHeights = samples
     .filter((sample) => sample.opacity > 0)
     .map((sample) => sample.height);
-  expect(samples.some((sample) => sample.opacity === 0)).toBe(true);
+  expect(samples.some((sample) => sample.opacity > 0 && sample.opacity < 1)).toBe(true);
+  expect(
+    Math.max(...samples.map((sample) => sample.buttonWidth)) -
+      Math.min(...samples.map((sample) => sample.buttonWidth))
+  ).toBeGreaterThan(1);
   expect(visibleHeights.length).toBeGreaterThan(0);
   expect(Math.max(...visibleHeights) - Math.min(...visibleHeights)).toBeLessThan(1);
+  expect(
+    Math.max(...samples.map((sample) => sample.width)) -
+      Math.min(...samples.map((sample) => sample.width))
+  ).toBeLessThan(1);
   const textLayout = await screen.evaluate((button) => {
     const description = button.lastElementChild?.lastElementChild?.lastElementChild;
     if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');

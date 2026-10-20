@@ -63,7 +63,7 @@ type ExportReadySectionProps = {
   urlInputOverflow?: number;
 };
 
-const HTML_COMPOSITION_CARD_CLASS_NAME = ['px-1 py-2'].join(' ');
+const HTML_COMPOSITION_CARD_CLASS_NAME = ['px-3 py-2'].join(' ');
 
 function renderReadyHint(
   props: Pick<ExportReadySectionProps, 'disabled' | 'hasLoadedPreferences' | 'selectedCount'>

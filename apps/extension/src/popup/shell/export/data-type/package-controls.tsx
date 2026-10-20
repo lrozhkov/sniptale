@@ -35,7 +35,7 @@ export function PackageDestinationSwitch(props: {
   const [animate, setAnimate] = useState(false);
   return (
     <div
-      className="flex min-w-0 gap-1.5"
+      className="flex min-w-0 gap-1.5 [container-type:inline-size]"
       aria-label={translate('popup.export.packageDestinationLabel')}
     >
       {destinations.map(({ value, icon, label, description }) => (

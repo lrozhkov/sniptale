@@ -1,8 +1,4 @@
-export const progressHeaderClassName = [
-  'rounded-[6px]',
-  'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--sniptale-color-accent-soft)_58%,transparent),transparent_75%)]',
-  'p-2.5 shadow-[inset_0_0_0_1px_var(--sniptale-color-border-soft)]',
-].join(' ');
+export const progressHeaderClassName = ['rounded-[6px]', 'p-2.5'].join(' ');
 
 export const progressDescriptionClassName = [
   'mt-0.5 break-words text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]',

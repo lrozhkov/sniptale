@@ -48,7 +48,7 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).toContain('opacity-0');
   expect(markup).toContain('group-hover:scale-110');
   expect(markup).not.toContain('group-hover:-translate-y-px');
-  expect(markup).toContain('absolute inset-y-0 left-[38px] right-2 flex');
+  expect(markup).toContain('absolute inset-y-0 left-[38px] flex');
   expect(markup).toContain('Choose an area');
   expect(markup).toContain('title="Area. Choose an area"');
 });
@@ -72,7 +72,7 @@ it('keeps the normal description visible while an unavailable reason stays in th
   expect(markup).toContain('disabled=""');
 });
 
-it('animates width before revealing the final compact and expanded text layouts', () => {
+it('crossfades stable text layouts at the same time as width without a delayed reveal', () => {
   const markup = renderToStaticMarkup(
     <PopupExpandingModeButton
       accentClassName="text-accent"
@@ -86,8 +86,10 @@ it('animates width before revealing the final compact and expanded text layouts'
   );
 
   expect(markup).toContain('transition-[flex-grow,background-color,border-color,color]');
-  expect(markup).toContain('transition-opacity delay-300 duration-150');
-  expect(markup).toContain('transition-none opacity-0');
+  expect(markup).toContain('transition-opacity duration-150');
+  expect(markup).not.toContain('delay-300');
+  expect(markup).toContain('100cqw');
+  expect(markup).toContain('--popup-mode-expanded-grow:1.9');
   expect(markup).toContain('transition-[left,top,translate,color,filter,scale]');
   expect(markup).toContain('top-1/2');
   expect(markup).toContain('left-2.5');

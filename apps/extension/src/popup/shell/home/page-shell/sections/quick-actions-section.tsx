@@ -45,7 +45,7 @@ export function PopupHomeQuickActions({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+    <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-2">
       {!quickActionsReady ? (
         <DelayedLoadingFallback fallback={<QuickActionsLoadingState />} />
       ) : hasQuickActions ? (

@@ -31,6 +31,9 @@ describe('PopupActionButton', () => {
     expect(markup).toContain('group');
     expect(markup).toContain('flex-1 items-center justify-between');
     expect(markup).toContain('text-brand');
+    expect(markup).not.toContain('scale-110');
+    expect(markup).toContain('group-[:enabled:active]:translate-y-px');
+    expect(markup).not.toContain('transition-all');
   });
 
   it('renders the compact variant with explicit aria and disabled defaults', () => {
@@ -122,7 +125,7 @@ describe('PopupActionButton', () => {
       />
     );
 
-    expect(markup).toContain('bg-[var(--sniptale-color-surface-hover)]');
+    expect(markup).toContain('bg-[var(--sniptale-color-surface-input)]');
     expect(markup).toContain('hover:bg-');
     expect(markup).toContain('focus-visible:bg-');
   });

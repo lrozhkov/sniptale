@@ -110,6 +110,28 @@ it('groups editing actions and runs one explicit decision', async () => {
   expect(downloadSavedRecordingTracksMock).not.toHaveBeenCalled();
 });
 
+it('matches Main capture tiles for editor actions and keeps the other result commands secondary', async () => {
+  await renderPanel();
+
+  for (const button of container?.querySelectorAll('button') ?? []) {
+    expect(button.className).toContain('rounded-[6px]');
+    expect(button.className).toContain('font-normal');
+    expect(button.className).toContain('focus-visible:');
+    expect(button.className).not.toContain('font-medium');
+    if (
+      button.textContent === 'popup.video.postRecordQuickEdit' ||
+      button.textContent === 'popup.video.postRecordOpenEditor'
+    ) {
+      expect(button.className).toContain('min-h-[88px]');
+      expect(button.className).toContain('flex-col');
+      expect(button.querySelector('svg')?.getAttribute('class')).toContain('h-6 w-6');
+      expect(button.querySelector('svg')?.getAttribute('class')).toContain('color-accent');
+    } else {
+      expect(button.querySelector('svg')?.getAttribute('class')).not.toMatch(/scale-|color-accent/);
+    }
+  }
+});
+
 it('disables every action and rejects same-tick re-entry while a decision is pending', async () => {
   let finishDecision!: () => void;
   openSavedRecordingInVideoEditorMock.mockReturnValueOnce(

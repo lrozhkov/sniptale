@@ -1,5 +1,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { GalleryThumbnails, Wrench, TvMinimalPlay, Upload } from 'lucide-react';
+import { GalleryThumbnails, TvMinimalPlay } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import toolsIcon from '@iconify-icons/tabler/tools';
+import worldDownIcon from '@iconify-icons/tabler/world-down';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
 import type { AppLocale } from '../../../platform/i18n/types';
@@ -14,9 +17,12 @@ const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'menu', icon: <ShellIcon path="M5 7h14M5 12h14M5 17h14" /> },
   {
     page: 'tools',
-    icon: <Wrench aria-hidden="true" />,
+    icon: <Icon icon={toolsIcon} className="tabler-tools" aria-hidden="true" />,
   },
-  { page: 'export', icon: <Upload aria-hidden="true" /> },
+  {
+    page: 'export',
+    icon: <Icon icon={worldDownIcon} className="tabler-world-down" aria-hidden="true" />,
+  },
 ];
 
 function ShellIcon({ path }: { path: string }) {
