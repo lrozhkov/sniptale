@@ -1,5 +1,17 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'video-project-gesture-feedback',
+    productionFile: 'apps/extension/src/features/video/review/project-action-audio.ts',
+    allowCrossOwner: true,
+    reason:
+      'Native composition and portable backup prove retained source gesture appearance and identity.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-action-audio.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+    ],
+  },
+  {
     owner: 'gallery-authored-speech-queue',
     productionFile: 'apps/extension/src/gallery/video-review/use-text-voice.ts',
     allowCrossOwner: true,

@@ -1,3 +1,4 @@
+import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
 // @vitest-environment jsdom
 import { act } from 'react';
@@ -535,5 +536,190 @@ it('cancels stale audition and exposes retry without document writes or playhead
     expect(project).toEqual({ ...authored, name: 'Replaced same ID' });
   } finally {
     if (host.firstChild) act(() => root.unmount());
+  }
+});
+
+it('preserves the current inherited gesture appearance on the first shape edit', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  updateProject.mockClear();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'rec',
+    filename: 'rec.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 1024,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'hold',
+        kind: 'CLICK',
+        time: 1,
+        duration: 1,
+        point: { x: 0.5, y: 0.5 },
+        label: '',
+        preset: 'NONE',
+        data: {
+          gestureId: 'hold',
+          gestureType: 'hold',
+          button: 0,
+          downTime: 1,
+          upTime: 2,
+          downX: 80,
+          downY: 45,
+          upX: 80,
+          upY: 45,
+          maxExcursionCssPx: 0,
+          pressDuration: 1,
+          completion: 'released',
+        },
+      },
+    ],
+  });
+  project.actionPresentation = {
+    enabled: true,
+    clickPreset: 'CLICK_RIPPLE',
+    duration: 0.7,
+    offset: 0,
+    clickSuppressionInterval: 1,
+    showKeystrokes: false,
+    clickStyle: { color: '#ff0000ff', size: 70, strokeWidth: 4, opacity: 0.5 },
+  };
+  const group = project.actionFeedback![0]!;
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={project}
+          recordingId="rec"
+          sourceInstanceId={group.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: 'hold' }, family: 'mouse' }}
+          disabled={false}
+          gesture
+          part="gesture"
+        />
+      )
+    );
+    const shape = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'gallery.videoReview.gesture_path'
+    )!;
+    expect(shape).toBeDefined();
+    act(() => shape.click());
+    expect(updateProject).toHaveBeenCalledOnce();
+    const current = structuredClone(project);
+    current.name = 'Concurrent rename';
+    current.actionPresentation!.clickStyle = {
+      color: '#cc2200ff',
+      size: 90,
+      strokeWidth: 5,
+      opacity: 0.8,
+    };
+    const changed = updateProject.mock.lastCall![0](current);
+    expect(changed.actionFeedback![0]!.gestureStyles![0]).toMatchObject({
+      id: 'hold',
+      effect: 'press',
+      gestureAppearance: 'path',
+      color: '#cc2200ff',
+      radius: 90,
+      stroke: 5,
+      opacity: 0.8,
+    });
+    expect(changed.name).toBe('Concurrent rename');
+    expect(changed.actionEvents).toEqual(current.actionEvents);
+    expect(changed.clips).toEqual(current.clips);
+    expect(changed.actionFeedback![0]!.settings).toEqual(current.actionFeedback![0]!.settings);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('resets only the selected authored gesture and keeps source, sound and other instances', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  updateProject.mockClear();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'rec',
+    filename: 'rec.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'hold',
+        kind: 'CLICK',
+        time: 1,
+        duration: 1,
+        point: { x: 0.5, y: 0.5 },
+        label: '',
+        preset: 'NONE',
+        data: {
+          gestureType: 'hold',
+          gestureId: 'hold',
+          downTime: 1,
+          upTime: 2,
+          completion: 'released',
+        },
+      },
+    ],
+  });
+  const group = project.actionFeedback![0]!;
+  group.gestureStyles = [
+    { ...REVIEW_CLICK_DEFAULT, id: 'hold', effect: 'press', radius: 75 },
+    { ...REVIEW_CLICK_DEFAULT, id: 'other', effect: 'off', radius: 40 },
+  ];
+  group.settings = [
+    {
+      ref: { kind: 'action', id: 'hold' },
+      enabled: true,
+      presetId: 'mouse-classic-paired-v2',
+      volume: 0.6,
+      offset: 0.1,
+    },
+  ];
+  project.actionFeedback!.push({ ...structuredClone(group), sourceInstanceId: 'other-instance' });
+  const original = structuredClone(project);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={project}
+          recordingId="rec"
+          sourceInstanceId={group.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: 'hold' }, family: 'mouse' }}
+          disabled={false}
+          gesture
+          part="gesture"
+        />
+      )
+    );
+    const reset = host.querySelector<HTMLButtonElement>('[data-ui="video-editor.gesture.reset"]')!;
+    expect(reset.disabled).toBe(false);
+    expect(reset.querySelector('svg')).not.toBeNull();
+    act(() => reset.click());
+    const updater = updateProject.mock.lastCall![0];
+    const changed = updater(project);
+    expect(changed.actionFeedback![0]!.gestureStyles).toEqual([
+      original.actionFeedback![0]!.gestureStyles![1],
+    ]);
+    expect(changed.actionFeedback![0]!.settings).toEqual(original.actionFeedback![0]!.settings);
+    expect(changed.actionFeedback![1]).toEqual(original.actionFeedback![1]);
+    expect(changed.actionEvents).toEqual(original.actionEvents);
+    expect(changed.clips).toEqual(original.clips);
+    expect(changed.assets).toEqual(original.assets);
+    expect(updater(changed)).toBe(changed);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
   }
 });

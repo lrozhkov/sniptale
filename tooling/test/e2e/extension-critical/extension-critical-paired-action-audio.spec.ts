@@ -374,22 +374,27 @@ for (const width of [1280, 1920]) {
             .first()
             .click();
         }
-        const appearance = page.getByRole('button', {
-          name: label('gallery.videoReview.gestureAppearance'),
-          exact: true,
-        });
+        const appearance = page
+          .getByRole('group', {
+            name: label('gallery.videoReview.gestureAppearance'),
+            exact: true,
+          })
+          .or(
+            page.getByRole('button', {
+              name: label('gallery.videoReview.gestureAppearance'),
+              exact: true,
+            })
+          );
         if (editor === 'gallery' && !(await appearance.isVisible()))
           await page
             .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
             .click();
         if (editor === 'gallery') {
-          await page
-            .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
-            .last()
-            .click();
-          await page
-            .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
-            .click();
+          const display = page.getByRole('switch', {
+            name: label('gallery.videoReview.gestureFeedback'),
+            exact: true,
+          });
+          if ((await display.getAttribute('aria-checked')) !== 'true') await display.click();
         }
         await chooseInspectorValue(
           page,
@@ -425,12 +430,20 @@ for (const width of [1280, 1920]) {
             exact: true,
           })
         ).toHaveValue('30');
+        const numericRow = details
+          .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+          .filter({
+            has: page.getByRole('textbox', {
+              name: label('gallery.videoReview.gestureArea_x'),
+              exact: true,
+            }),
+          });
+        await numericRow.scrollIntoViewIfNeeded();
         await x.hover();
         const slider = details.getByRole('slider', {
           name: `${label('gallery.videoReview.gestureArea_x')} range`,
           exact: true,
         });
-        await slider.scrollIntoViewIfNeeded();
         await slider.focus();
         await slider.press('ArrowRight');
         await slider.press('Tab');

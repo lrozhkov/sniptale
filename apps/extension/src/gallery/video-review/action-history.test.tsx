@@ -233,9 +233,15 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     );
   const change = (key: string, value: string) =>
     act(() => {
-      const node = host.querySelector<HTMLInputElement | HTMLSelectElement>(
-        `[aria-label="gallery.videoReview.${key}"]`
-      )!;
+      const node = host.querySelector<HTMLElement>(`[aria-label="gallery.videoReview.${key}"]`)!;
+      if (!(node instanceof HTMLInputElement) && !(node instanceof HTMLSelectElement)) {
+        const option = [...node.querySelectorAll<HTMLButtonElement>('button')].find(
+          (button) => button.textContent === `gallery.videoReview.click_${value}`
+        );
+        expect(option).toBeDefined();
+        option!.click();
+        return;
+      }
       const proto =
         node instanceof HTMLSelectElement
           ? HTMLSelectElement.prototype

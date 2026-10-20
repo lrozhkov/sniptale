@@ -47,15 +47,11 @@ it('offers press feedback rather than a fabricated click ripple for an incomplet
       )
     );
     const control = host.querySelector<HTMLButtonElement>(
-      `[aria-label="${translate('gallery.videoReview.clickEffect')}"]`
+      `[aria-label="${translate('gallery.videoReview.gestureFeedback')}"]`
     )!;
-    act(() => control.click());
-    expect(
-      Array.from(document.querySelectorAll('[role="option"]'), (option) => option.textContent)
-    ).toEqual([
-      translate('gallery.videoReview.click_off'),
-      translate('gallery.videoReview.click_press'),
-    ]);
+    expect(control.getAttribute('role')).toBe('switch');
+    expect(host.textContent).not.toContain(translate('gallery.videoReview.click_ripple'));
+    expect(host.textContent).not.toContain(translate('gallery.videoReview.click_magnify'));
   } finally {
     act(() => root.unmount());
     host.remove();

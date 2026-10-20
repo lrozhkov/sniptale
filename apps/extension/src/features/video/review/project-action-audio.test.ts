@@ -7,6 +7,7 @@ import {
   buildProjectActionAudioAuditionPlan,
   projectActionFeedbackMarkers,
   evaluateProjectGestureFeedback,
+  getProjectGestureFeedbackDefaults,
 } from './project-action-audio';
 import { iterateReviewActionAudioCues } from './action-audio';
 import { patchReviewClicks } from './advanced/click-animation';
@@ -522,4 +523,32 @@ it('auditions only the selected instance and typed identity through cut and Spee
     ).descriptors
   ).toEqual([]);
   expect(project).toEqual(before);
+});
+
+it('shares inherited gesture appearance without changing project defaults or captured facts', () => {
+  const project = fixture();
+  project.actionPresentation = {
+    ...getVideoProjectActionPresentation(project),
+    clickStyle: { color: '#cc2200ff', size: 90, strokeWidth: 5, opacity: 0.8 },
+  };
+  const before = structuredClone(project);
+  expect(getProjectGestureFeedbackDefaults(project)).toMatchObject({
+    effect: 'press',
+    color: '#cc2200ff',
+    radius: 90,
+    stroke: 5,
+    opacity: 0.8,
+  });
+  expect(project).toEqual(before);
+  const disabled = {
+    ...project,
+    actionPresentation: { ...project.actionPresentation, enabled: false },
+  };
+  expect(getProjectGestureFeedbackDefaults(disabled)).toMatchObject({
+    effect: 'off',
+    color: '#cc2200ff',
+    radius: 90,
+    stroke: 5,
+    opacity: 0.8,
+  });
 });

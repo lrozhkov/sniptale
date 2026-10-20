@@ -162,6 +162,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/media-library-list.tsx`
 - `apps/extension/src/ui/page-bootstrap`
 - `apps/extension/src/ui/paint-selector`
+- `apps/extension/src/ui/pointer-feedback`
 - `apps/extension/src/ui/popup-shell`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/theme`

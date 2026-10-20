@@ -1,14 +1,16 @@
+import { RotateCcw } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { PointerFeedbackFields } from '../../../../../ui/pointer-feedback/fields';
 import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
 import { createProjectActionAudioRuntime } from '../../../../preview/stage/runtime/action-audio';
 import { ActionAudioFields } from '../../../../../ui/action-audio/fields';
-import { reviewGestureAreaBounds } from '../../../../../features/video/project/action-feedback/validation';
 import {
   buildProjectActionAudioAuditionPlan,
   projectActionFeedbackMarkers,
+  getProjectGestureFeedbackDefaults,
 } from '../../../../../features/video/review/project-action-audio';
 import { InspectorDetails } from '../shared/details';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { NumericRow, type NumericRowProps } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
 import {
   useVideoEditorPlaybackPort,
@@ -25,11 +27,8 @@ import {
 } from '../../../../../features/video/review/advanced/action-audio';
 import {
   patchReviewClicks,
-  REVIEW_CLICK_DEFAULT,
   type ReviewClickStyle,
 } from '../../../../../features/video/review/advanced/click-animation';
-import { ToggleField } from '../shared/controls';
-import { OptionButtonsField } from '../shared/option-buttons';
 
 /** Local inspector adapter sends one authored update to the established project history port. */
 interface FeedbackProps {
@@ -40,6 +39,7 @@ interface FeedbackProps {
   disabled: boolean;
   gesture?: boolean;
   part?: 'sound' | 'gesture';
+  gesturePart?: 'animation' | 'appearance';
 }
 
 export function ActionFeedbackFields(props: FeedbackProps) {
@@ -73,12 +73,10 @@ export function ActionFeedbackFields(props: FeedbackProps) {
         : project;
     });
   };
-  const gestureStyle = group.gestureStyles?.find((item) => item.id === props.target.ref.id) ?? {
-    ...REVIEW_CLICK_DEFAULT,
-    effect:
-      props.project.actionPresentation?.enabled === false ? ('off' as const) : ('press' as const),
-  };
-  const changeGesture = (patch: Partial<ReviewClickStyle>) => {
+  const gestureStyle =
+    group.gestureStyles?.find((item) => item.id === props.target.ref.id) ??
+    getProjectGestureFeedbackDefaults(props.project);
+  const changeGesture = (patch: Partial<ReviewClickStyle> | null) => {
     if (props.disabled) return;
     updateProject((project) => {
       const current = project.actionFeedback?.find(
@@ -86,18 +84,24 @@ export function ActionFeedbackFields(props: FeedbackProps) {
           item.recordingId === identity.recordingId &&
           item.sourceInstanceId === identity.sourceInstanceId
       );
+      if (
+        patch === null &&
+        !current?.gestureStyles?.some((style) => style.id === props.target.ref.id)
+      )
+        return project;
       return current
         ? patchVideoProjectActionFeedback(project, identity, {
             gestureStyles: patchReviewClicks(
               current.gestureStyles ?? [],
               [props.target.ref.id],
-              {
-                effect:
-                  current.gestureStyles?.find((item) => item.id === props.target.ref.id)?.effect ??
-                  (project.actionPresentation?.enabled === false ? 'off' : 'press'),
-                ...patch,
-              },
-              patch.gestureAppearance === 'area'
+              patch === null
+                ? null
+                : {
+                    ...(current.gestureStyles?.find((item) => item.id === props.target.ref.id) ??
+                      getProjectGestureFeedbackDefaults(project)),
+                    ...patch,
+                  },
+              patch?.gestureAppearance === 'area'
                 ? projectActionFeedbackMarkers(project, current)
                 : []
             ),
@@ -128,7 +132,36 @@ export function ActionFeedbackFields(props: FeedbackProps) {
         </p>
       ) : null}
       {props.gesture && props.part !== 'sound' ? (
-        <FeedbackGestureFields gestureStyle={gestureStyle} changeGesture={changeGesture} />
+        <>
+          <PointerFeedbackFields
+            gesture
+            values={[gestureStyle]}
+            part={props.gesturePart ?? 'animation'}
+            disabled={props.disabled}
+            Details={InspectorDetails}
+            disclosurePreferenceId="action-feedback:gesture-area"
+            onChange={changeGesture}
+          />
+          {props.gesturePart !== 'appearance' ? (
+            <ContentToolbarButton
+              type="button"
+              tone="outline"
+              size="compact"
+              className="flex w-full items-center justify-center gap-2"
+              dataUi="video-editor.gesture.reset"
+              aria-label={translate('gallery.videoReview.clickReset')}
+              title={translate('gallery.videoReview.clickReset')}
+              disabled={
+                props.disabled ||
+                !group.gestureStyles?.some((style) => style.id === props.target.ref.id)
+              }
+              onClick={() => changeGesture(null)}
+            >
+              <RotateCcw size={14} aria-hidden="true" />
+              {translate('gallery.videoReview.clickReset')}
+            </ContentToolbarButton>
+          ) : null}
+        </>
       ) : null}
     </fieldset>
   );
@@ -206,76 +239,4 @@ function useActionSoundAudition(props: FeedbackProps) {
       });
   };
   return { audition, stop, error };
-}
-
-function FeedbackNumber(props: Omit<NumericRowProps, 'onPreviewValue'>) {
-  const [draft, setDraft] = useState<number>();
-  useEffect(() => setDraft(undefined), [props.value]);
-  return (
-    <NumericRow
-      {...props}
-      value={draft ?? props.value}
-      onPreviewValue={setDraft}
-      onCommitValue={(value) => {
-        setDraft(undefined);
-        props.onCommitValue(value);
-      }}
-    />
-  );
-}
-
-function FeedbackGestureFields({
-  gestureStyle,
-  changeGesture,
-}: {
-  gestureStyle: ReviewClickStyle;
-  changeGesture(patch: Partial<ReviewClickStyle>): void;
-}) {
-  return (
-    <>
-      <ToggleField
-        label={translate('gallery.videoReview.gestureFeedback')}
-        checked={gestureStyle.effect !== 'off'}
-        onChange={(enabled) => changeGesture({ effect: enabled ? 'press' : 'off' })}
-      />
-      <OptionButtonsField
-        label={translate('gallery.videoReview.gestureAppearance')}
-        value={gestureStyle.gestureAppearance ?? 'halo'}
-        options={(['halo', 'path', 'area'] as const).map((value) => ({
-          value,
-          label: translate(`gallery.videoReview.gesture_${value}`),
-        }))}
-        onChange={(gestureAppearance) => changeGesture({ gestureAppearance })}
-      />
-      {gestureStyle.gestureAppearance === 'area' && gestureStyle.gestureArea ? (
-        <InspectorDetails
-          preferenceId="action-feedback:gesture-area"
-          label={translate('gallery.videoReview.gestureAreaDetails')}
-        >
-          {(['x', 'y', 'width', 'height'] as const).map((key) => {
-            const area = gestureStyle.gestureArea!;
-            const { min, max } = reviewGestureAreaBounds(area, key);
-            return (
-              <FeedbackNumber
-                key={key}
-                appearance="plain"
-                focusAppearance="accent-box"
-                label={translate(`gallery.videoReview.gestureArea_${key}`)}
-                value={area[key] * 100}
-                min={min}
-                max={max}
-                step={0.1}
-                precision={1}
-                unit="%"
-                scrub={{ min, max, step: 0.1 }}
-                onCommitValue={(value) =>
-                  changeGesture({ gestureArea: { ...area, [key]: value / 100 } })
-                }
-              />
-            );
-          })}
-        </InspectorDetails>
-      ) : null}
-    </>
-  );
 }

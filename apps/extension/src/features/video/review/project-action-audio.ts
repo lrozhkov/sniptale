@@ -5,6 +5,7 @@ import type {
   VideoProjectActionFeedback,
   ReviewActionAudioTarget,
   ReviewActionAudioStyle,
+  ReviewClickStyle,
 } from '../project/action-feedback/types';
 import { buildReviewActionAudioPlan, type ReviewActionAudioPlan } from './action-audio';
 import { scheduleReviewClicks, evaluateReviewClicks } from './click-animation';
@@ -176,6 +177,23 @@ export function buildProjectActionAudioAuditionPlan(
   });
 }
 
+/** Gesture authoring and rendering inherit one project appearance without changing captured source facts. */
+export function getProjectGestureFeedbackDefaults(project: VideoProject): ReviewClickStyle {
+  const defaults = getVideoProjectActionPresentation(project);
+  return {
+    ...REVIEW_CLICK_DEFAULT,
+    effect: defaults.enabled ? 'press' : 'off',
+    ...(defaults.clickStyle
+      ? {
+          color: defaults.clickStyle.color,
+          radius: defaults.clickStyle.size,
+          stroke: defaults.clickStyle.strokeWidth,
+          opacity: defaults.clickStyle.opacity,
+        }
+      : {}),
+  };
+}
+
 const gesturePlans = new WeakMap<VideoProject, ReturnType<typeof prepareProjectGestureFeedback>>();
 
 /** Both surfaces query one source/run plan per immutable project revision. */
@@ -225,17 +243,8 @@ function prepareProjectGestureFeedback(project: VideoProject) {
         return [];
       return [
         {
-          ...REVIEW_CLICK_DEFAULT,
+          ...getProjectGestureFeedbackDefaults(project),
           id: marker.ref.id,
-          effect: 'press' as const,
-          ...(defaults.clickStyle
-            ? {
-                color: defaults.clickStyle.color,
-                radius: defaults.clickStyle.size,
-                stroke: defaults.clickStyle.strokeWidth,
-                opacity: defaults.clickStyle.opacity,
-              }
-            : {}),
         },
       ];
     });

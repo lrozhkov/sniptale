@@ -116,3 +116,53 @@ it('respects a locked history lane for both inheritance and point editing', () =
   expect(button('selectPointOnStage').disabled).toBe(true);
   expect(props.onUpdateActionEventDetails).not.toHaveBeenCalled();
 });
+
+it('groups gesture appearance without legacy timing or placement and keeps event admission', () => {
+  const props = fixture();
+  const base = props.project.actionEvents[0]!;
+  const project = {
+    ...props.project,
+    version: 3 as const,
+    actionEvents: [
+      {
+        ...base,
+        data: {
+          gestureType: 'hold',
+          gestureId: 'hold',
+          button: 0,
+          downTime: 1,
+          upTime: 2,
+          completion: 'released',
+        },
+        presentation: { enabled: false, preset: 'NONE' as const },
+      },
+    ],
+    actionFeedback: [
+      { recordingId: 'rec-asset-video', sourceInstanceId: 'instance', settings: [], signals: [] },
+    ],
+  };
+  const selected = resolveVideoProjectActionOccurrences(project).find(
+    (row) => row.clipId === 'repeat'
+  )!;
+  act(() =>
+    root.render(
+      <InspectActionPanel {...props} project={project} selectedActionOccurrence={selected} />
+    )
+  );
+  expect(button('historyForceOff').getAttribute('aria-pressed')).toBe('true');
+  const labels = [...container.querySelectorAll('button')].map((node) =>
+    node.getAttribute('aria-label')
+  );
+  expect(labels).not.toContain('videoEditor.sidebar.historyTransitions');
+  expect(labels).not.toContain('videoEditor.sidebar.inspectorGroupPlacement');
+  const style = container.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.clickAppearance"]'
+  )!;
+  expect(style).not.toBeNull();
+  act(() => style.click());
+  expect(
+    container.querySelector('input[aria-label="gallery.videoReview.clickRadius"]')
+  ).not.toBeNull();
+  expect(container.querySelector('[aria-label="videoEditor.sidebar.actionSize"]')).toBeNull();
+  expect(props.onUpdateActionEventDetails).not.toHaveBeenCalled();
+});

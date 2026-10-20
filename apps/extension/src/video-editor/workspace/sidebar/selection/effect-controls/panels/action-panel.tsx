@@ -1,3 +1,4 @@
+import { getProjectGestureFeedbackDefaults } from '../../../../../../features/video/review/project-action-audio';
 import { ActionFeedbackFields } from '../action-feedback-fields';
 import { ActionClickStyleFields, ActionKeyStyleFields } from '../action-style-fields';
 import { InspectorDetails } from '../../shared/details';
@@ -10,7 +11,7 @@ import { getVideoProjectUtilityLanes } from '../../../../../../features/video/pr
 import type { VideoProjectActionPresentationOverride } from '../../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../../contracts/selection-panel';
 import { ActionPointButtons, ActionPointFields, ActionPrimaryFields } from '../fields';
-import { InspectorGroupedPanel } from '../../grouped-inspector';
+import { InspectorGroupedPanel, type InspectorGroupDefinition } from '../../grouped-inspector';
 import { OptionButtonsField } from '../../shared/option-buttons';
 import { SelectionEmptyState } from '../../inspection/helpers';
 import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../../shared/panel';
@@ -38,6 +39,19 @@ export function InspectActionPanel(props: ActionProps) {
       row.occurrence.eventId === occurrence.eventId && row.occurrence.clipId === occurrence.clipId
   );
   if (!resolved) return <SelectionEmptyState />;
+  const source = event.anchor.kind === 'recording-source' ? event.anchor : null;
+  const feedback = source
+    ? props.project.actionFeedback?.find(
+        (group) =>
+          group.recordingId === source.recordingId &&
+          group.sourceInstanceId === source.sourceInstanceId
+      )
+    : undefined;
+  const gesture = Boolean(feedback && isCapturedGesture(event));
+  const authoredGesture = feedback?.gestureStyles?.find(
+    (style) => style.id === source?.sourceEventId
+  );
+  const gestureStyle = authoredGesture ?? getProjectGestureFeedbackDefaults(props.project);
   const disabled = getVideoProjectUtilityLanes(props.project).actions.locked;
   const update = (patch: VideoProjectActionPresentationOverride) => {
     if (!disabled)
@@ -59,7 +73,13 @@ export function InspectActionPanel(props: ActionProps) {
             id: 'info',
             semantic: 'info' as const,
             label: translate('videoEditor.sidebar.inspectorGroupInfo'),
-            content: <ActionOverview resolved={resolved} />,
+            content: (
+              <ActionOverview
+                resolved={resolved}
+                gesture={gesture}
+                feedbackOverridden={Boolean(authoredGesture)}
+              />
+            ),
           },
           {
             id: 'appearance',
@@ -76,26 +96,18 @@ export function InspectActionPanel(props: ActionProps) {
                 resolved={resolved}
                 disabled={disabled}
                 update={update}
+                gesture={gesture}
               />
             ),
           },
-          {
-            id: 'animation',
-            semantic: 'animation',
-            label: translate('videoEditor.sidebar.historyTransitions'),
-            content: (
-              <ActionPrimaryFields
-                part="animation"
-                easing={resolved.easing}
-                showEasing={event.kind !== 'KEY'}
-                duration={resolved.duration}
-                offset={resolved.offset}
-                preset={resolved.preset}
-                disabled={disabled}
-                onChange={update}
-              />
-            ),
-          },
+          ...actionVisualGroups({
+            props,
+            resolved,
+            disabled,
+            update,
+            gesture,
+            appearanceVisible: gestureStyle.effect !== 'off',
+          }),
           ...(event.anchor.kind === 'recording-source' &&
           (event.kind === 'CLICK' || event.kind === 'KEY')
             ? [
@@ -119,7 +131,7 @@ export function InspectActionPanel(props: ActionProps) {
                 },
               ]
             : []),
-          ...(event.kind === 'KEY'
+          ...(event.kind === 'KEY' || gesture
             ? []
             : [
                 {
@@ -140,6 +152,66 @@ export function InspectActionPanel(props: ActionProps) {
       />
     </section>
   );
+}
+
+/** Captured gestures use source appearance. Ordinary actions retain authored animation controls. */
+function actionVisualGroups({
+  props,
+  resolved,
+  disabled,
+  update,
+  gesture,
+  appearanceVisible,
+}: {
+  props: ActionProps;
+  resolved: ActionPresentation;
+  disabled: boolean;
+  update(patch: VideoProjectActionPresentationOverride): void;
+  gesture: boolean;
+  appearanceVisible: boolean;
+}): InspectorGroupDefinition<string>[] {
+  const event = resolved.event;
+  if (gesture) {
+    if (event.anchor.kind !== 'recording-source' || !appearanceVisible) return [];
+    return [
+      {
+        id: 'gesture-style',
+        semantic: 'appearance',
+        label: translate('gallery.videoReview.clickAppearance'),
+        content: (
+          <ActionFeedbackFields
+            project={props.project}
+            recordingId={event.anchor.recordingId}
+            sourceInstanceId={event.anchor.sourceInstanceId}
+            target={{ ref: { kind: 'action', id: event.anchor.sourceEventId }, family: 'mouse' }}
+            disabled={disabled}
+            gesture
+            part="gesture"
+            gesturePart="appearance"
+          />
+        ),
+      },
+    ];
+  }
+  return [
+    {
+      id: 'animation',
+      semantic: 'animation',
+      label: translate('videoEditor.sidebar.historyTransitions'),
+      content: (
+        <ActionPrimaryFields
+          part="animation"
+          easing={resolved.easing}
+          showEasing={event.kind !== 'KEY'}
+          duration={resolved.duration}
+          offset={resolved.offset}
+          preset={resolved.preset}
+          disabled={disabled}
+          onChange={update}
+        />
+      ),
+    },
+  ];
 }
 
 function ActionPlacementFields({
@@ -201,7 +273,15 @@ function ActionPlacementFields({
   );
 }
 
-function ActionOverview({ resolved }: { resolved: ActionPresentation }) {
+function ActionOverview({
+  resolved,
+  gesture,
+  feedbackOverridden,
+}: {
+  resolved: ActionPresentation;
+  gesture: boolean;
+  feedbackOverridden: boolean;
+}) {
   const event = resolved.event;
   return (
     <DetailList>
@@ -227,14 +307,16 @@ function ActionOverview({ resolved }: { resolved: ActionPresentation }) {
             : '—'
         }
       />
-      <DetailItem
-        label={translate('videoEditor.sidebar.inspectorGroupStatus')}
-        value={resolveStatusLabel(resolved.reason)}
-      />
+      {!gesture ? (
+        <DetailItem
+          label={translate('videoEditor.sidebar.inspectorGroupStatus')}
+          value={resolveStatusLabel(resolved.reason)}
+        />
+      ) : null}
       <DetailItem
         label={translate('videoEditor.sidebar.historySettings')}
         value={translate(
-          resolved.overridden
+          resolved.overridden || feedbackOverridden
             ? 'videoEditor.sidebar.historyOverridden'
             : 'videoEditor.sidebar.historyInherit'
         )}
@@ -303,10 +385,12 @@ function ActionAppearanceFields({
   resolved,
   disabled,
   update,
+  gesture,
 }: {
   props: ActionProps;
   resolved: ActionPresentation;
   disabled: boolean;
+  gesture: boolean;
   update(patch: VideoProjectActionPresentationOverride): void;
 }) {
   const { event, occurrence } = resolved;
@@ -336,25 +420,13 @@ function ActionAppearanceFields({
           });
         }}
       />
-      {resolved.reason ? (
+      {resolved.reason &&
+      (!gesture || resolved.reason === 'track-disabled' || resolved.reason === 'event-disabled') ? (
         <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]" role="status">
           {resolveStatusLabel(resolved.reason)}
         </p>
       ) : null}
-      <ActionPrimaryFields
-        part="appearance"
-        duration={resolved.duration}
-        offset={resolved.offset}
-        preset={resolved.preset}
-        showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
-        disabled={disabled}
-        onChange={update}
-      />
-      <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
-      {event.anchor.kind === 'recording-source' &&
-      event.kind === 'CLICK' &&
-      typeof event.data['gestureType'] === 'string' &&
-      (event.data['gestureType'] !== 'click' || event.data['completion'] !== 'released') ? (
+      {gesture && event.anchor.kind === 'recording-source' ? (
         <ActionFeedbackFields
           project={props.project}
           recordingId={event.anchor.recordingId}
@@ -363,22 +435,47 @@ function ActionAppearanceFields({
           disabled={disabled}
           gesture
           part="gesture"
+          gesturePart="animation"
         />
+      ) : (
+        <>
+          <ActionPrimaryFields
+            part="appearance"
+            duration={resolved.duration}
+            offset={resolved.offset}
+            preset={resolved.preset}
+            showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
+            disabled={disabled}
+            onChange={update}
+          />
+          <EventStyleFields props={props} resolved={resolved} disabled={disabled} update={update} />
+        </>
+      )}
+      {!gesture ? (
+        <InspectorActionButton
+          compact
+          tone="secondary"
+          separated
+          disabled={disabled || !resolved.overridden}
+          onClick={() =>
+            props.onUpdateActionEventDetails(event.id, {
+              clipId: occurrence.clipId,
+              presentation: null,
+            })
+          }
+        >
+          {translate('videoEditor.sidebar.historyReset')}
+        </InspectorActionButton>
       ) : null}
-      <InspectorActionButton
-        compact
-        tone="secondary"
-        separated
-        disabled={disabled || !resolved.overridden}
-        onClick={() =>
-          props.onUpdateActionEventDetails(event.id, {
-            clipId: occurrence.clipId,
-            presentation: null,
-          })
-        }
-      >
-        {translate('videoEditor.sidebar.historyReset')}
-      </InspectorActionButton>
     </>
+  );
+}
+
+function isCapturedGesture(event: ActionPresentation['event']): boolean {
+  return (
+    event.anchor.kind === 'recording-source' &&
+    event.kind === 'CLICK' &&
+    typeof event.data['gestureType'] === 'string' &&
+    (event.data['gestureType'] !== 'click' || event.data['completion'] !== 'released')
   );
 }
