@@ -10,7 +10,7 @@ import {
   setQuickEditWatermarkAnchor,
   setQuickEditWatermarkMode,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, ReviewDetails } from './controls';
 import {

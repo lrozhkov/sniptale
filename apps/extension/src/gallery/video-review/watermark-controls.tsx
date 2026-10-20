@@ -10,7 +10,7 @@ import {
 import {
   parseQuickEditWatermark,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';

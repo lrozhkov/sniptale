@@ -1,6 +1,6 @@
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { isBoundedNumber } from '../../project/validation/primitives';
+import { isBoundedNumber } from '../validation/primitives';
 
 const anchors = [
   'top-left',

@@ -395,7 +395,7 @@ it.each(['none', 'text', 'image'] as const)(
   'purges a remembered logo in %s without erasing authored text',
   async (mode) => {
     const { createQuickEditWatermark } =
-      await import('../../../features/video/review/advanced/watermark');
+      await import('../../../features/video/project/scene/watermark');
     const watermark = {
       ...createQuickEditWatermark('Keep this text'),
       mode,

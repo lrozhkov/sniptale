@@ -416,7 +416,7 @@ it('transfers an inactive image choice even without history', async () => {
 
 it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
   const { createQuickEditWatermark } =
-    await import('../../../features/video/review/advanced/watermark');
+    await import('../../../features/video/project/scene/watermark');
   const watermark = {
     ...createQuickEditWatermark('Saved brand'),
     mode: 'none' as const,

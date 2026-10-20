@@ -1,5 +1,5 @@
 import { createQuickEditZoomRegion } from './advanced/zoom';
-import { createQuickEditWatermark } from './advanced/watermark';
+import { createQuickEditWatermark } from '../project/scene/watermark';
 import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';

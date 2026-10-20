@@ -5,7 +5,7 @@ import { translate } from '../../../apps/extension/src/platform/i18n';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../../apps/extension/src/features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../../apps/extension/src/features/video/review/advanced/focus';
-import { createQuickEditWatermark } from '../../../apps/extension/src/features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../../apps/extension/src/features/video/project/scene/watermark';
 import type { QuickEditZoomRegion } from '../../../apps/extension/src/features/video/review/advanced/types';
 import { inspectVideoWorkspace } from '../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {

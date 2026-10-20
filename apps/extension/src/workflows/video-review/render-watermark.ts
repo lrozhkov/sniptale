@@ -2,7 +2,7 @@ import {
   resolveQuickEditWatermarkBounds,
   resolveQuickEditWatermarkTile,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import type {
   RenderCanvasLease,
   RenderResources,

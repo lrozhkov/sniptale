@@ -1,4 +1,4 @@
-import { createQuickEditWatermark } from './watermark';
+import { createQuickEditWatermark } from '../../project/scene/watermark';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';
 import { expect, it } from 'vitest';

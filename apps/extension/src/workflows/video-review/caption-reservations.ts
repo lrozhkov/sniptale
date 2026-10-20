@@ -9,7 +9,7 @@ import {
   quickEditWebcamBounds,
   quickEditWebcamFrameAt,
 } from '../../features/video/review/advanced/webcam';
-import { resolveQuickEditWatermarkTile } from '../../features/video/review/advanced/watermark';
+import { resolveQuickEditWatermarkTile } from '../../features/video/project/scene/watermark';
 import type { ReviewCaptionReservation } from '../../features/video/review/caption-plan';
 import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
 import type { PreviewScene } from './preview-scene';

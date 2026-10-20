@@ -8,7 +8,7 @@ import {
   quickEditWebcamFrameAt,
   quickEditWebcamBounds,
 } from '../../features/video/review/advanced/webcam';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { measureReviewComment } from './render-comments';

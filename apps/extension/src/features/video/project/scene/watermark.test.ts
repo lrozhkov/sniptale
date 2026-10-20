@@ -8,8 +8,14 @@ import {
   resolveQuickEditWatermarkBounds,
   resolveQuickEditWatermarkTile,
 } from './watermark';
-import { createQuickEditAdvancedState, createQuickEditAdvancedContent } from './defaults';
-import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
+import {
+  createQuickEditAdvancedState,
+  createQuickEditAdvancedContent,
+} from '../../review/advanced/defaults';
+import {
+  loadQuickEditAdvancedState,
+  loadQuickEditAdvancedContentState,
+} from '../../review/advanced/validation';
 
 const logo = { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 0.7 };
 it('starts off without adding authored content to old projects', () => {

@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewWatermark } from './use-review-watermark';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { createQuickEditAdvancedContent } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedContent } from '../../features/video/review/advanced/types';
 

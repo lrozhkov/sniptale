@@ -20,7 +20,7 @@ import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 
 let root: Root;
 let host: HTMLDivElement;

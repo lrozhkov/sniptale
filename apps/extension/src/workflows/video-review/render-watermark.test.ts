@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWatermarkRenderer, measureReviewWatermark } from './render-watermark';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
-import type { QuickEditWatermarkSettings } from '../../features/video/review/advanced/watermark';
+import type { QuickEditWatermarkSettings } from '../../features/video/project/scene/watermark';
 
 function settings(): QuickEditWatermarkSettings {
   return {

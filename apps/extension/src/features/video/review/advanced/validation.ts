@@ -12,7 +12,7 @@ import {
   parseReviewVoiceTextSnapshot,
 } from '../text-validation';
 import { parseQuickEditPresentationSettings } from './presentation';
-import { parseQuickEditWatermark } from './watermark';
+import { parseQuickEditWatermark } from '../../project/scene/watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from './key-animation';
 import {

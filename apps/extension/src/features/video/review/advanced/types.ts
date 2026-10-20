@@ -313,7 +313,7 @@ export interface QuickEditAdvancedContent {
   canvas?: QuickEditCanvasSize;
   windowHeader?: QuickEditWindowHeader;
   webcam?: QuickEditWebcam;
-  watermark?: import('./watermark').QuickEditWatermarkSettings;
+  watermark?: import('../../project/scene/watermark').QuickEditWatermarkSettings;
   presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }

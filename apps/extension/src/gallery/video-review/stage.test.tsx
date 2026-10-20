@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

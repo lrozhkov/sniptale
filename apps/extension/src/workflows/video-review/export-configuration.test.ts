@@ -1,4 +1,4 @@
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';

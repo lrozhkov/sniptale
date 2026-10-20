@@ -1,7 +1,7 @@
 import { argsFixture, contextFixture, state } from './render-export.test-support';
 import { afterEach, expect, it, vi } from 'vitest';
 import { writeReviewFrames } from './render-export';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 const painting = vi.hoisted(() => ({
   order: [] as string[],
   draw: vi.fn(),

@@ -6,7 +6,7 @@ import {
   createQuickEditWatermark,
   parseQuickEditWatermark,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import { translate } from '../../platform/i18n';
 
 type Session = ReturnType<typeof createVideoReviewSession>;

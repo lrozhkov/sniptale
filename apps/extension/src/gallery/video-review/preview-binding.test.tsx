@@ -10,7 +10,7 @@ import { createQuickEditZoomRegion } from '../../features/video/review/advanced/
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnnotation, ReviewSource } from '../../features/video/review/types';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';

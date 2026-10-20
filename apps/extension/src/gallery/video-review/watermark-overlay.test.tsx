@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewWatermarkOverlay } from './watermark-overlay';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 const io = vi.hoisted(() => ({ prepare: vi.fn(), draw: vi.fn(), dispose: vi.fn() }));
 vi.mock('../../workflows/video-review/render-watermark', () => ({
   createReviewWatermarkRenderer: io.prepare,

@@ -10,7 +10,7 @@ import {
 import {
   resolveQuickEditWatermarkBounds,
   type QuickEditWatermarkSettings,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 import {
   createReviewWatermarkRenderer,
   type ReviewWatermarkRenderer,

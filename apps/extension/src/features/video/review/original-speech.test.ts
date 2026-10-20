@@ -20,7 +20,7 @@ import {
 } from './advanced/validation';
 import { reviewAdvancedContentBaseline } from './document';
 import { createNeutralPresentationSettings } from './advanced/presentation';
-import { createQuickEditWatermark } from './advanced/watermark';
+import { createQuickEditWatermark } from '../project/scene/watermark';
 
 const profile = { modelId: 'tts', voiceId: 'alloy', responseFormat: 'mp3' as const };
 function speech(): ReviewOriginalSpeech {

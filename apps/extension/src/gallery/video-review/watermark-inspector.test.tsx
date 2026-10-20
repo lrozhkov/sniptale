@@ -9,7 +9,7 @@ import {
 import {
   createQuickEditWatermark,
   parseQuickEditWatermark,
-} from '../../features/video/review/advanced/watermark';
+} from '../../features/video/project/scene/watermark';
 
 const io = vi.hoisted(() => ({ picker: vi.fn() }));
 vi.mock('../../platform/i18n', () => ({
