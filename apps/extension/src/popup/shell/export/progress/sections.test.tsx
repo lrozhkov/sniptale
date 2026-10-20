@@ -153,7 +153,9 @@ async function verifyCompletedState() {
 
   expect(container?.textContent?.match(/Экспорт завершен/g)?.length).toBe(1);
   expect(container?.textContent).toContain('export.zip');
-  expect(container?.querySelector('[title="export.zip"]')?.textContent).toContain('export.zip');
+  expect(container?.querySelector('[data-popup-hint="export.zip"]')?.textContent).toContain(
+    'export.zip'
+  );
   expect(container?.textContent).not.toContain('Можно снова запустить экспорт');
   expect(container?.querySelector('button')).toBeNull();
   expect(container?.querySelectorAll('svg[class*="color-success"]')).toHaveLength(1);

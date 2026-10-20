@@ -140,7 +140,7 @@ function WebcamQualityOptionButton({
         QUALITY_OPTION_BASE_CLASS_NAME,
         active ? QUALITY_OPTION_ACTIVE_CLASS_NAME : QUALITY_OPTION_INACTIVE_CLASS_NAME,
       ].join(' ')}
-      title={label}
+      data-popup-hint={label}
       onClick={onClick}
     >
       {label}

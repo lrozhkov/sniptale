@@ -24,7 +24,7 @@ describe('PopupActionButton', () => {
 
     expect(markup).toContain('data-ui="popup.action"');
     expect(markup).toContain('aria-label="Open settings"');
-    expect(markup).toContain('title="Open settings"');
+    expect(markup).toContain('data-popup-hint="Open settings"');
     expect(markup).toContain('Configure defaults');
     expect(markup).toContain('⌘,');
     expect(markup).toContain('justify-start');
@@ -52,7 +52,7 @@ describe('PopupActionButton', () => {
 
     expect(markup).toContain('data-ui="shared.ui.popup-action-button"');
     expect(markup).toContain('aria-label="Save project"');
-    expect(markup).toContain('title="Save now"');
+    expect(markup).toContain('data-popup-hint="Save now"');
     expect(markup).toContain('disabled=""');
     expect(markup).toContain('sr-only">Save project<');
     expect(markup).toContain('group');
@@ -86,7 +86,7 @@ describe('PopupActionButton', () => {
     );
 
     expect(markup).not.toContain('sr-only');
-    expect(markup).not.toContain('title=');
+    expect(markup).not.toContain('data-popup-hint=');
   });
 
   it('keeps the shared aria fallback contract across both variants', () => {
@@ -109,9 +109,9 @@ describe('PopupActionButton', () => {
     );
 
     expect(defaultMarkup).toContain('aria-label="Export"');
-    expect(defaultMarkup).toContain('title="Export"');
+    expect(defaultMarkup).toContain('data-popup-hint="Export"');
     expect(compactMarkup).toContain('aria-label="Export"');
-    expect(compactMarkup).toContain('title="Export"');
+    expect(compactMarkup).toContain('data-popup-hint="Export"');
   });
 
   it('keeps the primary command visible with neutral hover and keyboard focus feedback', () => {

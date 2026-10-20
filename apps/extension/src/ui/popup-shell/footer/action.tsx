@@ -46,7 +46,7 @@ export function PopupFooterAction({
     <button
       type="button"
       onClick={onClick}
-      title={title ?? label}
+      data-popup-hint={title ?? label}
       data-ui={dataUi ?? 'shared.ui.popup-footer-action'}
       className={getPopupFooterActionClassName(iconOnlyMode)}
     >

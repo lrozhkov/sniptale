@@ -132,7 +132,7 @@ it('disables a known over-budget frame-rate choice instead of silently accepting
     (button) => button.textContent === '60 fps'
   );
   expect(sixtyFps?.disabled).toBe(true);
-  expect(sixtyFps?.getAttribute('title')).toBe('popup.video.outputResourceUnsupported');
+  expect(sixtyFps?.getAttribute('data-popup-hint')).toBe('popup.video.outputResourceUnsupported');
 });
 
 it('disables 4K at 60 fps instead of silently changing the selected cadence', () => {

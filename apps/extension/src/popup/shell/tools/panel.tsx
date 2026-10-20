@@ -92,7 +92,7 @@ function ToolButton(props: {
       className={props.tool.mode ? TOOL_BUTTON_CLASS_NAME : OPEN_TOOLBAR_CLASS_NAME}
       data-ui={props.tool.dataUi}
       disabled={Boolean(props.disabledReason)}
-      title={props.disabledReason ?? hint}
+      data-popup-hint={props.disabledReason ?? hint}
       onClick={() => props.onOpen(props.tool.mode)}
     >
       <span className={TOOL_ICON_CLASS_NAME}>

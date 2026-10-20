@@ -107,7 +107,7 @@ it('keeps the option list top-aligned with manual scrolling and no automatic off
 it('keeps parameter labels in the shared fixed-width column', () => {
   renderSelect();
 
-  const label = container?.querySelector<HTMLElement>('[title="Mic"]');
+  const label = container?.querySelector<HTMLElement>('[data-popup-hint="Mic"]');
   expect(label?.className).toContain('w-[88px]');
   expect(label?.className).toContain('truncate');
 });
@@ -151,8 +151,10 @@ it('opens over a theme-aware blurred backdrop and dismisses from the covered are
   expect(panel?.querySelector('[data-ui="popup.inline-curtain.back"]')).not.toBeNull();
   expect(backdrop?.className).toContain('var(--sniptale-color-surface-canvas)');
   expect(backdrop?.className).toContain('backdrop-blur-[4px]');
-  expect(container?.querySelector('[title="Studio microphone with a long name"]')).not.toBeNull();
-  expect(container?.querySelector('[title="Full device path"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[data-popup-hint="Studio microphone with a long name"]')
+  ).not.toBeNull();
+  expect(container?.querySelector('[data-popup-hint="Full device path"]')).not.toBeNull();
   expect(container?.querySelector('[aria-current="true"]')?.className).toContain(
     'var(--sniptale-color-surface-hover)'
   );

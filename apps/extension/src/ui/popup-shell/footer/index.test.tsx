@@ -184,7 +184,7 @@ it('wires the retained GitHub and Settings actions', async () => {
   const githubButton = footerAction('popup.footer.github-button');
   const githubIcon = githubButton?.querySelector('svg');
   expect(onOpenGithub).toHaveBeenCalledTimes(1);
-  expect(githubButton?.getAttribute('title')).toBe('GitHub');
+  expect(githubButton?.getAttribute('data-popup-hint')).toBe('GitHub');
   expect(githubIcon?.getAttribute('aria-hidden')).toBe('true');
   expect(githubIcon?.classList.contains('h-3.5')).toBe(true);
   expect(githubIcon?.getAttribute('viewBox')).toBe('0 0 24 24');

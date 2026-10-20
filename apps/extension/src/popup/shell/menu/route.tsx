@@ -306,7 +306,7 @@ function MenuCaptureActions(props: {
           type="button"
           className={CAPTURE_BUTTON_CLASS_NAME}
           disabled={Boolean(props.disabledReason) || props.pendingAction !== null}
-          title={props.disabledReason ?? hint}
+          data-popup-hint={props.disabledReason ?? hint}
           onClick={() => void props.onCapture(`download:${mode}`, mode)}
         >
           <Icon className={CAPTURE_ICON_CLASS_NAME} />
@@ -372,7 +372,7 @@ function MenuQuickScenarios(props: {
           type="button"
           className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
           disabled={scenario.disabled}
-          title={scenario.title}
+          data-popup-hint={scenario.title}
           onClick={scenario.onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
@@ -448,7 +448,7 @@ function MenuToolbarButton({
       type="button"
       className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
       data-ui={`popup.menu.tool-action.${mode}`}
-      title={disabledReason ?? translate(hintKey)}
+      data-popup-hint={disabledReason ?? translate(hintKey)}
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >

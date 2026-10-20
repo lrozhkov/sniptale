@@ -108,7 +108,7 @@ export function PopupExpandingModeButton({
       style={textLayoutStyle}
       disabled={disabled}
       onClick={onClick}
-      title={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
+      data-popup-hint={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
     >
       <Icon
         className={cx(

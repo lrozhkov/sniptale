@@ -41,7 +41,7 @@ function QuickActionButton({
     <button
       type="button"
       disabled={disabled}
-      title={title}
+      data-popup-hint={title}
       onClick={() => {
         if (!disabled) {
           onTriggerAction(action.id);

@@ -211,7 +211,7 @@ export function PopupIconStateButton({
       disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      title={title}
+      data-popup-hint={title}
       data-ui={dataUi ?? 'popup.icon-state-button'}
       className={getButtonClassName(active, disabled, layout, geometry)}
     >

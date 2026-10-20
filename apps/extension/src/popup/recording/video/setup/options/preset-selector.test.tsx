@@ -147,7 +147,7 @@ it('shows native size and window presets in an inline curtain', async () => {
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalledOnce();
 
   act(() => {
-    container?.querySelector<HTMLElement>('[title="Preset"]')?.closest('button')?.click();
+    container?.querySelector<HTMLElement>('[data-popup-hint="Preset"]')?.closest('button')?.click();
   });
   expect(onPresetChange).toHaveBeenCalledWith('preset-1');
 });
@@ -257,7 +257,7 @@ it('keeps a preset disabled when runtime availability fails', async () => {
   await flushEffects();
   expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalled();
   const presetButton = container
-    ?.querySelector<HTMLElement>('[title="Preset"]')
+    ?.querySelector<HTMLElement>('[data-popup-hint="Preset"]')
     ?.closest<HTMLButtonElement>('button');
   await vi.waitFor(() =>
     expect(container?.textContent).toContain('t:viewportPresets.availability.platformRejected')

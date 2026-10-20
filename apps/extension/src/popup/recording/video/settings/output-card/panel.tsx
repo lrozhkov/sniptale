@@ -161,7 +161,9 @@ function OutputOptionGroup<TValue extends string | number>(props: {
               option.disabled ? 'cursor-not-allowed opacity-50' : '',
             ].join(' ')}
             disabled={option.disabled}
-            title={option.disabled ? translate('popup.video.outputResourceUnsupported') : undefined}
+            data-popup-hint={
+              option.disabled ? translate('popup.video.outputResourceUnsupported') : undefined
+            }
             onClick={() => props.onChange(option.value)}
           >
             {option.label}

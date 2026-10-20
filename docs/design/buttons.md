@@ -20,7 +20,7 @@
 
 Use a form-owned submit button to submit a draft. Independent pressed modes retain stable names. Changing Start/Stop commands remain commands, not pressed modes. Use one primary command per clear task region. Full width needs a layout reason. Ordinary commands never use orange fill or orange text. Danger tone is a semantic exception with its own contrast proof.
 
-Do not mix borders among equivalent neighboring commands without a surface reason. A specialized command strip can use borderless utility icons throughout. Preserve its selected-mode surface and keyboard focus. Do not mix ordinary hover frames into that strip. Choose text and icon content through the [command decision table](command-content.md), not consumer preference. Icon-only actions require complete accessible names. Use native browser `title` for optional hints. Do not add custom tooltip layers. Keep required explanations visible.
+Do not mix borders among equivalent neighboring commands without a surface reason. A specialized command strip can use borderless utility icons throughout. Preserve its selected-mode surface and keyboard focus. Do not mix ordinary hover frames into that strip. Choose text and icon content through the [command decision table](command-content.md), not consumer preference. Icon-only actions require complete accessible names. Follow [full-text access](localization.md#full-text-access) for hints. Keep required explanations visible.
 
 Use 16px icons, 6px icon/text gaps, 10px compact horizontal padding, and the shared label weight. Preserve established 14px or 16px geometry on specialized surfaces. Labeled controls coordinate text weights 400/450/500 with Lucide strokes 1.75/1.875/2. Do not apply stroke overrides to filled logos.
 

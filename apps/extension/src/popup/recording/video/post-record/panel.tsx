@@ -40,7 +40,7 @@ function PostRecordActionButton({
           : 'bg-transparent text-[var(--sniptale-color-text-secondary)]',
         'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
-      title={label}
+      data-popup-hint={label}
       onClick={onClick}
     >
       <Icon

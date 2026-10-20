@@ -68,7 +68,7 @@ function resolvePopupActionButtonFrameProps(
   classNames: string[]
 ) {
   const resolvedAriaLabel =
-    props.ariaLabel ?? props.title ?? (typeof props.label === 'string' ? props.label : undefined);
+    props.ariaLabel ?? (typeof props.label === 'string' ? props.label : undefined);
 
   return {
     disabled: props.disabled,
@@ -84,7 +84,7 @@ function resolvePopupActionButtonFrameProps(
       type: 'button' as const,
       onClick: props.onClick,
       disabled: props.disabled,
-      title: props.title ?? resolvedAriaLabel,
+      'data-popup-hint': props.title ?? resolvedAriaLabel,
       'aria-label': resolvedAriaLabel,
       'data-ui': props.dataUi ?? 'shared.ui.popup-action-button',
       className: classNames.join(' '),
@@ -94,7 +94,7 @@ function resolvePopupActionButtonFrameProps(
 
 export function PopupActionButtonCompact(props: PopupActionButtonVariantProps) {
   const accessibleLabel =
-    props.ariaLabel ?? props.title ?? (typeof props.label === 'string' ? props.label : undefined);
+    props.ariaLabel ?? (typeof props.label === 'string' ? props.label : undefined);
 
   return renderPopupActionButtonFrame({
     classNames: [

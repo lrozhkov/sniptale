@@ -190,7 +190,7 @@ it('keeps prepared media read-only during countdown', async () => {
   });
   for (const button of container!.querySelectorAll('button')) {
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe('popup.video.countdownMediaReadOnly');
+    expect(button.getAttribute('data-popup-hint')).toBe('popup.video.countdownMediaReadOnly');
     await act(async () => button.click());
   }
   expect(onActiveRecordingSettingsChange).not.toHaveBeenCalled();

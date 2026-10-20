@@ -88,7 +88,7 @@ function ExportPagesDrawerRow(props: {
   return (
     <label
       ref={props.currentRowRef}
-      title={props.tab.disabledReason ?? props.tab.url ?? props.tab.title}
+      data-popup-hint={props.tab.disabledReason ?? props.tab.url ?? props.tab.title}
       className={cx(
         'sniptale-ai-modal-adopted bg-transparent! font-normal!',
         rowClassName,

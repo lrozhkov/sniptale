@@ -74,7 +74,7 @@ function ExportProgressStepRow({
         >
           <ExportStepIcon status={step.status} />
         </span>
-        <span title={step.label} className={progressStepLabelClassName}>
+        <span data-popup-hint={step.label} className={progressStepLabelClassName}>
           {step.label}
         </span>
         <div aria-hidden="true" className={progressStepDividerClassName} />
@@ -196,7 +196,7 @@ function ExportStatusHeader(props: ExportProgressSectionProps) {
           </div>
           {description ? (
             <div
-              title={description}
+              data-popup-hint={description}
               role={props.progress.phase === 'error' ? 'alert' : undefined}
               className={cx(
                 descriptionClassName,

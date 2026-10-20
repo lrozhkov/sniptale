@@ -17,7 +17,7 @@ Russian and English are the reference UI languages. Their current lengths do not
 | Filename or path | Wrap where practical | Middle ellipsis preserving identifying suffix/extension |
 | Numeric value, unit, HEX, dimensions | Keep meaningful parts together | Reflow the row. Never hide digits, units, alpha, or a dimension |
 | Hint and error | Wrap and grow | Do not truncate required recovery instructions |
-| Optional hint | Native browser title | Keep required instructions visible in the interface |
+| Optional hint | Omit a hint that repeats fully visible text | Expose clipped text on hover and keyboard focus |
 
 Do not abbreviate translated UI strings by character count. Use actual available width after padding, icons, state marks, and trailing actions. Keep existing inner padding and icon/text gaps when ellipsis appears. It replaces text, not padding. Use a single ellipsis at the logical end for ordinary names and values.
 
@@ -25,7 +25,15 @@ Middle ellipsis is for identifying paths/filenames, not translated command phras
 
 ## Full-text access
 
-A truncated visible label retains its complete accessible name and unchanged underlying value. Use native browser `title` for optional full-text hints on truncated content. Do not create custom tooltip surfaces. Keep the full accessible name on the existing control. Do not add duplicate Tab stops to labels. Keep required information visible, or provide an explicit detail/copy action. A browser hint must not carry required instructions.
+A truncated label retains its complete accessible name and unchanged underlying value. Use native browser `title` for optional hover hints. Do not draw custom tooltips. Omit duplicate hints when the complete text is visible. Measure clipping from the rendered element, not the character count. Preserve the existing control's focus target. Do not add Tab stops or change control dimensions for hints.
+
+Visible button text supplies its accessible name. Icon-only buttons require an accessible name, such as `aria-label`. Removing a duplicate hint must not remove that name. Do not use `title` as the only name or instruction. Browser hover hints do not provide reliable keyboard or touch access.
+
+Additional explanations remain available regardless of label clipping. Keep required instructions and recovery actions visible, or provide an explicit detail action. Put irreversible-deletion warnings in the confirmation, not only in a hint. Use an accessible description for supplemental instructions. Do not replace the action name with its explanation.
+
+The popup hint owner controls conditional `title` attributes. The browser owns hint presentation and dismissal. Native hints are not reliable visual disclosure on keyboard focus. Preserve full accessible names and existing choice or detail surfaces for keyboard access. Do not add custom hint layers, focus-only text wrapping, or control resizing.
+
+[W3C accessible names and descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/) explains the naming and description techniques.
 
 Editable input values retain normal caret movement and horizontal text scrolling. Preserve copyable full values.
 

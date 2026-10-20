@@ -141,13 +141,16 @@ function InlineCurtainOptionButton({
       <span className="flex min-w-0 items-center gap-2">
         {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
         <span className="min-w-0">
-          <span className="block whitespace-normal break-words font-normal" title={option.label}>
+          <span
+            className="block whitespace-normal break-words font-normal"
+            data-popup-hint={option.label}
+          >
             {option.label}
           </span>
           {option.description ? (
             <span
               className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
-              title={option.description}
+              data-popup-hint={option.description}
             >
               {option.description}
             </span>

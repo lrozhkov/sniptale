@@ -121,7 +121,7 @@ export function PopupFooterThemeToggle() {
     >
       <button
         type="button"
-        title={getThemeToggleTitle(preference)}
+        data-popup-hint={getThemeToggleTitle(preference)}
         aria-label={translate('popup.common.footerThemeToggleAria')}
         data-theme-preference={preference}
         data-resolved-theme={theme}

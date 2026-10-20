@@ -50,7 +50,7 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).not.toContain('group-hover:-translate-y-px');
   expect(markup).toContain('absolute inset-y-0 left-[38px] flex');
   expect(markup).toContain('Choose an area');
-  expect(markup).toContain('title="Area. Choose an area"');
+  expect(markup).toContain('data-popup-hint="Area. Choose an area"');
 });
 
 it('keeps the normal description visible while an unavailable reason stays in the title', () => {
@@ -68,7 +68,7 @@ it('keeps the normal description visible while an unavailable reason stays in th
   );
 
   expect(markup).toContain('>Capture the current tab</span>');
-  expect(markup).toContain('title="Tab. Unavailable on extension pages"');
+  expect(markup).toContain('data-popup-hint="Tab. Unavailable on extension pages"');
   expect(markup).toContain('disabled=""');
 });
 

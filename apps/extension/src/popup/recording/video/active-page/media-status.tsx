@@ -61,7 +61,7 @@ function InactiveMicrophoneStatus() {
       <MicOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeMicrophoneLabel')}</div>
-        <div className={STATUS_TEXT_CLASS_NAME} title={statusText}>
+        <div className={STATUS_TEXT_CLASS_NAME} data-popup-hint={statusText}>
           {statusText}
         </div>
       </div>
@@ -97,7 +97,7 @@ function ActiveMicrophoneStatus({
       />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeMicrophoneLabel')}</div>
-        <div className={VALUE_CLASS_NAME} title={selectedName}>
+        <div className={VALUE_CLASS_NAME} data-popup-hint={selectedName}>
           {selectedName}
         </div>
       </div>
@@ -134,7 +134,7 @@ function InactiveWebcamStatus() {
       <VideoOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeWebcamLabel')}</div>
-        <div className={STATUS_TEXT_CLASS_NAME} title={statusText}>
+        <div className={STATUS_TEXT_CLASS_NAME} data-popup-hint={statusText}>
           {statusText}
         </div>
       </div>
@@ -171,11 +171,11 @@ function ActiveWebcamStatus({
       />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeWebcamLabel')}</div>
-        <div className={VALUE_CLASS_NAME} title={selectedName}>
+        <div className={VALUE_CLASS_NAME} data-popup-hint={selectedName}>
           {selectedName}
         </div>
         {actualSettings ? (
-          <div className={STATUS_TEXT_CLASS_NAME} title={actualSettings}>
+          <div className={STATUS_TEXT_CLASS_NAME} data-popup-hint={actualSettings}>
             {actualSettings}
           </div>
         ) : null}
@@ -260,7 +260,7 @@ function ActiveMediaMuteButton({
       ].join(' ')}
       aria-label={label}
       disabled={busy || readOnly}
-      title={readOnly ? translate('popup.video.countdownMediaReadOnly') : label}
+      data-popup-hint={readOnly ? translate('popup.video.countdownMediaReadOnly') : label}
       onClick={handleClick}
     >
       <Icon className="h-4 w-4" />

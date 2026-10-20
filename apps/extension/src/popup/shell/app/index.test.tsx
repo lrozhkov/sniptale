@@ -65,6 +65,14 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   vi.clearAllMocks();
   mocks.activeTab.url = null;
   mocks.activeTab.videoByMode.TAB.supported = true;

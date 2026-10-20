@@ -7,10 +7,12 @@ import '@sniptale/ui/styles/overlays';
 import './previews/layout.css';
 import { DesignSystemPage } from './shell/page';
 import { DesignSystemThemeSurface } from './theme';
+import { PopupHints } from '../ui/popup-shell/hints';
 
 renderPageShell({
   element: (
     <DesignSystemThemeSurface>
+      <PopupHints />
       <DesignSystemPage />
     </DesignSystemThemeSurface>
   ),

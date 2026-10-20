@@ -103,7 +103,7 @@ it('renders stacked labels and inactive slash decoration when requested', () => 
     (element) => element.textContent === 'Microphone'
   );
 
-  expect(button?.getAttribute('title')).toBe('Microphone. Toggle microphone capture');
+  expect(button?.getAttribute('data-popup-hint')).toBe('Microphone. Toggle microphone capture');
   expect(button?.getAttribute('data-ui')).toBe('popup.test.microphone');
   expect(button?.className).toContain('min-h-[68px]');
   expect(label).toBeTruthy();

@@ -28,7 +28,7 @@ it('shows the current locale and switches through the canonical locale authority
 
   expect(button?.textContent).toBe('ru');
   expect(button?.getAttribute('data-locale-preference')).toBe('ru');
-  expect(button?.title).toBe('common.languages.ru → common.languages.en');
+  expect(button?.getAttribute('data-popup-hint')).toBe('common.languages.ru → common.languages.en');
   act(() => button?.click());
   expect(mocks.setLocalePreference).toHaveBeenCalledWith('en');
 

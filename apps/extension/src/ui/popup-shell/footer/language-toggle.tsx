@@ -36,7 +36,7 @@ export function PopupFooterLanguageToggle() {
           logger.error('Failed to persist popup footer locale preference', error);
         });
       }}
-      title={`${getLocaleName(locale)} → ${getLocaleName(nextLocale)}`}
+      data-popup-hint={`${getLocaleName(locale)} → ${getLocaleName(nextLocale)}`}
     >
       <span>{locale}</span>
     </button>

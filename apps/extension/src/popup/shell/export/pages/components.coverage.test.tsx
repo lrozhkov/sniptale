@@ -142,9 +142,9 @@ describe('export pages owner components', () => {
     expect(currentRowRef.current?.textContent).toContain('Current');
     expect(container?.textContent).toContain('popup.export.currentTabBadge');
     expect(container?.textContent).toContain('popup.common.noActiveTab');
-    expect(container?.querySelector('label[title="Blocked"] input')?.hasAttribute('disabled')).toBe(
-      true
-    );
+    expect(
+      container?.querySelector('label[data-popup-hint="Blocked"] input')?.hasAttribute('disabled')
+    ).toBe(true);
     expect(toggleTabSelection).toHaveBeenCalledWith(7);
     expect(toggleTabSelection).toHaveBeenCalledWith(9);
   });

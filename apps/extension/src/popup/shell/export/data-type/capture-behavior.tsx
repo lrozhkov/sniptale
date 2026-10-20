@@ -135,7 +135,7 @@ export function PackageCaptureBehaviorSettings(props: {
       >
         <span
           className="min-w-0 flex-1"
-          title={translate('popup.export.captureFloatingElementsDescription')}
+          data-popup-hint={translate('popup.export.captureFloatingElementsDescription')}
         >
           <span className="block text-[12px] text-[var(--sniptale-color-text-secondary)]">
             {translate('popup.export.captureFloatingElementsLabel')}

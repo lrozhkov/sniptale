@@ -184,10 +184,13 @@ function InlineCurtainPrimaryButton({
       ].join(' ')}
       onClick={onClick}
     >
-      <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} title={label}>
+      <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} data-popup-hint={label}>
         {label}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-normal" title={valueLabel}>
+      <span
+        className="min-w-0 flex-1 truncate text-[13px] font-normal"
+        data-popup-hint={valueLabel}
+      >
         {valueLabel}
       </span>
       <InlineCurtainChevron expanded={ariaExpanded} />
@@ -231,7 +234,7 @@ function InlineCurtainSecondaryButton({
       ].join(' ')}
       disabled={secondaryAction.disabled}
       onClick={onClick}
-      title={secondaryAction.title ?? secondaryAction.label}
+      data-popup-hint={secondaryAction.title ?? secondaryAction.label}
     >
       {secondaryAction.label}
     </button>

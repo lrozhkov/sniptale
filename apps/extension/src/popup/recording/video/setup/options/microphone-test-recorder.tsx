@@ -205,7 +205,7 @@ function IconButton({
       className={BUTTON_CLASS_NAME}
       disabled={disabled}
       onClick={onClick}
-      title={label}
+      data-popup-hint={label}
     >
       {icon}
     </button>
