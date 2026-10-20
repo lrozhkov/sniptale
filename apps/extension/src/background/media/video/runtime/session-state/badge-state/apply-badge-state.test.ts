@@ -24,6 +24,8 @@ vi.mock('./clear', () => ({
 }));
 
 import { applyBadgeState } from './apply-badge-state';
+import { DEFAULT_COLOR_RECORDING, DEFAULT_COLOR_WARNING_STRONG } from './colors';
+import { translate } from '../../../../../../platform/i18n';
 import {
   VideoRecordingStatus,
   type VideoRecordingRuntimeState,
@@ -46,6 +48,61 @@ beforeEach(() => {
 });
 
 describe('applyBadgeState', () => {
+  it('shows the microphone advisory in yellow and restores the recording badge after activity returns', () => {
+    const state = {
+      ...createState(VideoRecordingStatus.RECORDING),
+      duration: 32,
+      microphoneActivity: { status: 'ready' as const, level: 0, warning: true },
+    };
+    applyBadgeState(state);
+    expect(mocks.applyDurationBadgeState).toHaveBeenLastCalledWith(
+      state,
+      DEFAULT_COLOR_WARNING_STRONG,
+      translate('background.runtime.actionMicrophoneQuiet')
+    );
+    const recovered = {
+      ...state,
+      microphoneActivity: { ...state.microphoneActivity, level: 0.5, warning: false },
+    };
+    applyBadgeState(recovered);
+    expect(mocks.applyDurationBadgeState).toHaveBeenLastCalledWith(
+      recovered,
+      DEFAULT_COLOR_RECORDING,
+      translate('background.runtime.actionRecordingPrefix')
+    );
+  });
+
+  it.each([
+    VideoRecordingStatus.PREPARING,
+    VideoRecordingStatus.COUNTDOWN,
+    VideoRecordingStatus.STOPPING,
+    VideoRecordingStatus.IDLE,
+  ])('preserves the %s lifecycle badge when a stale microphone warning exists', (status) => {
+    applyBadgeState({
+      ...createState(status),
+      microphoneActivity: { status: 'ready', level: 0, warning: true },
+    });
+    expect(mocks.applyDurationBadgeState).not.toHaveBeenCalled();
+    if (status === VideoRecordingStatus.COUNTDOWN)
+      expect(mocks.applyCountdownBadgeState).toHaveBeenCalledOnce();
+    else if (status === VideoRecordingStatus.IDLE)
+      expect(mocks.clearBadgeState).toHaveBeenCalledOnce();
+    else expect(mocks.applyPendingBadgeState).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the pause label over a microphone warning', () => {
+    const state = {
+      ...createState(VideoRecordingStatus.PAUSED),
+      microphoneActivity: { status: 'ready' as const, level: 0, warning: true },
+    };
+    applyBadgeState(state);
+    expect(mocks.applyDurationBadgeState).toHaveBeenCalledExactlyOnceWith(
+      state,
+      DEFAULT_COLOR_WARNING_STRONG,
+      translate('background.runtime.actionPausedPrefix')
+    );
+  });
+
   it('dispatches countdown, duration, pending, and clear branches', () => {
     applyBadgeState(createState(VideoRecordingStatus.COUNTDOWN));
     applyBadgeState(createState(VideoRecordingStatus.RECORDING));

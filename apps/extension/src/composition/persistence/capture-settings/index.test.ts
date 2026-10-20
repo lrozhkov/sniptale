@@ -8,6 +8,7 @@ import {
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 
 const { browserStorageLocalGetMock, browserStorageLocalSetMock } = vi.hoisted(() => ({
   browserStorageLocalGetMock: vi.fn(),
@@ -221,12 +222,59 @@ describe('video', () => {
     expect(browserStorageLocalSetMock).not.toHaveBeenCalled();
   });
 
-  it('serializes concurrent field and profile mutations without stale overwrites', async () => {
-    let stored = DEFAULT_VIDEO_SETTINGS;
+  it('drains a remembered microphone choice before erasure removes that preference', async () => {
+    let stored = { ...DEFAULT_VIDEO_SETTINGS };
+    let releaseWrite!: () => void;
+    let markWriteStarted!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve;
+    });
+    const writeReleased = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
     browserStorageLocalGetMock.mockImplementation(async () => ({
       sniptale_video_settings: stored,
     }));
     browserStorageLocalSetMock.mockImplementation(async (items) => {
+      markWriteStarted();
+      await writeReleased;
+      stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
+    });
+    const remember = patchVideoSettings({ warnWithoutMicrophone: false });
+    await writeStarted;
+    const erase = vi.fn(async () => {
+      stored = { ...DEFAULT_VIDEO_SETTINGS };
+    });
+    const erasure = runWithPersistentDataErasureBarrier(erase);
+    await Promise.resolve();
+    expect(erase).not.toHaveBeenCalled();
+    releaseWrite();
+    await remember;
+    await erasure;
+    expect(erase).toHaveBeenCalledOnce();
+    await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: true });
+  });
+
+  it('serializes concurrent field and profile mutations without stale overwrites', async () => {
+    let stored = DEFAULT_VIDEO_SETTINGS;
+    let writeCount = 0;
+    let releaseFirstWrite!: () => void;
+    let markFirstWriteStarted!: () => void;
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve;
+    });
+    const firstWriteReleased = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      writeCount += 1;
+      if (writeCount === 1) {
+        markFirstWriteStarted();
+        await firstWriteReleased;
+      }
       stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
     });
     const profile = {
@@ -238,15 +286,21 @@ describe('video', () => {
       },
     };
 
-    await Promise.all([
-      patchVideoSettings({ interactionDiagnosticsEnabled: true }),
-      mutateVideoSettings((current) => ({
-        ...current,
-        qualityProfiles: [...current.qualityProfiles, profile],
-      })),
-    ]);
+    const preferenceWrite = patchVideoSettings({
+      interactionDiagnosticsEnabled: true,
+      warnWithoutMicrophone: false,
+    });
+    await firstWriteStarted;
+    const profileWrite = mutateVideoSettings((current) => ({
+      ...current,
+      qualityProfiles: [...current.qualityProfiles, profile],
+    }));
+    releaseFirstWrite();
+    await Promise.all([preferenceWrite, profileWrite]);
 
     expect(stored.interactionDiagnosticsEnabled).toBe(true);
+    expect(stored.warnWithoutMicrophone).toBe(false);
     expect(stored.qualityProfiles).toEqual([profile]);
+    await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: false });
   });
 });

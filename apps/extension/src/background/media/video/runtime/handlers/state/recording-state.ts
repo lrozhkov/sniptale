@@ -12,6 +12,7 @@ import {
   VideoRecordingStatus,
   type WebcamActualSettings,
   type VideoDisplaySurface,
+  type VideoMicrophoneActivity,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -77,6 +78,7 @@ function sendRecordingTabIdResponse(sendResponse: ResponseSender, senderTabId?: 
 export function handleRecordingDurationUpdated(
   message: {
     duration?: number;
+    microphoneActivity?: VideoMicrophoneActivity;
     recordingId?: string;
   },
   sendResponse: ResponseSender
@@ -91,14 +93,31 @@ export function handleRecordingDurationUpdated(
 
 async function updateRecordingDurationIfCurrent(message: {
   duration?: number;
+  microphoneActivity?: VideoMicrophoneActivity;
   recordingId?: string;
 }): Promise<void> {
   if (!(await isCurrentRecordingLifecycleEvent(message))) {
     return;
   }
   if (!isCurrentVideoRecordingId(message.recordingId)) return;
-  if (canPublishLiveRecordingState(message.recordingId))
-    setVideoRecordingRuntimeState({ duration: Number(message.duration) || 0 });
+  if (!canPublishLiveRecordingState(message.recordingId)) return;
+  const current = getVideoRecordingRuntimeState();
+  const microphoneActivity = message.microphoneActivity;
+  const microphoneEnabled = current.liveMedia?.microphoneEnabled !== false;
+  setVideoRecordingRuntimeState({
+    ...(message.duration === undefined ? {} : { duration: message.duration }),
+    ...(microphoneActivity === undefined
+      ? {}
+      : {
+          microphoneActivity: microphoneEnabled
+            ? {
+                ...microphoneActivity,
+                warning:
+                  current.status === VideoRecordingStatus.RECORDING && microphoneActivity.warning,
+              }
+            : { status: 'disabled', level: 0, warning: false },
+        }),
+  });
 }
 
 export function handleOffscreenRecordingStarted(
@@ -200,7 +219,7 @@ async function handleOffscreenRecordingPausedIfCurrent(message?: {
   if (!(await synchronizeExactRecordingHistory(message, 'pause'))) return;
   if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording paused');
-  setVideoRecordingRuntimeState({ status: VideoRecordingStatus.PAUSED });
+  setVideoRecordingRuntimeState({ status: VideoRecordingStatus.PAUSED, microphoneActivity: null });
 }
 
 export function handleOffscreenRecordingResumed(
@@ -226,7 +245,10 @@ async function handleOffscreenRecordingResumedIfCurrent(message?: {
   if (!(await synchronizeExactRecordingHistory(message, 'resume'))) return;
   if (!canPublishLiveRecordingState(message.recordingId)) return;
   logger.log('Recording resumed');
-  setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });
+  setVideoRecordingRuntimeState({
+    status: VideoRecordingStatus.RECORDING,
+    microphoneActivity: null,
+  });
 }
 
 async function synchronizeExactRecordingHistory(

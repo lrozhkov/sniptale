@@ -24,6 +24,20 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it('preserves optional microphone warning booleans and rejects malformed preferences', () => {
+    for (const warnWithoutMicrophone of [true, false]) {
+      expect(parseCurrentVideoSettings({ warnWithoutMicrophone }).value).toMatchObject({
+        warnWithoutMicrophone,
+      });
+    }
+    expect(parseCurrentVideoSettings({}).value).not.toHaveProperty('warnWithoutMicrophone');
+    for (const warnWithoutMicrophone of [null, 'false', 0, {}]) {
+      const parsed = parseCurrentVideoSettings({ warnWithoutMicrophone, microphoneEnabled: true });
+      expect(parsed.invalidFieldCount).toBe(1);
+      expect(parsed.value).not.toHaveProperty('warnWithoutMicrophone');
+      expect(parsed.value.microphoneEnabled).toBe(true);
+    }
+  });
   it('returns empty values for undefined and marks invalid non-record roots', () => {
     expect(parseStoredVideoSettings(undefined)).toEqual({
       hasInvalidRoot: false,

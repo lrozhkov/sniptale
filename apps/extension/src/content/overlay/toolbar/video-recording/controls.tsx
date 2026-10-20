@@ -25,6 +25,7 @@ import { RecordingSpotlightMenu } from './spotlight-menu';
 import { ToolbarSettingsMenu } from '../capture/settings';
 import type { ToolbarMenuState } from '../state/menu';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { RecordingStartConfirmation } from './start-confirmation';
 
 function formatDuration(durationSeconds: number): string {
   const seconds = Math.max(0, Math.floor(durationSeconds));
@@ -76,8 +77,46 @@ function runToolbarAction(action: () => Promise<void> | void): void {
   });
 }
 
-function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProps }) {
+function RecordingLifecycleControl(props: {
+  recording: ToolbarVideoRecordingProps;
+  displayMode: ContentToolbarDisplayMode;
+  toolbarMenuState: ToolbarMenuState;
+}) {
   const { state } = props.recording;
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const pendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    setConfirmationOpen(false);
+  }, [state.microphoneEnabled, state.recordingId]);
+  const cancelConfirmation = useCallback(() => {
+    setConfirmationOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+  const start = async (event: Event, rememberChoice?: boolean) => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    props.toolbarMenuState.closeMenus();
+    try {
+      const result =
+        rememberChoice === undefined
+          ? await props.recording.onStart(event)
+          : await props.recording.onStart(event, {
+              confirmedWithoutMicrophone: true,
+              rememberWithoutMicrophone: rememberChoice,
+            });
+      if (mountedRef.current) setConfirmationOpen(result === 'confirmation-required');
+    } finally {
+      pendingRef.current = false;
+    }
+  };
   if (state.phase === 'starting') {
     return (
       <>
@@ -143,10 +182,13 @@ function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProp
   return (
     <>
       <ContentToolbarButton
+        ref={triggerRef}
         dataUi="content.toolbar.video-recording.start"
         tone="danger"
         title={translate('content.toolbar.videoRecordingStartHint')}
-        onClick={(event) => void props.recording.onStart(event.nativeEvent)}
+        onClick={(event) => void start(event.nativeEvent)}
+        aria-expanded={confirmationOpen}
+        aria-haspopup="dialog"
       >
         <Circle
           style={{ height: 13, width: 13 }}
@@ -155,6 +197,14 @@ function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProp
           className="text-[var(--sniptale-color-danger)]"
         />
       </ContentToolbarButton>
+      {confirmationOpen ? (
+        <RecordingStartConfirmation
+          displayMode={props.displayMode}
+          triggerRef={triggerRef}
+          onCancel={cancelConfirmation}
+          onContinue={(event, rememberChoice) => void start(event, rememberChoice)}
+        />
+      ) : null}
     </>
   );
 }
@@ -275,7 +325,11 @@ export function ToolbarVideoRecordingControls(props: {
           dataUi="content.toolbar.video-recording.lifecycle"
         >
           <RecordingStatus state={props.recording.state} />
-          <RecordingLifecycleControl recording={props.recording} />
+          <RecordingLifecycleControl
+            recording={props.recording}
+            displayMode={props.displayMode}
+            toolbarMenuState={props.toolbarMenuState}
+          />
         </ContentToolbarGroup>
       ) : null}
       <RecordingDrawingControls
@@ -322,7 +376,11 @@ export function ToolbarVideoRecordingControls(props: {
           dataUi="content.toolbar.video-recording.lifecycle"
         >
           <RecordingStatus state={props.recording.state} />
-          <RecordingLifecycleControl recording={props.recording} />
+          <RecordingLifecycleControl
+            recording={props.recording}
+            displayMode={props.displayMode}
+            toolbarMenuState={props.toolbarMenuState}
+          />
         </ContentToolbarGroup>
       ) : null}
     </>

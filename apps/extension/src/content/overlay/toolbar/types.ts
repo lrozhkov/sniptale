@@ -50,7 +50,10 @@ export interface ToolbarVideoRecordingProps {
     cursorDimmingEnabled: boolean;
     clickAnimationEnabled: boolean;
   }) => Promise<void> | void;
-  onStart: (activationEvent?: Event) => Promise<void> | void;
+  onStart: (
+    activationEvent?: Event,
+    confirmation?: { confirmedWithoutMicrophone?: boolean; rememberWithoutMicrophone?: boolean }
+  ) => Promise<'confirmation-required' | 'started' | 'failed' | void> | void;
   onStop: () => Promise<void> | void;
 }
 

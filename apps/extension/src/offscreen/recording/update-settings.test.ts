@@ -43,6 +43,7 @@ beforeEach(() => {
   recordingContext.audioMixer = null;
   recordingContext.videoStream = null;
   switchCameraSourceInputMock.mockResolvedValue(undefined);
+  vi.spyOn(recordingContext, 'setMicrophoneObservationEnabled').mockImplementation(() => undefined);
 });
 
 it('switches the stable camera input before reporting live success', async () => {
@@ -79,6 +80,7 @@ it('routes live settings to the active multi-source session', () => {
   expect(updateMultiSourceRecordingSettingsMock).toHaveBeenCalledWith(patch);
   expect(setCameraSourceEnabledMock).toHaveBeenCalledWith(true);
   expect(setActiveSidecarWebcamEnabledMock).not.toHaveBeenCalled();
+  expect(recordingContext.setMicrophoneObservationEnabled).not.toHaveBeenCalled();
 });
 
 it('toggles the single-source microphone through the audio mixer when present', () => {
@@ -91,6 +93,7 @@ it('toggles the single-source microphone through the audio mixer when present', 
   updateRecordingSettings({ microphoneEnabled: false });
 
   expect(setMicrophoneEnabled).toHaveBeenCalledWith(false);
+  expect(recordingContext.setMicrophoneObservationEnabled).toHaveBeenCalledWith(false);
 });
 
 it('acquires and connects a microphone enabled after recording start', async () => {
@@ -109,6 +112,7 @@ it('acquires and connects a microphone enabled after recording start', async () 
     echoCancellation: false,
     microphoneDeviceId: 'mic-live',
   });
+  expect(recordingContext.setMicrophoneObservationEnabled).toHaveBeenCalledWith(true);
 });
 
 it('falls back to audio tracks on the single-source recording stream', () => {
@@ -122,6 +126,78 @@ it('falls back to audio tracks on the single-source recording stream', () => {
   updateRecordingSettings({ microphoneEnabled: false });
 
   expect(firstTrack.enabled).toBe(false);
+  expect(recordingContext.setMicrophoneObservationEnabled).toHaveBeenCalledWith(false);
+});
+
+it('resumes direct microphone observation only after its track is enabled', async () => {
+  const stream = createAudioStream();
+  const track = stream.getAudioTracks()[0]!;
+  track.enabled = false;
+  recordingContext.videoStream = stream;
+  vi.mocked(recordingContext.setMicrophoneObservationEnabled).mockImplementation((enabled) => {
+    expect(track.enabled).toBe(enabled);
+  });
+
+  await updateRecordingSettings({ microphoneEnabled: true });
+
+  expect(recordingContext.setMicrophoneObservationEnabled).toHaveBeenCalledWith(true);
+});
+
+it('retains microphone observation state when adding or switching input fails', async () => {
+  const mixer = new AudioMixer();
+  recordingContext.audioMixer = mixer;
+  const hasMicrophone = vi.spyOn(mixer, 'hasMicrophone').mockReturnValue(false);
+  vi.spyOn(mixer, 'addMicrophone').mockRejectedValue(new Error('input refused'));
+
+  await expect(updateRecordingSettings({ microphoneEnabled: true })).rejects.toThrow(
+    'input refused'
+  );
+  expect(recordingContext.setMicrophoneObservationEnabled).not.toHaveBeenCalled();
+
+  hasMicrophone.mockReturnValue(true);
+  vi.spyOn(mixer, 'switchMicrophone').mockRejectedValue(new Error('replacement refused'));
+  await expect(
+    updateRecordingSettings({ microphoneDeviceId: 'mic-2', microphoneEnabled: true })
+  ).rejects.toThrow('replacement refused');
+  expect(recordingContext.setMicrophoneObservationEnabled).not.toHaveBeenCalled();
+});
+
+it('keeps observation disabled until a newly enabled mixer input has connected', async () => {
+  const mixer = new AudioMixer();
+  recordingContext.audioMixer = mixer;
+  vi.spyOn(mixer, 'hasMicrophone').mockReturnValue(false);
+  let resolveInput!: () => void;
+  vi.spyOn(mixer, 'addMicrophone').mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveInput = resolve;
+      })
+  );
+
+  const transition = updateRecordingSettings({ microphoneEnabled: true });
+  expect(recordingContext.setMicrophoneObservationEnabled).not.toHaveBeenCalled();
+  resolveInput();
+  await transition;
+
+  expect(recordingContext.setMicrophoneObservationEnabled).toHaveBeenCalledWith(true);
+});
+
+it('changes observation after the mixer accepts mute and unmute', async () => {
+  const mixer = new AudioMixer();
+  recordingContext.audioMixer = mixer;
+  vi.spyOn(mixer, 'hasMicrophone').mockReturnValue(true);
+  const order: string[] = [];
+  vi.spyOn(mixer, 'setMicrophoneEnabled').mockImplementation((enabled) => {
+    order.push(`mixer:${enabled}`);
+  });
+  vi.mocked(recordingContext.setMicrophoneObservationEnabled).mockImplementation((enabled) => {
+    order.push(`observation:${enabled}`);
+  });
+
+  await updateRecordingSettings({ microphoneEnabled: false });
+  await updateRecordingSettings({ microphoneEnabled: true });
+
+  expect(order).toEqual(['mixer:false', 'observation:false', 'mixer:true', 'observation:true']);
 });
 
 it('toggles the active single-source sidecar webcam', () => {

@@ -3,6 +3,7 @@ import {
   isActivateVideoRecordingSurfaceMessage,
   isStartSavedTabVideoRecordingMessage,
   type VideoRecordingSurfaceCommand,
+  type StartSavedTabVideoRecordingMessage,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   attachContentActionIntent,
@@ -71,9 +72,15 @@ export async function closeVideoRecordingCameraPeer(identity: SurfaceIdentity): 
   if (!response?.success) throw new Error(response?.error ?? 'Camera peer close failed');
 }
 
-export async function startSavedTabVideoRecording(event: Event) {
+export async function startSavedTabVideoRecording(
+  event: Event,
+  confirmation: Pick<
+    StartSavedTabVideoRecordingMessage,
+    'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+  > = {}
+) {
   const message = await attachContentActionIntent(
-    { type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING },
+    { type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING, ...confirmation },
     createTrustedContentActionIntentSource(event)
   );
   if (!isStartSavedTabVideoRecordingMessage(message)) {

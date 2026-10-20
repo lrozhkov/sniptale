@@ -1,5 +1,25 @@
 import type { VideoMessageType } from '../messages/index';
-import type { CaptureMode, VideoRecordingSettings, VideoRecordingStatus } from './types';
+import type {
+  CaptureMode,
+  VideoMicrophoneActivity,
+  VideoRecordingSettings,
+  VideoRecordingStatus,
+} from './types';
+
+export interface CountdownCameraOfferMessage {
+  type: typeof VideoMessageType.COUNTDOWN_CAMERA_OFFER;
+  controlToken: string;
+  recordingId: string;
+  peerGeneration: number;
+  sdp: string;
+}
+
+export interface CountdownCameraCloseMessage {
+  type: typeof VideoMessageType.COUNTDOWN_CAMERA_CLOSE;
+  controlToken: string;
+  recordingId: string;
+  peerGeneration: number;
+}
 
 export interface StartRecordingMessage {
   type: typeof VideoMessageType.START_RECORDING;
@@ -48,7 +68,8 @@ export interface RecordingStatusChangedMessage {
 
 export interface RecordingDurationUpdatedMessage {
   type: typeof VideoMessageType.RECORDING_DURATION_UPDATED;
-  duration: number;
+  duration?: number;
+  microphoneActivity?: VideoMicrophoneActivity;
   recordingId: string;
 }
 
@@ -58,6 +79,8 @@ export interface RecordingErrorMessage {
 }
 
 export type VideoControlMessage =
+  | CountdownCameraOfferMessage
+  | CountdownCameraCloseMessage
   | StartRecordingMessage
   | CancelRecordingStartMessage
   | StopRecordingMessage

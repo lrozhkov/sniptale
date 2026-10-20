@@ -234,6 +234,7 @@ function assignParsedVideoSettingsField<TKey extends keyof VideoRecordingSetting
 
 const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['microphoneEnabled', parseOptionalBoolean],
+  ['warnWithoutMicrophone', parseOptionalBoolean],
   ['microphoneDeviceId', parseOptionalNullableString],
   ['echoCancellation', parseOptionalBoolean],
   ['noiseSuppression', parseOptionalBoolean],

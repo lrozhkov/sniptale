@@ -20,6 +20,7 @@ import {
   isRecord,
   isString,
   isVideoRecordingRuntimeState,
+  isVideoMicrophoneActivity,
   isVideoRecordingSettings,
 } from '../../../validators/index';
 import {
@@ -44,6 +45,24 @@ function isVideoPostRecordResult(value: unknown): value is VideoPostRecordResult
     isNonEmptyString(value['primaryRecordingId']) &&
     (value['projectId'] === null || isNonEmptyString(value['projectId'])) &&
     isNonEmptyString(value['recordingId'])
+  );
+}
+
+function isPeerGeneration(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isCameraOfferSource(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value['kind'] === 'surface') {
+    return Object.keys(value).length === 2 && isVideoRecordingSettings(value['settings']);
+  }
+  return (
+    value['kind'] === 'countdown' &&
+    Object.keys(value).length === 4 &&
+    isNonEmptyString(value['recordingId']) &&
+    isPeerGeneration(value['generation']) &&
+    isNonEmptyString(value['streamInstanceId'])
   );
 }
 
@@ -116,7 +135,51 @@ function isStartRecordingRequest(
   return value.captureMode === CaptureMode.CAMERA || typeof value.tabId === 'number';
 }
 
+const isRecordingProgressCandidate = createMessageGuard<
+  typeof VideoMessageType.RECORDING_DURATION_UPDATED,
+  RuntimeRequestByType[typeof VideoMessageType.RECORDING_DURATION_UPDATED]
+>({
+  type: VideoMessageType.RECORDING_DURATION_UPDATED,
+  required: { recordingId: isNonEmptyString },
+  optional: { duration: isNumber, microphoneActivity: isVideoMicrophoneActivity },
+});
+
 export const runtimeVideoSessionMessageContracts = {
+  [VideoMessageType.COUNTDOWN_CAMERA_OFFER]: {
+    parseRequest: createGuardParser(
+      'runtime COUNTDOWN_CAMERA_OFFER message',
+      createMessageGuard({
+        type: VideoMessageType.COUNTDOWN_CAMERA_OFFER,
+        required: {
+          controlToken: isNonEmptyString,
+          recordingId: isNonEmptyString,
+          peerGeneration: isPeerGeneration,
+          sdp: isNonEmptyString,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime COUNTDOWN_CAMERA_OFFER response',
+      createRuntimeResponseGuard({ optional: { sdp: isString } })
+    ),
+  },
+  [VideoMessageType.COUNTDOWN_CAMERA_CLOSE]: {
+    parseRequest: createGuardParser(
+      'runtime COUNTDOWN_CAMERA_CLOSE message',
+      createMessageGuard({
+        type: VideoMessageType.COUNTDOWN_CAMERA_CLOSE,
+        required: {
+          controlToken: isNonEmptyString,
+          recordingId: isNonEmptyString,
+          peerGeneration: isPeerGeneration,
+        },
+      })
+    ),
+    parseResponse: createGuardParser(
+      'runtime COUNTDOWN_CAMERA_CLOSE response',
+      createRuntimeResponseGuard({})
+    ),
+  },
   [VideoMessageType.VIDEO_RECORDING_CAMERA_OFFER]: {
     parseRequest: createGuardParser(
       'runtime VIDEO_RECORDING_CAMERA_OFFER message',
@@ -146,7 +209,7 @@ export const runtimeVideoSessionMessageContracts = {
           capabilityToken: isString,
           peerId: isString,
           sdp: isString,
-          settings: isVideoRecordingSettings,
+          source: isCameraOfferSource,
         },
       })
     ),
@@ -409,10 +472,9 @@ export const runtimeVideoSessionMessageContracts = {
   [VideoMessageType.RECORDING_DURATION_UPDATED]: {
     parseRequest: createGuardParser(
       'runtime RECORDING_DURATION_UPDATED message',
-      createMessageGuard({
-        type: VideoMessageType.RECORDING_DURATION_UPDATED,
-        required: { duration: isNumber, recordingId: isString },
-      })
+      (value): value is RuntimeRequestByType[typeof VideoMessageType.RECORDING_DURATION_UPDATED] =>
+        isRecordingProgressCandidate(value) &&
+        (value.duration !== undefined || value.microphoneActivity !== undefined)
     ),
     parseResponse: createGuardParser(
       'runtime RECORDING_DURATION_UPDATED response',

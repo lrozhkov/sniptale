@@ -32,7 +32,9 @@ function isCameraRecorderControlWithoutTab(message: TabRouteArgs['message']): bo
     message.type === VideoMessageType.PAUSE_RECORDING ||
     message.type === VideoMessageType.RESUME_RECORDING ||
     message.type === VideoMessageType.STOP_RECORDING ||
-    message.type === VideoMessageType.UPDATE_SETTINGS
+    message.type === VideoMessageType.UPDATE_SETTINGS ||
+    message.type === VideoMessageType.COUNTDOWN_CAMERA_OFFER ||
+    message.type === VideoMessageType.COUNTDOWN_CAMERA_CLOSE
   );
 }
 

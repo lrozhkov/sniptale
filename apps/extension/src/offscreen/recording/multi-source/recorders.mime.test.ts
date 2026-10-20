@@ -31,7 +31,8 @@ it('uses the supported WebM MIME for a separately staged microphone artifact', a
   const recorder = await createMicrophoneRecorder(
     'rec',
     { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
-    createRecordingStagingCoordinatorTestDouble()
+    createRecordingStagingCoordinatorTestDouble(),
+    { sendRuntimeMessage: vi.fn().mockResolvedValue(undefined) }
   );
   expect(recorder?.recorder.mimeType).toBe('video/webm');
   expect(recorder?.artifactSession).toBeDefined();

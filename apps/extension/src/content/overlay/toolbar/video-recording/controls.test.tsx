@@ -169,6 +169,41 @@ it('preserves the original Start event through the adopted command owner', () =>
   expect(actions.onStart).toHaveBeenCalledExactlyOnceWith(nativeEvent);
 });
 
+it('offers Cancel before any confirmed start and restores focus', async () => {
+  const actions = renderPhase('idle');
+  actions.onStart.mockResolvedValueOnce('confirmation-required');
+  const start = queryButton('content.toolbar.video-recording.start')!;
+  await act(async () => start.click());
+  const dialog = host.querySelector('[role="alertdialog"]')!;
+  expect(dialog).not.toBeNull();
+  const cancel = Array.from(dialog.querySelectorAll('button')).find(
+    (button) => button.textContent === 'common.actions.cancel'
+  )!;
+  act(() => cancel.click());
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(actions.onStart).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(start);
+});
+
+it('uses the actual Continue event and remembered choice without repeating activation', async () => {
+  const actions = renderPhase('idle');
+  actions.onStart.mockResolvedValueOnce('confirmation-required').mockResolvedValueOnce('started');
+  await act(async () => queryButton('content.toolbar.video-recording.start')!.click());
+  const dialog = host.querySelector('[role="alertdialog"]')!;
+  act(() => dialog.querySelector<HTMLInputElement>('input')!.click());
+  const continueButton = Array.from(dialog.querySelectorAll('button')).find(
+    (button) => button.textContent === 'content.toolbar.videoRecordingWithoutMicrophoneContinue'
+  )!;
+  const continueEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+  await act(async () => continueButton.dispatchEvent(continueEvent));
+  expect(actions.onStart).toHaveBeenNthCalledWith(2, continueEvent, {
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: true,
+  });
+  expect(actions.onStart).toHaveBeenCalledTimes(2);
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
 it('keeps a paused lifecycle command distinct from persistent tools and properties', () => {
   renderPhase('paused');
   const resume = queryButton('content.toolbar.video-recording.resume')!;

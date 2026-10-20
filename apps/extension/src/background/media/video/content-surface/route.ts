@@ -85,7 +85,12 @@ async function handleSurfaceMessage(args: {
     case 'ACTIVATE_VIDEO_RECORDING_SURFACE':
       return activateVideoRecordingSurface(resolvedTabId);
     case 'START_SAVED_TAB_VIDEO_RECORDING':
-      return startSavedTabVideoRecording(resolvedTabId, args.sender?.url, args.sender?.documentId);
+      return startSavedTabVideoRecording(
+        resolvedTabId,
+        args.sender?.url,
+        args.sender?.documentId,
+        message
+      );
     case 'RELEASE_VIDEO_RECORDING_SURFACE': {
       const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
       if (
@@ -150,7 +155,7 @@ async function answerCameraOffer(tabId: number, message: VideoRecordingCameraOff
       type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
       peerId,
       sdp: message.sdp,
-      settings,
+      source: { kind: 'surface', settings },
     })
   );
   if (!response?.success || !response.sdp) throw new Error(response?.error ?? 'Camera peer failed');

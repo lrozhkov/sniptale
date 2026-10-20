@@ -185,7 +185,7 @@ async function verifiesPopupVideoControlUsesRequestTabId() {
     true,
     listener,
     popupStartMessage,
-    createSender(undefined, POPUP_URL),
+    createSender(17, POPUP_URL),
     popupResponse
   );
   await flushPromises();
@@ -196,7 +196,7 @@ async function verifiesPopupVideoControlUsesRequestTabId() {
     }),
     resolvedTabId: 77,
     sendResponse: popupResponse,
-    sender: { url: POPUP_URL },
+    sender: createSender(17, POPUP_URL),
   });
 }
 

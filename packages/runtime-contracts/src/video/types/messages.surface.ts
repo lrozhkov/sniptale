@@ -79,6 +79,8 @@ export interface VideoRecordingSurfaceActivation {
 export interface StartSavedTabVideoRecordingMessage {
   type: typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
   contentIntent: ContentPrivilegedActionCapability;
+  confirmedWithoutMicrophone?: boolean;
+  rememberWithoutMicrophone?: boolean;
 }
 
 export interface ActivateVideoRecordingSurfaceMessage {
@@ -273,8 +275,16 @@ export function isStartSavedTabVideoRecordingMessage(
 ): value is StartSavedTabVideoRecordingMessage {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['type', 'contentIntent']) &&
+    Object.keys(value).every((key) =>
+      ['type', 'contentIntent', 'confirmedWithoutMicrophone', 'rememberWithoutMicrophone'].includes(
+        key
+      )
+    ) &&
     value['type'] === VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING &&
+    (value['confirmedWithoutMicrophone'] === undefined ||
+      typeof value['confirmedWithoutMicrophone'] === 'boolean') &&
+    (value['rememberWithoutMicrophone'] === undefined ||
+      typeof value['rememberWithoutMicrophone'] === 'boolean') &&
     isContentPrivilegedActionCapability(value['contentIntent'])
   );
 }

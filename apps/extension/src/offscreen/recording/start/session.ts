@@ -30,6 +30,7 @@ export function initializeRecordingSession(params: {
 
   const resolvedRecordingId = params.recordingId;
   recordingContext.beginRecordingSession(resolvedRecordingId, params.generation);
+  recordingContext.configureMicrophoneObservation(params.settings.microphoneEnabled);
   recordingContext.bindStreamInstance({
     generation: params.generation,
     recordingId: resolvedRecordingId,

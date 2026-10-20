@@ -8,6 +8,7 @@ import {
   loadPendingVideoPostRecordResult,
 } from '../post-record/result-runtime';
 import { VideoSetupBody } from './body';
+import { useVideoStartConfirmation } from './start-confirmation';
 import type { VideoSetupPageProps } from './types';
 import { getVideoSetupViewModel } from './view-model';
 
@@ -28,25 +29,28 @@ type PostRecordEffectArgs = {
 export default function VideoSetupPage(props: VideoSetupPageProps) {
   const postRecord = useVideoPostRecordState(props);
   const viewModel = getVideoSetupViewModel(postRecord.displayProps);
+  const startConfirmation = useVideoStartConfirmation({ ...props, canStart: viewModel.canStart });
   const footer =
     postRecord.postRecordResult ||
     postRecord.isVerificationPending ||
     postRecord.hasVerificationError ||
     postRecord.showSavingState ||
     postRecord.hasStopRequestFailure ||
-    props.recordingState.status === VideoRecordingStatus.STOPPING ? null : (
-      <VideoSetupFooter
-        canStart={viewModel.canStart}
-        startButtonLabel={viewModel.startButtonLabel}
-        startDisabledReason={viewModel.startDisabledReason}
-        onStart={props.onStart}
-        onPauseResume={props.onPauseResume}
-        onStop={props.onStop}
-        onCancel={postRecord.handleCancel}
-        recordingState={postRecord.displayProps.recordingState}
-        galleryTitle={viewModel.galleryTitle}
-      />
-    );
+    props.recordingState.status === VideoRecordingStatus.STOPPING
+      ? null
+      : (startConfirmation.confirmation ?? (
+          <VideoSetupFooter
+            canStart={viewModel.canStart}
+            startButtonLabel={viewModel.startButtonLabel}
+            startDisabledReason={viewModel.startDisabledReason}
+            onStart={startConfirmation.start}
+            onPauseResume={props.onPauseResume}
+            onStop={props.onStop}
+            onCancel={postRecord.handleCancel}
+            recordingState={postRecord.displayProps.recordingState}
+            galleryTitle={viewModel.galleryTitle}
+          />
+        ));
   const isIdle = postRecord.displayProps.recordingState.status === VideoRecordingStatus.IDLE;
 
   return (

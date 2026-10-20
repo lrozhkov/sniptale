@@ -2,9 +2,11 @@ import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { useState } from 'react';
 import { translate, type TranslationKey } from '../../../../platform/i18n/popup';
 import type {
+  VideoRecordingRuntimeState,
   VideoRecordingSettings,
   WebcamActualSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { formatKnownWebcamActualSettings } from '../webcam-actual-settings';
 
 export interface VideoActiveMediaSelection {
@@ -31,9 +33,11 @@ function resolveSelectedName(label: string | null, fallbackKey: TranslationKey):
 }
 
 function MicrophoneStatus({
+  readOnly,
   onActiveRecordingSettingsChange,
   selection,
 }: {
+  readOnly: boolean;
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   selection: VideoActiveMediaSelection;
 }) {
@@ -43,6 +47,7 @@ function MicrophoneStatus({
 
   return (
     <ActiveMicrophoneStatus
+      readOnly={readOnly}
       selection={selection}
       onActiveRecordingSettingsChange={onActiveRecordingSettingsChange}
     />
@@ -65,9 +70,11 @@ function InactiveMicrophoneStatus() {
 }
 
 function ActiveMicrophoneStatus({
+  readOnly,
   onActiveRecordingSettingsChange,
   selection,
 }: {
+  readOnly: boolean;
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   selection: VideoActiveMediaSelection;
 }) {
@@ -90,6 +97,7 @@ function ActiveMicrophoneStatus({
         </div>
       </div>
       <ActiveMediaMuteButton
+        readOnly={readOnly}
         enabled={selection.microphoneEnabled}
         labelWhenEnabled={translate('popup.video.activeMicrophoneMute')}
         labelWhenMuted={translate('popup.video.activeMicrophoneUnmute')}
@@ -103,9 +111,11 @@ function ActiveMicrophoneStatus({
 }
 
 function WebcamStatus({
+  readOnly,
   onActiveRecordingSettingsChange,
   selection,
 }: {
+  readOnly: boolean;
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   selection: VideoActiveMediaSelection;
 }) {
@@ -115,6 +125,7 @@ function WebcamStatus({
 
   return (
     <ActiveWebcamStatus
+      readOnly={readOnly}
       selection={selection}
       onActiveRecordingSettingsChange={onActiveRecordingSettingsChange}
     />
@@ -137,9 +148,11 @@ function InactiveWebcamStatus() {
 }
 
 function ActiveWebcamStatus({
+  readOnly,
   onActiveRecordingSettingsChange,
   selection,
 }: {
+  readOnly: boolean;
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   selection: VideoActiveMediaSelection;
 }) {
@@ -168,6 +181,7 @@ function ActiveWebcamStatus({
         ) : null}
       </div>
       <ActiveMediaMuteButton
+        readOnly={readOnly}
         enabled={selection.webcamEnabled}
         labelWhenEnabled={translate('popup.video.activeWebcamMute')}
         labelWhenMuted={translate('popup.video.activeWebcamUnmute')}
@@ -181,33 +195,53 @@ function ActiveWebcamStatus({
 }
 
 export function VideoActiveMediaStatus({
+  recordingState,
   onActiveRecordingSettingsChange,
   selection,
 }: {
+  recordingState?: VideoRecordingRuntimeState;
   onActiveRecordingSettingsChange: (patch: Partial<VideoRecordingSettings>) => Promise<void>;
   selection: VideoActiveMediaSelection;
 }) {
+  const readOnly = recordingState?.status === VideoRecordingStatus.COUNTDOWN;
+  const showSilenceWarning =
+    recordingState?.status === VideoRecordingStatus.RECORDING &&
+    selection.microphoneEnabled &&
+    recordingState.microphoneActivity?.warning === true;
   return (
     <div className="mt-3 grid gap-3 px-3">
       <MicrophoneStatus
+        readOnly={readOnly}
         selection={selection}
         onActiveRecordingSettingsChange={onActiveRecordingSettingsChange}
       />
       <WebcamStatus
+        readOnly={readOnly}
         selection={selection}
         onActiveRecordingSettingsChange={onActiveRecordingSettingsChange}
       />
+      {showSilenceWarning ? (
+        <p
+          role="status"
+          data-ui="popup.video-active.microphone-warning"
+          className="text-xs text-[var(--sniptale-color-text-primary)]"
+        >
+          {translate('popup.video.microphoneSilenceWarning')}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function ActiveMediaMuteButton({
+  readOnly,
   enabled,
   labelWhenEnabled,
   labelWhenMuted,
   onToggle,
   type,
 }: {
+  readOnly: boolean;
   enabled: boolean;
   labelWhenEnabled: string;
   labelWhenMuted: string;
@@ -218,6 +252,7 @@ function ActiveMediaMuteButton({
   const Icon = type === 'microphone' ? (enabled ? Mic : MicOff) : enabled ? Video : VideoOff;
   const label = enabled ? labelWhenEnabled : labelWhenMuted;
   const handleClick = () => {
+    if (readOnly || busy) return;
     setBusy(true);
     void onToggle().finally(() => setBusy(false));
   };
@@ -229,10 +264,13 @@ function ActiveMediaMuteButton({
         'inline-flex h-7 w-7 items-center justify-center rounded-[7px]',
         'text-[var(--sniptale-color-text-muted-strong)] transition-colors',
         'hover:text-[var(--sniptale-color-accent-emphasis)]',
+        'focus:outline-none focus-visible:outline focus-visible:outline-2',
+        'focus-visible:outline-[var(--sniptale-color-accent)]',
+        'disabled:cursor-default disabled:opacity-50',
       ].join(' ')}
       aria-label={label}
-      disabled={busy}
-      title={label}
+      disabled={busy || readOnly}
+      title={readOnly ? translate('popup.video.countdownMediaReadOnly') : label}
       onClick={handleClick}
     >
       <Icon className="h-4 w-4" />

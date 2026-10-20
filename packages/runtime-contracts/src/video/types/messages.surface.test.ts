@@ -23,6 +23,23 @@ const identity = {
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
 
+it('validates explicit microphone confirmation flags without allowing forged settings', () => {
+  const message = {
+    type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+    contentIntent,
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: false,
+  };
+  expect(isStartSavedTabVideoRecordingMessage(message)).toBe(true);
+  expect(
+    isStartSavedTabVideoRecordingMessage({ ...message, confirmedWithoutMicrophone: 'true' })
+  ).toBe(false);
+  expect(isStartSavedTabVideoRecordingMessage({ ...message, rememberWithoutMicrophone: 1 })).toBe(
+    false
+  );
+  expect(isStartSavedTabVideoRecordingMessage({ ...message, settings: {} })).toBe(false);
+});
+
 it('validates trusted start and activation intents without accepting extra payload', () => {
   expect(
     isStartSavedTabVideoRecordingMessage({

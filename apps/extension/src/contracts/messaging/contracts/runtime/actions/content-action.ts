@@ -3,6 +3,7 @@ import {
   createMessageGuard,
   createRuntimeResponseGuard,
   isNumber,
+  isRecord,
   isString,
 } from '../../../validators/index';
 import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
@@ -33,8 +34,35 @@ import {
   isActivateVideoRecordingSurfaceMessage,
   isStartSavedTabVideoRecordingMessage,
   isVideoRecordingSurfaceSnapshot,
+  isVideoRecordingSurfaceActivation,
   isVideoRecordingStartFailureCode,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { RuntimeContentActionResponseByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
+
+function isSavedRecordingStartResponse(
+  value: unknown
+): value is RuntimeContentActionResponseByType[typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING] {
+  const valid = createRuntimeResponseGuard({
+    optional: {
+      confirmationRequired: isLibraryDestinationRequestedMarker,
+      surfaceSessionId: isString,
+      surfaceToken: isString,
+      snapshot: isVideoRecordingSurfaceSnapshot,
+      failureCode: isVideoRecordingStartFailureCode,
+    },
+  });
+  if (!isRecord(value) || !valid(value)) return false;
+  if (value['success'] !== true) return true;
+  return value['confirmationRequired'] === true
+    ? value['snapshot'] === undefined &&
+        value['surfaceSessionId'] === undefined &&
+        value['surfaceToken'] === undefined
+    : isVideoRecordingSurfaceActivation({
+        surfaceSessionId: value['surfaceSessionId'],
+        surfaceToken: value['surfaceToken'],
+        snapshot: value['snapshot'],
+      });
+}
 
 function isLibraryDestinationRequestedMarker(value: unknown): value is true {
   return value === true;
@@ -98,14 +126,7 @@ export const contentActionRuntimeContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime START_SAVED_TAB_VIDEO_RECORDING response',
-      createRuntimeResponseGuard({
-        optional: {
-          surfaceSessionId: isString,
-          surfaceToken: isString,
-          snapshot: isVideoRecordingSurfaceSnapshot,
-          failureCode: isVideoRecordingStartFailureCode,
-        },
-      })
+      isSavedRecordingStartResponse
     ),
   },
   [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: {

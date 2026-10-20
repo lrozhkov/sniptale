@@ -38,11 +38,7 @@ function resolveOffscreenStartSettings(
     : { ...settings, systemAudioEnabled: false };
 }
 
-function waitForRecordingSourceAdmission(
-  context: RecordingStartContext,
-  multiSource: boolean
-): Promise<string> | null {
-  if (multiSource) return null;
+function waitForRecordingSourceAdmission(context: RecordingStartContext): Promise<string> {
   return waitForVideoSourceReady({
     recordingId: context.recordingId,
     expectedStreamInstanceId: context.streamInstanceId,
@@ -63,11 +59,8 @@ export async function finalizeRecordingStart(
     throw new Error('Recording start was cancelled before source dispatch');
   }
 
-  const multiSource =
-    context.captureMode === CaptureMode.SCREEN &&
-    normalizeVideoSourceCount(context.settings.sourceCount) > 1;
-  const ready = waitForRecordingSourceAdmission(context, multiSource);
-  const observedReady = ready?.catch(() => null);
+  const ready = waitForRecordingSourceAdmission(context);
+  const observedReady = ready.catch(() => null);
   try {
     await sendOffscreenStartRecording({
       captureMode: context.captureMode,
@@ -85,7 +78,6 @@ export async function finalizeRecordingStart(
     await observedReady;
     throw error;
   }
-  if (!ready) return context.streamInstanceId;
   const streamInstanceId = await ready;
   logger.debug('Raw recording source validated', {
     recordingId: context.recordingId,

@@ -246,6 +246,62 @@ function verifiesRemoveMicrophoneWithoutActiveStream(): void {
 }
 
 describe('AudioMixer', () => {
+  it('publishes only the microphone input through successful replacement and mute changes', async () => {
+    const original = createAudioStream();
+    const replacement = createAudioStream();
+    const observe = vi.fn();
+    vi.mocked(navigator.mediaDevices.getUserMedia)
+      .mockResolvedValueOnce(original)
+      .mockResolvedValueOnce(replacement);
+    const mixer = new AudioMixer(observe);
+    await mixer.addTabAudio(createAudioStream());
+    expect(observe).not.toHaveBeenCalled();
+    await mixer.addMicrophone();
+    expect(observe).toHaveBeenLastCalledWith(original, 1);
+    const settings = {
+      autoGainControl: true,
+      echoCancellation: true,
+      microphoneDeviceId: null,
+      microphoneGain: 2,
+      noiseSuppression: true,
+    };
+    await mixer.switchMicrophone(settings);
+    expect(observe).toHaveBeenLastCalledWith(replacement, 2);
+    expect(original.getAudioTracks()[0]?.stop).toHaveBeenCalledOnce();
+    mixer.setMicrophoneEnabled(false);
+    expect(observe).toHaveBeenLastCalledWith(replacement, 2);
+    expect(replacement.getAudioTracks()[0]?.enabled).toBe(false);
+    await mixer.cleanup();
+  });
+  it('observes committed microphone inputs and preserves the observation on switch rollback', async () => {
+    const original = createAudioStream();
+    const candidate = createAudioStream();
+    const observe = vi.fn();
+    vi.mocked(navigator.mediaDevices.getUserMedia)
+      .mockResolvedValueOnce(original)
+      .mockResolvedValueOnce(candidate);
+    const mixer = new AudioMixer(observe);
+    const settings = {
+      autoGainControl: true,
+      echoCancellation: true,
+      microphoneDeviceId: null,
+      microphoneGain: 2,
+      noiseSuppression: true,
+    };
+    await mixer.addMicrophone(settings);
+    expect(observe).toHaveBeenLastCalledWith(original, 2);
+    observe.mockClear();
+    connectMicrophoneStreamMock.mockImplementationOnce(() => {
+      throw new Error('connection failed');
+    });
+    await expect(mixer.switchMicrophone({ ...settings, microphoneGain: 3 })).rejects.toThrow(
+      'connection failed'
+    );
+    expect(observe).not.toHaveBeenCalled();
+    expect(connectMicrophoneStreamMock).toHaveBeenLastCalledWith(original, 2);
+    await mixer.cleanup();
+    expect(observe).toHaveBeenLastCalledWith(null, 1);
+  });
   it('delegates graph ownership to the dedicated graph seam', verifiesInitialization);
   it('adds tab audio only when the tab stream has audio tracks', verifiesTabAudioHandling);
   it('adds and removes microphone audio', verifiesMicrophoneLifecycle);

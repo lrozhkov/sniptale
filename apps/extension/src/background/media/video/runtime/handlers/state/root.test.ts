@@ -258,6 +258,7 @@ async function verifyRecordingPauseResumeLifecycle(
   await flushAsyncRoute();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PAUSED,
+    microphoneActivity: null,
   });
   expectAcceptedLifecycleResponse(sendResponse);
 
@@ -268,6 +269,7 @@ async function verifyRecordingPauseResumeLifecycle(
   await flushAsyncRoute();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     status: VideoRecordingStatus.RECORDING,
+    microphoneActivity: null,
   });
   expectAcceptedLifecycleResponse(sendResponse);
 }

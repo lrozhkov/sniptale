@@ -8,6 +8,7 @@ import {
   WebcamPresentationShape,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
+  type VideoMicrophoneActivity,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
@@ -94,6 +95,7 @@ export function isVideoRecordingSettings(value: unknown): value is VideoRecordin
     !Object.hasOwn(value, 'quality') &&
     !Object.hasOwn(value, 'output') &&
     isBoolean(value['microphoneEnabled']) &&
+    hasOptionalField(value, 'warnWithoutMicrophone', isBoolean) &&
     (value['microphoneDeviceId'] === null || isString(value['microphoneDeviceId'])) &&
     hasOptionalField(value, 'echoCancellation', isBoolean) &&
     hasOptionalField(value, 'noiseSuppression', isBoolean) &&
@@ -181,9 +183,26 @@ export function isVideoRecordingLiveMediaState(
   );
 }
 
+export function isVideoMicrophoneActivity(value: unknown): value is VideoMicrophoneActivity {
+  return (
+    isRecord(value) &&
+    (value['status'] === 'disabled' ||
+      value['status'] === 'unavailable' ||
+      value['status'] === 'ready') &&
+    typeof value['level'] === 'number' &&
+    Number.isFinite(value['level']) &&
+    value['level'] >= 0 &&
+    value['level'] <= 1 &&
+    isBoolean(value['warning'])
+  );
+}
+
 export function isVideoRecordingRuntimeState(value: unknown): value is VideoRecordingRuntimeState {
   return (
     isRecord(value) &&
+    (value['microphoneActivity'] === undefined ||
+      value['microphoneActivity'] === null ||
+      isVideoMicrophoneActivity(value['microphoneActivity'])) &&
     isString(value['status']) &&
     isNumber(value['duration']) &&
     (value['countdownEndsAt'] === null || isNumber(value['countdownEndsAt'])) &&

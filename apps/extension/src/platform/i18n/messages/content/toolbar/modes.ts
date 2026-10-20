@@ -11,6 +11,18 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  videoRecordingWithoutMicrophone: {
+    ru: 'Продолжить запись без микрофона?',
+    en: 'Continue recording without a microphone?',
+  },
+  videoRecordingWithoutMicrophoneRemember: {
+    ru: 'Больше не спрашивать',
+    en: "Don't ask me again",
+  },
+  videoRecordingWithoutMicrophoneContinue: {
+    ru: 'Продолжить',
+    en: 'Continue',
+  },
   cropResizeMode: { ru: 'Изменить область', en: 'Resize crop' },
   cropDrawingMode: { ru: 'Рисовать', en: 'Draw' },
   unknownError: {

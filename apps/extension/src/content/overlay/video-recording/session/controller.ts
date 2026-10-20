@@ -10,6 +10,7 @@ import {
 import type {
   VideoRecordingMediaDevice,
   VideoRecordingSurfaceSnapshot,
+  StartSavedTabVideoRecordingMessage,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
@@ -218,13 +219,23 @@ function useSurfaceStart(
 ) {
   const startAttemptRef = useRef(0);
   const start = useCallback(
-    async (event?: Event) => {
+    async (
+      event?: Event,
+      confirmation: Pick<
+        StartSavedTabVideoRecordingMessage,
+        'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
+      > = {}
+    ) => {
       if (!event) return;
       const attempt = ++startAttemptRef.current;
       dispatch({ type: 'starting' });
       try {
-        const response = await startSavedTabVideoRecording(event);
+        const response = await startSavedTabVideoRecording(event, confirmation);
         if (attempt !== startAttemptRef.current) return;
+        if (response?.success && response.confirmationRequired === true) {
+          dispatch({ type: 'idle' });
+          return 'confirmation-required' as const;
+        }
         if (!response?.success || !response.snapshot) {
           const code = isVideoRecordingStartFailureCode(response?.failureCode)
             ? response.failureCode
@@ -240,14 +251,16 @@ function useSurfaceStart(
           } else {
             dispatch({ type: 'failed', error: recordingStartError(code) });
           }
-          return;
+          return 'failed' as const;
         }
         applySnapshot(response.snapshot, response.surfaceToken);
+        return 'started' as const;
       } catch (error) {
         if (attempt !== startAttemptRef.current) return;
         const code = classifyRecordingStartError(error);
         logger.warn('Saved tab recording start failed', { code });
         dispatch({ type: 'failed', error: recordingStartError(code) });
+        return 'failed' as const;
       }
     },
     [applySnapshot, dispatch]

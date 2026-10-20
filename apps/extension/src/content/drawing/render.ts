@@ -22,7 +22,7 @@ import {
 import { drawRoughArrow } from './rough-arrow';
 import { getDrawingMultiRotationHandlePoint } from './interaction';
 
-export interface DrawingViewportProjection {
+interface DrawingViewportProjection {
   readonly x: number;
   readonly y: number;
 }

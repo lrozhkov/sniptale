@@ -24,6 +24,7 @@ import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
 import { getPopupRuntimeServices } from '../../runtime-services';
 
 type StartRecordingArgs = {
+  targetTabId?: number | null;
   videoSettings: VideoRecordingSettings;
   captureMode: CaptureMode;
   microphoneDevices: MicrophoneOption[];
@@ -141,9 +142,19 @@ function getNonAcceptedStartMessage(result: unknown): string {
 
 async function resolveActiveTabId(
   captureMode: CaptureMode,
-  setStartError: Dispatch<SetStateAction<string | null>>
+  setStartError: Dispatch<SetStateAction<string | null>>,
+  targetTabId?: number | null
 ): Promise<number | null> {
   if (captureMode === CaptureMode.CAMERA) {
+    return null;
+  }
+
+  if (targetTabId !== undefined) {
+    if (targetTabId !== null) {
+      const tab = await browserTabs.get(targetTabId);
+      if (tab.id === targetTabId) return targetTabId;
+    }
+    setStartError(translate('popup.common.noActiveTab'));
     return null;
   }
 
@@ -211,7 +222,7 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
       return;
     }
 
-    const tabId = await resolveActiveTabId(recordingCaptureMode, setStartError);
+    const tabId = await resolveActiveTabId(recordingCaptureMode, setStartError, args.targetTabId);
     if (recordingCaptureMode !== CaptureMode.CAMERA && tabId === null) {
       return;
     }

@@ -44,6 +44,7 @@ const setIsStartPending = vi.fn();
 const setRecordingControlCapability = vi.fn();
 const setStartError = vi.fn();
 const tabsQuery = vi.fn();
+const tabsGet = vi.fn();
 const runtimeSendMessage = vi.fn();
 
 function installChromeMocks() {
@@ -64,6 +65,7 @@ function installChromeMocks() {
       },
       tabs: {
         query: tabsQuery,
+        get: tabsGet,
       },
     },
   });
@@ -250,6 +252,24 @@ async function verifiesControlledCursorPreservedForTabCapture() {
 
 function runStartRecordingHandlerSuite() {
   beforeEach(resetStartRecordingMocks);
+
+  it('records the explicit source tab even when a different tab is active', async () => {
+    tabsQuery.mockResolvedValue([{ id: 999 }]);
+    tabsGet.mockResolvedValueOnce({ id: 21 });
+    await startRecordingHandler(createStartArgs({ targetTabId: 21 }));
+    expect(tabsQuery).not.toHaveBeenCalled();
+    expect(tabsGet).toHaveBeenCalledWith(21);
+    expect(runtimeSendMessage).toHaveBeenCalledWith(expect.objectContaining({ tabId: 21 }));
+  });
+
+  it('does not fall back to another tab when the explicit source has closed', async () => {
+    tabsQuery.mockResolvedValue([{ id: 999 }]);
+    tabsGet.mockRejectedValueOnce(new Error('No tab'));
+    await startRecordingHandler(createStartArgs({ targetTabId: 21 }));
+    expect(tabsQuery).not.toHaveBeenCalled();
+    expect(runtimeSendMessage).not.toHaveBeenCalled();
+    expect(setStartError).toHaveBeenCalled();
+  });
 
   it('sends the selected preset ID for tab recording', verifiesTabModeMessage);
   it('keeps the selected preset ID in the recording draft message', verifiesViewportPresetMessage);

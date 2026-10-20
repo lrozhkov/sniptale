@@ -3,6 +3,7 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import type { MultiSourceRecorder, MultiSourceSession } from './state';
 import { createMultiSourceLifecycle } from './state';
 import { pauseSessionRecorders, resumeSessionRecorders, setSessionMediaEnabled } from './controls';
+import { createMicrophoneActivityObserver } from '../stream/microphone-activity';
 
 function createRecorder(
   params: {
@@ -64,6 +65,20 @@ function createSession(): MultiSourceSession {
 }
 
 describe('multi-source recorder controls', () => {
+  it('suspends the microphone observation and resets intentional mute independently of processed output', () => {
+    const session = createSession();
+    const observation = createMicrophoneActivityObserver(vi.fn());
+    const phase = vi.spyOn(observation, 'setPhase');
+    const enabled = vi.spyOn(observation, 'setEnabled');
+    session.audioRecorder!.microphoneActivity = observation;
+    pauseSessionRecorders(session);
+    resumeSessionRecorders(session);
+    setSessionMediaEnabled(session, { microphoneEnabled: false });
+    expect(phase.mock.calls).toEqual([['paused'], ['recording']]);
+    expect(enabled).toHaveBeenCalledWith(false);
+    expect(observation.current.status).toBe('disabled');
+    observation.dispose();
+  });
   it('pauses and resumes active video and microphone recorders', () => {
     const session = createSession();
     pauseSessionRecorders(session);

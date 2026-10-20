@@ -3,6 +3,26 @@ import { popupVideoMediaMessages } from './video-media';
 import { popupVideoRecordingControlMessages } from './video-recording-controls';
 
 export const popupVideoMessages = defineMessageSource({
+  withoutMicrophoneTitle: {
+    ru: 'Начать запись без микрофона?',
+    en: 'Start recording without a microphone?',
+  },
+  withoutMicrophoneRemember: {
+    ru: 'Больше не спрашивать',
+    en: 'Don’t ask again',
+  },
+  withoutMicrophoneCancel: {
+    ru: 'Отмена',
+    en: 'Cancel',
+  },
+  withoutMicrophoneContinue: {
+    ru: 'Продолжить',
+    en: 'Continue',
+  },
+  withoutMicrophoneSaveError: {
+    ru: 'Не удалось сохранить выбор. Повторите попытку или снимите флажок, чтобы продолжить.',
+    en: 'Could not save your choice. Try again or clear the checkbox to continue.',
+  },
   modeTabLabel: {
     ru: 'Вкладка',
     en: 'Tab',
@@ -270,8 +290,36 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Countdown',
   },
   countdownDescription: {
-    ru: 'Добавляет паузу перед началом записи, чтобы вы успели подготовить экран.',
-    en: 'Add a delay before recording so you have time to prepare the screen.',
+    ru: 'Пауза перед записью позволяет подготовить экран и проверить микрофон и камеру.',
+    en: 'Use the countdown to prepare the screen and check your microphone and camera.',
+  },
+  countdownMicrophoneLevel: {
+    ru: 'Уровень микрофона',
+    en: 'Microphone level',
+  },
+  countdownMicrophoneUnavailable: {
+    ru: 'Уровень сигнала недоступен',
+    en: 'Signal level unavailable',
+  },
+  countdownCameraPreview: {
+    ru: 'Проверка камеры',
+    en: 'Camera preview',
+  },
+  countdownCameraLoading: {
+    ru: 'Подключаем камеру…',
+    en: 'Connecting camera…',
+  },
+  countdownCameraUnavailable: {
+    ru: 'Предпросмотр недоступен',
+    en: 'Preview unavailable',
+  },
+  countdownMediaReadOnly: {
+    ru: 'Для смены устройств отмените отсчёт и начните заново.',
+    en: 'Cancel the countdown and restart to change devices.',
+  },
+  microphoneSilenceWarning: {
+    ru: 'Микрофон давно не передаёт сигнал. Проверьте его, если вы говорите.',
+    en: 'No microphone signal for a while. Check your microphone if you are speaking.',
   },
   autoHideLabel: {
     ru: 'Скрыть',

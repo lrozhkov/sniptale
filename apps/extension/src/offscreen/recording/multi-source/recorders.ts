@@ -14,6 +14,9 @@ import {
 } from '../../../platform/media-utils/video-recording';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { createRecordingArtifactSession } from '../encoding/artifact-session';
+import { createMicrophoneActivityObserver } from '../stream/microphone-activity';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 
 function getFilenameSuffix(sourceIndex: number): string {
   return `window-${sourceIndex + 1}`;
@@ -106,6 +109,7 @@ async function createMediaRecorderSource(params: {
 
 export function stopRecorderStreams(recorders: Array<MultiSourceRecorder | null>): void {
   recorders.forEach((source) => {
+    source?.microphoneActivity?.dispose();
     source?.stream.getTracks().forEach((track) => track.stop());
     source?.release?.();
   });
@@ -211,6 +215,7 @@ export async function createMicrophoneRecorder(
   recordingId: string,
   settings: VideoRecordingSettings,
   coordinator: RecordingStagingCoordinator,
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>,
   filenameSession?: FilenameSession
 ): Promise<MultiSourceRecorder | null> {
   if (!settings.microphoneEnabled) {
@@ -228,7 +233,7 @@ export async function createMicrophoneRecorder(
     throw error;
   }
   try {
-    return await createMediaRecorderSource({
+    const source = await createMediaRecorderSource({
       ...(filenameSession ? { filenameSession } : {}),
       baseRecordingId: recordingId,
       coordinator,
@@ -238,6 +243,22 @@ export async function createMicrophoneRecorder(
       sourceIndex: 999,
       stream: processed.stream,
     });
+    source.microphoneActivity = createMicrophoneActivityObserver((microphoneActivity) => {
+      void messaging
+        .sendRuntimeMessage({
+          type: VideoMessageType.RECORDING_DURATION_UPDATED,
+          recordingId,
+          microphoneActivity,
+        })
+        .catch(() => undefined);
+    });
+    source.microphoneActivity.setSource(rawStream, resolveMicrophoneGain(settings));
+    const release = source.release;
+    source.release = () => {
+      source.microphoneActivity?.dispose();
+      release?.();
+    };
+    return source;
   } catch (error) {
     processed.stream.getTracks().forEach((track) => track.stop());
     processed.release();

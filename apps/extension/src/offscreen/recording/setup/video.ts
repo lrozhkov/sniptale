@@ -22,7 +22,9 @@ async function attachDirectMicrophoneTrack(
   const videoTracks = recordingContext.videoStream?.getVideoTracks();
   if (!videoTracks?.length) return;
   if (resolveMicrophoneGain(settings) !== 1) {
-    recordingContext.audioMixer = new AudioMixer();
+    recordingContext.audioMixer = new AudioMixer(
+      recordingContext.createMicrophoneObservationCallback()
+    );
     await recordingContext.audioMixer.initialize();
     await recordingContext.audioMixer.addMicrophone(settings);
     recordingContext.videoStream = new MediaStream([
@@ -31,9 +33,11 @@ async function attachDirectMicrophoneTrack(
     ]);
     return;
   }
+  const observeMicrophone = recordingContext.createMicrophoneObservationCallback();
   const microphoneStream = await navigator.mediaDevices.getUserMedia({
     audio: buildMicrophoneAudioConstraints(settings),
   });
+  observeMicrophone(microphoneStream, resolveMicrophoneGain(settings));
   recordingContext.videoStream = new MediaStream([
     ...videoTracks,
     ...microphoneStream.getAudioTracks(),
@@ -50,7 +54,9 @@ export async function attachMicrophoneAudioIfEnabled(settings: VideoRecordingSet
     }
     return;
   }
-  recordingContext.audioMixer = new AudioMixer();
+  recordingContext.audioMixer = new AudioMixer(
+    recordingContext.createMicrophoneObservationCallback()
+  );
   await recordingContext.audioMixer.initialize();
   if (recordingContext.sourceStream) {
     await recordingContext.audioMixer
@@ -72,7 +78,9 @@ export async function prepareStableTabRecordingAudio(settings: VideoRecordingSet
   const videoTracks = recordingContext.videoStream?.getVideoTracks();
   if (!videoTracks?.length) return;
 
-  recordingContext.audioMixer = new AudioMixer();
+  recordingContext.audioMixer = new AudioMixer(
+    recordingContext.createMicrophoneObservationCallback()
+  );
   await recordingContext.audioMixer.initialize();
   if (settings.systemAudioEnabled && recordingContext.sourceStream) {
     await recordingContext.audioMixer

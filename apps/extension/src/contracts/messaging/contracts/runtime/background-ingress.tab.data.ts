@@ -340,6 +340,8 @@ export const backgroundIngressTabRouteGroups = [
     messageTypes: [
       'START_RECORDING',
       'CANCEL_RECORDING_START',
+      'COUNTDOWN_CAMERA_OFFER',
+      'COUNTDOWN_CAMERA_CLOSE',
       'STOP_RECORDING',
       'PAUSE_RECORDING',
       'RESUME_RECORDING',

@@ -160,6 +160,7 @@ export interface WebcamPresentationSettings {
 
 export interface VideoRecordingSettings {
   microphoneEnabled: boolean;
+  warnWithoutMicrophone?: boolean;
   microphoneDeviceId: string | null;
   echoCancellation?: boolean;
   noiseSuppression?: boolean;
@@ -294,7 +295,15 @@ export interface VideoRecordingCompletionState {
   pending: boolean;
 }
 
+/** Transient microphone-only signal observation. This value does not identify speech or retain audio. */
+export interface VideoMicrophoneActivity {
+  status: 'disabled' | 'unavailable' | 'ready';
+  level: number;
+  warning: boolean;
+}
+
 export interface VideoRecordingRuntimeState {
+  microphoneActivity?: VideoMicrophoneActivity | null;
   completion?: VideoRecordingCompletionState | null;
   status: VideoRecordingStatus;
   duration: number;

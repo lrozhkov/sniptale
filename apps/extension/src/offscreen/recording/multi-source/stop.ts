@@ -23,6 +23,7 @@ function stopSessionStreams(session: MultiSourceSession): void {
 }
 
 function retireMultiSourceSession(session: MultiSourceSession): void {
+  session.audioRecorder?.microphoneActivity?.dispose();
   setActiveMultiSourceSession(null);
   stopSessionStreams(session);
   releaseVideoRecordingMediaActivityLease();
@@ -89,6 +90,7 @@ export function stopMultiSourceSession(params: {
   if (session.stopPromise) return session.stopPromise;
 
   const previousPhase = session.lifecycle.beginStop();
+  session.audioRecorder?.microphoneActivity?.dispose();
   if (previousPhase === null) return Promise.resolve();
   if (previousPhase === 'starting') {
     session.stopPromise = cancelStartingSession(session, params.discard);

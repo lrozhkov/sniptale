@@ -140,6 +140,32 @@ it('projects surface snapshots and lifecycle clock ownership', () => {
   expect(mocks.subscribeSurface).toHaveBeenCalledOnce();
 });
 
+it('returns authoritative confirmation without reporting a recording failure', async () => {
+  mocks.start.mockResolvedValueOnce({ success: true, confirmationRequired: true });
+  const startEvent = new Event('click');
+  await act(async () => expect(await controller.onStart(startEvent)).toBe('confirmation-required'));
+  expect(controller.state.phase).toBe('idle');
+  expect(controller.state.error).toBeNull();
+  expect(mocks.start).toHaveBeenCalledWith(startEvent, {});
+});
+
+it('uses the new Continue activation and explicit remembered choice on retry', async () => {
+  mocks.start.mockResolvedValueOnce({ success: true, snapshot, surfaceToken: 'token-1' });
+  const continueEvent = new Event('click');
+  await act(async () =>
+    expect(
+      await controller.onStart(continueEvent, {
+        confirmedWithoutMicrophone: true,
+        rememberWithoutMicrophone: true,
+      })
+    ).toBe('started')
+  );
+  expect(mocks.start).toHaveBeenCalledWith(continueEvent, {
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: true,
+  });
+});
+
 it('activates, releases, and starts through trusted content transport', async () => {
   mocks.activate.mockResolvedValue({ success: true, snapshot, surfaceToken: 'token-1' });
   await act(async () => expect(await controller.onActivate(new Event('click'))).toBe(true));
@@ -336,7 +362,7 @@ it('keeps a successful countdown cancellation idle when the original start settl
   }>();
   mocks.start.mockReturnValueOnce(pendingStart.promise);
 
-  let startPromise!: Promise<void>;
+  let startPromise!: ReturnType<Controller['onStart']>;
   act(() => {
     startPromise = controller.onStart(new Event('click'));
   });
@@ -358,7 +384,7 @@ it('accepts the successful start when cancel loses the activation race', async (
   mocks.start.mockReturnValueOnce(pendingStart.promise);
   mocks.command.mockRejectedValueOnce(new Error('no active countdown'));
 
-  let startPromise!: Promise<void>;
+  let startPromise!: ReturnType<Controller['onStart']>;
   act(() => {
     startPromise = controller.onStart(new Event('click'));
   });

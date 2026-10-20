@@ -13,6 +13,23 @@ import {
   isViewportRegion,
 } from './validators';
 
+it('accepts absent or boolean microphone warnings and rejects malformed preferences', () => {
+  expect(DEFAULT_VIDEO_SETTINGS.warnWithoutMicrophone).toBe(true);
+  expect(
+    isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, warnWithoutMicrophone: undefined })
+  ).toBe(true);
+  for (const warnWithoutMicrophone of [true, false]) {
+    expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, warnWithoutMicrophone })).toBe(
+      true
+    );
+  }
+  for (const warnWithoutMicrophone of [null, 'false', 0, {}]) {
+    expect(isVideoRecordingSettings({ ...DEFAULT_VIDEO_SETTINGS, warnWithoutMicrophone })).toBe(
+      false
+    );
+  }
+});
+
 function createTypingSignal() {
   return {
     data: { eventCount: 2, eventType: 'input' },

@@ -264,7 +264,7 @@ it('does not validate a SCREEN source against the initiating tab viewport', asyn
   );
 });
 
-it('does not wait for a single-source handshake in multi-source screen mode', async () => {
+it('waits for source admission in multi-source screen mode', async () => {
   await expect(
     finalizeRecordingStart({
       captureMode: CaptureMode.SCREEN,
@@ -277,7 +277,10 @@ it('does not wait for a single-source handshake in multi-source screen mode', as
       tabId: 12,
     })
   ).resolves.toBe('stream-instance-1');
-  expect(waitForVideoSourceReadyMock).not.toHaveBeenCalled();
+  expect(waitForVideoSourceReadyMock).toHaveBeenCalledWith({
+    expectedStreamInstanceId: 'stream-instance-1',
+    recordingId: 'recording-42',
+  });
 });
 
 it('settles source validation when offscreen start delivery rejects', async () => {

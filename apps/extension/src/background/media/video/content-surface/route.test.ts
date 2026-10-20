@@ -158,6 +158,7 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-1', token: 'intent-1' },
     },
     resolvedTabId: 12,
@@ -229,6 +230,7 @@ it('preserves manual surface authority while start is pending so cancel-start re
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-1', token: 'intent-1' },
     },
     resolvedTabId: 12,
@@ -733,6 +735,7 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-2', token: 'intent-2' },
     },
     resolvedTabId: 12,
@@ -750,6 +753,7 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-3', token: 'intent-3' },
     },
     resolvedTabId: 12,
@@ -762,28 +766,12 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
   );
 });
 
-it('opens the video popup when a previous recording must be resolved', async () => {
-  mocks.startRecording.mockResolvedValueOnce({
-    error: 'Resolve the previous recording before starting another.',
-    result: 'failed',
-  });
-
-  const response = await routeStartWithoutSender('https://example.test/page');
-
-  expect(response).toEqual(
-    expect.objectContaining({
-      failureCode: 'already-active',
-      success: false,
-    })
-  );
-  expect(mocks.openPopup).toHaveBeenCalledWith({ windowId: 7 });
-});
-
 async function routeStartWithoutSender(senderUrl?: string) {
   const response = vi.fn();
   routeVideoRecordingSurfaceMessage({
     message: {
       type: VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING,
+      confirmedWithoutMicrophone: true,
       contentIntent: { requestId: 'request-0', token: 'intent-0' },
     },
     resolvedTabId: 12,

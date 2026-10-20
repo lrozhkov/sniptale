@@ -2,6 +2,8 @@ declare module './index' {
   export namespace VideoMessageType {
     type OPEN_VIDEO_RECORDER = typeof import('./index').VideoMessageType.OPEN_VIDEO_RECORDER;
     type START_RECORDING = typeof import('./index').VideoMessageType.START_RECORDING;
+    type COUNTDOWN_CAMERA_OFFER = typeof import('./index').VideoMessageType.COUNTDOWN_CAMERA_OFFER;
+    type COUNTDOWN_CAMERA_CLOSE = typeof import('./index').VideoMessageType.COUNTDOWN_CAMERA_CLOSE;
     type START_SAVED_TAB_VIDEO_RECORDING =
       typeof import('./index').VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
     type ACTIVATE_VIDEO_RECORDING_SURFACE =

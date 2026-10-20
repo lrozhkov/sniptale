@@ -46,6 +46,7 @@ function resolveLiveMediaState(
 }
 
 interface VideoSetupBodyProps {
+  activeRecordingId?: string | null;
   settings: VideoRecordingSettings;
   captureMode: CaptureMode;
   selectedPresetId: string | null;
@@ -127,6 +128,7 @@ function VideoActiveRecordingSection(props: VideoSetupBodyProps) {
   return (
     <section className={VIDEO_SETUP_SECTION_CLASS_NAME}>
       <VideoSetupRecordingPanel
+        activeRecordingId={props.activeRecordingId ?? null}
         recordingState={props.recordingState}
         mediaSelection={{
           microphoneDeviceId: liveMedia.microphoneDeviceId,

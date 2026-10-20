@@ -1,5 +1,5 @@
 import { createFilenameSession } from '../../../workflows/file-naming/index';
-import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { releaseCountdownCameraPreparation } from '../countdown-preview';
 import { CaptureMode as RecordingCaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   CaptureMode,
@@ -12,7 +12,7 @@ import { initializeSidecarRecorders } from '../sidecar';
 import { cleanupResources } from './cleanup';
 import { finalizeRecordingBootstrap } from './recorder';
 import { handleRecordingStartError, initializeRecordingSession } from './session';
-import { waitForRecordingBegin } from './gate';
+import { admitPreparedRecordingSource } from './source-admission';
 import { createRecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 
 type StartRecordingParams = {
@@ -87,53 +87,17 @@ async function startRecordingInternal(
     observeRecordingFrameGeometry(pointObservation, inputFrameSettings, frame);
 
   const { streamInstanceId } = params;
-  const begin = waitForRecordingBegin(
+  const sourceBinding = { generation: params.generation, recordingId, streamInstanceId };
+  const admitted = await admitPreparedRecordingSource(
     {
-      generation: params.generation,
-      recordingId,
-      streamInstanceId,
+      binding: sourceBinding,
+      captureMode: params.captureMode ?? RecordingCaptureMode.TAB,
+      settings: params.settings,
+      prepared,
     },
-    Math.max(0, params.settings.countdownSeconds ?? 0) * 1_000
+    messaging
   );
-  // Observe rejection immediately: shared cleanup cancels this gate on DENY/transport failures.
-  const observedBegin: Promise<{ ok: true } | { error: unknown; ok: false }> = begin.then(
-    () => ({ ok: true }),
-    (error: unknown) => ({ error, ok: false })
-  );
-  try {
-    const response = await messaging.sendRuntimeMessage({
-      type: VideoMessageType.OFFSCREEN_SOURCE_READY,
-      generation: params.generation,
-      recordingId,
-      streamInstanceId,
-      videoWidth: prepared.rawVideoWidth,
-      videoHeight: prepared.rawVideoHeight,
-      trackSettings: {
-        ...(prepared.rawTrackSettings.width === undefined
-          ? {}
-          : { width: prepared.rawTrackSettings.width }),
-        ...(prepared.rawTrackSettings.height === undefined
-          ? {}
-          : { height: prepared.rawTrackSettings.height }),
-        ...(prepared.rawTrackSettings.frameRate === undefined
-          ? {}
-          : { frameRate: prepared.rawTrackSettings.frameRate }),
-      },
-    });
-    if (response?.success !== true || response.result !== 'ALLOW') {
-      throw new Error('source-dimensions-mismatch');
-    }
-  } catch (error) {
-    cleanupResources();
-    await observedBegin;
-    throw error;
-  }
-  const beginResult = await observedBegin;
-  if (!beginResult.ok) throw beginResult.error;
-  if (!isStillStarting(recordingId)) {
-    cleanupResources();
-    return;
-  }
+  if (!admitted) return;
 
   const filenameSession = {
     ...(await createFilenameSession(recordingId)),
@@ -153,6 +117,7 @@ async function startRecordingInternal(
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
   });
+  releaseCountdownCameraPreparation(sourceBinding);
   await finalizeRecordingBootstrap({
     filenameSession,
     resolvedRecordingId: recordingId,

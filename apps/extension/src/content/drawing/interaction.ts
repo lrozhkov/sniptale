@@ -27,7 +27,6 @@ import {
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
 import { resizeDrawingBox } from './box-resize';
-import type { DrawingViewportProjection } from './render';
 
 export type PointerDraft =
   | { kind: 'create'; start: DrawingPoint; object: DrawingObject; arrowFromTip: boolean }
@@ -90,7 +89,7 @@ function getDrawingTextMeasurementContext(): CanvasRenderingContext2D | null {
   return drawingTextMeasurementContext;
 }
 
-export function getDrawingViewportProjection(root: PageScrollRoot): DrawingViewportProjection {
+export function getDrawingViewportProjection(root: PageScrollRoot): Readonly<DrawingPoint> {
   const scroll = readPageScroll(root);
   if (root.kind !== 'element') return scroll;
   const rect = root.element.getBoundingClientRect();

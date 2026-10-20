@@ -13,6 +13,11 @@ export class AudioMixer {
   private readonly graph = new AudioMixerGraph();
   private micStream: MediaStream | null = null;
   private microphoneGeneration = 0;
+  private microphoneGain = 1;
+
+  constructor(
+    private readonly observeMicrophone?: (stream: MediaStream | null, gain: number) => void
+  ) {}
 
   private stopStreamTracks(stream: MediaStream | null): void {
     stream?.getTracks().forEach((track) => track.stop());
@@ -24,6 +29,7 @@ export class AudioMixer {
 
   private releaseMicrophoneStream(): void {
     this.microphoneGeneration += 1;
+    this.observeMicrophone?.(null, 1);
     this.graph.disconnectMicrophoneStream();
     this.stopStreamTracks(this.micStream);
     this.micStream = null;
@@ -67,6 +73,8 @@ export class AudioMixer {
       }
       this.graph.connectMicrophoneStream(candidate, resolveMicrophoneGain(settings));
       this.micStream = candidate;
+      this.microphoneGain = resolveMicrophoneGain(settings);
+      this.observeMicrophone?.(candidate, this.microphoneGain);
 
       logger.log('Microphone added');
     } catch (error) {
@@ -87,15 +95,18 @@ export class AudioMixer {
       throw new Error('Microphone switch was superseded');
     }
     const previous = this.micStream;
+    const previousGain = this.microphoneGain;
     try {
       this.graph.disconnectMicrophoneStream();
       this.graph.connectMicrophoneStream(candidate, resolveMicrophoneGain(settings));
       this.micStream = candidate;
+      this.microphoneGain = resolveMicrophoneGain(settings);
+      this.observeMicrophone?.(candidate, this.microphoneGain);
       this.stopStreamTracks(previous);
     } catch (error) {
       this.stopStreamTracks(candidate);
       if (previous) {
-        this.graph.connectMicrophoneStream(previous, resolveMicrophoneGain(settings));
+        this.graph.connectMicrophoneStream(previous, previousGain);
       }
       this.micStream = previous;
       throw error;
@@ -111,6 +122,7 @@ export class AudioMixer {
     this.micStream?.getAudioTracks().forEach((track) => {
       track.enabled = enabled;
     });
+    this.observeMicrophone?.(this.micStream, this.microphoneGain);
   }
 
   hasMicrophone(): boolean {

@@ -25,6 +25,7 @@ import {
   switchVideoRecordingCameraPeerInput,
 } from './camera-peer';
 import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
+import { cancelSavedTabVideoRecordingStart } from './start';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
   'set-microphone-enabled',
@@ -132,6 +133,7 @@ async function applySurfaceCommand(
       return { result: 'updated' };
     }
     case 'cancel-start':
+      cancelSavedTabVideoRecordingStart(tabId);
       return requireAcceptedResult(await cancelRecordingStart(), [
         'accepted',
         'cancelled-before-active',

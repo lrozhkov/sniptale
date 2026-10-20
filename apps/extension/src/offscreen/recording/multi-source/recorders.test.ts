@@ -11,6 +11,8 @@ import {
 import { createAudioStream, createStream } from './media-stream.test-support';
 import { createFixedVideoOutputStream } from '../stream/fixed-video-output';
 
+const messaging = { sendRuntimeMessage: vi.fn().mockResolvedValue(undefined) };
+
 vi.mock('../stream/fixed-video-output', () => ({
   createFixedVideoOutputStream: vi.fn(async (stream: MediaStream) => ({
     dimensions: stream.getVideoTracks()[0]?.getSettings() ?? { height: 720, width: 1280 },
@@ -84,7 +86,8 @@ it('creates and releases a separately staged microphone artifact', async () => {
   const recorder = await createMicrophoneRecorder(
     'rec',
     { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
-    createRecordingStagingCoordinatorTestDouble()
+    createRecordingStagingCoordinatorTestDouble(),
+    messaging
   );
   expect(recorder?.recordingId).toBe('rec-window-1000');
 
@@ -138,7 +141,8 @@ it('does not request microphone media when the microphone is disabled', async ()
     createMicrophoneRecorder(
       'rec',
       { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: false },
-      createRecordingStagingCoordinatorTestDouble()
+      createRecordingStagingCoordinatorTestDouble(),
+      messaging
     )
   ).resolves.toBeNull();
   expect(getUserMedia).not.toHaveBeenCalled();
@@ -156,7 +160,8 @@ it('stops the raw microphone stream when encoder construction fails', async () =
     createMicrophoneRecorder(
       'rec',
       { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true },
-      createRecordingStagingCoordinatorTestDouble()
+      createRecordingStagingCoordinatorTestDouble(),
+      messaging
     )
   ).rejects.toThrow('encoder construction failed');
   expect(audio.getTracks()[0]?.stop).toHaveBeenCalledOnce();
@@ -167,11 +172,19 @@ it('owns and releases the complete gain-processing graph', async () => {
   const processed = createAudioStream();
   const sourceNode = { connect: vi.fn(), disconnect: vi.fn() };
   const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 0 } };
+  const analysisSource = { connect: vi.fn(), disconnect: vi.fn() };
+  const analyser = { disconnect: vi.fn(), fftSize: 0, getFloatTimeDomainData: vi.fn() };
   const close = vi.fn().mockResolvedValue(undefined);
+  let contextCount = 0;
   class AudioContextMock {
+    constructor() {
+      contextCount += 1;
+    }
+    state = 'running';
+    createAnalyser = vi.fn(() => analyser);
     createGain = vi.fn(() => gainNode);
     createMediaStreamDestination = vi.fn(() => ({ stream: processed }));
-    createMediaStreamSource = vi.fn(() => sourceNode);
+    createMediaStreamSource = vi.fn(() => (contextCount === 1 ? sourceNode : analysisSource));
     close = close;
   }
   vi.stubGlobal('AudioContext', AudioContextMock);
@@ -183,7 +196,8 @@ it('owns and releases the complete gain-processing graph', async () => {
   const recorder = await createMicrophoneRecorder(
     'rec',
     { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
-    createRecordingStagingCoordinatorTestDouble()
+    createRecordingStagingCoordinatorTestDouble(),
+    messaging
   );
   stopRecorderStreams([recorder]);
 
@@ -194,7 +208,9 @@ it('owns and releases the complete gain-processing graph', async () => {
   expect(gainNode.disconnect).toHaveBeenCalledOnce();
   expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
   expect(processed.getTracks()[0]?.stop).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledOnce();
+  expect(analysisSource.connect).toHaveBeenCalledWith(analyser);
+  expect(analysisSource.disconnect).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledTimes(2);
 });
 
 it('rolls back a partially created gain-processing graph', async () => {
@@ -218,7 +234,8 @@ it('rolls back a partially created gain-processing graph', async () => {
     createMicrophoneRecorder(
       'rec',
       { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
-      createRecordingStagingCoordinatorTestDouble()
+      createRecordingStagingCoordinatorTestDouble(),
+      messaging
     )
   ).rejects.toThrow('gain unavailable');
 

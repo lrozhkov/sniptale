@@ -32,6 +32,40 @@ beforeEach(() => {
   mocks.persistUiState.mockResolvedValue(undefined);
 });
 
+it('keeps launch-window source selection transient while persisting ordinary settings edits', async () => {
+  const { usePopupVideoPersistenceEffects } = await import('./video-persistence-effects');
+  let updateSettings!: () => void;
+  let changeMode!: () => void;
+  function Harness() {
+    const [videoSettings, setVideoSettings] = useState(DEFAULT_VIDEO_SETTINGS);
+    const [videoCaptureMode, setVideoCaptureMode] = useState<CaptureMode>(CaptureMode.TAB_CROP);
+    const [selectedPresetId, setSelectedPresetId] = useState<string | null>('launch-preset');
+    updateSettings = () => setVideoSettings((current) => ({ ...current, countdownSeconds: 2 }));
+    changeMode = () => setVideoCaptureMode(CaptureMode.SCREEN);
+    usePopupVideoPersistenceEffects({
+      isReady: true,
+      persistUiSelection: false,
+      selectedPresetId,
+      setSelectedPresetId,
+      setVideoCaptureMode,
+      setVideoSettings,
+      videoCaptureMode,
+      videoSettings,
+    });
+    return null;
+  }
+  const root = createRoot(document.createElement('div'));
+  act(() => root.render(<Harness />));
+  act(() => changeMode());
+  expect(mocks.persistUiState).not.toHaveBeenCalled();
+  act(() => updateSettings());
+  await vi.waitFor(() =>
+    expect(mocks.persistSettings).toHaveBeenCalledWith({ countdownSeconds: 2 })
+  );
+  expect(mocks.persistUiState).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
 it('treats bootstrap values as the baseline and persists later Video edits', async () => {
   const { usePopupVideoPersistenceEffects } = await import('./video-persistence-effects');
   let setReady!: (ready: boolean) => void;

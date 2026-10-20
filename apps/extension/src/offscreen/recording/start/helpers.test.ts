@@ -8,12 +8,18 @@ const {
   loggerErrorMock,
   loggerWarnMock,
   sendRuntimeMessageMock,
+  observationFactoryMock,
 } = vi.hoisted(() => ({
   cleanupActiveSidecarRecordersMock: vi.fn(),
   detachCachedPreviewMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
+  observationFactoryMock: vi.fn(),
+}));
+
+vi.mock('../stream/microphone-activity', () => ({
+  createMicrophoneActivityObserver: observationFactoryMock,
 }));
 
 vi.mock('../sidecar', async (importOriginal) => ({
@@ -45,6 +51,10 @@ import { recordingContext } from '../context';
 import { cleanupResources } from './cleanup';
 import { handleRecordingStartError, initializeRecordingSession } from './session';
 import {
+  isRecordingStartErrorReported,
+  unwrapRecordingStartReportedError,
+} from './error-reporting';
+import {
   acquireVideoRecordingMediaActivityLease,
   releaseVideoRecordingMediaActivityLease,
 } from '../../media-activity/video-recording-lease';
@@ -58,6 +68,7 @@ beforeEach(() => {
   releaseVideoRecordingMediaActivityLease();
   resetOffscreenMediaActivityLeaseForTests();
   sendRuntimeMessageMock.mockResolvedValue(undefined);
+  observationFactoryMock.mockImplementation(createObservation);
 
   recordingContext.resetRecordingSession();
   recordingContext.videoStream = null;
@@ -66,6 +77,97 @@ beforeEach(() => {
   recordingContext.currentRecordingId = null;
   recordingContext.stopRecordingResolve = null;
   recordingContext.stopRecordingReject = null;
+});
+
+function createObservation() {
+  return {
+    current: { status: 'disabled' as const, level: 0, warning: false },
+    dispose: vi.fn(),
+    setEnabled: vi.fn(),
+    setSource: vi.fn(),
+    setPhase: vi.fn(),
+  };
+}
+
+it('disposes microphone observation before a cancelled preparation is retried', () => {
+  const previous = createObservation();
+  const replacement = createObservation();
+  observationFactoryMock.mockReturnValueOnce(previous).mockReturnValueOnce(replacement);
+  const first = {
+    settings: { ...createSettings(), microphoneEnabled: true },
+    streamId: 'stream-1',
+    recordingId: 'recording-1',
+    generation: 1,
+    streamInstanceId: 'instance-1',
+    captureMode: 'TAB_CROP',
+    viewport: { width: 1280, height: 720 },
+    cropRegion: { x: 0, y: 0, width: 640, height: 480 },
+  };
+  initializeRecordingSession(first);
+  expect(previous.setEnabled).toHaveBeenCalledWith(true);
+  cleanupResources();
+  initializeRecordingSession({
+    ...first,
+    settings: { ...first.settings, microphoneEnabled: false },
+    recordingId: 'recording-2',
+    generation: 2,
+    streamInstanceId: 'instance-2',
+  });
+  expect(previous.dispose).toHaveBeenCalledOnce();
+  expect(replacement.setEnabled).toHaveBeenCalledWith(false);
+  expect(
+    recordingContext.matchesSourceBinding({
+      recordingId: 'recording-1',
+      generation: 1,
+      streamInstanceId: 'instance-1',
+    })
+  ).toBe(false);
+  expect(
+    recordingContext.matchesSourceBinding({
+      recordingId: 'recording-2',
+      generation: 2,
+      streamInstanceId: 'instance-2',
+    })
+  ).toBe(true);
+  cleanupResources();
+  expect(replacement.dispose).toHaveBeenCalledOnce();
+  expect(previous.dispose).toHaveBeenCalledOnce();
+  expect(recordingContext.currentRecordingId).toBeNull();
+});
+
+it.each([new Error('early preparation failed'), 'early preparation refused'])(
+  'reports unscoped startup failure without inventing a recording identity: %s',
+  (error) => {
+    const reported = handleRecordingStartError(error);
+    const message = error instanceof Error ? error.message : String(error);
+    expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { originalErrorMessage: message },
+        payload: { type: VideoMessageType.OFFSCREEN_ERROR, error: message, phase: 'start' },
+      })
+    );
+    expect(isRecordingStartErrorReported(reported)).toBe(true);
+    expect(unwrapRecordingStartReportedError(reported)).toBe(error);
+    expect(recordingContext.currentRecordingId).toBeNull();
+  }
+);
+
+it('preserves an explicit preparation identity when reporting a primitive startup failure', () => {
+  const reported = handleRecordingStartError('source unavailable', 'recording-attempt');
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      context: { originalErrorMessage: 'source unavailable' },
+      payload: {
+        type: VideoMessageType.OFFSCREEN_ERROR,
+        error: 'source unavailable',
+        phase: 'start',
+        recordingId: 'recording-attempt',
+      },
+    })
+  );
+  expect(isRecordingStartErrorReported(reported)).toBe(true);
+  expect(unwrapRecordingStartReportedError(reported)).toBe('source unavailable');
+  expect(detachCachedPreviewMock).toHaveBeenCalledOnce();
 });
 
 it('releases the shared video lease from unexpected terminal cleanup', () => {

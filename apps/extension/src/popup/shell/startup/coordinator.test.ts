@@ -43,6 +43,38 @@ beforeEach(() => {
   });
 });
 
+it('selects the requested video source without replacing persisted startup selection', async () => {
+  mocks.startup.mockResolvedValue({ selection: 'tools', lastPage: 'menu' });
+  expect(
+    await resolvePopupStartupRoute(
+      [
+        'chrome-extension://test/apps/extension/src/popup/index.html',
+        '?videoLaunchMode=TAB_CROP&videoLaunchTabId=21&videoLaunchPresetId=preset-alt',
+      ].join('')
+    )
+  ).toMatchObject({
+    page: 'video',
+    videoMode: CaptureMode.TAB_CROP,
+    videoLaunch: { tabId: 21, viewportPresetId: 'preset-alt' },
+  });
+  expect(await resolvePopupStartupRoute()).toEqual({ page: 'tools' });
+});
+
+it.each([
+  'videoLaunchTabId=0',
+  'videoLaunchTabId=-1',
+  'videoLaunchTabId=1.5',
+  'videoLaunchTabId=NaN',
+  'videoLaunchTabId=9007199254740992',
+  'videoLaunchTabId=21&videoLaunchMode=SCREEN',
+])('rejects malformed video launch parameters: %s', async (parameters) => {
+  expect(
+    await resolvePopupStartupRoute(
+      `chrome-extension://test/apps/extension/src/popup/index.html?videoLaunchMode=TAB&${parameters}`
+    )
+  ).toEqual({ page: 'menu' });
+});
+
 it('keeps recording and export precedence ahead of persisted startup', async () => {
   mocks.startup.mockResolvedValue({ selection: 'tools', lastPage: 'menu' });
   mocks.exportIntent.mockResolvedValue({ tabId: 7, startExport: false });

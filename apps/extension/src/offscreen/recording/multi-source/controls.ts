@@ -1,6 +1,7 @@
 import type { MultiSourceSession } from './state';
 
 export function pauseSessionRecorders(session: MultiSourceSession | null): void {
+  session?.audioRecorder?.microphoneActivity?.setPhase('paused');
   session?.recorders.forEach((source) => {
     if (source.recorder.state === 'recording') {
       source.recorder.pause();
@@ -15,6 +16,7 @@ export function pauseSessionRecorders(session: MultiSourceSession | null): void 
 }
 
 export function resumeSessionRecorders(session: MultiSourceSession | null): void {
+  session?.audioRecorder?.microphoneActivity?.setPhase('recording');
   session?.recorders.forEach((source) => {
     if (source.recorder.state === 'paused') {
       source.recorder.resume();
@@ -33,6 +35,7 @@ export function setSessionMediaEnabled(
   patch: { microphoneEnabled?: boolean; webcamEnabled?: boolean }
 ): void {
   if (patch.microphoneEnabled !== undefined) {
+    session?.audioRecorder?.microphoneActivity?.setEnabled(patch.microphoneEnabled);
     session?.audioRecorder?.stream.getAudioTracks().forEach((track) => {
       track.enabled = patch.microphoneEnabled === true;
     });
