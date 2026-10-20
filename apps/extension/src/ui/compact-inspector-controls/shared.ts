@@ -55,6 +55,7 @@ export function parseCompactNumber(value: string, unit: CompactInspectorUnit = '
     unitLabel && withoutApiUnit.endsWith(unitLabel)
       ? withoutApiUnit.slice(0, -unitLabel.length)
       : withoutApiUnit;
+  if (!withoutUnit.trim()) return null;
   const parsed = Number(withoutUnit.trim());
   return Number.isFinite(parsed) ? parsed : null;
 }

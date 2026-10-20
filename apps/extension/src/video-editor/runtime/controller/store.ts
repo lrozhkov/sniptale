@@ -137,6 +137,7 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selectMotionLane: state.selectMotionLane,
     selectObjectTrack: state.selectObjectTrack,
     selectScene: state.selectScene,
+    selectComment: state.selectComment,
     selectTrack: state.selectTrack,
     selectTransition: state.selectTransition,
   };
@@ -157,6 +158,8 @@ function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
 
 function selectAnnotationEditingPort(state: VideoEditorState): AnnotationEditingPort {
   return {
+    addCommentDocument: state.addCommentDocument,
+    editCommentDocument: state.editCommentDocument,
     addAnnotationOverlay: state.addAnnotationOverlay,
     addShapeOverlay: state.addShapeOverlay,
     addSubtitleOverlay: state.addSubtitleOverlay,

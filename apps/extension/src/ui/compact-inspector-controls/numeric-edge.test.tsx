@@ -316,3 +316,15 @@ it('keeps a focused range exposed when the pointer leaves its row', () => {
   act(() => range.blur());
   expect(scrub.getAttribute('aria-hidden')).toBe('true');
 });
+
+it.each(['', '   ', 'px'])(
+  'restores the accepted number for an empty numeric draft %j',
+  (draft) => {
+    const { onCommitValue } = renderNumeric({ unit: 'px', value: 20.25 });
+    act(() => input().focus());
+    act(() => setInputValue(input(), draft));
+    act(() => input().blur());
+    expect(input().value).toBe('20.25');
+    expect(onCommitValue).not.toHaveBeenCalled();
+  }
+);

@@ -115,6 +115,7 @@ export function useVideoEditorRuntime(
       setPlaying: params.playback.setPlaying,
       duplicateClip: params.playback.duplicateClip,
       splitClipAt: params.playback.splitClipAt,
+      editCommentDocument: params.playback.editCommentDocument,
       deleteClip: params.playback.deleteSelection.clip,
       deleteActionEvent: params.playback.deleteSelection.actionEvent,
       deleteCursorSample: params.playback.deleteSelection.cursorSample,

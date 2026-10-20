@@ -81,6 +81,9 @@ interface ProjectTimelineCanvasProps {
   onSeekTime: (time: number) => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
+  onSelectComment?:
+    | ((documentId: string, commentId: string, projectTime?: number) => void)
+    | undefined;
   onSelectHistorySpan?: (
     target: import('../../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;

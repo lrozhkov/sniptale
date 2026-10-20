@@ -545,3 +545,34 @@ it.each(['none', 'text', 'image'] as const)(
     expect(undo.project.watermark).toEqual(watermark);
   }
 );
+
+it('protects dormant comment source bytes through the real unused-material command and repeated cleanup', async () => {
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const project = createEmptyVideoProject('Dormant comments');
+  const retained = createVideoAsset('comment-source');
+  const unused = createVideoAsset('unused');
+  project.version = 23;
+  project.assets = [retained, unused];
+  project.commentDocuments = [
+    {
+      id: 'notes',
+      binding: { kind: 'source', assetId: retained.id, sourceInstanceId: 'removed-placement' },
+      annotations: [
+        { id: 'note', text: 'Retained under a cut', anchor: { kind: 'point', time: 0 } },
+      ],
+      canvasComments: [],
+    },
+  ];
+  const store = createVideoEditorTestStore();
+  store.getState().setProject(project);
+  store.getState().removeUnusedAssets();
+  const cleaned = store.getState().project!;
+  expect(cleaned.assets).toEqual([retained]);
+  expect(cleaned.commentDocuments).toEqual(project.commentDocuments);
+  expect(isExportReadyVideoProject(cleaned)).toBe(true);
+  const history = store.getState().projectHistory;
+  store.getState().removeUnusedAssets();
+  expect(store.getState().project).toBe(cleaned);
+  expect(store.getState().projectHistory).toBe(history);
+});

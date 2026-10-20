@@ -1,3 +1,4 @@
+import type { VideoEditorAnnotationActions } from '../../contracts/commands/annotation';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type {
   VideoProject,
@@ -28,6 +29,7 @@ export interface UseVideoEditorRuntimeParams {
     selectedActionOccurrence: VideoProjectActionOccurrence | null;
     selectedClipId: string | null;
     selectedMotionRegion: VideoProjectMotionRegion | null;
+    editCommentDocument: VideoEditorAnnotationActions['editCommentDocument'];
     deleteSelection: {
       actionEvent: VideoEditorProjectActions['deleteActionEvent'];
       clip: VideoEditorProjectActions['deleteClip'];

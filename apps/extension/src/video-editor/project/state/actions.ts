@@ -1,3 +1,4 @@
+import { createVideoEditorProjectCommentActions } from './comments';
 import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import type {
@@ -24,6 +25,8 @@ type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 type VideoEditorStoreGet = VideoEditorProjectSliceGet;
 
 type VideoEditorProjectActionKeys =
+  | 'addCommentDocument'
+  | 'editCommentDocument'
   | 'renameProject'
   | 'renameTrack'
   | 'addTrackLogicalLane'
@@ -138,6 +141,7 @@ export function createVideoEditorProjectActions(
   };
 
   return {
+    ...createVideoEditorProjectCommentActions(set),
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),
     upsertAssets,

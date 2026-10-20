@@ -2,7 +2,9 @@
 import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useTimelineClipReveal } from './reveal';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import type { VideoEditorSelection } from '../../../contracts/selection';
+import { useTimelineClipReveal, useTimelineNoteReveal } from './reveal';
 let root: Root;
 let container: HTMLDivElement;
 let pending: FrameRequestCallback | null;
@@ -71,4 +73,49 @@ it('repeats an explicit reveal of the same clip but ignores ordinary renders and
   act(() => root.render(<Harness command={{ clipId: 'missing', serial: 3 }} />));
   expect(navigateTo).toHaveBeenCalledTimes(2);
   expect(pending).toBeNull();
+});
+
+it('reveals a selected note once while retaining manual scroll, visible notes and dormant data', () => {
+  const selection: VideoEditorSelection = { kind: 'comment', documentId: 'doc', commentId: 'note' };
+  let startTime = 0;
+  let dormant = false;
+  function NoteHarness({ command = selection }: { command?: VideoEditorSelection }) {
+    const project = createEmptyVideoProject('Notes');
+    project.duration = 100;
+    project.commentDocuments = [
+      {
+        id: 'doc',
+        binding: dormant
+          ? { kind: 'source', assetId: 'retained', sourceInstanceId: 'cut' }
+          : { kind: 'project' },
+        canvasComments: [],
+        annotations: [{ id: 'note', text: '', anchor: { kind: 'point', time: 80 } }],
+      },
+    ];
+    useTimelineNoteReveal({
+      selection: command,
+      project,
+      currentTime: 80,
+      pixelsPerSecond: 100,
+      viewportWidth: 1000,
+      readStartTime: () => startTime,
+      navigateTo,
+    });
+    return null;
+  }
+  act(() => root.render(<NoteHarness />));
+  expect(navigateTo).toHaveBeenCalledExactlyOnceWith(75);
+  act(() => root.render(<NoteHarness />));
+  expect(navigateTo).toHaveBeenCalledTimes(1);
+  act(() => root.render(<NoteHarness command={{ ...selection }} />));
+  expect(navigateTo).toHaveBeenCalledTimes(2);
+  startTime = 76;
+  act(() => root.render(<NoteHarness command={{ ...selection }} />));
+  expect(navigateTo).toHaveBeenCalledTimes(2);
+  startTime = 0;
+  dormant = true;
+  act(() => root.render(<NoteHarness command={{ ...selection }} />));
+  expect(navigateTo).toHaveBeenCalledTimes(2);
+  act(() => root.render(<NoteHarness command={{ ...selection, commentId: 'missing' }} />));
+  expect(navigateTo).toHaveBeenCalledTimes(2);
 });

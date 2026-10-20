@@ -219,7 +219,8 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   return { ...range, kind: 'speed', rate, audio };
 }
 
-function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {
+/** Parses shared marker and bubble metadata against its native clock bound. */
+export function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {
   if (
     !isRecord(value) ||
     !identity(value['id']) ||

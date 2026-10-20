@@ -278,3 +278,29 @@ it('clears orphaned FX targets and reconciles groups after removing their clips'
     })
   ).toBeNull();
 });
+
+it('retains only an existing local comment target and never assigns it a media track', () => {
+  const project = createSelectionProject();
+  project.commentDocuments = [
+    {
+      id: 'doc',
+      binding: { kind: 'project' },
+      annotations: [{ id: 'note', text: '', anchor: { kind: 'point', time: 0 } }],
+      canvasComments: [],
+    },
+  ];
+  const selection = {
+    kind: 'comment' as const,
+    documentId: 'doc',
+    commentId: 'note',
+  };
+  expect(resolveSelectionAfterProjectUpdate(project, selection)).toBe(selection);
+  expect(resolveSelectedTrackIdFromSelection(project, selection)).toBeNull();
+  expect(
+    resolveSelectionAfterProjectUpdate(project, { ...selection, commentId: 'missing' })
+  ).toEqual({
+    kind: 'scene',
+  });
+  project.commentDocuments[0]!.annotations = [];
+  expect(resolveSelectionAfterProjectUpdate(project, selection)).toEqual({ kind: 'scene' });
+});

@@ -77,6 +77,13 @@ export function removeVideoProjectLibrarySources(
           ),
         }
       : {}),
+    ...(project.commentDocuments
+      ? {
+          commentDocuments: project.commentDocuments.filter(
+            ({ binding }) => binding.kind === 'project' || !removedAssetIds.has(binding.assetId)
+          ),
+        }
+      : {}),
     actionEvents,
     ...(project.transitions
       ? { transitions: project.transitions.filter(({ id }) => !removedTransitionIds.has(id)) }

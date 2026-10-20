@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
-import type { VideoProjectClip } from '../../../../features/video/project/types';
+import { projectVideoProjectCommentAnchor } from '../../../../features/video/project/comments/projection';
+import type { VideoEditorSelection } from '../../../contracts/selection';
+import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import type { TimelineClipRevealRequest } from '../types';
 
 /** A reveal is a view command; it never changes zoom, selection or the receiving track. */
@@ -37,4 +39,35 @@ export function useTimelineClipReveal(params: {
     });
     return () => cancelAnimationFrame(frame);
   }, [params.request]);
+}
+
+/** Reveal a new note selection once, without following later playback or editing renders. */
+export function useTimelineNoteReveal(params: {
+  selection: VideoEditorSelection;
+  project: VideoProject;
+  currentTime: number;
+  pixelsPerSecond: number;
+  viewportWidth: number;
+  readStartTime(): number;
+  navigateTo(startTime: number): void;
+}) {
+  const latest = useRef(params);
+  latest.current = params;
+  useLayoutEffect(() => {
+    const model = latest.current;
+    const selection = model.selection;
+    if (selection.kind !== 'comment' || model.viewportWidth <= 0) return;
+    const document = model.project.commentDocuments?.find(
+      (item) => item.id === selection.documentId
+    );
+    const note = document?.annotations.find((item) => item.id === selection.commentId);
+    if (!document || !note) return;
+    const admitted = projectVideoProjectCommentAnchor(model.project, document, note.anchor).some(
+      (span) => Math.abs(span.start - model.currentTime) <= 1e-7
+    );
+    if (!admitted) return;
+    const x = (model.currentTime - model.readStartTime()) * model.pixelsPerSecond;
+    if (x >= 8 && x <= model.viewportWidth - 8) return;
+    model.navigateTo(model.currentTime - model.viewportWidth / model.pixelsPerSecond / 2);
+  }, [params.selection]);
 }

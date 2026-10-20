@@ -93,6 +93,7 @@ export interface TimelineEditingPort
 
 type SelectionAction =
   | 'selectScene'
+  | 'selectComment'
   | 'selectTrack'
   | 'selectClip'
   | 'selectTransition'

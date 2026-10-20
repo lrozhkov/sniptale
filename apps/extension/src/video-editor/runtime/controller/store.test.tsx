@@ -22,6 +22,8 @@ import {
 
 const expectedKeys = {
   annotation: [
+    'addCommentDocument',
+    'editCommentDocument',
     'addAnnotationOverlay',
     'addShapeOverlay',
     'addSubtitleOverlay',
@@ -102,6 +104,7 @@ const expectedKeys = {
     'selectMotionRegion',
     'selectObjectTrack',
     'selectScene',
+    'selectComment',
     'selectTrack',
     'selectTransition',
     'selectedClipId',

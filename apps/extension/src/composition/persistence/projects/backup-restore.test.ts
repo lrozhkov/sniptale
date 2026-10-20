@@ -740,3 +740,46 @@ it('restores schema22 spotlight coverage, appearance and retained clocks through
     })
   );
 });
+
+it('restores schema23 notes, linked bubbles and dormant source identity through the canonical writer', async () => {
+  const { createCanvasComment } = await import('../../../features/video/review/comments');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'comments-restore' });
+  const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing video');
+  const comments = [
+    {
+      id: 'source-comments',
+      binding: {
+        kind: 'source' as const,
+        assetId: clip.assetId,
+        sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      },
+      annotations: [
+        { id: 'note', text: 'Retained linked text', anchor: { kind: 'point' as const, time: 0 } },
+      ],
+      canvasComments: [
+        {
+          ...createCanvasComment({ id: 'bubble', annotationId: 'note' }),
+          visible: false,
+          renderToVideo: false,
+        },
+      ],
+    },
+  ];
+  entry.project = applyVideoProjectMutationPatch(entry.project, { commentDocuments: comments });
+  const original = structuredClone(entry.project);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 23, commentDocuments: comments }),
+    })
+  );
+  expect(entry.project).toEqual(original);
+});

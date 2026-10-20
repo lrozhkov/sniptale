@@ -1,4 +1,4 @@
-import { useTimelineClipReveal } from './reveal';
+import { useTimelineClipReveal, useTimelineNoteReveal } from './reveal';
 import { useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
@@ -210,6 +210,15 @@ export function useProjectTimelineState(
     navigateTo: viewState.navigateTo,
     timelineRef: scroll.timelineRef,
     trackListRef: scroll.trackListRef,
+  });
+  useTimelineNoteReveal({
+    selection: props.selection,
+    project,
+    currentTime: props.currentTime,
+    pixelsPerSecond,
+    viewportWidth,
+    readStartTime: viewState.readTimelineStartTime,
+    navigateTo: viewState.navigateTo,
   });
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({

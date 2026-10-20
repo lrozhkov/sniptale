@@ -46,6 +46,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
+    editCommentDocument: vi.fn(),
     deleteSelection: {
       actionEvent: fn(),
       clip: fn(),

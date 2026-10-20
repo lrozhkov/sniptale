@@ -1,6 +1,25 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  comments: { ru: 'Заметки', en: 'Notes' },
+  commentDeleteDocument: {
+    ru: 'Удалить заметки этой привязки',
+    en: 'Delete notes for this binding',
+  },
+  commentNote: { ru: 'Заметка', en: 'Note' },
+  commentAddNote: { ru: 'Добавить заметку', en: 'Add note' },
+  commentDestination: { ru: 'Привязка по времени', en: 'Time binding' },
+  commentProject: { ru: 'Проект', en: 'Project' },
+  commentTimeKind: { ru: 'Тип', en: 'Type' },
+  commentSourceTime: { ru: 'Время исходника', en: 'Source time' },
+  commentPoint: { ru: 'Момент', en: 'Point' },
+  commentRange: { ru: 'Интервал', en: 'Range' },
+  commentBack: { ru: 'К заметкам', en: 'Back to notes' },
+  commentEmpty: { ru: 'Нет заметок', en: 'No notes' },
+  commentRefused: {
+    ru: 'Правка недоступна. Выберите заметку заново.',
+    en: 'This edit is unavailable. Select the note again.',
+  },
   originalAudioRestore: { ru: 'Восстановить оригинал', en: 'Restore original' },
   originalAudio: { ru: 'Оригинал', en: 'Original audio' },
   originalAudioKeep: { ru: 'Оставить', en: 'Keep' },

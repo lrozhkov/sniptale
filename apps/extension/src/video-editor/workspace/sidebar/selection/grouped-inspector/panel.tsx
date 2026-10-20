@@ -4,6 +4,7 @@ import { useWorkspacePreference } from '../../../../runtime/controller/workspace
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  MessageSquare,
   Stamp,
   Keyboard,
   Rotate3D,
@@ -36,6 +37,7 @@ import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition, InspectorSectionSemantic } from './types';
 
 const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
+  comments: MessageSquare,
   watermark: Stamp,
   perspective: Rotate3D,
   depth: Focus,
@@ -69,6 +71,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
   const groups = resolveVisibleInspectorGroups(props.groups);
   const [presentation] = useWorkspacePreference('inspectorPresentation');
   const memory = useInspectorSectionMemory();
+  const consumeReturn = memory.consumeReturn;
   const defaultId =
     groups.find((group) => group.id === memory.remembered)?.id ??
     groups.find((group) => group.defaultActive && group.semantic !== 'info')?.id ??
@@ -76,13 +79,15 @@ export function InspectorGroupedPanel<TId extends string>(props: {
     groups[0]?.id;
   const surface = useRef<HTMLDivElement>(null);
   const consumedIntent = useRef<string | null>(null);
-  const focusIntent = useInspectorGroupFocusIntent();
+  const explicitFocusIntent = useInspectorGroupFocusIntent();
+  const focusIntent = explicitFocusIntent ?? memory.returnFocusIntent;
   const [request, setRequest] = useState<{ id: TId; token: number }>();
   const requestedGroup = groups.find((group) => group.id === focusIntent?.groupId);
 
   useEffect(() => {
     if (!focusIntent || !requestedGroup || consumedIntent.current === focusIntent.token) return;
     consumedIntent.current = focusIntent.token;
+    if (!explicitFocusIntent) consumeReturn();
     setRequest((previous) => ({ id: requestedGroup.id, token: (previous?.token ?? 0) + 1 }));
     const button = [
       ...(surface.current?.querySelectorAll<HTMLButtonElement>('nav button') ?? []),
@@ -95,7 +100,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
       section?.scrollIntoView({ block: 'nearest' });
       section?.focus({ preventScroll: true });
     } else button?.focus();
-  }, [focusIntent, requestedGroup, presentation]);
+  }, [focusIntent, requestedGroup, presentation, explicitFocusIntent, consumeReturn]);
 
   if (!defaultId) return null;
   if (groups.length === 1) {

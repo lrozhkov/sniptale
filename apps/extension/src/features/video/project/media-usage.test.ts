@@ -179,3 +179,20 @@ it.each(['none', 'text', 'image'] as const)(
     expect(project).toEqual(before);
   }
 );
+
+it('retains comment sources even when every placement and bubble is hidden or removed', () => {
+  const project = createEmptyVideoProject();
+  project.commentDocuments = [
+    {
+      id: 'bound',
+      binding: { kind: 'source', assetId: 'retained', sourceInstanceId: 'hidden' },
+      annotations: [],
+      canvasComments: [],
+    },
+    { id: 'independent', binding: { kind: 'project' }, annotations: [], canvasComments: [] },
+  ];
+  expect(getProjectAssetUses(project)).toEqual([
+    { assetId: 'retained', kind: 'comments', documentId: 'bound' },
+  ]);
+  expect([...getProjectAssetUseCounts(project)]).toEqual([['retained', 1]]);
+});

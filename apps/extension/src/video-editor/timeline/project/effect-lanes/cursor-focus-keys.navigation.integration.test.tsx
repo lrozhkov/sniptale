@@ -86,6 +86,7 @@ it.each(['key', 'row'] as const)(
         deleteActionEvent: vi.fn(),
         deleteClip: vi.fn(),
         deleteCursorSample: vi.fn(),
+        editCommentDocument: vi.fn(),
         deleteEffectInstance: vi.fn(),
         deleteMotionRegion: vi.fn(),
         deleteObjectTrack: vi.fn(),

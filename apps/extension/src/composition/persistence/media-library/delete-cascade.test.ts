@@ -666,3 +666,39 @@ it.each(
     expect(harness.complete).toHaveBeenCalledOnce();
   }
 );
+
+it('purges deleted comment sources through the cascade and preserves independent notes', async () => {
+  const entry = createVideoProjectEntryWithMediaClip({ version: 23 });
+  const asset = entry.project.assets[0]!;
+  entry.project.commentDocuments = [
+    {
+      id: 'bound',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'placement' },
+      annotations: [],
+      canvasComments: [],
+    },
+    {
+      id: 'independent',
+      binding: { kind: 'project' },
+      annotations: [{ id: 'note', text: 'Independent note', anchor: { kind: 'point', time: 0 } }],
+      canvasComments: [],
+    },
+  ];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  const saved = rows.get('video_projects')!.get(entry.id);
+  expect(saved).toMatchObject({
+    project: {
+      version: 23,
+      commentDocuments: [entry.project.commentDocuments[1]],
+      assets: [],
+      clips: [],
+    },
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledTimes(1);
+});

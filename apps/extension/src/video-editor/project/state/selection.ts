@@ -13,6 +13,15 @@ export function resolveSelectionAfterProjectUpdate(
   splitLineage?: ReadonlyMap<string, string>
 ): VideoEditorProjectState['selection'] {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.COMMENT: {
+      const document = project.commentDocuments?.find(
+        (document) => document.id === selection.documentId
+      );
+      const entries = document?.annotations;
+      return entries?.some((entry) => entry.id === selection.commentId)
+        ? selection
+        : createSceneSelection();
+    }
     case VideoEditorSelectionKind.EFFECT_INSTANCE:
       return project.effectInstances?.some((item) => item.id === selection.effectInstanceId)
         ? selection
@@ -105,6 +114,8 @@ export function resolveSelectedTrackIdFromSelection(
   selection: VideoEditorProjectState['selection']
 ): string | null {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.COMMENT:
+      return null;
     case VideoEditorSelectionKind.EFFECT_INSTANCE: {
       const target = project.effectInstances?.find(
         (item) => item.id === selection.effectInstanceId

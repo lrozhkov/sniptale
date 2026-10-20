@@ -1,3 +1,7 @@
+import {
+  parseVideoProjectCommentDocuments,
+  hasValidVideoProjectCommentReferences,
+} from '../comments/validation';
 import { getVideoProjectWatermarkAsset, parseQuickEditWatermark } from '../scene/watermark';
 import { parseSceneBackgroundSettings } from '../scene/background-settings';
 import {
@@ -94,8 +98,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 22) &&
+    isBoundedNumber(version, 2, 23) &&
     Number.isInteger(version) &&
+    (version >= 23 || value['commentDocuments'] === undefined) &&
     (version >= 20 || value['watermark'] === undefined) &&
     (version >= 22 ||
       !Array.isArray(value['motionRegions']) ||
@@ -165,6 +170,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isString(value['id']) &&
     (value['textDocuments'] === undefined ||
       parseVideoProjectTextDocuments(value['textDocuments']) !== null) &&
+    (value['commentDocuments'] === undefined ||
+      parseVideoProjectCommentDocuments(value['commentDocuments']) !== null) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -304,7 +311,8 @@ function hasValidReferences(project: VideoProject): boolean {
   return (
     hasValidVideoProjectBaseReferences(project) &&
     hasValidEffectProjectReferences(project) &&
-    hasValidVideoProjectTextReferences(project)
+    hasValidVideoProjectTextReferences(project) &&
+    hasValidVideoProjectCommentReferences(project)
   );
 }
 

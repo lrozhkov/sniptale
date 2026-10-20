@@ -19,6 +19,14 @@ function handleSelectionDelete(
         incomingConnection: null,
       });
       return;
+    case VideoEditorSelectionKind.COMMENT:
+      if (latestState.project)
+        handlersRef.current.editCommentDocument(
+          latestState.project,
+          latestState.selection.documentId,
+          { kind: 'remove-note', id: latestState.selection.commentId }
+        );
+      return;
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:

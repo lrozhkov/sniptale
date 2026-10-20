@@ -12,6 +12,7 @@ import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { VideoProjectInteractionTimeBasis } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
+  AnnotationEditingPort,
   ClipSelectionPort,
   EffectEditingPort,
   HistoryPort,
@@ -38,6 +39,7 @@ type NonEffectTimelineSelection = Exclude<
 >;
 
 type TimelineActionStore = TimelineEditingPort &
+  Pick<AnnotationEditingPort, 'editCommentDocument'> &
   Pick<EffectEditingPort, 'deleteEffectInstance'> &
   ClipSelectionPort &
   Pick<
@@ -162,6 +164,13 @@ function deleteSelectedTimelineObject(
     case VideoEditorSelectionKind.MOTION_CONNECTION:
       store.updateMotionRegion(selection.motionRegionId, { incomingConnection: null });
       return;
+    case VideoEditorSelectionKind.COMMENT:
+      if (store.project)
+        store.editCommentDocument(store.project, selection.documentId, {
+          kind: 'remove-note',
+          id: selection.commentId,
+        });
+      return;
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
@@ -270,6 +279,7 @@ export function createWorkspaceTimelineSelectionActions(
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onClearPlaybackRange: workspace.clearPlaybackRange,
+    onSelectComment: selectWithInspector(store.selectComment),
     onSelectHistorySpan: selectWithInspector(store.selectHistorySpan),
     onSelectActionOccurrence: selectWithInspector(store.selectActionOccurrence),
     onSelectClip: selectWithInspector(store.selectClip),

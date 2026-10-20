@@ -428,6 +428,7 @@ it('isolates Delete, Space and Undo during setup/review and restores shortcuts a
       deleteActionEvent: noop,
       deleteClip: remove,
       deleteCursorSample: noop,
+      editCommentDocument: vi.fn(),
       deleteEffectInstance: noop,
       deleteMotionRegion: noop,
       deleteObjectTrack: noop,

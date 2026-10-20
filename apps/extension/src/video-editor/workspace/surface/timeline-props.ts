@@ -112,6 +112,9 @@ function getTimelineInteractionActionProps(controller: VideoEditorTimelineContro
     onClearPlaybackRange: controller.actions.onClearPlaybackRange,
     onStepToNextFrame: controller.actions.onStepToNextFrame,
     onStepToPreviousFrame: controller.actions.onStepToPreviousFrame,
+    ...(controller.actions.onSelectComment
+      ? { onSelectComment: controller.actions.onSelectComment }
+      : {}),
     ...(controller.actions.onSelectHistorySpan
       ? { onSelectHistorySpan: controller.actions.onSelectHistorySpan }
       : {}),

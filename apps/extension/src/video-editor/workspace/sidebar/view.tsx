@@ -1,6 +1,7 @@
 import { getEffectInstanceLabel } from '../../../features/video/project/effect-instance/presentation';
 import React from 'react';
 import {
+  MessageSquare,
   Camera,
   Frame,
   Focus,
@@ -89,6 +90,8 @@ export function getSelectionMeta(
       const label = project ? getEffectInstanceLabel(project, selection.effectInstanceId) : 'FX';
       return { icon: renderSidebarIcon(SlidersHorizontal), label, title: label };
     }
+    case VideoEditorSelectionKind.COMMENT:
+      return createStaticSelectionMeta(MessageSquare, 'videoEditor.sidebar.commentNote');
     case VideoEditorSelectionKind.SCENE:
       return createStaticSelectionMeta(SlidersHorizontal, 'videoEditor.sidebar.sceneProperties');
     case VideoEditorSelectionKind.CLIP_GROUP:

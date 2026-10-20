@@ -15,6 +15,7 @@ import {
   getCurrentVideoEditorProjectId,
   getCurrentVideoEditorProjectSnapshot,
   getCurrentVideoEditorSelectedClipId,
+  useVideoEditorAnnotationEditingPort,
   useVideoEditorClipSelectionPort,
   useVideoEditorEffectEditingPort,
   useVideoEditorRecordingTelemetryPort,
@@ -54,6 +55,9 @@ function useVideoEditorRuntimeComposition(
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
   const effects = useVideoEditorEffectEditingPort((port) => port);
+  const editCommentDocument = useVideoEditorAnnotationEditingPort(
+    (port) => port.editCommentDocument
+  );
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
   const history = useVideoEditorHistoryPort((port) => port);
   const exportPort = useVideoEditorExportPort((port) => port);
@@ -90,6 +94,8 @@ function useVideoEditorRuntimeComposition(
   });
   usePlaybackRangeSanity({
     project: lifecycle.project,
+    selection: selection.selection,
+    currentTime: playback.currentTime,
     playbackRange: workspace.playbackRange,
     clearPlaybackRange: workspace.clearPlaybackRange,
     setPlaybackRange: workspace.setPlaybackRange,
@@ -110,6 +116,7 @@ function useVideoEditorRuntimeComposition(
       selectedActionOccurrence: selections.selectedActionOccurrence,
       selectedClipId: selection.selectedClipId,
       selectedMotionRegion: selections.selectedMotionRegion,
+      editCommentDocument,
       deleteSelection: {
         actionEvent: timeline.deleteActionEvent,
         clip: timeline.deleteClip,

@@ -9,6 +9,7 @@ export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'watermark' }
   | { kind: 'analysis'; objectTrackId: string }
   | { kind: 'text'; documentId: string }
+  | { kind: 'comments'; documentId: string }
 );
 
 /** Includes hidden clips, scene media, analysis and dormant source-text dependencies. */
@@ -44,6 +45,10 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   for (const entry of project.textDocuments ?? []) {
     if (entry.binding.kind === 'source')
       uses.push({ assetId: entry.binding.assetId, kind: 'text', documentId: entry.id });
+  }
+  for (const entry of project.commentDocuments ?? []) {
+    if (entry.binding.kind === 'source')
+      uses.push({ assetId: entry.binding.assetId, kind: 'comments', documentId: entry.id });
   }
   return uses;
 }

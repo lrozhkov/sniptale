@@ -1,3 +1,4 @@
+import { InspectProjectCommentsPanel } from './comments';
 import { SceneWatermarkFields } from './watermark';
 import { InspectProjectTextPanel } from './text';
 import { InspectCursorPathSettings } from './cursor-path';
@@ -94,6 +95,12 @@ function createSceneGroups(
           {...(props.textVoice ? { voice: props.textVoice } : {})}
         />
       ),
+    },
+    {
+      id: 'comments',
+      semantic: 'comments' as const,
+      label: translate('videoEditor.sidebar.comments'),
+      content: <InspectProjectCommentsPanel project={props.typingProject ?? props.project} />,
     },
     {
       id: 'grid',

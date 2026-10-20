@@ -1,3 +1,5 @@
+import { duplicateVideoProjectCommentDocuments } from '../../../../features/video/project/comments/duplication';
+import { isCommentSourceClip } from '../../../../features/video/project/comments/projection';
 import { projectMotionSourceBinding } from '../../../../features/video/project/motion/source-binding';
 import {
   isProjectOriginalAudioTarget,
@@ -80,6 +82,7 @@ export function splitProjectClipsAtTimeWithResult(
       isSourceTimedClip(item) &&
       !item.sourceInstanceId &&
       (project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
+        project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
         isProjectOriginalAudioTarget(project, item))
         ? { ...item, sourceInstanceId: item.id }
         : item;
@@ -270,11 +273,7 @@ export function duplicateProjectClipsWithResult(
         return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
       }),
     ];
-  if (project.textDocuments) {
-    const documents = duplicateVideoProjectTextDocuments(project.textDocuments, sourceInstances);
-    if (!documents) return null;
-    nextProject.textDocuments = documents;
-  }
+  if (!duplicateBoundDocuments(project, nextProject, sourceInstances)) return null;
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
   const motionRegions = duplicateBoundMotionRegions(
     project,
@@ -291,6 +290,28 @@ export function duplicateProjectClipsWithResult(
         project: placedProject,
       }
     : null;
+}
+
+/** Reject the complete clip copy when either bound-document budget cannot admit it. */
+function duplicateBoundDocuments(
+  project: VideoProject,
+  nextProject: VideoProject,
+  sourceInstances: ReadonlyMap<string, string>
+): boolean {
+  if (project.textDocuments) {
+    const documents = duplicateVideoProjectTextDocuments(project.textDocuments, sourceInstances);
+    if (!documents) return false;
+    nextProject.textDocuments = documents;
+  }
+  if (project.commentDocuments) {
+    const documents = duplicateVideoProjectCommentDocuments(
+      project.commentDocuments,
+      sourceInstances
+    );
+    if (!documents) return false;
+    nextProject.commentDocuments = documents;
+  }
+  return true;
 }
 
 function splitProjectClip(
@@ -400,6 +421,7 @@ function duplicateSourceInstance(
     (item.sourceInstanceId ||
       isProjectOriginalAudioTarget(project, item) ||
       project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
+      project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
       project.cursorFocusPath?.segments.some(
         (segment) =>
           segment.binding.kind === 'recording-source' &&

@@ -412,3 +412,30 @@ it.each(['none', 'text', 'image'] as const)(
     expect(project).toEqual(before);
   }
 );
+
+it('removes only comment documents bound to explicitly deleted source assets', () => {
+  const source = { kind: 'library-asset' as const, mediaId: 'removed-source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = 23;
+  project.commentDocuments = [
+    {
+      id: 'removed',
+      binding: { kind: 'source', assetId: removed.id, sourceInstanceId: 'removed' },
+      annotations: [],
+      canvasComments: [],
+    },
+    {
+      id: 'kept',
+      binding: { kind: 'source', assetId: kept.id, sourceInstanceId: 'kept' },
+      annotations: [],
+      canvasComments: [],
+    },
+    { id: 'independent', binding: { kind: 'project' }, annotations: [], canvasComments: [] },
+  ];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.commentDocuments?.map(({ id }) => id)).toEqual(['kept', 'independent']);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+});

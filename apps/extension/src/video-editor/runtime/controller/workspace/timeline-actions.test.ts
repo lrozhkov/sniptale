@@ -318,3 +318,30 @@ it('commits timeline framing gestures through the real project state', () => {
     useVideoEditorStore.setState(originalState, true);
   }
 });
+
+it('opens note selection in the inspector and routes Delete to the accepted note command', () => {
+  const store = createStore();
+  const project = store.project!;
+  const selectComment = vi.fn();
+  const editCommentDocument = vi.fn();
+  store.selectComment = selectComment;
+  store.editCommentDocument = editCommentDocument;
+  store.selection = { kind: 'comment', documentId: 'doc', commentId: 'note' };
+  const workspace = createWorkspace();
+  const runtime = {
+    seekTo: vi.fn(),
+    togglePlayback: vi.fn(),
+  } as unknown as VideoEditorRuntimeController;
+  const selection = createWorkspaceTimelineSelectionActions(store, runtime, workspace);
+  selection.onSelectComment('doc', 'note', 10);
+  expect(selectComment).toHaveBeenCalledExactlyOnceWith('doc', 'note', 10);
+  expect(workspace.inspector.openSelection).toHaveBeenCalledTimes(1);
+  const clipActions = createSelectedClipActions();
+  const editing = createWorkspaceTimelineEditingActions(store, workspace, clipActions);
+  editing.onDeleteSelectedTimelineObject();
+  expect(editCommentDocument).toHaveBeenCalledExactlyOnceWith(project, 'doc', {
+    kind: 'remove-note',
+    id: 'note',
+  });
+  expect(clipActions.deleteSelectedClip).not.toHaveBeenCalled();
+});

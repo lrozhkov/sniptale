@@ -1,3 +1,4 @@
+import { projectVideoProjectCommentAnchor } from '../../features/video/project/comments/projection';
 import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
 import { clampTimelineScale } from '../contracts/timeline-scale';
 import type { StateCreator } from 'zustand';
@@ -23,6 +24,7 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
     setPixelsPerSecond: (pixelsPerSecond: number) =>
       set({ pixelsPerSecond: clampTimelineScale(pixelsPerSecond) }),
     selectScene: createSelectSceneAction(set),
+    selectComment: createSelectCommentAction(set),
     selectTrack: createSelectTrackAction(set),
     selectClip: createSelectClipAction(set),
     selectTransition: createSelectTransitionAction(set),
@@ -275,4 +277,37 @@ function resolveTransitionTrackId(
     project?.clips.find((clip) => clip.id === transition.trailingClipId)?.trackId ??
     null
   );
+}
+
+function createSelectCommentAction(set: VideoEditorStoreSet): VideoEditorState['selectComment'] {
+  return (documentId, commentId, projectTime) =>
+    set((state) => {
+      const document = state.project?.commentDocuments?.find(
+        (document) => document.id === documentId
+      );
+      if (!document) return state;
+      const note = document.annotations.find((entry) => entry.id === commentId);
+      if (!note || !state.project) return state;
+      const spans = projectVideoProjectCommentAnchor(state.project, document, note.anchor).filter(
+        (span) => span.start >= 0 && span.start <= state.project!.duration
+      );
+      const distance = (span: (typeof spans)[number]) =>
+        Math.max(span.start - state.currentTime, state.currentTime - span.end, 0);
+      const nearest = spans.reduce<(typeof spans)[number] | undefined>(
+        (best, span) => (!best || distance(span) < distance(best) ? span : best),
+        undefined
+      );
+      const hinted =
+        typeof projectTime === 'number' && Number.isFinite(projectTime)
+          ? spans.find((span) => Math.abs(span.start - projectTime) <= 1e-7)
+          : undefined;
+      const target = hinted ?? nearest;
+      return {
+        isPlaying: false,
+        ...(target ? { currentTime: target.start } : {}),
+        selection: { kind: VideoEditorSelectionKind.COMMENT, documentId, commentId },
+        selectedTrackId: null,
+        placementMode: null,
+      };
+    });
 }

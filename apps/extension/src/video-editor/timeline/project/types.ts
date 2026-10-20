@@ -77,6 +77,9 @@ export interface ProjectTimelineProps {
   onSeek: (time: number) => void;
   onZoomChange: (value: number) => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
+  onSelectComment?:
+    | ((documentId: string, commentId: string, projectTime?: number) => void)
+    | undefined;
   onSelectScene: () => void;
   onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTrack: (trackId: string | null) => void;

@@ -1,5 +1,6 @@
 import { EffectPresetEditingProvider } from './effect-instance/editing';
 import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
+import { InspectCommentPanel } from './inspection/comment';
 import { InspectFxPanel } from './inspection/fx';
 import '../../../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
@@ -55,6 +56,14 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.COMMENT:
+      return (
+        <InspectCommentPanel
+          key={JSON.stringify(props.selection)}
+          project={props.typingProject ?? props.project}
+          selection={props.selection}
+        />
+      );
     case VideoEditorSelectionKind.EFFECT_INSTANCE:
       return <InspectFxPanel {...props} instanceId={props.selection.effectInstanceId} />;
     case VideoEditorSelectionKind.HISTORY_SPAN:

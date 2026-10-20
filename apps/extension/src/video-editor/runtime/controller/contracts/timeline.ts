@@ -69,6 +69,7 @@ interface VideoEditorTimelineActions {
   onClearPlaybackRange: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
+  onSelectComment?: VideoEditorSessionActions['selectComment'];
   onSelectHistorySpan?: VideoEditorSessionActions['selectHistorySpan'];
   onSelectActionOccurrence: VideoEditorSessionActions['selectActionOccurrence'];
   onSelectClip: VideoEditorSessionActions['selectClip'];

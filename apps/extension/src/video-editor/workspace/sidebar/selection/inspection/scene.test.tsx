@@ -302,3 +302,10 @@ it('opens a dedicated watermark group with the authored project instead of the p
     'Authored'
   );
 });
+
+it('opens notes as a scene category without nesting a selected inspector', () => {
+  renderInspectPanel(createProps());
+  clickGroup('videoEditor.sidebar.comments');
+  expect(container!.querySelector('[data-ui="video-editor.comments.panel"]')).not.toBeNull();
+  expect(container!.querySelector('[data-ui="video-editor.comment.inspector"]')).toBeNull();
+});
