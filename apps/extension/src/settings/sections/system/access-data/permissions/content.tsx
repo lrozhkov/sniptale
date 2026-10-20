@@ -292,6 +292,8 @@ export function PermissionsSectionContent(props: {
   onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
   mediaNavigationFailed?: boolean;
   mediaEnableFailed?: boolean;
+  mediaRecordingReady?: boolean;
+  mediaSessionFailed?: boolean;
   onRefresh: () => void;
   onRequestPermission: (id: string) => void;
   onRevokePermission?: (id: string) => void;
@@ -320,6 +322,15 @@ export function PermissionsSectionContent(props: {
             onRevokePermission={props.onRevokePermission ?? (() => undefined)}
             onOpenMediaSettings={props.onOpenMediaSettings}
           />
+          {props.mediaRecordingReady ? (
+            <p
+              role="status"
+              data-ui="settings.permissions.recording-ready"
+              className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+            >
+              {translate('settings.permissions.recordingDeviceReady')}
+            </p>
+          ) : null}
           {props.mediaNavigationFailed ? (
             <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
               {translate('settings.permissions.openBrowserSettingsFailed')}
@@ -328,6 +339,11 @@ export function PermissionsSectionContent(props: {
           {props.mediaEnableFailed ? (
             <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
               {translate('settings.permissions.enableRecordingDeviceFailed')}
+            </p>
+          ) : null}
+          {props.mediaSessionFailed ? (
+            <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('settings.permissions.recordingAccessSessionFailed')}
             </p>
           ) : null}
           <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />

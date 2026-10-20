@@ -343,4 +343,12 @@ export const settingsPermissionsMessages = defineMessageSource({
     ru: 'Не удалось включить устройство для записи. Откройте панель записи и включите микрофон или камеру ещё раз.',
     en: 'Could not enable the recording device. Open the recording panel and turn on the microphone or camera again.',
   },
+  recordingDeviceReady: {
+    ru: 'Вернитесь к записи через значок расширения. Для разового доступа оставьте эту вкладку открытой до завершения записи.',
+    en: 'Return to recording through the extension icon. For one-time access, keep this tab open until recording ends.',
+  },
+  recordingAccessSessionFailed: {
+    ru: 'Не удалось поддержать доступ к устройству для записи. Проверьте разрешения перед продолжением записи.',
+    en: 'Could not maintain device access for recording. Check device permissions before continuing.',
+  },
 });

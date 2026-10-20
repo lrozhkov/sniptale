@@ -1,10 +1,15 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
   startup: vi.fn(),
   recording: vi.fn(),
   exportIntent: vi.fn(),
+  clearLaunch: vi.fn(),
+}));
+
+vi.mock('../../platform/browser-driver', () => ({
+  clearPopupVideoLaunchUrlParams: mocks.clearLaunch,
 }));
 
 vi.mock(
@@ -36,10 +41,93 @@ vi.mock('../export/runtime/tab-message-routing', async (importOriginal) => ({
 import { resolvePopupStartupRoute } from './coordinator';
 
 beforeEach(() => {
+  mocks.clearLaunch.mockClear();
   mocks.startup.mockResolvedValue({ selection: 'remember-last', lastPage: 'menu' });
   mocks.exportIntent.mockResolvedValue(null);
   mocks.recording.mockResolvedValue({
     state: { status: VideoRecordingStatus.IDLE },
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+it('returns to recording setup without selecting a capture mode or replacing startup preference', async () => {
+  mocks.startup.mockResolvedValue({ selection: 'menu', lastPage: 'tools' });
+  expect(
+    await resolvePopupStartupRoute(
+      'chrome-extension://test/apps/extension/src/popup/index.html?recordingSetup=1'
+    )
+  ).toEqual({
+    page: 'video',
+    recordingSnapshot: {
+      controlCapability: null,
+      state: { status: VideoRecordingStatus.IDLE },
+      statusError: null,
+    },
+    postRecordSnapshot: { result: null },
+  });
+  expect(await resolvePopupStartupRoute()).toEqual({ page: 'menu' });
+});
+
+it('consumes a setup hint only from the current popup address', async () => {
+  const href = 'chrome-extension://test/apps/extension/src/popup/index.html?recordingSetup=1';
+  vi.stubGlobal('window', { location: { href } });
+  await resolvePopupStartupRoute(href);
+  expect(mocks.clearLaunch).toHaveBeenCalledExactlyOnceWith(href);
+});
+
+it.each([
+  'recordingSetup=0',
+  'recordingSetup=true',
+  'recordingSetup=',
+  'recordingSetup=1&recordingSetup=1',
+])('ignores invalid or duplicate setup hints: %s', async (parameters) => {
+  expect(
+    await resolvePopupStartupRoute(
+      `chrome-extension://test/apps/extension/src/popup/index.html?${parameters}`
+    )
+  ).toEqual({ page: 'menu' });
+  expect(mocks.clearLaunch).not.toHaveBeenCalled();
+});
+
+it('keeps explicit video launch precedence when a recording setup hint is also present', async () => {
+  expect(
+    await resolvePopupStartupRoute(
+      [
+        'chrome-extension://test/apps/extension/src/popup/index.html',
+        '?recordingSetup=1&videoLaunchMode=TAB&videoLaunchTabId=21',
+      ].join('')
+    )
+  ).toMatchObject({
+    page: 'video',
+    videoMode: CaptureMode.TAB,
+    videoLaunch: { tabId: 21, viewportPresetId: null },
+  });
+});
+
+it('keeps active recording and post-record snapshots ahead of a setup hint', async () => {
+  const href = 'chrome-extension://test/apps/extension/src/popup/index.html?recordingSetup=1';
+  mocks.recording.mockResolvedValue({
+    state: { status: VideoRecordingStatus.RECORDING },
+    controlToken: 'token',
+    recordingId: 'recording-1',
+  });
+  expect(await resolvePopupStartupRoute(href)).toMatchObject({
+    page: 'video',
+    recordingSnapshot: {
+      controlCapability: { controlToken: 'token', recordingId: 'recording-1' },
+      state: { status: VideoRecordingStatus.RECORDING },
+    },
+  });
+  mocks.recording.mockResolvedValue({
+    state: { status: VideoRecordingStatus.IDLE },
+    postRecordResult: { recordingId: 'recording-1' },
+  });
+  expect(await resolvePopupStartupRoute(href)).toMatchObject({
+    page: 'video',
+    postRecordSnapshot: { result: { recordingId: 'recording-1' } },
   });
 });
 

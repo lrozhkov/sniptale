@@ -5,5 +5,6 @@ export function clearPopupVideoLaunchUrlParams(expectedHref: string): void {
   url.searchParams.delete('videoLaunchMode');
   url.searchParams.delete('videoLaunchTabId');
   url.searchParams.delete('videoLaunchPresetId');
+  url.searchParams.delete('recordingSetup');
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }

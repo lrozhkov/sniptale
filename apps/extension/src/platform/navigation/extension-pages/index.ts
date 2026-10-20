@@ -1,4 +1,5 @@
 import { browserTabs } from '@sniptale/platform/browser/tabs';
+import { browserAction } from '@sniptale/platform/browser/action';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { buildEditorUrl } from './editor';
@@ -33,7 +34,9 @@ export function isOwnedSettingsPage(senderUrl: string | undefined): boolean {
     const expectedUrl = new URL(buildSettingsPageUrl());
     const candidateUrl = new URL(senderUrl);
     return (
-      candidateUrl.origin === expectedUrl.origin && candidateUrl.pathname === expectedUrl.pathname
+      candidateUrl.protocol === expectedUrl.protocol &&
+      candidateUrl.host === expectedUrl.host &&
+      candidateUrl.pathname === expectedUrl.pathname
     );
   } catch {
     return false;
@@ -128,7 +131,61 @@ export async function openSettingsPage(
   if (options.requestMediaAccess) {
     url.searchParams.set(SETTINGS_MEDIA_ACCESS_QUERY_PARAM, options.requestMediaAccess);
   }
-  await openSettingsUrl(url.toString());
+  if (!options.requestMediaAccess) {
+    await openSettingsUrl(url.toString());
+    return;
+  }
+
+  const [source] = await browserTabs.query({ active: true, currentWindow: true });
+  if (typeof source?.id !== 'number' || typeof source.windowId !== 'number') {
+    await browserTabs.create({ url: url.toString() });
+    return;
+  }
+
+  const existingTabs = await browserTabs.query({
+    url: `${buildSettingsPageUrl()}*`,
+    windowId: source.windowId,
+  });
+  const existing = existingTabs.find(
+    (tab) => tab.windowId === source.windowId && tab.id !== source.id
+  );
+  const opener = { openerTabId: source.id };
+  if (typeof existing?.id === 'number') {
+    await browserTabs.update(existing.id, { active: true, url: url.toString(), ...opener });
+    await browserWindows.update(source.windowId, { focused: true });
+    return;
+  }
+  await browserTabs.create({ url: url.toString(), windowId: source.windowId, ...opener });
+}
+
+/** Restores the browser-owned source tab and opens the action popup while Settings stays open. */
+export async function returnToMediaRecordingPopup(): Promise<void> {
+  const [settings] = await browserTabs.query({ active: true, currentWindow: true });
+  if (
+    !isOwnedSettingsPage(settings?.url) ||
+    typeof settings?.id !== 'number' ||
+    typeof settings.windowId !== 'number' ||
+    typeof settings.openerTabId !== 'number' ||
+    settings.openerTabId === settings.id
+  ) {
+    throw new Error('Recording source tab is unavailable');
+  }
+
+  const source = await browserTabs.get(settings.openerTabId);
+  if (source.id !== settings.openerTabId || source.windowId !== settings.windowId) {
+    throw new Error('Recording source tab is unavailable');
+  }
+  const previousPopup = await browserAction.getPopup({ tabId: source.id });
+  const popupUrl = new URL(runtimeInfo.getURL('apps/extension/src/popup/index.html'));
+  popupUrl.searchParams.set('recordingSetup', '1');
+  await browserTabs.update(source.id, { active: true });
+  await browserWindows.update(settings.windowId, { focused: true });
+  await browserAction.setPopup({ tabId: source.id, popup: popupUrl.toString() });
+  try {
+    await browserAction.openPopup({ windowId: settings.windowId });
+  } finally {
+    await browserAction.setPopup({ tabId: source.id, popup: previousPopup });
+  }
 }
 
 export async function openExtensionShortcutsPage(): Promise<void> {

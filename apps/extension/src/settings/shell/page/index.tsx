@@ -28,6 +28,7 @@ import {
 } from './sections';
 import { useSettingsRoute } from '../route/history';
 import { useSettingsStickyNavScrollPadding } from './sticky-nav-scroll';
+import { RecordingMediaAccessProvider } from '../../runtime/recording-media-access/provider';
 
 function SettingsPageSurface(props: {
   navigationLocked: boolean;
@@ -171,7 +172,9 @@ export function SettingsPage() {
           ) : (
             <SettingsSectionHeaderActionsProvider>
               <SettingsNavigationLockProvider>
-                <SettingsPageMain />
+                <RecordingMediaAccessProvider>
+                  <SettingsPageMain />
+                </RecordingMediaAccessProvider>
               </SettingsNavigationLockProvider>
             </SettingsSectionHeaderActionsProvider>
           )}

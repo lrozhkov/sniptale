@@ -9,8 +9,21 @@ it('removes only consumed video launch parameters and preserves history state', 
     '',
     [
       '/popup/index.html?keep=1&videoLaunchMode=TAB&videoLaunchTabId=12',
-      '&videoLaunchPresetId=preset-1#kept',
+      '&videoLaunchPresetId=preset-1&recordingSetup=1#kept',
     ].join('')
+  );
+  clearPopupVideoLaunchUrlParams(window.location.href);
+  expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+    '/popup/index.html?keep=1#kept'
+  );
+  expect(window.history.state).toEqual({ marker: 'kept' });
+});
+
+it('consumes the recording setup hint without changing unrelated URL state', () => {
+  window.history.replaceState(
+    { marker: 'kept' },
+    '',
+    '/popup/index.html?recordingSetup=1&keep=1#kept'
   );
   clearPopupVideoLaunchUrlParams(window.location.href);
   expect(window.location.pathname + window.location.search + window.location.hash).toBe(

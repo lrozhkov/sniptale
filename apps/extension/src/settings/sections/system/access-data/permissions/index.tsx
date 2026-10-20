@@ -3,15 +3,23 @@ import { mutateVideoSettings } from '../../../../../composition/persistence/capt
 import {
   openMediaPermissionSettingsPage,
   SETTINGS_MEDIA_ACCESS_QUERY_PARAM,
+  returnToMediaRecordingPopup,
 } from '../../../../../platform/navigation/extension-pages';
 import { PermissionsSectionContent } from './content';
 import { useSettingsPermissions } from './useSettingsPermissions';
+import { useRecordingMediaAccess } from '../../../../runtime/recording-media-access/provider';
 
-function useTargetedMediaPermissionEnable(requestPermission: (id: string) => Promise<boolean>) {
+function useTargetedMediaPermissionEnable(
+  requestPermission: (id: string) => Promise<boolean>,
+  activateRecordingAccess: () => void
+) {
   const [mediaEnableFailed, setMediaEnableFailed] = useState(false);
+  const [mediaRecordingReady, setMediaRecordingReady] = useState(false);
   const mounted = useRef(false);
   const requestPermissionRef = useRef(requestPermission);
   requestPermissionRef.current = requestPermission;
+  const activateRecordingAccessRef = useRef(activateRecordingAccess);
+  activateRecordingAccessRef.current = activateRecordingAccess;
   const intentRead = useRef(false);
   const pendingIntent = useRef<'microphone' | 'camera' | null>(null);
 
@@ -44,6 +52,12 @@ function useTargetedMediaPermissionEnable(requestPermission: (id: string) => Pro
               ? { ...current, microphoneEnabled: true }
               : { ...current, webcamEnabled: true };
           });
+          if (!mounted.current) return;
+          activateRecordingAccessRef.current();
+          setMediaRecordingReady(true);
+          if (document.visibilityState === 'visible' && document.hasFocus()) {
+            await returnToMediaRecordingPopup().catch(() => undefined);
+          }
         })
         .catch(() => {
           if (mounted.current) setMediaEnableFailed(true);
@@ -59,7 +73,7 @@ function useTargetedMediaPermissionEnable(requestPermission: (id: string) => Pro
     };
   }, []);
 
-  return mediaEnableFailed;
+  return { mediaEnableFailed, mediaRecordingReady };
 }
 
 export function PermissionsSection() {
@@ -75,7 +89,11 @@ export function PermissionsSection() {
   }, []);
   const { permissions, requestPermission, revokePermission, refreshPermissions } =
     useSettingsPermissions();
-  const mediaEnableFailed = useTargetedMediaPermissionEnable(requestPermission);
+  const recordingMediaAccess = useRecordingMediaAccess();
+  const { mediaEnableFailed, mediaRecordingReady } = useTargetedMediaPermissionEnable(
+    requestPermission,
+    recordingMediaAccess.activate
+  );
 
   const openMediaSettings = async (permission: 'microphone' | 'camera') => {
     if (navigating.current) return;
@@ -99,6 +117,8 @@ export function PermissionsSection() {
       onOpenMediaSettings={(permission) => void openMediaSettings(permission)}
       mediaNavigationFailed={mediaNavigationFailed}
       mediaEnableFailed={mediaEnableFailed}
+      mediaRecordingReady={mediaRecordingReady}
+      mediaSessionFailed={recordingMediaAccess.failed}
       view={view}
       onViewChange={setView}
     />

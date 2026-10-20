@@ -2,6 +2,8 @@
  * Shared browser action seam for popup opening, badge, and title updates.
  */
 interface BrowserActionAdapter {
+  getPopup(details: chrome.action.TabDetails): Promise<string>;
+  setPopup(details: chrome.action.PopupDetails): Promise<void>;
   openPopup(options?: chrome.action.OpenPopupOptions): Promise<void>;
   setIcon(details: Parameters<typeof chrome.action.setIcon>[0]): Promise<void>;
   setTitle(details: chrome.action.TitleDetails): Promise<void>;
@@ -10,6 +12,14 @@ interface BrowserActionAdapter {
 }
 
 export const browserAction: BrowserActionAdapter = {
+  getPopup(details) {
+    return chrome.action.getPopup(details);
+  },
+
+  setPopup(details) {
+    return chrome.action.setPopup(details);
+  },
+
   openPopup(options) {
     return options ? chrome.action.openPopup(options) : chrome.action.openPopup();
   },

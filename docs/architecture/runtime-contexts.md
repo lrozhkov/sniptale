@@ -42,6 +42,10 @@ Offscreen project export acquires before consuming persisted input and transfers
 
 These leases protect source identity and bytes, and introduce no second document authority.
 
+Settings documents that complete targeted recording-device enable keep one-time browser access valid during recording. The Settings root owns this disposable session across section navigation. It observes authoritative recording state, not control capabilities. Only admitted active or paused recording sessions can retain selected devices.
+
+Each retained device has a disabled native track in Settings. These tracks have no consumer and supply no samples to the application. Native per-kind locks prevent duplicate Settings resources across windows. Offscreen remains the recording source and encoder owner. Idle, terminal state, revocation, disposal and stale acquisition release the Settings resources. A bounded state heartbeat releases them after observation failure. No durable grant flag, idle capture or browser permission override exists. Closing the Settings tab still ends temporary browser access.
+
 ## Recording clock
 
 TAB recording calibration stays in the offscreen source/encoder owner. Before countdown, it samples an original frame from the same freshly acquired track. It bounds the native epoch offset by acquisition and receipt. It maps initial/resumed source timestamps to the encoder’s chosen PTS. Reader cancellation never stops the borrowed track.

@@ -7,20 +7,30 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 const { mutateVideoSettingsSpy } = vi.hoisted(() => ({ mutateVideoSettingsSpy: vi.fn() }));
+const mediaSession = vi.hoisted(() => ({ activate: vi.fn(), failed: false }));
+vi.mock('../../../../runtime/recording-media-access/provider', () => ({
+  useRecordingMediaAccess: () => mediaSession,
+}));
 
 vi.mock('../../../../../composition/persistence/capture-settings', () => ({
   mutateVideoSettings: mutateVideoSettingsSpy,
 }));
 
-const { permissionsSectionContentSpy, useSettingsPermissionsSpy, openMediaSettingsSpy } =
-  vi.hoisted(() => ({
-    permissionsSectionContentSpy: vi.fn(),
-    useSettingsPermissionsSpy: vi.fn(),
-    openMediaSettingsSpy: vi.fn(),
-  }));
+const {
+  permissionsSectionContentSpy,
+  useSettingsPermissionsSpy,
+  openMediaSettingsSpy,
+  returnToPopupSpy,
+} = vi.hoisted(() => ({
+  permissionsSectionContentSpy: vi.fn(),
+  useSettingsPermissionsSpy: vi.fn(),
+  openMediaSettingsSpy: vi.fn(),
+  returnToPopupSpy: vi.fn(),
+}));
 
 vi.mock('../../../../../platform/navigation/extension-pages', () => ({
   openMediaPermissionSettingsPage: openMediaSettingsSpy,
+  returnToMediaRecordingPopup: returnToPopupSpy,
   SETTINGS_MEDIA_ACCESS_QUERY_PARAM: 'requestMediaAccess',
 }));
 
@@ -61,10 +71,13 @@ async function renderSection(strictMode = false) {
 }
 
 beforeEach(() => {
+  mediaSession.activate.mockReset();
+  mediaSession.failed = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   permissionsSectionContentSpy.mockReset();
   useSettingsPermissionsSpy.mockReset();
   openMediaSettingsSpy.mockReset().mockResolvedValue(undefined);
+  returnToPopupSpy.mockReset().mockResolvedValue(undefined);
   mutateVideoSettingsSpy
     .mockReset()
     .mockImplementation(async (mutation) => mutation({ ...DEFAULT_VIDEO_SETTINGS }));
@@ -179,6 +192,8 @@ it('forwards permissions state and actions into the permissions content shell', 
     onOpenMediaSettings: expect.any(Function),
     mediaNavigationFailed: false,
     mediaEnableFailed: false,
+    mediaRecordingReady: false,
+    mediaSessionFailed: false,
     onViewChange: expect.any(Function),
     view: 'optional',
   });
@@ -194,6 +209,73 @@ function deferredResult<T>() {
   });
   return { promise, resolve, reject };
 }
+
+it.each(['microphone', 'camera'] as const)(
+  'returns to the actual popup only after the %s enable write completes',
+  async (permission) => {
+    window.history.replaceState(null, '', `?requestMediaAccess=${permission}`);
+    const saved = deferredResult<VideoRecordingSettings>();
+    mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+    useSettingsPermissionsSpy.mockReturnValue({
+      permissions: [],
+      requestPermission: async () => true,
+    });
+    await renderSection(true);
+    expect(returnToPopupSpy).not.toHaveBeenCalled();
+    await act(async () => saved.resolve(DEFAULT_VIDEO_SETTINGS));
+    expect(returnToPopupSpy).toHaveBeenCalledExactlyOnceWith();
+    expect(mediaSession.activate).toHaveBeenCalledOnce();
+    expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaRecordingReady).toBe(true);
+    await renderSection(true);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(returnToPopupSpy).toHaveBeenCalledTimes(1);
+  }
+);
+
+it('preserves the successful enable and manual return instruction if popup opening fails', async () => {
+  window.history.replaceState(null, '', '?requestMediaAccess=microphone');
+  returnToPopupSpy.mockRejectedValue(new Error('popup unavailable'));
+  useSettingsPermissionsSpy.mockReturnValue({
+    permissions: [],
+    requestPermission: async () => true,
+  });
+  await renderSection();
+  expect(returnToPopupSpy).toHaveBeenCalledOnce();
+  expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaRecordingReady).toBe(true);
+  expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaEnableFailed).toBe(false);
+});
+
+it.each(['refused', 'write-failed', 'unmounted', 'unfocused'] as const)(
+  'does not return to the popup after %s',
+  async (reason) => {
+    window.history.replaceState(null, '', '?requestMediaAccess=camera');
+    const saved = deferredResult<VideoRecordingSettings>();
+    mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+    useSettingsPermissionsSpy.mockReturnValue({
+      permissions: [],
+      requestPermission: async () => reason !== 'refused',
+    });
+    await renderSection();
+    if (reason === 'unmounted') {
+      act(() => root?.unmount());
+      root = null;
+    }
+    if (reason === 'unfocused') vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    await act(async () => {
+      if (reason === 'write-failed') saved.reject(new Error('storage failed'));
+      else saved.resolve(DEFAULT_VIDEO_SETTINGS);
+    });
+    expect(returnToPopupSpy).not.toHaveBeenCalled();
+    if (reason !== 'unfocused') expect(mediaSession.activate).not.toHaveBeenCalled();
+  }
+);
+
+it('shows a recording device session failure from the mounted Settings owner', async () => {
+  mediaSession.failed = true;
+  useSettingsPermissionsSpy.mockReturnValue({ permissions: [], requestPermission: vi.fn() });
+  await renderSection();
+  expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaSessionFailed).toBe(true);
+});
 
 it.each([
   ['microphone', 'microphoneEnabled'],

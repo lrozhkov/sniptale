@@ -53,6 +53,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             sniptale_video_settings: settings,
             sniptale_video_ui_state: { captureMode: 'SCREEN', viewportPresetId: null },
             'sniptale-locale-preference': 'en',
+            sniptale_popup_startup: {
+              selection: 'menu',
+              lastPage: 'menu',
+              lastExportDestination: 'export',
+            },
           });
         }, preferences);
         await seed.close();
@@ -86,6 +91,16 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await target.goto('about:blank');
         await target.bringToFront();
         const popupTarget = await triggerExtensionAction(context, extensionId, target);
+        const sourceTabId = z
+          .number()
+          .parse(
+            await evaluateInTarget(
+              context,
+              popupTarget,
+              '(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id)()',
+              true
+            )
+          );
         await clickPopupControl(
           context,
           session,
@@ -148,14 +163,36 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           fullPage: false,
           animations: 'disabled',
         });
-        await target.bringToFront();
-        const reopenedTarget = await triggerExtensionAction(context, extensionId, target);
-        await clickPopupControl(
-          context,
-          session,
-          reopenedTarget,
-          '[data-ui="popup.app.tabs"] button[data-page="video"]'
-        );
+        let reopenedTarget = '';
+        await expect
+          .poll(async () => {
+            const targets = z
+              .object({
+                targetInfos: z.array(
+                  z.object({
+                    targetId: z.string(),
+                    type: z.string(),
+                    url: z.string(),
+                  })
+                ),
+              })
+              .parse(await session.send('Target.getTargets'));
+            reopenedTarget =
+              targets.targetInfos.find(
+                (candidate) =>
+                  candidate.type === 'page' &&
+                  candidate.targetId !== popupTarget &&
+                  candidate.url === `${origin}/apps/extension/src/popup/index.html`
+              )?.targetId ?? '';
+            return reopenedTarget;
+          })
+          .not.toBe('');
+        expect(
+          await settings.evaluate(
+            async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id
+          )
+        ).toBe(sourceTabId);
+        expect(settings.isClosed()).toBe(false);
         await expect
           .poll(() =>
             evaluateInTarget(
@@ -180,6 +217,21 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             `document.querySelectorAll(${JSON.stringify(PERMISSION_NOTICES)}).length`
           )
         ).toBe(0);
+        await clickPopupControl(
+          context,
+          session,
+          reopenedTarget,
+          `button[aria-label="${name === 'microphone' ? 'Microphone device' : 'Camera device'}"]`
+        );
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              reopenedTarget,
+              'Array.from(document.querySelectorAll("[role=option]")).filter(option => option.textContent?.trim()).length'
+            )
+          )
+          .toBeGreaterThan(0);
         expect(await sendRuntimeMessage(settings, { type: 'GET_RECORDING_STATE' })).toMatchObject({
           success: true,
           state: { status: 'IDLE' },

@@ -39,7 +39,9 @@ async function renderContent(
   view: 'optional' | 'required' = 'optional',
   permissions?: PermissionInfo[],
   mediaNavigationFailed = false,
-  mediaEnableFailed = false
+  mediaEnableFailed = false,
+  mediaRecordingReady = false,
+  mediaSessionFailed = false
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -70,6 +72,8 @@ async function renderContent(
           onOpenMediaSettings={onOpenMediaSettings}
           mediaNavigationFailed={mediaNavigationFailed}
           mediaEnableFailed={mediaEnableFailed}
+          mediaRecordingReady={mediaRecordingReady}
+          mediaSessionFailed={mediaSessionFailed}
           onRequestPermission={onRequestPermission}
           onRevokePermission={onRevokePermission}
           view={view}
@@ -85,10 +89,35 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
 
+it('explains the successful popup handoff and temporary permission lifetime only after enable', async () => {
+  await renderContent();
+  expect(container?.querySelector('[data-ui="settings.permissions.recording-ready"]')).toBeNull();
+  await renderContent('optional', [createPermission('camera', 'granted')], false, false, true);
+  expect(
+    container?.querySelector('[data-ui="settings.permissions.recording-ready"]')?.textContent
+  ).toBe('settings.permissions.recordingDeviceReady');
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+});
+
 it('shows localized recording enable failure with granted permission intact', async () => {
   await renderContent('optional', [createPermission('microphone', 'granted')], false, true);
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
     'settings.permissions.enableRecordingDeviceFailed'
+  );
+  expect(container?.textContent).toContain('settings.permissions.statusGranted');
+});
+
+it('reports recording access session failure without changing the native grant status', async () => {
+  await renderContent(
+    'optional',
+    [createPermission('microphone', 'granted')],
+    false,
+    false,
+    true,
+    true
+  );
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'settings.permissions.recordingAccessSessionFailed'
   );
   expect(container?.textContent).toContain('settings.permissions.statusGranted');
 });
