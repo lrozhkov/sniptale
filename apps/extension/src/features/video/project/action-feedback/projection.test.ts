@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../factories/creation';
 import { getVideoProjectUtilityLanes } from '../utility-lanes';
-import { patchVideoProjectActionFeedback } from './projection';
+import { getVideoProjectFeedbackRuns, patchVideoProjectActionFeedback } from './projection';
 import { parseVideoProjectActionFeedback, REVIEW_CLICK_DEFAULT } from './validation';
 
 function fixture() {
@@ -152,4 +152,74 @@ it('keeps the text-capable project schema when editing captured feedback', () =>
   const changed = patchVideoProjectActionFeedback(project, group, { settings: [] });
   expect(changed.version).toBe(5);
   expect(changed.textDocuments).toEqual([]);
+});
+
+it('joins continuous feedback across tracks and separates source gaps and identities', () => {
+  const { project, identity } = fixture();
+  const first = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (first.type !== 'VIDEO') throw new Error('Expected a video clip');
+  const track = { ...project.tracks[0]!, id: 'other-track', visible: true };
+  project.tracks.push(track);
+  project.clips = [
+    {
+      ...first,
+      id: 'a',
+      startTime: 0,
+      duration: 0.5,
+      sourceStart: 0,
+      sourceDuration: 1,
+      playbackRate: 2,
+    },
+    {
+      ...first,
+      id: 'b',
+      trackId: track.id,
+      startTime: 0.5,
+      duration: 1,
+      sourceStart: 1,
+      sourceDuration: 1,
+      playbackRate: 1,
+    },
+    { ...first, id: 'gap', startTime: 1.5, duration: 1, sourceStart: 3, sourceDuration: 1 },
+    { ...first, id: 'independent', startTime: 0, sourceInstanceId: 'duplicate' },
+  ];
+  expect(
+    getVideoProjectFeedbackRuns(project, identity).map((run) => ({
+      ids: run.clips.map((clip) => clip.id),
+      segments: run.segments,
+    }))
+  ).toEqual([
+    {
+      ids: ['a', 'b'],
+      segments: [
+        { sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 0.5, kind: 'speed', rate: 2 },
+        { sourceStart: 1, sourceEnd: 2, resultStart: 0.5, resultEnd: 1.5, kind: 'keep', rate: 1 },
+      ],
+    },
+    {
+      ids: ['gap'],
+      segments: [
+        { sourceStart: 3, sourceEnd: 4, resultStart: 1.5, resultEnd: 2.5, kind: 'keep', rate: 1 },
+      ],
+    },
+  ]);
+  track.visible = false;
+  expect(
+    getVideoProjectFeedbackRuns(project, identity).flatMap((run) =>
+      run.clips.map((clip) => clip.id)
+    )
+  ).toEqual(['a', 'gap']);
+});
+
+it('retains feedback mapping after source media becomes a project asset', () => {
+  const { project, identity } = fixture();
+  project.assets[0]!.source = {
+    kind: 'project-asset',
+    projectAssetId: 'owned-source',
+    originRecordingId: identity.recordingId,
+  };
+  expect(getVideoProjectFeedbackRuns(project, identity)).toHaveLength(1);
+  expect(getVideoProjectFeedbackRuns(project, { ...identity, recordingId: 'different' })).toEqual(
+    []
+  );
 });

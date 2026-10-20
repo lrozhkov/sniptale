@@ -1,3 +1,5 @@
+import { evaluateProjectGestureFeedback } from './project-action-audio';
+import { resolveVideoProjectActionPresentations } from '../project/action-presentation';
 import { createCameraFollowSettings } from '../project/camera/cursor-policy';
 import { expect, it } from 'vitest';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
@@ -233,5 +235,79 @@ it('retains camera defaults through a settings-only Gallery-to-Montage handoff a
   ).toEqual(content.cameraFollowDefaults);
   content.cameraFollowDefaults.zoneSize = 0.25;
   expect(result.cameraFollowDefaults?.zoneSize).toBe(0.55);
+  expect(project).toEqual(before);
+});
+
+it('retains the complete ordinary click style through Gallery handoff and project reload', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'click.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 100,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0.1,
+        point: { x: 0.4, y: 0.6 },
+        label: '',
+        data: {},
+        preset: 'NONE',
+      },
+    ],
+  });
+  const content = createQuickEditAdvancedContent();
+  content.clickAnimations = [
+    {
+      id: 'click',
+      effect: 'magnify',
+      color: '#123456cc',
+      radius: 40,
+      stroke: 4,
+      opacity: 0.75,
+      before: 0.2,
+      after: 0.8,
+      offset: 0.15,
+      x: 0.1,
+      y: -0.1,
+      pulses: 3,
+      easing: 'linear',
+      magnification: 2,
+      lensShape: 'rounded',
+      lensShadow: 60,
+    },
+  ];
+  const before = structuredClone(project),
+    accepted = structuredClone(content.clickAnimations);
+  const result = applyRecordingReviewInteractions(project, 'recording', content);
+  const restored = parseHydratableVideoProject(JSON.parse(JSON.stringify(result)));
+  expect(restored).not.toBeNull();
+  if (!restored) throw new Error('Expected a valid project after reload');
+  expect(restored.actionFeedback![0]!.gestureStyles).toEqual(accepted);
+  expect(restored.actionEvents).toEqual(before.actionEvents);
+  expect(resolveVideoProjectActionPresentations(restored)[0]).toMatchObject({
+    preset: 'DWELL_ZOOM',
+    duration: 1,
+    offset: 0.15,
+    point: { x: 0.5, y: 0.5 },
+  });
+  const frame = evaluateProjectGestureFeedback(restored, 1.55)[0]!.frame;
+  expect(frame).toMatchObject({
+    effect: 'magnify',
+    color: '#123456cc',
+    stroke: 4,
+    point: { x: 0.5, y: 0.5 },
+    lens: { shape: 'rounded' },
+  });
+  expect(frame.radius).toBeCloseTo(60, 12);
+  expect(frame.opacity).toBeCloseTo(0.375, 12);
+  expect(frame.lens!.scale).toBeCloseTo(1.5, 12);
+  expect(frame.lens!.shadow).toBeCloseTo(30, 12);
+  content.clickAnimations[0]!.radius = 99;
+  expect(result.actionFeedback![0]!.gestureStyles).toEqual(accepted);
   expect(project).toEqual(before);
 });

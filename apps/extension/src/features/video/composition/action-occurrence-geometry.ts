@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionPresentations } from '../project/action-presentation';
 import {
   mapSourceNormalizedPointToVisualLayer,
   mapVisualLayerPointToSourceNormalized,
@@ -80,7 +81,12 @@ export function mapVideoActionOccurrencePointToScene(
   camera: VideoCompositionCameraState
 ) {
   if (!canEditVideoActionOccurrence(project, occurrence, currentTime)) return null;
-  const point = occurrence.event.presentation?.point ?? occurrence.event.point;
+  const point =
+    resolveVideoProjectActionPresentations(project).find(
+      (item) =>
+        item.occurrence.eventId === occurrence.eventId &&
+        item.occurrence.clipId === occurrence.clipId
+    )?.point ?? null;
   if (!point || occurrence.clipId === null) return point;
   const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, currentTime);
   const mapped = mapping && mapSourceNormalizedPointToVisualLayer({ ...mapping, point });

@@ -1,3 +1,4 @@
+import { drawPointerFeedbackFrame, type PointerFeedbackSource } from '../pointer-feedback';
 import { getActionClickStyle } from '../../../project/action-style';
 import { applyTemporalEasing } from '../../motion';
 import type { VideoCompositionActionState, VideoCompositionCameraState } from '../../types';
@@ -8,7 +9,8 @@ export function drawActionCompositionState(
   action: VideoCompositionActionState,
   fallbackPoint: { x: number; y: number } | null,
   sizeScale = 1,
-  bounds?: { x: number; y: number; width: number; height: number }
+  bounds?: { x: number; y: number; width: number; height: number },
+  source?: PointerFeedbackSource
 ): void {
   if (action.renderKind === null) return;
   if (action.renderKind === 'keystroke') {
@@ -19,6 +21,19 @@ export function drawActionCompositionState(
   if (!point || action.preset === 'NONE' || action.preset === 'SCROLL_EMPHASIS') return;
   if (action.gestureFeedback) {
     const frame = action.gestureFeedback;
+    if (!frame.path?.length) {
+      drawPointerFeedbackFrame(
+        context,
+        {
+          ...frame,
+          point,
+          radius: frame.radius * sizeScale,
+          stroke: frame.stroke * Math.max(0.2, sizeScale),
+        },
+        source
+      );
+      return;
+    }
     context.save();
     context.globalAlpha *= frame.opacity;
     context.strokeStyle = frame.color;

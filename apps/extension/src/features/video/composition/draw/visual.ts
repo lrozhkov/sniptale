@@ -1,3 +1,4 @@
+import type { PointerFeedbackSource } from './pointer-feedback';
 import { windowHeaderImageKey } from './window-header';
 import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
@@ -210,14 +211,11 @@ function drawVideoLayer(
   }
 
   const header = admittedVisualWindowHeader(layer.clip, loadedImages, layer.trackRole === 'CAMERA');
-  drawFittedMediaLayer({
+  const media = {
     ...header,
-    ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
-    context,
     displayScale,
     fitMode: layer.clip.fitMode,
     ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
-    frame,
     ...(layer.trackRole !== 'CAMERA' && layer.clip.windowCornerRadius !== undefined
       ? { windowCornerRadius: layer.clip.windowCornerRadius }
       : {}),
@@ -230,29 +228,54 @@ function drawVideoLayer(
     ...(layer.clip.shadowColor === undefined ? {} : { shadowColor: layer.clip.shadowColor }),
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
-    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) => {
-      if (!layer.effectActionsOnly) {
-        drawCameraMediaSource(
-          drawContext,
-          frame,
-          layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true,
-          () => {
-            if (source instanceof HTMLVideoElement)
-              drawContext.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-            else source.draw(drawContext, drawX, drawY, drawWidth, drawHeight);
-          }
-        );
+  };
+  const paintSource = (
+    target: CanvasRenderingContext2D,
+    destination: typeof frame,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) =>
+    drawCameraMediaSource(
+      target,
+      destination,
+      layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true,
+      () => {
+        if (source instanceof HTMLVideoElement) target.drawImage(source, x, y, width, height);
+        else source.draw(target, x, y, width, height);
       }
+    );
+  const feedbackSource: PointerFeedbackSource = {
+    rect: frame,
+    draw: (target, x, y, width, height) => {
+      const destination = { x, y, width, height };
+      drawFittedMediaLayer({
+        ...media,
+        context: target,
+        frame: destination,
+        displayScale: (displayScale * width) / Math.max(0.001, frame.width),
+        render: (drawX, drawY, drawWidth, drawHeight, drawContext = target) =>
+          paintSource(drawContext, destination, drawX, drawY, drawWidth, drawHeight),
+      });
+    },
+  };
+  drawFittedMediaLayer({
+    ...media,
+    ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
+    context,
+    frame,
+    render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) => {
+      if (!layer.effectActionsOnly)
+        paintSource(drawContext, frame, drawX, drawY, drawWidth, drawHeight);
       drawVideoSourceActions(
         drawContext,
         layer,
         frame,
         { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-        {
-          width: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
-          height: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
-        },
-        visibleContent
+        { width: media.sourceWidth, height: media.sourceHeight },
+        visibleContent,
+        feedbackSource
       );
     },
   });
@@ -264,7 +287,8 @@ function drawVideoSourceActions(
   frame: ReturnType<typeof getScaledLayerFrame>,
   sourceFrame: ReturnType<typeof getScaledLayerFrame>,
   sourceSize: { width: number; height: number },
-  visibleContent?: ReturnType<typeof getScaledLayerFrame>
+  visibleContent?: ReturnType<typeof getScaledLayerFrame>,
+  feedbackSource?: PointerFeedbackSource
 ) {
   const { x: drawX, y: drawY, width: drawWidth, height: drawHeight } = sourceFrame;
   drawContext.save();
@@ -318,7 +342,8 @@ function drawVideoSourceActions(
       },
       null,
       actionScale,
-      contentBounds
+      contentBounds,
+      feedbackSource
     );
   }
   drawContext.restore();

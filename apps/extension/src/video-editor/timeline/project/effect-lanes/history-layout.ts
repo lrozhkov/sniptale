@@ -1,3 +1,5 @@
+import { getVideoProjectClickStyle } from '../../../../features/video/project/action-feedback/projection';
+import { REVIEW_CLICK_BOUNDS } from '../../../../features/video/project/action-feedback/validation';
 import type { ResolvedVideoProjectActionPresentation } from '../../../../features/video/project/action-presentation';
 import type {
   VideoProjectActionEvent,
@@ -41,7 +43,14 @@ export function historyTimeBounds(
   const end = clips.length
     ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
     : project.duration;
-  return { minimumTime, maximumTime: Math.max(minimumTime, end - 1 / project.fps) };
+  const maximumTime = Math.max(minimumTime, end - 1 / project.fps);
+  const style = getVideoProjectClickStyle(project, item.event);
+  if (!style) return { minimumTime, maximumTime };
+  const current = Math.max(minimumTime, Math.min(maximumTime, item.animationStart));
+  return {
+    minimumTime: Math.max(minimumTime, current + REVIEW_CLICK_BOUNDS.offset[0] - style.offset),
+    maximumTime: Math.min(maximumTime, current + REVIEW_CLICK_BOUNDS.offset[1] - style.offset),
+  };
 }
 
 export function historyMarkerTime(

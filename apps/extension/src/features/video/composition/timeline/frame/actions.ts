@@ -1,3 +1,4 @@
+import { getVideoProjectClickStyle } from '../../../project/action-feedback/projection';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
 import { resolveCameraClip, cameraSourceTime } from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
@@ -50,6 +51,7 @@ export function resolveVideoCompositionActions(
 ): VideoCompositionActionState[] {
   const states: VideoCompositionActionState[] = [];
   for (const presentation of resolveVideoProjectActionPresentations(project)) {
+    if (getVideoProjectClickStyle(project, presentation.event) !== null) continue;
     const state = resolveActionState(presentation, currentTime);
     const anchor = state?.event.anchor;
     const authoredFeedback =

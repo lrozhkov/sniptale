@@ -146,13 +146,13 @@ it('separates visual gesture parameters from sound without changing their source
     sourceInstanceId: project.actionFeedback![0]!.sourceInstanceId,
     target: { ref: { kind: 'action' as const, id: 'drag' }, family: 'mouse' as const },
     disabled: false,
-    gesture: true,
+    visual: 'gesture' as const,
   };
   try {
     act(() => root.render(<ActionFeedbackFields {...props} part="sound" />));
     expect(host.querySelector('[data-ui="video-editor.action-audio-fields"]')).not.toBeNull();
     expect(host.textContent).not.toContain('gallery.videoReview.gestureAppearance');
-    act(() => root.render(<ActionFeedbackFields {...props} part="gesture" />));
+    act(() => root.render(<ActionFeedbackFields {...props} part="visual" />));
     expect(host.querySelector('[data-ui="video-editor.action-audio-fields"]')).toBeNull();
     const toggle = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.gestureFeedback"]'
@@ -228,7 +228,7 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
             sourceInstanceId={group.sourceInstanceId}
             target={target}
             disabled={false}
-            gesture={family === 'mouse'}
+            {...(family === 'mouse' ? { visual: 'gesture' as const } : {})}
           />
         )
       );
@@ -599,8 +599,8 @@ it('preserves the current inherited gesture appearance on the first shape edit',
           sourceInstanceId={group.sourceInstanceId}
           target={{ ref: { kind: 'action', id: 'hold' }, family: 'mouse' }}
           disabled={false}
-          gesture
-          part="gesture"
+          visual="gesture"
+          part="visual"
         />
       )
     );
@@ -697,8 +697,8 @@ it('resets only the selected authored gesture and keeps source, sound and other 
           sourceInstanceId={group.sourceInstanceId}
           target={{ ref: { kind: 'action', id: 'hold' }, family: 'mouse' }}
           disabled={false}
-          gesture
-          part="gesture"
+          visual="gesture"
+          part="visual"
         />
       )
     );

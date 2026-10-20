@@ -114,7 +114,10 @@ function PointerChoice<T extends string>(props: {
   onChange(value: T): void;
 }) {
   return (
-    <InspectorParameterRow label={props.label}>
+    <InspectorParameterRow
+      label={props.label}
+      valueOptions={props.options.map((option) => option.label)}
+    >
       <CompactSegmentedSelector
         ariaLabel={props.label}
         value={props.value}

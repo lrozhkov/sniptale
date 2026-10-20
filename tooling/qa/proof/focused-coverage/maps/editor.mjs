@@ -1,5 +1,25 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'native-source-click-command-adapter',
+    productionFile: 'apps/extension/src/video-editor/project/state/effects.ts',
+    reason: 'Legacy effects and source click commands preserve their distinct edit contracts.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/state/effects.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
+    ],
+  },
+  {
+    owner: 'native-source-click-inspector-adapter',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.tsx',
+    reason:
+      'Sound, captured gestures and ordinary clicks use the same current project update port.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-fields.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/action-feedback-click-fields.test.tsx',
+    ],
+  },
+  {
     owner: 'video-project-gesture-feedback',
     productionFile: 'apps/extension/src/features/video/review/project-action-audio.ts',
     allowCrossOwner: true,
@@ -9,6 +29,7 @@ export const EDITOR_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/review/project-action-audio.test.ts',
       'apps/extension/src/features/video/composition/timeline/frame/actions.test.ts',
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.action-feedback.test.ts',
     ],
   },
   {

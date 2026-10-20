@@ -110,7 +110,7 @@ it.each(['fixed', 'follow-video'] as const)(
       clip.radius
     );
     expect(context.stroke).toHaveBeenCalledOnce();
-    expect(context.restore).toHaveBeenCalledOnce();
+    expect(context.restore.mock.calls.length).toBe(context.save.mock.calls.length);
   }
 );
 

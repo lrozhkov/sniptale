@@ -1,9 +1,21 @@
+import {
+  getVideoProjectClickStyle,
+  patchVideoProjectActionFeedback,
+} from '../../../features/video/project/action-feedback/projection';
+import {
+  patchReviewClicks,
+  REVIEW_CLICK_BOUNDS,
+  type ReviewClickStyle,
+} from '../../../features/video/review/advanced/click-animation';
 import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
 import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
 import { editMotionBlurPhase } from '../../../features/video/project/motion/blur';
 import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
-import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
+import {
+  resolveVideoProjectActionPresentations,
+  getVideoProjectActionPresentation,
+} from '../../../features/video/project/action-presentation';
 import {
   isVideoProjectActionPresentation,
   isVideoProjectActionPresentationOverride,
@@ -15,7 +27,11 @@ import {
 } from '../../../features/video/project/motion/source-binding';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
-import { VideoProjectClipType } from '../../../features/video/project/types/index';
+import {
+  type VideoProject,
+  type VideoProjectActionEvent,
+  VideoProjectClipType,
+} from '../../../features/video/project/types/index';
 import { resolvePlacementModeAfterProjectUpdate } from '../selection/placement';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
@@ -155,7 +171,36 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
         let presentation =
           patch.presentation === null ? undefined : (patch.presentation ?? event.presentation);
         if (presentation && !isVideoProjectActionPresentationOverride(presentation)) return project;
-        if (patch.point !== undefined) {
+        let authored = project;
+        const style = getVideoProjectClickStyle(project, event);
+        if (style && event.anchor.kind === 'recording-source') {
+          const projected = resolveSourceClickEdit(project, event, patch, style);
+          if (!projected) return project;
+          const { x, y, offset } = projected;
+          if (patch.presentation?.point && presentation) {
+            const { point: _point, ...remaining } = presentation;
+            presentation = {
+              ...remaining,
+              ...(event.presentation?.point ? { point: event.presentation.point } : {}),
+            };
+          }
+          if (x !== style.x || y !== style.y || offset !== style.offset) {
+            const anchor = event.anchor;
+            const group = project.actionFeedback!.find(
+              (item) =>
+                item.recordingId === anchor.recordingId &&
+                item.sourceInstanceId === anchor.sourceInstanceId
+            )!;
+            authored = patchVideoProjectActionFeedback(project, anchor, {
+              gestureStyles: patchReviewClicks(group.gestureStyles ?? [], [anchor.sourceEventId], {
+                x,
+                y,
+                offset,
+              }),
+            });
+          }
+        }
+        if (!style && patch.point !== undefined) {
           const point = resolveActionPoint(bounds, patch.point);
           if (point) presentation = { ...presentation, point };
           else if (patch.point === null && presentation) {
@@ -163,7 +208,7 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
             presentation = remaining;
           } else return project;
         }
-        if (patch.time !== undefined && occurrence) {
+        if (!style && patch.time !== undefined && occurrence) {
           const clips = occurrence.playbackRun
             ? project.clips.filter((clip) => occurrence.playbackRun!.clipIds.includes(clip.id))
             : [];
@@ -182,16 +227,70 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
             ...presentation,
             point: resolveActionPoint(bounds, presentation.point)!,
           };
+        if (style && patch.presentation === undefined)
+          return authored === project ? project : applyVideoProjectMutationPatch(authored, {});
         const { presentation: _previous, ...captured } = event;
         const updated =
           presentation && Object.keys(presentation).length > 0
             ? { ...captured, presentation }
             : captured;
-        return applyVideoProjectMutationPatch(project, {
-          actionEvents: project.actionEvents.map((item) => (item.id === event.id ? updated : item)),
+        return applyVideoProjectMutationPatch(authored, {
+          actionEvents: authored.actionEvents.map((item) =>
+            item.id === event.id ? updated : item
+          ),
         });
       })
     );
+}
+
+function resolveSourceClickEdit(
+  project: VideoProject,
+  event: VideoProjectActionEvent,
+  patch: Parameters<VideoEditorProjectState['updateActionEventDetails']>[1],
+  style: Readonly<ReviewClickStyle>
+): Pick<ReviewClickStyle, 'x' | 'y' | 'offset'> | null {
+  let x = style.x,
+    y = style.y,
+    offset = style.offset;
+  const requestedPoint = patch.point !== undefined ? patch.point : patch.presentation?.point;
+  if (requestedPoint !== undefined) {
+    if (requestedPoint === null) {
+      x = 0;
+      y = 0;
+    } else {
+      const point = resolveActionPoint({ width: 1, height: 1 }, requestedPoint);
+      if (!point || !event.point) return null;
+      x = Math.max(
+        REVIEW_CLICK_BOUNDS.x[0],
+        Math.min(REVIEW_CLICK_BOUNDS.x[1], point.x - event.point.x)
+      );
+      y = Math.max(
+        REVIEW_CLICK_BOUNDS.y[0],
+        Math.min(REVIEW_CLICK_BOUNDS.y[1], point.y - event.point.y)
+      );
+    }
+  }
+  if (patch.time !== undefined) {
+    const row = resolveVideoProjectActionPresentations(project).find(
+      (item) => item.occurrence.eventId === event.id && item.occurrence.clipId === patch.clipId
+    );
+    if (!row) return null;
+    const clips = project.clips.filter((clip) =>
+      row.occurrence.playbackRun?.clipIds.includes(clip.id)
+    );
+    const start = clips.length ? Math.min(...clips.map((clip) => clip.startTime)) : 0;
+    const end = clips.length
+      ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
+      : project.duration;
+    const last = Math.max(start, end - 1 / project.fps);
+    const current = Math.max(start, Math.min(last, row.animationStart));
+    const requested = Math.max(start, Math.min(last, patch.time));
+    offset = Math.max(
+      REVIEW_CLICK_BOUNDS.offset[0],
+      Math.min(REVIEW_CLICK_BOUNDS.offset[1], style.offset + requested - current)
+    );
+  }
+  return { x, y, offset };
 }
 
 function createActionDeleter(set: VideoEditorStoreSet) {

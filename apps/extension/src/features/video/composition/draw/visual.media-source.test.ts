@@ -284,3 +284,33 @@ it.each([false, true])(
     expect(clip.transform).toMatchObject({ width: 160, height: 90 });
   }
 );
+
+it('provides original decoded window pixels to lenses without recursively drawing action overlays', () => {
+  vi.mocked(drawActionCompositionState).mockClear();
+  const layer = gestureLayer(),
+    draw = vi.fn(),
+    context = createVisualTestContext();
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, { draw, sourceWidth: 100, sourceHeight: 100 }]])
+  );
+  expect(draw).toHaveBeenCalledOnce();
+  const [, originalX, originalY, originalWidth, originalHeight] = draw.mock.lastCall!;
+  const source = vi.mocked(drawActionCompositionState).mock.lastCall![5]!;
+  expect(source).toBeDefined();
+  const rect = source.rect;
+  source.draw(context, rect.x - 20, rect.y - 30, rect.width * 2, rect.height * 2);
+  expect(draw).toHaveBeenLastCalledWith(
+    context,
+    rect.x - 20 + (originalX - rect.x) * 2,
+    rect.y - 30 + (originalY - rect.y) * 2,
+    originalWidth * 2,
+    originalHeight * 2
+  );
+  expect(draw).toHaveBeenCalledTimes(2);
+  expect(drawActionCompositionState).toHaveBeenCalledOnce();
+});

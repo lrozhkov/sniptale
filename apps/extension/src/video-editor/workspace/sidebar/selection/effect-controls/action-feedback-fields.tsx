@@ -1,3 +1,4 @@
+import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { PointerFeedbackFields } from '../../../../../ui/pointer-feedback/fields';
@@ -37,9 +38,9 @@ interface FeedbackProps {
   sourceInstanceId: string;
   target: ReviewActionAudioTarget;
   disabled: boolean;
-  gesture?: boolean;
-  part?: 'sound' | 'gesture';
-  gesturePart?: 'animation' | 'appearance';
+  visual?: 'click' | 'gesture';
+  part?: 'sound' | 'visual';
+  visualPart?: 'animation' | 'appearance' | 'timing' | 'position';
 }
 
 export function ActionFeedbackFields(props: FeedbackProps) {
@@ -75,10 +76,24 @@ export function ActionFeedbackFields(props: FeedbackProps) {
   };
   const gestureStyle =
     group.gestureStyles?.find((item) => item.id === props.target.ref.id) ??
-    getProjectGestureFeedbackDefaults(props.project);
+    (props.visual === 'gesture'
+      ? getProjectGestureFeedbackDefaults(props.project)
+      : REVIEW_CLICK_DEFAULT);
   const changeGesture = (patch: Partial<ReviewClickStyle> | null) => {
     if (props.disabled) return;
     updateProject((project) => {
+      if (
+        !project.actionEvents.some(
+          (event) =>
+            event.anchor.kind === 'recording-source' &&
+            event.anchor.recordingId === identity.recordingId &&
+            event.anchor.sourceInstanceId === identity.sourceInstanceId &&
+            props.target.ref.kind === 'action' &&
+            event.anchor.sourceEventId === props.target.ref.id
+        )
+      )
+        return project;
+
       const current = project.actionFeedback?.find(
         (item) =>
           item.recordingId === identity.recordingId &&
@@ -98,7 +113,9 @@ export function ActionFeedbackFields(props: FeedbackProps) {
                 ? null
                 : {
                     ...(current.gestureStyles?.find((item) => item.id === props.target.ref.id) ??
-                      getProjectGestureFeedbackDefaults(project)),
+                      (props.visual === 'gesture'
+                        ? getProjectGestureFeedbackDefaults(project)
+                        : REVIEW_CLICK_DEFAULT)),
                     ...patch,
                   },
               patch?.gestureAppearance === 'area'
@@ -115,7 +132,7 @@ export function ActionFeedbackFields(props: FeedbackProps) {
       className="sniptale-parameter-stack min-w-0 space-y-2"
       data-ui="video-editor.action-feedback-fields"
     >
-      {props.part !== 'gesture' ? (
+      {props.part !== 'visual' ? (
         <ActionAudioFields
           dataUi="video-editor.action-audio-fields"
           targets={[props.target]}
@@ -131,24 +148,24 @@ export function ActionFeedbackFields(props: FeedbackProps) {
           {soundPreview.error}
         </p>
       ) : null}
-      {props.gesture && props.part !== 'sound' ? (
+      {props.visual && props.part !== 'sound' ? (
         <>
           <PointerFeedbackFields
-            gesture
+            gesture={props.visual === 'gesture'}
             values={[gestureStyle]}
-            part={props.gesturePart ?? 'animation'}
+            part={props.visualPart ?? 'animation'}
             disabled={props.disabled}
             Details={InspectorDetails}
             disclosurePreferenceId="action-feedback:gesture-area"
             onChange={changeGesture}
           />
-          {props.gesturePart !== 'appearance' ? (
+          {(props.visualPart ?? 'animation') === 'animation' ? (
             <ContentToolbarButton
               type="button"
               tone="outline"
               size="compact"
               className="flex w-full items-center justify-center gap-2"
-              dataUi="video-editor.gesture.reset"
+              dataUi={`video-editor.${props.visual}.reset`}
               aria-label={translate('gallery.videoReview.clickReset')}
               title={translate('gallery.videoReview.clickReset')}
               disabled={
