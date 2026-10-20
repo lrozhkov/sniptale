@@ -122,7 +122,7 @@ function PopupHomePageContent({
     <div className="flex h-full min-h-0 flex-col gap-3">
       <section
         className={[
-          'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border p-3',
+          'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border p-3',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas))]',
         ].join(' ')}

@@ -99,13 +99,7 @@ export function VideoPostRecordPanel({
         runDecision={runDecision}
       />
       {actionError ? (
-        <div
-          className={[
-            'rounded-[10px] border border-[var(--sniptale-color-danger-soft)] px-3 py-2',
-            'text-xs text-[var(--sniptale-color-danger)]',
-          ].join(' ')}
-          role="alert"
-        >
+        <div className="popup-error-message" role="alert">
           {actionError}
         </div>
       ) : null}

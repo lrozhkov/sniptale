@@ -17,7 +17,7 @@ import {
   type InlineCurtainSecondaryAction,
 } from './trigger';
 
-const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[14px]';
+const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[6px]';
 type InlineCurtainSelectProps = {
   ariaLabel: string;
   description: string;

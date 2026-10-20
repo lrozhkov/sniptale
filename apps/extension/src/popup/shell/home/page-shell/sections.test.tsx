@@ -108,5 +108,5 @@ it('renders the popup home error message copy', async () => {
   await renderNode(<PopupHomeErrorMessage message="Action failed" />);
 
   expect(getContainer()?.textContent).toContain('Action failed');
-  expect(getContainer()?.querySelector('div')?.className).toContain('rounded-[16px]');
+  expect(getContainer()?.querySelector('[role="alert"]')?.textContent).toBe('Action failed');
 });

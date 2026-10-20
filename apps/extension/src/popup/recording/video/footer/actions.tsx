@@ -1,6 +1,5 @@
-import { Circle, Library } from 'lucide-react';
+import { Circle } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/popup';
-import { openGalleryPage } from '../../../../platform/navigation/extension-pages';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 import {
@@ -9,17 +8,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoActiveFooterControls } from './active-controls';
 
-const ACTION_ICON_CLASS_NAME = [
-  'text-[var(--sniptale-color-text-secondary)]',
-  'group-hover:text-[var(--sniptale-color-text-primary)]',
-  'group-focus-visible:text-[var(--sniptale-color-text-primary)]',
-].join(' ');
 const START_RECORDING_ICON_CLASS_NAME = 'fill-current text-[var(--sniptale-color-danger)]';
-
-function openGallery() {
-  void openGalleryPage({ folder: 'recording' });
-  window.close();
-}
 
 function VideoSetupStartButton({
   canStart,
@@ -38,6 +27,7 @@ function VideoSetupStartButton({
       label={startButtonLabel}
       iconClassName={START_RECORDING_ICON_CLASS_NAME}
       tone="primary"
+      centered
       dataUi="popup.video-setup.start-recording-button"
       disabled={!canStart}
       title={startDisabledReason ?? translate('popup.video.startTitle')}
@@ -51,7 +41,6 @@ export function VideoSetupFooter({
   startButtonLabel,
   startDisabledReason,
   onStart,
-  galleryTitle,
   onCancel,
   onPauseResume,
   onStop,
@@ -62,7 +51,6 @@ export function VideoSetupFooter({
   startButtonLabel: string;
   startDisabledReason: string | null;
   onStart: () => void;
-  galleryTitle: string;
   onCancel: () => void;
   onPauseResume: () => void;
   onStop: () => void;
@@ -85,7 +73,6 @@ export function VideoSetupFooter({
       startButtonLabel={startButtonLabel}
       startDisabledReason={startDisabledReason}
       onStart={onStart}
-      galleryTitle={galleryTitle}
     />
   );
 }
@@ -95,32 +82,20 @@ function IdleVideoSetupFooter({
   startButtonLabel,
   startDisabledReason,
   onStart,
-  galleryTitle,
 }: {
   canStart: boolean;
   startButtonLabel: string;
   startDisabledReason: string | null;
   onStart: () => void;
-  galleryTitle: string;
 }) {
   return (
     <div className={actionFooterSurfaceClassName}>
-      <div className="grid grid-cols-[minmax(0,1fr)_48px] gap-1.5">
+      <div className="grid grid-cols-1">
         <VideoSetupStartButton
           canStart={canStart}
           startButtonLabel={startButtonLabel}
           startDisabledReason={startDisabledReason}
           onStart={onStart}
-        />
-        <PopupActionButton
-          icon={Library}
-          label={translate('popup.video.galleryLabel')}
-          iconClassName={ACTION_ICON_CLASS_NAME}
-          tone="gallery"
-          compact
-          dataUi="popup.video-setup.gallery-button"
-          title={galleryTitle}
-          onClick={openGallery}
         />
       </div>
     </div>

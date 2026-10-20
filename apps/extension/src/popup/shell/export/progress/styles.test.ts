@@ -20,7 +20,7 @@ import {
 
 describe('progress styles', () => {
   it('exports stable class names for all progress view building blocks', () => {
-    expect(progressHeaderClassName).toContain('rounded-[12px]');
+    expect(progressHeaderClassName).toContain('rounded-[6px]');
     expect(progressDescriptionClassName).toContain('text-[11px]');
     expect(progressStepListClassName).toContain('flex-col');
     expect(progressStepRowClassName).toContain('min-h-[30px]');
@@ -32,7 +32,7 @@ describe('progress styles', () => {
     expect(progressStepDoneClassName).toContain('success');
     expect(progressStepErrorClassName).toContain('danger');
     expect(progressStepIdleClassName).toContain('text-[var(--sniptale-color-text-dim)]');
-    expect(progressErrorListClassName).toContain('text-[11px]');
+    expect(progressErrorListClassName).toContain('popup-error-message');
     expect(cancelButtonClassName).toContain('justify-center');
     expect(exportSectionContainerClassName).toContain('flex-1');
   });

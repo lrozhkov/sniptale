@@ -17,7 +17,7 @@ const INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME = [
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const INLINE_CURTAIN_DETAIL_CLASS_NAME = [
-  'mx-1.5 mt-1.5 rounded-[7px] px-2 py-1.5 text-[10px] leading-3',
+  'mx-1.5 mt-1.5 rounded-[6px] px-2 py-1.5 text-[10px] leading-3',
   'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 

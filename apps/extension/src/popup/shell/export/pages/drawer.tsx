@@ -33,7 +33,7 @@ function ExportPagesFilterInput(props: {
         onChange={(event) => props.setFilterQuery(event.currentTarget.value)}
         placeholder={translate('popup.export.tabsFilterPlaceholder')}
         className={[
-          'h-8 w-full rounded-[9px] border bg-transparent pl-7 pr-2.5 text-[11px]',
+          'h-8 w-full rounded-[6px] border bg-transparent pl-7 pr-2.5 text-[11px]',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
           'text-[var(--sniptale-color-text-primary)] placeholder:text-[var(--sniptale-color-text-dim)]',
           'outline-none focus:border-[var(--sniptale-color-text-secondary)]',
@@ -60,7 +60,7 @@ export function ExportPagesHeader(props: {
         type="button"
         onClick={props.toggleSelectAllTabs}
         className={[
-          'shrink-0 rounded-[9px] px-1.5 py-1 text-[10px] font-medium',
+          'shrink-0 rounded-[6px] px-1.5 py-1 text-[10px] font-medium',
           'text-[var(--sniptale-color-text-primary)] transition-colors',
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
           'outline-none focus-visible:outline-none',

@@ -162,7 +162,7 @@ function ManageSizePresetsButton() {
     <button
       type="button"
       className={[
-        'min-h-8 w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)] px-2',
+        'min-h-8 w-full rounded-[6px] border border-[var(--sniptale-color-border-soft)] px-2',
         'text-xs font-medium text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'hover:text-[var(--sniptale-color-text-primary)]',

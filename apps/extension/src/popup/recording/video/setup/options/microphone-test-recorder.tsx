@@ -110,7 +110,7 @@ export function MicrophoneTestRecorder({ stream }: { stream: MediaStream | null 
         />
       ) : null}
       {playbackError ? (
-        <div role="alert" className="text-[11px] text-[var(--sniptale-color-danger)]">
+        <div role="alert" className="popup-error-message">
           {translate('popup.video.microphoneTestPlaybackError')}
         </div>
       ) : null}

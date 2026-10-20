@@ -1,26 +1,17 @@
-import { type PreviewFormat } from '../selection/utils';
 import { footerActionGridClassName, footerSurfaceClassName } from './tokens';
-import { ExportFooterCopyButtons } from './copy-buttons';
 import { ExportFooterPrimaryActionButton } from './primary-action';
 import { Library } from 'lucide-react';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import type { PopupPackageDestination } from '../data-type/package-controls';
 
 type ExportFooterLayoutProps = {
-  canCopyJson: boolean;
-  canCopyMarkdown: boolean;
   canExport: boolean;
   destination?: PopupPackageDestination | undefined;
-  copyJsonTitle: string;
-  copyMarkdownTitle: string;
-  copiedFormat: PreviewFormat | null;
   exportTitle: string;
   isExporting: boolean;
   isResultReady: boolean;
   onOpenLibraryResult?: (() => void) | undefined;
   onCancelExport: () => void;
-  onCopyJson: () => void;
-  onCopyMarkdown: () => void;
   onResetExportView: () => void;
   openLibraryResultTitle?: string | undefined;
   onStartExport: () => void;
@@ -46,17 +37,6 @@ export function ExportFooterLayout(props: ExportFooterLayoutProps) {
           onResetExportView={props.onResetExportView}
           onStartExport={props.onStartExport}
         />
-        {props.isResultReady || props.isExporting ? null : (
-          <ExportFooterCopyButtons
-            canCopyJson={props.canCopyJson}
-            canCopyMarkdown={props.canCopyMarkdown}
-            copyJsonTitle={props.copyJsonTitle}
-            copyMarkdownTitle={props.copyMarkdownTitle}
-            copiedFormat={props.copiedFormat}
-            onCopyJson={props.onCopyJson}
-            onCopyMarkdown={props.onCopyMarkdown}
-          />
-        )}
         {props.isResultReady && props.onOpenLibraryResult && props.openLibraryResultTitle ? (
           <PopupActionButton
             icon={Library}

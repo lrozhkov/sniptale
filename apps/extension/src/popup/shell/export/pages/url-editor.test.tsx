@@ -83,3 +83,9 @@ it('switches page sources through the existing navigation control', async () => 
   await act(async () => urlsButton.click());
   expect(onChange).toHaveBeenCalledWith('urls');
 });
+
+it('uses neutral source segments without orange selection styling', async () => {
+  await act(async () => root.render(<ExportPageSourceSwitch mode="tabs" onChange={vi.fn()} />));
+  expect(container.innerHTML).not.toContain('--sniptale-color-accent');
+  expect(container.querySelector('[role="group"]')?.className).toContain('rounded-[6px]');
+});

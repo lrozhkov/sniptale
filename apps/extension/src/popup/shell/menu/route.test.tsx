@@ -224,7 +224,7 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     'popup.home.videoEditorLabel',
     'popup.home.scenarioEditorLabel',
   ]);
-  expect(container.querySelector('[data-ui="popup.menu.route"] > section')?.className).toContain(
+  expect(container.querySelector('[data-ui="popup.menu.content"]')?.className).toContain(
     'justify-between'
   );
   for (const selector of ['[data-ui="popup.menu.tools"]', '[data-ui="popup.menu.workspace"]']) {

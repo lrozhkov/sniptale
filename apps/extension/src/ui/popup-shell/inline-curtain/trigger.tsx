@@ -51,7 +51,7 @@ function InlineCurtainPanelCloseButton({
       aria-label={ariaLabel}
       className={[
         'sniptale-dismiss-button',
-        'absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-[7px]',
+        'absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-[6px]',
         'transition-colors',
       ].join(' ')}
       onClick={onClick}
@@ -84,7 +84,7 @@ export function InlineCurtainPanelHeader({
           type="button"
           aria-label={actionAriaLabel}
           className={[
-            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px]',
+            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px]',
             'text-[var(--sniptale-color-text-secondary)] transition-colors',
             'hover:bg-[var(--sniptale-color-surface-hover)]',
             'hover:text-[var(--sniptale-color-text-primary)]',
@@ -223,7 +223,7 @@ function InlineCurtainSecondaryButton({
       aria-controls={ariaControls}
       aria-label={secondaryAction.ariaLabel}
       className={[
-        'shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-medium',
+        'shrink-0 rounded-[6px] px-2 py-1 text-[11px] font-medium',
         'text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_70%,transparent)]',
         'hover:text-[var(--sniptale-color-text-primary)]',

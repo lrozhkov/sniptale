@@ -197,7 +197,11 @@ function ExportStatusHeader(props: ExportProgressSectionProps) {
           {description ? (
             <div
               title={description}
-              className={descriptionClassName}
+              role={props.progress.phase === 'error' ? 'alert' : undefined}
+              className={cx(
+                descriptionClassName,
+                props.progress.phase === 'error' && 'popup-error-message'
+              )}
               data-ui="popup.export.progress-description"
             >
               {description}

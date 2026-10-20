@@ -120,7 +120,7 @@ export function PopupToolsPanel(props: {
   onOpen(mode?: ToolbarWorkingMode): void;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-hidden pb-1" data-ui="popup.tools.actions">
+    <div className="min-h-0 flex-1 overflow-y-auto pb-1" data-ui="popup.tools.actions">
       <ToolButton tool={tools[0]!} disabledReason={props.disabledReason} onOpen={props.onOpen} />
       <section className="mt-2" aria-labelledby="popup-tools-editing">
         <h2 id="popup-tools-editing" className={TOOL_GROUP_HEADING_CLASS_NAME}>

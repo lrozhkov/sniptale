@@ -10,18 +10,11 @@ import { ExportFooterActions } from './actions';
 
 function renderActions(overrides: Partial<Parameters<typeof ExportFooterActions>[0]> = {}) {
   return ExportFooterActions({
-    canCopyJson: true,
-    canCopyMarkdown: true,
     canExport: true,
-    copyJsonTitle: 'Copy JSON current tab',
-    copyMarkdownTitle: 'Copy Markdown current tab',
-    copiedFormat: null,
     disabledTitle: null,
     isExporting: false,
     isResultReady: false,
     onCancelExport: vi.fn(),
-    onCopyJson: vi.fn(),
-    onCopyMarkdown: vi.fn(),
     onResetExportView: vi.fn(),
     onStartExport: vi.fn(),
     ...overrides,
@@ -33,8 +26,6 @@ describe('ExportFooterActions', () => {
     const element = renderActions({ disabledTitle: 'Недоступно', isExporting: true });
 
     expect(element.props.exportTitle).toBe('Недоступно');
-    expect(element.props.copyJsonTitle).toBe('Copy JSON current tab');
-    expect(element.props.copyMarkdownTitle).toBe('Copy Markdown current tab');
     expect(element.props.isResultReady).toBe(false);
   });
 

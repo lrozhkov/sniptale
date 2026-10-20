@@ -165,7 +165,7 @@ function PopupRouteError({
   if (!error) return null;
   return (
     <section
-      className="popup-react-shell__route-error"
+      className="popup-react-shell__route-error popup-error-message"
       data-ui="popup.app.route-error"
       role="alert"
     >

@@ -205,7 +205,7 @@ function VideoStartConfirmation({
             {translate('popup.video.withoutMicrophoneTitle')}
           </p>
           {hasSaveError ? (
-            <p role="alert" className="select-text text-xs text-[var(--sniptale-color-danger)]">
+            <p role="alert" className="popup-error-message">
               {translate('popup.video.withoutMicrophoneSaveError')}
             </p>
           ) : null}

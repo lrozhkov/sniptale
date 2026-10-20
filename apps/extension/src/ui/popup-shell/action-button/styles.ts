@@ -7,9 +7,16 @@ const POPUP_ACTION_BUTTON_DISABLED_CLASS_NAME = [
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_PRIMARY_CLASS_NAME = [
-  'border-none bg-transparent',
-  'text-[var(--sniptale-color-text-secondary)] shadow-none',
-  'hover:bg-transparent focus-visible:bg-transparent',
+  'border-none bg-[var(--sniptale-color-surface-hover)]',
+  'text-[var(--sniptale-color-text-primary)] shadow-none',
+  [
+    'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,',
+    'var(--sniptale-color-surface-hover))]',
+  ].join(''),
+  [
+    'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_12%,',
+    'var(--sniptale-color-surface-hover))]',
+  ].join(''),
   'hover:text-[var(--sniptale-color-text-primary-strong)]',
   'focus-visible:text-[var(--sniptale-color-text-primary-strong)] active:translate-y-px',
 ].join(' ');

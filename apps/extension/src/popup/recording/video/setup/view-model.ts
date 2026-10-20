@@ -134,7 +134,6 @@ export function getVideoSetupViewModel({
     controlledCursorDisabled,
     controlledCursorDisabledReason,
     startButtonLabel: getStartButtonLabel({ canStart, isStartPending, startDisabledReason }),
-    galleryTitle: translate('popup.video.galleryTitle'),
   };
 }
 

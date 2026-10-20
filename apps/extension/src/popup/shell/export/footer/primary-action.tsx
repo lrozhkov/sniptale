@@ -36,6 +36,7 @@ export function ExportFooterPrimaryActionButton(props: {
         label={translate('popup.export.doneButton')}
         iconClassName={footerPrimaryButtonIconClassName}
         tone="primary"
+        centered
         dataUi="popup.export.export-button"
         title={translate('popup.export.doneButton')}
         onClick={props.onResetExportView}
@@ -58,6 +59,7 @@ export function ExportFooterPrimaryActionButton(props: {
       label={action.label}
       iconClassName={footerPrimaryIdleButtonIconClassName}
       tone="primary"
+      centered
       dataUi="popup.export.export-button"
       disabled={!props.canExport}
       title={props.canExport ? action.label : props.exportTitle}

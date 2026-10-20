@@ -10,7 +10,7 @@ const POPUP_ICON_STATE_BUTTON_BASE_CLASS_NAME = [
 
 const POPUP_ICON_STATE_BUTTON_STACKED_CLASS_NAME = [
   [
-    'min-h-[68px] rounded-[14px] border border-transparent bg-transparent',
+    'min-h-[68px] rounded-[6px] border border-transparent bg-transparent',
     'flex-col justify-center gap-1.5 px-1.5 py-2 text-center transition-all',
   ].join(' '),
 ].join(' ');
@@ -21,11 +21,11 @@ const POPUP_ICON_STATE_BUTTON_TAB_CLASS_NAME = [
 
 const POPUP_ICON_STATE_BUTTON_DISABLED_CLASS_NAME = ['cursor-not-allowed opacity-40'].join(' ');
 const POPUP_ICON_STATE_BUTTON_ICON_ONLY_CLASS_NAME = [
-  'h-[46px] w-full rounded-[12px] px-2.5 py-2',
+  'h-[46px] w-full rounded-[6px] px-2.5 py-2',
   'border-none shadow-none',
 ].join(' ');
 const POPUP_ICON_STATE_BUTTON_SQUARE_CLASS_NAME = [
-  'aspect-square h-auto w-full rounded-[12px] p-2',
+  'aspect-square h-auto w-full rounded-[6px] p-2',
   'border-none shadow-none',
 ].join(' ');
 const POPUP_ICON_STATE_BUTTON_HOVER_LIFT_CLASS_NAME = [

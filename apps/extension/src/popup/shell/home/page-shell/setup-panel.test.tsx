@@ -4,10 +4,6 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
 import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
-const mocks = vi.hoisted(() => ({ openLibrary: vi.fn() }));
-
-vi.mock('../../navigation/actions', () => ({ openLibrary: mocks.openLibrary }));
-
 vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
@@ -113,22 +109,14 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
   const captureButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
-  expect(captureButton?.className).toContain('justify-start');
-  for (const label of ['popup.home.captureButtonLabel', 'popup.home.libraryLabel']) {
-    const button = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
-      (candidate) => candidate.textContent === label
-    );
-    expect(button?.dataset['iconClass']).toContain(
-      'group-hover:text-[var(--sniptale-color-text-primary)]'
-    );
-  }
-  expect(getContainer()?.textContent).not.toContain('popup.home.imageEditorLabel');
-  expect(captureButton?.parentElement?.className).toContain('grid-cols-[minmax(0,1fr)_48px]');
-  const libraryButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
-    (button) => button.textContent === 'popup.home.libraryLabel'
+  expect(captureButton?.className).toContain('justify-center');
+  expect(captureButton?.dataset['iconClass']).toContain(
+    'group-hover:text-[var(--sniptale-color-text-primary)]'
   );
-  libraryButton?.click();
-  expect(mocks.openLibrary).toHaveBeenCalledWith('screenshot');
+  expect(getContainer()?.textContent).not.toContain('popup.home.imageEditorLabel');
+  expect(captureButton?.parentElement?.className).toContain('grid-cols-1');
+  expect(captureButton?.parentElement?.querySelectorAll('button')).toHaveLength(1);
+  expect(getContainer()?.textContent).not.toContain('popup.home.libraryLabel');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });

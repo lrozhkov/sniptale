@@ -105,7 +105,7 @@ body {
   padding: 3px 5px;
   overflow: visible;
   border: 1px solid var(--popup-initial-border);
-  border-radius: 16px;
+  border-radius: 6px;
   background: var(--popup-initial-panel);
 }
 
@@ -121,7 +121,7 @@ body {
   gap: 0;
   padding: 4px 2px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 6px;
   background: transparent;
   color: var(--popup-initial-text);
   font: 550 9px/1.1 var(--sniptale-font-sans);
@@ -458,6 +458,77 @@ body {
   }
 }
 
+.popup-react-shell .popup-error-message {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  max-height: 112px;
+  flex-shrink: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  border: 1px solid
+    color-mix(in srgb, var(--sniptale-color-danger) 28%, var(--sniptale-color-border-soft));
+  border-radius: 6px;
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-danger-soft) 74%,
+    var(--sniptale-color-surface-panel)
+  );
+  padding: 8px 10px;
+  color: var(--sniptale-color-text-primary);
+  font-size: 11px;
+  line-height: 16px;
+  user-select: text;
+}
+
+.popup-react-shell [data-ui='popup.menu.route'][data-has-error='true'] .popup-menu-capture {
+  min-height: 64px;
+  gap: 6px;
+  padding-block: 8px;
+}
+
+.popup-react-shell [data-ui='popup.menu.route'][data-has-error='true'] .popup-menu-tile {
+  min-height: 48px;
+  gap: 2px;
+  padding-block: 2px;
+}
+
+.popup-react-shell
+  [data-ui='popup.menu.route'][data-has-error='true']
+  :is([data-ui='popup.menu.tools'], [data-ui='popup.menu.workspace']) {
+  padding-top: 4px;
+}
+
+.popup-react-shell [data-ui='popup.tools.route'][data-has-error='true'] > p:first-child {
+  margin-bottom: 6px;
+}
+
+.popup-react-shell
+  [data-ui='popup.tools.route'][data-has-error='true']
+  [data-ui='popup.tools.actions']
+  button {
+  height: 44px;
+  min-height: 44px;
+  padding-block: 1px;
+}
+
+.popup-react-shell
+  [data-ui='popup.tools.route'][data-has-error='true']
+  [data-ui='popup.tools.actions']
+  section {
+  margin-top: 4px;
+}
+
+.popup-react-shell
+  [data-ui='popup.tools.route'][data-has-error='true']
+  [data-ui='popup.tools.actions']
+  section
+  > div {
+  gap: 2px;
+}
+
 .popup-react-shell__route-error {
   position: absolute;
   z-index: 2;
@@ -471,7 +542,7 @@ body {
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--popup-initial-border);
-  border-radius: 14px;
+  border-radius: 6px;
   background: var(--popup-initial-panel);
   color: var(--popup-initial-active-text);
   font: 500 12px/1.25 var(--sniptale-font-sans);
@@ -486,13 +557,13 @@ body {
   padding: 15px;
   overflow: hidden;
   border: 1px solid var(--popup-initial-border);
-  border-radius: 16px;
+  border-radius: 6px;
   background: var(--sniptale-color-surface-panel, var(--popup-initial-panel));
 }
 
 .popup-react-shell__skeleton > div,
 .popup-react-shell__skeleton-grid > div {
-  border-radius: 10px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--popup-initial-text) 12%, transparent);
 }
 
@@ -537,7 +608,7 @@ body {
 .popup-react-shell__route-error button {
   padding: 6px 10px;
   border: 1px solid var(--popup-initial-border);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--sniptale-color-surface-canvas);
   color: inherit;
   cursor: pointer;

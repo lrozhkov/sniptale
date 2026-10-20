@@ -6,7 +6,7 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 
 const BUTTON_BASE_CLASS_NAME = [
   'group relative h-[58px] min-h-[58px] min-w-0 basis-0 overflow-hidden',
-  'rounded-[8px] border',
+  'rounded-[6px] border',
 ].join(' ');
 const BUTTON_ACTIVE_CLASS_NAME = [
   'grow-[1.9] border-[var(--sniptale-color-border-soft)]',
@@ -70,7 +70,10 @@ function getButtonClassName(
 function getCompactLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     COMPACT_LAYER_BASE_CLASS_NAME,
-    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
+    animate &&
+      (active
+        ? 'transition-none'
+        : 'transition-opacity delay-300 duration-150 ease-out motion-reduce:transition-none'),
     active ? 'opacity-0' : 'opacity-100'
   );
 }
@@ -78,7 +81,10 @@ function getCompactLayerClassName(active: boolean, animate: boolean): string {
 function getExpandedLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
-    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
+    animate &&
+      (active
+        ? 'transition-opacity delay-300 duration-150 ease-out motion-reduce:transition-none'
+        : 'transition-none'),
     active ? 'opacity-100' : 'opacity-0'
   );
 }

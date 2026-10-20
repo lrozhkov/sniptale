@@ -69,9 +69,7 @@ export function MicrophoneSettingsPanel({
       />
       <div role="status" className="min-h-4 text-[11px]">
         <MicrophoneProbeStatus probeStatus={probe.status} />
-        {errorKey ? (
-          <div className="text-[var(--sniptale-color-danger)]">{translate(errorKey)}</div>
-        ) : null}
+        {errorKey ? <div className="popup-error-message">{translate(errorKey)}</div> : null}
       </div>
     </div>
   );

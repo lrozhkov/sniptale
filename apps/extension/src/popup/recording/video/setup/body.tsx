@@ -118,7 +118,7 @@ export function VideoSetupBody(props: VideoSetupBodyProps) {
 }
 
 const VIDEO_SETUP_SECTION_CLASS_NAME = [
-  'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border',
+  'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[6px] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas)_4%)]',
   'p-3',
@@ -176,13 +176,15 @@ function VideoSavingSection({ discard }: { discard: boolean }) {
 
 function VideoIdleSetupSection(props: VideoSetupBodyProps) {
   return (
-    <section className={`relative ${VIDEO_SETUP_SECTION_CLASS_NAME}`}>
+    <section className={`relative ${VIDEO_SETUP_SECTION_CLASS_NAME} overflow-hidden!`}>
       <VideoCaptureModeSelector {...props} />
-      {props.pageAccessControls ? (
-        <div className="min-h-0 flex-1 pt-3">{props.pageAccessControls}</div>
-      ) : (
-        <VideoIdleSettings {...props} />
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto" data-ui="popup.video-setup.settings-scroll">
+        {props.pageAccessControls ? (
+          <div className="pt-3">{props.pageAccessControls}</div>
+        ) : (
+          <VideoIdleSettings {...props} />
+        )}
+      </div>
       {props.idleActions ? (
         <div className="mt-auto shrink-0 pt-3" data-ui="popup.video-setup.idle-actions">
           {props.idleActions}
@@ -290,7 +292,7 @@ function VideoCompletionFailureSection(props: VideoSetupBodyProps) {
         <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
           {translate('popup.video.completionIncomplete')}
         </h2>
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <p className="popup-error-message">
           {translate(
             outcome === 'failed'
               ? 'popup.video.completionFailedDescription'

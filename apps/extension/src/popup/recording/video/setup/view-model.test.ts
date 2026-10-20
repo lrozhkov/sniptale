@@ -86,7 +86,6 @@ it('derives a startable setup view model when the preset and mode are available'
       canStart: true,
       controlledCursorDisabled: false,
       controlledCursorDisabledReason: null,
-      galleryTitle: 't:popup.video.galleryTitle',
       selectedPreset: expect.objectContaining({ id: 'preset-1' }),
       startButtonLabel: 't:popup.video.startButton',
       startDisabledReason: null,
@@ -122,7 +121,6 @@ it('blocks start when the current mode is unavailable or pending', () => {
       canStart: false,
       controlledCursorDisabled: false,
       controlledCursorDisabledReason: null,
-      galleryTitle: 't:popup.video.galleryTitle',
       startButtonLabel: 't:popup.video.startPending',
       startDisabledReason: 'blocked',
     })
@@ -178,13 +176,6 @@ it('keeps camera mode startable while disabling incompatible setup options', () 
       controlledCursorDisabled: true,
       systemAudioDisabled: true,
     })
-  );
-});
-
-it('keeps the library hint independent of storage occupancy and project counts', () => {
-  expect(getVideoSetupViewModel(createProps()).galleryTitle).toBe('t:popup.video.galleryTitle');
-  expect(getVideoSetupViewModel(createProps({ galleryStatus: null })).galleryTitle).toBe(
-    't:popup.video.galleryTitle'
   );
 });
 

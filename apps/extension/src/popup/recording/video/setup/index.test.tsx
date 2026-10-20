@@ -190,7 +190,6 @@ async function verifiesStartableViewModel() {
         canStart: true,
         controlledCursorDisabled: false,
         controlledCursorDisabledReason: null,
-        galleryTitle: 't:popup.video.galleryTitle',
         selectedPreset: expect.objectContaining({ id: 'preset-1' }),
         startButtonLabel: 't:popup.video.startButton',
       }),
@@ -199,7 +198,6 @@ async function verifiesStartableViewModel() {
   expect(mocks.footerMock).toHaveBeenCalledWith(
     expect.objectContaining({
       canStart: true,
-      galleryTitle: 't:popup.video.galleryTitle',
       startButtonLabel: 't:popup.video.startButton',
     })
   );
@@ -232,7 +230,6 @@ async function verifiesDisabledStartState() {
   expect(mocks.footerMock).toHaveBeenCalledWith(
     expect.objectContaining({
       canStart: false,
-      galleryTitle: 't:popup.video.galleryTitle',
       startButtonLabel: 't:popup.video.startPending',
       startDisabledReason: 'blocked',
     })

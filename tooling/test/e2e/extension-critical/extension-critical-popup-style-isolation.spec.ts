@@ -176,9 +176,14 @@ async function inspectNeutralOptions(panel: Locator) {
       reference.style.color = 'var(--sniptale-color-text-primary)';
       reference.style.backgroundColor = 'var(--sniptale-color-surface-hover)';
       const neutral = getComputedStyle(reference);
+      const backgroundLayer = node.parentElement?.querySelector(
+        ':scope > span[aria-hidden="true"]'
+      );
       const result = {
         color: style.color,
-        background: style.backgroundColor,
+        background: backgroundLayer
+          ? getComputedStyle(backgroundLayer).backgroundColor
+          : style.backgroundColor,
         expectedColor: neutral.color,
         expectedBackground: neutral.backgroundColor,
         fontSize: style.fontSize,
@@ -242,6 +247,100 @@ async function inspectMicrophone(page: Page, panel: Locator, locale: AppLocale, 
     path: info.outputPath('microphone-playback-paused.png'),
     fullPage: false,
   });
+}
+
+async function inspectModeTextAnimation(page: Page, locale: AppLocale, info: TestInfo) {
+  for (const key of [
+    'popup.video.modeScreenLabel',
+    'popup.video.modeCameraLabel',
+    'popup.video.modeTabLabel',
+  ] as const) {
+    const mode = page
+      .getByRole('button', { name: translate(key, locale), exact: true })
+      .and(page.locator('button:not([data-ui="popup.icon-state-button"])'));
+    await mode.click();
+    const samples = await mode.evaluate((node) => {
+      const container = node.parentElement;
+      if (!container) throw new Error('Mode switch container is unavailable');
+      const animations = container.getAnimations({ subtree: true });
+      if (
+        !animations.some(
+          (animation) =>
+            animation instanceof CSSTransition && animation.transitionProperty === 'flex-grow'
+        )
+      ) {
+        throw new Error('Expected an actual mode width transition');
+      }
+      animations.forEach((animation) => animation.pause());
+      const snapshot = (time: number) => {
+        animations.forEach((animation) => {
+          animation.currentTime = time;
+        });
+        return [...container.querySelectorAll('button')].map((button) => ({
+          label: button.getAttribute('aria-label'),
+          width: button.getBoundingClientRect().width,
+          active: button.getAttribute('aria-pressed') === 'true',
+          layers: [...button.querySelectorAll(':scope > span[aria-hidden="true"]')].map(
+            (layer) => ({
+              opacity: Number(getComputedStyle(layer).opacity),
+              text: layer.textContent,
+            })
+          ),
+        }));
+      };
+      const result = { start: snapshot(0), middle: snapshot(150), end: snapshot(1_000) };
+      snapshot(150);
+      return result;
+    });
+    await page.screenshot({ path: info.outputPath(`${key}-transition.png`), fullPage: false });
+    await mode.evaluate((node) =>
+      node.parentElement
+        ?.getAnimations({ subtree: true })
+        .forEach((animation) => animation.finish())
+    );
+    for (let index = 0; index < samples.start.length; index += 1) {
+      const start = samples.start[index]!;
+      const middle = samples.middle[index]!;
+      const end = samples.end[index]!;
+      if (Math.abs(start.width - end.width) <= 1) continue;
+      expect(middle.width).toBeGreaterThan(Math.min(start.width, end.width));
+      expect(middle.width).toBeLessThan(Math.max(start.width, end.width));
+      expect(
+        middle.layers.map((layer) => layer.opacity),
+        `${key}: copy must not reflow visibly`
+      ).toEqual([0, 0]);
+      expect(end.layers.map((layer) => layer.opacity)).toEqual(end.active ? [0, 1] : [1, 0]);
+    }
+    await info.attach(`${key}-animation`, {
+      body: JSON.stringify(samples),
+      contentType: 'application/json',
+    });
+    await page.screenshot({ path: info.outputPath(`${key}-settled.png`), fullPage: false });
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const camera = page
+    .getByRole('button', {
+      name: translate('popup.video.modeCameraLabel', locale),
+      exact: true,
+    })
+    .and(page.locator('button:not([data-ui="popup.icon-state-button"])'));
+  await camera.click();
+  await expect(camera).toHaveAttribute('aria-pressed', 'true');
+  await expect(camera.locator(':scope > span[aria-hidden="true"]').last()).toHaveCSS(
+    'opacity',
+    '1'
+  );
+  expect(
+    await camera.evaluate((node) =>
+      node.parentElement
+        ?.getAnimations({ subtree: true })
+        .some((animation) => animation instanceof CSSTransition)
+    )
+  ).toBe(false);
+  await page
+    .getByRole('button', { name: translate('popup.video.modeTabLabel', locale), exact: true })
+    .click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
 }
 
 async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, info: TestInfo) {
@@ -343,6 +442,7 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
         exact: true,
       })
       .click();
+    await inspectModeTextAnimation(page, locale, info);
     for (const key of [
       'popup.video.presetRowAria',
       'popup.video.qualityAria',
@@ -393,6 +493,37 @@ async function inspectPopupPanels(page: Page, locale: AppLocale, route: string, 
         await selection.click();
         const header = page.locator('[data-ui="popup.inline-curtain.header"]');
         await expect(header).toBeVisible();
+        const sourceSwitch = header.locator('..').getByRole('group', {
+          name: translate('popup.export.pageSourceModeLabel', locale),
+          exact: true,
+        });
+        if (await sourceSwitch.count()) {
+          await inspectNeutralOptions(sourceSwitch);
+          await sourceSwitch
+            .getByRole('button', {
+              name: translate('popup.export.pageSourceUrls', locale),
+              exact: true,
+            })
+            .click();
+          await expect(
+            page.getByRole('textbox', {
+              name: translate('popup.export.urlInputLabel', locale),
+              exact: true,
+            })
+          ).toBeVisible();
+          await inspectNeutralOptions(sourceSwitch);
+          await page.screenshot({
+            path: info.outputPath('export-addresses.png'),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await sourceSwitch
+            .getByRole('button', {
+              name: translate('popup.export.pageSourceTabs', locale),
+              exact: true,
+            })
+            .click();
+        }
         const checkboxes = header.locator('..').getByRole('checkbox');
         for (const checkbox of await checkboxes.all()) {
           await expect(checkbox).toHaveClass(/sniptale-checkbox/u);
@@ -580,6 +711,44 @@ for (const locale of ['ru', 'en'] as const) {
           });
           await expect(root).toHaveCSS('width', '392px');
           await expect(root).toHaveCSS('height', '560px');
+          await expect(page.locator('[data-ui="popup.app.tabs"]')).toHaveCSS(
+            'border-radius',
+            '6px'
+          );
+          if (route === 'menu') {
+            await expect(page.locator('[data-ui="shared.ui.popup-footer"]')).toHaveCSS(
+              'border-radius',
+              '6px'
+            );
+          }
+          const primary = root.locator(
+            [
+              '[data-ui="popup.video-setup.start-recording-button"]',
+              '[data-ui="popup.export.export-button"]',
+            ].join(', ')
+          );
+          if (await primary.count()) {
+            await expect(primary).toHaveCSS('height', '48px');
+            await expect(primary).toHaveCSS('border-radius', '6px');
+            await expect(primary).toHaveCSS('justify-content', 'center');
+          }
+          if (route === 'screenshots' || route === 'video') {
+            await expect(
+              root.getByRole('button', {
+                name: translate(
+                  route === 'video' ? 'popup.video.galleryTitle' : 'popup.home.libraryTitle',
+                  locale
+                ),
+                exact: true,
+              })
+            ).toHaveCount(0);
+          }
+          if (route === 'export') {
+            await expect(root.locator('[data-ui="popup.export.copy-json-button"]')).toHaveCount(0);
+            await expect(root.locator('[data-ui="popup.export.copy-markdown-button"]')).toHaveCount(
+              0
+            );
+          }
           await expect(root.locator('[class~="p-3"]').first()).toHaveCSS('padding', '12px');
           await expect(root.locator('button[data-command-press]')).toHaveCount(0);
           if (route === 'menu') {
@@ -604,6 +773,7 @@ for (const locale of ['ru', 'en'] as const) {
             await expect(capture.locator('span')).toHaveCSS('font-weight', '450');
             await expect(capture.locator('svg')).toHaveCSS('width', '24px');
             await expect(capture.locator('svg')).toHaveCSS('stroke-width', '1.75px');
+            await expect(capture).toHaveCSS('border-radius', '6px');
             const tool = root.locator('[data-ui="popup.menu.tool-action.drawing"]');
             await expect(tool.locator('span')).toHaveCSS('font-size', '10px');
             await expect(tool.locator('span')).toHaveCSS('line-height', '12px');

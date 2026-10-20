@@ -54,7 +54,7 @@ it('uses the filled active contract for icon-only popup controls', () => {
   expect(button?.className).toContain(
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_74%,transparent)]'
   );
-  expect(button?.className).toContain('rounded-[12px]');
+  expect(button?.className).toContain('rounded-[6px]');
   expect(icon?.getAttribute('class')).toContain('text-[var(--sniptale-color-accent)]');
 });
 
@@ -79,7 +79,7 @@ it('keeps idle buttons borderless and hover-surface clickable', () => {
 
   expect(button?.className).toContain('bg-transparent');
   expect(button?.className).toContain('border-none');
-  expect(button?.className).toContain('rounded-[12px]');
+  expect(button?.className).toContain('rounded-[6px]');
   expect(onClick).toHaveBeenCalledTimes(1);
 });
 

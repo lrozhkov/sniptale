@@ -17,13 +17,6 @@ export const ACTIVE_PRESET_PILL_SURFACE_CLASS_NAME =
   'bg-[var(--sniptale-color-accent-soft)] px-3 py-1 text-xs font-medium';
 export const ACTIVE_PRESET_PILL_TEXT_CLASS_NAME =
   'text-[var(--sniptale-color-text-primary-strong)]';
-export const ACTIVE_ERROR_CLASS_NAME = 'rounded-[12px] border px-3 py-2 text-[12px]';
-export const ACTIVE_ERROR_TONE_CLASS_NAME =
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_28%,var(--sniptale-color-border-soft)_72%)]';
-export const ACTIVE_ERROR_SURFACE_CLASS_NAME = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_62%,var(--sniptale-color-surface-panel)_38%)]',
-  'text-[var(--sniptale-color-text-primary)]',
-].join(' ');
 export const ACTIVE_PRIMARY_BUTTON_CLASS_NAME =
   'flex h-14 items-center justify-center gap-2 rounded-[12px] border';
 export const ACTIVE_PRIMARY_BUTTON_SURFACE_CLASS_NAME =

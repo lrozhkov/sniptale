@@ -1,4 +1,4 @@
-import { Camera, Library } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n/popup';
@@ -10,7 +10,6 @@ import {
   TabCaptureCountdownField,
   TabCaptureSizeField,
 } from './setup-fields';
-import { openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 
 const ACTION_ICON_CLASS_NAME = [
@@ -49,23 +48,16 @@ export function ScreenshotSetupPanel(props: {
         </div>
       </div>
       <div className={`mt-3 ${actionFooterSurfaceClassName}`}>
-        <div className="grid grid-cols-[minmax(0,1fr)_48px] gap-1.5">
+        <div className="grid grid-cols-1">
           <PopupActionButton
             icon={Camera}
             label={translate('popup.home.captureButtonLabel')}
             iconClassName={ACTION_ICON_CLASS_NAME}
             tone="primary"
+            centered
             disabled={props.pending || Boolean(props.disabledReason)}
             title={props.disabledReason ?? translate('popup.home.captureButtonTitle')}
             onClick={props.onCapture}
-          />
-          <PopupActionButton
-            icon={Library}
-            label={translate('popup.home.libraryLabel')}
-            iconClassName={ACTION_ICON_CLASS_NAME}
-            compact
-            title={translate('popup.home.libraryTitle')}
-            onClick={() => openLibrary('screenshot')}
           />
         </div>
       </div>

@@ -85,7 +85,6 @@ function renderVideoSetupFooter(options: {
         status: options.status,
         viewportPresetId: null,
       }}
-      galleryTitle="Gallery title"
     />
   );
 }
@@ -113,7 +112,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('offers only start and the recording library with neutral command icons', () => {
+it('offers one centered full-width start action with the recording marker', () => {
   const onStart = vi.fn();
 
   renderVideoSetupFooter({ duration: 0, onStart, status: VideoRecordingStatus.IDLE });
@@ -121,20 +120,18 @@ it('offers only start and the recording library with neutral command icons', () 
 
   expect(container?.textContent).toContain('Start recording');
   expect(container?.textContent).not.toContain('t:popup.video.videoEditorLabel');
-  expect(container?.textContent).toContain('t:popup.video.galleryLabel');
+  expect(container?.textContent).not.toContain('t:popup.video.galleryLabel');
   expect(onStart).toHaveBeenCalledTimes(1);
-  expect(mocks.openGallery).toHaveBeenCalledTimes(1);
-  expect(mocks.openGallery).toHaveBeenCalledWith({ folder: 'recording' });
-  expect(window.close).toHaveBeenCalledOnce();
-  expect(container?.querySelectorAll('button')).toHaveLength(2);
-  expect(container?.querySelector('button')?.parentElement?.className).toContain(
-    'grid-cols-[minmax(0,1fr)_48px]'
-  );
+  expect(mocks.openGallery).not.toHaveBeenCalled();
+  expect(window.close).not.toHaveBeenCalled();
+  expect(container?.querySelectorAll('button')).toHaveLength(1);
+  expect(container?.querySelector('button')?.parentElement?.className).toContain('grid-cols-1');
   expect(mocks.activeFooter).not.toHaveBeenCalled();
   expect(mocks.actionButton).toHaveBeenCalledWith(
     expect.objectContaining({
       iconClassName: 'fill-current text-[var(--sniptale-color-danger)]',
       dataUi: 'popup.video-setup.start-recording-button',
+      centered: true,
     })
   );
   expect(
@@ -142,15 +139,6 @@ it('offers only start and the recording library with neutral command icons', () 
       ([props]) => !String(props.iconClassName).includes('--sniptale-color-accent')
     )
   ).toBe(true);
-  expect(mocks.actionButton).toHaveBeenCalledWith(
-    expect.objectContaining({
-      dataUi: 'popup.video-setup.gallery-button',
-      title: 'Gallery title',
-      iconClassName: expect.stringContaining(
-        'group-hover:text-[var(--sniptale-color-text-primary)]'
-      ),
-    })
-  );
 });
 
 it('switches to the active footer controls while recording is in progress', () => {

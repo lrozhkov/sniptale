@@ -368,7 +368,7 @@ export function WebCopyResourceControls(props: {
           </label>
         ))}
       {props.resources.error ? (
-        <div role="status" className="pb-1 text-[10px] text-[var(--sniptale-color-danger)]">
+        <div role="status" className="popup-error-message">
           {translate('popup.export.webCopyResourceSettingsError')}
         </div>
       ) : null}

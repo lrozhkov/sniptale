@@ -17,6 +17,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     label,
     onClick,
     tone,
+    centered,
   }: {
     dataUi?: string;
     disabled?: boolean;
@@ -25,6 +26,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     label: string;
     onClick: () => void;
     tone?: string;
+    centered?: boolean;
   }) => {
     popupActionButtonMock({
       dataUi,
@@ -34,6 +36,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
       label,
       onClick,
       tone,
+      centered,
     });
     return (
       <button type="button" data-ui={dataUi} disabled={disabled} onClick={onClick}>
@@ -93,6 +96,9 @@ afterEach(() => {
 describe('ExportFooterPrimaryActionButton', () => {
   it('renders the export action when export is idle', async () => {
     await renderButton(createProps());
+    expect(popupActionButtonMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ centered: true })
+    );
 
     expect(
       container?.querySelector('[data-ui="popup.export.export-button"]')?.textContent

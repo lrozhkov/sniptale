@@ -20,6 +20,7 @@ it('renders the initial active mode at its final fixed-height layout without ani
 
   expect(markup).toContain('grow-[1.9]');
   expect(markup).toContain('h-[58px] min-h-[58px]');
+  expect(markup).toContain('rounded-[6px]');
   expect(markup).toContain('opacity-100');
   expect(markup).not.toContain('transition-[flex-grow');
   expect(markup).not.toContain('transition-opacity');
@@ -71,7 +72,7 @@ it('keeps the normal description visible while an unavailable reason stays in th
   expect(markup).toContain('disabled=""');
 });
 
-it('animates width while crossfading static compact and expanded layouts', () => {
+it('animates width before revealing the final compact and expanded text layouts', () => {
   const markup = renderToStaticMarkup(
     <PopupExpandingModeButton
       accentClassName="text-accent"
@@ -85,6 +86,8 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   );
 
   expect(markup).toContain('transition-[flex-grow,background-color,border-color,color]');
+  expect(markup).toContain('transition-opacity delay-300 duration-150');
+  expect(markup).toContain('transition-none opacity-0');
   expect(markup).toContain('transition-[left,top,translate,color,filter,scale]');
   expect(markup).toContain('top-1/2');
   expect(markup).toContain('left-2.5');

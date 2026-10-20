@@ -106,10 +106,7 @@ export function OutputSettingsPanel(props: {
         }))}
       />
       {isSupported(outputProfile) ? null : (
-        <p
-          className="px-0.5 text-[10px] leading-4 text-[var(--sniptale-color-danger)]"
-          role="alert"
-        >
+        <p className="popup-error-message" role="alert">
           {unsupportedReason}
         </p>
       )}

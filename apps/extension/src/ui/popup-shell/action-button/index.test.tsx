@@ -111,7 +111,7 @@ describe('PopupActionButton', () => {
     expect(compactMarkup).toContain('title="Export"');
   });
 
-  it('keeps enabled buttons transparent until hover and focus reveal the surface', () => {
+  it('keeps the primary command visible with neutral hover and keyboard focus feedback', () => {
     const markup = renderToStaticMarkup(
       <PopupActionButton
         icon={TestIcon}
@@ -122,7 +122,7 @@ describe('PopupActionButton', () => {
       />
     );
 
-    expect(markup).toContain('bg-transparent');
+    expect(markup).toContain('bg-[var(--sniptale-color-surface-hover)]');
     expect(markup).toContain('hover:bg-');
     expect(markup).toContain('focus-visible:bg-');
   });

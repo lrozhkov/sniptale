@@ -9,6 +9,7 @@ export type SegmentedSwitchOption<TId extends string> = {
 
 type SegmentedSwitchProps<TId extends string> = {
   activeId: TId;
+  appearance?: 'default' | 'neutral';
   ariaLabel: string;
   dataAttribute?: Record<string, string>;
   density?: 'compact' | 'default';
@@ -39,7 +40,8 @@ function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
     <div
       aria-label={props.ariaLabel}
       className={[
-        'flex min-w-0 flex-wrap gap-1 overflow-hidden rounded-[10px] border p-1',
+        'flex min-w-0 flex-wrap gap-1 overflow-hidden border p-1',
+        props.appearance === 'neutral' ? 'rounded-[6px]' : 'rounded-[10px]',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
       ].join(' ')}
@@ -58,8 +60,11 @@ function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
             title={option.label}
             onClick={() => props.onChange(option.id)}
             className={[
-              getWrappedSegmentedOptionClassName(active),
-              'relative z-10 min-w-fit max-w-full flex-auto justify-center overflow-hidden !rounded-[7px] px-2 py-1.5',
+              props.appearance === 'neutral'
+                ? getNeutralSegmentedOptionClassName(active)
+                : getWrappedSegmentedOptionClassName(active),
+              'relative z-10 min-w-fit max-w-full flex-auto justify-center overflow-hidden px-2 py-1.5',
+              props.appearance === 'neutral' ? '!rounded-[6px]' : '!rounded-[7px]',
             ].join(' ')}
           >
             <span className="block min-w-0 max-w-full whitespace-normal text-center leading-tight">
@@ -81,7 +86,13 @@ function InlineSegmentedSwitch<TId extends string>(
       aria-label={props.ariaLabel}
       className={[
         'relative grid min-w-0 grid-flow-col overflow-hidden border',
-        compact ? 'rounded-[8px] p-0.5' : 'rounded-[10px] p-1',
+        props.appearance === 'neutral'
+          ? compact
+            ? 'rounded-[6px] p-0.5'
+            : 'rounded-[6px] p-1'
+          : compact
+            ? 'rounded-[8px] p-0.5'
+            : 'rounded-[10px] p-1',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
       ].join(' ')}
@@ -89,12 +100,13 @@ function InlineSegmentedSwitch<TId extends string>(
       style={getSwitchStyle(props.options.length, props.activeIndex, compact)}
       {...props.dataAttribute}
     >
-      <SegmentedSwitchActiveBackground compact={compact} />
+      <SegmentedSwitchActiveBackground compact={compact} neutral={props.appearance === 'neutral'} />
       {props.options.map((option) => (
         <InlineSegmentedSwitchOption
           key={option.id}
           active={option.id === props.activeId}
           compact={compact}
+          neutral={props.appearance === 'neutral'}
           disabled={!!option.disabled}
           label={option.label}
           onClick={() => props.onChange(option.id)}
@@ -108,6 +120,7 @@ function InlineSegmentedSwitchOption(props: {
   active: boolean;
   disabled: boolean;
   compact: boolean;
+  neutral: boolean;
   label: string;
   onClick: () => void;
 }) {
@@ -119,16 +132,31 @@ function InlineSegmentedSwitchOption(props: {
       title={props.label}
       onClick={props.onClick}
       className={[
-        props.active
-          ? getActiveSegmentedOptionClassName()
-          : getControlSegmentedOptionClassName({ active: props.active, density: 'compact' }),
+        props.neutral
+          ? getNeutralSegmentedOptionClassName(false)
+          : props.active
+            ? getActiveSegmentedOptionClassName()
+            : getControlSegmentedOptionClassName({ active: props.active, density: 'compact' }),
         'relative z-10 min-w-0 justify-center overflow-hidden px-2',
-        props.compact ? '!h-7 !min-h-7 !rounded-[6px]' : '!h-8 !min-h-8 !rounded-[7px]',
+        props.compact ? '!h-7 !min-h-7 !rounded-[6px]' : '!h-8 !min-h-8',
+        props.compact ? '' : props.neutral ? '!rounded-[6px]' : '!rounded-[7px]',
       ].join(' ')}
     >
       <span className="block min-w-0 max-w-full truncate">{props.label}</span>
     </button>
   );
+}
+
+function getNeutralSegmentedOptionClassName(active: boolean) {
+  return [
+    'inline-flex min-h-8 items-center gap-2 border-none px-2 text-[12px] font-normal leading-none',
+    'text-[var(--sniptale-color-text-primary)] shadow-none outline-none transition-colors',
+    active ? 'bg-[var(--sniptale-color-surface-hover)]' : 'bg-transparent',
+    'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_45%,transparent)]',
+    'focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
+    'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+    'disabled:cursor-not-allowed disabled:opacity-55',
+  ].join(' ');
 }
 
 function getWrappedSegmentedOptionClassName(active: boolean) {
@@ -168,15 +196,20 @@ function getSwitchStyle(groupCount: number, activeIndex: number, compact: boolea
   } as React.CSSProperties;
 }
 
-function SegmentedSwitchActiveBackground(props: { compact: boolean }) {
+function SegmentedSwitchActiveBackground(props: { compact: boolean; neutral: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={[
         'pointer-events-none absolute',
-        props.compact ? 'bottom-0.5 top-0.5 rounded-[6px]' : 'bottom-1 top-1 rounded-[8px]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,var(--sniptale-color-accent)_10%)]',
-        'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]',
+        props.compact ? 'bottom-0.5 top-0.5 rounded-[6px]' : 'bottom-1 top-1',
+        props.compact ? '' : props.neutral ? 'rounded-[6px]' : 'rounded-[8px]',
+        props.neutral
+          ? 'bg-[var(--sniptale-color-surface-hover)] shadow-none'
+          : [
+              'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,var(--sniptale-color-accent)_10%)]',
+              'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_24%,transparent)]',
+            ].join(' '),
         'transition-transform duration-200 ease-out motion-reduce:transition-none',
       ].join(' ')}
       style={{

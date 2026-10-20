@@ -3,18 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { getPopupActionButtonRootClassName } from './styles';
 
 describe('popup-action-button.styles', () => {
-  it('keeps popup action buttons transparent at rest across primary and gallery tones', () => {
+  it('gives the primary command a neutral surface while gallery actions stay quiet', () => {
     const primaryClassName = getPopupActionButtonRootClassName('primary', false);
     const galleryClassName = getPopupActionButtonRootClassName('gallery', false);
 
     expect(primaryClassName).toContain('border-none');
-    expect(primaryClassName).toContain('bg-transparent');
+    expect(primaryClassName).toContain('bg-[var(--sniptale-color-surface-hover)]');
     expect(primaryClassName).toContain('var(--sniptale-color-text-primary-strong)');
     expect(primaryClassName).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
     expect(primaryClassName).not.toContain(
       'focus-visible:text-[var(--sniptale-color-accent-emphasis)]'
     );
-    expect(primaryClassName).toContain('hover:bg-transparent');
+    expect(primaryClassName).toContain('hover:bg-[color:color-mix');
+    expect(primaryClassName).not.toContain('var(--sniptale-color-accent)');
     expect(galleryClassName).toContain('border-none');
     expect(galleryClassName).toContain('bg-transparent');
     expect(galleryClassName).toContain('var(--sniptale-color-text-primary)');

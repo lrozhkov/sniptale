@@ -1,5 +1,5 @@
 export const progressHeaderClassName = [
-  'rounded-[12px]',
+  'rounded-[6px]',
   'bg-[linear-gradient(135deg,color-mix(in_srgb,var(--sniptale-color-accent-soft)_58%,transparent),transparent_75%)]',
   'p-2.5 shadow-[inset_0_0_0_1px_var(--sniptale-color-border-soft)]',
 ].join(' ');
@@ -13,7 +13,7 @@ export const progressStepListClassName = [
 ].join(' ');
 
 export const progressStepRowClassName = [
-  'flex min-h-[30px] min-w-0 items-center gap-1.5 rounded-[10px] px-2 py-1',
+  'flex min-h-[30px] min-w-0 items-center gap-1.5 rounded-[6px] px-2 py-1',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_74%,transparent)]',
   'transition-all duration-200',
 ].join(' ');
@@ -55,16 +55,10 @@ export const progressStepIdleClassName = [
   'text-[var(--sniptale-color-text-dim)]',
 ].join(' ');
 
-export const progressErrorListClassName = [
-  'max-h-28 shrink-0 overflow-y-auto',
-  'rounded-[12px]',
-  'border border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_28%,var(--sniptale-color-border-soft)_72%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_78%,var(--sniptale-color-surface-panel)_22%)]',
-  'px-2.5 py-2 text-[11px] leading-4 text-[var(--sniptale-color-text-primary)]',
-].join(' ');
+export const progressErrorListClassName = ['popup-error-message'].join(' ');
 
 export const cancelButtonClassName = [
-  'inline-flex h-9 items-center justify-center gap-2 rounded-[12px]',
+  'inline-flex h-9 items-center justify-center gap-2 rounded-[6px]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_60%,var(--sniptale-color-surface-panel)_40%)]',
   'text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]',
   'shadow-[inset_0_0_0_1px_var(--sniptale-color-border-soft)] transition-all',
@@ -72,7 +66,7 @@ export const cancelButtonClassName = [
 ].join(' ');
 
 export const exportSectionContainerClassName = [
-  'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-[12px]',
+  'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-[6px]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_38%,var(--sniptale-color-surface-panel)_62%)]',
   'p-2.5 shadow-[inset_0_0_0_1px_var(--sniptale-color-border-soft)]',
 ].join(' ');

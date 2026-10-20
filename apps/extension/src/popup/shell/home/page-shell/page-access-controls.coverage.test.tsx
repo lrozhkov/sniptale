@@ -84,8 +84,10 @@ it('renders a standalone status error when page access is unavailable', async ()
   expect(getContainer()?.querySelector('[role="alert"]')?.textContent).toBe('Status unavailable');
   expect(getContainer()?.querySelector('button')).toBeNull();
   const replacement = getContainer()?.querySelector('[data-ui="popup.page-access.controls"]');
-  expect(replacement?.classList.contains('h-[88px]')).toBe(true);
-  expect(replacement?.classList.contains('min-h-[88px]')).toBe(true);
+  expect(replacement?.classList.contains('h-[88px]')).toBe(false);
+  expect(getContainer()?.querySelector('[role="alert"]')?.className).toContain(
+    'popup-error-message'
+  );
 });
 
 it('renders the normal action labels when no request is pending', async () => {

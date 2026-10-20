@@ -44,12 +44,6 @@ function getExportFooterCallbacks(args: {
     onCancelExport: () => {
       void args.controller.actions.handleCancelExport();
     },
-    onCopyJson: () => {
-      void args.controller.actions.handleCopyJson();
-    },
-    onCopyMarkdown: () => {
-      void args.controller.actions.handleCopyMarkdown();
-    },
     ...getLibraryResultAction(args.controller),
     onResetExportView: () => {
       void args.controller.actions.handleResetExportView();
@@ -79,11 +73,6 @@ function getExportFooterProps(args: {
 
   return {
     canExport: args.canExport ?? derived.canExport,
-    canCopyJson: derived.canCopyJson,
-    canCopyMarkdown: derived.canCopyMarkdown,
-    copiedFormat: session.copy.copiedFormat,
-    copyJsonTitle: translate('popup.export.copyJsonCurrentTabTitle'),
-    copyMarkdownTitle: translate('popup.export.copyMarkdownCurrentTabTitle'),
     isExporting: derived.isExporting,
     isResultReady,
     ...getExportFooterCallbacks({
@@ -98,7 +87,7 @@ function getExportFooterProps(args: {
 }
 
 const exportPageContentSectionClassName = [
-  'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border',
+  'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
   [
     'bg-[color:color-mix(',

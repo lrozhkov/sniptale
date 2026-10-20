@@ -9,28 +9,12 @@ export function footerActionGridClassName(
 ) {
   if (isExporting) return 'grid grid-cols-1 items-stretch gap-1.5';
   if (!isResultReady) {
-    return 'grid grid-cols-[minmax(0,1fr)_48px_48px] items-stretch gap-1.5';
+    return 'grid grid-cols-1 items-stretch gap-1.5';
   }
   return `grid items-stretch gap-1.5 ${
     hasLibraryAction ? 'grid-cols-[minmax(88px,0.7fr)_minmax(0,1.3fr)]' : 'grid-cols-1'
   }`;
 }
-
-export const footerCopyButtonBaseClassName = [
-  'group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[6px]',
-  'transition-all',
-  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]',
-].join(' ');
-
-export const footerCopyButtonEnabledClassName = [
-  'border-none bg-transparent text-[var(--sniptale-color-text-secondary)] shadow-none',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_42%,transparent)]',
-  'hover:text-[var(--sniptale-color-text-primary)]',
-].join(' ');
-
-export const footerCopyButtonDisabledClassName = [
-  'cursor-not-allowed border-none bg-transparent text-[var(--sniptale-color-text-dim)] opacity-50',
-].join(' ');
 
 export const footerPrimaryButtonIconClassName = 'text-[var(--sniptale-color-text-primary)]';
 

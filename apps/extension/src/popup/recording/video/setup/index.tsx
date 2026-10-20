@@ -46,7 +46,6 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
         onStop={props.onStop}
         onCancel={postRecord.handleCancel}
         recordingState={postRecord.displayProps.recordingState}
-        galleryTitle={viewModel.galleryTitle}
       />
     );
   const isIdle = postRecord.displayProps.recordingState.status === VideoRecordingStatus.IDLE;
@@ -249,14 +248,12 @@ function PostRecordVerificationError({ onRetry }: { onRetry: () => void }) {
   return (
     <section
       className={[
-        'flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-[16px] border p-4 text-center',
+        'flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-[6px] border p-4 text-center',
         'border-[var(--sniptale-color-danger-soft)] bg-[var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
       role="alert"
     >
-      <p className="text-xs text-[var(--sniptale-color-danger)]">
-        {translate('popup.video.postRecordLoadError')}
-      </p>
+      <p className="popup-error-message">{translate('popup.video.postRecordLoadError')}</p>
       <button
         className={[
           'inline-flex h-9 items-center justify-center rounded-[10px] px-4 text-xs font-semibold',

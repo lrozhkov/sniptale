@@ -61,6 +61,5 @@ export interface VideoSetupViewModel {
   controlledCursorDisabled: boolean;
   controlledCursorDisabledReason: string | null;
   startButtonLabel: string;
-  galleryTitle: string;
   knownOutputBasisDimensions: VideoOutputDimensions | null;
 }
