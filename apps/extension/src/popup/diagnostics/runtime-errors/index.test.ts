@@ -11,8 +11,23 @@ import {
   isStalePageRuntimeErrorMessage,
 } from './index';
 import { createTranslator } from '../../../platform/i18n/popup';
+import { PopupMediaAccessError } from '../../recording/media-devices';
 
 describe('popup runtime errors', () => {
+  it('shows classified microphone and camera permission recovery without internal details', () => {
+    expect(
+      getPopupRuntimeErrorMessage(
+        new PopupMediaAccessError('microphone', 'denied'),
+        'popup.video.microphoneAccessError'
+      )
+    ).toBe('t:popup.video.microphonePermissionDenied');
+    expect(
+      getPopupRuntimeErrorMessage(
+        new PopupMediaAccessError('camera', 'device-busy'),
+        'popup.video.webcamAccessError'
+      )
+    ).toBe('t:popup.video.mediaDeviceBusy');
+  });
   it('detects stale page runtime transport errors', () => {
     expect(
       isStalePageRuntimeErrorMessage(

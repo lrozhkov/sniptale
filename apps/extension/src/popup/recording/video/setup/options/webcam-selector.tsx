@@ -5,6 +5,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMediaDeviceSelector } from './media-device-selector';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
+import { MediaAccessBoundary } from './media-access';
 
 export function VideoWebcamSelector({
   captureMode,
@@ -13,6 +14,7 @@ export function VideoWebcamSelector({
   webcamDevices,
   isLoadingWebcams,
   onWebcamDeviceChange,
+  onRefreshDevices,
   onSettingsChange,
 }: {
   captureMode: CaptureMode;
@@ -21,40 +23,45 @@ export function VideoWebcamSelector({
   webcamDevices: Array<{ deviceId: string; label: string }>;
   isLoadingWebcams: boolean;
   onWebcamDeviceChange: (webcamDeviceId: string | null) => void;
+  onRefreshDevices?: (() => Promise<unknown>) | undefined;
   onSettingsChange: (patch: Partial<VideoRecordingSettings>) => void;
 }) {
-  if (!settings.webcamEnabled && !required) {
-    return null;
-  }
-
   return (
-    <VideoMediaDeviceSelector
+    <MediaAccessBoundary
+      deviceId={settings.webcamDeviceId ?? null}
+      enabled={settings.webcamEnabled || required}
       label={translate('popup.video.webcamRowLabel')}
-      description={translate('popup.video.webcamRowDescription')}
-      ariaLabel={translate('popup.video.webcamRowAria')}
-      currentDeviceId={settings.webcamDeviceId ?? null}
-      devices={webcamDevices}
-      emptyText={translate('popup.video.webcamEmpty')}
-      isLoading={isLoadingWebcams}
-      loadingText={translate('popup.video.webcamLoading')}
-      onDeviceChange={onWebcamDeviceChange}
-      placeholder={translate('popup.video.webcamPlaceholder')}
-      secondaryAction={{
-        ariaLabel: translate('popup.video.webcamSettingsActionAria'),
-        disabled: !settings.webcamDeviceId,
-        label: translate('popup.video.webcamSettingsAction'),
-        panelDescription: translate('popup.video.webcamSettingsDescription'),
-        panelTitle: translate('popup.video.webcamQualityTitle'),
-        panel: (
-          <WebcamSettingsPanel
-            captureMode={captureMode}
-            currentDeviceId={settings.webcamDeviceId ?? null}
-            settings={settings}
-            onSettingsChange={onSettingsChange}
-          />
-        ),
-      }}
-      selectAriaLabel={translate('popup.video.webcamAria')}
-    />
+      permissionName="camera"
+      onGranted={onRefreshDevices}
+    >
+      <VideoMediaDeviceSelector
+        label={translate('popup.video.webcamRowLabel')}
+        description={translate('popup.video.webcamRowDescription')}
+        ariaLabel={translate('popup.video.webcamRowAria')}
+        currentDeviceId={settings.webcamDeviceId ?? null}
+        devices={webcamDevices}
+        emptyText={translate('popup.video.webcamEmpty')}
+        isLoading={isLoadingWebcams}
+        loadingText={translate('popup.video.webcamLoading')}
+        onDeviceChange={onWebcamDeviceChange}
+        placeholder={translate('popup.video.webcamPlaceholder')}
+        secondaryAction={{
+          ariaLabel: translate('popup.video.webcamSettingsActionAria'),
+          disabled: !settings.webcamDeviceId,
+          label: translate('popup.video.webcamSettingsAction'),
+          panelDescription: translate('popup.video.webcamSettingsDescription'),
+          panelTitle: translate('popup.video.webcamQualityTitle'),
+          panel: (
+            <WebcamSettingsPanel
+              captureMode={captureMode}
+              currentDeviceId={settings.webcamDeviceId ?? null}
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+            />
+          ),
+        }}
+        selectAriaLabel={translate('popup.video.webcamAria')}
+      />
+    </MediaAccessBoundary>
   );
 }

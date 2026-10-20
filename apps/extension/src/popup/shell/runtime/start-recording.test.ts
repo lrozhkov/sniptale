@@ -253,6 +253,32 @@ async function verifiesControlledCursorPreservedForTabCapture() {
 function runStartRecordingHandlerSuite() {
   beforeEach(resetStartRecordingMocks);
 
+  it('preserves selected devices while permission redacts the inventory', async () => {
+    await startRecordingHandler(
+      createStartArgs({
+        videoSettings: {
+          ...defaultSettings,
+          microphoneEnabled: true,
+          microphoneDeviceId: 'saved-mic',
+          webcamEnabled: true,
+          webcamDeviceId: 'saved-camera',
+        },
+        microphoneDevices: [{ deviceId: '', label: 'Microphone 1' }],
+        webcamDevices: [],
+      })
+    );
+    expect(requestMicrophonePermission).toHaveBeenCalledWith('saved-mic');
+    expect(requestWebcamPermission).toHaveBeenCalledWith('saved-camera');
+    expect(runtimeSendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          microphoneDeviceId: 'saved-mic',
+          webcamDeviceId: 'saved-camera',
+        }),
+      })
+    );
+  });
+
   it('records the explicit source tab even when a different tab is active', async () => {
     tabsQuery.mockResolvedValue([{ id: 999 }]);
     tabsGet.mockResolvedValueOnce({ id: 21 });

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Check, X } from 'lucide-react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import { ProductModal } from '@sniptale/ui/product-modal';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../platform/i18n/popup';
-import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
-import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 import { persistVideoSettings } from '../../persistence';
 import type { VideoSetupPageProps } from './types';
 
@@ -128,6 +128,22 @@ function canStartRecording(props: StartConfirmationProps) {
   return props.canStart && props.recordingState.status === VideoRecordingStatus.IDLE;
 }
 
+function containConfirmationTab(event: ReactKeyboardEvent<HTMLDialogElement>) {
+  if (event.key !== 'Tab') return;
+  const controls = event.currentTarget.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled])'
+  );
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  const active = event.currentTarget.ownerDocument.activeElement;
+  const target =
+    event.shiftKey && active === first ? last : !event.shiftKey && active === last ? first : null;
+  if (target) {
+    event.preventDefault();
+    target.focus({ preventScroll: true });
+  }
+}
+
 function VideoStartConfirmation({
   rememberChoice,
   onRememberChoiceChange,
@@ -143,54 +159,101 @@ function VideoStartConfirmation({
   onCancel: () => void;
   onContinue: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    const trigger = document.activeElement;
+    dialog?.showModal();
+    dialog?.focus({ preventScroll: true });
+    return () => {
+      dialog?.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) {
+        trigger.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
   return (
-    <section className={actionFooterSurfaceClassName} aria-busy={isSaving}>
-      <p className="px-2 py-1 text-xs text-[var(--sniptale-color-text-primary)]">
-        {translate('popup.video.withoutMicrophoneTitle')}
-      </p>
-      <label
-        className={[
-          'flex min-h-8 cursor-pointer select-none items-center gap-2 px-2 text-xs',
-          'text-[var(--sniptale-color-text-secondary)]',
-        ].join(' ')}
+    <dialog
+      ref={dialogRef}
+      aria-modal="true"
+      aria-label={translate('popup.video.withoutMicrophoneTitle')}
+      aria-busy={isSaving}
+      tabIndex={-1}
+      onKeyDown={containConfirmationTab}
+      className={[
+        'm-0 h-screen max-h-none w-screen max-w-none border-0 bg-transparent p-0',
+        'text-[var(--sniptale-color-text-primary)] outline-none backdrop:bg-transparent',
+      ].join(' ')}
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+    >
+      <ProductModal
+        role="presentation"
+        onClose={onCancel}
+        width="calc(100vw - 32px)"
+        maxWidth="360px"
+        maxHeight="calc(100dvh - 32px)"
+        scrollable
+        backdropClassName="backdrop-blur-[2px]"
+        dialogClassName="sniptale-ai-modal-adopted"
       >
-        <input
-          type="checkbox"
-          checked={rememberChoice}
-          disabled={isSaving}
-          onChange={(event) => onRememberChoiceChange(event.target.checked)}
-          className={[
-            'accent-[var(--sniptale-color-accent)] focus:outline-none',
-            'focus-visible:outline focus-visible:outline-2',
-            'focus-visible:outline-[var(--sniptale-color-accent)]',
-          ].join(' ')}
-        />
-        {translate('popup.video.withoutMicrophoneRemember')}
-      </label>
-      {hasSaveError ? (
-        <p
-          role="alert"
-          className="select-text px-2 pb-2 text-xs text-[var(--sniptale-color-danger)]"
-        >
-          {translate('popup.video.withoutMicrophoneSaveError')}
-        </p>
-      ) : null}
-      <div className="grid grid-cols-2 gap-1.5">
-        <PopupActionButton
-          icon={X}
-          iconClassName="text-[var(--sniptale-color-text-secondary)]"
-          label={translate('popup.video.withoutMicrophoneCancel')}
-          onClick={onCancel}
-        />
-        <PopupActionButton
-          icon={Check}
-          iconClassName="text-[var(--sniptale-color-text-secondary)]"
-          label={translate('popup.video.withoutMicrophoneContinue')}
-          tone="primary"
-          disabled={isSaving}
-          onClick={onContinue}
-        />
-      </div>
-    </section>
+        <div className="flex flex-col gap-3 p-4">
+          <p className="m-0 text-[13px] leading-5 text-[var(--sniptale-color-text-primary)]">
+            {translate('popup.video.withoutMicrophoneTitle')}
+          </p>
+          {hasSaveError ? (
+            <p role="alert" className="select-text text-xs text-[var(--sniptale-color-danger)]">
+              {translate('popup.video.withoutMicrophoneSaveError')}
+            </p>
+          ) : null}
+          <div
+            className="flex items-center justify-between gap-2"
+            data-ui="popup.video.without-microphone-actions"
+          >
+            <label
+              className={[
+                'flex min-h-8 cursor-pointer select-none items-center gap-2 text-xs',
+                'text-[var(--sniptale-color-text-secondary)]',
+              ].join(' ')}
+            >
+              <input
+                type="checkbox"
+                checked={rememberChoice}
+                disabled={isSaving}
+                onChange={(event) => onRememberChoiceChange(event.target.checked)}
+                className={[
+                  'sniptale-checkbox rounded-full! focus:outline-none',
+                  'focus-visible:outline focus-visible:outline-2',
+                  'focus-visible:outline-[var(--sniptale-color-accent)]',
+                ].join(' ')}
+              />
+              {translate('popup.video.withoutMicrophoneRemember')}
+            </label>
+            <div className="flex shrink-0 items-center gap-1">
+              <ProductActionButton
+                compact
+                tone="secondary"
+                className="h-8! min-h-8! px-3! text-xs"
+                onClick={onCancel}
+              >
+                {translate('popup.video.withoutMicrophoneCancel')}
+              </ProductActionButton>
+              <ProductActionButton
+                compact
+                tone="primary"
+                className="h-8! min-h-8! px-3! text-xs"
+                disabled={isSaving}
+                onClick={onContinue}
+              >
+                {translate('popup.video.withoutMicrophoneContinue')}
+              </ProductActionButton>
+            </div>
+          </div>
+        </div>
+      </ProductModal>
+    </dialog>
   );
 }

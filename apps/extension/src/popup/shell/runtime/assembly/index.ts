@@ -9,6 +9,7 @@ export function assemblePopupVideoRuntimeState(
   pageAccess: PopupPageAccessRuntime
 ): PopupVideoSetupRuntime {
   return {
+    actions: state.actions,
     environment: {
       activeTabCapabilities: state.environment.activeTabCapabilities,
       galleryStatus: state.environment.galleryStatus,

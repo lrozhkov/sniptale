@@ -90,3 +90,15 @@ it('isolates fake camera and named window selection to the requested browser pro
   expect(tabArgs).not.toContain('--use-fake-device-for-media-stream=fps=30');
   expect(tabArgs).toContain('--auto-select-screen-capture-source');
 });
+
+it('can test browser permission refusal with fake devices without auto-granting access', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({
+    userDataDir: '/tmp/permission-profile',
+    fakeMediaDevices: true,
+    autoGrantMediaPermissions: false,
+  });
+  const args = browserIo.launch.mock.calls[0]?.[1]?.args;
+  expect(args).toContain('--use-fake-device-for-media-stream=fps=30');
+  expect(args).not.toContain('--use-fake-ui-for-media-stream');
+});

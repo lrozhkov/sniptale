@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshWebcamDevices, toggleWebcam } from './index';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { PopupMediaAccessError } from '../media-devices';
 
-const { loadWebcamDevicesMock, resolveWebcamDeviceIdMock } = vi.hoisted(() => ({
-  loadWebcamDevicesMock: vi.fn(),
-  resolveWebcamDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
-}));
+const { loadWebcamDevicesMock, resolveWebcamDeviceIdMock, requestWebcamPermissionMock } =
+  vi.hoisted(() => ({
+    loadWebcamDevicesMock: vi.fn(),
+    requestWebcamPermissionMock: vi.fn(),
+    resolveWebcamDeviceIdMock: vi.fn((deviceId: string | null) => deviceId),
+  }));
 
 vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
   translate: (key: string) => key,
@@ -14,6 +17,7 @@ vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
 
 vi.mock('../webcam', (_importOriginal) => ({
   loadWebcamDevices: loadWebcamDevicesMock,
+  requestWebcamPermission: requestWebcamPermissionMock,
   resolveWebcamDeviceId: resolveWebcamDeviceIdMock,
 }));
 
@@ -33,6 +37,7 @@ const defaultSettings = {
 function setupPopupWebcamFlowMocks() {
   beforeEach(() => {
     vi.clearAllMocks();
+    requestWebcamPermissionMock.mockResolvedValue(undefined);
     loadWebcamDevicesMock.mockRejectedValue(new Error('webcam load failed'));
     resolveWebcamDeviceIdMock.mockImplementation((deviceId: string | null) => deviceId);
   });
@@ -41,7 +46,29 @@ function setupPopupWebcamFlowMocks() {
 describe('toggleWebcam enable flow', () => {
   setupPopupWebcamFlowMocks();
 
+  it('preserves saved camera selection when access is refused', async () => {
+    requestWebcamPermissionMock.mockRejectedValueOnce(
+      new PopupMediaAccessError('camera', 'denied')
+    );
+    const setVideoSettings = vi.fn();
+    const refreshWebcams = vi.fn();
+    const setStartError = vi.fn();
+    await toggleWebcam({
+      videoSettings: defaultSettings,
+      setVideoSettings,
+      setStartError,
+      refreshWebcams,
+    });
+    expect(requestWebcamPermissionMock).toHaveBeenCalledWith('cam-1');
+    expect(refreshWebcams).not.toHaveBeenCalled();
+    expect(setVideoSettings).not.toHaveBeenCalled();
+    expect(setStartError).toHaveBeenLastCalledWith('popup.video.cameraPermissionDenied');
+  });
+
   it('hydrates labels and resolves stale selected cameras when enabling webcam capture', async () => {
+    requestWebcamPermissionMock.mockRejectedValueOnce(
+      new PopupMediaAccessError('camera', 'no-device')
+    );
     const setVideoSettings = vi.fn();
     const setStartError = vi.fn();
     const devices = [{ deviceId: 'cam-2', label: 'USB Camera' }];
@@ -59,6 +86,7 @@ describe('toggleWebcam enable flow', () => {
       hydrateLabels: 'always',
       preferredDeviceId: 'missing-camera',
     });
+    expect(requestWebcamPermissionMock.mock.calls).toEqual([['missing-camera'], ['cam-2']]);
     const applySettings = setVideoSettings.mock.calls[0]?.[0] as typeof setVideoSettings;
     expect(applySettings({ ...defaultSettings, webcamDeviceId: 'missing-camera' })).toEqual(
       expect.objectContaining({ webcamEnabled: true, webcamDeviceId: 'cam-2' })

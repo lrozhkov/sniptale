@@ -72,6 +72,8 @@ interface VideoSetupBodyProps {
   completionRequestFailed?: boolean;
   onRetryCompletion?: (() => void) | undefined;
   onRefreshRecordingState?: (() => Promise<void>) | undefined;
+  onRefreshMicrophones?: (() => Promise<unknown>) | undefined;
+  onRefreshWebcams?: (() => Promise<unknown>) | undefined;
   postRecordResult?: VideoPostRecordResult | null;
   onAcknowledgePostRecord?: () => Promise<void>;
   viewModel: VideoSetupViewModel;
@@ -209,6 +211,7 @@ function VideoIdleSettings(props: VideoSetupBodyProps) {
         microphoneDevices={props.microphoneDevices}
         isLoadingMicrophones={props.isLoadingMicrophones}
         onMicrophoneDeviceChange={props.onMicrophoneDeviceChange}
+        onRefreshDevices={props.onRefreshMicrophones}
         onSettingsChange={props.onSettingsChange}
       />
       <VideoWebcamSelector
@@ -218,6 +221,7 @@ function VideoIdleSettings(props: VideoSetupBodyProps) {
         webcamDevices={props.webcamDevices}
         isLoadingWebcams={props.isLoadingWebcams}
         onWebcamDeviceChange={props.onWebcamDeviceChange}
+        onRefreshDevices={props.onRefreshWebcams}
         onSettingsChange={props.onSettingsChange}
       />
       {props.captureMode === CaptureMode.CAMERA ? null : (

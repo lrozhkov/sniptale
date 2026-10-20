@@ -15,7 +15,12 @@ import { useVideoStartConfirmation } from './start-confirmation';
 
 function ConfirmationHarness(props: Parameters<typeof useVideoStartConfirmation>[0]) {
   const confirmation = useVideoStartConfirmation(props);
-  return <>{confirmation.confirmation ?? <button onClick={confirmation.start}>Start</button>}</>;
+  return (
+    <>
+      <button onClick={confirmation.start}>Start</button>
+      {confirmation.confirmation}
+    </>
+  );
 }
 
 type HarnessProps = ComponentProps<typeof ConfirmationHarness>;
@@ -58,6 +63,18 @@ async function remember() {
 }
 
 beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value: vi.fn(function (this: HTMLDialogElement) {
+      this.open = true;
+    }),
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value: vi.fn(function (this: HTMLDialogElement) {
+      this.open = false;
+    }),
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   persistVideoSettingsMock.mockReset();
   persistVideoSettingsMock.mockResolvedValue({
@@ -227,4 +244,64 @@ it('checks canStart before showing a confirmation', async () => {
   await click('Start');
   expect(container.textContent).not.toContain('withoutMicrophoneTitle');
   expect(props.onStart).not.toHaveBeenCalled();
+});
+
+it('protects confirmation with a modal dialog and uses the shared round checkbox', async () => {
+  await render();
+  await click('Start');
+  const dialog = container.querySelector('dialog');
+  expect(dialog?.getAttribute('aria-modal')).toBe('true');
+  expect(container.querySelector('input')?.classList.contains('sniptale-checkbox')).toBe(true);
+  expect(container.querySelector('.sniptale-modal-backdrop')).not.toBeNull();
+});
+
+it('restores the trigger after native cancellation without recording', async () => {
+  await render();
+  button('Start').focus();
+  await click('Start');
+  const dialog = container.querySelector('dialog');
+  expect(document.activeElement).toBe(dialog);
+  await act(async () => dialog?.dispatchEvent(new Event('cancel', { cancelable: true })));
+  expect(container.querySelector('dialog')).toBeNull();
+  expect(document.activeElement).toBe(button('Start'));
+  expect(props.onStart).not.toHaveBeenCalled();
+});
+
+it('keeps the question and one action row without header or footer sections', async () => {
+  await render();
+  await click('Start');
+  const actions = container.querySelector('[data-ui="popup.video.without-microphone-actions"]');
+  expect(actions?.querySelector('input')).not.toBeNull();
+  expect(actions?.querySelectorAll('button')).toHaveLength(2);
+  expect(container.querySelector('.sniptale-modal-header-sm')).toBeNull();
+  expect(container.querySelector('.sniptale-modal-footer-sm')).toBeNull();
+});
+
+it('keeps both Tab directions inside all enabled dialog controls', async () => {
+  await render();
+  await click('Start');
+  const last = button('withoutMicrophoneContinue');
+  const first = container.querySelector<HTMLInputElement>('input');
+  last.focus();
+  await act(async () =>
+    last.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(document.activeElement).toBe(first);
+  await act(async () =>
+    first?.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(document.activeElement).toBe(last);
 });

@@ -56,16 +56,20 @@ function sanitizeRecordingSettings(
   const sourceCount =
     captureMode === CaptureMode.SCREEN ? normalizeVideoSourceCount(settings.sourceCount) : 1;
   const webcamEnabled = captureMode === CaptureMode.CAMERA || settings.webcamEnabled === true;
+  const hasMicrophoneInventory = microphoneDevices.some((device) => device.deviceId.length > 0);
+  const hasWebcamInventory = webcamDevices.some((device) => device.deviceId.length > 0);
 
   return {
     ...settings,
-    microphoneDeviceId: settings.microphoneEnabled
-      ? resolveMicrophoneDeviceId(settings.microphoneDeviceId, microphoneDevices)
-      : settings.microphoneDeviceId,
+    microphoneDeviceId:
+      settings.microphoneEnabled && hasMicrophoneInventory
+        ? resolveMicrophoneDeviceId(settings.microphoneDeviceId, microphoneDevices)
+        : settings.microphoneDeviceId,
     sourceCount,
-    webcamDeviceId: webcamEnabled
-      ? resolveWebcamDeviceId(settings.webcamDeviceId ?? null, webcamDevices)
-      : (settings.webcamDeviceId ?? null),
+    webcamDeviceId:
+      webcamEnabled && hasWebcamInventory
+        ? resolveWebcamDeviceId(settings.webcamDeviceId ?? null, webcamDevices)
+        : (settings.webcamDeviceId ?? null),
     ...(sourceCount > 1 ? { systemAudioEnabled: false } : {}),
     ...(captureMode === CaptureMode.CAMERA
       ? {

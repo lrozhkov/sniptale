@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import { refreshMicrophoneDevices, toggleMicrophone } from './index';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { PopupMediaAccessError } from '../media-devices';
 
-const { loadMicrophoneDevicesMock } = vi.hoisted(() => ({
+const { loadMicrophoneDevicesMock, requestMicrophonePermissionMock } = vi.hoisted(() => ({
   loadMicrophoneDevicesMock: vi.fn(),
+  requestMicrophonePermissionMock: vi.fn(),
 }));
 
 vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
@@ -13,6 +15,7 @@ vi.mock('../../../platform/i18n/popup', (_importOriginal) => ({
 
 vi.mock('../microphone', (_importOriginal) => ({
   loadMicrophoneDevices: loadMicrophoneDevicesMock,
+  requestMicrophonePermission: requestMicrophonePermissionMock,
   resolveMicrophoneDeviceId: (deviceId: string | null) => deviceId,
 }));
 
@@ -30,12 +33,32 @@ const defaultSettings = {
 function setupPopupMicrophoneFlowMocks() {
   beforeEach(() => {
     vi.clearAllMocks();
+    requestMicrophonePermissionMock.mockResolvedValue(undefined);
     loadMicrophoneDevicesMock.mockRejectedValue(new Error('microphone load failed'));
   });
 }
 
 describe('toggleMicrophone enable flow', () => {
   setupPopupMicrophoneFlowMocks();
+
+  it('preserves saved selection and disabled preference when access is refused', async () => {
+    requestMicrophonePermissionMock.mockRejectedValueOnce(
+      new PopupMediaAccessError('microphone', 'denied')
+    );
+    const setVideoSettings = vi.fn();
+    const refreshMicrophones = vi.fn();
+    const setStartError = vi.fn();
+    await toggleMicrophone({
+      videoSettings: defaultSettings,
+      setVideoSettings,
+      setStartError,
+      refreshMicrophones,
+    });
+    expect(requestMicrophonePermissionMock).toHaveBeenCalledWith('mic-1');
+    expect(refreshMicrophones).not.toHaveBeenCalled();
+    expect(setVideoSettings).not.toHaveBeenCalled();
+    expect(setStartError).toHaveBeenLastCalledWith('popup.video.microphonePermissionDenied');
+  });
 
   it('hydrates labels through an explicit microphone refresh when enabling audio input', async () => {
     const setVideoSettings = vi.fn();

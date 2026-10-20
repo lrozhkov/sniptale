@@ -183,6 +183,7 @@ describe('user media adapter', () => {
   it.each([
     ['NotAllowedError', 'denied'],
     ['NotFoundError', 'no-device'],
+    ['OverconstrainedError', 'no-device'],
     ['NotReadableError', 'device-busy'],
     ['SecurityError', 'unavailable'],
   ] as const)('normalizes %s without exposing the browser error', async (name, expected) => {
@@ -192,6 +193,9 @@ describe('user media adapter', () => {
       },
     });
     await expect(requestMicrophoneAccess()).resolves.toBe(expected);
+    await expect(acquireMicrophoneInput('missing-microphone')).rejects.toMatchObject({
+      state: expected,
+    });
   });
 
   it('normalizes missing media APIs, aborts, and unknown failures', async () => {

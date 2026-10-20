@@ -1,6 +1,54 @@
 import { defineMessageSource } from '../source';
 
 export const popupVideoMediaMessages = defineMessageSource({
+  mediaAccessBlocked: {
+    ru: 'Доступ заблокирован',
+    en: 'Access blocked',
+  },
+  microphonePermissionRequired: {
+    ru: 'Разрешите доступ к микрофону перед записью.',
+    en: 'Allow microphone access before recording.',
+  },
+  cameraPermissionRequired: {
+    ru: 'Разрешите доступ к камере перед записью.',
+    en: 'Allow camera access before recording.',
+  },
+  microphonePermissionDenied: {
+    ru: 'Доступ к микрофону заблокирован. Откройте раздел «Разрешения» в настройках и разрешите доступ.',
+    en: 'Microphone access is blocked. Open Permissions in Settings to allow access.',
+  },
+  cameraPermissionDenied: {
+    ru: 'Доступ к камере заблокирован. Откройте раздел «Разрешения» в настройках и разрешите доступ.',
+    en: 'Camera access is blocked. Open Permissions in Settings to allow access.',
+  },
+  mediaDeviceBusy: {
+    ru: 'Устройство занято. Закройте другие приложения, которые его используют, и повторите попытку.',
+    en: 'This device is busy. Close other apps that use it and try again.',
+  },
+  mediaAccessUnavailable: {
+    ru: 'Доступ к устройству недоступен в этом окне. Откройте раздел «Разрешения» в настройках.',
+    en: 'Device access is unavailable in this window. Open Permissions in Settings.',
+  },
+  mediaAccessUnconfirmed: {
+    ru: 'Не удалось подтвердить доступ. Повторите запрос или откройте раздел «Разрешения» в настройках.',
+    en: 'Device access could not be confirmed. Request access again or open Permissions in Settings.',
+  },
+  mediaRequestAccess: {
+    ru: 'Разрешить доступ',
+    en: 'Allow access',
+  },
+  mediaOpenPermissions: {
+    ru: 'Открыть разрешения',
+    en: 'Open Permissions',
+  },
+  mediaRequestPending: {
+    ru: 'Запрашиваю доступ…',
+    en: 'Requesting access…',
+  },
+  mediaCheckingAccess: {
+    ru: 'Проверяю доступ…',
+    en: 'Checking access…',
+  },
   microphoneToggleLabel: {
     ru: 'Микрофон',
     en: 'Microphone',

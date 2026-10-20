@@ -26,6 +26,8 @@ export interface VideoSetupPageProps {
   isLoadingMicrophones: boolean;
   webcamDevices: Array<{ deviceId: string; label: string }>;
   isLoadingWebcams: boolean;
+  onRefreshMicrophones?: (() => Promise<unknown>) | undefined;
+  onRefreshWebcams?: (() => Promise<unknown>) | undefined;
   startError: string | null;
   isStartPending: boolean;
   pageAccessDisabledReason?: string | null;

@@ -541,6 +541,31 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       );
       await popup.close();
       popup = await openRealPopup(context, extensionId);
+      await popup.evaluate(
+        ({ startFailure, offscreenFailure }) => {
+          const failures: { type: string; error: string }[] = [];
+          Reflect.set(globalThis, '__sniptaleReadinessFailures', failures);
+          chrome.runtime.onMessage.addListener((message: unknown) => {
+            if (
+              typeof message !== 'object' ||
+              message === null ||
+              !('type' in message) ||
+              (message.type !== startFailure && message.type !== offscreenFailure) ||
+              !('error' in message) ||
+              typeof message.error !== 'string'
+            ) {
+              return;
+            }
+            if (failures.length < 20) {
+              failures.push({ type: message.type, error: message.error });
+            }
+          });
+        },
+        {
+          startFailure: VideoMessageType.RECORDING_START_FAILED,
+          offscreenFailure: VideoMessageType.OFFSCREEN_ERROR,
+        }
+      );
       await expect
         .poll(async () => (await readState(popup)).state.status)
         .toBe(VideoRecordingStatus.COUNTDOWN);
@@ -578,11 +603,31 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         offscreen,
         'globalThis.__sniptaleReadinessSignal.gain.gain.value = 0'
       );
-      await expect
-        .poll(async () => (await readState(popup)).state.microphoneActivity?.warning, {
-          timeout: 27_000,
-        })
-        .toBe(true);
+      let lastQuietState: Awaited<ReturnType<typeof readState>> | undefined;
+      try {
+        await expect
+          .poll(
+            async () => {
+              lastQuietState = await readState(popup);
+              return lastQuietState.state.microphoneActivity?.warning;
+            },
+            { timeout: 27_000 }
+          )
+          .toBe(true);
+      } catch (error) {
+        await info.attach('microphone-warning-failure-state', {
+          body: JSON.stringify({
+            lastQuietState,
+            finalState: await readState(popup).catch(() => null),
+            signal: await evaluateInTarget(context, offscreen, READ_SIGNAL).catch(() => null),
+            recordingFailures: await popup
+              .evaluate(() => Reflect.get(globalThis, '__sniptaleReadinessFailures'))
+              .catch(() => null),
+          }),
+          contentType: 'application/json',
+        });
+        throw error;
+      }
       expect(Date.now() - quietStartedAt).toBeGreaterThanOrEqual(19_000);
       await expect(popup.locator(WARNING)).toBeVisible();
       const warningBadge = await popup.evaluate(() => chrome.action.getBadgeBackgroundColor({}));

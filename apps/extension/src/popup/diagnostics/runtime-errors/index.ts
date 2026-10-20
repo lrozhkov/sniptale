@@ -7,6 +7,7 @@ import {
 } from '../../../platform/i18n/popup';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
+import { getPopupMediaAccessErrorKey } from '../../recording/media-devices';
 
 const STALE_PAGE_RUNTIME_PATTERNS = [
   'Could not establish connection',
@@ -52,6 +53,8 @@ export function getPopupRuntimeErrorMessage(
   locale?: AppLocale
 ): string {
   const translator = locale ? createTranslator(locale) : translate;
+  const mediaErrorKey = getPopupMediaAccessErrorKey(error);
+  if (mediaErrorKey) return translator(mediaErrorKey);
   const message = getErrorMessage(error);
   const viewportPresetError = getViewportPresetErrorMessage(message, locale);
   if (viewportPresetError) return viewportPresetError;

@@ -23,6 +23,7 @@ type LaunchExtensionBrowserOptions = {
   extensionBuildDir?: string;
   userDataDir?: string;
   fakeMediaDevices?: boolean;
+  autoGrantMediaPermissions?: boolean;
   windowCaptureTitle?: string;
 };
 
@@ -63,8 +64,9 @@ function getChromiumLaunchArgs(options: LaunchExtensionBrowserOptions): string[]
           '--auto-select-desktop-capture-source=Entire screen',
           '--auto-select-screen-capture-source',
         ]),
-    ...(options.fakeMediaDevices
-      ? ['--use-fake-device-for-media-stream=fps=30', '--use-fake-ui-for-media-stream']
+    ...(options.fakeMediaDevices ? ['--use-fake-device-for-media-stream=fps=30'] : []),
+    ...(options.fakeMediaDevices && options.autoGrantMediaPermissions !== false
+      ? ['--use-fake-ui-for-media-stream']
       : []),
   ];
 }

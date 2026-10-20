@@ -36,21 +36,19 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
     postRecord.hasVerificationError ||
     postRecord.showSavingState ||
     postRecord.hasStopRequestFailure ||
-    props.recordingState.status === VideoRecordingStatus.STOPPING
-      ? null
-      : (startConfirmation.confirmation ?? (
-          <VideoSetupFooter
-            canStart={viewModel.canStart}
-            startButtonLabel={viewModel.startButtonLabel}
-            startDisabledReason={viewModel.startDisabledReason}
-            onStart={startConfirmation.start}
-            onPauseResume={props.onPauseResume}
-            onStop={props.onStop}
-            onCancel={postRecord.handleCancel}
-            recordingState={postRecord.displayProps.recordingState}
-            galleryTitle={viewModel.galleryTitle}
-          />
-        ));
+    props.recordingState.status === VideoRecordingStatus.STOPPING ? null : (
+      <VideoSetupFooter
+        canStart={viewModel.canStart}
+        startButtonLabel={viewModel.startButtonLabel}
+        startDisabledReason={viewModel.startDisabledReason}
+        onStart={startConfirmation.start}
+        onPauseResume={props.onPauseResume}
+        onStop={props.onStop}
+        onCancel={postRecord.handleCancel}
+        recordingState={postRecord.displayProps.recordingState}
+        galleryTitle={viewModel.galleryTitle}
+      />
+    );
   const isIdle = postRecord.displayProps.recordingState.status === VideoRecordingStatus.IDLE;
 
   return (
@@ -77,6 +75,7 @@ export default function VideoSetupPage(props: VideoSetupPageProps) {
         />
       )}
       {isIdle ? null : footer}
+      {startConfirmation.confirmation}
     </div>
   );
 }
