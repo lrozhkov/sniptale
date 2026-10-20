@@ -69,7 +69,8 @@ it('validates phase vocabulary while retaining missing legacy phases', () => {
   expect(editMotionTransitionPhase(changed, { phase: 'enter', duration: 1 })).toBe(changed);
   expect(editMotionTransitionPhase(changed, { phase: 'enter', duration: 61 })).toBeNull();
   const none = editMotionTransitionPhase(changed, { phase: 'exit', type: 'none' })!;
-  expect(none.zoomOutDuration).toBe(0);
+  expect(none.zoomOutDuration).toBe(changed.zoomOutDuration);
+  expect(motionTransitionSettings(none, 'exit').duration).toBe(0);
   expect(none.phaseTransitions).toEqual({ enter: 'linear', exit: 'none' });
 });
 
@@ -88,7 +89,7 @@ it('fences schema18 and retains settings through hydration JSON and clearing', (
   ).toEqual(region.phaseTransitions);
   for (let version = 2; version < 18; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 22 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 23 })).toBe(false);
   const cleared = applyVideoProjectMutationPatch(changed, { motionRegions: [] });
   expect(cleared.version).toBe(18);
   const legacy = createVideoProjectMotionRegion(project, 0);
@@ -130,3 +131,51 @@ it.each(['enter', 'exit'] as const)(
     expect(hydrateVideoProject(oldProject).motionRegions?.[0]?.[durationKey]).toBe(61);
   }
 );
+
+it.each(['enter', 'exit'] as const)(
+  'retains authored %s duration while the phase is disabled and through hydration',
+  async (phase) => {
+    const { normalizeVideoProjectMotionRegion } = await import('./index');
+    const project = { ...createEmptyVideoProject('Dormant phase'), duration: 4 };
+    const key = phase === 'enter' ? 'zoomInDuration' : 'zoomOutDuration';
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 4,
+      zoomInDuration: 1.2,
+      zoomOutDuration: 1.2,
+      phaseTransitions: { enter: 'linear' as const, exit: 'linear' as const },
+    };
+    const disabled = editMotionTransitionPhase(region, { phase, type: 'none' })!;
+    expect.soft(disabled[key]).toBe(1.2);
+    expect(motionTransitionSettings(disabled, phase).duration).toBe(0);
+    expect.soft(normalizeVideoProjectMotionRegion(project, disabled)[key]).toBe(1.2);
+    const saved = hydrateVideoProject(
+      applyVideoProjectMutationPatch(project, { motionRegions: [disabled] })
+    );
+    expect.soft(saved.motionRegions![0]![key]).toBe(1.2);
+    expect
+      .soft(editMotionTransitionPhase(saved.motionRegions![0]!, { phase, type: 'linear' })?.[key])
+      .toBe(1.2);
+    expect(editMotionTransitionPhase(disabled, { phase, type: 'none' })).toBe(disabled);
+  }
+);
+
+it('reserves duration only when a remembered phase is enabled again', async () => {
+  const { normalizeVideoProjectMotionRegion } = await import('./index');
+  const project = { ...createEmptyVideoProject(), duration: 4 };
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    duration: 4,
+    zoomInDuration: 3,
+    zoomOutDuration: 3,
+    phaseTransitions: { enter: 'none' as const, exit: 'linear' as const },
+  };
+  const normalized = normalizeVideoProjectMotionRegion(project, region);
+  expect.soft(normalized.zoomInDuration).toBe(3);
+  const enabled = editMotionTransitionPhase(normalized, { phase: 'enter', type: 'linear' })!;
+  expect.soft(enabled.zoomInDuration).toBe(1);
+  expect(enabled.zoomOutDuration).toBe(3);
+  const shortened = normalizeVideoProjectMotionRegion(project, { ...normalized, duration: 1 });
+  expect.soft(shortened.zoomInDuration).toBe(3);
+  expect(motionTransitionSettings(shortened, 'enter').duration).toBe(0);
+});

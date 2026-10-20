@@ -3,7 +3,7 @@ import { createEmptyVideoProject } from '../factories/creation';
 import { hydrateVideoProject } from '../hydration';
 import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } from './index';
 import { createMotionFocusAreaFromPointScale, resolveMotionConnectionSource } from './index';
-import { resolveMotionScale } from './normalization';
+import { isCameraMotionRegion, resolveMotionScale } from './normalization';
 
 it('accepts positive zoom-out scales without admitting zero or invalid values', () => {
   expect(resolveMotionScale(0.1)).toBe(0.1);
@@ -199,4 +199,115 @@ it('creates and normalizes manual focus areas inside the project bounds', () => 
       focusMode: VideoMotionFocusMode.MANUAL_AREA,
     })
   );
+});
+
+it('retains spotlight authoring through mutation and hydration without occupying the camera', async () => {
+  const { createQuickEditSpotlight } = await import('../scene/focus-appearance');
+  const { applyVideoProjectMutationPatch } = await import('../mutation');
+  const project = createEmptyVideoProject('Spotlight');
+  project.duration = 8;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 1),
+    spotlight: createQuickEditSpotlight(),
+    spotlightTarget: 'viewport' as const,
+  };
+  const changed = applyVideoProjectMutationPatch(project, { motionRegions: [region] });
+  expect.soft(changed.version).toBe(22);
+  expect.soft(isCameraMotionRegion(region)).toBe(false);
+  expect.soft(hydrateVideoProject(changed).motionRegions?.[0]).toMatchObject({
+    spotlight: region.spotlight,
+    spotlightTarget: 'viewport' as const,
+    scale: region.scale,
+    focusPoint: region.focusPoint,
+  });
+});
+
+it.each(['viewport', 'window', 'scene'] as const)(
+  'resolves %s spotlight connections independently of camera and unrelated targets',
+  async (target) => {
+    const { createQuickEditSpotlight, createQuickEditBorder } =
+      await import('../scene/focus-appearance');
+    const project = createEmptyVideoProject();
+    project.duration = 10;
+    const binding = {
+      clipId: 'source-window',
+      sourceStart: 0,
+      sourceEnd: 1,
+      animation: { start: 0, end: 1, duration: 1 },
+    };
+    const first = {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'first',
+      duration: 1,
+      spotlight: createQuickEditSpotlight(),
+      spotlightTarget: target,
+      ...(target !== 'viewport' ? { sourceBinding: binding } : {}),
+    };
+    const second = {
+      ...first,
+      id: 'second',
+      startTime: 4,
+      incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
+    };
+    const unrelated = {
+      ...first,
+      id: 'unrelated',
+      startTime: 2,
+      ...(target === 'viewport'
+        ? { spotlightTarget: 'window' as const, sourceBinding: binding }
+        : {
+            sourceBinding: { ...binding, clipId: 'other-window' },
+          }),
+    };
+    const camera = { ...createVideoProjectMotionRegion(project, 3), id: 'camera', duration: 0.5 };
+    const border = {
+      ...camera,
+      id: 'border',
+      border: createQuickEditBorder(),
+      borderTarget: 'viewport' as const,
+    };
+    project.motionRegions = [first, unrelated, camera, border, second];
+    expect(resolveMotionConnectionSource(project, second)).toBe(first);
+    expect(resolveMotionConnectionSource(project, { ...second, startTime: 0.5 })).toBeNull();
+    expect(
+      resolveMotionConnectionSource(project, {
+        ...second,
+        incomingConnection: {
+          fromRegionId: unrelated.id,
+          easing: VideoTemporalEasing.LINEAR,
+        },
+      })
+    ).toBeNull();
+    expect(
+      resolveMotionConnectionSource(project, {
+        ...camera,
+        incomingConnection: {
+          fromRegionId: first.id,
+          easing: VideoTemporalEasing.LINEAR,
+        },
+      })
+    ).toBeNull();
+  }
+);
+
+it('keeps camera connections independent of intervening spotlight intervals', async () => {
+  const { createQuickEditSpotlight } = await import('../scene/focus-appearance');
+  const project = createEmptyVideoProject();
+  project.duration = 8;
+  const first = { ...createVideoProjectMotionRegion(project, 0), duration: 1 };
+  const spotlight = {
+    ...first,
+    id: 'spotlight',
+    startTime: 2,
+    spotlight: createQuickEditSpotlight(),
+    spotlightTarget: 'viewport' as const,
+  };
+  const second = {
+    ...first,
+    id: 'second',
+    startTime: 4,
+    incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
+  };
+  project.motionRegions = [first, spotlight, second];
+  expect(resolveMotionConnectionSource(project, second)).toBe(first);
 });

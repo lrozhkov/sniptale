@@ -1,5 +1,8 @@
-import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
-import { editMotionBorder } from '../../../features/video/project/motion';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../features/video/project/scene/focus-appearance';
+import { editMotionFocus } from '../../../features/video/project/motion/focus-appearance';
 import { patchReviewKeys } from '../../../features/video/project/action-feedback/key-animation';
 import {
   getVideoProjectClickStyle,
@@ -33,6 +36,7 @@ import { applyVideoProjectMutationPatch } from '../../../features/video/project/
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
 import {
   type VideoProject,
+  type VideoProjectMotionRegion,
   type VideoProjectActionEvent,
   VideoProjectClipType,
 } from '../../../features/video/project/types/index';
@@ -358,143 +362,190 @@ function createActionDeleter(set: VideoEditorStoreSet) {
     });
 }
 
+type MotionRegionPatch = Parameters<VideoEditorProjectState['updateMotionRegion']>[1];
+
 function createMotionRegionUpdater(set: VideoEditorStoreSet) {
-  return (
-    motionRegionId: string,
-    patch: Parameters<VideoEditorProjectState['updateMotionRegion']>[1]
-  ) =>
+  return (motionRegionId: string, patch: MotionRegionPatch) =>
     set((state) =>
-      applyProjectUpdate(state, (project) => {
-        if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
-        const target = project.motionRegions?.find((region) => region.id === motionRegionId);
-        if (patch.borderEdit !== undefined && !target) return project;
-        const spatial =
-          patch.spatialEdit === undefined
-            ? undefined
-            : target && editMotionSpatialSettings(target, patch.spatialEdit);
-        if (patch.spatialEdit !== undefined && (!target || spatial === null || spatial === target))
-          return project;
-        const transition =
-          patch.motionTransitionPhase === undefined
-            ? undefined
-            : target && editMotionTransitionPhase(target, patch.motionTransitionPhase);
-        if (
-          patch.motionTransitionPhase !== undefined &&
-          (!target ||
-            transition === null ||
-            (transition === target && patch.borderEdit === undefined))
-        )
-          return project;
-        const phases =
-          patch.motionBlurPhase === undefined
-            ? undefined
-            : target &&
-              editMotionBlurPhase(
-                target.motionBlur,
-                target.motionBlurAmount ?? 0,
-                patch.motionBlurPhase
-              );
-        if (
-          patch.motionBlurPhase !== undefined &&
-          (!target || phases === null || phases === target.motionBlur)
-        )
-          return project;
-        let borderRefused = false;
-        const motionRegions = (project.motionRegions ?? []).map((region) => {
-          if (region.id !== motionRegionId) {
-            const groupId = target?.sourceBinding?.animationGroupId;
-            return groupId &&
-              region.sourceBinding?.animationGroupId === groupId &&
-              patch.incomingConnection !== undefined
-              ? normalizeVideoProjectMotionRegion(project, {
-                  ...region,
-                  incomingConnection: patch.incomingConnection,
-                })
-              : region;
-          }
-          const {
-            sourceClipId,
-            borderEdit,
-            cameraFollow,
-            motionBlurPhase: _phase,
-            spatialEdit: _spatial,
-            motionTransitionPhase: _transition,
-            ...properties
-          } = patch;
-          if (sourceClipId !== undefined && region.duration <= 0) return region;
-          const {
-            perspective: _perspective,
-            depthOfField: _depth,
-            spatialReference: _reference,
-            ...withoutSpatial
-          } = transition ?? region;
-          let updated = {
-            ...(spatial ? withoutSpatial : (transition ?? region)),
-            ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
-            ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
-            ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
-            ...properties,
-            ...(phases ? { motionBlur: phases } : {}),
-          };
-          if (cameraFollow !== undefined) {
-            const { cameraFollow: _previous, ...rest } = updated;
-            updated = cameraFollow ? { ...rest, cameraFollow } : rest;
-          }
-          if (sourceClipId === null) {
-            const { sourceBinding: _binding, ...sceneRegion } = updated;
-            updated = {
-              ...sceneRegion,
-              ...(sceneRegion.border ? { borderTarget: 'viewport' as const } : {}),
-            };
-          } else if (sourceClipId !== undefined && sourceClipId !== region.sourceBinding?.clipId) {
-            const bindingRegion =
-              borderEdit?.enabled === true
-                ? { ...updated, border: updated.border ?? createQuickEditBorder() }
-                : updated;
-            const source = getMotionBindingCandidates(project, bindingRegion).find(
-              (item) => item.id === sourceClipId
-            );
-            if (!source) return region;
-            updated = bindMotionRegionToClip(updated, source);
-          }
-          const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
-          if (patch.duration !== undefined || patch.startTime !== undefined) {
-            updated = {
-              ...updated,
-              ...constrainMotionTiming(project, region, updated, patch.duration === undefined),
-            };
-            if (clip?.type === VideoProjectClipType.VIDEO)
-              updated = bindMotionRegionToClip(updated, clip);
-          }
-          if (borderEdit !== undefined) {
-            const border = editMotionBorder(project, updated, borderEdit);
-            if (!border) {
-              borderRefused = true;
-              return region;
-            }
-            const sameBinding =
-              sourceClipId === undefined ||
-              sourceClipId === region.sourceBinding?.clipId ||
-              (sourceClipId === null && !region.sourceBinding);
-            if (
-              border === updated &&
-              sameBinding &&
-              Object.keys(patch).every((key) => key === 'borderEdit' || key === 'sourceClipId')
-            )
-              return region;
-            updated = border;
-          }
-          return normalizeVideoProjectMotionRegion(project, updated);
-        });
-        if (
-          patch.borderEdit !== undefined &&
-          (borderRefused ||
-            motionRegions.every((region, index) => region === project.motionRegions?.[index]))
-        )
-          return project;
-        return applyVideoProjectMutationPatch(project, { motionRegions });
-      })
+      applyProjectUpdate(state, (project) =>
+        applyCurrentMotionRegionPatch(project, motionRegionId, patch)
+      )
     );
+}
+
+function applyCurrentMotionRegionPatch(
+  project: VideoProject,
+  motionRegionId: string,
+  patch: MotionRegionPatch
+): VideoProject {
+  if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
+  const target = project.motionRegions?.find((region) => region.id === motionRegionId);
+  const edits = prepareMotionPatch(target, patch);
+  if (!edits) return project;
+  let focusRefused = false;
+  const motionRegions = (project.motionRegions ?? []).map((region) => {
+    if (region.id !== motionRegionId) {
+      const groupId = target?.sourceBinding?.animationGroupId;
+      return groupId &&
+        region.sourceBinding?.animationGroupId === groupId &&
+        patch.incomingConnection !== undefined
+        ? normalizeVideoProjectMotionRegion(project, {
+            ...region,
+            incomingConnection: patch.incomingConnection,
+          })
+        : region;
+    }
+    const result = applyMotionRegionAuthoring(project, region, patch, edits);
+    focusRefused = result.refused;
+    return result.region;
+  });
+  if (
+    patch.focusEdit !== undefined &&
+    (focusRefused ||
+      motionRegions.every((region, index) => region === project.motionRegions?.[index]))
+  )
+    return project;
+  return applyVideoProjectMutationPatch(project, { motionRegions });
+}
+
+function prepareMotionPatch(
+  target: VideoProjectMotionRegion | undefined,
+  patch: MotionRegionPatch
+) {
+  if (patch.focusEdit !== undefined && !target) return null;
+  const spatial =
+    patch.spatialEdit === undefined
+      ? undefined
+      : target && editMotionSpatialSettings(target, patch.spatialEdit);
+  if (patch.spatialEdit !== undefined && (!target || spatial === null || spatial === target))
+    return null;
+  const transition =
+    patch.motionTransitionPhase === undefined
+      ? undefined
+      : target && editMotionTransitionPhase(target, patch.motionTransitionPhase);
+  if (
+    patch.motionTransitionPhase !== undefined &&
+    (!target || transition === null || (transition === target && patch.focusEdit === undefined))
+  )
+    return null;
+  const phases =
+    patch.motionBlurPhase === undefined
+      ? undefined
+      : target &&
+        editMotionBlurPhase(target.motionBlur, target.motionBlurAmount ?? 0, patch.motionBlurPhase);
+  if (
+    patch.motionBlurPhase !== undefined &&
+    (!target || phases === null || phases === target.motionBlur)
+  )
+    return null;
+  return { spatial, transition, phases };
+}
+
+type PreparedMotionPatch = NonNullable<ReturnType<typeof prepareMotionPatch>>;
+
+function mergeMotionRegionProperties(
+  region: VideoProjectMotionRegion,
+  patch: MotionRegionPatch,
+  edits: PreparedMotionPatch
+): VideoProjectMotionRegion {
+  const { spatial, transition, phases } = edits;
+  const {
+    sourceClipId: _sourceClipId,
+    focusEdit: _focusEdit,
+    cameraFollow,
+    motionBlurPhase: _phase,
+    spatialEdit: _spatial,
+    motionTransitionPhase: _transition,
+    ...properties
+  } = patch;
+  const {
+    perspective: _perspective,
+    depthOfField: _depth,
+    spatialReference: _reference,
+    ...withoutSpatial
+  } = transition ?? region;
+  let updated = {
+    ...(spatial ? withoutSpatial : (transition ?? region)),
+    ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
+    ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
+    ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
+    ...properties,
+    ...(phases ? { motionBlur: phases } : {}),
+  };
+  if (cameraFollow !== undefined) {
+    const { cameraFollow: _previous, ...rest } = updated;
+    updated = cameraFollow ? { ...rest, cameraFollow } : rest;
+  }
+  return updated;
+}
+
+function updateMotionRegionSource(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  updated: VideoProjectMotionRegion,
+  patch: MotionRegionPatch
+): VideoProjectMotionRegion | null {
+  const { sourceClipId, focusEdit } = patch;
+  if (sourceClipId === null) {
+    const { sourceBinding: _binding, ...sceneRegion } = updated;
+    updated = {
+      ...sceneRegion,
+      ...(sceneRegion.border ? { borderTarget: 'viewport' as const } : {}),
+      ...(sceneRegion.spotlight ? { spotlightTarget: 'viewport' as const } : {}),
+    };
+  } else if (sourceClipId !== undefined && sourceClipId !== region.sourceBinding?.clipId) {
+    const bindingRegion =
+      focusEdit?.enabled === true
+        ? focusEdit.kind === 'spotlight'
+          ? { ...updated, spotlight: updated.spotlight ?? createQuickEditSpotlight() }
+          : { ...updated, border: updated.border ?? createQuickEditBorder() }
+        : updated;
+    const source = getMotionBindingCandidates(project, bindingRegion).find(
+      (item) => item.id === sourceClipId
+    );
+    if (!source) return null;
+    updated = bindMotionRegionToClip(updated, source);
+  }
+  const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
+  if (patch.duration !== undefined || patch.startTime !== undefined) {
+    updated = {
+      ...updated,
+      ...constrainMotionTiming(project, region, updated, patch.duration === undefined),
+    };
+    if (clip?.type === VideoProjectClipType.VIDEO) updated = bindMotionRegionToClip(updated, clip);
+  }
+  return updated;
+}
+
+function applyMotionRegionAuthoring(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  patch: MotionRegionPatch,
+  edits: PreparedMotionPatch
+) {
+  const { sourceClipId, focusEdit } = patch;
+  if (sourceClipId !== undefined && region.duration <= 0) return { region, refused: false };
+  const merged = mergeMotionRegionProperties(region, patch, edits);
+  let updated = updateMotionRegionSource(project, region, merged, patch);
+  if (!updated) return { region, refused: false };
+  if (focusEdit !== undefined) {
+    const focus = editMotionFocus(project, updated, focusEdit);
+    if (!focus) {
+      return { region, refused: true };
+    }
+    const sameBinding =
+      sourceClipId === undefined ||
+      sourceClipId === region.sourceBinding?.clipId ||
+      (sourceClipId === null && !region.sourceBinding);
+    if (
+      focus === updated &&
+      sameBinding &&
+      Object.keys(patch).every((key) => key === 'focusEdit' || key === 'sourceClipId')
+    )
+      return { region, refused: false };
+    updated = focus;
+  }
+  return { region: normalizeVideoProjectMotionRegion(project, updated), refused: false };
 }
 
 function createMotionRegionDeleter(set: VideoEditorStoreSet) {

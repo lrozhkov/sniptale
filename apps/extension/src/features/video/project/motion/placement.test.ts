@@ -1,4 +1,4 @@
-import { createQuickEditBorder } from '../scene/focus-appearance';
+import { createQuickEditBorder, createQuickEditSpotlight } from '../scene/focus-appearance';
 import { describe, expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
 import { createVideoProjectMotionRegion } from './index';
@@ -81,4 +81,30 @@ it('keeps camera occupancy independent from border ranges', () => {
   expect
     .soft(constrainMotionTiming(project, border, { startTime: 2, duration: 10 }, false))
     .toEqual({ startTime: 2, duration: 10 });
+});
+
+it('moves and resizes spotlight intervals independently of camera occupancy and linked gaps', () => {
+  const { project, first, second } = fixture();
+  const spotlight = {
+    ...first,
+    id: 'spotlight',
+    spotlight: createQuickEditSpotlight(),
+    spotlightTarget: 'viewport' as const,
+  };
+  const destination = {
+    ...spotlight,
+    id: 'spotlight-target',
+    startTime: 10,
+    incomingConnection: { fromRegionId: spotlight.id, easing: spotlight.easing },
+  };
+  project.motionRegions = [first, second, spotlight, destination];
+  expect(constrainMotionTiming(project, spotlight, { startTime: 10, duration: 2 }, true)).toEqual({
+    startTime: 10,
+    duration: 2,
+  });
+  expect(constrainMotionTiming(project, spotlight, { startTime: 2, duration: 10 }, false)).toEqual({
+    startTime: 2,
+    duration: 10,
+  });
+  expect(getMotionInsertionRange(project, 5)).toEqual({ startTime: 5, duration: 2 });
 });

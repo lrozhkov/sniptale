@@ -41,7 +41,7 @@ export function constrainMotionTiming(
   const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
   let start = clip ? clip.startTime : 0;
   let end = clip ? clip.startTime + clip.duration : project.duration;
-  for (const range of region.border ? [] : occupiedRanges(project, region.id)) {
+  for (const range of isCameraMotionRegion(region) ? occupiedRanges(project, region.id) : []) {
     if (range.startTime + range.duration <= region.startTime) {
       start = Math.max(start, range.startTime + range.duration);
     } else if (range.startTime >= region.startTime + region.duration) {

@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../../../features/video/project/motion/normalization';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import type React from 'react';
 
@@ -117,7 +118,7 @@ export function getPointHandleStyle(
 export function getSelectedPoint(params: PointOverlayParams): StagePoint | null {
   if (
     params.selectedMotionRegion &&
-    !params.selectedMotionRegion.border &&
+    isCameraMotionRegion(params.selectedMotionRegion) &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
     return params.selectedMotionRegion.focusPoint ?? getProjectCenter(params.project);
@@ -140,7 +141,7 @@ export function getSelectedPointTarget(
 ): VideoEditorPlacementMode | null {
   if (
     params.selectedMotionRegion &&
-    !params.selectedMotionRegion.border &&
+    isCameraMotionRegion(params.selectedMotionRegion) &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
     return createMotionFocusPlacementMode(params.selectedMotionRegion.id);
@@ -176,7 +177,7 @@ export function getPlacementHint(placementMode: VideoEditorPlacementMode | null)
 export function canRenderSelectedPoint(params: PointOverlayParams): boolean {
   if (params.selectedMotionRegion) {
     return (
-      !params.selectedMotionRegion.border &&
+      isCameraMotionRegion(params.selectedMotionRegion) &&
       params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
     );
   }

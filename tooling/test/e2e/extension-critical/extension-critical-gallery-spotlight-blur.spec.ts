@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { readFile, writeFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -78,10 +79,12 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     await number('gallery.videoReview.backgroundShadow', '80');
     await addReviewFocus(page);
     await button('gallery.videoReview.focusSpotlight').click();
-    await button('gallery.videoReview.focusOutside').click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.focusBlur'), exact: true })
-      .click();
+    await chooseInspectorValue(
+      page,
+      dialog,
+      label('gallery.videoReview.focusOutside'),
+      label('gallery.videoReview.focusBlur')
+    );
     await dialog
       .getByRole('heading', { name: label('gallery.videoReview.preciseArea'), exact: true })
       .click();

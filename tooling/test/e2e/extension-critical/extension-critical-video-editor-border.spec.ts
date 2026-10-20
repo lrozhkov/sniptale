@@ -19,10 +19,6 @@ import {
   applyHarnessBootstrap,
   GALLERY_HARNESS_PATH,
   VIDEO_EDITOR_HARNESS_PATH,
-  OFFSCREEN_HARNESS_PATH,
-  emitTrustedOffscreenHarnessRuntimeMessage,
-  getRuntimeMessagesByType,
-  VideoMessageType,
 } from '../extension-critical.helpers';
 import { startHostServer } from '../support/host-server';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -34,7 +30,8 @@ import {
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { build } from 'esbuild';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 
 test('Native border preview and export preserve window scope, alpha and output coordinates', async ({
   page,
@@ -215,7 +212,7 @@ for (const [index, size] of [
           .toBe('window');
       }
       await expect(page.locator('[data-preview-stage-point-handle]')).toHaveCount(0);
-      await expect(page.locator('[data-preview-stage-border-handle]')).toHaveCount(4);
+      await expect(page.locator('[data-preview-stage-focus-handle]')).toHaveCount(4);
       const lane = page
         .locator('[data-ui="video-editor.timeline.motion-lane-select"]')
         .locator('..');
@@ -223,12 +220,12 @@ for (const [index, size] of [
         .getByRole('button', { name: label('videoEditor.timeline.laneEditable'), exact: true })
         .click();
       await expect.poll(async () => (await read()).utilityLanes!.camera.locked).toBe(true);
-      await expect(page.locator('[data-preview-stage-border-handle]')).toHaveCount(0);
+      await expect(page.locator('[data-preview-stage-focus-handle]')).toHaveCount(0);
       await lane
         .getByRole('button', { name: label('videoEditor.timeline.laneLocked'), exact: true })
         .click();
       await expect.poll(async () => (await read()).utilityLanes!.camera.locked).toBe(false);
-      await expect(page.locator('[data-preview-stage-border-handle]')).toHaveCount(4);
+      await expect(page.locator('[data-preview-stage-focus-handle]')).toHaveCount(4);
       await chooseInspectorValue(
         page,
         inspector,
@@ -239,7 +236,7 @@ for (const [index, size] of [
         .poll(async () => (await read()).motionRegions![0]!.borderTarget)
         .toBe('viewport');
       const beforeArea = (await read()).motionRegions![0]!.border!.area;
-      const area = page.locator('[data-preview-stage-border-area]');
+      const area = page.locator('[data-preview-stage-focus-area]');
       let box = (await area.boundingBox())!;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
@@ -256,7 +253,7 @@ for (const [index, size] of [
       await expect
         .poll(async () => (await read()).motionRegions![0]!.border!.area.x)
         .toBeGreaterThan(beforeArea.x);
-      const resize = page.locator('[data-preview-stage-border-handle="se"]');
+      const resize = page.locator('[data-preview-stage-focus-handle="se"]');
       const initialWidth = (await read()).motionRegions![0]!.border!.area.width;
       const resizeBox = (await resize.boundingBox())!;
       await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
@@ -449,7 +446,13 @@ for (const [index, size] of [
         const authored = structuredClone(await read());
         configureEncodedBorders(authored);
         for (const format of ['MP4', 'WEBM'] as const) {
-          const proof = await encodedBorderSamples(page, host.origin, authored, format);
+          const proof = await encodedNativeVideoSamples(
+            page,
+            host.origin,
+            authored,
+            format,
+            borderSamplePoints()
+          );
           await writeFile(
             info.outputPath(`native-border-${format}.json`),
             JSON.stringify(proof, null, 2)
@@ -511,7 +514,13 @@ test('encoded border composition retains canvas scope through transitions, Effec
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
     await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
     for (const format of ['MP4', 'WEBM'] as const) {
-      const proof = await encodedBorderSamples(page, host.origin, project, format, true);
+      const proof = await encodedNativeVideoSamples(
+        page,
+        host.origin,
+        project,
+        format,
+        borderSamplePoints(true)
+      );
       await writeFile(
         info.outputPath(`native-border-composition-${format}.json`),
         JSON.stringify(proof, null, 2)
@@ -657,139 +666,9 @@ async function configureEncodedComposition(project: VideoProject) {
   ];
 }
 
-async function encodedBorderSamples(
-  page: Page,
-  origin: string,
-  project: VideoProject,
-  format: 'MP4' | 'WEBM',
-  composition = false
-) {
-  await page.goto(`${origin}${OFFSCREEN_HARNESS_PATH}`);
-  await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
-  const jobId = `native-border-${format}`;
-  const input = await page.evaluate(
-    async ({ jobId, project }) => {
-      if (!window.__sniptaleOffscreenHarness) throw new Error('Missing export bridge');
-      return window.__sniptaleOffscreenHarness.stageProjectExportInput(jobId, project);
-    },
-    { jobId, project }
-  );
-  await emitTrustedOffscreenHarnessRuntimeMessage(page, {
-    input,
-    jobId,
-    type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT,
-    settings: {
-      burnInSubtitles: false,
-      downloadAfterExport: false,
-      format,
-      fps: 40,
-      width: 640,
-      height: 360,
-      quality: 'MEDIUM',
-      resolution: 'SOURCE',
-      scope: 'project',
-      subtitleSidecarFormats: [],
-      ...(format === 'MP4' ? { mp4VideoCodec: 'VP9' } : { webmVideoCodec: 'VP9' }),
-    },
-  });
-  await expect
-    .poll(
-      async () => {
-        const failed = await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_FAILED);
-        if (failed.some((message) => message.jobId === jobId))
-          throw new Error(JSON.stringify(failed));
-        return (
-          await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED)
-        ).some((message) => message.jobId === jobId);
-      },
-      { timeout: 120000 }
-    )
-    .toBe(true);
-  const completion = (
-    await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED)
-  ).find((message) => message.jobId === jobId)!;
-  if (typeof completion.exportId !== 'string') throw new Error('Missing export identity');
-  return page.evaluate(
-    async ({ exportId, composition }) => {
-      const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('sniptale-db');
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      const entry: unknown = await new Promise((resolve, reject) => {
-        const request = db
-          .transaction('project_exports')
-          .objectStore('project_exports')
-          .get(exportId);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-      db.close();
-      if (
-        typeof entry !== 'object' ||
-        entry === null ||
-        !('assetId' in entry) ||
-        typeof entry.assetId !== 'string'
-      )
-        throw new Error('Missing export asset');
-      const objects = await (
-        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
-      ).getDirectoryHandle('objects');
-      const file = await (await objects.getFileHandle(entry.assetId)).getFile();
-      const url = URL.createObjectURL(file),
-        video = document.createElement('video');
-      document.body.append(video);
-      video.muted = true;
-      video.src = url;
-      try {
-        await new Promise<void>((resolve, reject) => {
-          video.onloadeddata = () => resolve();
-          video.onerror = () => reject(new Error('Decode failed'));
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 360;
-        const context = canvas.getContext('2d')!;
-        const samples = [];
-        for (const time of [0.3, 0.6, 0.9]) {
-          await new Promise<void>((resolve) => {
-            const presented: VideoFrameRequestCallback = (_now, metadata) => {
-              if (Math.abs(metadata.mediaTime - time) < 0.012501) resolve();
-              else video.requestVideoFrameCallback(presented);
-            };
-            video.requestVideoFrameCallback(presented);
-            video.currentTime = time;
-          });
-          context.drawImage(video, 0, 0);
-          for (const [x, y, expected] of [
-            [130, 89, [0, 0, 255]],
-            [320, 94, [0, 255, 0]],
-          ] as const) {
-            if (composition && x === 130 && time !== 0.3) continue;
-            const pixel = Array.from(context.getImageData(x, y, 1, 1).data);
-            samples.push({
-              time,
-              x,
-              y,
-              pixel,
-              expected,
-              error: expected.reduce((sum, value, i) => sum + Math.abs(pixel[i]! - value), 0) / 3,
-            });
-          }
-        }
-        return {
-          width: video.videoWidth,
-          height: video.videoHeight,
-          duration: video.duration,
-          size: file.size,
-          samples,
-        };
-      } finally {
-        video.removeAttribute('src');
-        video.remove();
-        URL.revokeObjectURL(url);
-      }
-    },
-    { exportId: completion.exportId, composition }
-  );
+function borderSamplePoints(composition = false) {
+  return [0.3, 0.6, 0.9].flatMap((time) => [
+    ...(!composition || time === 0.3 ? [{ time, x: 130, y: 89, expected: [0, 0, 255] }] : []),
+    { time, x: 320, y: 94, expected: [0, 255, 0] },
+  ]);
 }

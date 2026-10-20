@@ -368,6 +368,10 @@ export interface VideoProjectMotionRegion {
   border?: import('../scene/focus-appearance').QuickEditBorder;
   /** Window geometry belongs to the bound clip, while viewport geometry ignores the camera. */
   borderTarget?: 'viewport' | 'window';
+  /** Active spotlight mode retains dormant camera settings and the same interval clock. */
+  spotlight?: import('../scene/focus-appearance').QuickEditSpotlight;
+  /** Bound openings can affect their own window or the composed scene explicitly. */
+  spotlightTarget?: 'viewport' | 'window' | 'scene';
   /** Absent settings inherit the project policy or the retained legacy path coefficients. */
   cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */

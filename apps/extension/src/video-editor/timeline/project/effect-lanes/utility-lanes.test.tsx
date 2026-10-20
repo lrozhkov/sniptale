@@ -1,4 +1,7 @@
-import { createQuickEditBorder } from '../../../../features/video/project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../../features/video/project/scene/focus-appearance';
 import { translate } from '../../../../platform/i18n';
 // @vitest-environment jsdom
 import { act } from 'react';
@@ -10,13 +13,15 @@ import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { ProjectTimelineEffectCanvasRows } from './utility-lanes';
 
 it.each([
+  { locked: false, withBorder: false, spotlight: true },
+  { locked: true, withBorder: false, spotlight: true },
   { locked: false, withBorder: false },
   { locked: true, withBorder: false },
   { locked: false, withBorder: true },
   { locked: true, withBorder: true },
 ])(
-  'adds camera connections through their button; locked=$locked, border=$withBorder',
-  ({ locked, withBorder }) => {
+  'adds camera connections through their button; locked=$locked, border=$withBorder, spotlight=$spotlight',
+  ({ locked, withBorder, spotlight }) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const project = createEmptyVideoProject();
     project.duration = 8;
@@ -24,6 +29,11 @@ it.each([
       { ...createVideoProjectMotionRegion(project, 0), id: 'first', startTime: 0, duration: 1 },
       { ...createVideoProjectMotionRegion(project, 4), id: 'second', startTime: 4, duration: 1 },
     ];
+    if (spotlight)
+      for (const region of project.motionRegions) {
+        region.spotlight = createQuickEditSpotlight();
+        region.spotlightTarget = 'viewport';
+      }
     if (withBorder)
       project.motionRegions.push({
         ...createVideoProjectMotionRegion(project, 2),
@@ -95,41 +105,59 @@ it.each([
   }
 );
 
-it('identifies a border segment without a camera zoom scale or connection action', () => {
-  const project = createEmptyVideoProject('Border lane');
-  project.duration = 4;
-  project.motionRegions = [
-    {
-      ...createVideoProjectMotionRegion(project, 0),
-      id: 'border',
-      duration: 2,
-      border: createQuickEditBorder(),
-      borderTarget: 'viewport',
-    },
-  ];
-  const host = document.createElement('div');
-  const root = createRoot(host);
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  try {
-    act(() =>
-      root.render(
-        <ProjectTimelineEffectCanvasRows
-          project={project}
-          pixelsPerSecond={90}
-          selectedEffectSelection={null}
-          onBeginRangeSelection={vi.fn()}
-          onBeginEffectInteraction={vi.fn()}
-          onResizeMotionRegion={vi.fn()}
-        />
-      )
-    );
-    const segment = host.querySelector('[data-timeline-effect-segment="border"]')!;
-    expect(segment.textContent).toContain(translate('gallery.videoReview.focusBorder'));
-    expect(segment.querySelector('.lucide-frame')).not.toBeNull();
-    expect(segment.textContent).not.toContain('1.35x');
-    expect(host.querySelector('[data-ui="video-editor.timeline.framing-connection"]')).toBeNull();
-  } finally {
-    act(() => root.unmount());
-    vi.unstubAllGlobals();
+it.each(['border', 'spotlight'] as const)(
+  'identifies a %s segment without dormant camera scale or connection',
+  (kind) => {
+    const project = createEmptyVideoProject('Border lane');
+    project.duration = 4;
+    project.motionRegions = [
+      {
+        ...createVideoProjectMotionRegion(project, 0),
+        id: 'border',
+        duration: 2,
+        border: createQuickEditBorder(),
+        borderTarget: 'viewport',
+      },
+    ];
+    if (kind === 'spotlight') {
+      const region = project.motionRegions[0]!;
+      delete region.border;
+      delete region.borderTarget;
+      region.spotlight = createQuickEditSpotlight();
+      region.spotlightTarget = 'viewport';
+    }
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    try {
+      act(() =>
+        root.render(
+          <ProjectTimelineEffectCanvasRows
+            project={project}
+            pixelsPerSecond={90}
+            selectedEffectSelection={null}
+            onBeginRangeSelection={vi.fn()}
+            onBeginEffectInteraction={vi.fn()}
+            onResizeMotionRegion={vi.fn()}
+          />
+        )
+      );
+      const segment = host.querySelector('[data-timeline-effect-segment="border"]')!;
+      expect(segment.textContent).toContain(
+        translate(
+          kind === 'border'
+            ? 'gallery.videoReview.focusBorder'
+            : 'gallery.videoReview.focusSpotlight'
+        )
+      );
+      expect(
+        segment.querySelector(kind === 'border' ? '.lucide-frame' : '.lucide-focus')
+      ).not.toBeNull();
+      expect(segment.textContent).not.toContain('1.35x');
+      expect(host.querySelector('[data-ui="video-editor.timeline.framing-connection"]')).toBeNull();
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
   }
-});
+);

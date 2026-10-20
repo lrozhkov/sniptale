@@ -1,6 +1,7 @@
+import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { expect, it, vi } from 'vitest';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
-import { drawReviewSpotlights } from './render-spotlight';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSpatialWindow,
@@ -10,7 +11,9 @@ import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '..
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
+vi.mock('../../features/video/composition/draw/spotlight', () => ({
+  drawSceneSpotlights: vi.fn(),
+}));
 vi.mock('./render-click-animation', () => ({ drawReviewClicks: vi.fn() }));
 vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
 vi.mock('./scene-frame', async (original) => ({
@@ -73,7 +76,7 @@ it.each([false, true])(
       context: main,
       canvas,
       spotlightScratch: null,
-      regions: [region],
+      regions: [{ ...region, spotlight: createQuickEditSpotlight() }],
       globalResultTime: 0.5,
       cameraScale: 2,
       sourceWidth: 800,
@@ -139,13 +142,13 @@ it.each([false, true])(
       context,
       renderer,
       spotlightScratch: null,
-      regions: [region],
+      regions: [{ ...region, spotlight: createQuickEditSpotlight() }],
       globalResultTime: 1,
       cameraScale: region.transform.scale,
       sourceWidth: canvas.width,
       scene: { canvas, layout, background, image: null, sample: { draw: vi.fn() } },
     });
-    const clip = vi.mocked(drawReviewSpotlights).mock.calls.at(-1)![4]!;
+    const clip = vi.mocked(drawSceneSpotlights).mock.calls.at(-1)![3][0]!.clip!;
     const window = computeQuickEditSpatialWindow(layout, background);
     expect(clip.rect).toEqual(window);
     expect(clip.radius).toBeCloseTo((24 * window.width) / layout.windowRect.width);
@@ -197,7 +200,7 @@ it('forwards managed resources and uses canonical spatial content before viewpor
     context,
     renderer,
     spotlightScratch: null,
-    regions: [region],
+    regions: [{ ...region, spotlight: createQuickEditSpotlight() }],
     globalResultTime: 1,
     cameraScale: 1,
     sourceWidth: 1200,
@@ -212,7 +215,7 @@ it('forwards managed resources and uses canonical spatial content before viewpor
       commentSpace: { canvas: canonical, layout: canonicalLayout, background },
     },
   });
-  expect(vi.mocked(drawReviewSpotlights).mock.calls.at(-1)![6]).toBe(resources);
+  expect(vi.mocked(drawSceneSpotlights).mock.calls.at(-1)![4]).toBe(resources);
   expect(vi.mocked(drawSceneBorders).mock.calls.at(-1)![4]).toBe(resources);
   const [content, viewport] = vi.mocked(drawReviewSceneComments).mock.calls;
   expect(content![0]).toBe(overlayContext);
@@ -266,13 +269,13 @@ it.each(['absent', 'hidden', 'outside-time', 'not-exported'] as const)(
       dispose: vi.fn(),
     };
     vi.mocked(drawReviewSceneComments).mockClear();
-    vi.mocked(drawReviewSpotlights).mockClear();
+    vi.mocked(drawSceneSpotlights).mockClear();
     drawReviewSceneOverlays({
       canvas,
       context,
       renderer,
       spotlightScratch: null,
-      regions: [region],
+      regions: [{ ...region, spotlight: createQuickEditSpotlight() }],
       globalResultTime: 1,
       cameraScale: 1,
       sourceWidth: canvas.width,
@@ -288,7 +291,7 @@ it.each(['absent', 'hidden', 'outside-time', 'not-exported'] as const)(
     });
     expect(renderer.surface).not.toHaveBeenCalled();
     expect(renderer.draw).not.toHaveBeenCalled();
-    expect(drawReviewSpotlights).toHaveBeenCalledOnce();
+    expect(drawSceneSpotlights).toHaveBeenCalledOnce();
     expect(drawReviewSceneComments).toHaveBeenCalledWith(
       context,
       expect.objectContaining({ comments: [viewport] })

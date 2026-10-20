@@ -97,17 +97,24 @@ export function editMotionTransitionPhase(
   if (!isMotionTransitionPhaseEdit(edit)) return null;
   const current = motionTransitionSettings(region, edit.phase);
   const type = edit.type ?? current.type;
-  const requested = edit.duration ?? current.duration;
+  // Inactive settings remain authored; only effective phase clocks consume time.
+  const durationKey = edit.phase === 'enter' ? 'zoomInDuration' : 'zoomOutDuration';
+  const remembered = region[durationKey];
+  const requested =
+    edit.duration ?? (type === 'none' || current.type === 'none' ? remembered : current.duration);
   const authorSmooth = edit.type === 'ease-in-out' && !current.explicit;
-  if (!authorSmooth && type === current.type && requested === current.duration) return region;
+  const unchangedDuration = current.type === 'none' ? remembered : current.duration;
+  if (!authorSmooth && type === current.type && requested === unchangedDuration) return region;
   const other = motionTransitionSettings(region, edit.phase === 'enter' ? 'exit' : 'enter');
   const duration =
     region.animation?.duration ?? region.sourceBinding?.animation.duration ?? region.duration;
   const next =
-    type === 'none' ? 0 : Math.min(60, requested, Math.max(0, duration - other.duration));
+    type === 'none'
+      ? Math.min(60, Math.max(0, requested))
+      : Math.min(60, requested, Math.max(0, duration - other.duration));
   return {
     ...region,
     phaseTransitions: { ...region.phaseTransitions, [edit.phase]: type },
-    [edit.phase === 'enter' ? 'zoomInDuration' : 'zoomOutDuration']: next,
+    [durationKey]: next,
   };
 }

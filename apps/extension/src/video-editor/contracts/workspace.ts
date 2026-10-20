@@ -1,5 +1,5 @@
 import type { MotionTransitionPhaseEdit } from '../../features/video/project/motion/transitions';
-import type { MotionBorderEdit } from '../../features/video/project/motion';
+import type { MotionFocusEdit } from '../../features/video/project/motion/focus-appearance';
 import type { MotionSpatialEdit } from '../../features/video/project/motion/spatial';
 import type { VideoProject } from '../../features/video/project/types';
 
@@ -11,7 +11,7 @@ export type VideoEditorMotionPreview = {
   regionId: string;
 } & (
   | { kind: 'spatial'; edit: MotionSpatialEdit }
-  | { kind: 'border'; edit: MotionBorderEdit; transition?: MotionTransitionPhaseEdit }
+  | { kind: 'focus'; edit: MotionFocusEdit; transition?: MotionTransitionPhaseEdit }
 );
 
 /** A scene draft is valid only for its accepted document snapshot. */

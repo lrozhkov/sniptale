@@ -30,18 +30,23 @@ function setup() {
 it('merges border fields and nested geometry against the latest interval', () => {
   const { store, region } = setup();
   const before = store.getState().project!;
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
   store
     .getState()
-    .updateMotionRegion(region.id, { borderEdit: { settings: { color: '#1166ccff', width: 7 } } });
-  store
-    .getState()
-    .updateMotionRegion(region.id, { borderEdit: { settings: { area: { x: 0.1 } } } });
-  store
-    .getState()
-    .updateMotionRegion(region.id, { borderEdit: { settings: { area: { width: 0.7 } } } });
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   store.getState().updateMotionRegion(region.id, {
-    borderEdit: { settings: { style: 'dotted', loop: true, motion: 'pulse' } },
+    focusEdit: { kind: 'border' as const, settings: { color: '#1166ccff', width: 7 } },
+  });
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'border' as const, settings: { area: { x: 0.1 } } },
+  });
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'border' as const, settings: { area: { width: 0.7 } } },
+  });
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: {
+      kind: 'border' as const,
+      settings: { style: 'dotted', loop: true, motion: 'pulse' },
+    },
   });
   const after = store.getState().project!;
   expect(after.version).toBe(21);
@@ -67,20 +72,34 @@ it('merges border fields and nested geometry against the latest interval', () =>
 
 it('refuses invalid, repeated, removed and locked border edits without history', () => {
   const { store, region } = setup();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   const accepted = store.getState();
   for (const width of [-1, 25, NaN, Infinity])
-    store.getState().updateMotionRegion(region.id, { borderEdit: { settings: { width } } });
+    store.getState().updateMotionRegion(region.id, {
+      focusEdit: { kind: 'border' as const, settings: { width } },
+    });
   for (const x of [-1, 2, NaN, Infinity])
-    store.getState().updateMotionRegion(region.id, { borderEdit: { settings: { area: { x } } } });
-  store.getState().updateMotionRegion(region.id, { borderEdit: { settings: {} } });
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
-  store.getState().updateMotionRegion('missing', { borderEdit: { enabled: true } });
+    store.getState().updateMotionRegion(region.id, {
+      focusEdit: { kind: 'border' as const, settings: { area: { x } } },
+    });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, settings: {} } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion('missing', { focusEdit: { kind: 'border' as const, enabled: true } });
   expect(store.getState().project).toBe(accepted.project);
   expect(store.getState().projectHistory).toBe(accepted.projectHistory);
   store.getState().setProject({ ...accepted.project!, motionRegions: [] });
   const removed = store.getState();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { settings: { width: 9 } } });
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'border' as const, settings: { width: 9 } },
+  });
   expect(store.getState().project).toBe(removed.project);
   expect(store.getState().projectHistory).toBe(removed.projectHistory);
   store.getState().setProject({
@@ -91,7 +110,9 @@ it('refuses invalid, repeated, removed and locked border edits without history',
     },
   });
   const locked = store.getState();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: false } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: false } });
   expect(store.getState().project).toBe(locked.project);
   expect(store.getState().projectHistory).toBe(locked.projectHistory);
 });
@@ -99,14 +120,18 @@ it('refuses invalid, repeated, removed and locked border edits without history',
 it('retains camera authoring across border mode and refuses a stale style edit after mode removal', () => {
   const { store, region } = setup();
   const camera = store.getState().project!.motionRegions![0]!;
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
-  expect(store.getState().project!.motionRegions![0]!.border).toEqual(createQuickEditBorder());
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: false } });
-  const cleared = store.getState();
-  expect(cleared.project!.motionRegions![0]).toEqual(camera);
   store
     .getState()
-    .updateMotionRegion(region.id, { borderEdit: { settings: { color: '#ff0000ff' } } });
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
+  expect(store.getState().project!.motionRegions![0]!.border).toEqual(createQuickEditBorder());
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: false } });
+  const cleared = store.getState();
+  expect(cleared.project!.motionRegions![0]).toEqual(camera);
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'border' as const, settings: { color: '#ff0000ff' } },
+  });
   expect(store.getState().project).toBe(cleared.project);
   expect(store.getState().projectHistory).toBe(cleared.projectHistory);
   const undo = undoVideoEditorProjectHistory(cleared.projectHistory, cleared.project!);
@@ -119,54 +144,66 @@ it('retains camera authoring across border mode and refuses a stale style edit a
 
 it('switches a bound window to viewport when its clock is detached and permits atomic rebinding', () => {
   const { store, region, clip } = setup();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   store.getState().updateMotionRegion(region.id, { sourceClipId: null });
   expect(store.getState().project!.motionRegions![0]).toMatchObject({ borderTarget: 'viewport' });
   expect(store.getState().project!.motionRegions![0]).not.toHaveProperty('sourceBinding');
   const detached = store.getState();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { target: 'window' } });
-  expect(store.getState().project).toBe(detached.project);
   store
     .getState()
-    .updateMotionRegion(region.id, { sourceClipId: clip.id, borderEdit: { target: 'window' } });
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, target: 'window' } });
+  expect(store.getState().project).toBe(detached.project);
+  store.getState().updateMotionRegion(region.id, {
+    sourceClipId: clip.id,
+    focusEdit: { kind: 'border' as const, target: 'window' },
+  });
   const rebound = store.getState();
   expect(rebound.project!.motionRegions![0]).toMatchObject({
     borderTarget: 'window',
     sourceBinding: { clipId: clip.id },
   });
-  store
-    .getState()
-    .updateMotionRegion(region.id, { sourceClipId: clip.id, borderEdit: { target: 'window' } });
+  store.getState().updateMotionRegion(region.id, {
+    sourceClipId: clip.id,
+    focusEdit: { kind: 'border' as const, target: 'window' },
+  });
   expect(store.getState().project).toBe(rebound.project);
   expect(isHydratableVideoProject(rebound.project)).toBe(true);
 });
 
 it('changes reveal while retaining an unchanged phase curve in one atomic command', () => {
   const { store, region } = setup();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   store.getState().updateMotionRegion(region.id, {
     motionTransitionPhase: { phase: 'enter', type: 'ease-in-out' },
   });
   store.getState().updateMotionRegion(region.id, {
-    borderEdit: { settings: { reveal: 'draw' } },
+    focusEdit: { kind: 'border' as const, settings: { reveal: 'draw' } },
     motionTransitionPhase: { phase: 'enter', type: 'ease-in-out' },
   });
   expect(store.getState().project!.motionRegions![0]!.border!.reveal).toBe('draw');
 });
 
-it('cancels an active camera placement when the selected interval becomes a border', () => {
-  const { store, region } = setup();
-  store.getState().selectMotionRegion(region.id);
-  store.setState({ placementMode: { kind: 'motion-focus', motionRegionId: region.id } });
-  expect(store.getState().placementMode?.kind).toBe('motion-focus');
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
-  expect(store.getState().placementMode).toBeNull();
-});
+it.each(['border', 'spotlight'] as const)(
+  'cancels active camera placement when the interval becomes %s',
+  (kind) => {
+    const { store, region } = setup();
+    store.getState().selectMotionRegion(region.id);
+    store.setState({ placementMode: { kind: 'motion-focus', motionRegionId: region.id } });
+    expect(store.getState().placementMode?.kind).toBe('motion-focus');
+    store.getState().updateMotionRegion(region.id, { focusEdit: { kind, enabled: true } });
+    expect(store.getState().placementMode).toBeNull();
+  }
+);
 
 it('retains border source phases through actual split, rate and duplicate commands with independent edits', () => {
   const { store, region, clip } = setup();
   store.getState().updateMotionRegion(region.id, {
-    borderEdit: {
+    focusEdit: {
+      kind: 'border' as const,
       enabled: true,
       settings: { style: 'dotted', motion: 'ripple', loop: true, period: 0.5 },
     },
@@ -200,7 +237,9 @@ it('retains border source phases through actual split, rate and duplicate comman
   expect(copyRegion.border).toEqual(appearance);
   expect(copyRegion.borderTarget).toBe('window');
   expect(copyRegion.sourceBinding?.animation).toEqual(spedRegion.sourceBinding?.animation);
-  store.getState().updateMotionRegion(copyRegion.id, { borderEdit: { settings: { width: 9 } } });
+  store.getState().updateMotionRegion(copyRegion.id, {
+    focusEdit: { kind: 'border' as const, settings: { width: 9 } },
+  });
   expect(
     store.getState().project!.motionRegions!.find((item) => item.id === spedRegion.id)?.border
   ).toEqual(appearance);
@@ -220,9 +259,10 @@ it('refuses missing or invalid phase commands and source changes on empty interv
   expect(store.getState().projectHistory).toBe(before.projectHistory);
   store.setState({ project: { ...before.project!, motionRegions: [{ ...region, duration: 0 }] } });
   const empty = store.getState();
-  store
-    .getState()
-    .updateMotionRegion(region.id, { sourceClipId: null, borderEdit: { enabled: true } });
+  store.getState().updateMotionRegion(region.id, {
+    sourceClipId: null,
+    focusEdit: { kind: 'border' as const, enabled: true },
+  });
   expect(store.getState().project).toBe(empty.project);
   expect(store.getState().projectHistory).toBe(empty.projectHistory);
 });
@@ -237,7 +277,9 @@ it('keeps copied source phases independent while propagating only explicit incom
   };
   const sibling = { ...first, id: 'sibling', startTime: 6, duration: 1 };
   store.setState({ project: { ...project, motionRegions: [first, sibling] } });
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   expect(store.getState().project!.motionRegions![1]!.border).toBeUndefined();
   const before = store.getState().project!;
   store.getState().updateMotionRegion(region.id, { incomingConnection: null });
@@ -248,7 +290,9 @@ it('keeps copied source phases independent while propagating only explicit incom
 
 it('preserves dormant spatial edits and rejects invalid combined phase changes for a border', () => {
   const { store, region } = setup();
-  store.getState().updateMotionRegion(region.id, { borderEdit: { enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'border' as const, enabled: true } });
   for (const spatialEdit of [
     { kind: 'perspective' as const, enabled: true, rotateY: 18 },
     { kind: 'depth' as const, enabled: true, strength: 0.6 },
@@ -263,9 +307,145 @@ it('preserves dormant spatial edits and rejects invalid combined phase changes f
     spatialReference: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 },
   });
   store.getState().updateMotionRegion(region.id, {
-    borderEdit: { settings: { width: 9 } },
+    focusEdit: { kind: 'border' as const, settings: { width: 9 } },
     motionTransitionPhase: { phase: 'enter', duration: -1 },
   });
   expect(store.getState().project).toBe(accepted.project);
   expect(store.getState().projectHistory).toBe(accepted.projectHistory);
+});
+
+it('activates spotlight through the current project owner and retains camera settings across mode changes', () => {
+  const { store, region } = setup();
+  const before = store.getState().project!.motionRegions![0]!;
+  const patch = {};
+  Reflect.set(patch, 'focusEdit', { kind: 'spotlight', enabled: true });
+  store.getState().updateMotionRegion(region.id, patch);
+  const spotlight = store.getState().project!.motionRegions![0]!;
+  expect(spotlight.spotlight).toBeDefined();
+  expect(spotlight.spotlightTarget).toBe('window');
+  expect(spotlight.scale).toBe(before.scale);
+  expect(spotlight.sourceBinding).toEqual(before.sourceBinding);
+  expect(store.getState().project!.version).toBe(22);
+});
+
+it('merges spotlight edits against current authoring and preserves its schema through Undo and Redo', () => {
+  const { store, region } = setup();
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', enabled: true } });
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'spotlight', settings: { area: { x: 0.1 }, effect: 'blur', blur: 18 } },
+  });
+  const previous = store.getState();
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: { kind: 'spotlight', settings: { area: { width: 0.8 }, strength: 0.4 } },
+  });
+  const accepted = store.getState();
+  expect(accepted.project!.motionRegions![0]!.spotlight).toMatchObject({
+    effect: 'blur',
+    blur: 18,
+    strength: 0.4,
+    area: { x: 0.1, width: 0.8 },
+  });
+  expect(isHydratableVideoProject(accepted.project)).toBe(true);
+  const undone = undoVideoEditorProjectHistory(accepted.projectHistory, accepted.project!);
+  if (undone?.status !== 'applied') throw new Error('Expected undo.');
+  expect(undone?.project?.motionRegions![0]!.spotlight).toEqual(
+    previous.project!.motionRegions![0]!.spotlight
+  );
+  const redone = redoVideoEditorProjectHistory(undone.history, undone.project);
+  if (redone?.status !== 'applied') throw new Error('Expected redo.');
+  expect(redone?.project?.motionRegions![0]!.spotlight).toEqual(
+    accepted.project!.motionRegions![0]!.spotlight
+  );
+  expect(redone?.project?.version).toBe(22);
+});
+
+it('refuses invalid, repeated, removed, locked and stale spotlight commands without history', () => {
+  const { store, region } = setup();
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', enabled: true } });
+  const accepted = store.getState();
+  for (const blur of [NaN, Infinity, -1, 41])
+    store
+      .getState()
+      .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', settings: { blur } } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', settings: {} } });
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', enabled: true } });
+  store
+    .getState()
+    .updateMotionRegion('missing', { focusEdit: { kind: 'spotlight', enabled: true } });
+  expect(store.getState().project).toBe(accepted.project);
+  expect(store.getState().projectHistory).toBe(accepted.projectHistory);
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', enabled: false } });
+  const cleared = store.getState();
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', settings: { blur: 10 } } });
+  expect(store.getState().project).toBe(cleared.project);
+  expect(store.getState().projectHistory).toBe(cleared.projectHistory);
+  store.getState().setProject({
+    ...cleared.project!,
+    utilityLanes: {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    },
+  });
+  const locked = store.getState();
+  store
+    .getState()
+    .updateMotionRegion(region.id, { focusEdit: { kind: 'spotlight', enabled: true } });
+  expect(store.getState().project).toBe(locked.project);
+  expect(store.getState().projectHistory).toBe(locked.projectHistory);
+});
+
+it('retains spotlight source phases through split, rate and duplicate with independent current edits', async () => {
+  const { getMotionAnimationTime } = await import('../../../features/video/project/motion/timing');
+  const { store, region, clip } = setup();
+  store.getState().updateMotionRegion(region.id, {
+    focusEdit: {
+      kind: 'spotlight',
+      enabled: true,
+      target: 'scene',
+      settings: { effect: 'blur', blur: 18, reveal: 'contract', exitReveal: 'fade' },
+    },
+  });
+  const before = store.getState().project!.motionRegions![0]!;
+  const sourceClock = getMotionAnimationTime(before, 2.5);
+  store.getState().splitClipAt(clip.id, 3);
+  const split = store.getState().project!;
+  const child = split.clips.find((item) => item.id !== clip.id)!;
+  const childRegion = split.motionRegions!.find((item) => item.sourceBinding?.clipId === child.id)!;
+  expect(childRegion.spotlight).toEqual(before.spotlight);
+  expect(childRegion.spotlightTarget).toBe('scene');
+  expect(getMotionAnimationTime(childRegion, 3.5 - childRegion.startTime)).toBe(sourceClock);
+  store.getState().updateClipPlaybackRate(child.id, 2);
+  const sped = store.getState().project!;
+  const spedRegion = sped.motionRegions!.find((item) => item.id === childRegion.id)!;
+  expect(getMotionAnimationTime(spedRegion, 0.25)).toBe(sourceClock);
+  expect(spedRegion.spotlight).toEqual(before.spotlight);
+  store.getState().duplicateClip(child.id);
+  const duplicated = store.getState().project!;
+  const copy = duplicated.clips.find((item) => item.id !== clip.id && item.id !== child.id)!;
+  const copyRegion = duplicated.motionRegions!.find(
+    (item) => item.sourceBinding?.clipId === copy.id
+  )!;
+  store
+    .getState()
+    .updateMotionRegion(copyRegion.id, { focusEdit: { kind: 'spotlight', settings: { blur: 9 } } });
+  expect(
+    store.getState().project!.motionRegions!.find((item) => item.id === childRegion.id)!.spotlight
+      ?.blur
+  ).toBe(18);
+  expect(
+    store.getState().project!.motionRegions!.find((item) => item.id === copyRegion.id)!.spotlight
+      ?.blur
+  ).toBe(9);
 });

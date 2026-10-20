@@ -18,7 +18,11 @@ import {
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
 import { ReviewBorderAnimation } from './border-inspector';
-import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
+import {
+  SpotlightAppearanceFields,
+  SpotlightRevealFields,
+  type SpotlightAppearancePatch,
+} from '../../ui/focus-appearance/spotlight';
 import type { ReactNode } from 'react';
 import {
   DraftNumericRow as ReviewNumberRow,
@@ -279,10 +283,14 @@ function ReviewFocusParameters(props: FocusParameterProps) {
     );
   if (region.spotlight)
     return (
-      <ReviewSpotlightInspector
+      <SpotlightAppearanceFields
         value={region.spotlight}
-        onChange={(spotlight) => onChange({ spotlight })}
-        onPreview={props.onPreview}
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.preciseArea"
+        onChange={(patch) => onChange(reviewSpotlightPatch(region.spotlight!, patch))}
+        onPreview={(patch) =>
+          props.onPreview?.(patch ? reviewSpotlightPatch(region.spotlight!, patch) : null)
+        }
       />
     );
   if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
@@ -451,10 +459,13 @@ function ReviewZoomAnimation(props: {
           onChange={(enter) => onChange({ enter })}
         >
           {region.spotlight ? (
-            <ReviewSpotlightAnimation
-              value={region.spotlight}
+            <SpotlightRevealFields
+              value={region.spotlight.reveal}
               phase="enter"
-              onChange={(spotlight) => onChange({ spotlight })}
+              onChange={(reveal) => {
+                if (reveal !== 'none')
+                  onChange({ spotlight: { ...region.spotlight!, reveal: reveal } });
+              }}
             />
           ) : (
             <ReviewMotionBlurSettings phase="enter" region={region} onChange={onChange} />
@@ -470,10 +481,13 @@ function ReviewZoomAnimation(props: {
           onChange={(exit) => onChange({ exit })}
         >
           {region.spotlight ? (
-            <ReviewSpotlightAnimation
-              value={region.spotlight}
+            <SpotlightRevealFields
+              value={region.spotlight.exitReveal}
               phase="exit"
-              onChange={(spotlight) => onChange({ spotlight })}
+              onChange={(reveal) => {
+                if (reveal !== 'none')
+                  onChange({ spotlight: { ...region.spotlight!, exitReveal: reveal } });
+              }}
             />
           ) : (
             <ReviewMotionBlurSettings phase="exit" region={region} onChange={onChange} />
@@ -645,4 +659,11 @@ function ReviewMotionBlurSettings(props: {
       ) : null}
     </div>
   );
+}
+
+function reviewSpotlightPatch(
+  value: NonNullable<QuickEditZoomRegion['spotlight']>,
+  patch: SpotlightAppearancePatch
+): QuickEditZoomRegionPatch {
+  return { spotlight: { ...value, ...patch, area: { ...value.area, ...patch.area } } };
 }

@@ -1,5 +1,6 @@
+import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionBorders } from './borders';
-import type { VideoCompositionBorderState } from '../../types';
+import type { VideoCompositionBorderState, VideoCompositionSpotlightState } from '../../types';
 import { resolveCameraVisualClip } from '../../../project/camera/animation';
 import { resolveVideoCompositionActions } from './actions';
 import {
@@ -62,6 +63,7 @@ function createVisualLayer(
     includeTransparent: boolean;
     actions: readonly VideoCompositionActionState[];
     windowBorders: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   }
 ): VideoCompositionVisualLayer | null {
   clip = resolveCameraVisualClip(project, clip, currentTime);
@@ -88,6 +90,9 @@ function createVisualLayer(
         kind: 'video',
         ...(options.windowBorders.get(clip.id)?.length
           ? { borders: options.windowBorders.get(clip.id)! }
+          : {}),
+        ...(options.windowSpotlights.get(clip.id)?.length
+          ? { spotlights: options.windowSpotlights.get(clip.id)! }
           : {}),
         actions: options.actions.filter((action) => action.clipId === clip.id),
         ...(project.tracks.find((track) => track.id === clip.trackId)?.role ===
@@ -135,6 +140,7 @@ export function resolveVideoCompositionVisualLayers(
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
     windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights?: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const resolvedOptions = {
@@ -142,6 +148,8 @@ export function resolveVideoCompositionVisualLayers(
     includeTransparent: false,
     windowBorders:
       options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows,
+    windowSpotlights:
+      options.windowSpotlights ?? resolveVideoCompositionSpotlights(project, currentTime).windows,
     actions: options.actions ?? resolveVideoCompositionActions(project, currentTime),
   };
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
@@ -178,6 +186,7 @@ export function resolveVideoCompositionEffectInputLayers(
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
     windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
+    windowSpotlights?: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const requestedClipIds = collectEffectInputClipIds(plans);
@@ -187,6 +196,8 @@ export function resolveVideoCompositionEffectInputLayers(
   const actions = options.actions ?? resolveVideoCompositionActions(project, currentTime);
   const windowBorders =
     options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows;
+  const windowSpotlights =
+    options.windowSpotlights ?? resolveVideoCompositionSpotlights(project, currentTime).windows;
   let zIndex = 0;
   for (const track of timelineIndex.tracksInRenderOrder) {
     if (!track.visible) continue;
@@ -197,6 +208,7 @@ export function resolveVideoCompositionEffectInputLayers(
         includeTransparent: true,
         actions,
         windowBorders,
+        windowSpotlights,
       });
       if (layer) layers.push(layer);
       zIndex += 1;

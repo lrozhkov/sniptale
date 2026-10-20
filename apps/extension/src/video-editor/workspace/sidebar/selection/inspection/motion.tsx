@@ -1,8 +1,9 @@
+import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
 import {
   MotionEffectModeField,
-  MotionBorderFields,
-  MotionBorderAnimationFields,
-} from '../motion/border';
+  MotionFocusFields,
+  MotionFocusAnimationFields,
+} from '../motion/appearance';
 import {
   MotionPerspectiveFields,
   MotionDepthFields,
@@ -54,14 +55,20 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
             })
           }
         />
-        <MotionBlurField motionRegion={source} phase="link" panel={props} />
+        {isCameraMotionRegion(source) ? (
+          <MotionBlurField motionRegion={source} phase="link" panel={props} />
+        ) : null}
         <InspectorActionButton
           compact
           tone="danger"
           separated
           onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
         >
-          {translate('videoEditor.timeline.disconnectFraming')}
+          {translate(
+            source.spotlight
+              ? 'videoEditor.sidebar.disconnectSpotlight'
+              : 'videoEditor.timeline.disconnectFraming'
+          )}
         </InspectorActionButton>
       </MotionInspectorFieldset>
     </section>
@@ -91,9 +98,11 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'zoom',
-            semantic: motionRegion.border ? ('appearance' as const) : ('framing' as const),
+            semantic: isCameraMotionRegion(motionRegion)
+              ? ('framing' as const)
+              : ('appearance' as const),
             label: translate(
-              motionRegion.border
+              !isCameraMotionRegion(motionRegion)
                 ? 'videoEditor.sidebar.inspectorGroupAppearance'
                 : 'videoEditor.sidebar.inspectorGroupFraming'
             ),
@@ -102,8 +111,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
               <MotionInspectorFieldset locked={isLocked}>
                 <div className="sniptale-parameter-stack">
                   <MotionEffectModeField motionRegion={motionRegion} panel={props} />
-                  {motionRegion.border ? (
-                    <MotionBorderFields motionRegion={motionRegion} panel={props} />
+                  {!isCameraMotionRegion(motionRegion) ? (
+                    <MotionFocusFields motionRegion={motionRegion} panel={props} />
                   ) : (
                     <MotionCameraFields motionRegion={motionRegion} panel={props} />
                   )}
@@ -113,7 +122,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'perspective',
-            visible: !motionRegion.border,
+            visible: isCameraMotionRegion(motionRegion),
             semantic: 'perspective' as const,
             label: translate('gallery.videoReview.perspective'),
             content: (
@@ -124,7 +133,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'depth',
-            visible: !motionRegion.border,
+            visible: isCameraMotionRegion(motionRegion),
             semantic: 'depth' as const,
             label: translate('gallery.videoReview.depthOfField'),
             content: (
@@ -135,7 +144,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'spatial-reference',
-            visible: !motionRegion.border,
+            visible: isCameraMotionRegion(motionRegion),
             semantic: 'framing' as const,
             label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
             content: (
@@ -160,8 +169,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                {motionRegion.border ? (
-                  <MotionBorderAnimationFields motionRegion={motionRegion} panel={props} />
+                {!isCameraMotionRegion(motionRegion) ? (
+                  <MotionFocusAnimationFields motionRegion={motionRegion} panel={props} />
                 ) : (
                   <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
                 )}

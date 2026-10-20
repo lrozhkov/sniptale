@@ -1,4 +1,7 @@
-import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../../features/video/project/scene/focus-appearance';
 import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
@@ -696,6 +699,44 @@ it('restores schema21 border targets, appearance and retained clocks through the
   expect(target.projects.put).toHaveBeenCalledWith(
     expect.objectContaining({
       project: expect.objectContaining({ version: 21, motionRegions: [bound, viewport] }),
+    })
+  );
+});
+
+it('restores schema22 spotlight coverage, appearance and retained clocks through the existing writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'spotlight-restore' });
+  const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+  const bound = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(entry.project, 1),
+      id: 'window-spotlight',
+      duration: 2,
+      spotlight: {
+        ...createQuickEditSpotlight(),
+        effect: 'blur',
+        reveal: 'contract',
+        exitReveal: 'fade',
+      },
+      spotlightTarget: 'window',
+    },
+    clip
+  );
+  const scene = { ...bound, id: 'scene-spotlight', spotlightTarget: 'scene' as const };
+  const viewport = { ...bound, id: 'viewport-spotlight', spotlightTarget: 'viewport' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    motionRegions: [bound, scene, viewport],
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 22, motionRegions: [bound, scene, viewport] }),
     })
   );
 });

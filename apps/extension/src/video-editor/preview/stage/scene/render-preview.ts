@@ -1,3 +1,4 @@
+import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
 import {
   createVideoProjectWatermarkRenderer,
@@ -319,6 +320,23 @@ function drawResolvedPreviewSceneContent(
 
   if (!overlayPrepared || args.params.signal?.aborted) return false;
 
+  drawCompositionSceneSpotlights({
+    context: overlayPrepared.context,
+    frame: args.renderPasses.overlayFrame,
+    project: args.params.project,
+    images: args.params.imageBank,
+    viewport: {
+      x: overlayPrepared.viewport.offsetX,
+      y: overlayPrepared.viewport.offsetY,
+      width: overlayPrepared.viewport.width,
+      height: overlayPrepared.viewport.height,
+    },
+    composition: {
+      x: overlayPrepared.viewport.offsetX,
+      y: overlayPrepared.viewport.offsetY,
+      scale: overlayPrepared.viewport.scale,
+    },
+  });
   drawCompositionBorders(
     overlayPrepared.context,
     args.renderPasses.overlayFrame.viewportBorders,

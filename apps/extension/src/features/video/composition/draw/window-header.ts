@@ -30,3 +30,21 @@ export function projectWindowHeaderImages(
     ];
   });
 }
+
+/** Admit the loaded header for concrete video and image consumers. */
+export function admittedVisualWindowHeader(
+  clip: {
+    id: string;
+    windowHeader?: import('@sniptale/runtime-contracts/window-header').WindowHeader;
+  },
+  images: Record<string, HTMLImageElement>,
+  camera: boolean
+) {
+  const header = camera ? undefined : clip.windowHeader;
+  const image = header ? images[windowHeaderImageKey(clip.id, header)] : undefined;
+  if (image?.complete && image.naturalWidth === 0)
+    throw new Error('Window header image could not be decoded.');
+  return image && clip.windowHeader
+    ? { windowHeaderImage: image, windowHeader: clip.windowHeader }
+    : {};
+}

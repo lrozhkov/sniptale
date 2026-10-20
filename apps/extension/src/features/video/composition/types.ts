@@ -1,4 +1,4 @@
-import type { QuickEditBorder } from '../project/scene/focus-appearance';
+import type { QuickEditBorder, QuickEditSpotlight } from '../project/scene/focus-appearance';
 import type { SceneBorderClock } from './scene-border';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
 import type { VideoProjectActionOccurrence } from '../project/action-occurrences';
@@ -83,6 +83,16 @@ export interface VideoCompositionBorderState {
   clock: SceneBorderClock;
 }
 
+/** Evaluated Native source phase; an optional concrete clip anchors scene-wide coverage. */
+export interface VideoCompositionSpotlightState {
+  id: string;
+  spotlight: QuickEditSpotlight;
+  phase: 'enter' | 'hold' | 'exit';
+  progress: number;
+  from?: QuickEditSpotlight;
+  clipId?: string;
+}
+
 export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
       /** Role of the source track, retained for independent camera composition. */
@@ -90,6 +100,8 @@ export type VideoCompositionVisualLayer =
       actions?: readonly VideoCompositionActionState[];
       /** Window-local borders enter the same clip/effect input and transform pipeline once. */
       borders?: readonly VideoCompositionBorderState[];
+      /** Window masks operate on isolated source pixels before clip/track effects. */
+      spotlights?: readonly VideoCompositionSpotlightState[];
     })
   | VideoCompositionLayerBase<VideoProjectImageClip, 'image'>
   | VideoCompositionLayerBase<VideoCompositionResolvedTextClip, 'text'>
@@ -143,6 +155,7 @@ export interface VideoCompositionCameraState {
 }
 
 export interface VideoCompositionFrame {
+  sceneSpotlights?: readonly VideoCompositionSpotlightState[];
   /** Viewport-normalized borders stay independent of the project camera. */
   viewportBorders?: readonly VideoCompositionBorderState[];
   actions: VideoCompositionActionState[];

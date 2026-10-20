@@ -525,8 +525,8 @@ it('presents border drafts through the existing snapshot owner and cancels stale
   const preview = {
     project,
     regionId: region.id,
-    kind: 'border' as const,
-    edit: { settings: { width: 8, area: { x: 0.1 } } },
+    kind: 'focus' as const,
+    edit: { kind: 'border' as const, settings: { width: 8, area: { x: 0.1 } } },
   };
   const snapshot = JSON.stringify(project);
   const presented = presentWorkspaceMotionPreview(project, selection, preview);
@@ -553,14 +553,20 @@ it('presents border drafts through the existing snapshot owner and cancels stale
   expect(
     presentWorkspaceMotionPreview(project, selection, {
       ...preview,
-      edit: { settings: { width: NaN } },
+      edit: { kind: 'border', settings: { width: NaN } },
     })
   ).toBe(project);
   expect(
-    presentWorkspaceMotionPreview(project, selection, { ...preview, edit: { settings: {} } })
+    presentWorkspaceMotionPreview(project, selection, {
+      ...preview,
+      edit: { kind: 'border', settings: {} },
+    })
   ).toBe(project);
   expect(
-    presentWorkspaceMotionPreview(project, selection, { ...preview, edit: { target: 'window' } })
+    presentWorkspaceMotionPreview(project, selection, {
+      ...preview,
+      edit: { kind: 'border', target: 'window' },
+    })
   ).toBe(project);
   const removed = { ...project, motionRegions: [sibling] };
   expect(presentWorkspaceMotionPreview(removed, selection, { ...preview, project: removed })).toBe(
@@ -622,8 +628,8 @@ it('previews a border phase with the retained source clock and refuses invalid d
   const preview = {
     project,
     regionId: region.id,
-    kind: 'border' as const,
-    edit: {},
+    kind: 'focus' as const,
+    edit: { kind: 'border' as const },
     transition: { phase: 'enter' as const, duration: 0.8 },
   };
   const presented = presentWorkspaceMotionPreview(project, selection, preview);
@@ -637,4 +643,69 @@ it('previews a border phase with the retained source clock and refuses invalid d
       transition: { phase: 'enter', duration: NaN },
     })
   ).toBe(project);
+});
+
+it('presents disposable spotlight drafts only for their accepted selection and retains schema 22', async () => {
+  const { createQuickEditSpotlight } =
+    await import('../../../features/video/project/scene/focus-appearance');
+  const project = createEmptyVideoProject('Spotlight draft');
+  project.version = 22;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    id: 'spotlight',
+    duration: 4,
+    spotlight: createQuickEditSpotlight(),
+    spotlightTarget: 'viewport' as const,
+  };
+  project.motionRegions = [region];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const preview = {
+    project,
+    regionId: region.id,
+    kind: 'focus' as const,
+    edit: {
+      kind: 'spotlight' as const,
+      settings: { effect: 'blur' as const, blur: 19, area: { x: 0.1 } },
+    },
+    transition: { phase: 'enter' as const, duration: 0.8 },
+  };
+  const original = structuredClone(project);
+  const presented = presentWorkspaceMotionPreview(project, selection, preview);
+  expect(presented.version).toBe(22);
+  expect(presented.motionRegions![0]).toMatchObject({
+    spotlight: { effect: 'blur', blur: 19, area: { x: 0.1 } },
+    zoomInDuration: 0.8,
+  });
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  expect(project).toEqual(original);
+  expect(presentWorkspaceMotionPreview(project, selection, null)).toBe(project);
+  const replaced = { ...project };
+  expect(presentWorkspaceMotionPreview(replaced, selection, preview)).toBe(replaced);
+  expect(presentWorkspaceMotionPreview(project, { kind: 'scene' }, preview)).toBe(project);
+  const removed = { ...project, motionRegions: [] };
+  expect(presentWorkspaceMotionPreview(removed, selection, { ...preview, project: removed })).toBe(
+    removed
+  );
+  const locked = {
+    ...project,
+    utilityLanes: {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    },
+  };
+  expect(presentWorkspaceMotionPreview(locked, selection, { ...preview, project: locked })).toBe(
+    locked
+  );
+  const camera = { ...project, motionRegions: [createVideoProjectMotionRegion(project, 0)] };
+  camera.motionRegions[0]!.id = region.id;
+  expect(presentWorkspaceMotionPreview(camera, selection, { ...preview, project: camera })).toBe(
+    camera
+  );
+  const enabled = presentWorkspaceMotionPreview(camera, selection, {
+    ...preview,
+    project: camera,
+    edit: { kind: 'spotlight', enabled: true },
+  });
+  expect(enabled.motionRegions![0]!.spotlight).toEqual(createQuickEditSpotlight());
+  expect(enabled.version).toBe(22);
 });

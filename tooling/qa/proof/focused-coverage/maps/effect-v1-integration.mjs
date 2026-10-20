@@ -208,7 +208,7 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
       'EffectV1, captured actions, camera phases, spatial edits and borders share the current project command owner.',
     testFiles: [
       'apps/extension/src/video-editor/project/state/effects.test.ts',
-      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
       'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
       'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
       'apps/extension/src/video-editor/project/state/effects.camera-phases.test.ts',

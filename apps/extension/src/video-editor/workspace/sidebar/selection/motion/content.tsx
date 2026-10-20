@@ -69,7 +69,9 @@ export function MotionTimingFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
-      {props.motionRegion.border && props.motionRegion.borderTarget === 'window' ? null : (
+      {props.motionRegion.borderTarget === 'window' ||
+      props.motionRegion.spotlightTarget === 'window' ||
+      props.motionRegion.spotlightTarget === 'scene' ? null : (
         <MotionBindingField {...props} />
       )}
       <MotionDurationField
@@ -276,8 +278,18 @@ export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }
     <div className="sniptale-parameter-stack space-y-3">
       <DetailList>
         <DetailItem
-          label={translate('videoEditor.sidebar.motionFocusLabel')}
-          value={getMotionFocusModeLabel(props.motionRegion.focusMode)}
+          label={translate(
+            props.motionRegion.border || props.motionRegion.spotlight
+              ? 'gallery.videoReview.focusType'
+              : 'videoEditor.sidebar.motionFocusLabel'
+          )}
+          value={
+            props.motionRegion.border
+              ? translate('gallery.videoReview.focusBorder')
+              : props.motionRegion.spotlight
+                ? translate('gallery.videoReview.focusSpotlight')
+                : getMotionFocusModeLabel(props.motionRegion.focusMode)
+          }
         />
         <DetailItem
           label={translate('videoEditor.sidebar.actionTimePrefix')}

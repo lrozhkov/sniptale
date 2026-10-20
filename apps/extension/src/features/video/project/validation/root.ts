@@ -94,9 +94,16 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 21) &&
+    isBoundedNumber(version, 2, 22) &&
     Number.isInteger(version) &&
     (version >= 20 || value['watermark'] === undefined) &&
+    (version >= 22 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          (region['spotlight'] === undefined && region['spotlightTarget'] === undefined)
+      )) &&
     (version >= 21 ||
       !Array.isArray(value['motionRegions']) ||
       value['motionRegions'].every(
@@ -213,7 +220,9 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     ) &&
     (project.motionRegions ?? []).every(
       (region) =>
-        (region.borderTarget !== 'window' ||
+        ((region.borderTarget !== 'window' &&
+          region.spotlightTarget !== 'window' &&
+          region.spotlightTarget !== 'scene') ||
           project.clips.some(
             (clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId
           )) &&

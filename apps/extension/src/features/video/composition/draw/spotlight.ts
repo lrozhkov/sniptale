@@ -1,35 +1,39 @@
-import type {
-  RenderCanvasLease,
-  RenderResources,
-} from '../../features/video/composition/canvas/render-resources';
 import {
-  projectQuickEditPoint,
-  type QuickEditHomography,
-} from '../../features/video/composition/motion/spatial-geometry';
-import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
-import type { QuickEditRect } from '../../features/video/review/advanced/scene';
-
-import {
-  quickEditSpotlightPath,
-  quickEditSpotlightOpeningPath,
-  type QuickEditSpotlightFrame,
-} from '../../features/video/review/advanced/focus';
+  sceneSpotlightPath,
+  sceneSpotlightOpeningPath,
+  type SceneSpotlightFrame,
+} from '../scene-spotlight';
+import type { RenderCanvasLease, RenderResources } from '../canvas/render-resources';
+import { projectQuickEditPoint, type QuickEditHomography } from '../motion/spatial-geometry';
+import { drawEdgePaddedBlur } from '../canvas/edge-padded-blur';
+type SceneSpotlightRect = SceneSpotlightFrame['opening'];
 
 /** Visible video-window clip in output pixels. */
-export type ReviewSpotlightClip = { rect: QuickEditRect; radius: number };
+export type SceneSpotlightClip = {
+  rect: SceneSpotlightRect;
+  radius: number;
+  /** Optional silhouette in unit-window coordinates, supplied by the attachment owner. */
+  outline?: readonly { x: number; y: number }[];
+};
+
+/** Each opening retains its own decorated-window clip and output projection. */
+export interface SceneSpotlightLayer extends SceneSpotlightFrame {
+  clip?: SceneSpotlightClip | undefined;
+  projection?: QuickEditHomography | undefined;
+}
 
 /** Snapshot before filtering prevents feedback and includes both video and scene background. */
-export function drawReviewSpotlight(
+export function drawSceneSpotlight(
   context: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  scratch: HTMLCanvasElement | null,
-  frame: QuickEditSpotlightFrame | null,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  scratch: HTMLCanvasElement | OffscreenCanvas | null,
+  frame: SceneSpotlightFrame | null,
   resources?: RenderResources
 ) {
   if (!frame) return;
   context.save();
   try {
-    context.clip(new Path2D(quickEditSpotlightPath(canvas, frame)), 'evenodd');
+    context.clip(new Path2D(sceneSpotlightPath(canvas, frame)), 'evenodd');
     if (frame.blur > 0 && (scratch || resources)) {
       drawEdgePaddedBlur(context, canvas, scratch, frame.blur, resources);
     }
@@ -43,11 +47,12 @@ export function drawReviewSpotlight(
 }
 
 /** Preserve legacy single-mask composition when its target is fully within the window. */
-export function reviewSpotlightNeedsClip(
-  frame: QuickEditSpotlightFrame,
-  clip: ReviewSpotlightClip | undefined
+export function sceneSpotlightNeedsClip(
+  frame: SceneSpotlightFrame,
+  clip: SceneSpotlightClip | undefined
 ): boolean {
   if (!clip) return false;
+  if (clip.outline) return true;
   const hole = frame.protectionOpening ?? frame.opening;
   return (
     hole.x < clip.rect.x + clip.radius ||
@@ -58,10 +63,10 @@ export function reviewSpotlightNeedsClip(
 }
 
 /** Opening and window clips expand in parallel; final protection keeps the real window bounds. */
-export function reviewSpotlightOpeningClip(
-  frame: QuickEditSpotlightFrame,
-  clip: ReviewSpotlightClip | undefined
-): ReviewSpotlightClip | undefined {
+export function sceneSpotlightOpeningClip(
+  frame: SceneSpotlightFrame,
+  clip: SceneSpotlightClip | undefined
+): SceneSpotlightClip | undefined {
   if (!clip) return undefined;
   const target = frame.protectionOpening ?? frame.opening;
   const distance =
@@ -69,6 +74,7 @@ export function reviewSpotlightOpeningClip(
       ? Math.max(0, (frame.opening.width - target.width) / 2)
       : 0;
   return {
+    ...clip,
     rect: {
       x: clip.rect.x - distance,
       y: clip.rect.y - distance,
@@ -107,11 +113,9 @@ function maskCanvas(
 }
 
 /** Rasterizes union coverage in bounded tiles; callers dispose both returned masks. */
-export function createReviewSpotlightMasks(
+export function createSceneSpotlightMasks(
   output: { width: number; height: number },
-  frames: readonly QuickEditSpotlightFrame[],
-  clip?: ReviewSpotlightClip,
-  projection?: QuickEditHomography,
+  frames: readonly SceneSpotlightLayer[],
   resources?: RenderResources
 ) {
   const leases: RenderCanvasLease[] = [];
@@ -151,9 +155,9 @@ export function createReviewSpotlightMasks(
           hole,
           single.opening,
           single.radius,
-          reviewSpotlightOpeningClip(single, clip),
-          reviewSpotlightNeedsClip(single, clip),
-          projection
+          sceneSpotlightOpeningClip(single, single.clip),
+          sceneSpotlightNeedsClip(single, single.clip),
+          single.projection
         );
       for (let y = 0; y < height; y += tileHeight)
         for (let x = 0; x < width; x += tileWidth) {
@@ -165,17 +169,7 @@ export function createReviewSpotlightMasks(
           };
           if (single) paintSingleMaskTile(dim.context, blur.context, hole, single, radius, tile);
           else if (prefix)
-            paintMaskTile(
-              dim.context,
-              blur.context,
-              hole,
-              frames,
-              prefix,
-              radius,
-              tile,
-              clip,
-              projection
-            );
+            paintMaskTile(dim.context, blur.context, hole, frames, prefix, radius, tile);
         }
     } finally {
       reservation?.release();
@@ -193,9 +187,9 @@ function paintSingleMaskTile(
   dim: CanvasRenderingContext2D,
   blur: CanvasRenderingContext2D,
   hole: RenderCanvasLease,
-  frame: QuickEditSpotlightFrame,
+  frame: SceneSpotlightFrame,
   radius: number,
-  tile: QuickEditRect
+  tile: SceneSpotlightRect
 ) {
   const opening = hole.context.getImageData(tile.x, tile.y, tile.width, tile.height).data;
   const dimPixels = dim.createImageData(tile.width, tile.height);
@@ -211,9 +205,9 @@ function paintSingleMaskTile(
 
 function rasterizeMaskOpening(
   hole: RenderCanvasLease,
-  rect: QuickEditRect,
+  rect: SceneSpotlightRect,
   corner: number,
-  bounds: ReviewSpotlightClip | undefined,
+  bounds: SceneSpotlightClip | undefined,
   clipped: boolean,
   projection: QuickEditHomography | undefined
 ) {
@@ -221,7 +215,9 @@ function rasterizeMaskOpening(
   hole.context.save();
   try {
     if (bounds && clipped) {
-      if (projection) hole.context.clip(projectedOpening(bounds.rect, bounds.radius, projection));
+      if (bounds.outline) hole.context.clip(spotlightOutlinePath(bounds, projection));
+      else if (projection)
+        hole.context.clip(projectedOpening(bounds.rect, bounds.radius, projection));
       else {
         hole.context.beginPath();
         hole.context.roundRect(
@@ -238,7 +234,7 @@ function rasterizeMaskOpening(
     hole.context.fill(
       projection
         ? projectedOpening(rect, corner, projection)
-        : new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius: corner }))
+        : new Path2D(sceneSpotlightOpeningPath({ opening: rect, radius: corner }))
     );
   } finally {
     hole.context.restore();
@@ -249,18 +245,17 @@ function paintMaskTile(
   dim: CanvasRenderingContext2D,
   blur: CanvasRenderingContext2D,
   hole: RenderCanvasLease,
-  frames: readonly QuickEditSpotlightFrame[],
+  frames: readonly SceneSpotlightLayer[],
   prefix: Float64Array,
   radius: number,
-  tile: QuickEditRect,
-  clip?: ReviewSpotlightClip,
-  projection?: QuickEditHomography
+  tile: SceneSpotlightRect
 ) {
   const coverage = (
-    rect: QuickEditRect,
+    rect: SceneSpotlightRect,
     corner: number,
-    bounds: ReviewSpotlightClip | undefined,
-    clipped: boolean
+    bounds: SceneSpotlightClip | undefined,
+    clipped: boolean,
+    projection: QuickEditHomography | undefined
   ) => {
     rasterizeMaskOpening(hole, rect, corner, bounds, clipped, projection);
     return hole.context.getImageData(tile.x, tile.y, tile.width, tile.height).data;
@@ -269,16 +264,18 @@ function paintMaskTile(
     coverage(
       frame.opening,
       frame.radius,
-      reviewSpotlightOpeningClip(frame, clip),
-      reviewSpotlightNeedsClip(frame, clip)
+      sceneSpotlightOpeningClip(frame, frame.clip),
+      sceneSpotlightNeedsClip(frame, frame.clip),
+      frame.projection
     )
   );
   const protections = frames.map((frame) =>
     coverage(
       frame.protectionOpening ?? frame.opening,
       frame.protectionRadius ?? frame.radius,
-      clip,
-      reviewSpotlightNeedsClip(frame, clip)
+      frame.clip,
+      sceneSpotlightNeedsClip(frame, frame.clip),
+      frame.projection
     )
   );
   const dimPixels = dim.createImageData(tile.width, tile.height),
@@ -303,25 +300,22 @@ function paintMaskTile(
 }
 
 /** Blur reads the original scene once; dim follows blur and borders are painted later. */
-export function drawReviewSpotlights(
+export function drawSceneSpotlights(
   context: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  scratch: HTMLCanvasElement | null,
-  frames: readonly QuickEditSpotlightFrame[],
-  clip?: ReviewSpotlightClip,
-  projection?: QuickEditHomography,
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  scratch: HTMLCanvasElement | OffscreenCanvas | null,
+  frames: readonly SceneSpotlightLayer[],
   resources?: RenderResources
 ) {
   if (
-    !projection &&
     frames.length <= 1 &&
-    (!frames[0] || !reviewSpotlightNeedsClip(frames[0], clip))
+    (!frames[0] || (!frames[0].projection && !sceneSpotlightNeedsClip(frames[0], frames[0].clip)))
   ) {
-    drawReviewSpotlight(context, canvas, scratch, frames[0] ?? null, resources);
+    drawSceneSpotlight(context, canvas, scratch, frames[0] ?? null, resources);
     return;
   }
   if (!frames.length) return;
-  const masks = createReviewSpotlightMasks(canvas, frames, clip, projection, resources);
+  const masks = createSceneSpotlightMasks(canvas, frames, resources);
   try {
     if (masks.radius > 0) {
       const layer = maskCanvas(canvas, 'spotlight.layer', resources);
@@ -341,7 +335,7 @@ export function drawReviewSpotlights(
 }
 
 /** Rounded openings become a bounded polygon in the same projected space as the window. */
-function projectedOpening(rect: QuickEditRect, radius: number, matrix: QuickEditHomography) {
+function projectedOpening(rect: SceneSpotlightRect, radius: number, matrix: QuickEditHomography) {
   const path = new Path2D();
   const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
   const corners = [
@@ -388,4 +382,26 @@ function publishSpotlightPixels(
 ) {
   dim.putImageData(dimPixels, tile.x, tile.y);
   blur.putImageData(blurPixels, tile.x, tile.y);
+}
+
+function spotlightOutlinePath(
+  clip: SceneSpotlightClip,
+  projection: QuickEditHomography | undefined
+) {
+  const path = new Path2D();
+  let first = true;
+  for (const normalized of clip.outline ?? []) {
+    const local = {
+      x: clip.rect.x + normalized.x * clip.rect.width,
+      y: clip.rect.y + normalized.y * clip.rect.height,
+    };
+    const point = projection ? projectQuickEditPoint(projection, local) : local;
+    if (!point) continue;
+    if (first) {
+      path.moveTo(point.x, point.y);
+      first = false;
+    } else path.lineTo(point.x, point.y);
+  }
+  path.closePath();
+  return path;
 }

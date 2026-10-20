@@ -1,3 +1,4 @@
+import { drawCompositionSceneSpotlights } from '../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../features/video/composition/draw/border';
 import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
@@ -319,6 +320,14 @@ export function drawProjectFrame(
     settings,
     options.effectRuntimeFrames
   );
+  drawCompositionSceneSpotlights({
+    context,
+    frame: renderPasses.overlayFrame,
+    project,
+    images: loadedImages,
+    viewport: { x: 0, y: 0, width: settings.width, height: settings.height },
+    composition: { x: offsetX, y: offsetY, scale },
+  });
   drawCompositionBorders(
     context,
     renderPasses.overlayFrame.viewportBorders,

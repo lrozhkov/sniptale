@@ -3,6 +3,7 @@ import React from 'react';
 import {
   Camera,
   Frame,
+  Focus,
   Keyboard,
   Film,
   ImageIcon,
@@ -129,13 +130,20 @@ export function getSelectionMeta(
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.telemetryLane');
     case VideoEditorSelectionKind.MOTION_LANE:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
-    case VideoEditorSelectionKind.MOTION_REGION:
-      return project?.motionRegions?.find((region) => region.id === selection.motionRegionId)
-        ?.border
+    case VideoEditorSelectionKind.MOTION_REGION: {
+      const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
+      return region?.border
         ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
-        : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
-    case VideoEditorSelectionKind.MOTION_CONNECTION:
-      return createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
+        : region?.spotlight
+          ? createStaticSelectionMeta(Focus, 'gallery.videoReview.focusSpotlight')
+          : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+    }
+    case VideoEditorSelectionKind.MOTION_CONNECTION: {
+      const region = project?.motionRegions?.find((item) => item.id === selection.motionRegionId);
+      return region?.spotlight
+        ? createStaticSelectionMeta(Focus, 'videoEditor.sidebar.spotlightConnection')
+        : createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
+    }
   }
 }
 

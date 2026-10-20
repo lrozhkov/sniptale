@@ -1,9 +1,20 @@
+import {
+  createProject,
+  createVideoClip,
+  createImageClip,
+  createTextClip,
+  createTrack,
+} from '../../project/timeline/project-meta.test.helpers';
 import { createVideoProjectAsset } from '../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
 import { drawCompositionVisualLayer } from './visual';
 import { createVisualTestContext } from './visual.test-support';
-import { windowHeaderImageKey } from './window-header';
+import {
+  admittedVisualWindowHeader,
+  projectWindowHeaderImages,
+  windowHeaderImageKey,
+} from './window-header';
 import { expect, it, vi } from 'vitest';
 import {
   DEFAULT_WINDOW_HEADER,
@@ -48,6 +59,7 @@ it.each([false, true])(
       rect: vi.fn(),
       clip: vi.fn(),
       translate: vi.fn(),
+      scale: vi.fn(),
       restore: vi.fn(),
     };
     const canvas = { width: 0, height: 0, getContext: () => plane };
@@ -76,11 +88,12 @@ it.each([false, true])(
     const paintedHeader = plane.drawImage.mock.calls[0]!;
     const paintedMedia = render.mock.calls[0]!;
     expect(paintedHeader[4]).toBe(Math.round(Number(paintedHeader[4])));
-    expect(paintedMedia[1]).toBe(4.7 + Number(paintedHeader[4]));
+    expect(paintedMedia[1]).toBeCloseTo(4.7 + (Number(paintedHeader[4]) * 600.4) / 601, 9);
+    expect(plane.scale).toHaveBeenCalledWith(1001 / 1000.3, 601 / 600.4);
     expect(paintedMedia[4]).toBe(plane);
     if (cropped) {
-      expect(paintedMedia[2]).toBe(2002);
-      expect(paintedMedia[5]).toMatchObject({ x: 12.2, width: 1001 });
+      expect(paintedMedia[2]).toBeCloseTo(2000.6, 9);
+      expect(paintedMedia[5]).toMatchObject({ x: 12.2, width: expect.closeTo(1000.3, 9) });
     }
   }
 );
@@ -148,6 +161,7 @@ it('rounds the complete cropped header plane while keeping source coordinates be
     rect: vi.fn(),
     clip: vi.fn(),
     translate: vi.fn(),
+    scale: vi.fn(),
     restore: vi.fn(),
   };
   const canvas = { width: 0, height: 0, getContext: () => plane };
@@ -197,4 +211,122 @@ it('rounds the complete cropped header plane while keeping source coordinates be
   const restored = mapVisualLayerPointToSourceNormalized({ ...mapping, point: scene! });
   expect(restored?.x).toBeCloseTo(source.x, 9);
   expect(restored?.y).toBeCloseTo(source.y, 9);
+});
+
+it('admits the current header raster and refuses a stale raster after a title edit', () => {
+  const clip = {
+    id: 'concrete-video',
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, title: 'Original' },
+  };
+  const raster = { complete: true, naturalWidth: 640, naturalHeight: 36 } as HTMLImageElement;
+  const bank = { [windowHeaderImageKey(clip.id, clip.windowHeader)]: raster };
+  expect(admittedVisualWindowHeader(clip, bank, false)).toEqual({
+    windowHeader: clip.windowHeader,
+    windowHeaderImage: raster,
+  });
+  const edited = { ...clip, windowHeader: { ...clip.windowHeader, title: 'Edited' } };
+  expect(admittedVisualWindowHeader(edited, bank, false)).toEqual({});
+  expect(admittedVisualWindowHeader(clip, bank, false).windowHeaderImage).toBe(raster);
+});
+
+it('keeps absent and pending header resources non-destructive and excludes camera decoration', () => {
+  const clip = { id: 'video', windowHeader: DEFAULT_WINDOW_HEADER };
+  const raster = { complete: false, naturalWidth: 0, naturalHeight: 0 } as HTMLImageElement;
+  const bank = { [windowHeaderImageKey(clip.id, clip.windowHeader)]: raster };
+  expect(admittedVisualWindowHeader(clip, {}, false)).toEqual({});
+  expect(admittedVisualWindowHeader({ id: clip.id }, bank, false)).toEqual({});
+  expect(admittedVisualWindowHeader(clip, bank, false)).toEqual({
+    windowHeader: clip.windowHeader,
+    windowHeaderImage: raster,
+  });
+  expect(admittedVisualWindowHeader(clip, bank, true)).toEqual({});
+  expect(clip.windowHeader).toBe(DEFAULT_WINDOW_HEADER);
+});
+
+it('reports a failed concrete header decode without accepting another window raster', () => {
+  const clip = { id: 'failed-window', windowHeader: DEFAULT_WINDOW_HEADER };
+  const failed = { complete: true, naturalWidth: 0, naturalHeight: 0 } as HTMLImageElement;
+  const valid = { complete: true, naturalWidth: 640, naturalHeight: 36 } as HTMLImageElement;
+  const bank = {
+    [windowHeaderImageKey(clip.id, clip.windowHeader)]: failed,
+    [windowHeaderImageKey('other-window', clip.windowHeader)]: valid,
+  };
+  const before = JSON.stringify(clip);
+  expect(() => admittedVisualWindowHeader(clip, bank, false)).toThrow(
+    'Window header image could not be decoded.'
+  );
+  expect(admittedVisualWindowHeader(clip, bank, true)).toEqual({});
+  expect(JSON.stringify(clip)).toBe(before);
+});
+
+it('describes independent video and image header rasters without camera or unavailable materials', () => {
+  const video = createVideoClip({
+    id: 'decorated-video',
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, title: 'Video title' },
+  });
+  const image = createImageClip({
+    id: 'decorated-image',
+    assetId: 'still',
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'application', title: 'Still title' },
+  });
+  const camera = { ...createTrack('camera-track', 2), role: 'CAMERA' as const };
+  const cameraClip = createVideoClip({
+    id: 'camera',
+    trackId: camera.id,
+    windowHeader: DEFAULT_WINDOW_HEADER,
+  });
+  const project = createProject([
+    video,
+    image,
+    cameraClip,
+    createVideoClip({ id: 'plain' }),
+    createTextClip(),
+    createVideoClip({ id: 'missing', assetId: 'missing', windowHeader: DEFAULT_WINDOW_HEADER }),
+    createVideoClip({
+      id: 'pending-width',
+      assetId: 'pending-width',
+      windowHeader: DEFAULT_WINDOW_HEADER,
+    }),
+    createVideoClip({
+      id: 'pending-height',
+      assetId: 'pending-height',
+      windowHeader: DEFAULT_WINDOW_HEADER,
+    }),
+  ]);
+  project.tracks.push(camera);
+  project.assets.push(
+    {
+      ...project.assets[0]!,
+      id: 'still',
+      type: 'IMAGE',
+      metadata: {
+        ...project.assets[0]!.metadata,
+        duration: null,
+        hasAudio: false,
+        mimeType: 'image/png',
+      },
+    },
+    {
+      ...project.assets[0]!,
+      id: 'pending-width',
+      metadata: { ...project.assets[0]!.metadata, width: 0 },
+    },
+    {
+      ...project.assets[0]!,
+      id: 'pending-height',
+      metadata: { ...project.assets[0]!.metadata, height: 0 },
+    }
+  );
+  const before = JSON.stringify(project);
+  const rasters = projectWindowHeaderImages(project);
+  expect(rasters.map((item) => item.key)).toEqual([
+    windowHeaderImageKey(video.id, video.windowHeader!),
+    windowHeaderImageKey(image.id, image.windowHeader!),
+  ]);
+  for (const raster of rasters) {
+    expect(raster.src).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
+    expect(decodeURIComponent(raster.src.slice(raster.src.indexOf(',') + 1))).toContain('<svg');
+  }
+  expect(projectWindowHeaderImages(project, [image])).toEqual([rasters[1]]);
+  expect(JSON.stringify(project)).toBe(before);
 });

@@ -2,10 +2,10 @@ import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge
 import { afterEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
-  createReviewSpotlightMasks,
-  drawReviewSpotlights,
-  drawReviewSpotlight,
-} from './render-spotlight';
+  createSceneSpotlightMasks,
+  drawSceneSpotlights,
+  drawSceneSpotlight,
+} from '../../features/video/composition/draw/spotlight';
 
 afterEach(() => vi.unstubAllGlobals());
 it('copies the composed scene before blur and clips only the outside with even-odd fill', () => {
@@ -27,7 +27,7 @@ it('copies the composed scene before blur and clips only the outside with even-o
   };
   const copy = { clearRect: vi.fn(), drawImage: () => events.push('snapshot') };
   const scratch = { width: 100, height: 80, getContext: () => copy };
-  drawReviewSpotlight(
+  drawSceneSpotlight(
     context as unknown as CanvasRenderingContext2D,
     { width: 100, height: 80 } as HTMLCanvasElement,
     scratch as unknown as HTMLCanvasElement,
@@ -103,7 +103,8 @@ it.each([
   },
 ])('$name', async ({ own, protection, presence, dim, blur, expected }) => {
   vi.stubGlobal('Path2D', class {});
-  const { createReviewSpotlightMasks } = await import('./render-spotlight');
+  const { createSceneSpotlightMasks } =
+    await import('../../features/video/composition/draw/spotlight');
   const alphas = [...own, ...protection];
   const written: Uint8ClampedArray[] = [];
   vi.stubGlobal('document', {
@@ -126,7 +127,7 @@ it.each([
       }),
     }),
   });
-  const masks = createReviewSpotlightMasks(
+  const masks = createSceneSpotlightMasks(
     { width: 1, height: 1 },
     own.map((_, i) => ({
       opening: { x: 0, y: 0, width: 1, height: 1 },
@@ -144,7 +145,8 @@ it.each([
 });
 
 it('expands the animated clip without rasterizing unused single-mask protection', async () => {
-  const { createReviewSpotlightMasks } = await import('./render-spotlight');
+  const { createSceneSpotlightMasks } =
+    await import('../../features/video/composition/draw/spotlight');
   vi.stubGlobal('Path2D', class {});
   const rectangles = vi.fn();
   vi.stubGlobal('document', {
@@ -167,7 +169,7 @@ it('expands the animated clip without rasterizing unused single-mask protection'
       }),
     }),
   });
-  const masks = createReviewSpotlightMasks(
+  const masks = createSceneSpotlightMasks(
     { width: 100, height: 100 },
     [
       {
@@ -180,8 +182,10 @@ it('expands the animated clip without rasterizing unused single-mask protection'
         presence: 0,
         openingClipProgress: 0,
       },
-    ],
-    { rect: { x: 20, y: 20, width: 60, height: 60 }, radius: 4 }
+    ].map((frame) => ({
+      ...frame,
+      clip: { rect: { x: 20, y: 20, width: 60, height: 60 }, radius: 4 },
+    }))
   );
   expect(rectangles.mock.calls).toEqual([[-30, -30, 160, 160, 54]]);
   masks.dispose();
@@ -290,11 +294,9 @@ const maskFrames = [0.8, 0.5].map((dim) => ({
 it('uses global raster coverage with bounded tile readbacks and releases masks explicitly', () => {
   vi.stubGlobal('Path2D', class {});
   const owner = managedMasks();
-  const masks = createReviewSpotlightMasks(
+  const masks = createSceneSpotlightMasks(
     { width: 9, height: 3 },
-    maskFrames,
-    undefined,
-    undefined,
+    maskFrames.map((frame) => ({ ...frame, clip: undefined, projection: undefined })),
     owner.resources
   );
   expect(owner.allocations).toContainEqual({ role: 'spotlight.hole', width: 9, height: 3 });
@@ -318,11 +320,9 @@ it.each(['spotlight.blur', 'spotlight.hole'])(
   (role) => {
     const owner = managedMasks(role);
     expect(() =>
-      createReviewSpotlightMasks(
+      createSceneSpotlightMasks(
         { width: 9, height: 3 },
-        maskFrames,
-        undefined,
-        undefined,
+        maskFrames.map((frame) => ({ ...frame, clip: undefined, projection: undefined })),
         owner.resources
       )
     ).toThrow('admission failed');
@@ -337,13 +337,11 @@ it('disposes masks and layer when managed blur admission fails without publishin
   const owner = managedMasks('spotlight.paddedBlur');
   const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
   expect(() =>
-    drawReviewSpotlights(
+    drawSceneSpotlights(
       context,
       { width: 9, height: 3 } as HTMLCanvasElement,
       null,
-      maskFrames,
-      undefined,
-      undefined,
+      maskFrames.map((frame) => ({ ...frame, clip: undefined, projection: undefined })),
       owner.resources
     )
   ).toThrow('admission failed');
@@ -398,11 +396,9 @@ it.each(['reservation', 'readback'])('releases all mask resources after %s failu
     };
   }
   expect(() =>
-    createReviewSpotlightMasks(
+    createSceneSpotlightMasks(
       { width: 9, height: 3 },
-      maskFrames,
-      undefined,
-      undefined,
+      maskFrames.map((frame) => ({ ...frame, clip: undefined, projection: undefined })),
       owner.resources
     )
   ).toThrow(`${failure} failed`);
@@ -417,17 +413,64 @@ it.each(['reservation', 'readback'])('releases all mask resources after %s failu
 it('rasterizes a single opening once across all tiles and reserves only its three tile buffers', () => {
   vi.stubGlobal('Path2D', class {});
   const owner = managedMasks();
-  const masks = createReviewSpotlightMasks(
+  const masks = createSceneSpotlightMasks(
     { width: 9, height: 3 },
-    [maskFrames[0]!],
-    undefined,
-    undefined,
+    [maskFrames[0]!].map((frame) => ({ ...frame, clip: undefined, projection: undefined })),
     owner.resources
   );
   expect(owner.fill).toHaveBeenCalledOnce();
   expect(owner.readbacks).toHaveLength(6);
   expect(owner.resources.bytes).toHaveBeenCalledWith('spotlight.coverage', 60);
   expect(owner.allocations).toHaveLength(3);
+  masks.dispose();
+  expect(owner.released).toEqual(['bytes', 'spotlight.hole', 'spotlight.dim', 'spotlight.blur']);
+});
+
+it('uses each window attachment for its opening and protection without sharing another projection', () => {
+  class RecordedPath {
+    points: { x: number; y: number }[] = [];
+    moveTo(x: number, y: number) {
+      this.points.push({ x, y });
+    }
+    lineTo(x: number, y: number) {
+      this.points.push({ x, y });
+    }
+    closePath() {}
+  }
+  vi.stubGlobal('Path2D', RecordedPath);
+  const owner = managedMasks();
+  const clips: RecordedPath[] = [];
+  const acquire = owner.resources.canvas.bind(owner.resources);
+  owner.resources.canvas = (role, size, options) => {
+    const lease = acquire(role, size, options);
+    if (role === 'spotlight.hole') {
+      lease.context.clip = vi.fn((path?: Path2D | CanvasFillRule) => {
+        if (path instanceof RecordedPath) clips.push(path);
+      });
+    }
+    return lease;
+  };
+  const layers = [10, 30].map((x) => ({
+    opening: { x: 0, y: 0, width: 9, height: 3 },
+    radius: 0,
+    dim: 0.5,
+    blur: 0,
+    clip: { rect: { x: 1, y: 0, width: 4, height: 3 }, radius: 0 },
+    projection: [1, 0, x, 0, 1, 0, 0, 0, 1] as const,
+  }));
+  const masks = createSceneSpotlightMasks({ width: 1, height: 1 }, layers, owner.resources);
+  expect(owner.fill.mock.calls.map(([path]) => path.points[0])).toEqual([
+    { x: 19, y: 0 },
+    { x: 39, y: 0 },
+    { x: 19, y: 0 },
+    { x: 39, y: 0 },
+  ]);
+  expect(clips.map((path) => path.points[0])).toEqual([
+    { x: 15, y: 0 },
+    { x: 35, y: 0 },
+    { x: 15, y: 0 },
+    { x: 35, y: 0 },
+  ]);
   masks.dispose();
   expect(owner.released).toEqual(['bytes', 'spotlight.hole', 'spotlight.dim', 'spotlight.blur']);
 });

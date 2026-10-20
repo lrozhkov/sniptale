@@ -1,4 +1,4 @@
-import { parseQuickEditBorder } from '../scene/focus-appearance';
+import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
 import {
   parseCameraPerspective,
   parseCameraDepth,
@@ -212,6 +212,13 @@ export function isMotionRegion(value: unknown): boolean {
       : parseQuickEditBorder(value['border']) !== null &&
         (value['borderTarget'] === 'viewport' ||
           (value['borderTarget'] === 'window' && value['sourceBinding'] !== undefined))) &&
+    (value['spotlight'] === undefined
+      ? value['spotlightTarget'] === undefined
+      : value['border'] === undefined &&
+        parseQuickEditSpotlight(value['spotlight']) !== null &&
+        (value['spotlightTarget'] === 'viewport' ||
+          ((value['spotlightTarget'] === 'window' || value['spotlightTarget'] === 'scene') &&
+            value['sourceBinding'] !== undefined))) &&
     parseCameraPerspective(value['perspective']) !== null &&
     parseCameraDepth(value['depthOfField']) !== null &&
     parseMotionSpatialReference(value['spatialReference']) !== null &&

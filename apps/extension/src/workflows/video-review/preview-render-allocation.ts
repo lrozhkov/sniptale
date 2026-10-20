@@ -14,7 +14,7 @@ import {
   canvasCommentBubble,
   isCanvasCommentVisibleAt,
 } from '../../features/video/review/comments';
-import { reviewSpotlightNeedsClip } from './render-spotlight';
+import { sceneSpotlightNeedsClip } from '../../features/video/composition/draw/spotlight';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { evaluateReviewClicks } from '../../features/video/review/click-animation';
 import { reviewWindowRasterBacking } from './window-header';
@@ -529,7 +529,7 @@ function focusAllocation(
           fastPath:
             !layout.spatial &&
             spotlights.length === 1 &&
-            !reviewSpotlightNeedsClip(spotlights[0]!, clip),
+            !sceneSpotlightNeedsClip(spotlights[0]!, clip),
         }
       : null,
     border: borders.length ? backing : null,

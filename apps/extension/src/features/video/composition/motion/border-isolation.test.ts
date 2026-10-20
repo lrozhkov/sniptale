@@ -4,7 +4,10 @@ import {
   createVideoProjectMotionRegion,
   normalizeVideoProjectMotionRegion,
 } from '../../project/motion';
-import { createQuickEditBorder } from '../../project/scene/focus-appearance';
+import {
+  createQuickEditBorder,
+  createQuickEditSpotlight,
+} from '../../project/scene/focus-appearance';
 import { applyVideoProjectMutationPatch } from '../../project/mutation';
 import { resolveVideoCompositionFrame } from '../timeline/frame';
 
@@ -119,4 +122,43 @@ it('omits border state when its utility lane is hidden without changing visible 
     },
   };
   expect(resolveVideoCompositionFrame(hidden, 3)).not.toHaveProperty('viewportBorders');
+});
+
+it('keeps connected spotlight openings out of camera pose and camera interpolation', () => {
+  const { project } = projectWithBorder();
+  const first = {
+    ...createVideoProjectMotionRegion(project, 0),
+    id: 'camera-first',
+    duration: 1,
+    scale: 2,
+  };
+  const last = {
+    ...createVideoProjectMotionRegion(project, 5),
+    id: 'camera-last',
+    duration: 2,
+    scale: 1.5,
+    incomingConnection: { fromRegionId: first.id, easing: first.easing },
+  };
+  const opening = {
+    ...createVideoProjectMotionRegion(project, 1),
+    id: 'opening',
+    duration: 1,
+    scale: 4,
+    focusPoint: { x: 0, y: 0 },
+    spotlight: createQuickEditSpotlight(),
+    spotlightTarget: 'viewport' as const,
+  };
+  const destination = {
+    ...opening,
+    id: 'opening-next',
+    startTime: 4,
+    incomingConnection: { fromRegionId: opening.id, easing: opening.easing },
+  };
+  const cameraOnly = { ...project, motionRegions: [first, last] };
+  const composed = { ...project, motionRegions: [first, opening, destination, last] };
+  for (const time of [0, 1, 1.5, 2, 3, 4, 4.5, 5, 6.5, 7.5]) {
+    expect(resolveVideoCompositionFrame(composed, time).camera).toEqual(
+      resolveVideoCompositionFrame(cameraOnly, time).camera
+    );
+  }
 });

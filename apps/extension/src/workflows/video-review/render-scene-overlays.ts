@@ -22,7 +22,7 @@ import {
 import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
 import { drawSceneBorders } from '../../features/video/composition/draw/border';
-import { drawReviewSpotlights } from './render-spotlight';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewWindowRaster } from './window-header';
 
@@ -54,7 +54,7 @@ export function drawReviewSceneOverlays(args: {
     : background;
   const motion = computeQuickEditSceneCamera(overlayLayout, overlayBackground);
   const spotlightWindow = computeQuickEditSpatialWindow(layout, background);
-  drawReviewSpotlights(
+  drawSceneSpotlights(
     context,
     canvas,
     args.spotlightScratch,
@@ -64,17 +64,19 @@ export function drawReviewSceneOverlays(args: {
       output: canvas,
       video: computeQuickEditSourceWindowTransform(layout),
       scale: (scene.sceneScale ?? 1) * args.cameraScale,
-    }),
-    {
-      rect: layout.spatial ? spotlightWindow : motion.windowClip,
-      radius: background.enabled
-        ? background.layout.cornerRadius *
-          (layout.spatial ? spotlightWindow.width / layout.windowRect.width : motion.scale)
-        : 0,
-    },
-    layout.spatial
-      ? quickEditPlaneProjection(spotlightWindow, spotlightWindow, layout.spatial)
-      : undefined,
+    }).map((frame) => ({
+      ...frame,
+      clip: {
+        rect: layout.spatial ? spotlightWindow : motion.windowClip,
+        radius: background.enabled
+          ? background.layout.cornerRadius *
+            (layout.spatial ? spotlightWindow.width / layout.windowRect.width : motion.scale)
+          : 0,
+      },
+      projection: layout.spatial
+        ? quickEditPlaneProjection(spotlightWindow, spotlightWindow, layout.spatial)
+        : undefined,
+    })),
     scene.resources
   );
   const borders = evaluateQuickEditBordersAtTime({

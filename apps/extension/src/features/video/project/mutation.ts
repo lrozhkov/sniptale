@@ -7,22 +7,35 @@ export function getVideoProjectMutationTimestamp(): number {
   return Date.now();
 }
 
+type MutationPatch = Omit<Partial<VideoProject>, 'updatedAt'>;
+
 function getMutationSchemaVersion(
   project: VideoProject,
-  patch: Omit<Partial<VideoProject>, 'updatedAt'>
+  patch: MutationPatch
 ): VideoProject['version'] {
+  const requirements = [
+    project.version,
+    motionSchemaRequirement(patch.motionRegions ?? project.motionRegions),
+    clipSchemaRequirement(patch.clips ?? project.clips),
+    projectSchemaRequirement(project, patch),
+  ];
+  return requirements.reduce(
+    (version, required) => (required > version ? required : version),
+    project.version
+  );
+}
+
+function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
   if (
-    project.version === 21 ||
-    (patch.motionRegions ?? project.motionRegions)?.some(
-      (region) => region.border !== undefined || region.borderTarget !== undefined
+    regions?.some(
+      (region) => region.spotlight !== undefined || region.spotlightTarget !== undefined
     )
   )
+    return 22;
+  if (regions?.some((region) => region.border !== undefined || region.borderTarget !== undefined))
     return 21;
-  if (project.version === 20 || project.watermark !== undefined || patch.watermark !== undefined)
-    return 20;
   if (
-    project.version === 19 ||
-    (patch.motionRegions ?? project.motionRegions)?.some(
+    regions?.some(
       (region) =>
         region.perspective !== undefined ||
         region.depthOfField !== undefined ||
@@ -30,113 +43,66 @@ function getMutationSchemaVersion(
     )
   )
     return 19;
+  if (regions?.some((region) => region.phaseTransitions !== undefined)) return 18;
+  if (regions?.some((region) => region.motionBlur !== undefined)) return 17;
+  if (regions?.some((region) => region.cameraFollow !== undefined)) return 4;
+  return 2;
+}
+
+function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
   if (
-    project.version === 18 ||
-    (patch.motionRegions ?? project.motionRegions)?.some(
-      (region) => region.phaseTransitions !== undefined
-    )
-  )
-    return 18;
-  if (
-    project.version === 17 ||
-    (patch.motionRegions ?? project.motionRegions)?.some(
-      (region) => region.motionBlur !== undefined
-    )
-  )
-    return 17;
-  if (
-    project.version === 16 ||
-    (patch.sceneBackground ?? project.sceneBackground)?.blur !== undefined
-  )
-    return 16;
-  if (
-    project.version === 15 ||
-    (patch.clips ?? project.clips).some(
+    clips.some(
       (clip) =>
         (clip.type === 'VIDEO' || clip.type === 'IMAGE') && clip.windowCornerRadius !== undefined
     )
   )
     return 15;
-  const background = patch.sceneBackground ?? project.sceneBackground;
   if (
-    project.version === 14 ||
-    background?.remembered !== undefined ||
-    (background?.kind === 'image' && background.imageFit !== undefined)
-  )
-    return 14;
-  if (
-    project.version === 13 ||
-    (patch.clips ?? project.clips).some(
+    clips.some(
       (clip) => (clip.type === 'VIDEO' || clip.type === 'IMAGE') && clip.sourceCrop !== undefined
     )
   )
     return 13;
-  if (
-    project.version === 12 ||
-    (patch.clips ?? project.clips).some(
-      (clip) => clip.type === 'VIDEO' && clip.cameraHiddenRanges !== undefined
-    )
-  )
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraHiddenRanges !== undefined))
     return 12;
   if (
-    project.version === 11 ||
-    (patch.clips ?? project.clips).some(
+    clips.some(
       (clip) =>
         clip.type === 'VIDEO' &&
         clip.cameraPositions?.some((position) => position.crop !== undefined)
     )
   )
     return 11;
-  if (
-    project.version === 10 ||
-    (patch.clips ?? project.clips).some(
-      (clip) => clip.type === 'VIDEO' && clip.cameraAppearance?.shape === 'circle'
-    )
-  )
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraAppearance?.shape === 'circle'))
     return 10;
   if (
-    project.version === 9 ||
-    (patch.clips ?? project.clips).some(
+    clips.some(
       (clip) => (clip.type === 'VIDEO' || clip.type === 'IMAGE') && clip.shadowColor !== undefined
     )
   )
     return 9;
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraMirrored !== undefined)) return 8;
+  if (clips.some((clip) => clip.type === 'AUDIO' && clip.originalAudioMute !== undefined)) return 6;
+  return 2;
+}
+
+function projectSchemaRequirement(
+  project: VideoProject,
+  patch: MutationPatch
+): VideoProject['version'] {
+  if (project.watermark !== undefined || patch.watermark !== undefined) return 20;
+  const background = patch.sceneBackground ?? project.sceneBackground;
+  if (background?.blur !== undefined) return 16;
   if (
-    project.version === 8 ||
-    (patch.clips ?? project.clips).some(
-      (clip) => clip.type === 'VIDEO' && clip.cameraMirrored !== undefined
-    )
+    background?.remembered !== undefined ||
+    (background?.kind === 'image' && background.imageFit !== undefined)
   )
-    return 8;
-  if (
-    project.version === 7 ||
-    (patch.tracks ?? project.tracks).some((track) => track.audioVolume !== undefined)
-  )
-    return 7;
-  if (
-    project.version === 6 ||
-    (patch.clips ?? project.clips).some(
-      (clip) => clip.type === 'AUDIO' && clip.originalAudioMute !== undefined
-    )
-  )
-    return 6;
-  if (
-    project.version === 5 ||
-    project.textDocuments !== undefined ||
-    patch.textDocuments !== undefined
-  )
-    return 5;
-  if (
-    project.version === 4 ||
-    project.cameraFollowDefaults !== undefined ||
-    patch.cameraFollowDefaults !== undefined ||
-    (patch.motionRegions ?? project.motionRegions)?.some(
-      (region) => region.cameraFollow !== undefined
-    )
-  )
+    return 14;
+  if ((patch.tracks ?? project.tracks).some((track) => track.audioVolume !== undefined)) return 7;
+  if (project.textDocuments !== undefined || patch.textDocuments !== undefined) return 5;
+  if (project.cameraFollowDefaults !== undefined || patch.cameraFollowDefaults !== undefined)
     return 4;
   if (
-    project.version === 3 ||
     project.cursorFocusPath !== undefined ||
     project.actionFeedback !== undefined ||
     patch.cursorFocusPath !== undefined ||

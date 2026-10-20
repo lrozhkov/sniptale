@@ -1,10 +1,4 @@
-import {
-  parseQuickEditBorder,
-  createQuickEditBorder,
-  clampQuickEditSpotlightArea,
-  type QuickEditBorder,
-} from '../scene/focus-appearance';
-import { isBoundedNumber, isRecord } from '../validation/primitives';
+import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
 import { isCameraMotionRegion } from './normalization';
 import { parseCameraPerspective, parseCameraDepth, parseMotionSpatialReference } from './spatial';
 import { parseMotionPhaseTransitions } from './transitions';
@@ -57,23 +51,8 @@ export function resolveMotionConnectionSource(
   project: Pick<VideoProject, 'motionRegions'>,
   destination: VideoProjectMotionRegion
 ): VideoProjectMotionRegion | null {
-  if (
-    destination.duration <= 0 ||
-    !destination.incomingConnection ||
-    !isConnectableMotionState(destination)
-  )
-    return null;
-  let previous: VideoProjectMotionRegion | null = null;
-  for (const region of project.motionRegions ?? []) {
-    if (
-      !isCameraMotionRegion(region) ||
-      region.duration <= 0 ||
-      region.id === destination.id ||
-      region.startTime > destination.startTime
-    )
-      continue;
-    if (!previous || region.startTime > previous.startTime) previous = region;
-  }
+  if (!destination.incomingConnection) return null;
+  const previous = resolveMotionConnectionCandidate(project, destination);
   const authoredSource = project.motionRegions?.find(
     (region) => region.id === destination.incomingConnection?.fromRegionId
   );
@@ -82,20 +61,55 @@ export function resolveMotionConnectionSource(
     previous &&
     (previous.id === destination.incomingConnection.fromRegionId ||
       (sourceGroup && previous.sourceBinding?.animationGroupId === sourceGroup));
+  return previous && matchesSource ? previous : null;
+}
+
+/** Nearest compatible held state; the UI can offer it before a connection is authored. */
+export function resolveMotionConnectionCandidate(
+  project: Pick<VideoProject, 'motionRegions'>,
+  destination: VideoProjectMotionRegion
+): VideoProjectMotionRegion | null {
+  if (destination.duration <= 0 || !isConnectableMotionState(destination)) return null;
+  let previous: VideoProjectMotionRegion | null = null;
+  for (const region of project.motionRegions ?? []) {
+    if (
+      !hasSameMotionConnectionTarget(region, destination) ||
+      region.duration <= 0 ||
+      region.id === destination.id ||
+      region.startTime > destination.startTime
+    )
+      continue;
+    if (!previous || region.startTime > previous.startTime) previous = region;
+  }
   return previous &&
-    matchesSource &&
     previous.startTime + previous.duration <= destination.startTime &&
     isConnectableMotionState(previous)
     ? previous
     : null;
 }
 
+function hasSameMotionConnectionTarget(
+  source: VideoProjectMotionRegion,
+  destination: VideoProjectMotionRegion
+): boolean {
+  if (source.spotlight && destination.spotlight) {
+    return (
+      source.spotlightTarget === destination.spotlightTarget &&
+      (source.spotlightTarget === 'viewport' ||
+        (source.sourceBinding !== undefined &&
+          source.sourceBinding.clipId === destination.sourceBinding?.clipId))
+    );
+  }
+  return isCameraMotionRegion(source) && isCameraMotionRegion(destination);
+}
+
 function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
   return (
-    isCameraMotionRegion(region) &&
-    (region.focusMode === VideoMotionFocusMode.MANUAL ||
-      region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
-      region.focusMode === VideoMotionFocusMode.ACTION)
+    Boolean(region.spotlight) ||
+    (isCameraMotionRegion(region) &&
+      (region.focusMode === VideoMotionFocusMode.MANUAL ||
+        region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
+        region.focusMode === VideoMotionFocusMode.ACTION))
   );
 }
 
@@ -217,6 +231,8 @@ export function normalizeVideoProjectMotionRegion(
   const sourceBinding = parseMotionSourceBinding(region.sourceBinding);
   const border = parseQuickEditBorder(region.border);
   const borderTarget = region.borderTarget;
+  const spotlight = border ? null : parseQuickEditSpotlight(region.spotlight);
+  const spotlightTarget = region.spotlightTarget;
   const duration = resolveMotionDuration(project, region.duration);
   const animation = isMotionAnimation(region.animation) ? region.animation : undefined;
   const animationDuration = sourceBinding?.animation.duration ?? animation?.duration ?? duration;
@@ -236,10 +252,17 @@ export function normalizeVideoProjectMotionRegion(
   const phaseRegion = phaseTransitions ? { ...region, phaseTransitions } : region;
   const enter = motionTransitionSettings(phaseRegion, 'enter');
   const exit = motionTransitionSettings(phaseRegion, 'exit');
+  const enterDuration = enter.type === 'none' ? region.zoomInDuration : enter.duration;
+  const exitDuration = exit.type === 'none' ? region.zoomOutDuration : exit.duration;
 
   return projectMotionSourceBinding(project, {
     ...(border && (borderTarget === 'viewport' || (borderTarget === 'window' && sourceBinding))
       ? { border, borderTarget }
+      : {}),
+    ...(spotlight &&
+    (spotlightTarget === 'viewport' ||
+      ((spotlightTarget === 'window' || spotlightTarget === 'scene') && sourceBinding))
+      ? { spotlight, spotlightTarget }
       : {}),
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(motionBlur ? { motionBlur } : {}),
@@ -266,87 +289,14 @@ export function normalizeVideoProjectMotionRegion(
     startTime,
     targetAction,
     zoomInDuration: clampNumber(
-      Number.isFinite(enter.duration) ? enter.duration : 0,
+      Number.isFinite(enterDuration) ? enterDuration : 0,
       0,
-      animationDuration
+      enter.type === 'none' ? 60 : animationDuration
     ),
     zoomOutDuration: clampNumber(
-      Number.isFinite(exit.duration) ? exit.duration : 0,
+      Number.isFinite(exitDuration) ? exitDuration : 0,
       0,
-      animationDuration
+      exit.type === 'none' ? 60 : animationDuration
     ),
-  });
-}
-
-/** Partial authoring edits merge inside the current interval owner, independently of its source clock. */
-export interface MotionBorderEdit {
-  enabled?: boolean;
-  target?: 'window' | 'viewport';
-  settings?: Omit<Partial<QuickEditBorder>, 'area'> & { area?: Partial<QuickEditBorder['area']> };
-}
-
-/** Admit one border edit without reviving a removed mode or changing dormant camera fields. */
-export function editMotionBorder(
-  project: Pick<VideoProject, 'clips'>,
-  region: VideoProjectMotionRegion,
-  edit: MotionBorderEdit
-): VideoProjectMotionRegion | null {
-  if (!isMotionBorderEdit(edit)) return null;
-  if (!(edit.enabled ?? region.border !== undefined)) {
-    if (edit.settings !== undefined || edit.target !== undefined) return null;
-    if (!region.border) return region;
-    const { border: _border, borderTarget: _target, ...camera } = region;
-    return camera;
-  }
-  const target =
-    edit.target ?? region.borderTarget ?? (region.sourceBinding ? 'window' : 'viewport');
-  if (
-    target === 'window' &&
-    !project.clips.some((clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId)
-  )
-    return null;
-  const border = mergeMotionBorderAppearance(
-    region.border ?? createQuickEditBorder(),
-    edit.settings
-  );
-  if (!border) return null;
-  if (
-    target === region.borderTarget &&
-    JSON.stringify(border) === JSON.stringify(parseQuickEditBorder(region.border))
-  )
-    return region;
-  return { ...region, border, borderTarget: target };
-}
-
-function isMotionBorderEdit(edit: MotionBorderEdit): boolean {
-  if (edit.enabled !== undefined && typeof edit.enabled !== 'boolean') return false;
-  if (edit.target !== undefined && edit.target !== 'window' && edit.target !== 'viewport')
-    return false;
-  return edit.settings === undefined || isRecord(edit.settings);
-}
-
-function mergeMotionBorderAppearance(
-  previous: QuickEditBorder,
-  settings: MotionBorderEdit['settings']
-): QuickEditBorder | null {
-  const area = settings?.area;
-  if (area !== undefined && !isMotionBorderAreaPatch(area)) return null;
-  return parseQuickEditBorder({
-    ...previous,
-    ...settings,
-    area: clampQuickEditSpotlightArea({ ...previous.area, ...area }),
-  });
-}
-
-function isMotionBorderAreaPatch(area: unknown): boolean {
-  if (!isRecord(area)) return false;
-  const minimums: Readonly<Record<string, number>> = { x: 0, y: 0, width: 0.01, height: 0.01 };
-  return Object.entries(area).every(([key, value]) => {
-    const minimum = minimums[key];
-    return (
-      Object.hasOwn(minimums, key) &&
-      typeof minimum === 'number' &&
-      isBoundedNumber(value, minimum, 1)
-    );
   });
 }

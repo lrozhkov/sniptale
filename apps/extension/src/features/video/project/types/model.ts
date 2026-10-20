@@ -324,7 +324,8 @@ export interface VideoProject {
     | 18
     | 19
     | 20
-    | 21;
+    | 21
+    | 22;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;

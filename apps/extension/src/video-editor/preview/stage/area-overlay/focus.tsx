@@ -8,7 +8,7 @@ import {
 } from 'react';
 import {
   clampQuickEditSpotlightArea,
-  type QuickEditBorder,
+  type QuickEditSpotlight,
 } from '../../../../features/video/project/scene/focus-appearance';
 import { resolveVideoCompositionVisualLayers } from '../../../../features/video/composition/timeline/frame/layers';
 import {
@@ -26,42 +26,44 @@ import {
 import { AREA_HANDLE_CLASS_NAME } from './shared';
 import type { AreaOverlayParams } from './types';
 
-type Area = QuickEditBorder['area'];
+type Area = QuickEditSpotlight['area'];
 type Point = { x: number; y: number };
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 
-const BORDER_AREA_BODY_CLASS_NAME = [
+const FOCUS_AREA_BODY_CLASS_NAME = [
   'pointer-events-auto cursor-move fill-transparent',
   'stroke-[var(--sniptale-color-accent-emphasis)] focus:outline-none',
   'focus:stroke-[var(--sniptale-color-text-primary-strong)]',
 ].join(' ');
-const BORDER_CORNER_LABELS = {
+const FOCUS_CORNER_LABELS = {
   nw: 'gallery.videoReview.key_top-left',
   ne: 'gallery.videoReview.key_top-right',
   sw: 'gallery.videoReview.key_bottom-left',
   se: 'gallery.videoReview.key_bottom-right',
 } as const;
 
-/** A border gesture presents one disposable draft and commits once against its accepted snapshot. */
-export function PreviewStageBorderAreaOverlay(params: AreaOverlayParams) {
+/** A focus-area gesture presents one disposable draft and commits once against its accepted snapshot. */
+export function PreviewStageFocusAreaOverlay(params: AreaOverlayParams) {
   const accepted = params.motionProject ?? params.project;
   const id = params.selectedMotionRegion?.id;
   const region = accepted.motionRegions?.find((item) => item.id === id);
   const displayed = params.project.motionRegions?.find((item) => item.id === id) ?? region;
   const locked = getVideoProjectUtilityLanes(accepted).camera.locked;
   const stage = params.stageRef.current;
-  const mapping = region?.border && stage ? borderTargetMapping(params, stage) : null;
-  const editing = useBorderAreaEditing(params, mapping);
+  const appearance = region?.border ?? region?.spotlight;
+  const displayedAppearance = displayed?.border ?? displayed?.spotlight;
+  const mapping = appearance && stage ? focusTargetMapping(params, stage) : null;
+  const editing = useFocusAreaEditing(params, mapping);
   if (
-    !region?.border ||
-    !displayed?.border ||
+    !appearance ||
+    !displayedAppearance ||
     !mapping ||
     !editing ||
     locked ||
     !params.onPreviewMotion
   )
     return null;
-  const area = displayed.border.area;
+  const area = displayedAppearance.area;
   const corners = [
     ['nw', { x: area.x, y: area.y }],
     ['ne', { x: area.x + area.width, y: area.y }],
@@ -76,15 +78,17 @@ export function PreviewStageBorderAreaOverlay(params: AreaOverlayParams) {
         className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
-        aria-label={translate('gallery.videoReview.focusBorder')}
+        aria-label={translate(
+          region?.border ? 'gallery.videoReview.focusBorder' : 'gallery.videoReview.focusSpotlight'
+        )}
       >
         <polygon
-          data-preview-stage-border-area="true"
+          data-preview-stage-focus-area="true"
           role="button"
           tabIndex={0}
           aria-label={translate('videoEditor.sidebar.selectAreaOnStage')}
           points={positions.map(({ point }) => `${point!.x},${point!.y}`).join(' ')}
-          className={BORDER_AREA_BODY_CLASS_NAME}
+          className={FOCUS_AREA_BODY_CLASS_NAME}
           strokeWidth={2}
           vectorEffect="non-scaling-stroke"
           onPointerDown={(event) => editing.begin(event, 'move')}
@@ -96,10 +100,10 @@ export function PreviewStageBorderAreaOverlay(params: AreaOverlayParams) {
         <button
           key={corner}
           type="button"
-          data-preview-stage-border-handle={corner}
+          data-preview-stage-focus-handle={corner}
           aria-label={[
             translate('videoEditor.sidebar.resizeAreaOnStage'),
-            translate(BORDER_CORNER_LABELS[corner]),
+            translate(FOCUS_CORNER_LABELS[corner]),
           ].join(' · ')}
           className={AREA_HANDLE_CLASS_NAME}
           style={{ left: `${point!.x}%`, top: `${point!.y}%`, cursor: `${corner}-resize` }}
@@ -112,9 +116,9 @@ export function PreviewStageBorderAreaOverlay(params: AreaOverlayParams) {
   );
 }
 
-function useBorderAreaEditing(
+function useFocusAreaEditing(
   params: AreaOverlayParams,
-  mapping: ReturnType<typeof borderTargetMapping>
+  mapping: ReturnType<typeof focusTargetMapping>
 ) {
   const accepted = params.motionProject ?? params.project;
   const id = params.selectedMotionRegion?.id;
@@ -124,15 +128,17 @@ function useBorderAreaEditing(
   const live = useRef(params);
   live.current = params;
   useEffect(() => () => session.current?.(), [accepted, id, locked, params.currentTime]);
-  if (!region?.border || !mapping) return null;
+  const appearance = region?.border ?? region?.spotlight;
+  if (!region || !appearance || !mapping) return null;
+  const kind = region.border ? 'border' : 'spotlight';
   const preview = (next: Area | null) =>
     params.onPreviewMotion?.(
       next
         ? {
             project: accepted,
             regionId: region.id,
-            kind: 'border',
-            edit: { settings: { area: next } },
+            kind: 'focus',
+            edit: { kind, settings: { area: next } },
           }
         : null
     );
@@ -145,10 +151,12 @@ function useBorderAreaEditing(
     if (
       isCurrent() &&
       Object.keys(next).some(
-        (key) => next[key as keyof Area] !== region.border!.area[key as keyof Area]
+        (key) => next[key as keyof Area] !== appearance.area[key as keyof Area]
       )
     )
-      params.onUpdateMotionRegion(region.id, { borderEdit: { settings: { area: next } } });
+      params.onUpdateMotionRegion(region.id, {
+        focusEdit: { kind, settings: { area: next } },
+      });
   };
   const begin = (
     event: ReactPointerEvent<SVGPolygonElement | HTMLButtonElement>,
@@ -163,7 +171,7 @@ function useBorderAreaEditing(
     const node = event.currentTarget;
     node.focus();
     const pointerId = event.pointerId;
-    const origin = region.border!.area;
+    const origin = appearance.area;
     let next = origin;
     const cleanup = () => {
       window.removeEventListener('pointermove', move);
@@ -189,7 +197,7 @@ function useBorderAreaEditing(
       next =
         mode === 'move'
           ? clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
-          : resizeBorderArea(origin, mode, dx, dy);
+          : resizeFocusArea(origin, mode, dx, dy);
       preview(next);
     };
     const finish = (input: PointerEvent) => {
@@ -220,17 +228,17 @@ function useBorderAreaEditing(
     if (!dx && !dy) return;
     event.preventDefault();
     event.stopPropagation();
-    const origin = region.border!.area;
+    const origin = appearance.area;
     commit(
       corner
-        ? resizeBorderArea(origin, corner, dx, dy)
+        ? resizeFocusArea(origin, corner, dx, dy)
         : clampQuickEditSpotlightArea({ ...origin, x: origin.x + dx, y: origin.y + dy })
     );
   };
   return { begin, keyboard, cancel: () => session.current?.() };
 }
 
-function resizeBorderArea(area: Area, corner: Corner, dx: number, dy: number): Area {
+function resizeFocusArea(area: Area, corner: Corner, dx: number, dy: number): Area {
   const right = area.x + area.width,
     bottom = area.y + area.height;
   const x = corner.endsWith('w') ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
@@ -244,18 +252,19 @@ function resizeBorderArea(area: Area, corner: Corner, dx: number, dy: number): A
 }
 
 /** Each concrete video's resolved visual layer supplies the same fit and affine transform as paint. */
-function borderTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
+function focusTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
   const region = params.selectedMotionRegion;
   if (!region) return null;
   const project = params.project;
   let mapping: VisualLayerSourcePointMapping | null = null;
   let lock = true;
-  if (region.borderTarget === 'window') {
+  const target = region.border ? region.borderTarget : region.spotlightTarget;
+  if (target === 'window' || target === 'scene') {
     const layer = resolveVideoCompositionVisualLayers(project, params.currentTime ?? 0).find(
       (item) => item.clipId === region.sourceBinding?.clipId && item.kind === 'video'
     );
     if (!layer || layer.kind !== 'video') return null;
-    mapping = borderWindowMapping(project, layer);
+    mapping = focusWindowMapping(project, layer);
     lock = shouldLockPreviewClipToViewport(layer.clip, params.camera, project);
   }
   return {
@@ -285,7 +294,7 @@ function borderTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
   };
 }
 
-function borderWindowMapping(
+function focusWindowMapping(
   project: AreaOverlayParams['project'],
   layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>
 ): VisualLayerSourcePointMapping {

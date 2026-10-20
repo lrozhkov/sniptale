@@ -1,5 +1,5 @@
 import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
-import { createReviewSpotlightMasks } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
+import { createSceneSpotlightMasks } from '../../../../apps/extension/src/features/video/composition/draw/spotlight';
 import { drawSceneBorders } from '../../../../apps/extension/src/features/video/composition/draw/border';
 import { evaluateQuickEditBordersAtTime } from '../../../../apps/extension/src/features/video/review/advanced/border';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
@@ -20,7 +20,7 @@ export function probe() {
     blur: 0,
     presence: 1,
   };
-  const masks = createReviewSpotlightMasks(output, [first, second]);
+  const masks = createSceneSpotlightMasks(output, [first, second]);
   const alpha = (x: number, y: number) =>
     masks.dim.getContext('2d')!.getImageData(x, y, 1, 1).data[3];
   const canvas = document.createElement('canvas');

@@ -38,7 +38,7 @@ export function resolveMotionStartTime(
   );
 }
 
-/** Camera occupancy and sampling exclude authored border intervals. */
+/** Camera occupancy and sampling exclude authored appearance intervals. */
 export function isCameraMotionRegion(region: VideoProjectMotionRegion): boolean {
-  return region.border === undefined;
+  return region.border === undefined && region.spotlight === undefined;
 }

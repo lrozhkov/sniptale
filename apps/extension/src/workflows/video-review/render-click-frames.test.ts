@@ -2,7 +2,7 @@ import { contextFixture } from './render-export.test-support';
 import { expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import { renderRenderWindowFrames } from './render-export';
-import { drawReviewSpotlights } from './render-spotlight';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 
@@ -63,7 +63,7 @@ it('uses global fragment time and paints clicks after focus, before viewport com
   expect(context.arc).toHaveBeenCalledWith(80, 90, 9.6, 0, 2 * Math.PI);
   const order = (fn: unknown) =>
     vi.mocked(fn as typeof context.stroke).mock.invocationCallOrder[0]!;
-  expect(order(drawReviewSpotlights)).toBeLessThan(order(context.arc));
+  expect(order(drawSceneSpotlights)).toBeLessThan(order(context.arc));
   expect(order(context.stroke)).toBeLessThan(order(context.fillText));
   expect(order(context.fillText)).toBeLessThan(order(add));
 });

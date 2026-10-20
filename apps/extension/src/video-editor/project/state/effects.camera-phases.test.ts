@@ -9,6 +9,7 @@ import { bindMotionRegionToClip } from '../../../features/video/project/motion/s
 import { createVideoEditorProjectTestStore } from './test-store.test-support';
 import { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } from '../history';
 import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import { motionTransitionSettings } from '../../../features/video/project/motion/timing';
 import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 
 function setup() {
@@ -56,8 +57,9 @@ it('merges current scalar edits without replacing another phase or region', () =
   expect(after.motionRegions?.[0]).toMatchObject({
     phaseTransitions: { enter: 'ease-in-out', exit: 'none' },
     zoomInDuration: 3.5,
-    zoomOutDuration: 0,
+    zoomOutDuration: 0.5,
   });
+  expect(motionTransitionSettings(after.motionRegions![0]!, 'exit').duration).toBe(0);
   expect(after.motionRegions?.[1]).toEqual(before.motionRegions?.[1]);
   expect(after.clips).toEqual(before.clips);
   expect(after.assets).toEqual(before.assets);

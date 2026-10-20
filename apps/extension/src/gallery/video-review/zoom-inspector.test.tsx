@@ -5,7 +5,6 @@ import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
-import { ReviewSpotlightInspector } from './spotlight-inspector';
 
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
@@ -280,10 +279,11 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     const section = phase
       ? host.querySelector(`fieldset[aria-label="gallery.videoReview.${phase}"]`)!
       : host;
-    if (label === 'focusReveal') {
-      await act(async () =>
-        section.querySelector<HTMLButtonElement>(`[title="gallery.videoReview.${option}"]`)!.click()
-      );
+    const direct = section.querySelector<HTMLButtonElement>(
+      `button[title="gallery.videoReview.${option}"]`
+    );
+    if (direct) {
+      await act(async () => direct.click());
       return;
     }
     await act(async () =>
@@ -667,7 +667,15 @@ it.each([
     const preview = vi.fn();
     const change = vi.fn();
     await act(async () =>
-      root.render(<ReviewSpotlightInspector value={value} onPreview={preview} onChange={change} />)
+      root.render(
+        <ReviewZoomInspector
+          region={{ ...region, spotlight: value }}
+          onPreview={preview}
+          onChange={change}
+          onReset={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
     );
     const range = host.querySelector<HTMLInputElement>(
       `input[type="range"][aria-label^="gallery.videoReview.${label}"]`
@@ -684,7 +692,7 @@ it.each([
     key('keydown', 'ArrowRight');
     key('keyup', 'ArrowRight');
     expect(change).toHaveBeenCalledOnce();
-    expect(change.mock.lastCall![0][target]).not.toEqual(value[target]);
+    expect(change.mock.lastCall![0].spotlight[target]).not.toEqual(value[target]);
   }
 );
 

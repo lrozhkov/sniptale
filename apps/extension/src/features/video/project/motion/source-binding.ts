@@ -60,7 +60,9 @@ export function getMotionBindingCandidates(
     return (
       clip.type === VideoProjectClipType.VIDEO &&
       track?.visible === true &&
-      (region.border !== undefined || track.role !== VideoProjectTrackRole.CAMERA) &&
+      (region.border !== undefined ||
+        region.spotlight !== undefined ||
+        track.role !== VideoProjectTrackRole.CAMERA) &&
       clip.startTime <= region.startTime &&
       clip.startTime + clip.duration >= region.startTime + region.duration
     );

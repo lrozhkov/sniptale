@@ -1,5 +1,5 @@
 import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
-import { editMotionBorder } from '../../../features/video/project/motion';
+import { editMotionFocus } from '../../../features/video/project/motion/focus-appearance';
 import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
 import type { VideoProject } from '../../../features/video/project/types';
@@ -383,16 +383,17 @@ export function presentWorkspaceMotionPreview(
     return project;
   const region = project.motionRegions?.find((item) => item.id === preview.regionId);
   if (!region) return project;
-  if (preview.kind === 'border') {
-    const border = editMotionBorder(project, region, preview.edit);
-    if (!border) return project;
+  if (preview.kind === 'focus') {
+    const focus = editMotionFocus(project, region, preview.edit);
+    if (!focus) return project;
     const edited = preview.transition
-      ? editMotionTransitionPhase(border, preview.transition)
-      : border;
+      ? editMotionTransitionPhase(focus, preview.transition)
+      : focus;
     if (!edited || edited === region) return project;
+    const version = edited.spotlight ? 22 : 21;
     return {
       ...project,
-      version: project.version >= 21 ? project.version : 21,
+      version: project.version >= version ? project.version : version,
       motionRegions: project.motionRegions!.map((item) => (item === region ? edited : item)),
     };
   }

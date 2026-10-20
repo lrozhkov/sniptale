@@ -1,5 +1,85 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'scene-spotlight-sampling',
+    productionFile: 'apps/extension/src/features/video/composition/scene-spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Both timeline adapters share opening geometry and evaluated interpolation.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/scene-spotlight.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus-layout.test.ts',
+      'apps/extension/src/features/video/review/advanced/focus-reveal.test.ts',
+    ],
+  },
+  {
+    owner: 'scene-spotlight-paint',
+    productionFile: 'apps/extension/src/features/video/composition/draw/spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Mask projection, union coverage and allocation failure serve both editors.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-spotlight.test.ts',
+      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+      'apps/extension/src/gallery/video-review/spotlight-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-focus-authoring',
+    productionFile: 'apps/extension/src/features/video/project/motion/focus-appearance.ts',
+    allowCrossOwner: true,
+    reason: 'Current commands and disposable previews share strict partial focus edits.',
+    testFiles: [
+      'apps/extension/src/features/video/project/motion/focus-appearance.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-spotlight-frame',
+    productionFile: 'apps/extension/src/features/video/composition/timeline/frame/spotlights.ts',
+    allowCrossOwner: true,
+    reason: 'Native clocks, target coverage and compatible morphs enter scene and effect inputs.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/timeline/frame/spotlights.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/layers.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
+    ],
+  },
+  {
+    owner: 'native-spotlight-projection',
+    productionFile: 'apps/extension/src/features/video/composition/draw/project-spotlight.ts',
+    allowCrossOwner: true,
+    reason: 'Native source phases and attachment geometry share mask protection rules.',
+    testFiles: ['apps/extension/src/features/video/composition/draw/project-spotlight.test.ts'],
+  },
+  {
+    owner: 'native-video-window-draw',
+    productionFile: 'apps/extension/src/features/video/composition/draw/video.ts',
+    allowCrossOwner: true,
+    reason: 'Video isolation owns source fit, decorations, sharp feedback and failure cleanup.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/draw/video.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.scaling.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/features/video/composition/draw/decoded-sample.test.ts',
+    ],
+  },
+  {
+    owner: 'fitted-media-raster',
+    productionFile: 'apps/extension/src/features/video/composition/draw/fitted-media.ts',
+    allowCrossOwner: true,
+    reason: 'Header raster density must retain authored source coordinates and clip geometry.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+      'apps/extension/src/features/video/composition/draw/window-header.test.ts',
+      'apps/extension/src/features/video/composition/draw/visual.scaling.test.ts',
+      'apps/extension/src/features/video/composition/draw/camera-appearance.test.ts',
+    ],
+  },
+
+  {
     owner: 'scene-border-sampling',
     productionFile: 'apps/extension/src/features/video/composition/scene-border.ts',
     allowCrossOwner: true,
@@ -28,7 +108,7 @@ export const EDITOR_OWNER_MAPPINGS = [
       'Explicit targets retain source phase through split, rate and duplicate without moving the camera.',
     testFiles: [
       'apps/extension/src/features/video/composition/motion/border-isolation.test.ts',
-      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
     ],
   },
   {
@@ -43,24 +123,25 @@ export const EDITOR_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'native-border-inspector',
-    productionFile: 'apps/extension/src/video-editor/workspace/sidebar/selection/motion/border.tsx',
+    owner: 'native-focus-inspector',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/appearance.tsx',
     allowCrossOwner: true,
     reason: 'The inspector uses current commands and the existing disposable preview owner.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
       'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
-      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.focus.test.ts',
     ],
   },
   {
-    owner: 'native-border-area',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/area-overlay/border.tsx',
+    owner: 'native-focus-area',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/area-overlay/focus.tsx',
     allowCrossOwner: true,
     reason:
       'Window projection and pointer cancellation preserve accepted data until one gesture commits.',
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/area-overlay/border.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/area-overlay/focus.test.tsx',
       'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
     ],
   },

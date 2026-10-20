@@ -3,13 +3,13 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ReviewSpotlightOverlay } from '../../../../apps/extension/src/gallery/video-review/spotlight-overlay';
-import { createReviewSpotlightMasks } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
+import { createSceneSpotlightMasks } from '../../../../apps/extension/src/features/video/composition/draw/spotlight';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import { drawReviewSpotlights } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
+import { drawSceneSpotlights } from '../../../../apps/extension/src/features/video/composition/draw/spotlight';
 
 function edgeProbe() {
   return [false, true].map((clipped) => {
@@ -24,12 +24,18 @@ function edgeProbe() {
     const scratch = document.createElement('canvas');
     scratch.width = canvas.width;
     scratch.height = canvas.height;
-    drawReviewSpotlights(
+    drawSceneSpotlights(
       context,
       canvas,
       scratch,
-      [{ opening: { x: 10, y: 65, width: 20, height: 20 }, radius: 2, blur: 12, dim: 0 }],
-      clipped ? { rect: { x: 15, y: 15, width: 200, height: 130 }, radius: 10 } : undefined
+      [{ opening: { x: 10, y: 65, width: 20, height: 20 }, radius: 2, blur: 12, dim: 0 }].map(
+        (frame) => ({
+          ...frame,
+          clip: clipped
+            ? { rect: { x: 15, y: 15, width: 200, height: 130 }, radius: 10 }
+            : undefined,
+        })
+      )
     );
     const contrast = (y: number) => {
       const pixels = context.getImageData(80, y, 80, 1).data;
@@ -119,12 +125,13 @@ function sceneProbe() {
         dim,
         blur: dim ? 0 : 12,
       };
-      drawReviewSpotlights(
+      drawSceneSpotlights(
         context,
         canvas,
         document.createElement('canvas'),
-        overlapping ? [frame, { ...frame, opening: { ...frame.opening, x: 25 } }] : [frame],
-        { rect: layout.windowRect, radius: 14 }
+        (overlapping ? [frame, { ...frame, opening: { ...frame.opening, x: 25 } }] : [frame]).map(
+          (frame) => ({ ...frame, clip: { rect: layout.windowRect, radius: 14 } })
+        )
       );
       const actual = context.getImageData(0, 0, canvas.width, canvas.height).data;
       let error = 0;
@@ -194,7 +201,10 @@ async function previewProbe() {
       const canvas = Object.assign(document.createElement('canvas'), output);
       canvas.getContext('2d')!.drawImage(image, 0, 0, output.width, output.height);
       const actual = canvas.getContext('2d')!.getImageData(0, 0, output.width, output.height).data;
-      const expected = createReviewSpotlightMasks(output, [frame], clip)
+      const expected = createSceneSpotlightMasks(
+        output,
+        [frame].map((frame) => ({ ...frame, clip: clip }))
+      )
         .dim.getContext('2d')!
         .getImageData(0, 0, output.width, output.height).data;
       let mismatch = 0;
