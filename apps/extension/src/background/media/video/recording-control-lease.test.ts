@@ -62,6 +62,7 @@ import {
   getActiveVideoRecordingLeaseSnapshot,
   issuePreparedVideoRecordingLease,
   resetActiveVideoRecordingLeaseForTests,
+  requireActiveVideoRecordingSourceBinding,
   validateRecordingControlCapability,
 } from './recording-control-lease';
 import {
@@ -172,6 +173,38 @@ it('persists a camera recording control lease without a recording tab id', async
       }),
     },
     expect.anything()
+  );
+});
+
+it('admits a source binding only after the exact prepared lease activates', async () => {
+  const binding = { generation: 2, streamInstanceId: 'stream-instance-1' };
+  await issuePreparedVideoRecordingLease({
+    captureMode: CaptureMode.TAB,
+    ownerSenderUrl,
+    surfaceBinding: binding,
+  });
+  await expect(requireActiveVideoRecordingSourceBinding()).rejects.toThrow(
+    'Active recording source binding is unavailable'
+  );
+  await activateVideoRecordingLease({ ...binding, recordingId: 'recording-1' });
+  await expect(requireActiveVideoRecordingSourceBinding()).resolves.toEqual({
+    ...binding,
+    recordingId: 'recording-1',
+  });
+});
+
+it('refuses source binding authority when the active lease has no source binding', async () => {
+  await expect(requireActiveVideoRecordingSourceBinding()).rejects.toThrow(
+    'Active recording source binding is unavailable'
+  );
+  await issuePreparedVideoRecordingLease({ captureMode: CaptureMode.TAB, ownerSenderUrl });
+  await activateVideoRecordingLease({
+    generation: 1,
+    recordingId: 'recording-1',
+    streamInstanceId: null,
+  });
+  await expect(requireActiveVideoRecordingSourceBinding()).rejects.toThrow(
+    'Active recording source binding is unavailable'
   );
 });
 

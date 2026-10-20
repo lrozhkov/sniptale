@@ -101,7 +101,11 @@ async function installControlledTabCamera(
   }
   const install = (acquisitionDelay: number) => {
     const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    const probe = { requests: 0, streams: [] as MediaStream[] };
+    const probe = {
+      requests: 0,
+      streams: [] as MediaStream[],
+      captureStreams: [] as MediaStream[],
+    };
     Reflect.set(globalThis, '__countdownCameraSource', probe);
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       const video = constraints?.video;
@@ -110,7 +114,11 @@ async function installControlledTabCamera(
         typeof mandatory === 'object' &&
         mandatory !== null &&
         Reflect.get(mandatory, 'chromeMediaSource') === 'tab';
-      if (!video || tabSource) return original(constraints);
+      if (!video || tabSource) {
+        const stream = await original(constraints);
+        probe.captureStreams.push(stream);
+        return stream;
+      }
       probe.requests += 1;
       await new Promise<void>((resolve) => setTimeout(resolve, acquisitionDelay));
       const canvas = document.createElement('canvas');
@@ -143,14 +151,22 @@ const scenarios = [
   { captureMode: CaptureMode.TAB, countdownSeconds: 3, cameraDelay: 0 },
   { captureMode: CaptureMode.TAB, countdownSeconds: 3, cameraDelay: 2_600 },
   { captureMode: CaptureMode.TAB, countdownSeconds: 10, cameraDelay: 2_600, reopen: true },
+  {
+    captureMode: CaptureMode.TAB,
+    countdownSeconds: 10,
+    cameraDelay: 0,
+    reopen: true,
+    cancel: true,
+  },
 ] as const;
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const scenario of scenarios) {
     const { captureMode, countdownSeconds, cameraDelay } = scenario;
     const reopen = 'reopen' in scenario && scenario.reopen;
+    const cancel = 'cancel' in scenario && scenario.cancel;
     const name = `actual action popup camera countdown ${captureMode} ${countdownSeconds}s`;
-    test(`${name} ${cameraDelay ?? 'native'}ms ${reopen ? 'reopen' : 'record'} ${viewport.name}`, async ({}, info) => {
+    test(`${name} ${cameraDelay ?? 'native'}ms ${cancel ? 'cancel-restart' : reopen ? 'reopen' : 'record'} ${viewport.name}`, async ({}, info) => {
       const server = await startHostServer();
       const launched = await launchExtensionBrowser({
         viewport: viewport.size,
@@ -309,6 +325,115 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           }
           await expect.poll(inspect, { intervals: [50, 100] }).toMatchObject({ hasFrames: true });
           await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+        }
+        if (cancel) {
+          for (const attempt of ['first', 'restarted']) {
+            if (attempt === 'restarted') {
+              await sendRuntimeMessageInTarget(
+                context,
+                action,
+                {
+                  type: VideoMessageType.START_RECORDING,
+                  captureMode,
+                  tabId,
+                  viewportPresetId: null,
+                  settings,
+                },
+                false
+              );
+              const previous = action;
+              const session = await browser.newBrowserCDPSession();
+              try {
+                await expect
+                  .poll(async () => {
+                    const { targetInfos } = await session.send('Target.getTargets');
+                    return targetInfos.some((candidate) => candidate.targetId === previous);
+                  })
+                  .toBe(false);
+              } finally {
+                await session.detach();
+              }
+              await expect.poll(inspect).toMatchObject({ hasFrames: true });
+              await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+            }
+            await expect
+              .poll(() =>
+                evaluateInTarget(
+                  context,
+                  action,
+                  `(() => {
+                    const button = document.querySelector('[data-ui="popup.video-active.cancel-button"]');
+                    if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
+                    button.scrollIntoView({ block: 'nearest' });
+                    const bounds = button.getBoundingClientRect();
+                    return bounds.top >= 0 && bounds.bottom <= innerHeight &&
+                      bounds.left >= 0 && bounds.right <= innerWidth;
+                  })()`
+                )
+              )
+              .toBe(true);
+            await saveActionScreenshot(
+              browser,
+              action,
+              info.outputPath(`cancel-${attempt}-countdown.png`)
+            );
+            await evaluateInTarget(
+              context,
+              action,
+              `document.querySelector('[data-ui="popup.video-active.cancel-button"]')?.click()`
+            );
+            await expect
+              .poll(readStatus)
+              .toBe(VideoRecordingStatus.IDLE)
+              .catch(async (error) => {
+                await saveActionScreenshot(browser, action, info.outputPath('cancel-failure.png'));
+                throw error;
+              });
+            const stopped = parseRuntimeResponseForMessage(
+              VideoMessageType.GET_RECORDING_STATE,
+              await sendRuntimeMessageInTarget(context, action, {
+                type: VideoMessageType.GET_RECORDING_STATE,
+              })
+            );
+            expect(stopped).toMatchObject({
+              success: true,
+              state: { status: VideoRecordingStatus.IDLE, error: null, completion: null },
+            });
+            if (!offscreen) throw new Error('Cancellation track probe is unavailable');
+            await expect
+              .poll(() =>
+                evaluateInTarget(
+                  context,
+                  offscreen,
+                  `(() => {
+                    const source = globalThis.__countdownCameraSource;
+                    const streams = [...source.streams, ...source.captureStreams];
+                    return {
+                      cameraRequests: source.requests,
+                      hasCapture: source.captureStreams.length > 0,
+                      liveTracks: streams.flatMap(stream => stream.getTracks())
+                        .filter(track => track.readyState === 'live').length,
+                    };
+                  })()`
+                )
+              )
+              .toEqual({
+                cameraRequests: attempt === 'first' ? 1 : 2,
+                hasCapture: true,
+                liveTracks: 0,
+              });
+            await saveActionScreenshot(
+              browser,
+              action,
+              info.outputPath(`cancel-${attempt}-idle.png`)
+            );
+          }
+          const library = await context.newPage();
+          await library.goto(
+            `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`
+          );
+          await expect(library.getByText('Your Library is empty', { exact: true })).toBeVisible();
+          return;
         }
         await expect
           .poll(readStatus, { timeout: countdownSeconds * 1_000 + 10_000 })

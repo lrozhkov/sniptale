@@ -4,6 +4,7 @@ import {
   allowRecordingBegin,
   assertRecordingBegin,
   cancelRecordingBegin,
+  RecordingBeginCancelledError,
   waitForRecordingBegin,
 } from './gate';
 
@@ -62,6 +63,7 @@ it('rejects parallel gates and stale begin signals', async () => {
 it('cancels safely with and without a pending gate', async () => {
   const pending = waitForRecordingBegin(binding);
   cancelRecordingBegin();
+  await expect(pending).rejects.toBeInstanceOf(RecordingBeginCancelledError);
   await expect(pending).rejects.toThrow('Recording start was cancelled');
   expect(() => cancelRecordingBegin()).not.toThrow();
 });

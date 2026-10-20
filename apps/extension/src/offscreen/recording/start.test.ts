@@ -281,6 +281,28 @@ it('routes setup errors through the shared start-error path', async () => {
   expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(expect.any(Error), 'recording-error');
 });
 
+it('settles explicit cancellation before the pending Stop changes the starting lifecycle', async () => {
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'ALLOW' });
+  const pendingStart = startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 1,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: createSettings(),
+      streamId: 'stream-1',
+    },
+    messaging
+  );
+  await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledOnce());
+  cancelRecordingBegin();
+
+  await expect(pendingStart).resolves.toBeUndefined();
+  expect(handleRecordingStartErrorMock).not.toHaveBeenCalled();
+  expect(createRecordingStagingCoordinatorMock).not.toHaveBeenCalled();
+  expect(finalizeRecordingBootstrapMock).not.toHaveBeenCalled();
+});
+
 it.each([
   { displayWidth: 1200 },
   { displayHeight: 700 },

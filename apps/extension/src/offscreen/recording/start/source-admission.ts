@@ -9,7 +9,7 @@ import { prepareCountdownCameraPreview, retireCountdownCameraPeers } from '../co
 import { recordingContext } from '../context';
 import type { RecordingSetupResult } from '../setup';
 import { cleanupResources } from './cleanup';
-import { waitForRecordingBegin } from './gate';
+import { RecordingBeginCancelledError, waitForRecordingBegin } from './gate';
 
 function isStillStarting(recordingId: string): boolean {
   return (
@@ -70,7 +70,10 @@ export async function admitPreparedRecordingSource(
     throw error;
   }
   const beginResult = await observedBegin;
-  if (!beginResult.ok) throw beginResult.error;
+  if (!beginResult.ok) {
+    if (beginResult.error instanceof RecordingBeginCancelledError) return false;
+    throw beginResult.error;
+  }
   retireCountdownCameraPeers(binding);
   if (!isStillStarting(binding.recordingId)) {
     cleanupResources();

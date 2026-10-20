@@ -3,6 +3,7 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { admitPreparedRecordingSource } from './source-admission';
+import { RecordingBeginCancelledError } from './gate';
 
 const mocks = vi.hoisted(() => ({
   preview: vi.fn(),
@@ -23,7 +24,10 @@ vi.mock('../countdown-preview', () => ({
 }));
 vi.mock('../context', () => ({ recordingContext: mocks.context }));
 vi.mock('./cleanup', () => ({ cleanupResources: mocks.cleanup }));
-vi.mock('./gate', () => ({ waitForRecordingBegin: mocks.begin }));
+vi.mock('./gate', async (original) => ({
+  ...(await original<typeof import('./gate')>()),
+  waitForRecordingBegin: mocks.begin,
+}));
 
 const binding = { recordingId: 'recording', generation: 1, streamInstanceId: 'stream' };
 const prepared = {
@@ -121,4 +125,34 @@ it('cleans up a start cancelled while awaiting BEGIN', async () => {
   await expect(admission).resolves.toBe(false);
   expect(mocks.retire).toHaveBeenCalledWith(binding);
   expect(mocks.cleanup).toHaveBeenCalledOnce();
+});
+
+it.each(['starting', 'stopping'])(
+  'settles explicit cancellation while the prepared session is %s',
+  async (lifecycle) => {
+    mocks.context.lifecycleState = 'starting';
+    const begin = Promise.withResolvers<void>();
+    mocks.begin.mockReturnValue(begin.promise);
+    const admission = admitPreparedRecordingSource(args, { sendRuntimeMessage: mocks.send });
+    await flush();
+    mocks.context.lifecycleState = lifecycle;
+    begin.reject(new RecordingBeginCancelledError('Recording start was cancelled'));
+    await expect(admission).resolves.toBe(false);
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.retire).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  { lifecycle: 'starting', error: new Error('Timed out while waiting for recording activation') },
+  { lifecycle: 'stopping', error: new Error('Timed out while waiting for recording activation') },
+  { lifecycle: 'stopping', error: new Error('source failed') },
+])('preserves BEGIN failure for $lifecycle: $error.message', async ({ lifecycle, error }) => {
+  const begin = Promise.withResolvers<void>();
+  mocks.begin.mockReturnValue(begin.promise);
+  const admission = admitPreparedRecordingSource(args, { sendRuntimeMessage: mocks.send });
+  await flush();
+  mocks.context.lifecycleState = lifecycle;
+  begin.reject(error);
+  await expect(admission).rejects.toBe(error);
 });
