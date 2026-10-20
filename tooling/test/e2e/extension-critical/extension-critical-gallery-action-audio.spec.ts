@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { build } from 'esbuild';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -227,14 +228,20 @@ for (const viewport of [
         ['typing', 'gallery.videoReview.actionAudioTypingNatural'],
       ] as const) {
         const row = audio.locator(`[data-family="${family}"]`);
-        await row.locator('button[aria-haspopup="listbox"]').click();
-        await page.getByRole('option', { name: label(preset), exact: true }).click();
+        const choiceName = await row
+          .locator('[data-audio-choice-row] [aria-label]')
+          .first()
+          .getAttribute('aria-label');
+        await chooseInspectorValue(page, row, choiceName!, label(preset));
         const listen = row.getByRole('button', {
           name: label('gallery.videoReview.actionAudioListen'),
           exact: true,
         });
         await expect(listen).toBeEnabled();
-        const choiceBox = (await row.locator('button[aria-haspopup="listbox"]').boundingBox())!;
+        const choiceBox = (await row
+          .locator('[data-audio-choice-row]')
+          .locator('.sniptale-property-choice')
+          .boundingBox())!;
         const listenBox = (await listen.boundingBox())!;
         expect(listenBox.x).toBeGreaterThanOrEqual(choiceBox.x + choiceBox.width);
         expect(

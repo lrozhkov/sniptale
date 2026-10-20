@@ -1,7 +1,11 @@
 import { REVIEW_CLICK_DEFAULT } from '../project/action-feedback/validation';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
 import type { VideoProject, RecordingActionEvent, VideoProjectVideoClip } from '../project/types';
-import type { VideoProjectActionFeedback } from '../project/action-feedback/types';
+import type {
+  VideoProjectActionFeedback,
+  ReviewActionAudioTarget,
+  ReviewActionAudioStyle,
+} from '../project/action-feedback/types';
 import { buildReviewActionAudioPlan, type ReviewActionAudioPlan } from './action-audio';
 import { scheduleReviewClicks, evaluateReviewClicks } from './click-animation';
 import { projectReviewTelemetry } from './telemetry';
@@ -145,6 +149,33 @@ export function buildProjectActionAudioPlan(project: VideoProject): ReviewAction
   }
   return { duration: project.duration, descriptors };
 }
+/** A read-only audition uses the selected instance and the existing source-to-project time map. */
+export function buildProjectActionAudioAuditionPlan(
+  project: VideoProject,
+  identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>,
+  target: ReviewActionAudioTarget,
+  style: ReviewActionAudioStyle
+): ReviewActionAudioPlan {
+  const group = project.actionFeedback?.find(
+    (item) =>
+      item.recordingId === identity.recordingId &&
+      item.sourceInstanceId === identity.sourceInstanceId
+  );
+  if (
+    !group ||
+    (target.ref.kind === 'signal' &&
+      group.signals.some(
+        (signal) => signal.id === target.ref.id && signal.data['privacy'] === 'protected'
+      ))
+  )
+    return { duration: project.duration, descriptors: [] };
+  return buildProjectActionAudioPlan({
+    ...project,
+    actionPresentation: { ...getVideoProjectActionPresentation(project), enabled: true },
+    actionFeedback: [{ ...group, settings: [{ ...style, enabled: true, ref: { ...target.ref } }] }],
+  });
+}
+
 const gesturePlans = new WeakMap<VideoProject, ReturnType<typeof prepareProjectGestureFeedback>>();
 
 /** Both surfaces query one source/run plan per immutable project revision. */

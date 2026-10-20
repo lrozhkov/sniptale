@@ -4,6 +4,7 @@ import { createVideoProjectFromRecording } from '../project/factories/creation';
 import { encodeRecordingKeyboardRhythm } from '../project/keyboard-rhythm';
 import {
   buildProjectActionAudioPlan,
+  buildProjectActionAudioAuditionPlan,
   projectActionFeedbackMarkers,
   evaluateProjectGestureFeedback,
 } from './project-action-audio';
@@ -461,4 +462,64 @@ it('honours per-event Off for saved authored gesture styles and restores them on
   expect(evaluateProjectGestureFeedback(on, 2)).toEqual(evaluateProjectGestureFeedback(project, 2));
   expect(resolveVideoCompositionActions(on, 2)).toHaveLength(1);
   expect(on.actionFeedback![0]!.gestureStyles).toEqual(styles);
+});
+
+it('auditions only the selected instance and typed identity through cut and Speed without authoring', () => {
+  const project = fixture();
+  const base = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const group = project.actionFeedback![0]!;
+  const copy = { ...structuredClone(group), sourceInstanceId: 'copy' };
+  project.actionFeedback!.push(copy);
+  project.actionEvents.push(
+    ...project.actionEvents.flatMap((event) =>
+      event.anchor.kind === 'recording-source'
+        ? [
+            {
+              ...event,
+              id: `${event.id}:copy`,
+              anchor: { ...event.anchor, sourceInstanceId: 'copy' },
+            },
+          ]
+        : []
+    )
+  );
+  project.clips.push({
+    ...base,
+    id: 'copy-clip',
+    sourceInstanceId: 'copy',
+    sourceStart: 2,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 2,
+    playbackRate: 2,
+  });
+  project.duration = 12;
+  project.actionPresentation = { ...getVideoProjectActionPresentation(project), enabled: false };
+  const before = structuredClone(project);
+  const target = { ref: { kind: 'action' as const, id: 'drag' }, family: 'mouse' as const };
+  const style = { ...group.settings[1]!, offset: 0.2 };
+  const audition = cues(buildProjectActionAudioAuditionPlan(project, copy, target, style));
+  expect(audition).toHaveLength(1);
+  expect(audition[0]!.start).toBeCloseTo(11.7, 12);
+  expect(audition[0]!.rate).toBe(1);
+  expect(audition[0]!.volume).toBeCloseTo(style.volume, 12);
+  expect(
+    buildProjectActionAudioAuditionPlan(
+      project,
+      { ...copy, sourceInstanceId: 'removed' },
+      target,
+      style
+    ).descriptors
+  ).toEqual([]);
+  const protectedProject = structuredClone(project);
+  protectedProject.actionFeedback![1]!.signals[0]!.data['privacy'] = 'protected';
+  expect(
+    buildProjectActionAudioAuditionPlan(
+      protectedProject,
+      copy,
+      { ref: { kind: 'signal', id: 'rhythm' }, family: 'typing' },
+      group.settings[0]!
+    ).descriptors
+  ).toEqual([]);
+  expect(project).toEqual(before);
 });

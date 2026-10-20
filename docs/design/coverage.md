@@ -39,6 +39,7 @@ Inspected source paths use `apps/extension/src/`:
 
 - `gallery/video-review/{inspector,inspector-sections,scene-inspector,background-inspector,presentation-inspector}.tsx`
 - `ui/watermark/inspector.tsx`
+- `ui/action-audio/fields.tsx`
 - `workflows/browser-frame/settings.tsx`
 - `popup/recording/video/setup/body.tsx`
 - `popup/recording/video/settings/layout.tsx`

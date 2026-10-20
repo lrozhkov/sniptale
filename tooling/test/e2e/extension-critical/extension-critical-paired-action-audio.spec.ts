@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { expect, test, type Page, type Locator } from '@playwright/test';
@@ -87,11 +88,12 @@ for (const viewport of [
             .click();
           await audio.scrollIntoViewIfNeeded();
         }
-        await audio
-          .locator('[data-family="mouse"]')
-          .getByRole('button', { name: /^Mouse ·/ })
-          .click();
-        await page.getByRole('option', { name: label(key), exact: true }).click();
+        await chooseInspectorValue(
+          page,
+          audio.locator('[data-family="mouse"]'),
+          `${label('gallery.videoReview.actionAudioMouse')} · 1`,
+          label(key)
+        );
         await expect
           .poll(async () => (await persistedReviewContent(page))?.actionAudio?.[0]?.presetId)
           .toBe(preset);
@@ -347,7 +349,10 @@ for (const width of [1280, 1920]) {
           await page.locator('[data-ui="video-editor.timeline.history-event"]').first().click();
           await page
             .locator('nav')
-            .getByRole('button', { name: label('gallery.videoReview.actionAudio'), exact: true })
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.historyClickEffects'),
+              exact: true,
+            })
             .click();
         } else {
           await page.reload();
@@ -386,10 +391,12 @@ for (const width of [1280, 1920]) {
             .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
             .click();
         }
-        await appearance.click();
-        await page
-          .getByRole('option', { name: label('gallery.videoReview.gesture_area'), exact: true })
-          .click();
+        await chooseInspectorValue(
+          page,
+          page.locator('body'),
+          label('gallery.videoReview.gestureAppearance'),
+          label('gallery.videoReview.gesture_area')
+        );
         const details = page.locator('details[data-level="group"]').filter({
           has: page.getByText(label('gallery.videoReview.gestureAreaDetails'), { exact: true }),
         });
@@ -513,8 +520,11 @@ for (const width of [1280, 1920]) {
           ).toBeVisible();
         await page.reload();
         if (editor === 'gallery') {
-          await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-          await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          if (new URL(page.url()).searchParams.get('mode') !== 'edit') {
+            await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+            await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+          }
+          await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toBeVisible();
           await page
             .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
             .click();
@@ -532,7 +542,10 @@ for (const width of [1280, 1920]) {
           await page.locator('[data-ui="video-editor.timeline.history-event"]').first().click();
           await page
             .locator('nav')
-            .getByRole('button', { name: label('gallery.videoReview.actionAudio'), exact: true })
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.historyClickEffects'),
+              exact: true,
+            })
             .click();
         }
         if ((await details.getAttribute('open')) === null) await details.locator('summary').click();

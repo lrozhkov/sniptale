@@ -1,3 +1,4 @@
+import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -5,19 +6,33 @@ import { expect, it, vi } from 'vitest';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { createVideoProjectFromRecording } from '../../../../../features/video/project/factories/creation';
 import { ActionFeedbackFields } from './action-feedback-fields';
-const { updateProject } = vi.hoisted(() => ({
-  updateProject: vi.fn<(updater: (project: VideoProject) => VideoProject) => void>(),
-}));
+const { updateProject, setPlaying, auditionWork, closeAudition, getAuthoredProject } = vi.hoisted(
+  () => ({
+    getAuthoredProject: vi.fn<() => VideoProject | null>(() => null),
+    auditionWork: vi.fn<(plan: unknown, signal: AbortSignal) => Promise<void>>(),
+    closeAudition: vi.fn(async () => undefined),
+    setPlaying: vi.fn(),
+    updateProject: vi.fn<(updater: (project: VideoProject) => VideoProject) => void>(),
+  })
+);
 vi.mock('../../../../runtime/controller/store', () => ({
+  useVideoEditorProjectLifecyclePort: (
+    selector: (port: { project: VideoProject | null }) => unknown
+  ) => selector({ project: getAuthoredProject() }),
+  useVideoEditorPlaybackPort: (selector: (port: { setPlaying: typeof setPlaying }) => unknown) =>
+    selector({ setPlaying }),
   useVideoEditorTimelineEditingPort: (
     selector: (port: { updateProject: typeof updateProject }) => unknown
   ) => selector({ updateProject }),
+}));
+vi.mock('../../../../preview/stage/runtime/action-audio', () => ({
+  createProjectActionAudioRuntime: () => ({ audition: auditionWork, close: closeAudition }),
 }));
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-it('saves explicit sound enable and disable as one project update while keeping source facts immutable', () => {
+it('accepts preset and None once while keeping source facts immutable', () => {
   let project = createVideoProjectFromRecording({
     recordingId: 'rec',
     filename: 'rec.webm',
@@ -65,11 +80,13 @@ it('saves explicit sound enable and disable as one project update while keeping 
     );
   try {
     render();
-    const toggle = () =>
-      container.querySelector<HTMLButtonElement>(
-        '[aria-label="gallery.videoReview.actionAudioEnabled"]'
-      )!;
-    act(() => toggle().click());
+    const choose = (key: string) =>
+      act(() => {
+        [...container.querySelectorAll<HTMLButtonElement>('button')]
+          .find((button) => button.textContent === key)!
+          .click();
+      });
+    choose('gallery.videoReview.actionAudioMousePaired');
     expect(updateProject).toHaveBeenCalledOnce();
     project = updateProject.mock.calls[0]![0](project);
     expect(project.actionFeedback![0]!.settings[0]).toMatchObject({
@@ -78,7 +95,7 @@ it('saves explicit sound enable and disable as one project update while keeping 
     });
     expect(project.version).toBe(3);
     render();
-    act(() => toggle().click());
+    choose('gallery.videoReview.actionAudioNone');
     expect(updateProject).toHaveBeenCalledTimes(2);
     project = updateProject.mock.calls[1]![0](project);
     expect(project.actionFeedback![0]!.settings[0]!.enabled).toBe(false);
@@ -132,12 +149,10 @@ it('separates visual gesture parameters from sound without changing their source
   };
   try {
     act(() => root.render(<ActionFeedbackFields {...props} part="sound" />));
-    expect(
-      host.querySelector('[aria-label="gallery.videoReview.actionAudioEnabled"]')
-    ).not.toBeNull();
+    expect(host.querySelector('[data-ui="video-editor.action-audio-fields"]')).not.toBeNull();
     expect(host.textContent).not.toContain('gallery.videoReview.gestureAppearance');
     act(() => root.render(<ActionFeedbackFields {...props} part="gesture" />));
-    expect(host.querySelector('[aria-label="gallery.videoReview.actionAudioEnabled"]')).toBeNull();
+    expect(host.querySelector('[data-ui="video-editor.action-audio-fields"]')).toBeNull();
     const toggle = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.gestureFeedback"]'
     )!;
@@ -217,7 +232,9 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
         )
       );
     const click = (label: string) =>
-      act(() => host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click());
+      act(() =>
+        host.querySelector<HTMLButtonElement | HTMLInputElement>(`[aria-label="${label}"]`)!.click()
+      );
     const accept = () => {
       project = updateProject.mock.lastCall![0](project);
       render();
@@ -233,7 +250,15 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
         accept();
         expect(project.actionFeedback![0]!.gestureStyles![0]!.effect).toBe('press');
       }
-      click('gallery.videoReview.actionAudioEnabled');
+      act(() => {
+        const label =
+          family === 'mouse'
+            ? 'gallery.videoReview.actionAudioMousePaired'
+            : 'gallery.videoReview.actionAudioRecorded';
+        [...host.querySelectorAll<HTMLButtonElement>('button')]
+          .find((button) => button.textContent === label)!
+          .click();
+      });
       accept();
       expect(project.actionFeedback![0]!.settings[0]!.presetId).toBe(
         family === 'mouse'
@@ -318,3 +343,197 @@ it.each(['mouse', 'keyboard', 'typing'] as const)(
     }
   }
 );
+
+function feedbackFixture() {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'rec',
+    filename: 'rec.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'sound',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0.3,
+        point: { x: 0.2, y: 0.3 },
+        label: '',
+        preset: 'NONE',
+        data: {
+          gestureId: 'sound',
+          gestureType: 'hold',
+          downTime: 1,
+          upTime: 1.3,
+          button: 0,
+          completion: 'released',
+          downX: 32,
+          downY: 27,
+          upX: 32,
+          upY: 27,
+          maxExcursionCssPx: 0,
+          pressDuration: 0.3,
+        },
+      },
+      {
+        id: 'other',
+        kind: 'KEY',
+        time: 2,
+        duration: 0.1,
+        point: null,
+        label: 'Other key',
+        preset: 'NONE',
+        data: {},
+      },
+    ],
+  });
+  project.actionFeedback![0]!.settings = [
+    {
+      ref: { kind: 'action', id: 'sound' },
+      enabled: true,
+      presetId: 'mouse-classic-paired-v2',
+      volume: 0.5,
+      offset: 0,
+    },
+    {
+      ref: { kind: 'action', id: 'other' },
+      enabled: true,
+      presetId: 'keyboard-v1',
+      volume: 0.4,
+      offset: 0.1,
+    },
+  ];
+  return project;
+}
+
+it('uses the full shared mouse catalog and resets only the selected sound setting', () => {
+  updateProject.mockClear();
+  let project = feedbackFixture();
+  const group = project.actionFeedback![0]!;
+  const before = structuredClone(project);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const render = () =>
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={project}
+          recordingId="rec"
+          sourceInstanceId={group.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: 'sound' }, family: 'mouse', recorded: true }}
+          disabled={false}
+        />
+      )
+    );
+  const choose = (label: string) =>
+    act(() => {
+      [...host.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent === label)!
+        .click();
+    });
+  try {
+    render();
+    expect(host.textContent).toContain('gallery.videoReview.actionAudioMouseAlternate');
+    expect(host.textContent).toContain('gallery.videoReview.actionAudioMouseSoft');
+    choose('gallery.videoReview.actionAudioMouseAlternate');
+    project = updateProject.mock.lastCall![0]({ ...project, name: 'Concurrent rename' });
+    render();
+    expect(project.name).toBe('Concurrent rename');
+    expect(
+      project.actionFeedback![0]!.settings.find((item) => item.ref.id === 'sound')?.presetId
+    ).toBe('mouse-alternate-v1');
+    expect(host.querySelector('[aria-label="gallery.videoReview.actionAudioDown"]')).toBeNull();
+    choose('gallery.videoReview.actionAudioReset');
+    project = updateProject.mock.lastCall![0](project);
+    expect(project.actionFeedback![0]!.settings).toEqual([before.actionFeedback![0]!.settings[1]]);
+    expect(project.actionEvents).toEqual(before.actionEvents);
+    expect(project.clips).toEqual(before.clips);
+    expect(project.actionFeedback![0]!.signals).toEqual(before.actionFeedback![0]!.signals);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('cancels stale audition and exposes retry without document writes or playhead changes', async () => {
+  updateProject.mockClear();
+  setPlaying.mockClear();
+  closeAudition.mockClear();
+  auditionWork.mockReset();
+  let rejectLate!: (reason: Error) => void;
+  auditionWork.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectLate = reject;
+      })
+  );
+  let project = feedbackFixture();
+  getAuthoredProject.mockImplementation(() => project);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const render = () =>
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={{ ...project }}
+          recordingId="rec"
+          sourceInstanceId={project.actionFeedback![0]!.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: 'sound' }, family: 'mouse', recorded: true }}
+          disabled={false}
+        />
+      )
+    );
+  const listen = () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.actionAudioListen"]')!;
+  try {
+    render();
+    act(() => listen().click());
+    const first = auditionWork.mock.calls[0]![1];
+    expect(first.aborted).toBe(false);
+    render();
+    expect(first.aborted).toBe(false);
+    expect(setPlaying).toHaveBeenCalledWith(false);
+    project = { ...project, updatedAt: project.updatedAt + 1 };
+    render();
+    expect(first.aborted).toBe(false);
+    const authored = structuredClone(project);
+    project = { ...structuredClone(project), name: 'Replaced same ID' };
+    render();
+    expect(first.aborted).toBe(true);
+    await act(async () => {
+      rejectLate(new Error('Late private detail'));
+    });
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    auditionWork.mockRejectedValueOnce(new Error('Resource detail'));
+    await act(async () => {
+      listen().click();
+    });
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'gallery.videoReview.actionAudioResource'
+    );
+    expect(host.textContent).not.toContain('Resource detail');
+    auditionWork.mockRejectedValueOnce(new ReviewActionAudioUnavailable('voice-limit'));
+    await act(async () => {
+      listen().click();
+    });
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      'gallery.videoReview.actionAudioLimit'
+    );
+
+    auditionWork.mockResolvedValueOnce();
+    await act(async () => {
+      listen().click();
+    });
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    auditionWork.mockImplementationOnce(() => new Promise<void>(() => undefined));
+    act(() => listen().click());
+    const last = auditionWork.mock.lastCall![1];
+    act(() => root.unmount());
+    expect(last.aborted).toBe(true);
+    expect(updateProject).not.toHaveBeenCalled();
+    expect(project).toEqual({ ...authored, name: 'Replaced same ID' });
+  } finally {
+    if (host.firstChild) act(() => root.unmount());
+  }
+});

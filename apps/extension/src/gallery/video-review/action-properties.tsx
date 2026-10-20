@@ -1,5 +1,6 @@
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
-import { ReviewActionAudioFields, reviewActionAudioSection } from './action-audio-fields';
+import { ActionAudioFields } from '../../ui/action-audio/fields';
+import { reviewActionAudioSection } from './action-audio-section';
 import { reviewActionAudioTarget } from '../../features/video/review/action-audio';
 import type {
   ReviewActionAudioSetting,
@@ -45,7 +46,7 @@ export function ReviewActionProperties(props: {
   onActionAudio?:
     | ((targets: readonly ReviewActionAudioTarget[], patch: ReviewActionAudioPatch | null) => void)
     | undefined;
-  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onAudition?: Parameters<typeof ActionAudioFields>[0]['onAudition'];
   onStopAudition?: (() => void) | undefined;
   keyAnimations?: readonly ReviewKeyAnimation[] | undefined;
   onKeyAnimation?: ((ids: readonly string[], patch: ReviewKeyPatch | null) => void) | undefined;
@@ -67,7 +68,7 @@ export function ReviewActionProperties(props: {
     target && props.onActionAudio
       ? [
           reviewActionAudioSection(
-            <ReviewActionAudioFields
+            <ActionAudioFields
               targets={[target]}
               settings={props.actionAudio ?? []}
               busy={props.busy}

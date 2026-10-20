@@ -1,12 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Play, RotateCcw, Volume2 } from 'lucide-react';
-import {
-  NumericRow,
-  CheckboxField,
-  CompactSelect,
-  ToggleField,
-} from '../../ui/compact-inspector-controls';
-import { translate, formatNumber } from '../../platform/i18n';
+import { useEffect, useState } from 'react';
+import { Play, RotateCcw } from 'lucide-react';
+import { NumericRow, CheckboxField, ToggleField } from '../compact-inspector-controls';
+import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import {
   REVIEW_ACTION_AUDIO_DEFAULT,
   reviewActionAudioRefKey,
@@ -18,8 +13,9 @@ import {
   type ReviewActionAudioPatch,
   type ReviewActionAudioFamily,
 } from '../../features/video/review/advanced/action-audio';
-import { ReviewButton, reviewTextButtonClassName } from './controls';
-import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { CompactSegmentedSelector } from '../compact-inspector-controls/control-renderers';
+import { InspectorParameterRow } from '../compact-inspector-controls/layout';
 
 const PRESETS = {
   mouse: [
@@ -49,18 +45,9 @@ const PRESET_LABELS = {
   'typing-recorded-v2': 'gallery.videoReview.actionAudioRecorded',
 } as const;
 
-/** One remembered inspector section for both single and bulk presentation modes. */
-export function reviewActionAudioSection(content: ReactNode) {
-  return {
-    id: 'action-audio',
-    label: translate('gallery.videoReview.actionAudio'),
-    icon: Volume2,
-    content,
-  };
-}
-
 /** Family selectors preserve other families; common fields submit one functional batch. */
-export function ReviewActionAudioFields(props: {
+export function ActionAudioFields(props: {
+  dataUi?: string;
   targets: readonly ReviewActionAudioTarget[];
   settings: readonly ReviewActionAudioSetting[];
   busy: boolean;
@@ -70,6 +57,7 @@ export function ReviewActionAudioFields(props: {
     | undefined;
   onStopAudition?: (() => void) | undefined;
 }) {
+  useAppLocale();
   const selectionKey = JSON.stringify(
     props.targets.map((target) => reviewActionAudioRefKey(target.ref))
   );
@@ -82,16 +70,17 @@ export function ReviewActionAudioFields(props: {
   const style = (target: ReviewActionAudioTarget): ReviewActionAudioStyle =>
     settings.get(reviewActionAudioRefKey(target.ref)) ?? REVIEW_ACTION_AUDIO_DEFAULT;
   const values = props.targets.map(style);
+  const repeatTargets = props.targets.filter((target) => target.family !== 'mouse');
   const common = <T,>(values: readonly T[]) =>
     values.every((value) => value === values[0]) ? values[0] : undefined;
   return (
     <fieldset
       disabled={props.busy}
       className="min-w-0 sniptale-parameter-stack"
-      data-ui="gallery.videoReview.actionAudioFields"
+      data-ui={props.dataUi ?? 'gallery.videoReview.actionAudioFields'}
     >
       {(['mouse', 'keyboard', 'typing'] as const).map((family) => (
-        <ReviewAudioFamily key={family} family={family} props={props} style={style} />
+        <ActionAudioFamily key={family} family={family} props={props} style={style} />
       ))}
       {props.targets.some(
         (target) =>
@@ -106,14 +95,14 @@ export function ReviewActionAudioFields(props: {
             const phaseEnabled = common(targets.map((target) => style(target)[enabledKey] ?? true));
             return (
               <div key={phase} className="space-y-1">
-                <CheckboxField
+                <ActionAudioBoolean
+                  count={targets.length}
                   label={translate(
                     phase === 'down'
                       ? 'gallery.videoReview.actionAudioDown'
                       : 'gallery.videoReview.actionAudioUp'
                   )}
-                  value={phaseEnabled === true}
-                  indeterminate={phaseEnabled === undefined}
+                  value={phaseEnabled}
                   onChange={(enabled) => props.onChange(targets, { [enabledKey]: enabled })}
                 />
                 <ActionAudioNumber
@@ -131,15 +120,11 @@ export function ReviewActionAudioFields(props: {
           style(target).presetId === 'keyboard-recorded-v2' ||
           style(target).presetId === 'typing-recorded-v2'
       ) ? (
-        <ToggleField
+        <ActionAudioBoolean
+          count={repeatTargets.length}
           label={translate('gallery.videoReview.actionAudioRepeats')}
-          value={values.some((value) => value.includeRepeats === true)}
-          onChange={(includeRepeats) =>
-            props.onChange(
-              props.targets.filter((target) => target.family !== 'mouse'),
-              { includeRepeats }
-            )
-          }
+          value={common(repeatTargets.map((target) => style(target).includeRepeats === true))}
+          onChange={(includeRepeats) => props.onChange(repeatTargets, { includeRepeats })}
         />
       ) : null}
       <ActionAudioNumber
@@ -154,16 +139,38 @@ export function ReviewActionAudioFields(props: {
         value={common(values.map((value) => value.offset))}
         onChange={(offset) => props.onChange(props.targets, { offset })}
       />
-      <ReviewButton
-        className={`${reviewTextButtonClassName} !w-full justify-start`}
-        data-ui="gallery.videoReview.actionAudioReset"
-        label={translate('gallery.videoReview.actionAudioReset')}
+      <ContentToolbarButton
+        type="button"
+        tone="outline"
+        size="compact"
+        className="flex w-full items-center justify-center gap-2"
+        dataUi="gallery.videoReview.actionAudioReset"
+        aria-label={translate('gallery.videoReview.actionAudioReset')}
+        title={translate('gallery.videoReview.actionAudioReset')}
         onClick={() => props.onChange(props.targets, null)}
       >
         <RotateCcw size={14} aria-hidden="true" />
         {translate('gallery.videoReview.actionAudioReset')}
-      </ReviewButton>
+      </ContentToolbarButton>
     </fieldset>
+  );
+}
+
+function ActionAudioBoolean(props: {
+  count: number;
+  label: string;
+  value: boolean | undefined;
+  onChange(value: boolean): void;
+}) {
+  return props.count > 1 ? (
+    <CheckboxField
+      label={props.label}
+      value={props.value === true}
+      indeterminate={props.value === undefined}
+      onChange={props.onChange}
+    />
+  ) : (
+    <ToggleField label={props.label} value={props.value === true} onChange={props.onChange} />
   );
 }
 
@@ -209,13 +216,13 @@ function ActionAudioNumber(props: {
   );
 }
 
-function ReviewAudioFamily({
+function ActionAudioFamily({
   family,
   props,
   style,
 }: {
   family: ReviewActionAudioFamily;
-  props: Parameters<typeof ReviewActionAudioFields>[0];
+  props: Parameters<typeof ActionAudioFields>[0];
   style(target: ReviewActionAudioTarget): ReviewActionAudioStyle;
 }) {
   const common = <T,>(values: readonly T[]) =>
@@ -235,15 +242,19 @@ function ReviewAudioFamily({
         label={`${translate(FAMILY_LABELS[family])} · ${formatNumber(targets.length)}`}
       >
         <div className="flex min-w-0 items-center gap-1" data-audio-choice-row>
-          <CompactSelect
-            appearance="plain"
-            disabled={props.busy}
-            aria-label={`${translate(FAMILY_LABELS[family])} · ${formatNumber(targets.length)}`}
+          <CompactSegmentedSelector
+            columns={3}
+            ariaLabel={`${translate(FAMILY_LABELS[family])} · ${formatNumber(targets.length)}`}
             value={presetId === undefined ? '' : (presetId ?? 'none')}
             options={[
-              { value: 'none', label: translate('gallery.videoReview.actionAudioNone') },
+              {
+                disabled: props.busy,
+                value: 'none',
+                label: translate('gallery.videoReview.actionAudioNone'),
+              },
               ...PRESETS[family].map((value) => ({
                 value,
+                disabled: props.busy,
                 label: translate(PRESET_LABELS[value]),
               })),
             ]}
@@ -256,16 +267,20 @@ function ReviewAudioFamily({
                 props.onChange(targets, { presetId: value });
             }}
           />
-          <ReviewButton
-            className={`${reviewTextButtonClassName} !w-8 !min-w-8 !shrink-0 !px-0`}
-            label={translate('gallery.videoReview.actionAudioListen')}
-            disabled={!props.onAudition || !presetId || style(first).volume <= 0}
+          <ContentToolbarButton
+            type="button"
+            tone="utility"
+            size="compact"
+            className="!h-8 !w-8 !min-w-8 shrink-0 !px-0"
+            aria-label={translate('gallery.videoReview.actionAudioListen')}
+            title={translate('gallery.videoReview.actionAudioListen')}
+            disabled={props.busy || !props.onAudition || !presetId || style(first).volume <= 0}
             onClick={() => {
               if (presetId) props.onAudition?.(first, { ...style(first), enabled: true, presetId });
             }}
           >
             <Play size={14} aria-hidden="true" />
-          </ReviewButton>
+          </ContentToolbarButton>
         </div>
       </InspectorParameterRow>
       {presetId === undefined ? (

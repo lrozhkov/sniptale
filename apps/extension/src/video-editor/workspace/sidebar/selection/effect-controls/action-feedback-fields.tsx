@@ -1,16 +1,24 @@
+import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
+import { createProjectActionAudioRuntime } from '../../../../preview/stage/runtime/action-audio';
+import { ActionAudioFields } from '../../../../../ui/action-audio/fields';
 import { reviewGestureAreaBounds } from '../../../../../features/video/project/action-feedback/validation';
-import { projectActionFeedbackMarkers } from '../../../../../features/video/review/project-action-audio';
+import {
+  buildProjectActionAudioAuditionPlan,
+  projectActionFeedbackMarkers,
+} from '../../../../../features/video/review/project-action-audio';
 import { InspectorDetails } from '../shared/details';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { NumericRow, type NumericRowProps } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
-import { useVideoEditorTimelineEditingPort } from '../../../../runtime/controller/store';
+import {
+  useVideoEditorPlaybackPort,
+  useVideoEditorProjectLifecyclePort,
+  useVideoEditorTimelineEditingPort,
+} from '../../../../runtime/controller/store';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { patchVideoProjectActionFeedback } from '../../../../../features/video/project/action-feedback/projection';
 import {
   patchReviewActionAudio,
-  REVIEW_ACTION_AUDIO_DEFAULT,
-  isReviewActionAudioPreset,
   type ReviewActionAudioTarget,
   type ReviewActionAudioPatch,
   type ReviewActionAudioStyle,
@@ -35,6 +43,7 @@ interface FeedbackProps {
 }
 
 export function ActionFeedbackFields(props: FeedbackProps) {
+  const soundPreview = useActionSoundAudition(props);
   const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
   const group = props.project.actionFeedback?.find(
     (item) =>
@@ -49,10 +58,6 @@ export function ActionFeedbackFields(props: FeedbackProps) {
   )
     return null;
   const identity = { recordingId: props.recordingId, sourceInstanceId: props.sourceInstanceId };
-  const style =
-    group.settings.find(
-      (item) => item.ref.kind === props.target.ref.kind && item.ref.id === props.target.ref.id
-    ) ?? REVIEW_ACTION_AUDIO_DEFAULT;
   const change = (patch: ReviewActionAudioPatch | null) => {
     if (props.disabled) return;
     updateProject((project) => {
@@ -68,12 +73,6 @@ export function ActionFeedbackFields(props: FeedbackProps) {
         : project;
     });
   };
-  const preset =
-    props.target.family === 'mouse'
-      ? 'mouse-classic-paired-v2'
-      : props.target.family === 'keyboard'
-        ? 'keyboard-recorded-v2'
-        : 'typing-recorded-v2';
   const gestureStyle = group.gestureStyles?.find((item) => item.id === props.target.ref.id) ?? {
     ...REVIEW_CLICK_DEFAULT,
     effect:
@@ -113,21 +112,100 @@ export function ActionFeedbackFields(props: FeedbackProps) {
       data-ui="video-editor.action-feedback-fields"
     >
       {props.part !== 'gesture' ? (
-        <>
-          <FeedbackSoundFields
-            style={style}
-            target={props.target}
-            preset={preset}
-            change={change}
-          />
-          <FeedbackAttackFields style={style} target={props.target} change={change} />
-        </>
+        <ActionAudioFields
+          dataUi="video-editor.action-audio-fields"
+          targets={[props.target]}
+          settings={group.settings}
+          busy={props.disabled}
+          onChange={(_targets, patch) => change(patch)}
+          onAudition={soundPreview.audition}
+          onStopAudition={soundPreview.stop}
+        />
+      ) : null}
+      {soundPreview.error ? (
+        <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
+          {soundPreview.error}
+        </p>
       ) : null}
       {props.gesture && props.part !== 'sound' ? (
         <FeedbackGestureFields gestureStyle={gestureStyle} changeGesture={changeGesture} />
       ) : null}
     </fieldset>
   );
+}
+
+function useActionSoundAudition(props: FeedbackProps) {
+  const project = useVideoEditorProjectLifecyclePort((port) => port.project);
+  const setPlaying = useVideoEditorPlaybackPort((port) => port.setPlaying);
+  const active = useRef<{
+    controller: AbortController;
+    runtime: ReturnType<typeof createProjectActionAudioRuntime>;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const stop = useCallback(() => {
+    const previous = active.current;
+    active.current = null;
+    previous?.controller.abort();
+    if (previous) void previous.runtime.close().catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    stop();
+    setError(null);
+    return stop;
+  }, [
+    project?.id,
+    project?.duration,
+    project?.clips,
+    project?.tracks,
+    project?.assets,
+    project?.actionEvents,
+    project?.actionFeedback,
+    project?.actionPresentation,
+    props.recordingId,
+    props.sourceInstanceId,
+    props.target.ref.kind,
+    props.target.ref.id,
+    props.disabled,
+    props.part,
+    stop,
+  ]);
+  const audition = (target: ReviewActionAudioTarget, style: ReviewActionAudioStyle) => {
+    if (props.disabled || !project || project.id !== props.project.id) return;
+    stop();
+    setError(null);
+    const session = {
+      controller: new AbortController(),
+      runtime: createProjectActionAudioRuntime(),
+    };
+    active.current = session;
+    setPlaying(false);
+    const plan = buildProjectActionAudioAuditionPlan(
+      project,
+      {
+        recordingId: props.recordingId,
+        sourceInstanceId: props.sourceInstanceId,
+      },
+      target,
+      style
+    );
+    void session.runtime
+      .audition(plan, session.controller.signal)
+      .catch((failure: unknown) => {
+        if (active.current === session && !session.controller.signal.aborted)
+          setError(
+            translate(
+              failure instanceof ReviewActionAudioUnavailable && failure.reason === 'voice-limit'
+                ? 'gallery.videoReview.actionAudioLimit'
+                : 'gallery.videoReview.actionAudioResource'
+            )
+          );
+      })
+      .finally(() => {
+        if (active.current === session) active.current = null;
+        void session.runtime.close().catch(() => undefined);
+      });
+  };
+  return { audition, stop, error };
 }
 
 function FeedbackNumber(props: Omit<NumericRowProps, 'onPreviewValue'>) {
@@ -146,146 +224,6 @@ function FeedbackNumber(props: Omit<NumericRowProps, 'onPreviewValue'>) {
   );
 }
 
-function FeedbackSoundFields({
-  style,
-  target,
-  preset,
-  change,
-}: {
-  style: ReviewActionAudioStyle;
-  target: ReviewActionAudioTarget;
-  preset: NonNullable<ReviewActionAudioStyle['presetId']>;
-  change(patch: ReviewActionAudioPatch | null): void;
-}) {
-  return (
-    <>
-      {' '}
-      <ToggleField
-        label={translate('gallery.videoReview.actionAudioEnabled')}
-        checked={style.enabled}
-        onChange={(enabled) =>
-          change(
-            enabled
-              ? style.presetId
-                ? { enabled: true }
-                : { presetId: preset }
-              : { enabled: false }
-          )
-        }
-      />
-      <OptionButtonsField
-        label={translate('gallery.videoReview.actionAudio')}
-        value={style.presetId ?? 'none'}
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.actionAudioNone') },
-          {
-            value: preset,
-            label: translate(
-              target.family === 'mouse'
-                ? 'gallery.videoReview.actionAudioMousePaired'
-                : 'gallery.videoReview.actionAudioRecorded'
-            ),
-          },
-          ...(target.family === 'typing'
-            ? [
-                {
-                  value: 'typing-natural-v1',
-                  label: translate('gallery.videoReview.actionAudioTypingNatural'),
-                },
-              ]
-            : target.family === 'keyboard'
-              ? [
-                  {
-                    value: 'keyboard-v1',
-                    label: translate('gallery.videoReview.actionAudioKeyboardNatural'),
-                  },
-                ]
-              : [
-                  {
-                    value: 'mouse-soft-paired-v2',
-                    label: translate('gallery.videoReview.actionAudioMouseSoftPaired'),
-                  },
-                  {
-                    value: 'mouse-classic-v1',
-                    label: translate('gallery.videoReview.actionAudioMouseClassic'),
-                  },
-                ]),
-        ]}
-        onChange={(value) => {
-          if (value === 'none') change({ presetId: null });
-          else if (isReviewActionAudioPreset(value)) change({ presetId: value });
-        }}
-      />
-      <FeedbackNumber
-        label={translate('gallery.videoReview.actionAudioVolume')}
-        value={style.volume * 100}
-        min={0}
-        max={100}
-        step={1}
-        unit="%"
-        onCommitValue={(volume) => change({ volume: volume / 100 })}
-      />
-      <FeedbackNumber
-        label={translate('gallery.videoReview.actionAudioOffset')}
-        value={style.offset}
-        min={-2}
-        max={2}
-        step={0.01}
-        precision={2}
-        unit="s"
-        onCommitValue={(offset) => change({ offset })}
-      />
-    </>
-  );
-}
-function FeedbackAttackFields({
-  style,
-  target,
-  change,
-}: {
-  style: ReviewActionAudioStyle;
-  target: ReviewActionAudioTarget;
-  change(patch: ReviewActionAudioPatch | null): void;
-}) {
-  return target.family === 'mouse' ? (
-    (['down', 'up'] as const).map((phase) => {
-      const enabledKey = phase === 'down' ? 'downEnabled' : 'upEnabled',
-        gainKey = phase === 'down' ? 'downGain' : 'upGain';
-      return (
-        <div key={phase}>
-          <ToggleField
-            label={translate(
-              phase === 'down'
-                ? 'gallery.videoReview.actionAudioDown'
-                : 'gallery.videoReview.actionAudioUp'
-            )}
-            checked={style[enabledKey] !== false}
-            onChange={(enabled) => change({ [enabledKey]: enabled })}
-          />
-          <FeedbackNumber
-            label={translate(
-              phase === 'down'
-                ? 'gallery.videoReview.actionAudioDownGain'
-                : 'gallery.videoReview.actionAudioUpGain'
-            )}
-            value={(style[gainKey] ?? 1) * 100}
-            min={0}
-            max={100}
-            step={1}
-            unit="%"
-            onCommitValue={(gain) => change({ [gainKey]: gain / 100 })}
-          />
-        </div>
-      );
-    })
-  ) : (
-    <ToggleField
-      label={translate('gallery.videoReview.actionAudioRepeats')}
-      checked={style.includeRepeats === true}
-      onChange={(includeRepeats) => change({ includeRepeats })}
-    />
-  );
-}
 function FeedbackGestureFields({
   gestureStyle,
   changeGesture,

@@ -43,6 +43,7 @@ export function createReviewActionAudioSource<Buffer extends DecodedActionSample
   fetch: typeof fetch;
   decode(data: ArrayBuffer, signal: AbortSignal): Promise<Buffer>;
 }): ReviewActionAudioSource<Buffer> {
+  const requestResource = deps.fetch;
   const cache = new Map<ActionSoundSampleId, Promise<Buffer>>();
   const controller = new AbortController();
   const dispose = () => {
@@ -59,7 +60,7 @@ export function createReviewActionAudioSource<Buffer extends DecodedActionSample
     const sample = ACTION_SOUND_CATALOG[sampleId];
     let response: Response;
     try {
-      response = await deps.fetch(deps.getURL(sample.path), {
+      response = await requestResource(deps.getURL(sample.path), {
         signal: controller.signal,
         credentials: 'omit',
         redirect: 'error',

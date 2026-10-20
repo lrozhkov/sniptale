@@ -2,15 +2,15 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewActionAudioFields } from './action-audio-fields';
+import { ActionAudioFields } from './fields';
 import {
   REVIEW_ACTION_AUDIO_DEFAULT,
   type ReviewActionAudioTarget,
 } from '../../features/video/review/advanced/action-audio';
 import { translate } from '../../platform/i18n';
 
-vi.mock('../../ui/compact-inspector-controls', async (original) => ({
-  ...(await original<typeof import('../../ui/compact-inspector-controls')>()),
+vi.mock('../compact-inspector-controls', async (original) => ({
+  ...(await original<typeof import('../compact-inspector-controls')>()),
   SelectField: (p: {
     label: string;
     value: string;
@@ -68,6 +68,28 @@ vi.mock('../../ui/compact-inspector-controls', async (original) => ({
   ),
 }));
 
+vi.mock('../compact-inspector-controls/control-renderers', () => ({
+  CompactSegmentedSelector: (p: {
+    ariaLabel: string;
+    value: string;
+    options: { value: string; label: string; disabled?: boolean }[];
+    onChange(value: string): void;
+  }) => (
+    <select
+      aria-label={p.ariaLabel}
+      value={p.value}
+      onChange={(event) => p.onChange(event.currentTarget.value)}
+    >
+      <option value="" />
+      {p.options.map((option) => (
+        <option key={option.value} value={option.value} disabled={option.disabled}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 it('scopes family selectors to typed targets and patches only the edited common field', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div'),
@@ -81,7 +103,7 @@ it('scopes family selectors to typed targets and patches only the edited common 
   try {
     act(() =>
       root.render(
-        <ReviewActionAudioFields targets={targets} settings={[]} busy={false} onChange={onChange} />
+        <ActionAudioFields targets={targets} settings={[]} busy={false} onChange={onChange} />
       )
     );
     expect(
@@ -146,7 +168,7 @@ it('paired phases and recorded repeats target their own families and stop auditi
   try {
     act(() =>
       root.render(
-        <ReviewActionAudioFields
+        <ActionAudioFields
           targets={targets}
           settings={settings}
           busy={false}
@@ -180,7 +202,7 @@ it('paired phases and recorded repeats target their own families and stop auditi
     }
     act(() =>
       root.render(
-        <ReviewActionAudioFields
+        <ActionAudioFields
           targets={[]}
           settings={settings}
           busy={false}
@@ -206,7 +228,7 @@ it('shows None for a persisted disabled preset and keeps audition beside its sel
   try {
     act(() =>
       root.render(
-        <ReviewActionAudioFields
+        <ActionAudioFields
           targets={[target]}
           settings={[
             {
@@ -233,6 +255,54 @@ it('shows None for a persisted disabled preset and keeps audition beside its sel
     ).toBe(true);
     act(() => listen.click());
     expect(audition).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('shows mixed paired phases and keyboard repeats as indeterminate bulk booleans', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host),
+    change = vi.fn();
+  const targets: ReviewActionAudioTarget[] = [
+    { ref: { kind: 'action', id: 'mouse-a' }, family: 'mouse' },
+    { ref: { kind: 'action', id: 'mouse-b' }, family: 'mouse' },
+    { ref: { kind: 'action', id: 'key-a' }, family: 'keyboard' },
+    { ref: { kind: 'action', id: 'key-b' }, family: 'keyboard' },
+  ];
+  try {
+    act(() =>
+      root.render(
+        <ActionAudioFields
+          targets={targets}
+          busy={false}
+          onChange={change}
+          settings={targets.map((target, index) => ({
+            ...REVIEW_ACTION_AUDIO_DEFAULT,
+            ref: target.ref,
+            enabled: true,
+            presetId:
+              target.family === 'mouse' ? 'mouse-classic-paired-v2' : 'keyboard-recorded-v2',
+            downEnabled: index % 2 === 0,
+            includeRepeats: index % 2 === 0,
+          }))}
+        />
+      )
+    );
+    const down = host.querySelector<HTMLInputElement>(
+      `[aria-label="${translate('gallery.videoReview.actionAudioDown')}"]`
+    )!;
+    const repeats = host.querySelector<HTMLInputElement>(
+      `[aria-label="${translate('gallery.videoReview.actionAudioRepeats')}"]`
+    )!;
+    expect(down.indeterminate).toBe(true);
+    expect(repeats.indeterminate).toBe(true);
+    act(() => down.click());
+    expect(change).toHaveBeenLastCalledWith(targets.slice(0, 2), { downEnabled: true });
+    act(() => repeats.click());
+    expect(change).toHaveBeenLastCalledWith(targets.slice(2), { includeRepeats: true });
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

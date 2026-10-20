@@ -131,6 +131,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/navigation`
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
+- `apps/extension/src/ui/action-audio`
 - `apps/extension/src/ui/annotation-template-query`
 - `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`

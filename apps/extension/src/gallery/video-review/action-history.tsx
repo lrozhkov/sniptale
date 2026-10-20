@@ -11,7 +11,8 @@ import type {
   ReviewActionAudioSetting,
   ReviewActionAudioPatch,
 } from '../../features/video/review/advanced/action-audio';
-import { ReviewActionAudioFields, reviewActionAudioSection } from './action-audio-fields';
+import { ActionAudioFields } from '../../ui/action-audio/fields';
+import { reviewActionAudioSection } from './action-audio-section';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
   REVIEW_KEY_DEFAULT,
@@ -47,7 +48,7 @@ type ReviewActionHistoryProps = {
     targets: readonly ReviewActionAudioTarget[],
     patch: ReviewActionAudioPatch | null
   ): void;
-  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onAudition?: Parameters<typeof ActionAudioFields>[0]['onAudition'];
   onStopAudition?: (() => void) | undefined;
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
   activeRef?: ReviewTelemetryMarker['ref'] | undefined;
@@ -277,7 +278,7 @@ function HistoryAnimationFields(props: {
     targets: readonly ReviewActionAudioTarget[],
     patch: ReviewActionAudioPatch | null
   ): void;
-  onAudition?: Parameters<typeof ReviewActionAudioFields>[0]['onAudition'];
+  onAudition?: Parameters<typeof ActionAudioFields>[0]['onAudition'];
   onStopAudition?: (() => void) | undefined;
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
@@ -324,7 +325,7 @@ function HistoryAnimationFields(props: {
     ...(props.onAudioChange && props.audioTargets.length
       ? [
           reviewActionAudioSection(
-            <ReviewActionAudioFields
+            <ActionAudioFields
               targets={props.audioTargets}
               settings={props.actionAudio ?? []}
               busy={props.busy}

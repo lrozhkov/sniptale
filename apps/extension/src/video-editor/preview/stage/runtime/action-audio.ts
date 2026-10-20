@@ -13,6 +13,7 @@ export function createProjectActionAudioRuntime() {
   const runtime = new ProjectActionAudioRuntime();
   return {
     sync: runtime.sync.bind(runtime),
+    audition: runtime.audition.bind(runtime),
     close: runtime.close.bind(runtime),
     reset: runtime.reset.bind(runtime),
   };
@@ -27,7 +28,7 @@ class ProjectActionAudioRuntime {
   private controller = new AbortController();
   private context: AudioContext | null = null;
   private source: ReturnType<typeof createReviewActionAudioSource<AudioBuffer>> | null = null;
-  private ready: Promise<{ busGain: number }> | null = null;
+  private ready: ReturnType<typeof admitReviewActionAudioPlan> | null = null;
   private playing = false;
   private desiredTime = 0;
   private anchorTime = 0;
@@ -216,6 +217,50 @@ class ProjectActionAudioRuntime {
     // A later empty window cannot recover a failed read. Retry/seek resets the generation;
     // a successful retry of this same cue can also clear its failure.
     if (this.failed.size) throw this.failed.values().next().value;
+  }
+  /** One audition prepares native samples before its bounded playback and then closes its graph. */
+  async audition(plan: ReviewActionAudioPlan, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (this.disposed) return;
+    const first = iterateReviewActionAudioCues(plan, { start: 0, end: plan.duration }).next();
+    if (first.done || !first.value.length) return;
+    const start = first.value[0]!.start;
+    const end = Math.min(plan.duration, start + 2);
+    this.revisePlan(plan);
+    this.ensureGraph(plan);
+    const graph = this.context!;
+    const source = this.source!;
+    const stop = () => {
+      void this.close().catch(() => undefined);
+    };
+    signal.addEventListener('abort', stop, { once: true });
+    try {
+      const admission = await this.ready!;
+      signal.throwIfAborted();
+      for (const sample of admission.sampleIds) await source.read(sample);
+      await graph.resume();
+      signal.throwIfAborted();
+      if (this.disposed) return;
+      // Resume can advance the audio clock. Anchor afterwards and retain a short scheduling lead.
+      const lead = 0.05;
+      this.playing = true;
+      this.anchorTime = start;
+      this.anchorClock = graph.currentTime + lead;
+      await this.sync({ plan, currentTime: start, isPlaying: true });
+      const audioStart = this.anchorClock;
+      const deadline = performance.now() + (end - start + lead) * 1000;
+      while (!this.disposed && performance.now() < deadline) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 25));
+        signal.throwIfAborted();
+        if (this.disposed) return;
+        const currentTime = Math.max(start, start + graph.currentTime - audioStart);
+        if (currentTime >= end) break;
+        await this.sync({ plan, currentTime, isPlaying: true });
+      }
+    } finally {
+      signal.removeEventListener('abort', stop);
+      await this.close();
+    }
   }
   async close() {
     this.disposed = true;
