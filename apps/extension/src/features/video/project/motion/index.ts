@@ -1,3 +1,11 @@
+import {
+  parseQuickEditBorder,
+  createQuickEditBorder,
+  clampQuickEditSpotlightArea,
+  type QuickEditBorder,
+} from '../scene/focus-appearance';
+import { isBoundedNumber, isRecord } from '../validation/primitives';
+import { isCameraMotionRegion } from './normalization';
 import { parseCameraPerspective, parseCameraDepth, parseMotionSpatialReference } from './spatial';
 import { parseMotionPhaseTransitions } from './transitions';
 import type { MotionPhaseTransitions } from './transitions';
@@ -58,6 +66,7 @@ export function resolveMotionConnectionSource(
   let previous: VideoProjectMotionRegion | null = null;
   for (const region of project.motionRegions ?? []) {
     if (
+      !isCameraMotionRegion(region) ||
       region.duration <= 0 ||
       region.id === destination.id ||
       region.startTime > destination.startTime
@@ -83,9 +92,10 @@ export function resolveMotionConnectionSource(
 
 function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
   return (
-    region.focusMode === VideoMotionFocusMode.MANUAL ||
-    region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
-    region.focusMode === VideoMotionFocusMode.ACTION
+    isCameraMotionRegion(region) &&
+    (region.focusMode === VideoMotionFocusMode.MANUAL ||
+      region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
+      region.focusMode === VideoMotionFocusMode.ACTION)
   );
 }
 
@@ -205,6 +215,8 @@ export function normalizeVideoProjectMotionRegion(
   region: VideoProjectMotionRegion
 ): VideoProjectMotionRegion {
   const sourceBinding = parseMotionSourceBinding(region.sourceBinding);
+  const border = parseQuickEditBorder(region.border);
+  const borderTarget = region.borderTarget;
   const duration = resolveMotionDuration(project, region.duration);
   const animation = isMotionAnimation(region.animation) ? region.animation : undefined;
   const animationDuration = sourceBinding?.animation.duration ?? animation?.duration ?? duration;
@@ -226,6 +238,9 @@ export function normalizeVideoProjectMotionRegion(
   const exit = motionTransitionSettings(phaseRegion, 'exit');
 
   return projectMotionSourceBinding(project, {
+    ...(border && (borderTarget === 'viewport' || (borderTarget === 'window' && sourceBinding))
+      ? { border, borderTarget }
+      : {}),
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(motionBlur ? { motionBlur } : {}),
     ...(perspective ? { perspective } : {}),
@@ -260,5 +275,78 @@ export function normalizeVideoProjectMotionRegion(
       0,
       animationDuration
     ),
+  });
+}
+
+/** Partial authoring edits merge inside the current interval owner, independently of its source clock. */
+export interface MotionBorderEdit {
+  enabled?: boolean;
+  target?: 'window' | 'viewport';
+  settings?: Omit<Partial<QuickEditBorder>, 'area'> & { area?: Partial<QuickEditBorder['area']> };
+}
+
+/** Admit one border edit without reviving a removed mode or changing dormant camera fields. */
+export function editMotionBorder(
+  project: Pick<VideoProject, 'clips'>,
+  region: VideoProjectMotionRegion,
+  edit: MotionBorderEdit
+): VideoProjectMotionRegion | null {
+  if (!isMotionBorderEdit(edit)) return null;
+  if (!(edit.enabled ?? region.border !== undefined)) {
+    if (edit.settings !== undefined || edit.target !== undefined) return null;
+    if (!region.border) return region;
+    const { border: _border, borderTarget: _target, ...camera } = region;
+    return camera;
+  }
+  const target =
+    edit.target ?? region.borderTarget ?? (region.sourceBinding ? 'window' : 'viewport');
+  if (
+    target === 'window' &&
+    !project.clips.some((clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId)
+  )
+    return null;
+  const border = mergeMotionBorderAppearance(
+    region.border ?? createQuickEditBorder(),
+    edit.settings
+  );
+  if (!border) return null;
+  if (
+    target === region.borderTarget &&
+    JSON.stringify(border) === JSON.stringify(parseQuickEditBorder(region.border))
+  )
+    return region;
+  return { ...region, border, borderTarget: target };
+}
+
+function isMotionBorderEdit(edit: MotionBorderEdit): boolean {
+  if (edit.enabled !== undefined && typeof edit.enabled !== 'boolean') return false;
+  if (edit.target !== undefined && edit.target !== 'window' && edit.target !== 'viewport')
+    return false;
+  return edit.settings === undefined || isRecord(edit.settings);
+}
+
+function mergeMotionBorderAppearance(
+  previous: QuickEditBorder,
+  settings: MotionBorderEdit['settings']
+): QuickEditBorder | null {
+  const area = settings?.area;
+  if (area !== undefined && !isMotionBorderAreaPatch(area)) return null;
+  return parseQuickEditBorder({
+    ...previous,
+    ...settings,
+    area: clampQuickEditSpotlightArea({ ...previous.area, ...area }),
+  });
+}
+
+function isMotionBorderAreaPatch(area: unknown): boolean {
+  if (!isRecord(area)) return false;
+  const minimums: Readonly<Record<string, number>> = { x: 0, y: 0, width: 0.01, height: 0.01 };
+  return Object.entries(area).every(([key, value]) => {
+    const minimum = minimums[key];
+    return (
+      Object.hasOwn(minimums, key) &&
+      typeof minimum === 'number' &&
+      isBoundedNumber(value, minimum, 1)
+    );
   });
 }

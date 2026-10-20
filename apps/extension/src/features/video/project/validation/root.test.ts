@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../scene/focus-appearance';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
 import { getVideoProjectActionPresentation } from '../action-presentation';
@@ -91,7 +92,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 21])
+  for (const version of [2, 3, 4, 22])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,7 +130,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 21])
+    for (const version of [2, 3, 4, 5, 6, 7, 22])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -156,7 +157,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 21])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 22])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -214,7 +215,7 @@ it('fences circle at schema ten and retains dormant camera settings without open
   expect(changed.version).toBe(10);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 21])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 22])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const parsed = parseHydratableVideoProject({ ...project, version });
@@ -256,7 +257,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   expect(changed.version).toBe(11);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 21])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 22])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     const parsed = parseHydratableVideoProject({
@@ -297,7 +298,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   ).toBe(11);
 });
 
-it.each([1, 2.5, 16.5, 21, NaN, Infinity, '12', null, undefined])(
+it.each([1, 2.5, 16.5, 22, NaN, Infinity, '12', null, undefined])(
   'refuses unsupported or malformed schema version %j',
   (version) => {
     expect(isHydratableVideoProject({ ...createEmptyVideoProject('Version'), version })).toBe(
@@ -326,7 +327,7 @@ it('fences per-media source crop at schema thirteen and retains the version afte
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version <= 12; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 21 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 22 })).toBe(false);
   for (const sourceCrop of [
     null,
     [],
@@ -375,7 +376,7 @@ it('fences decorated window radius at schema fifteen without rewriting old proje
     expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
     for (let version = 2; version <= 14; version++)
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 21 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 22 })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: project.clips }).version).toBe(15);
   }
   for (const radius of [null, '12', NaN, Infinity, -1, 4096.01, {}, []])
@@ -404,7 +405,7 @@ it('admits watermark at schema twenty without writing defaults and retains the v
   for (let version = 2; version < 20; version++) {
     expect(isHydratableVideoProject({ ...authored, version })).toBe(false);
   }
-  expect(isHydratableVideoProject({ ...authored, version: 21 })).toBe(false);
+  expect(isHydratableVideoProject({ ...authored, version: 22 })).toBe(false);
   expect(isHydratableVideoProject({ ...authored, watermark: null })).toBe(false);
   expect(
     isHydratableVideoProject({
@@ -472,5 +473,34 @@ it('requires declared IMAGE materials for active and dormant watermark reference
     expect(
       getVideoProjectWatermarkAsset({ ...project, assets: [{ ...asset, id: 'another-alias' }] })
     ).toBeUndefined();
+  }
+});
+
+it('admits border settings only in their schema and rejects malformed or unbound window targets', () => {
+  const project = createEmptyVideoProject('Border');
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    border: createQuickEditBorder(),
+    borderTarget: 'viewport' as const,
+  };
+  const candidate = { ...project, version: 21, motionRegions: [region] };
+  expect.soft(isHydratableVideoProject(candidate)).toBe(true);
+  expect.soft(isHydratableVideoProject({ ...candidate, version: 20 })).toBe(false);
+  for (const patch of [
+    { border: null },
+    { border: { ...region.border, width: Infinity } },
+    { borderTarget: 'unknown' },
+    { borderTarget: 'window' },
+    { borderTarget: undefined },
+    { border: undefined, borderTarget: 'viewport' },
+  ]) {
+    expect
+      .soft(
+        isHydratableVideoProject({
+          ...candidate,
+          motionRegions: [{ ...region, ...patch }],
+        })
+      )
+      .toBe(false);
   }
 });

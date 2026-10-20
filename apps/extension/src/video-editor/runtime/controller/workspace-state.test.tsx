@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
 import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 import { presentWorkspaceWatermarkPreview } from './workspace-state';
 // @vitest-environment jsdom
@@ -5,7 +6,7 @@ import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../features/video/project/moti
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
-import { presentWorkspaceMotionSpatialPreview } from './workspace-state';
+import { presentWorkspaceMotionPreview } from './workspace-state';
 import {
   createWorkspaceLayoutController,
   createWorkspaceHeaderController,
@@ -325,18 +326,19 @@ it('keeps a spatial gesture disposable and exposes a stable cancellation callbac
   renderWorkspaceHarness(root, (state) => {
     workspaceState = state;
   });
-  const callback = workspaceState!.inspector.previewMotionSpatial;
+  const callback = workspaceState!.inspector.previewMotion;
   const project = createEmptyVideoProject('Gesture');
   const preview = {
     project,
     regionId: 'region',
+    kind: 'spatial' as const,
     edit: { kind: 'perspective' as const, rotateY: 20 },
   };
   act(() => callback(preview));
-  expect(workspaceState!.inspector.motionSpatialPreview).toBe(preview);
-  expect(workspaceState!.inspector.previewMotionSpatial).toBe(callback);
+  expect(workspaceState!.inspector.motionPreview).toBe(preview);
+  expect(workspaceState!.inspector.previewMotion).toBe(callback);
   act(() => callback(null));
-  expect(workspaceState!.inspector.motionSpatialPreview).toBeNull();
+  expect(workspaceState!.inspector.motionPreview).toBeNull();
 });
 
 it('presents a scalar spatial draft without changing accepted data or sibling fields', () => {
@@ -352,9 +354,10 @@ it('presents a scalar spatial draft without changing accepted data or sibling fi
   project.motionRegions = [region, sibling];
   const snapshot = JSON.stringify(project);
   const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
-  const presented = presentWorkspaceMotionSpatialPreview(project, selection, {
+  const presented = presentWorkspaceMotionPreview(project, selection, {
     project,
     regionId: region.id,
+    kind: 'spatial' as const,
     edit: { kind: 'perspective', rotateY: 35 },
   });
   expect(JSON.stringify(project)).toBe(snapshot);
@@ -366,9 +369,10 @@ it('presents a scalar spatial draft without changing accepted data or sibling fi
   expect(presented.motionRegions?.[1]).toBe(sibling);
   expect(presented.clips).toBe(project.clips);
   expect(isHydratableVideoProject(presented)).toBe(true);
-  const reset = presentWorkspaceMotionSpatialPreview(project, selection, {
+  const reset = presentWorkspaceMotionPreview(project, selection, {
     project,
     regionId: region.id,
+    kind: 'spatial' as const,
     edit: { kind: 'reference', reset: true },
   });
   expect(reset.motionRegions?.[0]).not.toHaveProperty('spatialReference');
@@ -383,16 +387,13 @@ it('rejects stale, foreign, unselected, missing, locked, invalid and unchanged s
   const preview = {
     project,
     regionId: region.id,
+    kind: 'spatial' as const,
     edit: { kind: 'perspective' as const, rotateY: 35 },
   };
-  expect(presentWorkspaceMotionSpatialPreview(project, selection, null)).toBe(project);
-  expect(presentWorkspaceMotionSpatialPreview(project, { kind: 'scene' }, preview)).toBe(project);
+  expect(presentWorkspaceMotionPreview(project, selection, null)).toBe(project);
+  expect(presentWorkspaceMotionPreview(project, { kind: 'scene' }, preview)).toBe(project);
   expect(
-    presentWorkspaceMotionSpatialPreview(
-      project,
-      { ...selection, motionRegionId: 'other' },
-      preview
-    )
+    presentWorkspaceMotionPreview(project, { ...selection, motionRegionId: 'other' }, preview)
   ).toBe(project);
   for (const changed of [
     { ...project },
@@ -406,19 +407,19 @@ it('rejects stale, foreign, unselected, missing, locked, invalid and unchanged s
       },
     },
   ]) {
-    expect(presentWorkspaceMotionSpatialPreview(changed, selection, preview)).toBe(changed);
+    expect(presentWorkspaceMotionPreview(changed, selection, preview)).toBe(changed);
   }
   expect(
-    presentWorkspaceMotionSpatialPreview(project, selection, { ...preview, regionId: 'missing' })
+    presentWorkspaceMotionPreview(project, selection, { ...preview, regionId: 'missing' })
   ).toBe(project);
   expect(
-    presentWorkspaceMotionSpatialPreview(project, selection, {
+    presentWorkspaceMotionPreview(project, selection, {
       ...preview,
       edit: { kind: 'perspective', rotateY: 90 },
     })
   ).toBe(project);
   expect(
-    presentWorkspaceMotionSpatialPreview(project, selection, {
+    presentWorkspaceMotionPreview(project, selection, {
       ...preview,
       edit: { kind: 'perspective', rotateY: 0 },
     })
@@ -430,9 +431,9 @@ it('rejects stale, foreign, unselected, missing, locked, invalid and unchanged s
       camera: { visible: true, locked: true },
     },
   };
-  expect(
-    presentWorkspaceMotionSpatialPreview(locked, selection, { ...preview, project: locked })
-  ).toBe(locked);
+  expect(presentWorkspaceMotionPreview(locked, selection, { ...preview, project: locked })).toBe(
+    locked
+  );
 });
 
 it('upgrades only the presented legacy snapshot and refuses a missing selected region', () => {
@@ -444,18 +445,19 @@ it('upgrades only the presented legacy snapshot and refuses a missing selected r
   const preview = {
     project,
     regionId: region.id,
+    kind: 'spatial' as const,
     edit: { kind: 'perspective' as const, rotateY: 35, enabled: true },
   };
-  const presented = presentWorkspaceMotionSpatialPreview(project, selection, preview);
+  const presented = presentWorkspaceMotionPreview(project, selection, preview);
   expect(project.version).toBe(18);
   expect(project.motionRegions[0]).toBe(region);
   expect(project.motionRegions[0]!.perspective).toBeUndefined();
   expect(presented.version).toBe(19);
   expect(isHydratableVideoProject(presented)).toBe(true);
   const deleted = { ...project, motionRegions: [] };
-  expect(
-    presentWorkspaceMotionSpatialPreview(deleted, selection, { ...preview, project: deleted })
-  ).toBe(deleted);
+  expect(presentWorkspaceMotionPreview(deleted, selection, { ...preview, project: deleted })).toBe(
+    deleted
+  );
 });
 
 it('scopes watermark presentation to the accepted scene snapshot without writing source data', () => {
@@ -498,11 +500,141 @@ it('keeps schema20 and the authored watermark when spatial draft presentation is
   const region = { ...createVideoProjectMotionRegion(project, 0), id: 'region' };
   project.motionRegions = [region];
   const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
-  const presented = presentWorkspaceMotionSpatialPreview(project, selection, {
+  const presented = presentWorkspaceMotionPreview(project, selection, {
     project,
     regionId: region.id,
+    kind: 'spatial' as const,
     edit: { kind: 'perspective', rotateY: 20 },
   });
   expect(presented.version).toBe(20);
   expect(presented.watermark).toBe(project.watermark);
+});
+
+it('presents border drafts through the existing snapshot owner and cancels stale or refused edits', () => {
+  const project = createEmptyVideoProject('Border draft');
+  project.version = 21;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    id: 'border',
+    border: createQuickEditBorder(),
+    borderTarget: 'viewport' as const,
+  };
+  const sibling = { ...region, id: 'sibling' };
+  project.motionRegions = [region, sibling];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const preview = {
+    project,
+    regionId: region.id,
+    kind: 'border' as const,
+    edit: { settings: { width: 8, area: { x: 0.1 } } },
+  };
+  const snapshot = JSON.stringify(project);
+  const presented = presentWorkspaceMotionPreview(project, selection, preview);
+  expect(presented.motionRegions?.[0]?.border).toEqual({
+    ...region.border,
+    width: 8,
+    area: { ...region.border.area, x: 0.1 },
+  });
+  expect(presented.motionRegions?.[1]).toBe(sibling);
+  expect(presented.clips).toBe(project.clips);
+  expect(presented.version).toBe(21);
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  expect(JSON.stringify(project)).toBe(snapshot);
+  expect(presentWorkspaceMotionPreview(project, selection, null)).toBe(project);
+  const restored = { ...project };
+  expect(presentWorkspaceMotionPreview(restored, selection, preview)).toBe(restored);
+  expect(presentWorkspaceMotionPreview(project, { kind: 'scene' }, preview)).toBe(project);
+  expect(
+    presentWorkspaceMotionPreview(project, { ...selection, motionRegionId: sibling.id }, preview)
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionPreview(project, selection, { ...preview, regionId: 'removed' })
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionPreview(project, selection, {
+      ...preview,
+      edit: { settings: { width: NaN } },
+    })
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionPreview(project, selection, { ...preview, edit: { settings: {} } })
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionPreview(project, selection, { ...preview, edit: { target: 'window' } })
+  ).toBe(project);
+  const removed = { ...project, motionRegions: [sibling] };
+  expect(presentWorkspaceMotionPreview(removed, selection, { ...preview, project: removed })).toBe(
+    removed
+  );
+  const locked = {
+    ...project,
+    utilityLanes: {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    },
+  };
+  expect(presentWorkspaceMotionPreview(locked, selection, { ...preview, project: locked })).toBe(
+    locked
+  );
+});
+
+it('retains version 21 when spatial and watermark drafts present a project with borders', () => {
+  const project = createEmptyVideoProject('Retained schema');
+  project.version = 21;
+  const region = { ...createVideoProjectMotionRegion(project, 0), id: 'camera' };
+  project.motionRegions = [
+    region,
+    { ...region, id: 'border', border: createQuickEditBorder(), borderTarget: 'viewport' },
+  ];
+  const presented = presentWorkspaceMotionPreview(
+    project,
+    { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id },
+    {
+      project,
+      regionId: region.id,
+      kind: 'spatial',
+      edit: { kind: 'perspective', enabled: true, rotateY: 15 },
+    }
+  );
+  expect(presented.version).toBe(21);
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  const watermark = presentWorkspaceWatermarkPreview(
+    project,
+    { kind: 'scene' },
+    { project, settings: createQuickEditWatermark('Draft') }
+  );
+  expect(watermark.version).toBe(21);
+  expect(isHydratableVideoProject(watermark)).toBe(true);
+});
+
+it('previews a border phase with the retained source clock and refuses invalid duration', () => {
+  const project = createEmptyVideoProject('Border phase');
+  project.version = 21;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    id: 'border',
+    duration: 4,
+    border: createQuickEditBorder(),
+    borderTarget: 'viewport' as const,
+  };
+  project.motionRegions = [region];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const preview = {
+    project,
+    regionId: region.id,
+    kind: 'border' as const,
+    edit: {},
+    transition: { phase: 'enter' as const, duration: 0.8 },
+  };
+  const presented = presentWorkspaceMotionPreview(project, selection, preview);
+  expect(presented.motionRegions?.[0]?.zoomInDuration).toBe(0.8);
+  expect(project.motionRegions[0]).toBe(region);
+  expect(presented.motionRegions?.[0]?.border).toEqual(region.border);
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  expect(
+    presentWorkspaceMotionPreview(project, selection, {
+      ...preview,
+      transition: { phase: 'enter', duration: NaN },
+    })
+  ).toBe(project);
 });

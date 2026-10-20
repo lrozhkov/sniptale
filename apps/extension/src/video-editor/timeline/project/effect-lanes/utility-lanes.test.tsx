@@ -1,3 +1,5 @@
+import { createQuickEditBorder } from '../../../../features/video/project/scene/focus-appearance';
+import { translate } from '../../../../platform/i18n';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -7,9 +9,14 @@ import { createVideoProjectMotionRegion } from '../../../../features/video/proje
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { ProjectTimelineEffectCanvasRows } from './utility-lanes';
 
-it.each([false, true])(
-  'adds a transition only through its centered button; locked=%s',
-  (locked) => {
+it.each([
+  { locked: false, withBorder: false },
+  { locked: true, withBorder: false },
+  { locked: false, withBorder: true },
+  { locked: true, withBorder: true },
+])(
+  'adds camera connections through their button; locked=$locked, border=$withBorder',
+  ({ locked, withBorder }) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const project = createEmptyVideoProject();
     project.duration = 8;
@@ -17,6 +24,15 @@ it.each([false, true])(
       { ...createVideoProjectMotionRegion(project, 0), id: 'first', startTime: 0, duration: 1 },
       { ...createVideoProjectMotionRegion(project, 4), id: 'second', startTime: 4, duration: 1 },
     ];
+    if (withBorder)
+      project.motionRegions.push({
+        ...createVideoProjectMotionRegion(project, 2),
+        id: 'intervening-border',
+        startTime: 2,
+        duration: 1,
+        border: createQuickEditBorder(),
+        borderTarget: 'viewport',
+      });
     project.utilityLanes = {
       camera: { visible: true, locked },
       actions: { visible: true, locked: false },
@@ -78,3 +94,42 @@ it.each([false, true])(
     }
   }
 );
+
+it('identifies a border segment without a camera zoom scale or connection action', () => {
+  const project = createEmptyVideoProject('Border lane');
+  project.duration = 4;
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'border',
+      duration: 2,
+      border: createQuickEditBorder(),
+      borderTarget: 'viewport',
+    },
+  ];
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  try {
+    act(() =>
+      root.render(
+        <ProjectTimelineEffectCanvasRows
+          project={project}
+          pixelsPerSecond={90}
+          selectedEffectSelection={null}
+          onBeginRangeSelection={vi.fn()}
+          onBeginEffectInteraction={vi.fn()}
+          onResizeMotionRegion={vi.fn()}
+        />
+      )
+    );
+    const segment = host.querySelector('[data-timeline-effect-segment="border"]')!;
+    expect(segment.textContent).toContain(translate('gallery.videoReview.focusBorder'));
+    expect(segment.querySelector('.lucide-frame')).not.toBeNull();
+    expect(segment.textContent).not.toContain('1.35x');
+    expect(host.querySelector('[data-ui="video-editor.timeline.framing-connection"]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

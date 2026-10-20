@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../../../features/video/project/motion/normalization';
 import { buildVideoCompositionMotionSegments } from '../../../../features/video/composition/timeline/lanes';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { translate } from '../../../../platform/i18n';
@@ -10,7 +11,7 @@ import { resolveMotionConnectionSource } from '../../../../features/video/projec
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { projectTimelineInterval } from '../interaction-state/projection';
-import { MoveRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { Frame, MoveRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
 
 const MOTION_LANE_SEGMENT_CLASS_NAME = [
@@ -56,7 +57,7 @@ function ProjectTimelineMotionLane(props: UtilityLaneProps & { laneVisible: bool
 
 function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
   const states = (props.project.motionRegions ?? [])
-    .filter((region) => region.duration > 0)
+    .filter((region) => isCameraMotionRegion(region) && region.duration > 0)
     .sort((a, b) => a.startTime - b.startTime);
   const locked = getVideoProjectUtilityLanes(props.project).camera.locked;
   return states.slice(1).map((destination, index) => {
@@ -182,7 +183,11 @@ function MotionSegments(
   }
 ) {
   return props.segments.map((segment) => {
-    const subtitle = `${segment.region.scale.toFixed(2)}x`;
+    const border = segment.region.border;
+    const label = translate(
+      border ? 'gallery.videoReview.focusBorder' : 'videoEditor.timeline.motionSegment'
+    );
+    const subtitle = border ? label : `${segment.region.scale.toFixed(2)}x`;
     return (
       <ProjectTimelineEffectSegment
         key={segment.id}
@@ -191,16 +196,18 @@ function MotionSegments(
         className={MOTION_LANE_SEGMENT_CLASS_NAME}
         height={28}
         isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'motion', segment.id)}
-        label={translate('videoEditor.timeline.motionSegment')}
+        label={label}
         hideLabel
         leadingIcon={
-          segment.region.scale < 1 ? (
+          border ? (
+            <Frame size={14} aria-hidden="true" />
+          ) : segment.region.scale < 1 ? (
             <ZoomOut size={14} aria-hidden="true" />
           ) : (
             <ZoomIn size={14} aria-hidden="true" />
           )
         }
-        title={`${translate('videoEditor.timeline.motionSegment')} · ${subtitle}`}
+        title={border ? label : `${label} · ${subtitle}`}
         startTime={segment.start}
         endTime={segment.end}
         pixelsPerSecond={props.pixelsPerSecond}

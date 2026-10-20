@@ -1,3 +1,5 @@
+import { drawCompositionBorders } from './border';
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
 import { resolveVideoCompositionFrame } from '../timeline/frame';
@@ -13,6 +15,8 @@ import {
   FakeHTMLMediaElement,
   FakeHTMLVideoElement,
 } from './visual.test-support';
+
+vi.mock('./border', () => ({ drawCompositionBorders: vi.fn() }));
 
 const createContext = createVisualTestContext;
 
@@ -352,3 +356,51 @@ function createCapturedVideoLayer(): Extract<
   if (layer?.kind !== 'video') throw new Error('Expected video layer');
   return layer;
 }
+
+it.each([false, true])(
+  'paints borders before source actions and excludes them from effect actions; camera=%s',
+  (camera) => {
+    const context = createContext();
+    context.arc = vi.fn();
+    const layer = createCapturedVideoLayer();
+    if (camera) {
+      layer.trackRole = 'CAMERA';
+      layer.clip.cameraAppearance = { shape: 'circle', roundness: 50, zoom: 1, panX: 0, panY: 0 };
+    }
+    layer.borders = [
+      {
+        id: 'border',
+        border: createQuickEditBorder(),
+        clock: {
+          time: 1,
+          duration: 3,
+          enter: { type: 'none', duration: 0 },
+          exit: { type: 'none', duration: 0 },
+        },
+      },
+    ];
+    vi.mocked(drawCompositionBorders).mockClear();
+    const sources = new Map([
+      [layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement],
+    ]);
+    drawCompositionVisualLayer(context, layer, 1, 1, {}, sources);
+    expect(drawCompositionBorders).toHaveBeenCalledOnce();
+    const borderOrder = vi.mocked(drawCompositionBorders).mock.invocationCallOrder[0]!;
+    expect(vi.mocked(context.drawImage).mock.invocationCallOrder[0]).toBeLessThan(borderOrder);
+    expect(vi.mocked(context.arc).mock.invocationCallOrder.at(-1)).toBeGreaterThan(borderOrder);
+    expect(drawCompositionBorders).toHaveBeenCalledWith(
+      context,
+      layer.borders,
+      camera ? { x: 10, y: 20, width: 100, height: 100 } : { x: 10, y: 40, width: 100, height: 60 },
+      1,
+      0
+    );
+    vi.mocked(drawCompositionBorders).mockClear();
+    vi.mocked(context.drawImage).mockClear();
+    vi.mocked(context.arc).mockClear();
+    drawCompositionVisualLayer(context, { ...layer, effectActionsOnly: true }, 1, 1, {}, sources);
+    expect(drawCompositionBorders).not.toHaveBeenCalled();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(context.arc).toHaveBeenCalled();
+  }
+);

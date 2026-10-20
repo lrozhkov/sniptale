@@ -1,3 +1,4 @@
+import { BorderAppearanceFields } from '../../ui/focus-appearance/border';
 import { ReviewCameraFollowSettings } from './cursor-path-editor';
 import {
   resolveCameraFollowPolicy,
@@ -16,7 +17,7 @@ import {
 } from './inspector-sections';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
-import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
+import { ReviewBorderAnimation } from './border-inspector';
 import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
 import type { ReactNode } from 'react';
 import {
@@ -248,10 +249,32 @@ function ReviewFocusParameters(props: FocusParameterProps) {
   const { region, onChange } = props;
   if (region.border)
     return (
-      <ReviewBorderInspector
+      <BorderAppearanceFields
         value={region.border}
-        onChange={(border) => onChange({ border })}
-        onPreview={props.onPreview}
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
+        onChange={(patch) =>
+          onChange({
+            border: {
+              ...region.border!,
+              ...patch,
+              area: { ...region.border!.area, ...patch.area },
+            },
+          })
+        }
+        onPreview={(patch) =>
+          props.onPreview?.(
+            patch
+              ? {
+                  border: {
+                    ...region.border!,
+                    ...patch,
+                    area: { ...region.border!.area, ...patch.area },
+                  },
+                }
+              : null
+          )
+        }
       />
     );
   if (region.spotlight)

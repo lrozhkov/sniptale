@@ -1,3 +1,5 @@
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
+import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { createVideoProjectRestoreTransaction } from './index.test-support';
@@ -653,6 +655,47 @@ it('restores schema19 spatial settings and independent reference through the exi
   expect(target.projects.put).toHaveBeenCalledWith(
     expect.objectContaining({
       project: expect.objectContaining({ version: 19, motionRegions: [region] }),
+    })
+  );
+});
+
+it('restores schema21 border targets, appearance and retained clocks through the existing writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'border-restore' });
+  const clip = entry.project.clips.find((item) => item.type === 'VIDEO')!;
+  const bound = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(entry.project, 1),
+      id: 'bound-border',
+      duration: 2,
+      border: {
+        ...createQuickEditBorder(),
+        style: 'dotted',
+        reveal: 'draw-ccw',
+        exitReveal: 'erase-ccw',
+        loop: true,
+        motion: 'ripple',
+        period: 0.5,
+        segmentPercent: 23,
+      },
+      borderTarget: 'window',
+    },
+    clip
+  );
+  const viewport = { ...bound, id: 'viewport-border', borderTarget: 'viewport' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    motionRegions: [bound, viewport],
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 21, motionRegions: [bound, viewport] }),
     })
   );
 });

@@ -1,5 +1,70 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'scene-border-sampling',
+    productionFile: 'apps/extension/src/features/video/composition/scene-border.ts',
+    allowCrossOwner: true,
+    reason: 'Both timeline adapters use the same geometry, reveal and retained phase sampling.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/scene-border.test.ts',
+      'apps/extension/src/features/video/review/advanced/border.test.ts',
+    ],
+  },
+  {
+    owner: 'scene-border-paint',
+    productionFile: 'apps/extension/src/features/video/composition/draw/border.ts',
+    allowCrossOwner: true,
+    reason: 'Gallery and Native retain path, opacity, destination transforms and surface cleanup.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/render-border.test.ts',
+      'apps/extension/src/workflows/video-review/render-export-focus.test.ts',
+      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    ],
+  },
+  {
+    owner: 'native-border-frame',
+    productionFile: 'apps/extension/src/features/video/composition/timeline/frame/borders.ts',
+    allowCrossOwner: true,
+    reason:
+      'Explicit targets retain source phase through split, rate and duplicate without moving the camera.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/motion/border-isolation.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+    ],
+  },
+  {
+    owner: 'focus-appearance-fields',
+    productionPrefix: 'apps/extension/src/ui/focus-appearance/',
+    allowCrossOwner: true,
+    reason: 'Shared controlled fields preserve Gallery gestures and Native inspector grouping.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/border-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-inspector.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-border-inspector',
+    productionFile: 'apps/extension/src/video-editor/workspace/sidebar/selection/motion/border.tsx',
+    allowCrossOwner: true,
+    reason: 'The inspector uses current commands and the existing disposable preview owner.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+    ],
+  },
+  {
+    owner: 'native-border-area',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/area-overlay/border.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Window projection and pointer cancellation preserve accepted data until one gesture commits.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/area-overlay/border.test.tsx',
+      'apps/extension/src/features/video/composition/draw/fitted-media.test.ts',
+    ],
+  },
+  {
     owner: 'video-focus-appearance',
     productionFile: 'apps/extension/src/features/video/project/scene/focus-appearance.ts',
     allowCrossOwner: true,

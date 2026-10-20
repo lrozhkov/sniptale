@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { cameraSourceGeometryBreaks } from './camera-source-geometry';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import {
@@ -46,6 +47,7 @@ export function resolveProjectCameraEdges(project: VideoProject, region: VideoPr
   const group = region.sourceBinding?.animationGroupId;
   const parts = group
     ? (project.motionRegions ?? [])
+        .filter(isCameraMotionRegion)
         .filter((item) => item.duration > 0 && item.sourceBinding?.animationGroupId === group)
         .toSorted((a, b) => (a.animation?.start ?? 0) - (b.animation?.start ?? 0))
     : [region];
@@ -53,9 +55,9 @@ export function resolveProjectCameraEdges(project: VideoProject, region: VideoPr
     last = parts.at(-1) ?? region;
   return {
     connectedIn: resolveMotionConnectionSource(project, first) !== null,
-    connectedOut: (project.motionRegions ?? []).some(
-      (item) => resolveMotionConnectionSource(project, item)?.id === last.id
-    ),
+    connectedOut: (project.motionRegions ?? [])
+      .filter(isCameraMotionRegion)
+      .some((item) => resolveMotionConnectionSource(project, item)?.id === last.id),
   };
 }
 
@@ -397,9 +399,9 @@ function resolvePlanEntry(
 ) {
   const provisional = resolveProvisionalPlanEntry(project, region, output);
   const boundaries: WorkingZoneCameraBoundaries = {};
-  const neighbors = (project.motionRegions ?? []).filter(
-    (item) => item.duration > 0 && item.id !== region.id
-  );
+  const neighbors = (project.motionRegions ?? [])
+    .filter(isCameraMotionRegion)
+    .filter((item) => item.duration > 0 && item.id !== region.id);
   const previous = neighbors.find((item) => item.startTime + item.duration === region.startTime);
   const next = neighbors.find((item) => item.startTime === region.startTime + region.duration);
   const key = [
@@ -478,7 +480,7 @@ export function resolveProjectCameraConflicts(
   interval = { start: 0, end: project.duration }
 ): ProjectCameraConflict[] {
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return [];
-  return (project.motionRegions ?? []).flatMap((region) => {
+  return (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
     if (
       region.focusMode !== VideoMotionFocusMode.CURSOR ||
       region.duration <= 0 ||

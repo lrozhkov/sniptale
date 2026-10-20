@@ -206,7 +206,8 @@ export function createWorkspacePreviewController(
     addActionEvent: (preset: VideoProjectActionPreset) => void;
     addMotionRegion: () => void;
     enableCursorTrack: () => void;
-  }
+  },
+  motionProject: NonNullable<ProjectLifecyclePort['project']> = project
 ) {
   return {
     assetUrls: runtime.assetUrls,
@@ -226,6 +227,8 @@ export function createWorkspacePreviewController(
       onUpdateEffectInstance: args.store.updateEffectInstance,
     },
     pointAuthoring: {
+      motionProject,
+      onPreviewMotion: args.workspace.inspector.previewMotion,
       onClearPlacementMode: args.store.clearPlacementMode,
       onUpdateActionEventDetails: args.store.updateActionEventDetails,
       onUpdateMotionRegion: args.store.updateMotionRegion,

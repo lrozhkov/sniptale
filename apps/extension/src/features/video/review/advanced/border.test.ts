@@ -7,7 +7,8 @@ import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { expect, it } from 'vitest';
-import { evaluateQuickEditBordersAtTime, quickEditBorderPath } from './border';
+import { evaluateQuickEditBordersAtTime } from './border';
+import { sceneBorderPath } from '../../composition/scene-border';
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
 import { evaluateQuickEditSpotlightsAtTime } from './focus';
 import {
@@ -77,7 +78,7 @@ it('samples camera independently and packs overlays reproducibly', () => {
   ).toHaveLength(2);
 });
 it('starts clockwise at top-center with analytic circular perimeter', () => {
-  const path = quickEditBorderPath({ x: 0, y: 0, width: 20, height: 10 }, 2);
+  const path = sceneBorderPath({ x: 0, y: 0, width: 20, height: 10 }, 2);
   expect(path.path.startsWith('M10 0H18')).toBe(true);
   expect(path.perimeter).toBeCloseTo(44 + 4 * Math.PI);
 });
@@ -378,7 +379,7 @@ it('deactivates a stored Spotlight morph when another focus occupies its gap', (
 });
 
 it('uses continuous straight segments for square corners without degenerate dash-resetting arcs', () => {
-  const path = quickEditBorderPath({ x: 1, y: 2, width: 20, height: 10 }, 0);
+  const path = sceneBorderPath({ x: 1, y: 2, width: 20, height: 10 }, 0);
   expect(path).toEqual({ path: 'M11 2H21V12H1V2H11Z', perimeter: 60 });
 });
 
@@ -557,8 +558,8 @@ it.each(['solid', 'dashed', 'dotted'] as const)(
 
 it('uses exact chord lengths for patterned corners while retaining circular solid paths', () => {
   const rect = { x: 20.25, y: 30.5, width: 363.125, height: 153.75 };
-  const solid = quickEditBorderPath(rect, 17.5);
-  const patterned = quickEditBorderPath(rect, 17.5, true);
+  const solid = sceneBorderPath(rect, 17.5);
+  const patterned = sceneBorderPath(rect, 17.5, true);
   expect(solid.path).toContain('A17.5 17.5');
   expect(patterned.path).not.toContain('A');
   const points = [...patterned.path.matchAll(/[ML]([\d.e+-]+) ([\d.e+-]+)/g)].map((match) => ({
@@ -572,7 +573,7 @@ it('uses exact chord lengths for patterned corners while retaining circular soli
   expect(patterned.perimeter).toBe(length);
   expect(solid.perimeter - patterned.perimeter).toBeGreaterThan(0);
   expect(solid.perimeter - patterned.perimeter).toBeLessThan(0.2);
-  expect(quickEditBorderPath(rect, 0, true)).toEqual(quickEditBorderPath(rect, 0));
+  expect(sceneBorderPath(rect, 0, true)).toEqual(sceneBorderPath(rect, 0));
 });
 
 it('admits Ripple without changing legacy color pulses and rejects unknown motions', () => {
@@ -625,3 +626,17 @@ it.each(['solid', 'dashed', 'dotted'] as const)(
     expect(sample(2)).toHaveLength(1);
   }
 );
+
+it('orders active borders by source anchor and stable identity while omitting dormant intervals', () => {
+  const first = { ...border(), id: 'a', sourceAnchor: { start: 4, end: 14 } };
+  const second = { ...first, id: 'b' };
+  const earlier = { ...border(), id: 'c', sourceAnchor: { start: 1, end: 11 } };
+  const unanchored = { ...border(), id: 'unanchored' };
+  Reflect.deleteProperty(unanchored, 'sourceAnchor');
+  const frames = evaluateQuickEditBordersAtTime({
+    ...geometry,
+    time: 2,
+    regions: [second, { ...first, id: 'dormant', dormant: true }, first, earlier, unanchored],
+  });
+  expect(frames.map((frame) => frame.id)).toEqual(['unanchored', 'c', 'a', 'b']);
+});

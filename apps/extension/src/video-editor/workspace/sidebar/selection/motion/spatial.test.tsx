@@ -7,8 +7,8 @@ import {
   DEFAULT_CAMERA_DEPTH,
 } from '../../../../../features/video/project/motion/spatial';
 import { translate } from '../../../../../platform/i18n';
-import type { VideoEditorMotionSpatialPreview } from '../../../../contracts/workspace';
-import { presentWorkspaceMotionSpatialPreview } from '../../../../runtime/controller/workspace-state';
+import type { VideoEditorMotionPreview } from '../../../../contracts/workspace';
+import { presentWorkspaceMotionPreview } from '../../../../runtime/controller/workspace-state';
 import {
   MotionPerspectiveFields,
   MotionDepthFields,
@@ -44,16 +44,16 @@ async function renderFields(
 ) {
   const accepted = props.project;
   function Harness() {
-    const [preview, setPreview] = useState<VideoEditorMotionSpatialPreview | null>(null);
-    const previewDraft = useCallback((draft: VideoEditorMotionSpatialPreview | null) => {
+    const [preview, setPreview] = useState<VideoEditorMotionPreview | null>(null);
+    const previewDraft = useCallback((draft: VideoEditorMotionPreview | null) => {
       observe(draft);
       setPreview(draft);
     }, []);
     const panel = {
       ...props,
       typingProject: accepted,
-      project: presentWorkspaceMotionSpatialPreview(accepted, props.selection, preview),
-      onPreviewMotionSpatial: previewDraft,
+      project: presentWorkspaceMotionPreview(accepted, props.selection, preview),
+      onPreviewMotion: previewDraft,
       onUpdateMotionRegion: commit,
     };
     return <Fields panel={panel} motionRegion={props.selectedMotionRegion!} />;

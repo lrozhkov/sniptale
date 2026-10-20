@@ -15,7 +15,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import * as focusEvaluation from '../../features/video/review/advanced/focus';
 
-import { drawReviewBorders } from '../../workflows/video-review/render-border';
+import { drawSceneBorders } from '../../features/video/composition/draw/border';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -25,7 +25,7 @@ import { ReviewSpotlightOverlay } from './spotlight-overlay';
 
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
-vi.mock('../../workflows/video-review/render-border', () => ({ drawReviewBorders: vi.fn() }));
+vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
 const paint = vi.hoisted(() => vi.fn());
 vi.mock('./zoom-preview-paint', () => ({
   paintZoomPreview: paint,
@@ -401,7 +401,7 @@ it('retains the projected source phase clock in Border Result after cut and spee
       />
     )
   );
-  expect(drawReviewBorders).toHaveBeenLastCalledWith(
+  expect(drawSceneBorders).toHaveBeenLastCalledWith(
     expect.anything(),
     output,
     [

@@ -12,7 +12,7 @@ import type { ReviewSpatialRenderer } from '../../features/video/composition/can
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
 vi.mock('./render-click-animation', () => ({ drawReviewClicks: vi.fn() }));
-vi.mock('./render-border', () => ({ drawReviewBorders: vi.fn() }));
+vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
 vi.mock('./scene-frame', async (original) => ({
   ...(await original<typeof import('./scene-frame')>()),
   drawReviewSceneComments: vi.fn(),
@@ -154,7 +154,7 @@ it.each([false, true])(
 );
 
 it('forwards managed resources and uses canonical spatial content before viewport comments', async () => {
-  const { drawReviewBorders } = await import('./render-border');
+  const { drawSceneBorders } = await import('../../features/video/composition/draw/border');
   const { drawReviewSceneComments } = await import('./scene-frame');
   const { createCanvasComment } = await import('../../features/video/review/comments');
   const canonical = { width: 1200, height: 800 };
@@ -213,7 +213,7 @@ it('forwards managed resources and uses canonical spatial content before viewpor
     },
   });
   expect(vi.mocked(drawReviewSpotlights).mock.calls.at(-1)![6]).toBe(resources);
-  expect(vi.mocked(drawReviewBorders).mock.calls.at(-1)![4]).toBe(resources);
+  expect(vi.mocked(drawSceneBorders).mock.calls.at(-1)![4]).toBe(resources);
   const [content, viewport] = vi.mocked(drawReviewSceneComments).mock.calls;
   expect(content![0]).toBe(overlayContext);
   expect(content![1].commentSpace?.canvas).toEqual(canonical);

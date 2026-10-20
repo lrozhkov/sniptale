@@ -1,4 +1,14 @@
-import { expect, it } from 'vitest';
+import {
+  mapWindowNormalizedPointToVisualLayer,
+  mapVisualLayerPointToWindowNormalized,
+  getFittedMediaWindowFrame,
+  type VisualLayerSourcePointMapping,
+} from './fitted-media';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { expect, it, vi } from 'vitest';
+import * as bufferPool from '../canvas/buffer-pool';
+import { createVisualTestContext } from './visual.test-support';
+import { drawFittedMediaLayer } from './fitted-media';
 import { mapFittedMediaFramePointToSource, mapSourcePointToFittedMediaFrame } from './fitted-media';
 
 it('maps source cursor coordinates through contain, cover, stretch, and source-100 frames', () => {
@@ -323,4 +333,157 @@ it('clips normal fitted pixels at the scaled visible window and restores context
   expect(render).toHaveBeenCalledWith(10, 70, 200, 100);
   expect(save).toHaveBeenCalledTimes(1);
   expect(restore).toHaveBeenCalledTimes(1);
+});
+
+it('maps decorated windows through crop, fit and affine transitions without source mirroring', () => {
+  const params: VisualLayerSourcePointMapping = {
+    point: { x: 0.2, y: 0.1 },
+    frame: { x: 50, y: 80, width: 320, height: 180, rotation: 37 },
+    sourceWidth: 160,
+    sourceHeight: 90,
+    fitMode: 'CONTAIN',
+    sourceCrop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, title: 'Header' },
+    renderState: { translateX: 19, translateY: -8, scaleX: 0.7, scaleY: 1.3 },
+  };
+  const mapped = mapWindowNormalizedPointToVisualLayer(params)!;
+  expect(mapped).not.toBeNull();
+  const inverse = mapVisualLayerPointToWindowNormalized({ ...params, point: mapped })!;
+  expect(inverse.x).toBeCloseTo(params.point.x, 7);
+  expect(inverse.y).toBeCloseTo(params.point.y, 7);
+  expect(mapWindowNormalizedPointToVisualLayer({ ...params, mirrored: true })).toEqual(mapped);
+  const plain = {
+    ...params,
+    frame: { ...params.frame, rotation: 0 },
+    renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+    point: { x: 0, y: 0 },
+  };
+  const window = getFittedMediaWindowFrame(plain);
+  expect(mapWindowNormalizedPointToVisualLayer(plain)).toEqual({ x: window.x, y: window.y });
+  const outside = mapVisualLayerPointToWindowNormalized({
+    ...plain,
+    point: { x: window.x - window.width, y: window.y },
+  });
+  expect(outside?.x).toBeCloseTo(-1, 7);
+  expect(
+    mapVisualLayerPointToWindowNormalized({
+      ...params,
+      renderState: { ...params.renderState, scaleX: 0 },
+    })
+  ).toBeNull();
+});
+
+it.each([1, 2, 100])('keeps header and source coordinates stable at device scale %s', (density) => {
+  const destination = createVisualTestContext();
+  const plane = createVisualTestContext();
+  Object.assign(destination, { getTransform: () => ({ a: density, b: 0, c: 0, d: density }) });
+  Object.assign(plane, { setTransform: vi.fn(), clearRect: vi.fn(), reset: vi.fn() });
+  const scratch = Object.assign(plane.canvas, { width: 0, height: 0, getContext: () => plane });
+  const release = vi.fn();
+  const acquire = vi
+    .spyOn(bufferPool, 'acquireVideoCompositionBuffer')
+    .mockImplementation((width, height) => {
+      scratch.width = width;
+      scratch.height = height;
+      return { canvas: scratch, release };
+    });
+  const render = vi.fn();
+  const header = { naturalHeight: 20 } as HTMLImageElement;
+  try {
+    drawFittedMediaLayer({
+      context: destination,
+      frame: { x: 10, y: 20, width: 200, height: 100 },
+      fitMode: 'STRETCH',
+      sourceWidth: 200,
+      sourceHeight: 80,
+      displayScale: 1,
+      shadowIntensity: 0,
+      shadowMode: undefined,
+      windowHeaderImage: header,
+      render,
+    });
+    const expectedWidth = Math.min(200 * density, 4096);
+    expect(acquire).toHaveBeenCalledWith(
+      expectedWidth,
+      expectedWidth / 2,
+      destination.canvas.ownerDocument
+    );
+    // The 4096-pixel cap rounds the header join by less than 0.025 composition pixels.
+    expect(render).toHaveBeenCalledWith(
+      10,
+      expect.closeTo(40, 1),
+      200,
+      expect.closeTo(80, 1),
+      plane
+    );
+    expect(destination.drawImage).toHaveBeenCalledWith(scratch, 10, 20, 200, 100);
+    expect(plane.drawImage).toHaveBeenCalledWith(
+      header,
+      0,
+      0,
+      expectedWidth,
+      Math.round(expectedWidth / 10)
+    );
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    acquire.mockRestore();
+  }
+});
+
+it('releases the header surface after source rendering fails', () => {
+  const context = createVisualTestContext();
+  const plane = createVisualTestContext();
+  Object.assign(plane, { setTransform: vi.fn(), clearRect: vi.fn() });
+  const release = vi.fn();
+  const acquire = vi.spyOn(bufferPool, 'acquireVideoCompositionBuffer').mockReturnValue({
+    canvas: Object.assign(plane.canvas, { getContext: () => plane }),
+    release,
+  });
+  try {
+    expect(() =>
+      drawFittedMediaLayer({
+        context,
+        frame: { x: 0, y: 0, width: 200, height: 100 },
+        fitMode: 'STRETCH',
+        sourceWidth: 200,
+        sourceHeight: 80,
+        displayScale: 1,
+        shadowIntensity: 0,
+        shadowMode: undefined,
+        windowHeaderImage: { naturalHeight: 20 } as HTMLImageElement,
+        hideWindowHeader: true,
+        render: () => {
+          throw new Error('source failure');
+        },
+      })
+    ).toThrow('source failure');
+    expect(plane.drawImage).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    acquire.mockRestore();
+  }
+});
+
+it('rejects invalid window mapping and maps circular window coordinates independently of source crop', () => {
+  const mapping: VisualLayerSourcePointMapping = {
+    fitMode: 'CONTAIN',
+    frame: { x: 0, y: 0, width: 200, height: 100, rotation: 0 },
+    sourceWidth: 200,
+    sourceHeight: 100,
+    point: { x: 0, y: 0 },
+    renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+    cameraAppearance: { shape: 'circle', roundness: 50, zoom: 1, panX: 0, panY: 0 },
+  };
+  expect(mapWindowNormalizedPointToVisualLayer(mapping)).toEqual({ x: 50, y: 0 });
+  expect(mapVisualLayerPointToWindowNormalized({ ...mapping, point: { x: 150, y: 100 } })).toEqual({
+    x: 1,
+    y: 1,
+  });
+  for (const invalid of [
+    { ...mapping, sourceWidth: 0 },
+    { ...mapping, renderState: { ...mapping.renderState, scaleX: 0 } },
+  ]) {
+    expect(mapWindowNormalizedPointToVisualLayer(invalid)).toBeNull();
+    expect(mapVisualLayerPointToWindowNormalized(invalid)).toBeNull();
+  }
 });

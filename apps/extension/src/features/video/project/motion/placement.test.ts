@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../scene/focus-appearance';
 import { describe, expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
 import { createVideoProjectMotionRegion } from './index';
@@ -61,4 +62,23 @@ describe('zoom placement', () => {
       duration: 2,
     });
   });
+});
+
+it('keeps camera occupancy independent from border ranges', () => {
+  const { project, first, second } = fixture();
+  const border = { ...first, border: createQuickEditBorder(), borderTarget: 'viewport' as const };
+  project.motionRegions = [border, second];
+  expect.soft(getMotionInsertionRange(project, 3)).toEqual({ startTime: 3, duration: 4 });
+  expect
+    .soft(constrainMotionTiming(project, second, { startTime: 0, duration: 2 }, true))
+    .toEqual({ startTime: 0, duration: 2 });
+  expect
+    .soft(constrainMotionTiming(project, second, { startTime: 0, duration: 9 }, false))
+    .toEqual({ startTime: 0, duration: 9 });
+  expect
+    .soft(constrainMotionTiming(project, border, { startTime: 10, duration: 2 }, true))
+    .toEqual({ startTime: 10, duration: 2 });
+  expect
+    .soft(constrainMotionTiming(project, border, { startTime: 2, duration: 10 }, false))
+    .toEqual({ startTime: 2, duration: 10 });
 });

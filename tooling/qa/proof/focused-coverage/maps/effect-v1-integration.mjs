@@ -205,9 +205,15 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-editor-project-state',
     productionFile: 'apps/extension/src/video-editor/project/state/effects.ts',
     reason:
-      'EffectV1 project actions, cursor preservation, instance authority, and utility lanes have direct state proof.',
+      'EffectV1, captured actions, camera phases, spatial edits and borders share the current project command owner.',
     testFiles: [
       'apps/extension/src/video-editor/project/state/effects.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.border.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.camera-phases.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.motion-blur.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.spatial.test.ts',
       'apps/extension/src/video-editor/project/state/effects.cursor.test.ts',
       'apps/extension/src/video-editor/project/state/effects.effect-instance.test.ts',
       'apps/extension/src/video-editor/project/state/effects.utility-lanes.test.ts',

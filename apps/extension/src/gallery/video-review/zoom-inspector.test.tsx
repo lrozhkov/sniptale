@@ -493,14 +493,17 @@ it('preserves the source area when switching Spotlight to Border and blocks conf
 });
 
 it('previews Border width without history writes, commits once, and cancels with Escape', async () => {
-  const { ReviewBorderInspector } = await import('./border-inspector');
+  const { BorderAppearanceFields } = await import('../../ui/focus-appearance/border');
+  const { ReviewDetails } = await import('./controls');
   const { createQuickEditBorder } =
     await import('../../features/video/project/scene/focus-appearance');
   const onChange = vi.fn();
   const onPreview = vi.fn();
   act(() =>
     root.render(
-      <ReviewBorderInspector
+      <BorderAppearanceFields
+        Details={ReviewDetails}
+        preferenceId="gallery.videoReview.borderPreciseArea"
         value={createQuickEditBorder()}
         onChange={onChange}
         onPreview={onPreview}
@@ -512,9 +515,7 @@ it('previews Border width without history writes, commits once, and cancels with
   await type(range, '5');
   await type(range, '8');
   expect(onChange).not.toHaveBeenCalled();
-  expect(onPreview).toHaveBeenLastCalledWith(
-    expect.objectContaining({ border: expect.objectContaining({ width: 8 }) })
-  );
+  expect(onPreview).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
   act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
   expect(onChange).toHaveBeenCalledTimes(1);
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));

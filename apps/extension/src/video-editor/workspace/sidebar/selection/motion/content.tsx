@@ -69,7 +69,9 @@ export function MotionTimingFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
-      <MotionBindingField {...props} />
+      {props.motionRegion.border && props.motionRegion.borderTarget === 'window' ? null : (
+        <MotionBindingField {...props} />
+      )}
       <MotionDurationField
         duration={props.motionRegion.duration}
         motionRegionId={props.motionRegion.id}

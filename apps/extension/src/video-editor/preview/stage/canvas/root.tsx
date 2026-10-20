@@ -142,6 +142,8 @@ function PreviewStageRootOverlayLayer(props: {
         onUpdateAnnotationClipTemplate={params.onUpdateAnnotationClipTemplate}
         onUpdateActionEventDetails={params.onUpdateActionEventDetails}
         onUpdateMotionRegion={params.onUpdateMotionRegion}
+        motionProject={params.motionProject}
+        onPreviewMotion={params.onPreviewMotion}
         onUpsertObjectTrackCorrectionAnchor={params.onUpsertObjectTrackCorrectionAnchor}
         placementMode={params.placementMode}
         project={params.project}

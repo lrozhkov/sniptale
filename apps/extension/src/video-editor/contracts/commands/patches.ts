@@ -1,3 +1,4 @@
+import type { MotionBorderEdit } from '../../../features/video/project/motion';
 import type { MotionSpatialEdit } from '../../../features/video/project/motion/spatial';
 import type { MotionTransitionPhaseEdit } from '../../../features/video/project/motion/transitions';
 import type { MotionBlurPhaseEdit } from '../../../features/video/project/motion/blur';
@@ -65,6 +66,7 @@ export type VideoEditorMotionRegionPatch = Partial<
   >
 > & {
   sourceClipId?: string | null;
+  borderEdit?: MotionBorderEdit;
   motionBlurPhase?: MotionBlurPhaseEdit;
   spatialEdit?: MotionSpatialEdit;
   motionTransitionPhase?: MotionTransitionPhaseEdit;

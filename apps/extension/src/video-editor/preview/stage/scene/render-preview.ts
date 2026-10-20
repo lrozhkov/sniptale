@@ -1,3 +1,4 @@
+import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
 import {
   createVideoProjectWatermarkRenderer,
   type VideoProjectWatermarkRenderer,
@@ -318,6 +319,17 @@ function drawResolvedPreviewSceneContent(
 
   if (!overlayPrepared || args.params.signal?.aborted) return false;
 
+  drawCompositionBorders(
+    overlayPrepared.context,
+    args.renderPasses.overlayFrame.viewportBorders,
+    {
+      x: overlayPrepared.viewport.offsetX,
+      y: overlayPrepared.viewport.offsetY,
+      width: overlayPrepared.viewport.width,
+      height: overlayPrepared.viewport.height,
+    },
+    overlayPrepared.viewport.scale
+  );
   drawPreviewSceneOverlays({
     camera: args.renderPasses.overlayFrame.camera,
     context: overlayPrepared.context,

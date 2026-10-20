@@ -124,7 +124,7 @@ describe('camera source visibility boundary', () => {
         })
       ).toBe(false);
     }
-    expect(isHydratableVideoProject({ ...project, version: 21 })).toBe(false);
+    expect(isHydratableVideoProject({ ...project, version: 22 })).toBe(false);
     const legacy = fixture();
     delete legacy.clip.cameraAppearance;
     delete legacy.clip.cameraPositions;

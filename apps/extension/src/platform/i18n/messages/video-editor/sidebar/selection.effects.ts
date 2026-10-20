@@ -56,6 +56,8 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   historyEnabled: { ru: 'Визуализация истории', en: 'History visualization' },
   historySuppression: { ru: 'Интервал между акцентами', en: 'Accent interval' },
   historyShowKeys: { ru: 'Показывать нажатия клавиш', en: 'Show keystrokes' },
+  borderTarget: { ru: 'Объект рамки', en: 'Border target' },
+  borderTargetViewport: { ru: 'Холст', en: 'Canvas' },
   framingBinding: { ru: 'Привязка', en: 'Binding' },
   framingBindingScene: { ru: 'Сцена', en: 'Scene' },
   framingExactPosition: { ru: 'Точное положение', en: 'Exact position' },

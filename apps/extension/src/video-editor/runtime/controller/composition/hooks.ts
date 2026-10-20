@@ -2,7 +2,7 @@ import { getVideoProjectWatermarkAsset } from '../../../../features/video/projec
 import { useContext, useMemo, type Context } from 'react';
 import {
   presentWorkspaceWatermarkPreview,
-  presentWorkspaceMotionSpatialPreview,
+  presentWorkspaceMotionPreview,
 } from '../workspace-state';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
@@ -240,11 +240,11 @@ export function useVideoEditorHeaderController() {
 function usePresentedProject() {
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const sceneBackground = useWorkspaceSceneBackgroundContext();
-  const { motionSpatialPreview, watermarkPreview } = useWorkspaceInspectorContext();
+  const { motionPreview, watermarkPreview } = useWorkspaceInspectorContext();
   const selection = useVideoEditorClipSelectionPort((port) => port.selection);
   return useMemo(() => {
     if (!project) return project;
-    let presented = presentWorkspaceMotionSpatialPreview(project, selection, motionSpatialPreview);
+    let presented = presentWorkspaceMotionPreview(project, selection, motionPreview);
     presented = presentWorkspaceWatermarkPreview(
       presented,
       selection,
@@ -252,7 +252,7 @@ function usePresentedProject() {
     );
     if (!sceneBackground.preview) return presented;
     return { ...presented, ...syncProjectSceneBackground(presented, sceneBackground.preview) };
-  }, [project, selection, motionSpatialPreview, watermarkPreview, sceneBackground.preview]);
+  }, [project, selection, motionPreview, watermarkPreview, sceneBackground.preview]);
 }
 
 export function useVideoEditorPreviewController() {
@@ -305,7 +305,8 @@ export function useVideoEditorPreviewController() {
     },
     runtime,
     project,
-    projectUpdaters
+    projectUpdaters,
+    lifecycleProject
   );
 }
 

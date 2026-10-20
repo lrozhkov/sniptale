@@ -21,7 +21,7 @@ import {
 } from './scene-frame';
 import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
-import { drawReviewBorders } from './render-border';
+import { drawSceneBorders } from '../../features/video/composition/draw/border';
 import { drawReviewSpotlights } from './render-spotlight';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewWindowRaster } from './window-header';
@@ -121,7 +121,7 @@ export function drawReviewSceneOverlays(args: {
   }
   const overlay = spatial ? spatial.surface('overlay', canvas.width, canvas.height) : null;
   const overlayContext = overlay?.context ?? context;
-  drawReviewBorders(
+  drawSceneBorders(
     overlayContext,
     overlay?.canvas ?? canvas,
     borders,

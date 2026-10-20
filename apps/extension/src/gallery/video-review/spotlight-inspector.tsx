@@ -1,5 +1,5 @@
 import { type QuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
-import { ReviewFocusRoundness, ReviewFocusAreaFields } from './focus-area-fields';
+import { FocusRoundnessField, FocusAreaFields } from '../../ui/focus-appearance/geometry';
 import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
 import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
@@ -56,7 +56,7 @@ export function ReviewSpotlightInspector(props: {
           onChange={(blur) => onChange({ ...value, blur })}
         />
       )}
-      <ReviewFocusRoundness
+      <FocusRoundnessField
         value={value.roundness}
         onPreview={(roundness) =>
           props.onPreview?.(roundness === null ? null : { spotlight: { ...value, roundness } })
@@ -67,7 +67,7 @@ export function ReviewSpotlightInspector(props: {
         preferenceId="gallery.videoReview.preciseArea"
         label={translate('gallery.videoReview.preciseArea')}
       >
-        <ReviewFocusAreaFields
+        <FocusAreaFields
           area={value.area}
           onPreview={(area) =>
             props.onPreview?.(area === null ? null : { spotlight: { ...value, area } })

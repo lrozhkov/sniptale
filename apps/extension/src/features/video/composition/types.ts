@@ -1,3 +1,5 @@
+import type { QuickEditBorder } from '../project/scene/focus-appearance';
+import type { SceneBorderClock } from './scene-border';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
 import type { VideoProjectActionOccurrence } from '../project/action-occurrences';
 import type { ResolvedAnnotationPresentation } from '../project/annotation/template';
@@ -74,11 +76,20 @@ export interface VideoCompositionResolvedAnnotationClip {
   trackId: string;
 }
 
+/** Disposable authored appearance and retained phase clock, before output geometry is known. */
+export interface VideoCompositionBorderState {
+  id: string;
+  border: QuickEditBorder;
+  clock: SceneBorderClock;
+}
+
 export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
       /** Role of the source track, retained for independent camera composition. */
       trackRole?: VideoProjectTrackRole;
       actions?: readonly VideoCompositionActionState[];
+      /** Window-local borders enter the same clip/effect input and transform pipeline once. */
+      borders?: readonly VideoCompositionBorderState[];
     })
   | VideoCompositionLayerBase<VideoProjectImageClip, 'image'>
   | VideoCompositionLayerBase<VideoCompositionResolvedTextClip, 'text'>
@@ -132,6 +143,8 @@ export interface VideoCompositionCameraState {
 }
 
 export interface VideoCompositionFrame {
+  /** Viewport-normalized borders stay independent of the project camera. */
+  viewportBorders?: readonly VideoCompositionBorderState[];
   actions: VideoCompositionActionState[];
   camera: VideoCompositionCameraState;
   cursor: VideoCompositionCursorState | null;

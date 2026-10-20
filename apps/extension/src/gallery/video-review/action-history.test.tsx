@@ -546,16 +546,10 @@ it('configures recorded keys without pointer locations, separately from selected
     );
     expect(host.textContent).toContain('gallery.videoReview.historyClicks');
     expect(host.textContent).toContain('gallery.videoReview.historyKeys');
-    const select = host.querySelector<HTMLSelectElement>(
-      '[aria-label="gallery.videoReview.keyDisplay"]'
-    )!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
-        select,
-        'on'
-      );
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    const display = host.querySelector('[aria-label="gallery.videoReview.keyDisplay"]')!;
+    act(() =>
+      display.querySelector<HTMLButtonElement>('[title="gallery.videoReview.keyCaption"]')!.click()
+    );
     expect(onKeyChange).toHaveBeenCalledExactlyOnceWith(['key'], { enabled: true });
     expect(onChange).not.toHaveBeenCalled();
   } finally {

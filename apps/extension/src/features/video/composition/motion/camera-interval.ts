@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { resolveMotionConnectionSource } from '../../project/motion';
 import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
@@ -18,7 +19,7 @@ export function resolveActiveMotionRegion(
   time: number
 ): VideoProjectMotionRegion | null {
   let active: VideoProjectMotionRegion | null = null;
-  for (const region of project.motionRegions ?? []) {
+  for (const region of (project.motionRegions ?? []).filter(isCameraMotionRegion)) {
     if (time < region.startTime || time >= region.startTime + region.duration) continue;
     if (!active || region.startTime > active.startTime) active = region;
   }
@@ -27,7 +28,7 @@ export function resolveActiveMotionRegion(
 
 /** Connections fill only the explicit gap between their validated source and destination. */
 export function resolveConnectingMotionRegions(project: VideoProject, time: number) {
-  for (const destination of project.motionRegions ?? []) {
+  for (const destination of (project.motionRegions ?? []).filter(isCameraMotionRegion)) {
     if (time >= destination.startTime || !destination.incomingConnection) continue;
     const source = resolveMotionConnectionSource(project, destination);
     if (source && time >= source.startTime + source.duration) return { source, destination };
@@ -149,7 +150,7 @@ function canCrossBoundary(
 
 function cameraBoundaries(project: VideoProject) {
   const result = [0, project.duration];
-  for (const region of project.motionRegions ?? []) {
+  for (const region of (project.motionRegions ?? []).filter(isCameraMotionRegion)) {
     if (region.duration <= 0) continue;
     result.push(region.startTime, region.startTime + region.duration);
     const start = region.animation?.start ?? 0;

@@ -1,3 +1,4 @@
+import { PreviewStageBorderAreaOverlay } from './border';
 import { translate } from '../../../../platform/i18n';
 import { VideoMotionFocusMode } from '../../../../features/video/project/types/index';
 import { VideoEditorPlacementModeKind } from '../../../contracts/placement';
@@ -15,6 +16,7 @@ export { handleStageAreaPlacement } from './placement';
 
 export function PreviewStageMotionAreaOverlay(params: AreaOverlayParams) {
   const motionRegion = params.selectedMotionRegion;
+  if (motionRegion?.border) return <PreviewStageBorderAreaOverlay {...params} />;
   const area =
     motionRegion?.focusMode === VideoMotionFocusMode.MANUAL_AREA ? motionRegion.focusArea : null;
   const isPickingArea = params.placementMode?.kind === VideoEditorPlacementModeKind.MOTION_AREA;

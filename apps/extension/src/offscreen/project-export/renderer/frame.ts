@@ -1,3 +1,4 @@
+import { drawCompositionBorders } from '../../../features/video/composition/draw/border';
 import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
@@ -317,6 +318,12 @@ export function drawProjectFrame(
     renderPasses.visualPasses,
     settings,
     options.effectRuntimeFrames
+  );
+  drawCompositionBorders(
+    context,
+    renderPasses.overlayFrame.viewportBorders,
+    { x: 0, y: 0, width: settings.width, height: settings.height },
+    scale
   );
   context.save();
   if (offsetX !== 0 || offsetY !== 0) {

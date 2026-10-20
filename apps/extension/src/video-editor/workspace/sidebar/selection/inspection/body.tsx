@@ -64,7 +64,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onStartMotionFocusPlacement'
     | 'onStartObjectTrackAnchorPlacement'
     | 'onClearPlacementMode'
-    | 'onPreviewMotionSpatial'
+    | 'onPreviewMotion'
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
@@ -225,9 +225,7 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
 
     onStartObjectTrackAnchorPlacement: props.onStartObjectTrackAnchorPlacement ?? (() => undefined),
     onClearPlacementMode: props.onClearPlacementMode ?? (() => undefined),
-    ...(props.onPreviewMotionSpatial
-      ? { onPreviewMotionSpatial: props.onPreviewMotionSpatial }
-      : {}),
+    ...(props.onPreviewMotion ? { onPreviewMotion: props.onPreviewMotion } : {}),
     onUpdateMotionRegion: props.onUpdateMotionRegion ?? (() => undefined),
     onUpdateTransitionDuration: props.onUpdateTransitionDuration ?? (() => undefined),
     onUpdateTransitionEasing: props.onUpdateTransitionEasing ?? (() => undefined),

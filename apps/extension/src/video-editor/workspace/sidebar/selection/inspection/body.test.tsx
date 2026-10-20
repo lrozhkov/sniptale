@@ -57,7 +57,7 @@ describe('workspace-sidebar/selection/body', () => {
         ...createProps(),
         onApplyCameraLayout: vi.fn(),
         onEditCameraPosition: vi.fn(),
-        onPreviewMotionSpatial: vi.fn(),
+        onPreviewMotion: vi.fn(),
         canAddCameraPosition,
       };
       inspectPanelMock.mockClear();
@@ -68,7 +68,7 @@ describe('workspace-sidebar/selection/body', () => {
         expect.objectContaining({
           onApplyCameraLayout: props.onApplyCameraLayout,
           onEditCameraPosition: props.onEditCameraPosition,
-          onPreviewMotionSpatial: props.onPreviewMotionSpatial,
+          onPreviewMotion: props.onPreviewMotion,
           canAddCameraPosition,
         }),
         undefined

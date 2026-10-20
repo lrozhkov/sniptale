@@ -1,3 +1,4 @@
+import { resolveVideoCompositionBorders } from './borders';
 import type { CameraOutputViewport } from '../../../project/export/output-dimensions';
 import type { VideoProject } from '../../../project/types/index';
 import { resolveVideoCompositionCamera } from '../../motion/index';
@@ -32,9 +33,11 @@ export function resolveVideoCompositionFrame(
   const actions = resolveVideoCompositionActions(project, currentTime);
   const cursorSample = resolveCursorSample(project, currentTime);
   const effectRuntimePlans = resolveEffectRuntimeFramePlans(project, currentTime);
-  const layerOptions = { ...options, timelineIndex, actions };
+  const borders = resolveVideoCompositionBorders(project, currentTime);
+  const layerOptions = { ...options, timelineIndex, actions, windowBorders: borders.windows };
 
   return {
+    ...(borders.viewport.length ? { viewportBorders: borders.viewport } : {}),
     actions: actions.filter((action) => action.clipId === null),
     camera: resolveVideoCompositionCamera({
       actions,

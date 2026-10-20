@@ -138,7 +138,7 @@ function getWorkspaceSidebarProjectEffectProps(
     | 'onClearCursorSampleSkinOverride'
     | 'onUpdateCursorSkin'
     | 'onClearPlacementMode'
-    | 'onPreviewMotionSpatial'
+    | 'onPreviewMotion'
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
@@ -158,7 +158,7 @@ function getWorkspaceSidebarProjectEffectProps(
     onUpdateCursorSampleSkinOverride: controller.projectActions.onUpdateCursorSampleSkinOverride,
     onUpdateCursorSampleVisibility: controller.projectActions.onUpdateCursorSampleVisibility,
     onUpdateCursorSkin: controller.projectActions.onUpdateCursorSkin,
-    onPreviewMotionSpatial: controller.projectActions.onPreviewMotionSpatial,
+    onPreviewMotion: controller.projectActions.onPreviewMotion,
     onUpdateMotionRegion: controller.projectActions.onUpdateMotionRegion,
     onUpdateTransitionDuration: controller.projectActions.onUpdateTransitionDuration,
     onUpdateTransitionEasing: controller.projectActions.onUpdateTransitionEasing,

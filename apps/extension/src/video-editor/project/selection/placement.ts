@@ -89,6 +89,7 @@ export function resolvePlacementModeAfterProjectUpdate(
       return (project.motionRegions ?? []).some(
         (region) =>
           region.id === placementMode.motionRegionId &&
+          !region.border &&
           region.focusMode === VideoMotionFocusMode.MANUAL
       )
         ? placementMode
@@ -97,6 +98,7 @@ export function resolvePlacementModeAfterProjectUpdate(
       return (project.motionRegions ?? []).some(
         (region) =>
           region.id === placementMode.motionRegionId &&
+          !region.border &&
           region.focusMode === VideoMotionFocusMode.MANUAL_AREA
       )
         ? placementMode

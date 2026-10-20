@@ -423,6 +423,8 @@ function createWorkspacePreviewActions(
   | 'onTogglePlay'
   | 'onUpdateActionEventDetails'
   | 'onUpdateMotionRegion'
+  | 'onPreviewMotion'
+  | 'motionProject'
   | 'onUpsertObjectTrackCorrectionAnchor'
 > {
   return {
@@ -439,6 +441,8 @@ function createWorkspacePreviewActions(
     onTogglePlay: preview.transport.onTogglePlay,
     onUpdateActionEventDetails: preview.pointAuthoring.onUpdateActionEventDetails,
     onUpdateMotionRegion: preview.pointAuthoring.onUpdateMotionRegion,
+    onPreviewMotion: preview.pointAuthoring.onPreviewMotion,
+    motionProject: preview.pointAuthoring.motionProject,
     onUpsertObjectTrackCorrectionAnchor: preview.pointAuthoring.onUpsertObjectTrackCorrectionAnchor,
   };
 }

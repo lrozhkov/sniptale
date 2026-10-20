@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../scene/focus-appearance';
 import { expect, it } from 'vitest';
 import { resolveVideoCompositionCamera } from '../../composition/motion';
 import { createProject, createVideoClip } from '../timeline/project-meta.test.helpers';
@@ -353,4 +354,37 @@ it('redirects a deleted split endpoint only to its surviving authored group', ()
   });
   expect(deletedSource.motionRegions).toHaveLength(1);
   expect(deletedSource.motionRegions![0]!.incomingConnection).toBeNull();
+});
+
+it('retains window border authoring and its source phase through trim, untrim and clip movement', () => {
+  const clip = createVideoClip();
+  const project = createProject([clip]);
+  project.version = 21;
+  const region = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(project, 1),
+      duration: 4,
+      border: { ...createQuickEditBorder(), style: 'dotted', loop: true, motion: 'ripple' },
+      borderTarget: 'window',
+    },
+    clip
+  );
+  project.motionRegions = [region];
+  const trimmed = {
+    ...project,
+    clips: [
+      { ...clip, sourceStart: 2, sourceDuration: 2, startTime: 8, duration: 1, playbackRate: 2 },
+    ],
+  };
+  const projected = projectMotionSourceBinding(trimmed, region);
+  expect(projected.animation).toEqual({ start: 1, end: 3, duration: 4 });
+  expect(projected.border).toEqual(region.border);
+  expect(projected.borderTarget).toBe('window');
+  expect(projected.startTime).toBe(8);
+  expect(projected.duration).toBe(1);
+  const restored = projectMotionSourceBinding(project, projected);
+  expect(restored.animation).toEqual({ start: 0, end: 4, duration: 4 });
+  expect(restored.sourceBinding).toEqual(region.sourceBinding);
+  expect(restored.border).toEqual(region.border);
+  expect(isHydratableVideoProject({ ...project, motionRegions: [restored] })).toBe(true);
 });

@@ -14,7 +14,8 @@ export type AreaOverlayParams = Pick<
   | 'project'
   | 'selectedMotionRegion'
   | 'stageRef'
->;
+> &
+  Partial<Pick<PreviewStageCanvasProps, 'currentTime' | 'motionProject' | 'onPreviewMotion'>>;
 
 export interface AreaDragParams {
   area: VideoProjectMotionArea;

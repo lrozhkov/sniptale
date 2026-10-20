@@ -67,7 +67,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onUpdateMediaClipShadowColor'
   | 'onEditMediaClip'
   | 'onUpdateMediaClipWindowHeader'
-  | 'onPreviewMotionSpatial'
+  | 'onPreviewMotion'
   | 'onUpdateMotionRegion'
   | 'onUpdateShapeStyle'
   | 'onUpdateSubtitleTrackStyle'

@@ -1,10 +1,18 @@
+import { drawCompositionBorders } from './border';
+import { roundedWindowRadius } from '../../project/window-geometry';
+import { cameraWindowFrame } from '../../project/camera/appearance';
+import { traceCameraShape } from './media-shadow';
 import type { PointerFeedbackSource } from './pointer-feedback';
 import { windowHeaderImageKey } from './window-header';
 import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionActionState, VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
-import { drawFittedMediaLayer, drawCameraMediaSource } from './fitted-media';
+import {
+  drawFittedMediaLayer,
+  drawCameraMediaSource,
+  getFittedMediaWindowFrame,
+} from './fitted-media';
 import { drawTextCompositionLayer } from './overlays';
 import { drawShapeCompositionLayer } from './shape';
 import { isVideoCompositionFrameSource, type VideoCompositionMediaSource } from './media-source';
@@ -260,6 +268,8 @@ function drawVideoLayer(
       });
     },
   };
+  const deferActions =
+    !layer.effectActionsOnly && !!layer.borders?.length && !!layer.actions?.length;
   drawFittedMediaLayer({
     ...media,
     ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
@@ -268,17 +278,69 @@ function drawVideoLayer(
     render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) => {
       if (!layer.effectActionsOnly)
         paintSource(drawContext, frame, drawX, drawY, drawWidth, drawHeight);
-      drawVideoSourceActions(
-        drawContext,
-        layer,
-        frame,
-        { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-        { width: media.sourceWidth, height: media.sourceHeight },
-        visibleContent,
-        feedbackSource
-      );
+      if (!deferActions)
+        drawVideoSourceActions(
+          drawContext,
+          layer,
+          frame,
+          { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+          { width: media.sourceWidth, height: media.sourceHeight },
+          visibleContent,
+          feedbackSource
+        );
     },
   });
+  if (!layer.effectActionsOnly) drawVideoWindowBorders(context, layer, media, frame, displayScale);
+  if (deferActions)
+    drawFittedMediaLayer({
+      ...media,
+      context,
+      frame,
+      hideWindowHeader: true,
+      shadowIntensity: 0,
+      render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) =>
+        drawVideoSourceActions(
+          drawContext,
+          layer,
+          frame,
+          { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+          { width: media.sourceWidth, height: media.sourceHeight },
+          visibleContent,
+          feedbackSource
+        ),
+    });
+}
+
+function drawVideoWindowBorders(
+  context: CanvasRenderingContext2D,
+  layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>,
+  media: Omit<Parameters<typeof drawFittedMediaLayer>[0], 'context' | 'frame' | 'render'>,
+  frame: ReturnType<typeof getScaledLayerFrame>,
+  displayScale: number
+) {
+  if (!layer.borders?.length) return;
+  const window =
+    layer.trackRole === 'CAMERA'
+      ? cameraWindowFrame(frame, media.cameraAppearance?.shape ?? 'rounded')
+      : getFittedMediaWindowFrame({ ...media, frame });
+  context.save();
+  try {
+    if (media.cameraAppearance) {
+      traceCameraShape(context, window, media.cameraAppearance);
+      context.clip();
+    }
+    const radius =
+      layer.trackRole === 'CAMERA'
+        ? 0
+        : roundedWindowRadius(
+            window.width,
+            window.height,
+            (layer.clip.windowCornerRadius ?? 0) * displayScale
+          );
+    drawCompositionBorders(context, layer.borders, window, displayScale, radius);
+  } finally {
+    context.restore();
+  }
 }
 
 function drawVideoSourceActions(

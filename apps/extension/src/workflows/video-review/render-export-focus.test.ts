@@ -13,10 +13,10 @@ import {
 } from '../../features/video/review/advanced/scene';
 import { renderRenderWindowFrames } from './render-export';
 import { drawReviewSpotlights } from './render-spotlight';
-import { drawReviewBorders } from './render-border';
+import { drawSceneBorders } from '../../features/video/composition/draw/border';
 
 vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
-vi.mock('./render-border', () => ({ drawReviewBorders: vi.fn() }));
+vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
 vi.mock('mediabunny', async (importOriginal) => ({
   ...(await importOriginal<typeof import('mediabunny')>()),
   VideoSample: class {
@@ -65,7 +65,7 @@ it.each(['fixed', 'follow-video'] as const)(
     };
     for (const scale of [1, 2]) {
       vi.mocked(drawReviewSpotlights).mockClear();
-      vi.mocked(drawReviewBorders).mockClear();
+      vi.mocked(drawSceneBorders).mockClear();
       const camera = { scale, centerX: 0.25, centerY: 0.25 };
       const layout = computeQuickEditSceneLayout({
         source: sourceSize,
@@ -115,7 +115,7 @@ it.each(['fixed', 'follow-video'] as const)(
       expect(opening.y).toBeCloseTo(layout.videoTransform.y - canvas.headerHeight * scale);
       expect(opening.height).toBeCloseTo(layout.windowRect.height * scale * area.height);
       expect(opening.y + opening.height).toBeLessThan(layout.videoTransform.y);
-      const border = vi.mocked(drawReviewBorders).mock.calls[0]![2][0]!;
+      const border = vi.mocked(drawSceneBorders).mock.calls[0]![2][0]!;
       expect(border.width).toBe(3 * scale);
       const start = border.path.match(/^M([\d.-]+) ([\d.-]+)/)!;
       expect(Number(start[1])).toBeCloseTo(opening.x + opening.width / 2);

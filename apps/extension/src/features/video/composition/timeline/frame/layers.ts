@@ -1,3 +1,5 @@
+import { resolveVideoCompositionBorders } from './borders';
+import type { VideoCompositionBorderState } from '../../types';
 import { resolveCameraVisualClip } from '../../../project/camera/animation';
 import { resolveVideoCompositionActions } from './actions';
 import {
@@ -59,6 +61,7 @@ function createVisualLayer(
     includeSubtitles: boolean;
     includeTransparent: boolean;
     actions: readonly VideoCompositionActionState[];
+    windowBorders: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
   }
 ): VideoCompositionVisualLayer | null {
   clip = resolveCameraVisualClip(project, clip, currentTime);
@@ -83,6 +86,9 @@ function createVisualLayer(
         ...resolvedBaseLayer,
         clip,
         kind: 'video',
+        ...(options.windowBorders.get(clip.id)?.length
+          ? { borders: options.windowBorders.get(clip.id)! }
+          : {}),
         actions: options.actions.filter((action) => action.clipId === clip.id),
         ...(project.tracks.find((track) => track.id === clip.trackId)?.role ===
         VideoProjectTrackRole.CAMERA
@@ -128,11 +134,14 @@ export function resolveVideoCompositionVisualLayers(
     includeSubtitles?: boolean;
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
+    windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const resolvedOptions = {
     includeSubtitles: options.includeSubtitles ?? true,
     includeTransparent: false,
+    windowBorders:
+      options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows,
     actions: options.actions ?? resolveVideoCompositionActions(project, currentTime),
   };
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
@@ -168,6 +177,7 @@ export function resolveVideoCompositionEffectInputLayers(
     includeSubtitles?: boolean;
     timelineIndex?: VideoCompositionTimelineIndex;
     actions?: readonly VideoCompositionActionState[];
+    windowBorders?: ReadonlyMap<string, readonly VideoCompositionBorderState[]>;
   } = {}
 ): VideoCompositionVisualLayer[] {
   const requestedClipIds = collectEffectInputClipIds(plans);
@@ -175,6 +185,8 @@ export function resolveVideoCompositionEffectInputLayers(
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const layers: VideoCompositionVisualLayer[] = [];
   const actions = options.actions ?? resolveVideoCompositionActions(project, currentTime);
+  const windowBorders =
+    options.windowBorders ?? resolveVideoCompositionBorders(project, currentTime).windows;
   let zIndex = 0;
   for (const track of timelineIndex.tracksInRenderOrder) {
     if (!track.visible) continue;
@@ -184,6 +196,7 @@ export function resolveVideoCompositionEffectInputLayers(
         includeSubtitles: options.includeSubtitles ?? true,
         includeTransparent: true,
         actions,
+        windowBorders,
       });
       if (layer) layers.push(layer);
       zIndex += 1;

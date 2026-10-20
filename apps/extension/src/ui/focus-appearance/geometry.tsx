@@ -1,15 +1,18 @@
 import { clampQuickEditSpotlightArea } from '../../features/video/project/scene/focus-appearance';
 import { translate } from '../../platform/i18n';
 
-import type { QuickEditRect } from '../../features/video/review/advanced/scene';
-import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
-export function ReviewFocusRoundness(props: {
+import type { QuickEditBorder } from '../../features/video/project/scene/focus-appearance';
+import { PreviewNumericRow } from '../compact-inspector-controls/numeric-preview';
+
+type FocusArea = QuickEditBorder['area'];
+/** Edit normalized corner roundness through the compact percentage control. */
+export function FocusRoundnessField(props: {
   value: number;
   onPreview(value: number | null): void;
   onChange(value: number): void;
 }) {
   return (
-    <ReviewPreviewNumberRow
+    <PreviewNumericRow
       label={translate('gallery.videoReview.focusRoundness')}
       min={0}
       max={50}
@@ -22,10 +25,11 @@ export function ReviewFocusRoundness(props: {
     />
   );
 }
-export function ReviewFocusAreaFields(props: {
-  area: QuickEditRect;
-  onPreview(area: QuickEditRect | null): void;
-  onChange(area: QuickEditRect): void;
+/** Keep numeric area edits and pointer edits inside the same normalized bounds. */
+export function FocusAreaFields(props: {
+  area: FocusArea;
+  onPreview(area: FocusArea | null): void;
+  onChange(area: FocusArea): void;
 }) {
   return (
     [
@@ -35,7 +39,7 @@ export function ReviewFocusAreaFields(props: {
       ['height', 'focusAreaHeight'],
     ] as const
   ).map(([field, label]) => (
-    <ReviewPreviewNumberRow
+    <PreviewNumericRow
       key={field}
       label={translate(`gallery.videoReview.${label}`)}
       min={field === 'x' || field === 'y' ? 0 : 1}

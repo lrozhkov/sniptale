@@ -2,6 +2,7 @@ import { getEffectInstanceLabel } from '../../../features/video/project/effect-i
 import React from 'react';
 import {
   Camera,
+  Frame,
   Keyboard,
   Film,
   ImageIcon,
@@ -127,8 +128,12 @@ export function getSelectionMeta(
     case VideoEditorSelectionKind.HISTORY_LANE:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.telemetryLane');
     case VideoEditorSelectionKind.MOTION_LANE:
-    case VideoEditorSelectionKind.MOTION_REGION:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+    case VideoEditorSelectionKind.MOTION_REGION:
+      return project?.motionRegions?.find((region) => region.id === selection.motionRegionId)
+        ?.border
+        ? createStaticSelectionMeta(Frame, 'gallery.videoReview.focusBorder')
+        : createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
     case VideoEditorSelectionKind.MOTION_CONNECTION:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
   }

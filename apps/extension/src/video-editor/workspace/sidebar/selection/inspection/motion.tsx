@@ -1,4 +1,9 @@
 import {
+  MotionEffectModeField,
+  MotionBorderFields,
+  MotionBorderAnimationFields,
+} from '../motion/border';
+import {
   MotionPerspectiveFields,
   MotionDepthFields,
   MotionSpatialReferenceFields,
@@ -86,17 +91,29 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'zoom',
-            semantic: 'framing' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupFraming'),
+            semantic: motionRegion.border ? ('appearance' as const) : ('framing' as const),
+            label: translate(
+              motionRegion.border
+                ? 'videoEditor.sidebar.inspectorGroupAppearance'
+                : 'videoEditor.sidebar.inspectorGroupFraming'
+            ),
             defaultActive: true,
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                <MotionCameraFields motionRegion={motionRegion} panel={props} />
+                <div className="sniptale-parameter-stack">
+                  <MotionEffectModeField motionRegion={motionRegion} panel={props} />
+                  {motionRegion.border ? (
+                    <MotionBorderFields motionRegion={motionRegion} panel={props} />
+                  ) : (
+                    <MotionCameraFields motionRegion={motionRegion} panel={props} />
+                  )}
+                </div>
               </MotionInspectorFieldset>
             ),
           },
           {
             id: 'perspective',
+            visible: !motionRegion.border,
             semantic: 'perspective' as const,
             label: translate('gallery.videoReview.perspective'),
             content: (
@@ -107,6 +124,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'depth',
+            visible: !motionRegion.border,
             semantic: 'depth' as const,
             label: translate('gallery.videoReview.depthOfField'),
             content: (
@@ -117,6 +135,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'spatial-reference',
+            visible: !motionRegion.border,
             semantic: 'framing' as const,
             label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
             content: (
@@ -141,7 +160,11 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
-                <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
+                {motionRegion.border ? (
+                  <MotionBorderAnimationFields motionRegion={motionRegion} panel={props} />
+                ) : (
+                  <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
+                )}
               </MotionInspectorFieldset>
             ),
           },

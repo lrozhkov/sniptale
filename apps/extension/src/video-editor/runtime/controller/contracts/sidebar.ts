@@ -105,7 +105,7 @@ interface VideoEditorSidebarProjectActions {
   onUpdateCursorSampleSkinOverride: VideoEditorSidebarCommands['updateCursorSampleSkinOverride'];
   onUpdateCursorSampleVisibility: VideoEditorSidebarCommands['updateCursorSampleVisibility'];
   onUpdateCursorSkin: (patch: Partial<NonNullable<VideoProjectCursorTrack['skin']>>) => void;
-  onPreviewMotionSpatial: VideoEditorWorkspaceState['inspector']['previewMotionSpatial'];
+  onPreviewMotion: VideoEditorWorkspaceState['inspector']['previewMotion'];
   onUpdateMotionRegion: VideoEditorSidebarCommands['updateMotionRegion'];
   onUpdateTransitionDuration: VideoEditorSidebarCommands['updateTransitionDuration'];
   onUpdateTransitionEasing: VideoEditorSidebarCommands['updateTransitionEasing'];

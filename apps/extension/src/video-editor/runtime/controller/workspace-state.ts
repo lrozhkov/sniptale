@@ -1,9 +1,11 @@
+import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
+import { editMotionBorder } from '../../../features/video/project/motion';
 import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
 import type { VideoProject } from '../../../features/video/project/types';
 import type {
   VideoEditorWatermarkPreview,
-  VideoEditorMotionSpatialPreview,
+  VideoEditorMotionPreview,
 } from '../../contracts/workspace';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import { useWorkspacePreference } from './workspace-preferences';
@@ -45,8 +47,8 @@ interface VideoEditorWorkspaceInspectorState {
   cancelWatermarkAcquisition: () => void;
   mode: VideoEditorInspectorMode;
   openSelection: () => void;
-  motionSpatialPreview: VideoEditorMotionSpatialPreview | null;
-  previewMotionSpatial: (preview: VideoEditorMotionSpatialPreview | null) => void;
+  motionPreview: VideoEditorMotionPreview | null;
+  previewMotion: (preview: VideoEditorMotionPreview | null) => void;
 }
 
 export interface VideoEditorWorkspaceState {
@@ -222,8 +224,7 @@ function useVideoEditorInspectorState(
     previewWatermark(null);
   }, []);
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
-  const [motionSpatialPreview, previewMotionSpatial] =
-    useState<VideoEditorMotionSpatialPreview | null>(null);
+  const [motionPreview, previewMotion] = useState<VideoEditorMotionPreview | null>(null);
 
   const openSelection = useCallback(() => {
     setMode('selection');
@@ -234,8 +235,8 @@ function useVideoEditorInspectorState(
     () => ({
       mode,
       openSelection,
-      motionSpatialPreview,
-      previewMotionSpatial,
+      motionPreview,
+      previewMotion,
       watermarkPreview,
       previewWatermark,
       registerWatermarkAbort,
@@ -244,7 +245,7 @@ function useVideoEditorInspectorState(
     [
       mode,
       openSelection,
-      motionSpatialPreview,
+      motionPreview,
       watermarkPreview,
       registerWatermarkAbort,
       cancelWatermarkAcquisition,
@@ -367,10 +368,10 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
 }
 
 /** Project identity invalidates a draft after Undo, restore, replacement or accepted edits. */
-export function presentWorkspaceMotionSpatialPreview(
+export function presentWorkspaceMotionPreview(
   project: VideoProject,
   selection: VideoEditorSelection,
-  preview: VideoEditorMotionSpatialPreview | null
+  preview: VideoEditorMotionPreview | null
 ): VideoProject {
   if (
     !preview ||
@@ -382,12 +383,25 @@ export function presentWorkspaceMotionSpatialPreview(
     return project;
   const region = project.motionRegions?.find((item) => item.id === preview.regionId);
   if (!region) return project;
+  if (preview.kind === 'border') {
+    const border = editMotionBorder(project, region, preview.edit);
+    if (!border) return project;
+    const edited = preview.transition
+      ? editMotionTransitionPhase(border, preview.transition)
+      : border;
+    if (!edited || edited === region) return project;
+    return {
+      ...project,
+      version: project.version >= 21 ? project.version : 21,
+      motionRegions: project.motionRegions!.map((item) => (item === region ? edited : item)),
+    };
+  }
   const edited = editMotionSpatialSettings(region, preview.edit);
   if (!edited || edited === region) return project;
   const { spatialReference: _reference, ...retained } = region;
   return {
     ...project,
-    version: project.version === 20 ? 20 : 19,
+    version: project.version >= 19 ? project.version : 19,
     motionRegions: project.motionRegions!.map((item) =>
       item === region ? { ...retained, ...edited } : item
     ),
@@ -402,5 +416,9 @@ export function presentWorkspaceWatermarkPreview(
 ): VideoProject {
   if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
     return project;
-  return { ...project, version: 20, watermark: preview.settings };
+  return {
+    ...project,
+    version: project.version >= 20 ? project.version : 20,
+    watermark: preview.settings,
+  };
 }

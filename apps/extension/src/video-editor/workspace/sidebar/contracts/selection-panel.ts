@@ -94,7 +94,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onUpdateMediaClipWindowHeader?: WorkspaceSidebarProps['onUpdateMediaClipWindowHeader'];
   onApplyMediaClipVisualsToTrack?: WorkspaceSidebarProps['onApplyMediaClipVisualsToTrack'];
   onConvertTextClipToAnnotation?: WorkspaceSidebarProps['onConvertTextClipToAnnotation'];
-  onPreviewMotionSpatial?: WorkspaceSidebarProps['onPreviewMotionSpatial'];
+  onPreviewMotion?: WorkspaceSidebarProps['onPreviewMotion'];
   onUpdateMotionRegion: NonNullable<WorkspaceSidebarProps['onUpdateMotionRegion']>;
   onUpdateShapeStyle: WorkspaceSidebarProps['onUpdateShapeStyle'];
   onUpdateSubtitleTrackStyle?: WorkspaceSidebarProps['onUpdateSubtitleTrackStyle'];

@@ -364,6 +364,10 @@ export interface VideoProjectMotionArea {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Active border mode retains the dormant camera configuration in this interval. */
+  border?: import('../scene/focus-appearance').QuickEditBorder;
+  /** Window geometry belongs to the bound clip, while viewport geometry ignores the camera. */
+  borderTarget?: 'viewport' | 'window';
   /** Absent settings inherit the project policy or the retained legacy path coefficients. */
   cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */

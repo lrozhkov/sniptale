@@ -20,13 +20,13 @@ type SpatialFieldProps = {
 /** Commands use accepted settings; only the presentation receives a gesture draft. */
 function useMotionSpatialEditing({ motionRegion, panel }: SpatialFieldProps) {
   const project = panel.typingProject ?? panel.project;
-  const preview = panel.onPreviewMotionSpatial;
+  const preview = panel.onPreviewMotion;
   useEffect(() => () => preview?.(null), [preview, project, motionRegion.id]);
   return {
     presented:
       panel.project.motionRegions?.find((region) => region.id === motionRegion.id) ?? motionRegion,
     preview: (edit: MotionSpatialEdit | null) =>
-      preview?.(edit ? { project, regionId: motionRegion.id, edit } : null),
+      preview?.(edit ? { project, regionId: motionRegion.id, kind: 'spatial', edit } : null),
     commit: (edit: MotionSpatialEdit) => {
       preview?.(null);
       panel.onUpdateMotionRegion(motionRegion.id, { spatialEdit: edit });

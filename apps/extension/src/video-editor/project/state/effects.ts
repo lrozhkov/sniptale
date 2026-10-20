@@ -1,3 +1,5 @@
+import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
+import { editMotionBorder } from '../../../features/video/project/motion';
 import { patchReviewKeys } from '../../../features/video/project/action-feedback/key-animation';
 import {
   getVideoProjectClickStyle,
@@ -365,6 +367,7 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
         const target = project.motionRegions?.find((region) => region.id === motionRegionId);
+        if (patch.borderEdit !== undefined && !target) return project;
         const spatial =
           patch.spatialEdit === undefined
             ? undefined
@@ -377,7 +380,9 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
             : target && editMotionTransitionPhase(target, patch.motionTransitionPhase);
         if (
           patch.motionTransitionPhase !== undefined &&
-          (!target || transition === null || transition === target)
+          (!target ||
+            transition === null ||
+            (transition === target && patch.borderEdit === undefined))
         )
           return project;
         const phases =
@@ -394,68 +399,100 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
           (!target || phases === null || phases === target.motionBlur)
         )
           return project;
-        return applyVideoProjectMutationPatch(project, {
-          motionRegions: (project.motionRegions ?? []).map((region) => {
-            if (region.id !== motionRegionId) {
-              const groupId = target?.sourceBinding?.animationGroupId;
-              return groupId &&
-                region.sourceBinding?.animationGroupId === groupId &&
-                patch.incomingConnection !== undefined
-                ? normalizeVideoProjectMotionRegion(project, {
-                    ...region,
-                    incomingConnection: patch.incomingConnection,
-                  })
-                : region;
-            }
-            const {
-              sourceClipId,
-              cameraFollow,
-              motionBlurPhase: _phase,
-              spatialEdit: _spatial,
-              motionTransitionPhase: _transition,
-              ...properties
-            } = patch;
-            if (sourceClipId !== undefined && region.duration <= 0) return region;
-            const {
-              perspective: _perspective,
-              depthOfField: _depth,
-              spatialReference: _reference,
-              ...withoutSpatial
-            } = transition ?? region;
-            let updated = {
-              ...(spatial ? withoutSpatial : (transition ?? region)),
-              ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
-              ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
-              ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
-              ...properties,
-              ...(phases ? { motionBlur: phases } : {}),
+        let borderRefused = false;
+        const motionRegions = (project.motionRegions ?? []).map((region) => {
+          if (region.id !== motionRegionId) {
+            const groupId = target?.sourceBinding?.animationGroupId;
+            return groupId &&
+              region.sourceBinding?.animationGroupId === groupId &&
+              patch.incomingConnection !== undefined
+              ? normalizeVideoProjectMotionRegion(project, {
+                  ...region,
+                  incomingConnection: patch.incomingConnection,
+                })
+              : region;
+          }
+          const {
+            sourceClipId,
+            borderEdit,
+            cameraFollow,
+            motionBlurPhase: _phase,
+            spatialEdit: _spatial,
+            motionTransitionPhase: _transition,
+            ...properties
+          } = patch;
+          if (sourceClipId !== undefined && region.duration <= 0) return region;
+          const {
+            perspective: _perspective,
+            depthOfField: _depth,
+            spatialReference: _reference,
+            ...withoutSpatial
+          } = transition ?? region;
+          let updated = {
+            ...(spatial ? withoutSpatial : (transition ?? region)),
+            ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
+            ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
+            ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
+            ...properties,
+            ...(phases ? { motionBlur: phases } : {}),
+          };
+          if (cameraFollow !== undefined) {
+            const { cameraFollow: _previous, ...rest } = updated;
+            updated = cameraFollow ? { ...rest, cameraFollow } : rest;
+          }
+          if (sourceClipId === null) {
+            const { sourceBinding: _binding, ...sceneRegion } = updated;
+            updated = {
+              ...sceneRegion,
+              ...(sceneRegion.border ? { borderTarget: 'viewport' as const } : {}),
             };
-            if (cameraFollow !== undefined) {
-              const { cameraFollow: _previous, ...rest } = updated;
-              updated = cameraFollow ? { ...rest, cameraFollow } : rest;
+          } else if (sourceClipId !== undefined && sourceClipId !== region.sourceBinding?.clipId) {
+            const bindingRegion =
+              borderEdit?.enabled === true
+                ? { ...updated, border: updated.border ?? createQuickEditBorder() }
+                : updated;
+            const source = getMotionBindingCandidates(project, bindingRegion).find(
+              (item) => item.id === sourceClipId
+            );
+            if (!source) return region;
+            updated = bindMotionRegionToClip(updated, source);
+          }
+          const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
+          if (patch.duration !== undefined || patch.startTime !== undefined) {
+            updated = {
+              ...updated,
+              ...constrainMotionTiming(project, region, updated, patch.duration === undefined),
+            };
+            if (clip?.type === VideoProjectClipType.VIDEO)
+              updated = bindMotionRegionToClip(updated, clip);
+          }
+          if (borderEdit !== undefined) {
+            const border = editMotionBorder(project, updated, borderEdit);
+            if (!border) {
+              borderRefused = true;
+              return region;
             }
-            if (sourceClipId === null) {
-              const { sourceBinding: _binding, ...sceneRegion } = updated;
-              updated = sceneRegion;
-            } else if (sourceClipId !== undefined) {
-              const source = getMotionBindingCandidates(project, updated).find(
-                (item) => item.id === sourceClipId
-              );
-              if (!source) return region;
-              updated = bindMotionRegionToClip(updated, source);
-            }
-            const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
-            if (patch.duration !== undefined || patch.startTime !== undefined) {
-              updated = {
-                ...updated,
-                ...constrainMotionTiming(project, region, updated, patch.duration === undefined),
-              };
-              if (clip?.type === VideoProjectClipType.VIDEO)
-                updated = bindMotionRegionToClip(updated, clip);
-            }
-            return normalizeVideoProjectMotionRegion(project, updated);
-          }),
+            const sameBinding =
+              sourceClipId === undefined ||
+              sourceClipId === region.sourceBinding?.clipId ||
+              (sourceClipId === null && !region.sourceBinding);
+            if (
+              border === updated &&
+              sameBinding &&
+              Object.keys(patch).every((key) => key === 'borderEdit' || key === 'sourceClipId')
+            )
+              return region;
+            updated = border;
+          }
+          return normalizeVideoProjectMotionRegion(project, updated);
         });
+        if (
+          patch.borderEdit !== undefined &&
+          (borderRefused ||
+            motionRegions.every((region, index) => region === project.motionRegions?.[index]))
+        )
+          return project;
+        return applyVideoProjectMutationPatch(project, { motionRegions });
       })
     );
 }

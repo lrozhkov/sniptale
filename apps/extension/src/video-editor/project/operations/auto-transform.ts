@@ -1,3 +1,4 @@
+import { isCameraMotionRegion } from '../../../features/video/project/motion/normalization';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { recordingIdForProjectAsset } from '../../../features/video/project/source-interactions';
 import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
@@ -283,6 +284,7 @@ function bindSelectedCameraRegions(
     motionRegions: [
       ...(project.motionRegions ?? []).filter(
         (region) =>
+          !isCameraMotionRegion(region) ||
           !camera.some(
             (next) =>
               region.id === next.id ||

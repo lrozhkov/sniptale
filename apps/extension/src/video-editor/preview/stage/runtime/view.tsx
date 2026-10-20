@@ -99,6 +99,8 @@ function buildPreviewStageSurfaceActionProps(
     onPreviewEffectAnchors: runtime.render.onPreviewEffectAnchors,
     onPreviewEffectControls: runtime.render.onPreviewEffectControls,
     onUpdateMotionRegion: props.onUpdateMotionRegion,
+    motionProject: props.motionProject,
+    onPreviewMotion: props.onPreviewMotion,
     onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor,
   };
 }

@@ -20,7 +20,7 @@ import type {
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type {
   VideoEditorInspectorMode,
-  VideoEditorMotionSpatialPreview,
+  VideoEditorMotionPreview,
 } from '../../../contracts/workspace';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoObjectTrack } from '../../../../features/video/project/object-tracks';
@@ -166,7 +166,7 @@ export interface WorkspaceSidebarProps {
     clipId: string,
     templateKind: VideoProjectAnnotationClip['templateKind']
   ) => void;
-  onPreviewMotionSpatial?: (preview: VideoEditorMotionSpatialPreview | null) => void;
+  onPreviewMotion?: (preview: VideoEditorMotionPreview | null) => void;
   onUpdateMotionRegion?: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpdateShapeStyle: (clipId: string, patch: Record<string, string | number>) => void;
   onUpdateSubtitleTrackStyle?: (trackId: string, patch: Record<string, string | number>) => void;

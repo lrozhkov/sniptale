@@ -350,7 +350,14 @@ export function drawFittedMediaLayer(params: {
 function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]): void {
   const header = params.windowHeaderImage;
   if (!header) return;
-  const rasterScale = Math.min(1, 4096 / Math.max(params.frame.width, params.frame.height));
+  const transform = params.context.getTransform?.();
+  const deviceScale = transform
+    ? Math.max(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d))
+    : 1;
+  const rasterScale = Math.min(
+    deviceScale,
+    4096 / Math.max(params.frame.width, params.frame.height)
+  );
   const width = Math.max(1, Math.ceil(params.frame.width * rasterScale));
   const height = Math.max(1, Math.ceil(params.frame.height * rasterScale));
   const lease = acquireVideoCompositionBuffer(width, height, params.context.canvas.ownerDocument);
@@ -388,9 +395,18 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
         plane.beginPath();
         plane.rect(x, join, w, y + h - join);
         plane.clip();
-        // Keep callback coordinates in the composition frame for source-anchored actions.
+        // Raster density must not change the composition coordinates of source actions.
+        const scaleX = width / params.frame.width;
+        const scaleY = height / params.frame.height;
+        plane.scale(scaleX, scaleY);
         plane.translate(-params.frame.x, -params.frame.y);
-        params.render(params.frame.x + x, params.frame.y + join, w, y + h - join, plane);
+        params.render(
+          params.frame.x + x / scaleX,
+          params.frame.y + join / scaleY,
+          w / scaleX,
+          (y + h - join) / scaleY,
+          plane
+        );
         plane.restore();
       }
     );
@@ -529,6 +545,47 @@ export function mapVisualLayerPointToSourceNormalized(
   return {
     x: Math.min(crop.x + crop.width, Math.max(crop.x, native.x)),
     y: Math.min(crop.y + crop.height, Math.max(crop.y, native.y)),
+  };
+}
+
+/** Window coordinates include decoration and do not inherit source crop or mirroring. */
+export function mapWindowNormalizedPointToVisualLayer(
+  params: VisualLayerSourcePointMapping
+): SourcePoint | null {
+  if (!isValidPointMapping(params)) return null;
+  const window = params.cameraAppearance
+    ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
+    : getFittedMediaWindowFrame(params);
+  const { center, angle } = visualLayerRotation(params.frame);
+  const x = window.x + params.point.x * window.width - center.x;
+  const y = window.y + params.point.y * window.height - center.y;
+  return {
+    x:
+      center.x +
+      params.renderState.translateX +
+      params.renderState.scaleX * (x * Math.cos(angle) - y * Math.sin(angle)),
+    y:
+      center.y +
+      params.renderState.translateY +
+      params.renderState.scaleY * (x * Math.sin(angle) + y * Math.cos(angle)),
+  };
+}
+
+/** Pointer inversion stays unbounded so a drag can clamp the authored area at its owner. */
+export function mapVisualLayerPointToWindowNormalized(
+  params: VisualLayerSourcePointMapping
+): SourcePoint | null {
+  if (!isValidPointMapping(params)) return null;
+  const window = params.cameraAppearance
+    ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
+    : getFittedMediaWindowFrame(params);
+  if (window.width <= 0 || window.height <= 0) return null;
+  const { center, angle } = visualLayerRotation(params.frame);
+  const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;
+  const y = (params.point.y - center.y - params.renderState.translateY) / params.renderState.scaleY;
+  return {
+    x: (center.x + x * Math.cos(angle) + y * Math.sin(angle) - window.x) / window.width,
+    y: (center.y - x * Math.sin(angle) + y * Math.cos(angle) - window.y) / window.height,
   };
 }
 

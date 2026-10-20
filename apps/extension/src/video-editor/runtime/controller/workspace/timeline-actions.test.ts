@@ -59,8 +59,8 @@ function createWorkspace(): Pick<
       previewWatermark: () => undefined,
       registerWatermarkAbort: () => () => undefined,
       cancelWatermarkAcquisition: () => undefined,
-      motionSpatialPreview: null,
-      previewMotionSpatial: vi.fn(),
+      motionPreview: null,
+      previewMotion: vi.fn(),
     },
     confirm: {
       dialog: null,

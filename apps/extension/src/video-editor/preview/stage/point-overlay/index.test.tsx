@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../../../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
@@ -585,3 +586,27 @@ it.each(['crop', 'destination', 'circle', 'dormant'] as const)(
     });
   }
 );
+
+it('does not expose dormant camera handles for a selected border interval', () => {
+  const project = createPointOverlayProject();
+  const region = project.motionRegions![0]!;
+  region.border = createQuickEditBorder();
+  region.borderTarget = 'viewport';
+  act(() =>
+    root?.render(
+      <PreviewStagePointOverlay
+        camera={createCamera()}
+        currentTime={1}
+        onClearPlacementMode={vi.fn()}
+        onUpdateActionEventDetails={vi.fn()}
+        onUpdateMotionRegion={vi.fn()}
+        placementMode={null}
+        project={project}
+        selectedActionOccurrence={null}
+        selectedMotionRegion={region}
+        stageRef={{ current: createStage(220, 140) }}
+      />
+    )
+  );
+  expect(container?.querySelector('[data-preview-stage-point-handle="true"]')).toBeNull();
+});

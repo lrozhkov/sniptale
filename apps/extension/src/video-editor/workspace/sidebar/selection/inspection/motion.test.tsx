@@ -1,3 +1,12 @@
+import { MotionBorderFields, MotionBorderAnimationFields } from '../motion/border';
+import {
+  createProject,
+  createVideoClip,
+  createTrack,
+} from '../../../../../features/video/project/timeline/project-meta.test.helpers';
+import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
+import { bindMotionRegionToClip } from '../../../../../features/video/project/motion/source-binding';
+import { createQuickEditBorder } from '../../../../../features/video/project/scene/focus-appearance';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -173,3 +182,220 @@ function clickGroup(title: string) {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
+
+it('groups border settings and phases while preserving the camera mode command', () => {
+  const props = createMotionPanelProps({
+    border: createQuickEditBorder(),
+    borderTarget: 'viewport',
+  });
+  props.onUpdateMotionRegion = vi.fn();
+  renderPanel(props);
+  expect(container?.textContent).toContain('gallery.videoReview.borderWidth');
+  expect(container?.textContent).toContain('videoEditor.sidebar.borderTarget');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.motionScaleLabel');
+  expect(
+    container?.querySelector('nav button[title="gallery.videoReview.perspective"]')
+  ).toBeNull();
+  expect(
+    container?.querySelector('nav button[title="gallery.videoReview.depthOfField"]')
+  ).toBeNull();
+  clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
+  expect(container?.textContent).toContain('gallery.videoReview.borderHold');
+  expect(container?.textContent).not.toContain('gallery.videoReview.motionBlur');
+  clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+  const mode = container?.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.zoomRegionLabel"]'
+  );
+  expect(mode).toBeTruthy();
+  act(() => mode!.click());
+  expect(props.onUpdateMotionRegion).toHaveBeenCalledWith(props.selectedMotionRegion!.id, {
+    borderEdit: { enabled: false },
+  });
+});
+
+it('keeps window selection with its target and exposes an independent clock only for viewport borders', () => {
+  const clip = createVideoClip();
+  const project = createProject([clip]);
+  const region = bindMotionRegionToClip(
+    {
+      ...createVideoProjectMotionRegion(project, 1),
+      border: createQuickEditBorder(),
+      borderTarget: 'window',
+    },
+    clip
+  );
+  project.motionRegions = [region];
+  const props = createMotionPanelProps(region);
+  props.project = project;
+  props.selectedMotionRegion = region;
+  renderPanel(props);
+  clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.framingBinding');
+  const viewport = { ...region, borderTarget: 'viewport' as const };
+  props.project = { ...project, motionRegions: [viewport] };
+  props.selectedMotionRegion = viewport;
+  renderPanel(props);
+  expect(container?.textContent).toContain('videoEditor.sidebar.framingBinding');
+});
+
+it('previews border width without history, cancels it and commits only accepted authoring', () => {
+  const props = createMotionPanelProps({
+    border: createQuickEditBorder(),
+    borderTarget: 'viewport',
+  });
+  props.onPreviewMotion = vi.fn();
+  props.onUpdateMotionRegion = vi.fn();
+  act(() =>
+    root?.render(<MotionBorderFields panel={props} motionRegion={props.selectedMotionRegion!} />)
+  );
+  const width = container!.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.videoReview.borderWidth range"]'
+  )!;
+  expect(width).toBeTruthy();
+  const key = (type: string, value: string) =>
+    act(() => width.dispatchEvent(new KeyboardEvent(type, { key: value, bubbles: true })));
+  key('keydown', 'ArrowRight');
+  expect(props.onPreviewMotion).toHaveBeenLastCalledWith({
+    kind: 'border',
+    project: props.project,
+    regionId: props.selectedMotionRegion!.id,
+    edit: { settings: { width: 4 } },
+  });
+  expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
+  key('keydown', 'Escape');
+  key('keyup', 'ArrowRight');
+  expect(props.onPreviewMotion).toHaveBeenLastCalledWith(null);
+  expect(props.onUpdateMotionRegion).not.toHaveBeenCalled();
+  key('keydown', 'ArrowRight');
+  key('keyup', 'ArrowRight');
+  expect(props.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(
+    props.selectedMotionRegion!.id,
+    { borderEdit: { settings: { width: 4 } } }
+  );
+  act(() => root?.render(null));
+  expect(props.onPreviewMotion).toHaveBeenLastCalledWith(null);
+});
+
+it.each(['enter', 'exit'] as const)(
+  'adapts %s reveal, phase duration and hold edits to Native commands',
+  (phase) => {
+    const props = createMotionPanelProps({
+      border: createQuickEditBorder(),
+      borderTarget: 'viewport',
+      phaseTransitions: { enter: 'none', exit: 'none' },
+    });
+    props.onPreviewMotion = vi.fn();
+    props.onUpdateMotionRegion = vi.fn();
+    const render = () =>
+      act(() =>
+        root?.render(
+          <MotionBorderAnimationFields panel={props} motionRegion={props.selectedMotionRegion!} />
+        )
+      );
+    render();
+    const phaseLabel = phase === 'enter' ? 'zoomTransitionIn' : 'zoomTransitionOut';
+    const scope = () =>
+      container!.querySelector(`[aria-label="gallery.videoReview.${phaseLabel}"]`)!;
+    const click = (title: string, parent: ParentNode = scope()) => {
+      const node = parent.querySelector<HTMLButtonElement>(
+        `[title="gallery.videoReview.${title}"]`
+      )!;
+      expect(node).toBeTruthy();
+      act(() => node.click());
+    };
+    click(phase === 'enter' ? 'borderDrawing' : 'borderErasing');
+    const key = phase === 'enter' ? 'reveal' : 'exitReveal';
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion!.id, {
+      borderEdit: { settings: { [key]: phase === 'enter' ? 'draw' : 'erase' } },
+      motionTransitionPhase: { phase, type: 'ease-in-out' },
+    });
+    props.selectedMotionRegion = {
+      ...props.selectedMotionRegion!,
+      phaseTransitions: { enter: 'linear', exit: 'ease-out' },
+      border: {
+        ...props.selectedMotionRegion!.border!,
+        [key]: phase === 'enter' ? 'draw' : 'erase',
+      },
+    };
+    props.project = { ...props.project, motionRegions: [props.selectedMotionRegion] };
+    render();
+    click('borderCounterclockwise');
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion.id, {
+      borderEdit: { settings: { [key]: phase === 'enter' ? 'draw-ccw' : 'erase-ccw' } },
+      motionTransitionPhase: { phase, type: phase === 'enter' ? 'linear' : 'ease-out' },
+    });
+    const slider = scope().querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.zoomTransitionDuration range"]'
+    )!;
+    act(() =>
+      slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    );
+    expect(props.onPreviewMotion).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: 'border',
+        edit: {},
+        transition: { phase, duration: expect.any(Number) },
+      })
+    );
+    act(() =>
+      slider.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
+    );
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion.id, {
+      borderEdit: {},
+      motionTransitionPhase: { phase, duration: expect.any(Number) },
+    });
+    click(phase === 'enter' ? 'borderAppear' : 'borderDisappear');
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion.id, {
+      borderEdit: { settings: {} },
+      motionTransitionPhase: { phase, type: 'none' },
+    });
+    const hold = container!.querySelector('[aria-label="gallery.videoReview.borderHold"]')!;
+    click('borderPulse', hold);
+    expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(props.selectedMotionRegion.id, {
+      borderEdit: { settings: { loop: true, motion: 'pulse' } },
+    });
+  }
+);
+
+it.each([false, true])(
+  'identifies overlapping same-name border targets on one track=%s',
+  (sameTrack) => {
+    const first = createVideoClip({ id: 'first-target', name: 'Footage' });
+    const second = createVideoClip({
+      id: 'second-target',
+      name: 'Footage',
+      trackId: sameTrack ? first.trackId : 'overlay-track',
+    });
+    const project = createProject([first, second]);
+    project.tracks.find((track) => track.id === first.trackId)!.name = 'Main';
+    if (!sameTrack) project.tracks.push({ ...createTrack('overlay-track', 1), name: 'Overlay' });
+    const region = bindMotionRegionToClip(
+      {
+        ...createVideoProjectMotionRegion(project, 1),
+        border: createQuickEditBorder(),
+        borderTarget: 'window',
+      },
+      first
+    );
+    project.motionRegions = [region];
+    const props = createMotionPanelProps(region);
+    props.project = project;
+    props.selectedMotionRegion = region;
+    props.onUpdateMotionRegion = vi.fn();
+    props.onPreviewMotion = vi.fn();
+    act(() => root?.render(<MotionBorderFields panel={props} motionRegion={region} />));
+    for (const [clip, label] of [
+      [first, 'Footage · Main (1)'],
+      [second, `Footage · ${sameTrack ? 'Main' : 'Overlay'} (2)`],
+    ] as const) {
+      const button = container!.querySelector<HTMLButtonElement>(`[title="${label}"]`);
+      expect(button).not.toBeNull();
+      act(() => button!.click());
+      expect(props.onPreviewMotion).toHaveBeenLastCalledWith(null);
+      expect(props.onUpdateMotionRegion).toHaveBeenLastCalledWith(region.id, {
+        sourceClipId: clip.id,
+        borderEdit: { target: 'window' },
+      });
+    }
+  }
+);

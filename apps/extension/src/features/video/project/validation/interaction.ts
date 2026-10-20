@@ -1,3 +1,4 @@
+import { parseQuickEditBorder } from '../scene/focus-appearance';
 import {
   parseCameraPerspective,
   parseCameraDepth,
@@ -206,6 +207,11 @@ export function isMotionRegion(value: unknown): boolean {
   const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
     phaseTransitions !== null &&
+    (value['border'] === undefined
+      ? value['borderTarget'] === undefined
+      : parseQuickEditBorder(value['border']) !== null &&
+        (value['borderTarget'] === 'viewport' ||
+          (value['borderTarget'] === 'window' && value['sourceBinding'] !== undefined))) &&
     parseCameraPerspective(value['perspective']) !== null &&
     parseCameraDepth(value['depthOfField']) !== null &&
     parseMotionSpatialReference(value['spatialReference']) !== null &&

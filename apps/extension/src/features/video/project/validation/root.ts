@@ -94,9 +94,16 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 20) &&
+    isBoundedNumber(version, 2, 21) &&
     Number.isInteger(version) &&
     (version >= 20 || value['watermark'] === undefined) &&
+    (version >= 21 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          (region['border'] === undefined && region['borderTarget'] === undefined)
+      )) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
     (version >= 4 ||
@@ -206,12 +213,16 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     ) &&
     (project.motionRegions ?? []).every(
       (region) =>
-        region.targetAction === null ||
-        occurrences.some(
-          (occurrence) =>
-            occurrence.eventId === region.targetAction?.eventId &&
-            occurrence.clipId === region.targetAction.clipId
-        )
+        (region.borderTarget !== 'window' ||
+          project.clips.some(
+            (clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId
+          )) &&
+        (region.targetAction === null ||
+          occurrences.some(
+            (occurrence) =>
+              occurrence.eventId === region.targetAction?.eventId &&
+              occurrence.clipId === region.targetAction.clipId
+          ))
     ) &&
     hasValidInteractionAnchorReferences(project)
   );
