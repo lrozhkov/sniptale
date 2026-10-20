@@ -1,5 +1,7 @@
+import { REVIEW_KEY_DEFAULT, type ReviewKeyStyle } from './action-feedback/key-animation';
 import {
   getVideoProjectClickStyle,
+  getVideoProjectKeyStyle,
   getVideoProjectFeedbackRuns,
 } from './action-feedback/projection';
 import { REVIEW_CLICK_DEFAULT } from './action-feedback/validation';
@@ -113,6 +115,8 @@ function resolveEvent(
   const event = occurrence.event;
   const sourceClick = getVideoProjectClickStyle(project, event);
   if (sourceClick) return resolveSourceClick(project, defaults, occurrence, sourceClick);
+  const sourceKey = getVideoProjectKeyStyle(project, event);
+  if (sourceKey) return resolveSourceKey(project, defaults, occurrence, sourceKey);
   const override = event.presentation;
   const preset = override?.preset ?? (event.kind === 'CLICK' ? defaults.clickPreset : 'NONE');
   const duration = override?.duration ?? defaults.duration;
@@ -287,4 +291,74 @@ export function resolveActionKindForPreset(
     case 'CLICK_RIPPLE':
       return 'CLICK';
   }
+}
+
+/** Recorded captions use result-time windows and viewport placement, not source cursor coordinates. */
+function resolveSourceKey(
+  project: VideoProject,
+  defaults: VideoProjectActionPresentation,
+  occurrence: VideoProjectActionOccurrence,
+  settings: Readonly<ReviewKeyStyle>
+): ResolvedVideoProjectActionPresentation {
+  const event = occurrence.event;
+  const anchor = event.anchor;
+  const run =
+    anchor.kind === 'recording-source'
+      ? getVideoProjectFeedbackRuns(project, anchor).find((item) =>
+          item.clips.some((clip) => clip.id === occurrence.clipId)
+        )
+      : undefined;
+  const window =
+    anchor.kind === 'recording-source' && run
+      ? reviewCueWindow(
+          run.segments,
+          anchor.sourceTime,
+          settings.offset,
+          settings.before,
+          settings.after
+        )
+      : null;
+  const renderIntervals = window
+    ? (run?.clips ?? [])
+        .map((clip) => ({
+          clipId: clip.id,
+          start: Math.max(clip.startTime, window.start),
+          end: Math.min(clip.startTime + clip.duration, window.end),
+        }))
+        .filter((interval) => interval.end > interval.start)
+    : [];
+  let reason: VideoProjectActionPresentationReason | null = null;
+  if (!defaults.enabled) reason = 'track-disabled';
+  else if (event.presentation?.enabled === false) reason = 'event-disabled';
+  else if (!settings.enabled) reason = 'keystrokes-disabled';
+  else if (!event.label) reason = 'unsupported';
+  else if (!renderIntervals.length) reason = 'outside-source';
+  const start = window?.start ?? Math.max(0, occurrence.time + settings.offset - settings.before);
+  const end = window?.end ?? start;
+  return {
+    event,
+    occurrence: run
+      ? {
+          ...occurrence,
+          playbackRun: { id: run.clips[0]!.id, clipIds: run.clips.map((clip) => clip.id) },
+        }
+      : occurrence,
+    clickStyle: getActionClickStyle(defaults.clickStyle),
+    keyStyle: settings.style,
+    easing: 'LINEAR',
+    preset: 'NONE',
+    duration: window ? end - start : settings.before + settings.after,
+    offset: settings.offset,
+    point: null,
+    pointSpace: 'scene',
+    enabled: reason === null,
+    reason,
+    renderKind: reason ? null : 'keystroke',
+    renderIntervals,
+    suppressedByOccurrence: null,
+    overridden: settings !== REVIEW_KEY_DEFAULT || event.presentation?.enabled !== undefined,
+    start,
+    end,
+    animationStart: start,
+  };
 }

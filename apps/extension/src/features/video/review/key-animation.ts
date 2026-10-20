@@ -1,7 +1,7 @@
 import { reviewCueWindow } from './cue-window';
 import type { ReviewTelemetryMarker } from './telemetry';
 import type { ReviewTimeSegment } from './timeline';
-import type { ReviewKeyAnimation, ReviewKeyStyle } from './advanced/key-animation';
+import type { ReviewKeyAnimation, ReviewKeyStyle } from '../project/action-feedback/key-animation';
 
 export function isReviewKey(marker: ReviewTelemetryMarker): boolean {
   return (

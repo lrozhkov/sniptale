@@ -103,6 +103,8 @@ export interface VideoCompositionActionState {
   gestureFeedback?: import('../review/click-animation').ReviewClickFrame;
   clickStyle?: import('../project/types').VideoActionClickStyle;
   keyStyle?: import('../project/types').VideoActionKeyStyle;
+  /** Absent for legacy project-pixel keys. Captured captions declare their authored viewport width. */
+  keyStyleViewportWidth?: number;
   easing?: import('../project/types').VideoTemporalEasing;
   preset: VideoProjectActionPreset;
   occurrence: VideoProjectActionOccurrence;

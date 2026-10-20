@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
@@ -60,14 +61,21 @@ for (const [width, height, locale, theme] of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const button = (key: Parameters<typeof translate>[0]) =>
-        page.locator('dialog').getByRole('button', { name: label(key), exact: true });
+        page.getByRole('dialog').getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       const marker = page.locator('[data-ui="gallery.videoReview.historyStrip"] button').first();
       await marker.click();
-      await button('gallery.videoReview.keyDisplay').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.keyCaption'), exact: true })
-        .click();
+      await chooseInspectorValue(
+        page,
+        page.getByRole('dialog'),
+        label('gallery.videoReview.keyDisplay'),
+        label('gallery.videoReview.keyCaption')
+      );
+      const appearance = page
+        .getByRole('dialog')
+        .locator('nav')
+        .getByRole('button', { name: label('gallery.videoReview.clickAppearance'), exact: true });
+      if (await appearance.count()) await appearance.click();
       const amount = page.getByRole('textbox', {
         name: label('gallery.videoReview.key_fontSize'),
         exact: true,
@@ -111,22 +119,39 @@ for (const [width, height, locale, theme] of [
       });
       await effects.click();
       await expect.poll(hasCaption).toBe(true);
-      await button('gallery.videoReview.telemetry').click();
+      await button('gallery.videoReview.trackSettings').click();
+      await page.locator('[data-review-header-track="actions"] [role="switch"]').click();
+      await button('gallery.videoReview.trackSettings').click();
       await expect(marker).toHaveCount(0);
       await expect.poll(hasCaption).toBe(false);
-      await button('gallery.videoReview.telemetry').click();
+      await button('gallery.videoReview.trackSettings').click();
+      await page.locator('[data-review-header-track="actions"] [role="switch"]').click();
+      await button('gallery.videoReview.trackSettings').click();
       await expect(marker).toBeVisible();
       await expect(effects).toHaveAttribute('aria-pressed', 'true');
       await expect.poll(hasCaption).toBe(true);
+      await marker.click();
       await amount.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('keyboard-inspector.png'), fullPage: false });
-      await button('gallery.videoReview.clickReset').scrollIntoViewIfNeeded();
+      await button('gallery.videoReview.keyReset').scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('keyboard-footer.png'), fullPage: false });
       await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.preview.openInEditor').click();
+      await expect
+        .poll(
+          async () =>
+            (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+        )
+        .toBe(1);
+      const [tab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
+      const target = new URL(tab!.url!);
+      expect(target.searchParams.get('mediaId')).toBe(betaV1Fixture.records.media_library[0]!.id);
+      expect(target.searchParams.get('mode')).toBe('edit');
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}${target.search}`);
+      await expect(button('gallery.videoReview.advancedEditing')).toBeVisible();
       await marker.click();
       await expect(amount).toHaveValue('32');
     } finally {
@@ -147,7 +172,7 @@ test('keyboard preview pixels match the export painter and latest command replac
         "ps/extension/src/gallery/video-review/key-animation-overlay';\n    import {dr" +
         "awReviewKeys} from './apps/extension/src/workflows/video-review/render-key-a" +
         "nimation';\n    import {REVIEW_KEY_DEFAULT} from './apps/extension/src/featur" +
-        "es/video/review/advanced/key-animation';\n    export async function probe(){\n" +
+        "es/video/project/action-feedback/key-animation';\n    export async function probe(){\n" +
         '      const output={width:640,height:360,x:100,y:50};\n      const style={...' +
         "REVIEW_KEY_DEFAULT.style,fontSize:60,entrance:'none'};\n      const cues=[{la" +
         "bel:'Ctrl+C',start:0,end:4,settings:{...REVIEW_KEY_DEFAULT,enabled:true,styl" +

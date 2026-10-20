@@ -16,7 +16,7 @@ import {
   computeQuickEditSceneLayout,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
-import { REVIEW_KEY_DEFAULT } from '../../features/video/review/advanced/key-animation';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
 import { drawReviewKeys } from './render-key-animation';
 
 const output = { width: 640, height: 360 };

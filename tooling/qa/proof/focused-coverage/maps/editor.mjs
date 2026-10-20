@@ -1,11 +1,29 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
-    owner: 'native-source-click-command-adapter',
+    owner: 'source-key-feedback',
+    productionPrefix: 'apps/extension/src/features/video/project/action-feedback/',
+    allowCrossOwner: true,
+    reason:
+      'Captured key styles retain source facts through handoff, commands, and portable backup.',
+    testFiles: [
+      'apps/extension/src/features/video/project/action-feedback/key-animation.test.ts',
+      'apps/extension/src/features/video/project/action-feedback/key-projection.test.ts',
+      'apps/extension/src/features/video/project/action-presentation.keys.test.ts',
+      'apps/extension/src/features/video/review/standalone-key-interactions.test.ts',
+      'apps/extension/src/features/video/composition/timeline/frame/keys.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/key-feedback-fields.test.tsx',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.action-feedback.test.ts',
+    ],
+  },
+  {
+    owner: 'native-source-feedback-command-adapter',
     productionFile: 'apps/extension/src/video-editor/project/state/effects.ts',
-    reason: 'Legacy effects and source click commands preserve their distinct edit contracts.',
+    reason: 'Legacy effects and captured click and key commands preserve their edit contracts.',
     testFiles: [
       'apps/extension/src/video-editor/project/state/effects.test.ts',
       'apps/extension/src/video-editor/project/state/effects.source-click.test.ts',
+      'apps/extension/src/video-editor/project/state/effects.source-key.test.ts',
     ],
   },
   {

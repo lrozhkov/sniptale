@@ -220,9 +220,17 @@ export function drawSceneActionCompositionStates(
   viewport: { offsetX: number; offsetY: number; scaleX: number; scaleY: number }
 ): void {
   const viewportScale = (viewport.scaleX + viewport.scaleY) / 2;
+  const bounds = {
+    x: viewport.offsetX,
+    y: viewport.offsetY,
+    width: camera.viewportWidth * camera.scale * viewport.scaleX,
+    height: camera.viewportHeight * camera.scale * viewport.scaleY,
+  };
   for (const action of actions) {
     const sizeScale =
-      viewportScale * (action.renderKind !== 'keystroke' && action.point ? camera.scale : 1);
+      action.renderKind === 'keystroke' && action.keyStyleViewportWidth
+        ? bounds.width / action.keyStyleViewportWidth
+        : viewportScale * (action.renderKind !== 'keystroke' && action.point ? camera.scale : 1);
     const point = action.point
       ? {
           x:
@@ -236,11 +244,6 @@ export function drawSceneActionCompositionStates(
             y: viewport.offsetY + 48 * viewport.scaleY,
           }
         : null;
-    drawActionCompositionState(context, { ...action, point }, null, sizeScale, {
-      x: viewport.offsetX,
-      y: viewport.offsetY,
-      width: camera.viewportWidth * camera.scale * viewport.scaleX,
-      height: camera.viewportHeight * camera.scale * viewport.scaleY,
-    });
+    drawActionCompositionState(context, { ...action, point }, null, sizeScale, bounds);
   }
 }

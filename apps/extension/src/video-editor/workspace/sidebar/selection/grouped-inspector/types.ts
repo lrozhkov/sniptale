@@ -20,6 +20,7 @@ export type InspectorSectionSemantic =
   | 'tracking'
   | 'effects'
   | 'content'
+  | 'keyboard'
   | 'history'
   | 'track'
   | 'transition'

@@ -303,7 +303,7 @@ export interface QuickEditAdvancedContent {
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
-  keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
+  keyAnimations?: import('../../project/action-feedback/key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
   actionAudio?: import('./action-audio').ReviewActionAudioSetting[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */

@@ -1,3 +1,5 @@
+import { createVideoProjectFromRecording } from '../../../../../features/video/project/factories/creation';
+import { patchReviewKeys } from '../../../../../features/video/project/action-feedback/key-animation';
 // @vitest-environment jsdom
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import { VideoTemporalEasing } from '../../../../../features/video/project/types';
@@ -231,4 +233,73 @@ it('keeps cursor lane display with Cursor and editable when project controls are
   expect(toggle.closest('details')).toBeNull();
   act(() => toggle.click());
   expect(update).toHaveBeenCalledWith(false);
+});
+
+function capturedKeyProject() {
+  return createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 160,
+    height: 90,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 100,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'key',
+        kind: 'KEY',
+        time: 1,
+        duration: 0.2,
+        point: null,
+        label: 'Ctrl+K',
+        preset: 'NONE',
+        data: {},
+      },
+    ],
+  });
+}
+it('uses common captured key groups and hides ineffective legacy key controls', () => {
+  const project = capturedKeyProject();
+  project.actionFeedback![0]!.keyStyles = patchReviewKeys([], ['key'], { enabled: true });
+  act(() =>
+    root.render(<InspectHistoryLanePanel project={project} onUpdateActionPresentation={vi.fn()} />)
+  );
+  const category = (name: string) =>
+    container.querySelector<HTMLButtonElement>(`nav button[aria-label="${name}"]`);
+  expect(category('gallery.videoReview.keyDisplay')).not.toBeNull();
+  expect(category('gallery.videoReview.clickTiming')).not.toBeNull();
+  expect(category('videoEditor.sidebar.historyKeyboard')).toBeNull();
+  act(() => category('gallery.videoReview.keyDisplay')!.click());
+  expect(container.querySelector('[data-ui="shared.ui.keyboard-feedback.display"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="videoEditor.sidebar.historyShowKeys"]')).toBeNull();
+});
+it('distinguishes captured and added keyboard groups when both event families exist', () => {
+  const project = capturedKeyProject();
+  project.actionEvents.push({
+    ...project.actionEvents[0]!,
+    id: 'manual-key',
+    anchor: { kind: 'project', time: 1 },
+  });
+  act(() =>
+    root.render(<InspectHistoryLanePanel project={project} onUpdateActionPresentation={vi.fn()} />)
+  );
+  expect(
+    container.querySelector('nav button[aria-label="videoEditor.sidebar.historyRecordedKeys"]')
+  ).not.toBeNull();
+  expect(
+    container.querySelector('nav button[aria-label="videoEditor.sidebar.historyAddedKeys"]')
+  ).not.toBeNull();
+  expect(
+    container.querySelector('nav button[aria-label="gallery.videoReview.clickTiming"]')
+  ).toBeNull();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        'nav button[aria-label="videoEditor.sidebar.historyAddedKeys"]'
+      )!
+      .click()
+  );
+  expect(
+    container.querySelector('[aria-label="videoEditor.sidebar.historyShowKeys"]')
+  ).not.toBeNull();
 });

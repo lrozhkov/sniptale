@@ -1,3 +1,10 @@
+import {
+  patchReviewKeys,
+  REVIEW_KEY_DEFAULT,
+  type ReviewKeyStyle,
+  type ReviewKeyAnimation,
+  type ReviewKeyPatch,
+} from './key-animation';
 import type { ReviewTimeSegment } from '../../review/timeline';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from '../types';
 import type {
@@ -13,7 +20,11 @@ import { isVideoProjectUtilityLaneLocked } from '../utility-lanes';
 export function patchVideoProjectActionFeedback(
   project: VideoProject,
   identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>,
-  patch: { settings?: ReviewActionAudioSetting[]; gestureStyles?: ReviewClickAnimation[] }
+  patch: {
+    settings?: ReviewActionAudioSetting[];
+    gestureStyles?: ReviewClickAnimation[];
+    keyStyles?: ReviewKeyAnimation[];
+  }
 ): VideoProject {
   if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
   if (
@@ -123,4 +134,95 @@ export function getVideoProjectFeedbackRuns(
     clips,
     segments: segments(clips),
   }));
+}
+
+/** Recorded command appearance shares Gallery defaults while source facts stay immutable. */
+export function getVideoProjectKeyStyle(
+  project: VideoProject,
+  event: VideoProjectActionEvent
+): Readonly<ReviewKeyStyle> | null {
+  const anchor = event.anchor;
+  if (anchor.kind !== 'recording-source' || event.kind !== 'KEY') return null;
+  const group = project.actionFeedback?.find(
+    (item) =>
+      item.recordingId === anchor.recordingId && item.sourceInstanceId === anchor.sourceInstanceId
+  );
+  return group
+    ? (group.keyStyles?.find((style) => style.id === anchor.sourceEventId) ?? REVIEW_KEY_DEFAULT)
+    : null;
+}
+
+/** A caption target identifies authored source presentation without copying capture coordinates or time. */
+interface VideoProjectKeyFeedbackTarget {
+  recordingId: string;
+  sourceInstanceId: string;
+  sourceEventId: string;
+}
+
+/** Only existing captured commands with an admitted feedback group can receive caption patches. */
+export function getVideoProjectKeyFeedbackTargets(
+  project: VideoProject
+): VideoProjectKeyFeedbackTarget[] {
+  const groups = new Set(
+    (project.actionFeedback ?? []).map((group) =>
+      JSON.stringify([group.recordingId, group.sourceInstanceId])
+    )
+  );
+  return project.actionEvents.flatMap((event) => {
+    const anchor = event.anchor;
+    return event.kind === 'KEY' &&
+      anchor.kind === 'recording-source' &&
+      groups.has(JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]))
+      ? [
+          {
+            recordingId: anchor.recordingId,
+            sourceInstanceId: anchor.sourceInstanceId,
+            sourceEventId: anchor.sourceEventId,
+          },
+        ]
+      : [];
+  });
+}
+
+/** Batch caption patches retain current values and validate the complete feedback only once. */
+export function patchVideoProjectKeyFeedback(
+  project: VideoProject,
+  targets: readonly VideoProjectKeyFeedbackTarget[],
+  patch: ReviewKeyPatch | null
+): VideoProject {
+  if (isVideoProjectUtilityLaneLocked(project, 'actions') || !project.actionFeedback)
+    return project;
+  const admitted = new Set(
+    getVideoProjectKeyFeedbackTargets(project).map((target) =>
+      JSON.stringify([target.recordingId, target.sourceInstanceId, target.sourceEventId])
+    )
+  );
+  const selected = new Map<string, Set<string>>();
+  for (const target of targets) {
+    if (
+      !admitted.has(
+        JSON.stringify([target.recordingId, target.sourceInstanceId, target.sourceEventId])
+      )
+    )
+      continue;
+    const key = JSON.stringify([target.recordingId, target.sourceInstanceId]);
+    const ids = selected.get(key) ?? new Set<string>();
+    ids.add(target.sourceEventId);
+    selected.set(key, ids);
+  }
+  let changed = false;
+  const groups = project.actionFeedback.map((group) => {
+    const ids = selected.get(JSON.stringify([group.recordingId, group.sourceInstanceId]));
+    if (!ids || (patch === null && !group.keyStyles?.some((style) => ids.has(style.id))))
+      return group;
+    const keyStyles = patchReviewKeys(group.keyStyles ?? [], [...ids], patch);
+    if (JSON.stringify(keyStyles) === JSON.stringify(group.keyStyles ?? [])) return group;
+    changed = true;
+    return { ...group, keyStyles };
+  });
+  if (!changed) return project;
+  const parsed = parseVideoProjectActionFeedback(groups);
+  return parsed
+    ? { ...project, version: project.version >= 4 ? project.version : 3, actionFeedback: parsed }
+    : project;
 }

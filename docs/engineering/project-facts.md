@@ -157,6 +157,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
 - `apps/extension/src/ui/keyboard`
+- `apps/extension/src/ui/keyboard-feedback`
 - `apps/extension/src/ui/media-library-header.test.tsx`
 - `apps/extension/src/ui/media-library-header.tsx`
 - `apps/extension/src/ui/media-library-list.tsx`

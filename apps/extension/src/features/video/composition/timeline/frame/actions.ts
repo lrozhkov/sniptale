@@ -1,4 +1,8 @@
-import { getVideoProjectClickStyle } from '../../../project/action-feedback/projection';
+import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../../project/action-feedback/key-animation';
+import {
+  getVideoProjectClickStyle,
+  getVideoProjectKeyStyle,
+} from '../../../project/action-feedback/projection';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
 import { resolveCameraClip, cameraSourceTime } from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
@@ -50,8 +54,17 @@ export function resolveVideoCompositionActions(
   currentTime: number
 ): VideoCompositionActionState[] {
   const states: VideoCompositionActionState[] = [];
+  const keys = new Map<string, ResolvedVideoProjectActionPresentation>();
   for (const presentation of resolveVideoProjectActionPresentations(project)) {
     if (getVideoProjectClickStyle(project, presentation.event) !== null) continue;
+    if (getVideoProjectKeyStyle(project, presentation.event) !== null) {
+      if (presentation.enabled && presentation.start <= currentTime) {
+        const previous = keys.get(presentation.keyStyle.position);
+        if (!previous || previous.start <= presentation.start)
+          keys.set(presentation.keyStyle.position, presentation);
+      }
+      continue;
+    }
     const state = resolveActionState(presentation, currentTime);
     const anchor = state?.event.anchor;
     const authoredFeedback =
@@ -73,6 +86,11 @@ export function resolveVideoCompositionActions(
     ) {
       states.push(state);
     }
+  }
+  for (const presentation of keys.values()) {
+    const state = resolveActionState(presentation, currentTime);
+    if (state)
+      states.push({ ...state, clipId: null, keyStyleViewportWidth: REVIEW_KEY_VIEWPORT_WIDTH });
   }
   for (const feedback of evaluateProjectGestureFeedback(project, currentTime)) {
     const clip = project.clips.find((clip) => clip.id === feedback.clipId);

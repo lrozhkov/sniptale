@@ -1,3 +1,4 @@
+import { getActionKeyStyle } from '../../../project/action-style';
 import type { VideoCompositionActionState } from '../../types';
 import { expect, it, vi } from 'vitest';
 import {
@@ -490,4 +491,44 @@ it('does not allocate action raster bounds for missing points or unsupported pre
     { ...state, preset: 'SCROLL_EMPHASIS' },
   ];
   for (const action of refused) expect(resolveActionCompositionPaintBounds(action)).toBeNull();
+});
+
+it('scales captured viewport caption fonts and margins while preserving legacy key project pixels', () => {
+  for (const zoom of [1, 2]) {
+    const context = createContext();
+    context.measureText = vi.fn(() => ({ width: 80 }) as TextMetrics);
+    context.fillText = vi.fn();
+    const action = {
+      ...createActionState(),
+      event: { ...createActionState().event, kind: 'KEY' as const, label: 'Ctrl+K' },
+      renderKind: 'keystroke' as const,
+      preset: 'NONE' as const,
+      keyStyle: {
+        ...getActionKeyStyle(),
+        fontSize: 60,
+        fontFamily: 'monospace' as const,
+        position: 'bottom-left' as const,
+        entrance: 'none' as const,
+      },
+      keyStyleViewportWidth: 1920,
+    };
+    const camera = {
+      focusPoint: { x: 100, y: 50 },
+      motionBlurAmount: 0,
+      overlayZoomMode: 'LOCK_OVERLAYS' as const,
+      regionId: 'zoom',
+      scale: zoom,
+      viewportWidth: 640 / zoom,
+      viewportHeight: 360 / zoom,
+      viewportX: 0,
+      viewportY: 0,
+    };
+    const viewport = { offsetX: 40, offsetY: 20, scaleX: 1, scaleY: 1 };
+    drawSceneActionCompositionStates(context, [action], camera, viewport);
+    expect(context.font).toBe('500 20px monospace');
+    expect(context.roundRect).toHaveBeenLastCalledWith(48, 336, 102, 36, expect.any(Number));
+    const { keyStyleViewportWidth: _basis, ...legacy } = action;
+    drawSceneActionCompositionStates(context, [legacy], camera, viewport);
+    expect(context.font).toBe('500 60px monospace');
+  }
 });

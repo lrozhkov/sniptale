@@ -68,7 +68,9 @@ type SelectedPropertiesProps = {
   onStopActionAudioAudition?: (() => void) | undefined;
   onKeyAnimation?(
     ids: readonly string[],
-    patch: import('../../features/video/review/advanced/key-animation').ReviewKeyPatch | null
+    patch:
+      | import('../../features/video/project/action-feedback/key-animation').ReviewKeyPatch
+      | null
   ): void;
   onClickAnimation?(
     ids: readonly string[],

@@ -39,7 +39,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   onToggleActions?: (() => void) | undefined;
   onOpenHistory?: (() => void) | undefined;
   keyAnimations?:
-    | readonly import('../../features/video/review/advanced/key-animation').ReviewKeyAnimation[]
+    | readonly import('../../features/video/project/action-feedback/key-animation').ReviewKeyAnimation[]
     | undefined;
   clickAnimations?: readonly ReviewClickAnimation[] | undefined;
   fillHeight?: boolean | undefined;

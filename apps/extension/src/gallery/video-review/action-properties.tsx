@@ -12,7 +12,7 @@ import {
   REVIEW_KEY_DEFAULT,
   type ReviewKeyAnimation,
   type ReviewKeyPatch,
-} from '../../features/video/review/advanced/key-animation';
+} from '../../features/video/project/action-feedback/key-animation';
 import { ReviewKeyFields } from './key-animation-fields';
 import { isReviewClick } from '../../features/video/review/click-animation';
 import {

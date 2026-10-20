@@ -1,3 +1,4 @@
+import { parseReviewKeyAnimations } from './key-animation';
 import { isRecord, isBoundedNumber } from '../validation/primitives';
 import { isRecordingTelemetrySignal } from '../validation/recording-telemetry';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
@@ -264,13 +265,21 @@ export function parseVideoProjectActionFeedback(
   const ids = new Set<string>();
   let settingsCount = 0,
     signalCount = 0,
-    styleCount = 0;
+    styleCount = 0,
+    keyStyleCount = 0;
   for (const item of raw) {
     if (
       !isRecord(item) ||
       Object.keys(item).some(
         (key) =>
-          !['recordingId', 'sourceInstanceId', 'settings', 'signals', 'gestureStyles'].includes(key)
+          ![
+            'recordingId',
+            'sourceInstanceId',
+            'settings',
+            'signals',
+            'gestureStyles',
+            'keyStyles',
+          ].includes(key)
       ) ||
       typeof item['recordingId'] !== 'string' ||
       !item['recordingId'] ||
@@ -282,10 +291,12 @@ export function parseVideoProjectActionFeedback(
       return null;
     const settings = parseReviewActionAudio(item['settings']);
     const styles = parseReviewClickAnimations(item['gestureStyles']);
+    const keys = parseReviewKeyAnimations(item['keyStyles']);
     const signals = item['signals'];
     if (
       !settings ||
       styles === null ||
+      keys === null ||
       !Array.isArray(signals) ||
       signals.length > 10000 ||
       !signals.every(isRecordingTelemetrySignal)
@@ -294,10 +305,12 @@ export function parseVideoProjectActionFeedback(
     settingsCount += settings.length;
     signalCount += signals.length;
     styleCount += styles?.length ?? 0;
+    keyStyleCount += keys?.length ?? 0;
     if (
       settingsCount > 10000 ||
       signalCount > 10000 ||
       styleCount > 10000 ||
+      keyStyleCount > 10000 ||
       new Set(signals.map((signal) => signal.id)).size !== signals.length
     )
       return null;
@@ -310,6 +323,7 @@ export function parseVideoProjectActionFeedback(
       settings,
       signals: signals.map((signal) => structuredClone(signal)),
       ...(styles ? { gestureStyles: styles } : {}),
+      ...(keys ? { keyStyles: keys } : {}),
     });
   }
   return groups;

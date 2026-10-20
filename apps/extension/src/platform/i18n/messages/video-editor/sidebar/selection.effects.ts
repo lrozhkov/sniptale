@@ -5,6 +5,8 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   historyClickEffects: { ru: 'Эффекты клика', en: 'Click effects' },
   historyTransitions: { ru: 'Переходы и время', en: 'Transitions & timing' },
   historyKeyboard: { ru: 'Клавиши', en: 'Keystrokes' },
+  historyRecordedKeys: { ru: 'Записанные нажатия', en: 'Recorded keystrokes' },
+  historyAddedKeys: { ru: 'Добавленные нажатия', en: 'Added keystrokes' },
   historyCursor: { ru: 'Курсор', en: 'Cursor' },
   historyRules: { ru: 'Правила истории', en: 'History rules' },
   actionColor: { ru: 'Цвет', en: 'Color' },

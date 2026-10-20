@@ -14,6 +14,7 @@ export function applyRecordingReviewInteractions(
     content.cameraFollowDefaults === undefined &&
     content.actionAudio === undefined &&
     content.clickAnimations === undefined &&
+    content.keyAnimations === undefined &&
     content.actionsEnabled === undefined
   )
     return project;
@@ -33,12 +34,14 @@ export function applyRecordingReviewInteractions(
     (group) => group.recordingId === recordingId && group.sourceInstanceId === sourceInstanceId
   );
   const styles = content.clickAnimations ?? current?.gestureStyles;
+  const keys = content.keyAnimations ?? current?.keyStyles;
   const group = {
     recordingId,
     sourceInstanceId,
     signals: structuredClone(current?.signals ?? []),
     settings: structuredClone(content.actionAudio ?? current?.settings ?? []),
     ...(styles ? { gestureStyles: structuredClone(styles) } : {}),
+    ...(keys ? { keyStyles: structuredClone(keys) } : {}),
   };
   const cursorFocusPath = content.cursorFocusPath
     ? {

@@ -1,4 +1,7 @@
-import { getVideoProjectClickStyle } from '../../../../features/video/project/action-feedback/projection';
+import {
+  getVideoProjectClickStyle,
+  getVideoProjectKeyStyle,
+} from '../../../../features/video/project/action-feedback/projection';
 import { REVIEW_CLICK_BOUNDS } from '../../../../features/video/project/action-feedback/validation';
 import type { ResolvedVideoProjectActionPresentation } from '../../../../features/video/project/action-presentation';
 import type {
@@ -44,7 +47,8 @@ export function historyTimeBounds(
     ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
     : project.duration;
   const maximumTime = Math.max(minimumTime, end - 1 / project.fps);
-  const style = getVideoProjectClickStyle(project, item.event);
+  const style =
+    getVideoProjectClickStyle(project, item.event) ?? getVideoProjectKeyStyle(project, item.event);
   if (!style) return { minimumTime, maximumTime };
   const current = Math.max(minimumTime, Math.min(maximumTime, item.animationStart));
   return {
@@ -64,7 +68,9 @@ export function historyMarkerTime(
     minimumTime,
     Math.min(
       maximumTime,
-      observedKeyboardInterval(item.event) ? item.occurrence.time : item.animationStart
+      observedKeyboardInterval(item.event) && !getVideoProjectKeyStyle(project, item.event)
+        ? item.occurrence.time
+        : item.animationStart
     )
   );
 }
@@ -83,12 +89,14 @@ function recordedHistoryDuration(
   item: ResolvedVideoProjectActionPresentation,
   project: VideoProject
 ) {
+  if (getVideoProjectKeyStyle(project, item.event)) return Math.max(0, item.end - item.start);
   const range = recordedHistoryRange(item, project);
   return range ? range.end - range.start : 0;
 }
 
 /** Source ranges remain factual when the down point is trimmed or playback rates change. */
 function recordedHistoryRange(item: ResolvedVideoProjectActionPresentation, project: VideoProject) {
+  if (getVideoProjectKeyStyle(project, item.event)) return null;
   const data = item.event.data;
   const down = data['downTime'];
   const ends = [data['upTime'], data['semanticEndTime'], data['lastObservedTime']].filter(

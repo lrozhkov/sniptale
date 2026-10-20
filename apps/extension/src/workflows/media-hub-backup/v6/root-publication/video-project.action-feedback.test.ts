@@ -5,6 +5,12 @@ it('keeps authored source path and audible feedback attached to duplicated recor
     await import('../../../../features/video/project/factories/creation');
   const { buildProjectActionAudioPlan, evaluateProjectGestureFeedback } =
     await import('../../../../features/video/review/project-action-audio');
+  const { patchReviewKeys } =
+    await import('../../../../features/video/project/action-feedback/key-animation');
+  const { resolveVideoCompositionActions } =
+    await import('../../../../features/video/composition/timeline/frame/actions');
+  const { parseHydratableVideoProject } =
+    await import('../../../../features/video/project/validation/root');
   const { transformPortableVideoProjectReferences } = await import('./video-project-references');
   const { resolveProjectCursorFocusSamples } =
     await import('../../../../features/video/project/cursor-focus-path/projection');
@@ -18,6 +24,16 @@ it('keeps authored source path and audible feedback attached to duplicated recor
     size: 1024,
     recordingSignals: [],
     sourceNormalizedActionEvents: [
+      {
+        id: 'command',
+        kind: 'KEY',
+        time: 1,
+        duration: 0.3,
+        point: null,
+        label: 'Ctrl+K',
+        preset: 'NONE',
+        data: {},
+      },
       {
         id: 'click',
         kind: 'CLICK',
@@ -80,6 +96,23 @@ it('keeps authored source path and audible feedback attached to duplicated recor
       lensShadow: 36,
     },
   ];
+  group.keyStyles = patchReviewKeys([], ['command'], {
+    enabled: true,
+    before: 0.2,
+    after: 2,
+    offset: -0.1,
+    style: {
+      fontFamily: 'monospace',
+      fontSize: 36,
+      color: '#12345680',
+      background: '#abcdef90',
+      opacity: 0.7,
+      cornerRadius: 12,
+      margin: 42,
+      entrance: 'slide',
+      position: 'top-right',
+    },
+  });
   const original = structuredClone(project);
   const restored = transformPortableVideoProjectReferences(
     project,
@@ -90,6 +123,22 @@ it('keeps authored source path and audible feedback attached to duplicated recor
   expect(buildProjectActionAudioPlan(original).descriptors).toHaveLength(1);
   expect(buildProjectActionAudioPlan(restored).descriptors).toHaveLength(1);
   expect(restored.actionFeedback?.[0]?.recordingId).toBe('new');
+  expect(parseHydratableVideoProject(restored)).not.toBeNull();
+  expect(restored.actionFeedback?.[0]?.keyStyles).toEqual(original.actionFeedback![0]!.keyStyles);
+  const originalCaption = resolveVideoCompositionActions(original, 1.1).find(
+    (action) => action.renderKind === 'keystroke'
+  );
+  const restoredCaption = resolveVideoCompositionActions(restored, 1.1).find(
+    (action) => action.renderKind === 'keystroke'
+  );
+  expect(originalCaption).toBeDefined();
+  expect(restoredCaption).toMatchObject({
+    keyStyle: originalCaption!.keyStyle,
+    duration: originalCaption!.duration,
+    progress: originalCaption!.progress,
+    clipId: null,
+    event: { label: 'Ctrl+K', anchor: { recordingId: 'new', sourceEventId: 'command' } },
+  });
   expect(restored.actionFeedback?.[0]?.gestureStyles).toEqual(
     original.actionFeedback![0]!.gestureStyles
   );

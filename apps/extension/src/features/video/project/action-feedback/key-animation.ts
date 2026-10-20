@@ -1,7 +1,10 @@
-import { isRecord, isBoundedNumber } from '../../project/validation/primitives';
-import { isActionKeyStyle } from '../../project/validation/action-style';
-import { getActionKeyStyle } from '../../project/action-style';
-import type { VideoActionKeyStyle } from '../../project/types';
+import { isRecord, isBoundedNumber } from '../validation/primitives';
+import { isActionKeyStyle } from '../validation/action-style';
+import { getActionKeyStyle } from '../action-style';
+import type { VideoActionKeyStyle } from '../types';
+
+/** Authored caption lengths use a stable viewport width in preview and export. */
+export const REVIEW_KEY_VIEWPORT_WIDTH = 1920;
 
 /** Authored presentation never rewrites the recorded command or timestamp. */
 export interface ReviewKeyStyle {

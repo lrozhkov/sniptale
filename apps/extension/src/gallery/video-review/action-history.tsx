@@ -18,7 +18,7 @@ import {
   REVIEW_KEY_DEFAULT,
   type ReviewKeyAnimation,
   type ReviewKeyPatch,
-} from '../../features/video/review/advanced/key-animation';
+} from '../../features/video/project/action-feedback/key-animation';
 import { reviewKeySections } from './key-animation-fields';
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft } from 'lucide-react';

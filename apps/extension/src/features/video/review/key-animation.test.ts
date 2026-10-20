@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { parseReviewKeyAnimations, patchReviewKeys } from './advanced/key-animation';
+import {
+  parseReviewKeyAnimations,
+  patchReviewKeys,
+} from '../project/action-feedback/key-animation';
 import { scheduleReviewKeys } from './key-animation';
 import { buildReviewTimeMap } from './timeline';
 import { createQuickEditAdvancedContent, createQuickEditAdvancedState } from './advanced/defaults';

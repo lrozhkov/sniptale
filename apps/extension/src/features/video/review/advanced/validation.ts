@@ -14,7 +14,7 @@ import {
 import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from '../../project/scene/watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
-import { parseReviewKeyAnimations } from './key-animation';
+import { parseReviewKeyAnimations } from '../../project/action-feedback/key-animation';
 import {
   parseCameraPerspective as parseQuickEditPerspective,
   parseCameraDepth as parseQuickEditDepth,

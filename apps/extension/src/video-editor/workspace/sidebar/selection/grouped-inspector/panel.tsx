@@ -5,6 +5,7 @@ import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
   Stamp,
+  Keyboard,
   Rotate3D,
   Focus,
   Grid3X3,
@@ -56,6 +57,7 @@ const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
   tracking: Scan,
   effects: Sparkles,
   content: Type,
+  keyboard: Keyboard,
   history: History,
   track: SlidersHorizontal,
   transition: Blend,

@@ -1,3 +1,5 @@
+import { getVideoProjectKeyStyle } from '../../../../../features/video/project/action-feedback/projection';
+import { KeyFeedbackFields } from '../effect-controls/key-feedback-fields';
 import {
   getActionClickStyle,
   getActionKeyStyle,
@@ -13,7 +15,7 @@ import { getVideoProjectActionPresentation } from '../../../../../features/video
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ActionPrimaryFields } from '../effect-controls/fields';
-import { InspectorGroupedPanel } from '../grouped-inspector';
+import { InspectorGroupedPanel, type InspectorGroupDefinition } from '../grouped-inspector';
 import { ToggleField } from '../shared/controls';
 import { SliderField } from '../shared/sliders';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
@@ -106,30 +108,7 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
               />
             ),
           },
-          {
-            id: 'keys',
-            semantic: 'content',
-            label: translate('videoEditor.sidebar.historyKeyboard'),
-            content: (
-              <>
-                <ToggleField
-                  label={translate('videoEditor.sidebar.historyShowKeys')}
-                  checked={presentation.showKeystrokes}
-                  disabled={disabled}
-                  onChange={(showKeystrokes) => update({ showKeystrokes })}
-                />
-                {presentation.showKeystrokes ? (
-                  <ActionKeyStyleFields
-                    value={getActionKeyStyle(presentation.keyStyle)}
-                    disabled={disabled}
-                    recentColors={props.recentColors}
-                    onRememberRecentColor={props.onRememberRecentColor}
-                    onChange={(keyStyle) => update({ keyStyle })}
-                  />
-                ) : null}
-              </>
-            ),
-          },
+          ...historyKeyGroups(props, disabled, update),
           {
             id: 'cursor',
             semantic: 'tracking',
@@ -192,4 +171,104 @@ function HistoryCursorSettings({ props, disabled }: { props: HistoryProps; disab
       />
     </fieldset>
   );
+}
+
+/** Recorded and added commands have separate authoring contracts in the same history inspector. */
+function historyKeyGroups(
+  props: HistoryProps,
+  disabled: boolean,
+  update: NonNullable<HistoryProps['onUpdateActionPresentation']>
+): InspectorGroupDefinition<string>[] {
+  const capturedKeys = props.project.actionEvents.flatMap((event) => {
+    const style = getVideoProjectKeyStyle(props.project, event);
+    return style ? [style] : [];
+  });
+  const hasLegacyKeys = props.project.actionEvents.some(
+    (event) => event.kind === 'KEY' && !getVideoProjectKeyStyle(props.project, event)
+  );
+  const mixedKeyFamilies = capturedKeys.length > 0 && hasLegacyKeys;
+  const presentation = getVideoProjectActionPresentation(props.project);
+  return [
+    ...capturedKeyGroups(
+      props,
+      capturedKeys.some((style) => style.enabled),
+      mixedKeyFamilies,
+      capturedKeys.length > 0
+    ),
+    {
+      id: 'keys',
+      semantic: 'keyboard',
+      visible: !capturedKeys.length || hasLegacyKeys,
+      label: translate(
+        mixedKeyFamilies
+          ? 'videoEditor.sidebar.historyAddedKeys'
+          : 'videoEditor.sidebar.historyKeyboard'
+      ),
+      content: (
+        <>
+          <ToggleField
+            label={translate('videoEditor.sidebar.historyShowKeys')}
+            checked={presentation.showKeystrokes}
+            disabled={disabled}
+            onChange={(showKeystrokes) => update({ showKeystrokes })}
+          />
+          {presentation.showKeystrokes ? (
+            <ActionKeyStyleFields
+              value={getActionKeyStyle(presentation.keyStyle)}
+              disabled={disabled}
+              recentColors={props.recentColors}
+              onRememberRecentColor={props.onRememberRecentColor}
+              onChange={(keyStyle) => update({ keyStyle })}
+            />
+          ) : null}
+        </>
+      ),
+    },
+  ];
+}
+
+/** Captured commands use common source fields while added commands retain their separate defaults. */
+function capturedKeyGroups(
+  props: HistoryProps,
+  enabled: boolean,
+  mixed: boolean,
+  available: boolean
+): InspectorGroupDefinition<string>[] {
+  if (!available) return [];
+  const disabled = getVideoProjectUtilityLanes(props.project).actions.locked;
+  const fields = (part: 'display' | 'appearance' | 'timing' | 'position') => (
+    <KeyFeedbackFields project={props.project} scope="project" part={part} disabled={disabled} />
+  );
+  return [
+    {
+      id: 'captured-key-display',
+      semantic: 'keyboard',
+      label: translate(
+        mixed ? 'videoEditor.sidebar.historyRecordedKeys' : 'gallery.videoReview.keyDisplay'
+      ),
+      content: fields('display'),
+    },
+    ...(enabled
+      ? [
+          {
+            id: 'captured-key-appearance',
+            semantic: 'appearance' as const,
+            label: translate('gallery.videoReview.clickAppearance'),
+            content: fields('appearance'),
+          },
+          {
+            id: 'captured-key-timing',
+            semantic: 'animation' as const,
+            label: translate('gallery.videoReview.clickTiming'),
+            content: fields('timing'),
+          },
+          {
+            id: 'captured-key-position',
+            semantic: 'placement' as const,
+            label: translate('gallery.videoReview.clickPosition'),
+            content: fields('position'),
+          },
+        ]
+      : []),
+  ];
 }
