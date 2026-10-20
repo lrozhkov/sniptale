@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   sender: vi.fn(),
   hydrate: vi.fn(),
   send: vi.fn(),
+  contexts: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/runtime', () => ({
+  runtimeInfo: { getContexts: mocks.contexts },
 }));
 
 vi.mock('../../recording-control-lease', () => ({
@@ -46,6 +51,7 @@ beforeEach(() => {
   });
   mocks.state.mockReturnValue({ status: VideoRecordingStatus.COUNTDOWN });
   mocks.send.mockResolvedValue({ success: true, sdp: 'answer' });
+  mocks.contexts.mockResolvedValue([]);
 });
 
 function command(peerGeneration = 0) {
@@ -78,6 +84,149 @@ it('negotiates only the prepared source and derives document-bound peer identity
     },
   });
   expect(reply).toHaveBeenCalledWith({ success: true, sdp: 'answer' });
+  expect(mocks.contexts).not.toHaveBeenCalled();
+});
+
+function popupContext(documentId = 'native-popup-document') {
+  return { contextType: 'POPUP', documentUrl: sender.url, documentId };
+}
+
+function dispatchNativePopup(
+  message: Parameters<typeof routeCountdownCamera>[0]['message'] = command()
+) {
+  const response = Promise.withResolvers<unknown>();
+  routeCountdownCamera({
+    message,
+    sender: { url: sender.url },
+    sendResponse: response.resolve,
+  });
+  return response.promise;
+}
+
+it('resolves the actual action popup document from its unique browser-owned context', async () => {
+  mocks.contexts.mockResolvedValue([popupContext()]);
+  await expect(dispatchNativePopup()).resolves.toEqual({ success: true, sdp: 'answer' });
+  expect(mocks.contexts).toHaveBeenCalledWith({ documentUrls: [sender.url] });
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      peerId: `countdown:${JSON.stringify([activeRecordingId, 'native-popup-document', 0])}`,
+    })
+  );
+});
+
+it.each([
+  ['absent', []],
+  ['ambiguous', [popupContext(), popupContext('another-document')]],
+  ['other URL', [{ ...popupContext(), documentUrl: 'untrusted-url' }]],
+  ['ordinary tab context', [{ ...popupContext(), contextType: 'TAB' }]],
+  ['missing document', [{ ...popupContext(), documentId: undefined }]],
+  ['invalid document', [{ ...popupContext(), documentId: null }]],
+  ['empty document', [popupContext('')]],
+] as const)('refuses %s native popup context before effects', async (_failure, contexts) => {
+  mocks.contexts.mockResolvedValue(contexts);
+  await expect(dispatchNativePopup()).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('refuses unavailable context lookup without effects', async () => {
+  mocks.contexts.mockRejectedValue(new Error('context lookup unavailable'));
+  await expect(dispatchNativePopup()).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('allows native popup cleanup after BEGIN with the same browser-owned document', async () => {
+  mocks.contexts.mockResolvedValue([popupContext()]);
+  await expect(dispatchNativePopup()).resolves.toEqual({ success: true, sdp: 'answer' });
+  mocks.lease.mockReturnValue({ ...mocks.lease(), phase: 'active' });
+  mocks.state.mockReturnValue({ status: VideoRecordingStatus.RECORDING });
+  await expect(
+    dispatchNativePopup({ ...command(), type: VideoMessageType.COUNTDOWN_CAMERA_CLOSE })
+  ).resolves.toEqual({ success: true });
+  expect(mocks.send).toHaveBeenLastCalledWith({
+    type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE,
+    peerId: `countdown:${JSON.stringify([activeRecordingId, 'native-popup-document', 0])}`,
+  });
+});
+
+it('does not use popup context discovery for an ordinary tab without document identity', async () => {
+  mocks.contexts.mockResolvedValue([popupContext()]);
+  const reply = vi.fn();
+  routeCountdownCamera({
+    message: command(),
+    sender: {
+      url: sender.url,
+      tab: {
+        id: 7,
+        index: 0,
+        pinned: false,
+        highlighted: false,
+        windowId: 1,
+        active: true,
+        frozen: false,
+        incognito: false,
+        selected: true,
+        discarded: false,
+        autoDiscardable: true,
+        groupId: -1,
+        lastAccessed: 0,
+      },
+    },
+    sendResponse: reply,
+  });
+  await flush();
+  expect(reply).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+  expect(mocks.contexts).not.toHaveBeenCalled();
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('refuses untrusted native popup senders before context discovery', async () => {
+  mocks.sender.mockReturnValue(null);
+  mocks.contexts.mockResolvedValue([popupContext()]);
+  await expect(dispatchNativePopup()).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.contexts).not.toHaveBeenCalled();
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it.each(['expired', 'replacement lease', 'source', 'BEGIN'] as const)(
+  'refuses %s after asynchronous native document discovery',
+  async (change) => {
+    const contexts = Promise.withResolvers<ReturnType<typeof popupContext>[]>();
+    mocks.contexts.mockReturnValue(contexts.promise);
+    const response = dispatchNativePopup();
+    await flush();
+    if (change === 'expired') mocks.lease.mockReturnValue({ ...mocks.lease(), expiresAt: 0 });
+    if (change === 'replacement lease')
+      mocks.lease.mockReturnValue({ ...mocks.lease(), controlToken: 'replacement' });
+    if (change === 'source')
+      mocks.lease.mockReturnValue({
+        ...mocks.lease(),
+        surfaceBinding: { generation: 2, streamInstanceId: 'replacement' },
+      });
+    if (change === 'BEGIN') {
+      mocks.lease.mockReturnValue({ ...mocks.lease(), phase: 'active' });
+      mocks.state.mockReturnValue({ status: VideoRecordingStatus.RECORDING });
+    }
+    contexts.resolve([popupContext()]);
+    await expect(response).resolves.toEqual(expect.objectContaining({ success: false }));
+    expect(mocks.send).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps a late answer cleanup on its original popup document after replacement', async () => {
+  const answer = Promise.withResolvers<{ success: boolean; sdp: string }>();
+  mocks.contexts.mockResolvedValueOnce([popupContext('old-popup')]);
+  mocks.send.mockReturnValueOnce(answer.promise);
+  const oldResponse = dispatchNativePopup();
+  await flush();
+  mocks.contexts.mockResolvedValue([popupContext('new-popup')]);
+  await expect(dispatchNativePopup()).resolves.toEqual({ success: true, sdp: 'answer' });
+  mocks.state.mockReturnValue({ status: VideoRecordingStatus.RECORDING });
+  answer.resolve({ success: true, sdp: 'late answer' });
+  await expect(oldResponse).resolves.toEqual(expect.objectContaining({ success: false }));
+  expect(mocks.send).toHaveBeenLastCalledWith({
+    type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE,
+    peerId: `countdown:${JSON.stringify([activeRecordingId, 'old-popup', 0])}`,
+  });
 });
 
 it.each(['sender', 'capability', 'expired', 'phase', 'status', 'document'] as const)(

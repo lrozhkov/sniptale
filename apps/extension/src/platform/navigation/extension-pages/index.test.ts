@@ -236,7 +236,7 @@ describe('returnToMediaRecordingPopup', () => {
       operations.push('popup');
     });
     const { returnToMediaRecordingPopup } = await import('./index');
-    await returnToMediaRecordingPopup();
+    await expect(returnToMediaRecordingPopup()).resolves.toBe(true);
     expect(browserTabsQueryMock).toHaveBeenCalledExactlyOnceWith({
       active: true,
       currentWindow: true,
@@ -259,15 +259,24 @@ describe('returnToMediaRecordingPopup', () => {
   });
 
   it.each([
-    undefined,
-    { id: 7, windowId: 9, url: POPUP_PAGE_URL, openerTabId: 3 },
-    { id: 7, windowId: 9, url: `chrome-extension://other/${SETTINGS_PAGE_PATH}`, openerTabId: 3 },
     { id: 7, windowId: 9, url: SETTINGS_PAGE_URL },
     { id: 7, windowId: 9, url: SETTINGS_PAGE_URL, openerTabId: 7 },
   ])('refuses an absent or invalid Settings source: %j', async (settingsTab) => {
     browserTabsQueryMock.mockResolvedValueOnce(settingsTab ? [settingsTab] : []);
     const { returnToMediaRecordingPopup } = await import('./index');
     await expect(returnToMediaRecordingPopup()).rejects.toThrow();
+    expect(browserTabsUpdateMock).not.toHaveBeenCalled();
+    expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    undefined,
+    { id: 7, windowId: 9, url: POPUP_PAGE_URL, openerTabId: 3 },
+    { id: 7, windowId: 9, url: `chrome-extension://other/${SETTINGS_PAGE_PATH}`, openerTabId: 3 },
+  ])('defers while the active page is not owned Settings: %j', async (settingsTab) => {
+    browserTabsQueryMock.mockResolvedValueOnce(settingsTab ? [settingsTab] : []);
+    const { returnToMediaRecordingPopup } = await import('./index');
+    await expect(returnToMediaRecordingPopup()).resolves.toBe(false);
     expect(browserTabsUpdateMock).not.toHaveBeenCalled();
     expect(browserActionOpenPopupMock).not.toHaveBeenCalled();
   });

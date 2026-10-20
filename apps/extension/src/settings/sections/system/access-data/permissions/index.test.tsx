@@ -77,7 +77,7 @@ beforeEach(() => {
   permissionsSectionContentSpy.mockReset();
   useSettingsPermissionsSpy.mockReset();
   openMediaSettingsSpy.mockReset().mockResolvedValue(undefined);
-  returnToPopupSpy.mockReset().mockResolvedValue(undefined);
+  returnToPopupSpy.mockReset().mockResolvedValue(true);
   mutateVideoSettingsSpy
     .mockReset()
     .mockImplementation(async (mutation) => mutation({ ...DEFAULT_VIDEO_SETTINGS }));
@@ -245,7 +245,84 @@ it('preserves the successful enable and manual return instruction if popup openi
   expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaEnableFailed).toBe(false);
 });
 
-it.each(['refused', 'write-failed', 'unmounted', 'unfocused'] as const)(
+it.each(['microphone', 'camera'] as const)(
+  'returns once after focus recovers from successful %s approval',
+  async (permission) => {
+    window.history.replaceState(null, '', `?requestMediaAccess=${permission}`);
+    const saved = deferredResult<VideoRecordingSettings>();
+    mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+    useSettingsPermissionsSpy.mockReturnValue({
+      permissions: [],
+      requestPermission: async () => true,
+    });
+    await renderSection(true);
+    const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    returnToPopupSpy.mockResolvedValueOnce(false).mockResolvedValue(true);
+    await act(async () => saved.resolve(DEFAULT_VIDEO_SETTINGS));
+    expect(returnToPopupSpy).toHaveBeenCalledOnce();
+    expect(mediaSession.activate).toHaveBeenCalledOnce();
+    focused.mockReturnValue(true);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(returnToPopupSpy).toHaveBeenCalledTimes(2);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(returnToPopupSpy).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('waits for visibility as well as focus after approval', async () => {
+  window.history.replaceState(null, '', '?requestMediaAccess=microphone');
+  const saved = deferredResult<VideoRecordingSettings>();
+  mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+  useSettingsPermissionsSpy.mockReturnValue({
+    permissions: [],
+    requestPermission: async () => true,
+  });
+  await renderSection();
+  const visible = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  await act(async () => saved.resolve(DEFAULT_VIDEO_SETTINGS));
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(returnToPopupSpy).not.toHaveBeenCalled();
+  visible.mockReturnValue('visible');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(returnToPopupSpy).toHaveBeenCalledOnce();
+});
+
+it('discards a deferred return on unmount', async () => {
+  window.history.replaceState(null, '', '?requestMediaAccess=microphone');
+  const saved = deferredResult<VideoRecordingSettings>();
+  mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+  useSettingsPermissionsSpy.mockReturnValue({
+    permissions: [],
+    requestPermission: async () => true,
+  });
+  await renderSection();
+  const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+  returnToPopupSpy.mockResolvedValue(false);
+  await act(async () => saved.resolve(DEFAULT_VIDEO_SETTINGS));
+  act(() => root?.unmount());
+  root = null;
+  focused.mockReturnValue(true);
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(returnToPopupSpy).toHaveBeenCalledOnce();
+});
+
+it('returns after native approval while browser UI retains focus', async () => {
+  window.history.replaceState(null, '', '?requestMediaAccess=microphone');
+  const saved = deferredResult<VideoRecordingSettings>();
+  mutateVideoSettingsSpy.mockReturnValue(saved.promise);
+  useSettingsPermissionsSpy.mockReturnValue({
+    permissions: [],
+    requestPermission: async () => true,
+  });
+  await renderSection();
+  vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+  returnToPopupSpy.mockResolvedValue(true);
+  await act(async () => saved.resolve(DEFAULT_VIDEO_SETTINGS));
+  expect(returnToPopupSpy).toHaveBeenCalledExactlyOnceWith();
+});
+
+it.each(['refused', 'write-failed', 'unmounted'] as const)(
   'does not return to the popup after %s',
   async (reason) => {
     window.history.replaceState(null, '', '?requestMediaAccess=camera');
@@ -260,13 +337,12 @@ it.each(['refused', 'write-failed', 'unmounted', 'unfocused'] as const)(
       act(() => root?.unmount());
       root = null;
     }
-    if (reason === 'unfocused') vi.spyOn(document, 'hasFocus').mockReturnValue(false);
     await act(async () => {
       if (reason === 'write-failed') saved.reject(new Error('storage failed'));
       else saved.resolve(DEFAULT_VIDEO_SETTINGS);
     });
     expect(returnToPopupSpy).not.toHaveBeenCalled();
-    if (reason !== 'unfocused') expect(mediaSession.activate).not.toHaveBeenCalled();
+    expect(mediaSession.activate).not.toHaveBeenCalled();
   }
 );
 

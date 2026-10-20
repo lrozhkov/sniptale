@@ -1,4 +1,5 @@
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
   CountdownCameraOfferMessage,
@@ -17,13 +18,11 @@ type CameraCommand = CountdownCameraOfferMessage | CountdownCameraCloseMessage;
 let recordingId: string | null = null;
 const generations = new Map<string, { generation: number; closed: boolean }>();
 
-function requireAuthority(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
+function requireCapability(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
   const senderUrl = resolveTrustedPopupRuntimeSenderUrl(sender);
-  const documentId = sender?.documentId;
   const lease = getActiveVideoRecordingLeaseSnapshot();
   if (
     !senderUrl ||
-    !documentId ||
     !lease ||
     lease.phase === 'terminal' ||
     lease.expiresAt <= Date.now() ||
@@ -35,13 +34,25 @@ function requireAuthority(message: CameraCommand, sender?: chrome.runtime.Messag
     throw new Error('Unauthorized countdown camera capability');
   return {
     lease,
-    documentId,
     binding: { recordingId: lease.recordingId, ...lease.surfaceBinding },
   };
 }
 
+async function resolvePopupDocumentId(sender?: chrome.runtime.MessageSender): Promise<string> {
+  if (sender?.documentId) return sender.documentId;
+  if (!sender?.url || sender.tab) throw new Error('Unauthorized countdown camera document');
+  const contexts = await runtimeInfo.getContexts({ documentUrls: [sender.url] });
+  const matching = contexts.filter(
+    (context) => context.contextType === 'POPUP' && context.documentUrl === sender.url
+  );
+  const documentId = matching.length === 1 ? matching[0]?.documentId : undefined;
+  if (typeof documentId !== 'string' || documentId.length === 0)
+    throw new Error('Unauthorized countdown camera document');
+  return documentId;
+}
+
 function requireCountdown(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
-  const authority = requireAuthority(message, sender);
+  const authority = requireCapability(message, sender);
   if (
     authority.lease.phase !== 'prepared' ||
     getVideoRecordingRuntimeState().status !== VideoRecordingStatus.COUNTDOWN
@@ -62,7 +73,14 @@ function closePeer(peerId: string): Promise<unknown> {
 
 async function runCameraCommand(message: CameraCommand, sender?: chrome.runtime.MessageSender) {
   await ensureActiveVideoRecordingLeaseHydrated();
-  const { lease, documentId, binding } = requireAuthority(message, sender);
+  const initial = requireCapability(message, sender);
+  const documentId = await resolvePopupDocumentId(sender);
+  const { lease, binding } = requireCapability(message, sender);
+  if (
+    binding.generation !== initial.binding.generation ||
+    binding.streamInstanceId !== initial.binding.streamInstanceId
+  )
+    throw new Error('Stale countdown camera source');
   const peerId = `countdown:${JSON.stringify([lease.recordingId, documentId, message.peerGeneration])}`;
   if (recordingId !== lease.recordingId) {
     generations.clear();

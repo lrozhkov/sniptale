@@ -114,6 +114,18 @@ it('uses one left microphone icon button before the selected device name', async
   expect(row.lastElementChild?.textContent).toContain('Studio mic');
 });
 
+it.each([true, false])('uses one left camera control when enabled is %s', async (enabled) => {
+  await renderStatus({ selection: createMediaSelection({ webcamEnabled: enabled }) });
+  const button = container!.querySelector<HTMLButtonElement>(
+    `[aria-label="popup.video.activeWebcam${enabled ? 'Mute' : 'Unmute'}"]`
+  )!;
+  const row = button.parentElement!;
+  expect(row.firstElementChild).toBe(button);
+  expect(row.querySelectorAll('svg')).toHaveLength(1);
+  expect(row.textContent).toContain('Desk camera');
+  expect(row.className).toContain('grid-cols-[28px_minmax(0,1fr)]');
+});
+
 it('renders not-recorded copy without mute controls when media was not selected before recording', async () => {
   await renderStatus({
     selection: createMediaSelection({

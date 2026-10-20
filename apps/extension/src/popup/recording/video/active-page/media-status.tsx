@@ -21,8 +21,7 @@ export interface VideoActiveMediaSelection {
   webcamLabel: string | null;
 }
 
-const ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2';
-const MICROPHONE_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2';
+const ACTIVE_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2';
 const STATUS_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2';
 const LABEL_CLASS_NAME = 'truncate text-[11px] text-[var(--sniptale-color-text-muted-strong)]';
 const VALUE_CLASS_NAME = 'truncate text-xs font-medium text-[var(--sniptale-color-text-primary)]';
@@ -85,7 +84,7 @@ function ActiveMicrophoneStatus({
   );
 
   return (
-    <div className={MICROPHONE_ROW_CLASS_NAME}>
+    <div className={ACTIVE_ROW_CLASS_NAME}>
       <ActiveMediaMuteButton
         readOnly={readOnly}
         enabled={selection.microphoneEnabled}
@@ -159,12 +158,17 @@ function ActiveWebcamStatus({
   const actualSettings = formatKnownWebcamActualSettings(selection.webcamSettings);
 
   return (
-    <div className={ROW_CLASS_NAME}>
-      {selection.webcamEnabled ? (
-        <Video className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
-      ) : (
-        <VideoOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
-      )}
+    <div className={ACTIVE_ROW_CLASS_NAME}>
+      <ActiveMediaMuteButton
+        readOnly={readOnly}
+        enabled={selection.webcamEnabled}
+        labelWhenEnabled={translate('popup.video.activeWebcamMute')}
+        labelWhenMuted={translate('popup.video.activeWebcamUnmute')}
+        onToggle={() =>
+          onActiveRecordingSettingsChange({ webcamEnabled: !selection.webcamEnabled })
+        }
+        type="webcam"
+      />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeWebcamLabel')}</div>
         <div className={VALUE_CLASS_NAME} title={selectedName}>
@@ -176,16 +180,6 @@ function ActiveWebcamStatus({
           </div>
         ) : null}
       </div>
-      <ActiveMediaMuteButton
-        readOnly={readOnly}
-        enabled={selection.webcamEnabled}
-        labelWhenEnabled={translate('popup.video.activeWebcamMute')}
-        labelWhenMuted={translate('popup.video.activeWebcamUnmute')}
-        onToggle={() =>
-          onActiveRecordingSettingsChange({ webcamEnabled: !selection.webcamEnabled })
-        }
-        type="webcam"
-      />
     </div>
   );
 }

@@ -159,10 +159,10 @@ export async function openSettingsPage(
 }
 
 /** Restores the browser-owned source tab and opens the action popup while Settings stays open. */
-export async function returnToMediaRecordingPopup(): Promise<void> {
+export async function returnToMediaRecordingPopup(): Promise<boolean> {
   const [settings] = await browserTabs.query({ active: true, currentWindow: true });
+  if (!isOwnedSettingsPage(settings?.url)) return false;
   if (
-    !isOwnedSettingsPage(settings?.url) ||
     typeof settings?.id !== 'number' ||
     typeof settings.windowId !== 'number' ||
     typeof settings.openerTabId !== 'number' ||
@@ -186,6 +186,7 @@ export async function returnToMediaRecordingPopup(): Promise<void> {
   } finally {
     await browserAction.setPopup({ tabId: source.id, popup: previousPopup });
   }
+  return true;
 }
 
 export async function openExtensionShortcutsPage(): Promise<void> {

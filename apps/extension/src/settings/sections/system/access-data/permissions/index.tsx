@@ -22,6 +22,7 @@ function useTargetedMediaPermissionEnable(
   activateRecordingAccessRef.current = activateRecordingAccess;
   const intentRead = useRef(false);
   const pendingIntent = useRef<'microphone' | 'camera' | null>(null);
+  const pendingReturn = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -38,9 +39,18 @@ function useTargetedMediaPermissionEnable(
         pendingIntent.current = permission;
       }
     }
-    const requestWhenFocused = () => {
+    const continueWhenFocused = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (pendingReturn.current) {
+        pendingReturn.current = false;
+        void returnToMediaRecordingPopup()
+          .then((returned) => {
+            if (!returned && mounted.current) pendingReturn.current = true;
+          })
+          .catch(() => undefined);
+      }
       const permission = pendingIntent.current;
-      if (!permission || document.visibilityState !== 'visible' || !document.hasFocus()) return;
+      if (!permission || !document.hasFocus()) return;
       pendingIntent.current = null;
       void requestPermissionRef
         .current(permission)
@@ -55,21 +65,20 @@ function useTargetedMediaPermissionEnable(
           if (!mounted.current) return;
           activateRecordingAccessRef.current();
           setMediaRecordingReady(true);
-          if (document.visibilityState === 'visible' && document.hasFocus()) {
-            await returnToMediaRecordingPopup().catch(() => undefined);
-          }
+          pendingReturn.current = true;
+          continueWhenFocused();
         })
         .catch(() => {
           if (mounted.current) setMediaEnableFailed(true);
         });
     };
-    window.addEventListener('focus', requestWhenFocused);
-    document.addEventListener('visibilitychange', requestWhenFocused);
-    requestWhenFocused();
+    window.addEventListener('focus', continueWhenFocused);
+    document.addEventListener('visibilitychange', continueWhenFocused);
+    continueWhenFocused();
     return () => {
       mounted.current = false;
-      window.removeEventListener('focus', requestWhenFocused);
-      document.removeEventListener('visibilitychange', requestWhenFocused);
+      window.removeEventListener('focus', continueWhenFocused);
+      document.removeEventListener('visibilitychange', continueWhenFocused);
     };
   }, []);
 
