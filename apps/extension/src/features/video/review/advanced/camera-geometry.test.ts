@@ -9,7 +9,10 @@ import {
   computeQuickEditSpatialRasterLayout,
   evaluateQuickEditCameraAtTime,
 } from './scene';
-import { projectQuickEditPoint, quickEditPlaneProjection } from './spatial-geometry';
+import {
+  projectQuickEditPoint,
+  quickEditPlaneProjection,
+} from '../../composition/motion/spatial-geometry';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from './zoom';
 import {

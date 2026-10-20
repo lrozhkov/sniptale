@@ -622,3 +622,37 @@ it('restores schema18 independent entrance and exit modes through the existing p
     })
   );
 });
+
+it('restores schema19 spatial settings and independent reference through the existing project writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntry({ id: 'spatial-restore' }, { id: 'spatial-restore' });
+  entry.project.duration = 4;
+  const region = {
+    ...createVideoProjectMotionRegion(entry.project, 1),
+    duration: 2,
+    perspective: { enabled: false, rotateX: 20, rotateY: -30, rotateZ: 40, strength: 0.7 },
+    depthOfField: {
+      enabled: true,
+      mode: 'depth' as const,
+      x: 0.4,
+      y: 0.6,
+      width: 0.2,
+      softness: 0.3,
+      strength: 0.8,
+    },
+    spatialReference: { x: 0.1, y: 0.2, width: 0.8, height: 0.6 },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, { motionRegions: [region] });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ version: 19, motionRegions: [region] }),
+    })
+  );
+});

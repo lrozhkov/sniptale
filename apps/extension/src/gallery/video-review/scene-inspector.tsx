@@ -2,7 +2,7 @@ import { WindowHeaderSettings } from '../../workflows/browser-frame/settings';
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../platform/i18n';
 import { SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { reviewSelectFieldClassName } from './controls';
 import {
   quickEditCanvasPreset,

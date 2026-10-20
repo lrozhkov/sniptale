@@ -111,8 +111,10 @@ it.each(['none', 'publish', 'background', 'overlay'] as const)(
 it.each(['ordinary', 'exposure', 'spatial'] as const)(
   'uses the retained background painter for %s without taking disposal ownership',
   async (mode) => {
-    const { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+    const { quickEditSpatialTargetCamera } =
       await import('../../features/video/review/advanced/spatial');
+    const { DEFAULT_CAMERA_PERSPECTIVE: DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+      await import('../../features/video/project/motion/spatial');
     const { createQuickEditZoomRegion } = await import('../../features/video/review/advanced/zoom');
     const makeContext = () =>
       ({
@@ -154,6 +156,7 @@ it.each(['ordinary', 'exposure', 'spatial'] as const)(
         bytes: vi.fn(),
       },
       spatialRenderer: {
+        validateSizes: vi.fn(),
         surface: () => ({ canvas: { ...output } as HTMLCanvasElement, context: makeContext() }),
         draw: vi.fn(),
         dispose: vi.fn(),
@@ -312,7 +315,7 @@ it.each(['success', 'sample-failure', 'projection-failure'] as const)(
         image: null,
         sceneScale: 0.5,
         sample: { draw: sample },
-        spatialRenderer: { surface, draw, dispose: vi.fn() },
+        spatialRenderer: { validateSizes: vi.fn(), surface, draw, dispose: vi.fn() },
         motionBlur: [
           { camera, alpha: 0.5 },
           { camera, alpha: 0.5 },

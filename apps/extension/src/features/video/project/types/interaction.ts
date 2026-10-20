@@ -1,3 +1,4 @@
+import type { CameraPerspective, CameraDepthOfField, CameraSpatialRect } from '../motion/spatial';
 import type { MotionPhaseTransitions } from '../motion/transitions';
 import type { MotionBlurPhases } from '../motion/blur';
 export const VideoProjectSourceKind = {
@@ -388,6 +389,10 @@ export interface VideoProjectMotionRegion {
   /** Explicit phase settings override the retained legacy scalar. */
   motionBlur?: MotionBlurPhases;
   phaseTransitions?: MotionPhaseTransitions;
+  perspective?: CameraPerspective;
+  depthOfField?: CameraDepthOfField;
+  /** Independent normalized scene plane; omission uses the whole project canvas. */
+  spatialReference?: CameraSpatialRect;
   overlayZoomMode?: VideoMotionOverlayZoomMode;
 
   scale: number;

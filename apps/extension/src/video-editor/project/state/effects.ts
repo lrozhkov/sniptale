@@ -1,3 +1,4 @@
+import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
 import { editMotionTransitionPhase } from '../../../features/video/project/motion/timing';
 import { editMotionBlurPhase } from '../../../features/video/project/motion/blur';
 import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
@@ -229,6 +230,12 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
         const target = project.motionRegions?.find((region) => region.id === motionRegionId);
+        const spatial =
+          patch.spatialEdit === undefined
+            ? undefined
+            : target && editMotionSpatialSettings(target, patch.spatialEdit);
+        if (patch.spatialEdit !== undefined && (!target || spatial === null || spatial === target))
+          return project;
         const transition =
           patch.motionTransitionPhase === undefined
             ? undefined
@@ -269,12 +276,22 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
               sourceClipId,
               cameraFollow,
               motionBlurPhase: _phase,
+              spatialEdit: _spatial,
               motionTransitionPhase: _transition,
               ...properties
             } = patch;
             if (sourceClipId !== undefined && region.duration <= 0) return region;
+            const {
+              perspective: _perspective,
+              depthOfField: _depth,
+              spatialReference: _reference,
+              ...withoutSpatial
+            } = transition ?? region;
             let updated = {
-              ...(transition ?? region),
+              ...(spatial ? withoutSpatial : (transition ?? region)),
+              ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
+              ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
+              ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),
               ...properties,
               ...(phases ? { motionBlur: phases } : {}),
             };

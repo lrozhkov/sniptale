@@ -1,3 +1,8 @@
+import {
+  parseCameraPerspective,
+  parseCameraDepth,
+  parseMotionSpatialReference,
+} from '../motion/spatial';
 import { parseMotionPhaseTransitions } from '../motion/transitions';
 import { parseMotionBlurPhases } from '../motion/blur';
 import { parseCameraFollowSettings } from '../camera/cursor-policy';
@@ -201,6 +206,9 @@ export function isMotionRegion(value: unknown): boolean {
   const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
     phaseTransitions !== null &&
+    parseCameraPerspective(value['perspective']) !== null &&
+    parseCameraDepth(value['depthOfField']) !== null &&
+    parseMotionSpatialReference(value['spatialReference']) !== null &&
     (value['cameraFollow'] === undefined ||
       parseCameraFollowSettings(value['cameraFollow']) !== null) &&
     (value['sourceBinding'] === undefined ||

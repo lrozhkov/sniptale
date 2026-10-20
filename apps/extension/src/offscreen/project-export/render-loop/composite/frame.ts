@@ -1,3 +1,4 @@
+import { getProjectExportSpatialRenderer } from '../../runtime';
 import { type LoadedImagesMap, drawProjectFrame } from '../../renderer';
 import type { VideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { syncClipPlayback } from '../../media';
@@ -55,6 +56,7 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
       throw new Error('PROJECT_EXPORT_CANCELLED');
     }
     const frameOptions = {
+      spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
       ...(compositionIndex ? { compositionIndex } : {}),
       ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
     };
@@ -93,6 +95,7 @@ function renderCompositeEffectFrames(args: RenderCompositeFrameArgs) {
     loadedImages: args.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
     project: args.project,
+    spatialRenderer: () => getProjectExportSpatialRenderer(args.job, args.signal),
   };
   return args.effectRuntime
     ? args.effectRuntime.renderProjectFrames(frameArgs)

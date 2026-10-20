@@ -1,5 +1,5 @@
 import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
-import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
+import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import {
   evaluateReviewClicks,
   type ReviewClickCue,
@@ -23,7 +23,7 @@ import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
 import { drawReviewBorders } from './render-border';
 import { drawReviewSpotlights } from './render-spotlight';
-import type { ReviewSpatialRenderer } from './spatial-renderer';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewWindowRaster } from './window-header';
 
 /** Sharp content annotations project together; viewport comments remain in output space. */

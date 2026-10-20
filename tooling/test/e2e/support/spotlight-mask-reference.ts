@@ -3,7 +3,7 @@
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial-geometry';
+} from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import type { QuickEditRect } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import {
   quickEditSpotlightOpeningPath,

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { NumericRow } from '../../ui/compact-inspector-controls';
-import type { CompactInspectorUnit } from '../../ui/compact-inspector-controls/shared';
+import { NumericRow } from './numeric';
+import type { CompactInspectorUnit } from './shared';
 
 /** Numeric gestures remain local until release or accepted text input. */
-export function ReviewNumberRow(props: {
+export function DraftNumericRow(props: {
   label: string;
   unit?: CompactInspectorUnit;
   value: number;
@@ -18,12 +18,12 @@ export function ReviewNumberRow(props: {
   disabled?: boolean;
   onChange(value: number): void;
 }) {
-  return <ReviewPreviewNumberRow {...props} />;
+  return <PreviewNumericRow {...props} />;
 }
 
 /** Numeric preview gestures share cancellation and commit ownership across effect inspectors. */
-export function ReviewPreviewNumberRow(
-  props: ComponentProps<typeof ReviewNumberRow> & {
+export function PreviewNumericRow(
+  props: ComponentProps<typeof DraftNumericRow> & {
     onPreview?(value: number | null): void;
     title?: string;
     /** Optional external visual draft, separate from the supplied value. */

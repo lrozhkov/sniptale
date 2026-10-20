@@ -8,7 +8,7 @@ import {
 } from '../../features/video/review/text-document';
 import { translate } from '../../platform/i18n';
 import { CaptionStyleFields } from '../../ui/video-text/caption-style';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 
 /** Scene defaults and fragment overrides share the existing compact inspector controls. */
 function ReviewCaptionStyleControls(props: {

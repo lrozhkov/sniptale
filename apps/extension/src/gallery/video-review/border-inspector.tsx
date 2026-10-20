@@ -8,7 +8,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 
 /** Source geometry and stroke appearance share the selected effect's draft owner. */

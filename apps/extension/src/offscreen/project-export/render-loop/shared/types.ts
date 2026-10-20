@@ -1,3 +1,4 @@
+import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../../../features/video/project/export/time-estimate';
 import type { ProjectExportMediaState } from '../../media';
 import type { VideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
@@ -10,6 +11,7 @@ export type RenderLoopJobState = Pick<
   'clipMediaElements' | 'clipAudioNodes'
 > & {
   captionRenderer?: VideoProjectCaptionRenderer;
+  cameraSpatialRenderer?: ReviewSpatialRenderer;
   cancelled: boolean;
   timeEstimator?: ExportTimeEstimator;
   renderProgressRange?: { start: number; end: number };

@@ -1,13 +1,13 @@
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
-import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { createReviewPresentationMain } from './presentation-main';
 import type { ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
-import { createReviewSpatialRenderer } from './spatial-renderer';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import {
   createAdaptiveFrameWriter,
   createAdaptiveComparisonBudget,

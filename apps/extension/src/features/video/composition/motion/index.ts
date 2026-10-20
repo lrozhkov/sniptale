@@ -1,3 +1,5 @@
+import { evaluateMotionSpatial, motionCameraProjection } from './spatial';
+import { invertQuickEditProjection, projectQuickEditPoint } from './spatial-geometry';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
 import { motionTransitionSettings } from '../../project/motion/timing';
 import { regionMotionBlurAmount } from './blur';
@@ -147,6 +149,7 @@ export function resolveVideoCompositionCamera(params: {
     edges.connectedIn,
     edges.connectedOut
   );
+  const spatial = evaluateMotionSpatial(params.project, null, activeRegion, progress);
   const following =
     activeRegion.focusMode === VideoMotionFocusMode.CURSOR
       ? resolveProjectFollowingCamera(
@@ -173,6 +176,7 @@ export function resolveVideoCompositionCamera(params: {
       focusPoint,
       scale,
       regionId: activeRegion.id,
+      ...(spatial ? { spatial } : {}),
       motionBlurAmount,
       overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
       viewportHeight: params.project.height / scale,
@@ -194,6 +198,7 @@ export function resolveVideoCompositionCamera(params: {
     motionBlurAmount,
     overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
     regionId: activeRegion.id,
+    ...(spatial ? { spatial } : {}),
     scale,
     viewportHeight: currentViewport.viewportHeight,
     viewportWidth: currentViewport.viewportWidth,
@@ -229,9 +234,11 @@ function resolveConnectingCamera(
       resolveMotionTargetScale(params.project, destination),
       progress
     );
+    const spatial = evaluateMotionSpatial(params.project, source, destination, progress);
     return {
       focusPoint,
       scale,
+      ...(spatial ? { spatial } : {}),
       ...resolveCameraViewportFrame(params.project, focusPoint, scale),
       regionId: destination.id,
       motionBlurAmount:
@@ -252,29 +259,58 @@ export function mapCompositionPointThroughCamera(
   point: { x: number; y: number },
   camera: VideoCompositionCameraState
 ) {
+  if (
+    ![point.x, point.y, camera.scale, camera.viewportX, camera.viewportY].every(Number.isFinite) ||
+    camera.scale <= 0
+  )
+    return null;
+  if (camera.spatial) {
+    const matrix = motionCameraProjection(camera);
+    if (!matrix || !matrix.every(Number.isFinite)) return null;
+    const mapped = projectQuickEditPoint(matrix, point);
+    return mapped && Number.isFinite(mapped.x) && Number.isFinite(mapped.y) ? mapped : null;
+  }
   return {
     x: (point.x - camera.viewportX) * camera.scale,
     y: (point.y - camera.viewportY) * camera.scale,
   };
 }
 
+/** Axis-aligned paint bounds; interactive frames retain their full projected quadrilateral. */
 export function mapCompositionRectThroughCamera(
   rect: { height: number; width: number; x: number; y: number },
   camera: VideoCompositionCameraState
 ) {
-  const point = mapCompositionPointThroughCamera(rect, camera);
-  return {
-    height: rect.height * camera.scale,
-    width: rect.width * camera.scale,
-    x: point.x,
-    y: point.y,
-  };
+  const points = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+    { x: rect.x, y: rect.y + rect.height },
+  ].map((point) => mapCompositionPointThroughCamera(point, camera));
+  if (points.some((point) => !point)) return null;
+  const xs = points.map((point) => point!.x),
+    ys = points.map((point) => point!.y);
+  const x = Math.min(...xs),
+    y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 }
 
 export function mapViewportPointToComposition(
   point: { x: number; y: number },
   camera: VideoCompositionCameraState
 ) {
+  if (
+    ![point.x, point.y, camera.scale, camera.viewportX, camera.viewportY].every(Number.isFinite) ||
+    camera.scale <= 0
+  )
+    return null;
+  if (camera.spatial) {
+    const matrix = motionCameraProjection(camera);
+    if (!matrix || !matrix.every(Number.isFinite)) return null;
+    const inverse = invertQuickEditProjection(matrix);
+    const mapped = inverse && projectQuickEditPoint(inverse, point);
+    return mapped && Number.isFinite(mapped.x) && Number.isFinite(mapped.y) ? mapped : null;
+  }
   return {
     x: point.x / camera.scale + camera.viewportX,
     y: point.y / camera.scale + camera.viewportY,

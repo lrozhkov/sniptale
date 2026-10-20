@@ -21,7 +21,9 @@ export type InspectorSectionSemantic =
   | 'content'
   | 'history'
   | 'track'
-  | 'transition';
+  | 'transition'
+  | 'perspective'
+  | 'depth';
 
 export interface InspectorGroupDefinition<TId extends string> {
   content: React.ReactNode;

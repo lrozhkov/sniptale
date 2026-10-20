@@ -52,7 +52,12 @@ function createWorkspace(): Pick<
     setAutoProcessingModalOpen: vi.fn(),
     clearPlaybackRange: vi.fn(),
     playbackRange: null,
-    inspector: { mode: 'selection', openSelection: vi.fn() },
+    inspector: {
+      mode: 'selection',
+      openSelection: vi.fn(),
+      motionSpatialPreview: null,
+      previewMotionSpatial: vi.fn(),
+    },
     confirm: {
       dialog: null,
       onCancel: vi.fn(),

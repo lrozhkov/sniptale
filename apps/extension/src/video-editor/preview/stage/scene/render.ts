@@ -1,3 +1,7 @@
+import {
+  createReviewSpatialRenderer,
+  type ReviewSpatialRenderer,
+} from '../../../../features/video/composition/canvas/spatial-renderer';
 import { usePreviewFrameRate } from '../frame-rate';
 import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
@@ -34,7 +38,8 @@ export function usePreviewStageCanvasRender(
   const renderSchedulerRef = usePreviewRenderSchedulerRef(
     params.effectRuntimeFeedback.onFailure,
     params.effectRuntimeFeedback.onRecovery,
-    params.previewExactFrameCache
+    params.previewExactFrameCache,
+    params.effectRuntimeFeedback.retryVersion
   );
 
   usePreviewStageRenderEffect(params, effectRuntimeRef, renderRevision, renderSchedulerRef);
@@ -145,7 +150,8 @@ function createPreviewStageCanvasRenderJob(args: {
 function usePreviewRenderSchedulerRef(
   onFailure: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onFailure'],
   onRecovery: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onRecovery'],
-  exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache']
+  exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache'],
+  retryVersion: number
 ): MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>> {
   const frameRate = usePreviewFrameRate();
   const frameRateRef = useRef(frameRate);
@@ -154,18 +160,53 @@ function usePreviewRenderSchedulerRef(
   feedbackRef.current = { onFailure, onRecovery };
   const schedulerRef = useRef<ReturnType<typeof createPreviewSceneRenderScheduler> | null>(null);
   const captionsRef = useRef<ReturnType<typeof createVideoProjectCaptionRenderer> | null>(null);
+  const stagingRef = useRef<HTMLCanvasElement | null>(null);
+  const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
+  const retryRef = useRef(retryVersion);
   if (!schedulerRef.current) {
     const captionRenderer = createVideoProjectCaptionRenderer();
     captionsRef.current = captionRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
-      onError: (error) => feedbackRef.current.onFailure('visual', error),
+      onError: (error) => {
+        const spatial = spatialRef.current;
+        spatialRef.current = null;
+        spatial?.dispose();
+        feedbackRef.current.onFailure('visual', error);
+      },
       onSuccess: (job) => {
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },
       render: (job) => {
         const render = (input: Parameters<typeof renderPreviewScene>[0]) =>
-          renderPreviewScene({ ...input, captionRenderer });
+          renderPreviewScene({
+            ...input,
+            captionRenderer,
+            spatialRenderer: () => {
+              input.signal?.throwIfAborted();
+              if (spatialRef.current) return spatialRef.current;
+              const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+                if (spatialRef.current !== renderer) return;
+                spatialRef.current = null;
+                renderer.dispose();
+                feedbackRef.current.onFailure('visual', new Error('Perspective context was lost.'));
+              });
+              spatialRef.current = renderer;
+              return renderer;
+            },
+            stagingCanvas: () => {
+              if (stagingRef.current?.ownerDocument === input.canvas.ownerDocument)
+                return stagingRef.current;
+              if (stagingRef.current) {
+                stagingRef.current.width = 0;
+                stagingRef.current.height = 0;
+              }
+              stagingRef.current = input.canvas.ownerDocument.createElement('canvas');
+              stagingRef.current.width = 0;
+              stagingRef.current.height = 0;
+              return stagingRef.current;
+            },
+          });
         if (!exactFrameCache) return render(job);
         return renderPreviewSceneWithExactCache({
           cache: exactFrameCache,
@@ -175,11 +216,26 @@ function usePreviewRenderSchedulerRef(
       },
     });
   }
+  useLayoutEffect(() => {
+    if (retryRef.current === retryVersion) return;
+    retryRef.current = retryVersion;
+    const spatial = spatialRef.current;
+    spatialRef.current = null;
+    spatial?.dispose();
+  }, [retryVersion]);
   useEffect(() => {
     const scheduler = schedulerRef.current;
     return () => {
       scheduler?.dispose();
       captionsRef.current?.clear();
+      const spatial = spatialRef.current;
+      spatialRef.current = null;
+      spatial?.dispose();
+      if (stagingRef.current) {
+        stagingRef.current.width = 0;
+        stagingRef.current.height = 0;
+        stagingRef.current = null;
+      }
     };
   }, []);
   return schedulerRef as MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>>;

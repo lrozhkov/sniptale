@@ -47,7 +47,16 @@ export function beginEditorRegionGesture(args: {
           if (!finished) args.preview(patch());
         });
     },
-    onEnd: () => finish(true),
+    onEnd(event) {
+      const next = event?.pointerId === args.pointerId ? args.mapPoint(event) : null;
+      if (!next) {
+        finish(false);
+        return;
+      }
+      point = next;
+      changed = Math.abs(point.x - args.origin.x) + Math.abs(point.y - args.origin.y) > 0.01;
+      finish(true);
+    },
     onCancel: () => finish(false),
   });
   return () => {

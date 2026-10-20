@@ -103,7 +103,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/composition/timeline/frame/cursor.test.ts',
       'apps/extension/src/features/video/composition/motion/camera-geometry.test.ts',
       'apps/extension/src/features/video/composition/motion/project-follow.test.ts',
-      'apps/extension/src/features/video/review/advanced/camera-projection-bounds.test.ts',
+      'apps/extension/src/features/video/composition/motion/spatial-projection-bounds.test.ts',
       'apps/extension/src/features/video/review/advanced/camera-geometry.test.ts',
       'apps/extension/src/features/video/review/advanced/scene-camera-plan.test.ts',
       'apps/extension/src/video-editor/project/state/clip-property/media-roundness.test.ts',

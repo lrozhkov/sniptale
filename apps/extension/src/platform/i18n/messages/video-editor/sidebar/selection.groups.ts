@@ -1,4 +1,5 @@
 export const videoEditorSidebarSelectionGroupMessages = {
+  inspectorGroupSpatialReference: { ru: 'Опорная область', en: 'Reference area' },
   inspectorGroupSwitcherLabel: {
     ru: 'Группы свойств',
     en: 'Property groups',

@@ -490,10 +490,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
       "symbol": "createProjectWorkingZoneCameraGeometry",
       "owner": "extension:feature:video:composition",
-      "reason": "tool-noise: This factory binds one renderer geometry snapshot. Parent line count includes nested methods. Parent control metrics skip those methods. The parent has 16 statements, cyclomatic 3, cognitive 2, nesting 0, and no effects or state. Source bounds now use separate crop, rotation, and transition functions. Projection and source-end/cut tests prove their paths. A forwarding factory split would add navigation without separating authority. The architecture reviewer must assess this classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess new authority, independent responsibilities, or method growth. Remove when the analyzer separates parent and nested method line counts.",
-      "reviewDate": "2026-10-14",
-      "astHash": "b43a97196b5bc077f1d7e788c7e2c474ad89a4f6f7e8d4fa15bd073c82da19f8",
+      "reason": "tool-noise: This factory binds one read-only renderer geometry snapshot. The parent span includes nested projection and source methods. Parent metrics show 19 statements, cyclomatic 5, and no state or effects. Source raster bounds and shared perspective intervals retain their existing owners. A forwarding factory split would add navigation without separating authority. Fresh architecture review must check this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess new authority, independent operations, or method growth. Remove when the analyzer separates parent and nested method line counts.",
+      "reviewDate": "2026-10-20",
+      "astHash": "fbef4b948d7a3a5a873cec21b8237e21f32a6a6e74ff4dddd7ff98f15f7fec32",
       "signatureHash": "bf0f4f53e34843f435e3221d9ec8a76f30cbe24c2ee8d7c390def907f6c82e95"
     },
     {
@@ -630,7 +630,7 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/review/advanced/camera-projection-bounds.test.ts",
+      "file": "apps/extension/src/features/video/composition/motion/spatial-projection-bounds.test.ts",
       "symbol": "describe callback",
       "owner": "extension:app-core:features",
       "reason": "tool-noise: This callback groups projection bounds tests with one shared geometry fixture. It owns no runtime state or effects. The added cases compare follow derivatives with rendered positions. Splitting the callback only to reduce its length would separate the same mathematical contract.",
@@ -765,11 +765,11 @@
       "file": "apps/extension/src/gallery/video-review/stage.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "a7ac671b88b3a3a2a969306a0563be20f55ef237aecbe532dfba77f64bce7743",
-      "signatureHash": "fa9a1eb2ee8933c59a173a489946fabc2ccb58ed9a34265eea2092d931366c44",
-      "reviewDate": "2026-10-17",
-      "reason": "tool-noise: One existing mounted stage fixture adds header-hook identity assertions through manual/native handoff. It adds no fixture lifecycle, resource owner, or writer; cohesion remains 1 and score 2 has delta 0. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification."
+      "reason": "tool-noise: The candidate changes only the dynamic import and local alias of the shared perspective default. Test fixtures, assertions, and lifecycle remain unchanged. The existing file score is 4 with delta 0. Splitting this fixture for a mechanical import change would add unrelated test ownership. Fresh architecture review must check this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent fixtures, state receivers, gestures, resources, or test behavior. Remove when import-only analysis recognizes this dynamic import projection.",
+      "reviewDate": "2026-10-20",
+      "astHash": "f2dc57463fe306444aac6f18ed64b04eeef7446007e0de539189987ea0ede63b",
+      "signatureHash": "ef5dee3252ee043ec4e129b77f2488d6c9091f0ea6426835716b79e68759d0ab"
     },
     {
       "rule": "structural-function-risk",
@@ -1661,6 +1661,39 @@
       "reviewDate": "2026-10-19",
       "astHash": "b5d438e3e4f46de080c20c4dfa5666a194ea417f05b80e3fc3eba326aa6c0527",
       "signatureHash": "8783ebf91937af841db25490d4c5caad3ab7618449da8f53b1dbe87310653750"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/spatial-renderer.ts",
+      "symbol": "createReviewSpatialRenderer",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One GPU session owns one canvas receiver, textures, surface leases, and disposal. The factory span includes its nested draw, surface, and disposal methods. Parent metrics show 25 statements, cyclomatic 7, and one state receiver. Separating these closures would distribute one resource lifetime. Fresh architecture review must check this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess resource ownership, independent operations, or lifetime changes. Remove when the analyzer excludes nested methods from factory line counts.",
+      "reviewDate": "2026-10-20",
+      "astHash": "009d1d2c5171468ad0edaadecce9d47695c1b572d721a43cd4e6152aa0ef114f",
+      "signatureHash": "b2deda953026a032a900354e8c5f4a78cc6488a2e9bf83977461ed0e4cf0002c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/motion/index.ts",
+      "symbol": "resolveVideoCompositionCamera",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This function computes one camera frame from the current region and playback time. It owns no state or effects. The domain index filename gives it the entrypoint profile. It is not a runtime entrypoint or facade. Its existing score is 3 with delta 0. Spatial fields extend the same frame result. Fresh architecture review must check this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any runtime, state, effect, or independent operation. Remove when the analyzer distinguishes domain index modules from runtime entrypoints.",
+      "reviewDate": "2026-10-20",
+      "astHash": "b5364c54dde440ea88702d4341edfdec0a36c812bffc786f171afa6d13227133",
+      "signatureHash": "40a97668312cca68cbb4b5f4e9aaf1a061ed96f550635aedbd54936e4887d342"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.tsx",
+      "symbol": "EditorRegionFrame",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One React frame owns four EffectV1 region handles and their shared gesture. Its span includes JSX and nested pointer and keyboard callbacks. Parent metrics show 12 statements, cyclomatic 8, and no state authority. Separate fragments would retain the same model, gesture, and cleanup receiver. Exact geometry, native drag, cancellation, and reopening tests cover this component. Fresh architecture review must check this classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent UI state, commands, resource ownership, or gesture lifetimes. Remove when the analyzer separates JSX and nested callbacks from parent span.",
+      "reviewDate": "2026-10-20",
+      "astHash": "a3f4b3d516fac8aff0f77682f5c2ac7622b64071e504955a6b77dcc2f2dbf590",
+      "signatureHash": "a11ab1391dfe7ae96a8a24102d264fe5c331be4fe1af613111e8191e23fda9a7"
     }
   ]
 }

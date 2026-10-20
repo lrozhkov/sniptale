@@ -1,3 +1,4 @@
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   renderEffectRuntimeComposition,
   type EffectRuntimeRenderedComposition,
@@ -16,6 +17,7 @@ export interface RenderOffscreenProjectEffectFramesInput {
   currentTime: number;
   loadedImages: LoadedImagesMap;
   ownerDocument?: Document;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   project: VideoProject;
 }
 
@@ -54,6 +56,7 @@ export function createOffscreenProjectEffectRuntime(
         imageBank: projectArgs.loadedImages,
         overlayFrame: renderPasses.overlayFrame,
         overlayTime: projectArgs.currentTime,
+        ...(projectArgs.spatialRenderer ? { spatialRenderer: projectArgs.spatialRenderer } : {}),
         ...(projectArgs.ownerDocument ? { ownerDocument: projectArgs.ownerDocument } : {}),
         visualPasses: renderPasses.visualPasses,
       });

@@ -15,7 +15,10 @@ import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from './watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from './key-animation';
-import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import {
+  parseCameraPerspective as parseQuickEditPerspective,
+  parseCameraDepth as parseQuickEditDepth,
+} from '../../project/motion/spatial';
 import { parseReviewClickAnimations } from './click-animation';
 import { parseQuickEditBorder } from './border';
 import { quickEditFocusConflicts } from './focus-layout';

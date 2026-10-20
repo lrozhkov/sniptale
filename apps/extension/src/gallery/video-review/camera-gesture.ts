@@ -1,5 +1,5 @@
 import { captureReviewSpatialPointer } from './spatial-pointer';
-import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
+import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { useRef, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';

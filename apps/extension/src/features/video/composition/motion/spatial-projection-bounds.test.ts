@@ -1,23 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
-import * as trajectoryBounds from '../../composition/motion/camera-trajectory';
+import * as trajectoryBounds from './camera-trajectory';
 import {
+  boundCameraPlaneProjection,
   boundQuickEditCameraMotion,
   boundQuickEditCameraProjection,
-} from './camera-projection-bounds';
-import type { QuickEditCameraProjectionInterval } from './camera-projection-bounds';
+} from './spatial-projection-bounds';
+import type { QuickEditCameraProjectionInterval } from './spatial-projection-bounds';
 import {
   createCameraTrajectory,
   evaluateCameraTrajectory,
   evaluateCameraTrajectoryDerivative,
-} from '../../composition/motion/camera-trajectory';
+} from './camera-trajectory';
 import {
   computeQuickEditVideoTransform,
   computeQuickEditSpatialWindow,
   computeQuickEditSpatialRasterLayout,
-} from './scene';
-import { interpolateQuickEditSpatial } from './spatial';
+} from '../../review/advanced/scene';
+import { interpolateCameraSpatial as interpolateQuickEditSpatial } from '../../project/motion/spatial';
 import { projectQuickEditPoint, quickEditPlaneProjection } from './spatial-geometry';
-import { createQuickEditZoomRegion } from './zoom';
+import { createQuickEditZoomRegion } from '../../review/advanced/zoom';
 
 const base: QuickEditCameraProjectionInterval = {
   start: 0,
@@ -320,4 +321,60 @@ it('bounds each trajectory derivative once for both axes of a motion interval', 
   } finally {
     bound.mockRestore();
   }
+});
+
+it('bounds a scene source interval outside its independent reference across phase and pan', () => {
+  const reference = { x: 30, y: 20, width: 60, height: 70 };
+  const settings = { enabled: true, rotateX: 20, rotateY: -25, rotateZ: 12, strength: 0.7 };
+  const phase = createCameraTrajectory({
+    start: 0,
+    end: 1,
+    from: { x: 0, y: 0 },
+    to: { x: 1, y: 0 },
+  });
+  const input = {
+    start: 0.2,
+    end: 0.6,
+    phase,
+    targetScale: 1.5,
+    reference,
+    perspective: settings,
+    source: { x: [5, 100] as const, y: [5, 100] as const },
+    pan: { minX: 5, maxX: 15, minY: 10, maxY: 20 },
+    output: { width: 180, height: 130 },
+    offset: { x: 20, y: 5 },
+  };
+  const bounds = boundCameraPlaneProjection(input)!;
+  expect(bounds).not.toBeNull();
+  for (const time of [0.2, 0.3, 0.4, 0.5, 0.6]) {
+    const progress = evaluateCameraTrajectory(phase, time).x,
+      scale = 1 + 0.5 * progress;
+    const matrix = quickEditPlaneProjection(
+      reference,
+      {
+        x: reference.x * scale,
+        y: reference.y * scale,
+        width: reference.width * scale,
+        height: reference.height * scale,
+      },
+      interpolateQuickEditSpatial(null, { perspective: settings }, progress)
+    );
+    for (const x of input.source.x)
+      for (const y of input.source.y)
+        for (const px of [5, 15])
+          for (const py of [10, 20]) {
+            const projected = projectQuickEditPoint(matrix, { x, y })!;
+            const denominator = matrix[6] * x + matrix[7] * y + matrix[8];
+            const ox = projected.x + 20 - progress * px,
+              oy = projected.y + 5 - progress * py;
+            const clearance = Math.min(ox, oy, 180 - ox, 130 - oy);
+            expect(bounds.denominator.low).toBeLessThanOrEqual(denominator);
+            expect(bounds.denominator.high).toBeGreaterThanOrEqual(denominator);
+            expect(bounds.viewport!.low).toBeLessThanOrEqual(clearance);
+            expect(bounds.viewport!.high).toBeGreaterThanOrEqual(clearance);
+          }
+  }
+  expect(
+    boundCameraPlaneProjection({ ...input, phase: 1, source: { x: [0, 10000], y: [0, 10000] } })
+  ).toBeNull();
 });

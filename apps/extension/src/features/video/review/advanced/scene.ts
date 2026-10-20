@@ -21,11 +21,11 @@ import type {
 import type { WorkingZoneCameraGeometry } from '../../composition/motion/follow-cursor';
 import type { WorkingZoneCameraPlan } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
+import { quickEditSpatialSpan } from './spatial';
 import {
-  interpolateQuickEditSpatial,
-  quickEditSpatialSpan,
-  hasQuickEditPerspective,
-} from './spatial';
+  interpolateCameraSpatial as interpolateQuickEditSpatial,
+  hasCameraPerspective as hasQuickEditPerspective,
+} from '../../project/motion/spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';

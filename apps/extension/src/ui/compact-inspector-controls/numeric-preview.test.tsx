@@ -2,7 +2,10 @@
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ReviewNumberRow, ReviewPreviewNumberRow } from './number-row';
+import {
+  DraftNumericRow as ReviewNumberRow,
+  PreviewNumericRow as ReviewPreviewNumberRow,
+} from './numeric-preview';
 
 let root: Root;
 let host: HTMLDivElement;

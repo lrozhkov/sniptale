@@ -2,7 +2,7 @@ import {
   invertQuickEditProjection,
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 
 /** Freeze the inverse and viewport at pointer-down so a live camera cannot feed back into its drag. */
 export function captureReviewSpatialPointer(

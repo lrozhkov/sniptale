@@ -8,7 +8,7 @@ import {
   reviewDeleteButtonClassName,
   reviewTextButtonClassName,
 } from './controls';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import {
   reviewTextSplitBoundary,
   type ReviewTextFragment,

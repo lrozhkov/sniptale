@@ -2,9 +2,9 @@ import { build } from 'esbuild';
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import type {
-  QuickEditDepthOfField,
-  SpatialQuaternion,
-} from '../../../../apps/extension/src/features/video/review/advanced/spatial';
+  CameraDepthOfField as QuickEditDepthOfField,
+  SpatialQuaternion as SpatialQuaternion,
+} from '../../../../apps/extension/src/features/video/project/motion/spatial';
 
 test('perspective filters subpixel rules and depth blur without moving line copies', async ({
   page,

@@ -5,7 +5,7 @@ import type {
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 

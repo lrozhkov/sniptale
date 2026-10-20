@@ -1,5 +1,8 @@
-import type { QuickEditSpatialFrame, SpatialQuaternion } from './spatial';
-import type { QuickEditRect } from './types';
+import type {
+  CameraSpatialFrame as QuickEditSpatialFrame,
+  SpatialQuaternion as SpatialQuaternion,
+} from '../../project/motion/spatial';
+import type { CameraSpatialRect as QuickEditRect } from '../../project/motion/spatial';
 
 export type QuickEditHomography = readonly [
   number,

@@ -154,6 +154,49 @@ function traceGesturePath(
   if (points.length > 1) context.lineTo(last.x, last.y);
 }
 
+/** Source bounds precede camera projection; callers supply the same raster state as the painter. */
+export function resolveActionCompositionPaintBounds(
+  action: VideoCompositionActionState,
+  sizeScale = 1
+) {
+  const point = action.point;
+  if (
+    !point ||
+    action.renderKind !== 'accent' ||
+    action.preset === 'NONE' ||
+    action.preset === 'SCROLL_EMPHASIS'
+  )
+    return null;
+  const style = getActionClickStyle(action.clickStyle);
+  const feedback = action.gestureFeedback;
+  const radius = feedback
+    ? Math.max(0.01, feedback.radius * sizeScale)
+    : style.size * Math.max(0.2, sizeScale);
+  const stroke = ((feedback?.stroke ?? style.strokeWidth) * Math.max(0.2, sizeScale)) / 2 + 2;
+  let x = point.x - radius,
+    y = point.y - radius;
+  let right = point.x + radius,
+    bottom = point.y + radius;
+  for (const item of feedback?.path ?? []) {
+    x = Math.min(x, item.x);
+    y = Math.min(y, item.y);
+    right = Math.max(right, item.x);
+    bottom = Math.max(bottom, item.y);
+  }
+  if (feedback?.area) {
+    x = Math.min(x, feedback.area.x);
+    y = Math.min(y, feedback.area.y);
+    right = Math.max(right, feedback.area.x + feedback.area.width);
+    bottom = Math.max(bottom, feedback.area.y + feedback.area.height);
+  }
+  return {
+    x: x - stroke,
+    y: y - stroke,
+    width: right - x + stroke * 2,
+    height: bottom - y + stroke * 2,
+  };
+}
+
 /** Shared manual-action overlay mapping for preview and exported output. */
 export function drawSceneActionCompositionStates(
   context: CanvasRenderingContext2D,

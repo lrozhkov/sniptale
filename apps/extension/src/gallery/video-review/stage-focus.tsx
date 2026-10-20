@@ -1,4 +1,4 @@
-import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
+import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';

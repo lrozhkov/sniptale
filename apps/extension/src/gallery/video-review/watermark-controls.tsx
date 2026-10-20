@@ -13,7 +13,7 @@ import {
 } from '../../features/video/review/advanced/watermark';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 
 export type WatermarkBinding = {
   settings: QuickEditWatermarkSettings;

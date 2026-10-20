@@ -1,9 +1,11 @@
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../features/video/project/export/time-estimate';
 import type { ExportAudioSettings } from './codecs/types';
 import { type ClipAudioNode } from './media';
 import type { VideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
 
 export interface ProjectExportRuntimeState {
+  cameraSpatialRenderer?: ReviewSpatialRenderer;
   captionRenderer?: VideoProjectCaptionRenderer;
   mediaRecorder: MediaRecorder | null;
   clipMediaElements: Map<string, HTMLMediaElement>;

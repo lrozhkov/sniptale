@@ -137,7 +137,7 @@ it('renders a composite frame and returns the next progress timestamp', async ()
     0.25,
     expect.anything(),
     expect.any(Map),
-    {}
+    { spatialRenderer: expect.any(Function) }
   );
   expect(renderOffscreenProjectEffectFramesMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -188,7 +188,7 @@ it('renders effect frames through the reusable runtime when one is provided', as
     expect.anything(),
     expect.anything(),
     expect.any(Map),
-    { effectRuntimeFrames }
+    { effectRuntimeFrames, spatialRenderer: expect.any(Function) }
   );
   expect(disposeEffectRuntimeCompositionMock).toHaveBeenCalledWith(effectRuntimeFrames);
 });

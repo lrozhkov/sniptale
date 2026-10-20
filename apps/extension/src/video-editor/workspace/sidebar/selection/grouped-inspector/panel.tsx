@@ -4,6 +4,8 @@ import { useWorkspacePreference } from '../../../../runtime/controller/workspace
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Rotate3D,
+  Focus,
   Grid3X3,
   CaseSensitive,
   Shapes,
@@ -32,6 +34,8 @@ import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition, InspectorSectionSemantic } from './types';
 
 const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
+  perspective: Rotate3D,
+  depth: Focus,
   typography: CaseSensitive,
   geometry: Shapes,
   processing: SlidersHorizontal,

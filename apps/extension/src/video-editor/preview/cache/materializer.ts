@@ -1,3 +1,7 @@
+import {
+  createReviewSpatialRenderer,
+  type ReviewSpatialRenderer,
+} from '../../../features/video/composition/canvas/spatial-renderer';
 import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
@@ -25,6 +29,9 @@ export interface VideoPreviewFrameMaterializer {
 }
 
 interface VideoPreviewMaterializerState {
+  disposed: boolean;
+  spatialRenderer: ReviewSpatialRenderer | null;
+  stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
@@ -196,6 +203,9 @@ function createMaterializerMediaState(
   stage: HTMLDivElement
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
+    disposed: false,
+    spatialRenderer: null,
+    stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
     effectRuntime: null,
     imageBank: {},
@@ -232,6 +242,16 @@ function createMaterializerMediaState(
 }
 
 function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDivElement): void {
+  if (state.disposed) return;
+  state.disposed = true;
+  const spatial = state.spatialRenderer;
+  state.spatialRenderer = null;
+  spatial?.dispose();
+  if (state.stagingCanvas) {
+    state.stagingCanvas.width = 0;
+    state.stagingCanvas.height = 0;
+  }
+  state.stagingCanvas = null;
   Object.values(state.videoRefs).forEach((video) => {
     video?.pause();
     video?.removeAttribute('src');
@@ -253,15 +273,38 @@ async function renderMaterializedFrame(
   signal: AbortSignal,
   cameraOverride?: VideoCompositionCameraState
 ): Promise<HTMLCanvasElement> {
-  throwIfAborted(signal);
+  const assertActive = () => {
+    throwIfAborted(signal);
+    if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+  };
+  assertActive();
   await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
+  assertActive();
   await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
-  await renderPreviewScene({
+  assertActive();
+  const drawn = await renderPreviewScene({
     captionRenderer: state.captionRenderer,
+    stagingCanvas: () => {
+      assertActive();
+      state.stagingCanvas ??= params.ownerDocument.createElement('canvas');
+      return state.stagingCanvas;
+    },
+    spatialRenderer: () => {
+      assertActive();
+      if (state.spatialRenderer) return state.spatialRenderer;
+      const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+        if (state.spatialRenderer !== renderer) return;
+        state.spatialRenderer = null;
+        renderer.dispose();
+      });
+      state.spatialRenderer = renderer;
+      return renderer;
+    },
     ...(cameraOverride ? { cameraOverride } : {}),
     canvas,
     currentTime: time,
     effectRuntimeExecutor: () => {
+      assertActive();
       state.effectRuntime ??= createVideoEditorEffectRuntime({
         ownerDocument: params.ownerDocument,
       });
@@ -274,7 +317,8 @@ async function renderMaterializedFrame(
     stage,
     videoRefs: { current: state.videoRefs },
   });
-  throwIfAborted(signal);
+  assertActive();
+  if (drawn === false) throw new Error('Preview frame is unavailable.');
   return canvas;
 }
 

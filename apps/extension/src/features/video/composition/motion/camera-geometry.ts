@@ -1,3 +1,7 @@
+import { boundCameraPlaneProjection } from './spatial-projection-bounds';
+import { hasCameraPerspective } from '../../project/motion/spatial';
+import { evaluateMotionSpatial } from './spatial';
+import { projectQuickEditPoint, quickEditPlaneProjection } from './spatial-geometry';
 import { cameraTransitionDerivative } from '../../project/motion/transitions';
 import type { CameraTransitionType } from '../../project/motion/transitions';
 import { motionTransitionSettings } from '../../project/motion/timing';
@@ -383,6 +387,37 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     height: project.height * transform.scale,
   };
   const phase = nominalPhase(input.region, input.connectedIn, input.connectedOut);
+  const perspective = hasCameraPerspective(input.region.perspective)
+    ? input.region.perspective
+    : null;
+  const ref = input.region.spatialReference ?? { x: 0, y: 0, width: 1, height: 1 };
+  const reference = {
+    x: ref.x * window.width,
+    y: ref.y * window.height,
+    width: ref.width * window.width,
+    height: ref.height * window.height,
+  };
+  const projectPoint = (point: CameraPanPoint, targetScale: number, progress: number) => {
+    if (!perspective)
+      return {
+        x: point.x * (1 + (targetScale - 1) * progress),
+        y: point.y * (1 + (targetScale - 1) * progress),
+      };
+    const spatial = evaluateMotionSpatial(project, null, input.region, progress)!;
+    const scale = 1 + (targetScale - 1) * progress;
+    const projection = quickEditPlaneProjection(
+      reference,
+      {
+        x: reference.x * scale,
+        y: reference.y * scale,
+        width: reference.width * scale,
+        height: reference.height * scale,
+      },
+      spatial
+    );
+    return projectQuickEditPoint(projection, point);
+  };
+
   const transitions = buildProjectTransitionSegments(project);
   const clips = new Map(project.clips.map((clip) => [clip.id, clip]));
   const mappings = new Map(
@@ -522,10 +557,11 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     panDomain: domain,
     preferredPan(frame, scale) {
       const point = worldPoint(frame, frame.segmentId, frame.time);
-      return point
+      const projected = point && projectPoint(point, scale, 1);
+      return projected
         ? {
-            x: transform.offsetX + point.x * scale - output.width / 2,
-            y: transform.offsetY + point.y * scale - output.height / 2,
+            x: transform.offsetX + projected.x - output.width / 2,
+            y: transform.offsetY + projected.y - output.height / 2,
           }
         : { x: 0, y: 0 };
     },
@@ -538,14 +574,15 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       const progress =
         typeof curve === 'number' ? curve : evaluateCameraTrajectory(curve, frame.time).x;
       if (progress <= 1e-12) return bounds;
-      const zoom = 1 + (scale - 1) * progress;
+      const projected = projectPoint(point, scale, progress);
+      if (!projected) return null;
       const mx = output.width * marginFraction,
         my = output.height * marginFraction;
       return {
-        minX: Math.max(0, (transform.offsetX + zoom * point.x - output.width + mx) / progress),
-        maxX: Math.min(bounds.maxX, (transform.offsetX + zoom * point.x - mx) / progress),
-        minY: Math.max(0, (transform.offsetY + zoom * point.y - output.height + my) / progress),
-        maxY: Math.min(bounds.maxY, (transform.offsetY + zoom * point.y - my) / progress),
+        minX: Math.max(0, (transform.offsetX + projected.x - output.width + mx) / progress),
+        maxX: Math.min(bounds.maxX, (transform.offsetX + projected.x - mx) / progress),
+        minY: Math.max(0, (transform.offsetY + projected.y - output.height + my) / progress),
+        maxY: Math.min(bounds.maxY, (transform.offsetY + projected.y - my) / progress),
       };
     },
     clearanceBounds({ start, end, segmentId, pan, actual, targetScale, preservePointer }) {
@@ -577,10 +614,26 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         [source.raster.low, source.raster.high],
         product(source.rasterScale, [1 + (targetScale - 1) * g[0], 1 + (targetScale - 1) * g[1]])
       );
+      const spatial = perspective
+        ? boundCameraPlaneProjection({
+            start,
+            end,
+            phase: phase.at((start + end) / 2),
+            targetScale,
+            pan,
+            perspective,
+            reference,
+            source: { x: source.x, y: source.y },
+            output,
+            offset: { x: transform.offsetX, y: transform.offsetY },
+          })
+        : null;
+      if (perspective && !spatial) return null;
       return {
         ...result,
+        ...(spatial ?? {}),
         raster: { low: raster[0], high: raster[1] },
-        viewport: {
+        viewport: spatial?.viewport ?? {
           low: Math.min(x[0], y[0], output.width - x[1], output.height - y[1]),
           high: Math.min(x[1], y[1], output.width - x[0], output.height - y[0]),
         },

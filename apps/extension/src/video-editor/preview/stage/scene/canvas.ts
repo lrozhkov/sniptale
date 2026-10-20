@@ -100,10 +100,11 @@ function resolvePreviewSceneContext(
   canvas: HTMLCanvasElement,
   project: VideoProject,
   stage: HTMLDivElement | null,
-  rasterSize?: VideoEditorPreviewRasterSize
+  rasterSize?: VideoEditorPreviewRasterSize,
+  viewportCanvas?: HTMLCanvasElement
 ) {
   const context = canvas.getContext('2d');
-  const { bounds, viewport } = resolvePreviewSceneMetrics(canvas, project, stage);
+  const { bounds, viewport } = resolvePreviewSceneMetrics(viewportCanvas ?? canvas, project, stage);
   if (!context) {
     return null;
   }
@@ -154,6 +155,7 @@ function hasUsablePreviewViewport(
 
 export function resolvePreparedPreviewSceneCanvas(params: {
   canvas: HTMLCanvasElement;
+  viewportCanvas?: HTMLCanvasElement;
   imageBank: Record<string, HTMLImageElement>;
   project: VideoProject;
   previewRasterSize?: VideoEditorPreviewRasterSize;
@@ -165,7 +167,8 @@ export function resolvePreparedPreviewSceneCanvas(params: {
     params.canvas,
     params.project,
     params.stage,
-    params.previewRasterSize
+    params.previewRasterSize,
+    params.viewportCanvas
   );
   if (!hasUsablePreviewViewport(prepared)) {
     return null;

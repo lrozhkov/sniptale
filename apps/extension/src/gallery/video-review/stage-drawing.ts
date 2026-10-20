@@ -1,7 +1,7 @@
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import { normalizeVideoPoint, regionFromPoints } from '../../features/video/review/geometry';
 import type { ReviewRegion } from '../../features/video/review/types';

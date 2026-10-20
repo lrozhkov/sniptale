@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  type SpatialQuaternion,
-} from '../../features/video/review/advanced/spatial';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  type SpatialQuaternion as SpatialQuaternion,
+} from '../../features/video/project/motion/spatial';
 import {
   quickEditPlaneProjection,
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 import {
   resolveReviewSpatialFocusGeometry,
   reviewSpatialFocusPatch,

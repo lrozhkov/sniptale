@@ -12,6 +12,16 @@ function getMutationSchemaVersion(
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
 ): VideoProject['version'] {
   if (
+    project.version === 19 ||
+    (patch.motionRegions ?? project.motionRegions)?.some(
+      (region) =>
+        region.perspective !== undefined ||
+        region.depthOfField !== undefined ||
+        region.spatialReference !== undefined
+    )
+  )
+    return 19;
+  if (
     project.version === 18 ||
     (patch.motionRegions ?? project.motionRegions)?.some(
       (region) => region.phaseTransitions !== undefined

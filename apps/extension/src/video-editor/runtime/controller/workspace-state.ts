@@ -1,3 +1,8 @@
+import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
+import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
+import type { VideoProject } from '../../../features/video/project/types';
+import type { VideoEditorMotionSpatialPreview } from '../../contracts/workspace';
+import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import { useWorkspacePreference } from './workspace-preferences';
 import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +38,8 @@ interface VideoEditorWorkspaceConfirmState {
 interface VideoEditorWorkspaceInspectorState {
   mode: VideoEditorInspectorMode;
   openSelection: () => void;
+  motionSpatialPreview: VideoEditorMotionSpatialPreview | null;
+  previewMotionSpatial: (preview: VideoEditorMotionSpatialPreview | null) => void;
 }
 
 export interface VideoEditorWorkspaceState {
@@ -194,13 +201,18 @@ function useVideoEditorInspectorState(
   setCollapsed: (collapsed: boolean) => void
 ): VideoEditorWorkspaceInspectorState {
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
+  const [motionSpatialPreview, previewMotionSpatial] =
+    useState<VideoEditorMotionSpatialPreview | null>(null);
 
   const openSelection = useCallback(() => {
     setMode('selection');
     setCollapsed(false);
   }, [setCollapsed]);
 
-  return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
+  return useMemo(
+    () => ({ mode, openSelection, motionSpatialPreview, previewMotionSpatial }),
+    [mode, openSelection, motionSpatialPreview]
+  );
 }
 
 /** The mounted recorder owns the take; the workspace only admits leaving its project. */
@@ -315,4 +327,32 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       toggleSidebarCollapsed,
     ]
   );
+}
+
+/** Project identity invalidates a draft after Undo, restore, replacement or accepted edits. */
+export function presentWorkspaceMotionSpatialPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorMotionSpatialPreview | null
+): VideoProject {
+  if (
+    !preview ||
+    preview.project !== project ||
+    selection.kind !== VideoEditorSelectionKind.MOTION_REGION ||
+    selection.motionRegionId !== preview.regionId ||
+    isVideoProjectUtilityLaneLocked(project, 'camera')
+  )
+    return project;
+  const region = project.motionRegions?.find((item) => item.id === preview.regionId);
+  if (!region) return project;
+  const edited = editMotionSpatialSettings(region, preview.edit);
+  if (!edited || edited === region) return project;
+  const { spatialReference: _reference, ...retained } = region;
+  return {
+    ...project,
+    version: 19,
+    motionRegions: project.motionRegions!.map((item) =>
+      item === region ? { ...retained, ...edited } : item
+    ),
+  };
 }

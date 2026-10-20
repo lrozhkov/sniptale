@@ -170,3 +170,31 @@ it('releases Escape after commit and cleanup, and allows a fresh gesture', () =>
     expect(escape.defaultPrevented).toBe(false);
   }
 });
+
+it('restores the authored transform when the final pointer has no valid inverse', () => {
+  const onCommit = vi.fn(),
+    onRestore = vi.fn(),
+    onSettle = vi.fn(),
+    onPreviewTransform = vi.fn();
+  const state = createPreviewTransformGestureState({
+    clipId: 'clip-1',
+    origin: { clientX: 10, clientY: 20 },
+    transform: TRANSFORM,
+  });
+  startPreviewTransformGesture({
+    state,
+    onCommit,
+    onRestore,
+    onSettle,
+    onPreviewTransform,
+    resolveTransform: ({ clientX }) => (clientX > 50 ? null : { ...TRANSFORM, x: clientX }),
+  });
+  dispatchPointer('pointermove', 30, 20);
+  animationFrame?.(10);
+  expect(onPreviewTransform).toHaveBeenCalledWith('clip-1', { ...TRANSFORM, x: 30 });
+  dispatchPointer('pointerup', 80, 20);
+  expect(onCommit).not.toHaveBeenCalled();
+  expect(onRestore).toHaveBeenCalledExactlyOnceWith('clip-1');
+  expect(onSettle).toHaveBeenCalledExactlyOnceWith('cancel');
+  expect(onPreviewTransform).toHaveBeenLastCalledWith('clip-1', null);
+});

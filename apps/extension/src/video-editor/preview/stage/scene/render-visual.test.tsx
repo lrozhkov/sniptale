@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import type { ResolvedTransitionOverlay } from '../../../../features/video/project/transition/presentation';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../../features/video/project/transition/presentation.types';
@@ -47,6 +48,10 @@ vi.mock('../../../../features/video/project/scene/background-audio', async (impo
   resolveSceneBackgroundAudioEnvelope: vi.fn(() => 0),
 }));
 
+import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
+vi.mock('../../../../features/video/composition/draw/spatial', () => ({
+  drawSpatialCompositionGroup: vi.fn(() => true),
+}));
 import { drawPreviewVisualPasses } from './render-visual';
 
 afterEach(() => {
@@ -202,4 +207,102 @@ it('uses a weighted pass buffer for multi-pass preview rendering', () => {
   );
   expect(drawEffectRuntimeVisualLayerMock).toHaveBeenCalled();
   expect(drawEffectRuntimeVisualLayerMock).toHaveBeenCalledBefore(drawTransitionOverlayMock);
+});
+
+it('dispatches a spatial preview pass at the real viewport raster without applying the affine camera again', () => {
+  vi.mocked(drawSpatialCompositionGroup).mockClear();
+  drawEffectRuntimeVisualLayerMock.mockClear();
+  const context = createCanvasContext();
+  const canvas = createPreviewCanvas(context);
+  const base = createPass(1.5, 1.25, 12, 7);
+  const spatial = {
+    rotation: [0, 0, 0, 1] as const,
+    perspective: 0.5,
+    windowMotion: 1,
+    lockBackground: true,
+    focus: [],
+    reference: { x: 0, y: 0, width: 200, height: 100 },
+  };
+  const pass = {
+    ...base,
+    alpha: 1,
+    frame: { ...base.frame, camera: { ...base.frame.camera, spatial } },
+  };
+  const renderer = { validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() };
+  const spatialRenderer = vi.fn(() => renderer);
+  const project = { ...createEmptyVideoProject('Spatial preview', 200, 100) };
+  const args = {
+    canvas,
+    clipMediaElements: new Map(),
+    imageBank: {},
+    overlayFrame: pass.frame,
+    passes: [pass],
+    project,
+    stage: null,
+    spatialRenderer,
+  };
+  drawPreviewVisualPasses(args);
+  expect(spatialRenderer).toHaveBeenCalledOnce();
+  expect(drawSpatialCompositionGroup).toHaveBeenCalledWith(
+    expect.objectContaining({
+      camera: pass.frame.camera,
+      renderer,
+      rasterScale: 1,
+      output: { width: 200, height: 100 },
+      destination: { x: 0, y: 0, width: 200, height: 100 },
+    })
+  );
+  expect(context.scale).not.toHaveBeenCalled();
+  expect(drawEffectRuntimeVisualLayerMock).not.toHaveBeenCalled();
+  const { spatialRenderer: _factory, ...withoutRenderer } = args;
+  expect(() => drawPreviewVisualPasses(withoutRenderer)).toThrow('Perspective renderer');
+});
+
+it('refuses spatial multi-pass rendering when an exposure buffer cannot be acquired', () => {
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(
+        public width: number,
+        public height: number
+      ) {}
+      getContext() {
+        return null;
+      }
+    }
+  );
+  const context = createCanvasContext();
+  const canvas = createPreviewCanvas(context);
+  Object.defineProperty(canvas, 'clientWidth', { configurable: true, get: () => 333 });
+  const base = createPass(1.5, 1.25, 12, 7);
+  const pass = {
+    ...base,
+    frame: {
+      ...base.frame,
+      camera: {
+        ...base.frame.camera,
+        spatial: {
+          rotation: [0, 0, 0, 1] as const,
+          perspective: 0.5,
+          windowMotion: 1,
+          lockBackground: true,
+          focus: [],
+          reference: { x: 0, y: 0, width: 200, height: 100 },
+        },
+      },
+    },
+  };
+  vi.mocked(drawSpatialCompositionGroup).mockClear();
+  expect(() =>
+    drawPreviewVisualPasses({
+      canvas,
+      clipMediaElements: new Map(),
+      imageBank: {},
+      overlayFrame: pass.frame,
+      passes: [pass, { ...pass, time: 1.6 }],
+      project: createEmptyVideoProject('No exposure', 200, 100),
+      stage: null,
+    })
+  ).toThrow('Motion blur buffer');
+  expect(drawSpatialCompositionGroup).not.toHaveBeenCalled();
 });

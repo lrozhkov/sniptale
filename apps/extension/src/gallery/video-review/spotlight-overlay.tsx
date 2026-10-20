@@ -1,4 +1,4 @@
-import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
+import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import {
   createReviewSpotlightMasks,

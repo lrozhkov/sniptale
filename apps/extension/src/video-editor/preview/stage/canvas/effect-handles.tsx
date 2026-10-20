@@ -63,7 +63,7 @@ export function PreviewEffectHandles(props: Props) {
               'cursor-move rounded-full border-2 border-[var(--sniptale-color-accent-emphasis)]',
               'bg-[var(--sniptale-color-surface-panel)]',
             ].join(' ')}
-            style={{ left: style.left, top: style.top }}
+            style={{ left: style.left, top: style.top, display: style.display }}
             onPointerDown={(event) => {
               cleanup.current?.();
               cleanup.current = beginHandleDrag(

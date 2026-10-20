@@ -72,6 +72,12 @@ vi.mock('../../../features/video/project/scene/background-audio', async (importO
   resolveSceneBackgroundAudioEnvelope: vi.fn(() => 0),
 }));
 
+import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
+vi.mock('../../../features/video/composition/draw/spatial', async (original) => ({
+  ...(await original<typeof import('../../../features/video/composition/draw/spatial')>()),
+  drawSpatialCompositionGroup: vi.fn(() => true),
+}));
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -210,4 +216,48 @@ it('draws locked overlay layers outside the camera scale path while keeping medi
   configureLockedOverlayRenderPass(camera);
   drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
   expectLockedOverlayFrameDraw(context);
+});
+
+it('projects native media once while keeping the locked foreground outside the spatial plane', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const context = createContext();
+  context.globalAlpha = 1;
+  const camera = {
+    ...createCamera(),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 0.5,
+      windowMotion: 1,
+      lockBackground: true,
+      focus: [],
+      reference: { x: 0, y: 0, width: 100, height: 50 },
+    },
+  };
+  const { project, settings } = createFrameFixture();
+  configureLockedOverlayRenderPass(camera);
+  const renderer = { validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() };
+  const spatialRenderer = vi.fn(() => renderer);
+  drawProjectFrame(context, project, settings, 1.5, {}, new Map(), { spatialRenderer });
+  expect(spatialRenderer).toHaveBeenCalledOnce();
+  expect(drawSpatialCompositionGroup).toHaveBeenCalledWith(
+    expect.objectContaining({
+      camera,
+      renderer,
+      rasterScale: 2,
+      output: { width: 200, height: 100 },
+      destination: { x: 0, y: 0, width: 200, height: 100 },
+      layers: [expect.objectContaining({ clipId: 'clip-image' })],
+    })
+  );
+  expect(drawCompositionLayerMock).toHaveBeenCalledOnce();
+  expect(drawCompositionLayerMock).toHaveBeenCalledWith(
+    context,
+    expect.objectContaining({ clipId: 'clip-text' }),
+    2,
+    2,
+    {},
+    expect.any(Map),
+    1
+  );
+  expect(context.scale).not.toHaveBeenCalled();
 });

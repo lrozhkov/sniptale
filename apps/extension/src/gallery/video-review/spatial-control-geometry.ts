@@ -1,15 +1,15 @@
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 import {
-  parseQuickEditDepth,
-  type QuickEditDepthOfField,
-  type SpatialQuaternion,
-} from '../../features/video/review/advanced/spatial';
+  parseCameraDepth as parseQuickEditDepth,
+  type CameraDepthOfField as QuickEditDepthOfField,
+  type SpatialQuaternion as SpatialQuaternion,
+} from '../../features/video/project/motion/spatial';
 import {
   invertQuickEditProjection,
   projectQuickEditPoint,
   quickEditRotationMatrix,
   type QuickEditHomography,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 
 export interface ReviewSpatialControlPoint {
   x: number;

@@ -494,7 +494,7 @@ The existing command, history, save, and resource owners retain authority. Previ
 
 ## Montage scene background variants
 
-Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–18 without these fields and refuse future versions.
+Montage project schema 14 admits optional `sceneBackground.remembered` and `imageFit` on an image background. Earlier schemas refuse these fields. Readers retain schemas 2–19 without these fields and refuse future versions.
 
 The remembered object contains at most one solid, gradient and image variant. Variants cannot contain another remembered object. Gradient variants retain authored animation. Image variants retain their asset identity and optional fit mode. Missing `imageFit` retains legacy cover rendering without a write.
 
@@ -517,7 +517,7 @@ Camera tracks retain this field without applying it. Their camera appearance rem
 
 ## Montage scene background blur
 
-Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–18 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
+Project schema 16 admits optional `sceneBackground.blur`. The value is finite and ranges from zero through 25 logical project pixels. Older schemas refuse the field. Readers accept schemas 2–19 without the field and refuse future versions. Reading adds no defaults. Reset and removal retain schema 16.
 
 Blur applies to the complete gradient or image background after fitting and animation. Solid backgrounds retain the value without applying it. Kind changes, image replacement and source deletion preserve this common value. Remembered paint variants cannot contain blur. Clips, headers, shadows, actions and transitions retain their own rendering semantics.
 
@@ -540,7 +540,7 @@ Gallery and Montage share the inset calculation. Gallery retains its enabled-bac
 
 ## Montage motion blur phases
 
-Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–18 and refuse future versions.
+Project schema 17 admits optional `motionBlur` on a `MotionRegion`. The shared Gallery parser validates the `enter`, `exit` and `link` settings. Each setting contains a boolean `enabled` and a finite `strength` from zero through one. Unknown phase keys do not enter the admitted model. Earlier schemas refuse the field. Readers accept schemas 2–19 and refuse future versions.
 
 Reading adds no defaults. Absent phase settings retain the legacy `motionBlurAmount` behavior. An explicit phase map overrides that scalar. A missing phase in an explicit map stays disabled. Disabled settings retain their strength. The first phase edit preserves the other legacy strengths.
 
@@ -553,7 +553,7 @@ Mutation and clearing retain schema 17. This field adds no writer, queued operat
 
 ## Montage camera phase transitions
 
-Project schema 18 admits optional `phaseTransitions` on a `MotionRegion`. The partial map contains `enter` and `exit` types. Valid types are `none`, `linear`, `ease-in-out`, `ease-out` and `instant`. Earlier schemas refuse the map. Readers accept schemas 2–18 and refuse future versions. Unknown map keys do not enter the model.
+Project schema 18 admits optional `phaseTransitions` on a `MotionRegion`. The partial map contains `enter` and `exit` types. Valid types are `none`, `linear`, `ease-in-out`, `ease-out` and `instant`. Earlier schemas refuse the map. Readers accept schemas 2–19 and refuse future versions. Unknown map keys do not enter the model.
 
 The existing `zoomInDuration` and `zoomOutDuration` fields remain authoritative. Reading adds no defaults. An absent phase retains its scalar easing curve and endpoint behavior. Explicit `ease-in-out` uses the Gallery smoothstep curve. Legacy scalar `EASE_IN_OUT` retains its two-piece cubic curve.
 
@@ -564,3 +564,16 @@ New manual and automatic camera regions use explicit Gallery smooth defaults. Th
 The existing updater merges each scalar command into the current region. Invalid, equal, missing-target and locked edits preserve identity and history. Undo, redo, save and portable restore retain the settings. Source-bound split parts retain their animation clock. Clip duplication copies bound settings into independent region identities.
 
 Connected regions retain their phase settings. Existing connection topology suppresses connected entrance and exit phases. Connection easing retains its existing owner. The shared transition math adds no writer, store, resource or physical database migration.
+
+
+## Montage spatial camera settings
+
+Project schema 19 admits optional `perspective`, `depthOfField` and `spatialReference` fields on a `MotionRegion`. Earlier schemas refuse these fields. Readers accept schemas 2–19 and refuse future versions. Reading adds no defaults. Mutations retain schema 19 after removal.
+
+Both editors use the same perspective and depth parsers. Perspective angles X and Y range from −60 through 60 degrees. Angle Z ranges from −180 through 180 degrees. Perspective strength ranges from zero through one. Depth mode is `area` or `depth`. Depth position, width and strength range from zero through one. Softness ranges from 0.01 through one. Disabling a setting retains its values.
+
+The reference rectangle uses normalized project-canvas coordinates. Omission means the whole canvas. Coordinates range from zero through one. Dimensions are positive and do not exceed one. Each far edge must not exceed one by more than 1e-9. This tolerance covers floating-point addition. Source binding retains its timing and lifecycle meaning. Clip placement does not move the reference.
+
+The existing project updater merges spatial scalar commands into the current settings. Invalid, equal, missing-target and locked commands preserve project identity and history. Reset removes only the reference rectangle. Undo, redo, save, hydration and portable restore retain authored settings. Source split, rate changes and duplication retain the settings. Duplicate regions have independent identities.
+
+Evaluated poses and GPU resources do not enter these fields. The change adds no store, writer or physical database migration.

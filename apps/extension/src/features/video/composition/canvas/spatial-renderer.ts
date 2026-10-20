@@ -1,14 +1,11 @@
-import type {
-  RenderResources,
-  RenderCanvasLease,
-} from '../../features/video/composition/canvas/render-resources';
+import type { RenderResources, RenderCanvasLease } from './render-resources';
 import {
   quickEditPlaneProjection,
   invertQuickEditProjection,
   quickEditRotationMatrix,
-} from '../../features/video/review/advanced/spatial-geometry';
-import type { QuickEditSpatialFrame } from '../../features/video/review/advanced/spatial';
-import type { QuickEditRect } from '../../features/video/review/advanced/scene';
+} from '../motion/spatial-geometry';
+import type { CameraSpatialFrame as QuickEditSpatialFrame } from '../../project/motion/spatial';
+import type { CameraSpatialRect as QuickEditRect } from '../../project/motion/spatial';
 import { createReviewSpatialTextures } from './spatial-textures';
 import { REVIEW_SPATIAL_VERTEX, REVIEW_SPATIAL_FRAGMENT } from './spatial-shaders';
 
@@ -23,40 +20,60 @@ interface ReviewSpatialDrawRequest {
   sharp?: boolean;
 }
 
+function validateSpatialSize(
+  gl: WebGLRenderingContext,
+  role: 'source' | 'output',
+  size: { width: number; height: number }
+) {
+  const { width, height } = size;
+  if (
+    !Number.isSafeInteger(width) ||
+    width <= 0 ||
+    !Number.isSafeInteger(height) ||
+    height <= 0 ||
+    !Number.isSafeInteger(width * height * (role === 'source' ? 8 : 4))
+  )
+    throw new Error('Perspective output size is unavailable.');
+  if (role === 'source') {
+    const texture: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    if (
+      typeof texture !== 'number' ||
+      !Number.isFinite(texture) ||
+      width > texture ||
+      height > texture
+    )
+      throw new Error('Perspective output size is unavailable.');
+    return;
+  }
+  const buffer: unknown = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+  const viewport: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+  if (
+    typeof buffer !== 'number' ||
+    !Number.isFinite(buffer) ||
+    width > buffer ||
+    height > buffer ||
+    !(viewport instanceof Int32Array || Array.isArray(viewport)) ||
+    typeof viewport[0] !== 'number' ||
+    typeof viewport[1] !== 'number' ||
+    !Number.isFinite(viewport[0]) ||
+    !Number.isFinite(viewport[1]) ||
+    width > viewport[0] ||
+    height > viewport[1]
+  )
+    throw new Error('Perspective output size is unavailable.');
+}
+
 function validateSpatialDraw(gl: WebGLRenderingContext, args: ReviewSpatialDrawRequest) {
   const { source, sourceRect, output } = args;
-  const dimensions = [source.width, source.height, output.width, output.height];
   if (
-    dimensions.some((value) => !Number.isSafeInteger(value) || value <= 0) ||
-    !Number.isSafeInteger(source.width * source.height * 8) ||
-    !Number.isSafeInteger(output.width * output.height * 4) ||
     !Number.isSafeInteger(sourceRect.x) ||
     !Number.isSafeInteger(sourceRect.y) ||
     sourceRect.width !== source.width ||
     sourceRect.height !== source.height
   )
     throw new Error('Perspective output size is unavailable.');
-  const texture: unknown = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-  const buffer: unknown = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
-  const viewport: unknown = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
-  if (
-    typeof texture !== 'number' ||
-    !Number.isFinite(texture) ||
-    source.width > texture ||
-    source.height > texture ||
-    typeof buffer !== 'number' ||
-    !Number.isFinite(buffer) ||
-    output.width > buffer ||
-    output.height > buffer ||
-    !(viewport instanceof Int32Array || Array.isArray(viewport)) ||
-    typeof viewport[0] !== 'number' ||
-    typeof viewport[1] !== 'number' ||
-    !Number.isFinite(viewport[0]) ||
-    !Number.isFinite(viewport[1]) ||
-    output.width > viewport[0] ||
-    output.height > viewport[1]
-  )
-    throw new Error('Perspective output size is unavailable.');
+  validateSpatialSize(gl, 'source', source);
+  validateSpatialSize(gl, 'output', output);
 }
 
 /** Compile the shader pipeline before the session admits surfaces or draw requests. */
@@ -235,8 +252,18 @@ export function createReviewSpatialRenderer(
       }
     };
     return {
+      /** Admit all dimensions before a caller allocates either capture or output surfaces. */
+      validateSizes(
+        source: { width: number; height: number },
+        output: { width: number; height: number }
+      ) {
+        if (disposed || gl.isContextLost()) throw new Error('Perspective context was lost.');
+        validateSpatialSize(gl, 'source', source);
+        validateSpatialSize(gl, 'output', output);
+      },
       surface(kind: 'plane' | 'overlay' | 'exposure', width: number, height: number) {
-        if (disposed) throw new Error('Perspective context was lost.');
+        if (disposed || gl.isContextLost()) throw new Error('Perspective context was lost.');
+        validateSpatialSize(gl, kind === 'exposure' ? 'output' : 'source', { width, height });
         if (resources) {
           try {
             let lease = leases.get(kind);

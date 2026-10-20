@@ -4,7 +4,7 @@ import {
   resolvePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewWebcam } from '../../../../apps/extension/src/workflows/video-review/render-webcam';
 import { quickEditMotionBlurCameras } from '../../../../apps/extension/src/features/video/review/advanced/motion-blur';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../apps/extension/src/features/video/project/camera/appearance';

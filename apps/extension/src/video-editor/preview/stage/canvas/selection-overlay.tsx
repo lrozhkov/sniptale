@@ -5,12 +5,14 @@ import type {
 } from '../../../../features/video/project/types/index';
 import {
   getCompositionRectStageStyle,
+  getCompositionPointStageStyle,
   mapClientPointToCompositionPoint,
   shouldLockPreviewClipToViewport,
 } from './geometry';
 import { resolvePreviewClipTransform } from './clip-layout';
 import {
   getPreviewTransformResizeCursor,
+  getPreviewTransformHandlePoint,
   isPointInsidePreviewTransform,
   type PreviewTransformResizeHandle,
 } from './transform/geometry';
@@ -41,8 +43,8 @@ function getSelectionOverlayStyle(
   );
   return {
     ...stageStyle,
-    transform: `rotate(${transform.rotation}deg)`,
-    transformOrigin: 'center center',
+    transform: stageStyle.transform ?? `rotate(${transform.rotation}deg)`,
+    transformOrigin: stageStyle.transformOrigin ?? 'center center',
   };
 }
 
@@ -142,37 +144,54 @@ export function PreviewStageSelectionOverlay(
     return null;
   }
   const transform = resolvePreviewClipTransform(params.project, params.selectedClip);
+  const projected =
+    params.camera.spatial &&
+    !shouldLockPreviewClipToViewport(params.selectedClip, params.camera, params.project);
+  const handles = params.selectedClipLocked
+    ? null
+    : (['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map((handle) => (
+        <button
+          key={handle}
+          type="button"
+          data-preview-selection-handle={handle}
+          className={[
+            PREVIEW_SELECTION_HANDLE_CLASS_NAME,
+            PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
+            PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
+          ].join(' ')}
+          style={
+            projected
+              ? {
+                  ...getCompositionPointStageStyle(
+                    params.project,
+                    getPreviewTransformHandlePoint(transform, handle),
+                    params.camera,
+                    false,
+                    stage
+                  ),
+                  cursor: getPreviewTransformResizeCursor(handle, transform.rotation),
+                }
+              : getSelectionHandleStyle(handle, transform.rotation)
+          }
+          onPointerDown={(event) => params.beginInteraction(event, params.selectedClip!, handle)}
+        />
+      ));
 
   return (
-    <div
-      className={[
-        'pointer-events-none absolute border-2',
-        params.selectedClipLocked
-          ? 'border-dotted border-[color:var(--sniptale-color-border-strong)]'
-          : 'border-dashed border-[color:var(--sniptale-color-border-accent-strong)]',
-      ].join(' ')}
-      data-preview-selection-state={params.selectedClipLocked ? 'locked' : 'editable'}
-      style={getSelectionOverlayStyle(params.project, params.selectedClip, params.camera, stage)}
-    >
-      {params.selectedClipLocked
-        ? null
-        : (['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map(
-            (handle) => (
-              <button
-                key={handle}
-                type="button"
-                className={[
-                  PREVIEW_SELECTION_HANDLE_CLASS_NAME,
-                  PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
-                  PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
-                ].join(' ')}
-                style={getSelectionHandleStyle(handle, transform.rotation)}
-                onPointerDown={(event) =>
-                  params.beginInteraction(event, params.selectedClip!, handle)
-                }
-              />
-            )
-          )}
-    </div>
+    <>
+      <div
+        className={[
+          'pointer-events-none absolute border-2',
+          params.selectedClipLocked
+            ? 'border-dotted border-[color:var(--sniptale-color-border-strong)]'
+            : 'border-dashed border-[color:var(--sniptale-color-border-accent-strong)]',
+        ].join(' ')}
+        data-preview-selection-state={params.selectedClipLocked ? 'locked' : 'editable'}
+        style={getSelectionOverlayStyle(params.project, params.selectedClip, params.camera, stage)}
+      >
+        {projected ? null : handles}
+      </div>
+      {projected ? handles : null}
+    </>
   );
 }

@@ -11,7 +11,7 @@ import {
   reviewVoiceoverPlaybackDuration,
   reviewVoiceoverRange,
 } from '../../features/video/review/voiceover-edits';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { Trash2, AudioLines, Waves } from 'lucide-react';

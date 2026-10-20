@@ -6,7 +6,7 @@ import {
   resolveEffectV1ObjectRenderBounds,
   validateEffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
-import { quickEditPlaneProjection } from '../advanced/spatial-geometry';
+import { quickEditPlaneProjection } from '../../composition/motion/spatial-geometry';
 import {
   initializeReviewAnnotationEffectAnchors,
   mapReviewAnnotationEffectPoint,
@@ -135,7 +135,7 @@ describe('annotation canonical geometry', () => {
 });
 
 it('preserves projected center and finite-difference local axes rather than a corner midpoint', async () => {
-  const { projectQuickEditPoint } = await import('../advanced/spatial-geometry');
+  const { projectQuickEditPoint } = await import('../../composition/motion/spatial-geometry');
   const mapping = [1, 0.2, 70, 0.1, 1, -30, 0.0006, 0.0002, 1] as const;
   const output = { width: 1024, height: 768 };
   const changed = transformReviewAnnotationEffectAttachment(transform, plane, output, mapping)!;

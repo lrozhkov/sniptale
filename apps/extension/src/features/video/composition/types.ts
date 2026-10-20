@@ -1,3 +1,4 @@
+import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
 import type { VideoProjectActionOccurrence } from '../project/action-occurrences';
 import type { ResolvedAnnotationPresentation } from '../project/annotation/template';
 import type { ResolvedAnnotationScene } from '../project/annotation-engine';
@@ -115,6 +116,8 @@ export interface VideoCompositionActionState {
 }
 
 export interface VideoCompositionCameraState {
+  /** Disposable pose and absolute project-plane reference, never persisted. */
+  spatial?: CameraSpatialFrame & { reference: CameraSpatialRect };
   focusPoint: { x: number; y: number };
   motionBlurAmount: number;
   overlayZoomMode?: VideoMotionOverlayZoomMode;

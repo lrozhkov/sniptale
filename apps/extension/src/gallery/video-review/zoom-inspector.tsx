@@ -19,7 +19,10 @@ import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-e
 import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
 import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
 import type { ReactNode } from 'react';
-import { ReviewNumberRow, ReviewPreviewNumberRow } from './number-row';
+import {
+  DraftNumericRow as ReviewNumberRow,
+  PreviewNumericRow as ReviewPreviewNumberRow,
+} from '../../ui/compact-inspector-controls/numeric-preview';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditZoomLinkEasing,

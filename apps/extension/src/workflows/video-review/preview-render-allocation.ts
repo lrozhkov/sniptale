@@ -1,5 +1,5 @@
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
-import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,

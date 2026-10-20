@@ -15,7 +15,7 @@ import type { RenderResources } from '../../features/video/composition/canvas/re
 import { createReviewPreviewRenderer } from './render-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { reviewCutTransitionAt } from '../../features/video/review/cuts';
-import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/project/motion/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -56,7 +56,9 @@ vi.mock('./window-header', async (original) => ({
   loadReviewWindowHeader: io.header,
   reviewWindowHeaderUrl: () => 'local-header',
 }));
-vi.mock('./spatial-renderer', () => ({ createReviewSpatialRenderer: io.spatial }));
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
+  createReviewSpatialRenderer: io.spatial,
+}));
 vi.mock('./scene-background', () => ({ createReviewBackgroundPainter: io.background }));
 
 const size = { width: 1920, height: 1080 };

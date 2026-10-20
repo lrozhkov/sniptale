@@ -1,3 +1,4 @@
+import { parseCameraPerspective, parseCameraDepth, parseMotionSpatialReference } from './spatial';
 import { parseMotionPhaseTransitions } from './transitions';
 import type { MotionPhaseTransitions } from './transitions';
 import { motionTransitionSettings } from './timing';
@@ -216,6 +217,9 @@ export function normalizeVideoProjectMotionRegion(
   const startTime = resolveMotionStartTime(project.duration, region.startTime, duration);
   const cameraFollow = parseCameraFollowSettings(region.cameraFollow);
   const motionBlur = parseMotionBlurPhases(region.motionBlur);
+  const perspective = parseCameraPerspective(region.perspective);
+  const depthOfField = parseCameraDepth(region.depthOfField);
+  const spatialReference = parseMotionSpatialReference(region.spatialReference);
   const phaseTransitions = parseMotionPhaseTransitions(region.phaseTransitions);
   const phaseRegion = phaseTransitions ? { ...region, phaseTransitions } : region;
   const enter = motionTransitionSettings(phaseRegion, 'enter');
@@ -224,6 +228,9 @@ export function normalizeVideoProjectMotionRegion(
   return projectMotionSourceBinding(project, {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(motionBlur ? { motionBlur } : {}),
+    ...(perspective ? { perspective } : {}),
+    ...(depthOfField ? { depthOfField } : {}),
+    ...(spatialReference ? { spatialReference } : {}),
     ...(phaseTransitions ? { phaseTransitions } : {}),
     ...(sourceBinding ? { sourceBinding } : {}),
     ...(animation ? { animation } : {}),

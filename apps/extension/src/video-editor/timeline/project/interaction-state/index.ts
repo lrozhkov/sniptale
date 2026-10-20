@@ -213,6 +213,7 @@ export function useProjectTimelineState(
   });
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({
+    selection: props.selection,
     selectedTrackId: props.selectedTrackId,
     timelineRef: playback.timelineRef,
     trackLayoutModel: interactions.trackLayoutModel,

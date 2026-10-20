@@ -101,11 +101,12 @@ it('renders composite frames from deterministic frame indexes and pauses media f
 
   const job = createJob();
 
+  const context = { save: vi.fn(), restore: vi.fn() };
   await runCompositeRenderLoop(
     job as never,
     createProject(1) as never,
     createSettings(),
-    {} as CanvasRenderingContext2D,
+    context as unknown as CanvasRenderingContext2D,
     {}
   );
 
@@ -114,6 +115,8 @@ it('renders composite frames from deterministic frame indexes and pauses media f
     0, 0.25, 0.5, 0.75,
   ]);
   expect(drawProjectFrameMock).toHaveBeenCalledTimes(4);
+  expect(context.save).toHaveBeenCalledTimes(4);
+  expect(context.restore).toHaveBeenCalledTimes(4);
   expect(waitForDelayMock).toHaveBeenCalledTimes(3);
   expect(sendCompositeRenderProgressMock).toHaveBeenCalledTimes(4);
 });

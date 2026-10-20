@@ -14,20 +14,20 @@ import type { WorkingZoneCameraGeometry } from '../../composition/motion/follow-
 import {
   boundQuickEditCameraMotion,
   boundQuickEditCameraProjection,
-} from './camera-projection-bounds';
-import type { QuickEditCameraProjectionInterval } from './camera-projection-bounds';
+} from '../../composition/motion/spatial-projection-bounds';
+import type { QuickEditCameraProjectionInterval } from '../../composition/motion/spatial-projection-bounds';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { resolveQuickEditFocusLink } from './focus-layout';
+import { quickEditSpatialSpan } from './spatial';
 import {
-  interpolateQuickEditSpatial,
-  hasQuickEditPerspective,
-  quickEditSpatialSpan,
-} from './spatial';
+  interpolateCameraSpatial as interpolateQuickEditSpatial,
+  hasCameraPerspective as hasQuickEditPerspective,
+} from '../../project/motion/spatial';
 import {
   invertQuickEditProjection,
   projectQuickEditPoint,
   quickEditPlaneProjection,
-} from './spatial-geometry';
+} from '../../composition/motion/spatial-geometry';
 import type {
   QuickEditBackgroundSettings,
   QuickEditZoomRegion,

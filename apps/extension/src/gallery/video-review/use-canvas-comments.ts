@@ -15,7 +15,7 @@ type Session = ReturnType<
 interface ReviewCommentGeometry {
   output: { width: number; height: number };
   projection?:
-    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
   videoTransform: { x: number; y: number; width: number; height: number } | null;
 }

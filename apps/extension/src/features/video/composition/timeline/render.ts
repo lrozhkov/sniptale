@@ -18,7 +18,8 @@ function hasMeaningfulMotionBlurSpread(
     ({ frame }) =>
       Math.abs(frame.camera.scale - overlayFrame.camera.scale) > 1e-7 ||
       Math.abs(frame.camera.viewportX - overlayFrame.camera.viewportX) > 1e-7 ||
-      Math.abs(frame.camera.viewportY - overlayFrame.camera.viewportY) > 1e-7
+      Math.abs(frame.camera.viewportY - overlayFrame.camera.viewportY) > 1e-7 ||
+      JSON.stringify(frame.camera.spatial) !== JSON.stringify(overlayFrame.camera.spatial)
   );
 }
 

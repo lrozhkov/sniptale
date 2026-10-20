@@ -11,7 +11,7 @@ interface WindowPointerSessionParams {
     | 'n-resize'
     | 'ne-resize';
   onMove: (event: PointerEvent) => void;
-  onEnd?: () => void;
+  onEnd?: (event?: PointerEvent) => void;
   onCancel?: () => void;
 }
 
@@ -54,13 +54,13 @@ export function startWindowPointerSession(params: WindowPointerSessionParams): (
     params.onMove(event);
   };
 
-  const handleEnd = () => {
+  const handleEnd = (event: PointerEvent) => {
     if (!active) {
       return;
     }
 
     cleanup();
-    params.onEnd?.();
+    params.onEnd?.(event);
   };
 
   const handleCancel = () => {

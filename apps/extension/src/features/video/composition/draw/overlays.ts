@@ -5,6 +5,32 @@ function scaleOverlayLength(value: number, displayScale: number) {
   return value * Math.max(0.2, displayScale);
 }
 
+/** One layout for painting and raster capture, including text beyond the authored panel height. */
+export function resolveTextCompositionLayout(
+  context: CanvasRenderingContext2D,
+  clip: VideoCompositionResolvedTextClip,
+  frame: { x: number; y: number; width: number; height: number },
+  displayScale = 1
+) {
+  const { style } = clip;
+  const padding = scaleOverlayLength(style.padding, displayScale);
+  const fontSize = scaleOverlayLength(style.fontSize, displayScale);
+  const lineHeightPx = fontSize * style.lineHeight;
+  const contentWidth = Math.max(scaleOverlayLength(24, displayScale), frame.width - padding * 2);
+  const font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
+  const lines = wrapText(context, clip.text, font, contentWidth);
+  return {
+    padding,
+    fontSize,
+    lineHeightPx,
+    contentWidth,
+    font,
+    lines,
+    contentHeight: Math.min(frame.height, padding * 2 + lines.length * lineHeightPx),
+    anchorX: getTextAnchorX(style.textAlign, frame.x, frame.width, padding),
+  };
+}
+
 export function drawTextCompositionLayer(
   context: CanvasRenderingContext2D,
   clip: VideoCompositionResolvedTextClip,
@@ -15,27 +41,19 @@ export function drawTextCompositionLayer(
   displayScale = 1
 ): void {
   const { style } = clip;
-  const padding = scaleOverlayLength(style.padding, displayScale);
-  const fontSize = scaleOverlayLength(style.fontSize, displayScale);
-  const lineHeightPx = fontSize * style.lineHeight;
-  const contentWidth = Math.max(scaleOverlayLength(24, displayScale), width - padding * 2);
-  const lines = wrapText(
-    context,
-    clip.text,
-    `${style.fontWeight} ${fontSize}px ${style.fontFamily}`,
-    contentWidth
-  );
-  const contentHeight = Math.min(height, padding * 2 + lines.length * lineHeightPx);
-
-  drawTextPanelChrome(context, clip, x, y, width, contentHeight, displayScale);
-  context.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
+  const layout = resolveTextCompositionLayout(context, clip, { x, y, width, height }, displayScale);
+  drawTextPanelChrome(context, clip, x, y, width, layout.contentHeight, displayScale);
+  context.font = layout.font;
   context.fillStyle = style.color;
   context.textBaseline = 'top';
   context.textAlign = style.textAlign;
-
-  const anchorX = getTextAnchorX(style.textAlign, x, width, padding);
-  lines.forEach((line, index) => {
-    context.fillText(line, anchorX, y + padding + index * lineHeightPx, contentWidth);
+  layout.lines.forEach((line, index) => {
+    context.fillText(
+      line,
+      layout.anchorX,
+      y + layout.padding + index * layout.lineHeightPx,
+      layout.contentWidth
+    );
   });
 }
 

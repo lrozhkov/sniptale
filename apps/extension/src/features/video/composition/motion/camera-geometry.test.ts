@@ -1,7 +1,11 @@
+import { resolveProjectCursorCameraPlan } from './project-follow';
+import { motionCameraProjection } from './spatial';
+import { projectQuickEditPoint } from './spatial-geometry';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../project/motion';
 import {
+  type VideoProjectMotionRegion,
   VideoCursorCaptureMode,
   VideoMediaFitMode,
   VideoMotionFocusMode,
@@ -53,7 +57,7 @@ function fixture() {
       ],
     },
   });
-  const region = {
+  const region: VideoProjectMotionRegion & { focusPoint: { x: number; y: number } } = {
     ...createVideoProjectMotionRegion(project, 0),
     duration: 3,
     scale: 2,
@@ -162,35 +166,48 @@ it.each(['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const)(
   }
 );
 
-it('retains source crop failure before rotation even when the resulting canvas point is inside the output', () => {
-  const { project, region, policy } = fixture();
-  const clip = project.clips[0]!;
-  project.width = 300;
-  project.height = 300;
-  if (clip.type !== 'VIDEO') throw new Error('Video fixture is required.');
-  clip.transform = { ...clip.transform, x: 100, y: 100, width: 100, height: 100, rotation: 180 };
-  clip.fitMode = VideoMediaFitMode.COVER;
-  project.assets[0]!.metadata.height = 50;
-  const geometry = createProjectWorkingZoneCameraGeometry({
-    project,
-    region: { ...region, zoomInDuration: 0, zoomOutDuration: 0 },
-    policy,
-    connectedIn: false,
-    connectedOut: false,
-    bindings: new Map([['source', { focusClipId: clip.id, actualClipId: clip.id }]]),
-  });
-  const point = { x: 0.1, y: 0.5 };
-  const bounds = geometry.clearanceBounds({
-    start: 1,
-    end: 1,
-    segmentId: 'source',
-    targetScale: 2,
-    pan: { minX: 300, maxX: 300, minY: 150, maxY: 150 },
-    actual: { from: point, to: point },
-  })!;
-  expect(bounds.raster!.high).toBeLessThan(0);
-  expect(bounds.viewport!.low).toBeGreaterThan(0);
-});
+it.each([false, true])(
+  'retains source crop failure before local rotation and perspective=%s',
+  (perspective) => {
+    const { project, region, policy } = fixture();
+    const clip = project.clips[0]!;
+    project.width = 300;
+    project.height = 300;
+    if (clip.type !== 'VIDEO') throw new Error('Video fixture is required.');
+    clip.transform = { ...clip.transform, x: 100, y: 100, width: 100, height: 100, rotation: 180 };
+    clip.fitMode = VideoMediaFitMode.COVER;
+    project.assets[0]!.metadata.height = 50;
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region: {
+        ...region,
+        zoomInDuration: 0,
+        zoomOutDuration: 0,
+        ...(perspective
+          ? {
+              perspective: { enabled: true, rotateX: 0, rotateY: 15, rotateZ: 0, strength: 0.7 },
+              spatialReference: { x: 0.1, y: 0.1, width: 0.7, height: 0.7 },
+            }
+          : {}),
+      },
+      policy,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([['source', { focusClipId: clip.id, actualClipId: clip.id }]]),
+    });
+    const point = { x: 0.1, y: 0.5 };
+    const bounds = geometry.clearanceBounds({
+      start: 1,
+      end: 1,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 300, maxX: 300, minY: 150, maxY: 150 },
+      actual: { from: point, to: point },
+    })!;
+    expect(bounds.raster!.high).toBeLessThan(0);
+    expect(bounds.viewport!.low).toBeGreaterThan(0);
+  }
+);
 
 it('bounds the real editable cursor curve instead of a linear approximation between preview samples', () => {
   const { project, region, policy } = fixture();
@@ -458,4 +475,135 @@ it('bounds rounded source corners conservatively while accepting an interior cur
     })!;
   expect(bounds({ x: 0.01, y: 0.01 }).raster!.high).toBeLessThan(0);
   expect(bounds({ x: 0.5, y: 0.5 }).raster!.low).toBeGreaterThan(0);
+});
+
+it.each([
+  { width: 100, height: 100 },
+  { width: 160, height: 90 },
+])(
+  'proves the actual perspective plane independently of source raster and output $width×$height',
+  (output) => {
+    const { project, region, policy } = fixture();
+    region.easing = VideoTemporalEasing.LINEAR;
+    region.perspective = { enabled: true, rotateX: 25, rotateY: -35, rotateZ: 18, strength: 0.8 };
+    region.spatialReference = { x: 0.1, y: 0.2, width: 0.7, height: 0.6 };
+    region.animation = { start: 0.2, end: 2.8, duration: 3 };
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region,
+      policy,
+      output,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([['source', {}]]),
+    });
+    const rasterScale = Math.min(output.width / 100, output.height / 100);
+    const offset = {
+      x: (output.width - 100 * rasterScale) / 2,
+      y: (output.height - 100 * rasterScale) / 2,
+    };
+    const point = { x: 0.78, y: 0.35 };
+    const pan = { x: 70 * rasterScale, y: 50 * rasterScale };
+    const projectAt = (progress: number) => {
+      const ax = (25 * progress * Math.PI) / 180,
+        ay = (-35 * progress * Math.PI) / 180,
+        az = (18 * progress * Math.PI) / 180;
+      const sx = Math.sin(ax),
+        cx = Math.cos(ax),
+        sy = Math.sin(ay),
+        cy = Math.cos(ay),
+        sz = Math.sin(az),
+        cz = Math.cos(az);
+      const x = point.x * 100 - 45,
+        y = point.y * 100 - 50;
+      const z = -sy * x + cy * sx * y;
+      const denominator = 1 - (0.7 * 0.8 * progress * z) / Math.hypot(70, 60);
+      return {
+        denominator,
+        x:
+          offset.x +
+          rasterScale *
+            (1 + progress) *
+            (45 + (cz * cy * x + (cz * sy * sx - sz * cx) * y) / denominator),
+        y:
+          offset.y +
+          rasterScale *
+            (1 + progress) *
+            (50 + (sz * cy * x + (sz * sy * sx + cz * cx) * y) / denominator),
+      };
+    };
+    for (const time of [0.01, 0.2, 0.4, 1, 2.6, 2.9]) {
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const progress = camera.scale - 1;
+      const projected = projectAt(progress);
+      const x = projected.x - progress * pan.x,
+        y = projected.y - progress * pan.y;
+      const clearance = Math.min(x, y, output.width - x, output.height - y);
+      const proof = geometry.clearanceBounds({
+        start: time,
+        end: time,
+        segmentId: 'source',
+        targetScale: 2,
+        pan: { minX: pan.x, maxX: pan.x, minY: pan.y, maxY: pan.y },
+        actual: { from: point, to: point },
+      })!;
+      expect(proof.denominator.low).toBeCloseTo(projected.denominator, 7);
+      expect(proof.denominator.high).toBeCloseTo(projected.denominator, 7);
+      expect(proof.viewport!.low).toBeCloseTo(clearance, 7);
+      expect(proof.viewport!.high).toBeCloseTo(clearance, 7);
+      if (progress > 0) {
+        const bounds = geometry.pointPanBounds!(
+          { ...point, actual: point, time, segmentId: 'source' },
+          2
+        )!;
+        expect(bounds.minX).toBeCloseTo(Math.max(0, (projected.x - output.width) / progress), 7);
+        expect(bounds.maxX).toBeCloseTo(Math.min(100 * rasterScale, projected.x / progress), 7);
+        expect(bounds.minY).toBeCloseTo(Math.max(0, (projected.y - output.height) / progress), 7);
+        expect(bounds.maxY).toBeCloseTo(Math.min(100 * rasterScale, projected.y / progress), 7);
+      }
+    }
+    const target = projectAt(1);
+    expect(geometry.preferredPan({ ...point, time: 1, segmentId: 'source' }, 2)).toEqual({
+      x: expect.closeTo(target.x - output.width / 2, 7),
+      y: expect.closeTo(target.y - output.height / 2, 7),
+    });
+  }
+);
+
+it('admits a real perspective CURSOR plan and keeps the rendered observation visible without authoring writes', () => {
+  const { project, region } = fixture();
+  region.focusMode = VideoMotionFocusMode.CURSOR;
+  region.zoomInDuration = 0;
+  region.zoomOutDuration = 0;
+  region.perspective = { enabled: true, rotateX: 15, rotateY: -35, rotateZ: 12, strength: 0.8 };
+  region.spatialReference = { x: 0.1, y: 0.2, width: 0.7, height: 0.6 };
+  project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+    ...sample,
+    x: 57,
+    y: 50,
+    recordingPoint: { x: 0.57, y: 0.5 },
+  }));
+  const before = structuredClone(project);
+  const plan = resolveProjectCursorCameraPlan(project, region);
+  expect(plan.status).toBe('ready');
+  for (const currentTime of [2.9, 0.1, 1.5]) {
+    const camera = resolveVideoCompositionCamera({
+      project,
+      currentTime,
+      actions: [],
+      cursorSample: null,
+    });
+    const point = projectQuickEditPoint(motionCameraProjection(camera)!, { x: 57, y: 50 })!;
+    expect(point.x).toBeGreaterThanOrEqual(0);
+    expect(point.x).toBeLessThanOrEqual(100);
+    expect(point.y).toBeGreaterThanOrEqual(0);
+    expect(point.y).toBeLessThanOrEqual(100);
+  }
+  expect(resolveProjectCursorCameraPlan(project, region)).toBe(plan);
+  expect(project).toEqual(before);
 });

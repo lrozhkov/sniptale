@@ -6,7 +6,7 @@ import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/t
 import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
 import { fitVideoRect } from '../../features/video/review/geometry';
 import type { ReviewRegion, ReviewSource } from '../../features/video/review/types';
-import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
+import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import {
@@ -39,7 +39,7 @@ export type ReviewStageScene = {
 export type ReviewStageCommentGeometry = {
   output: { width: number; height: number };
   projection?:
-    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
   videoTransform: { x: number; y: number; width: number; height: number } | null;
 };

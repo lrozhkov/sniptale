@@ -197,6 +197,7 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Отдельно',
     en: 'Standalone',
   },
+  spatialReferenceReset: { ru: 'Весь холст', en: 'Full canvas' },
   widthLabel: {
     ru: 'Ширина',
     en: 'Width',

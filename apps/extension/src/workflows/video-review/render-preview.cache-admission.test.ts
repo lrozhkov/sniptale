@@ -21,7 +21,7 @@ vi.mock('./render-watermark', () => ({
   measureReviewWatermark: async () => ({ cache: null, source: null, paint: vi.fn() }),
 }));
 vi.mock('./scene-background', () => ({ createReviewBackgroundPainter: io.background }));
-vi.mock('./spatial-renderer', () => ({
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: () => ({ dispose: vi.fn() }),
 }));
 vi.mock('./cut-transition-frames', async (original) => ({

@@ -99,6 +99,9 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
 
 function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
+    ...(props.onPreviewMotionSpatial
+      ? { onPreviewMotionSpatial: props.onPreviewMotionSpatial }
+      : {}),
     onPreviewSceneBackground: props.onPreviewSceneBackground,
     onRememberRecentColor: props.onRememberRecentColor,
     onResetSceneBackgroundPreview: props.onResetSceneBackgroundPreview,
@@ -227,6 +230,7 @@ function createSelectionPanelUpdateProps(
   | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onResizeProject'
+  | 'onPreviewMotionSpatial'
   | 'onPreviewSceneBackground'
   | 'onRememberRecentColor'
   | 'onResetSceneBackgroundPreview'
@@ -253,6 +257,9 @@ function createSelectionPanelUpdateProps(
   | 'onUpdateTransitionTemplate'
 > {
   return {
+    ...(props.onPreviewMotionSpatial
+      ? { onPreviewMotionSpatial: props.onPreviewMotionSpatial }
+      : {}),
     ...createSelectionPanelBaseUpdateProps(props),
     ...createSelectionPanelAnnotationUpdateProps(props),
     onConvertTextClipToAnnotation: props.onConvertTextClipToAnnotation,

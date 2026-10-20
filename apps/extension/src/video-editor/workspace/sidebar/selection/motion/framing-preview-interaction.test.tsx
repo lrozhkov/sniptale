@@ -112,3 +112,64 @@ it('does not report export camera conflicts for a hidden camera lane', async () 
   await act(async () => root.render(<FramingPreviewSurface {...props} />));
   expect(host.querySelector('[role="status"]')).toBeNull();
 });
+
+it.each([
+  VideoMotionFocusMode.MANUAL,
+  VideoMotionFocusMode.MANUAL_AREA,
+  VideoMotionFocusMode.CURSOR,
+])(
+  'shows the selected %s spatial target independently of transition progress and keeps overview neutral',
+  (focusMode) => {
+    const original = fixture();
+    const region = {
+      ...original.region,
+      focusMode,
+      zoomInDuration: 2.5,
+      zoomOutDuration: 0.5,
+      phaseTransitions: { enter: 'linear' as const, exit: 'linear' as const },
+      perspective: { enabled: true, rotateX: 0, rotateY: 35, rotateZ: 0, strength: 1 },
+      depthOfField: {
+        enabled: true,
+        mode: 'area' as const,
+        x: 0.2,
+        y: 0.3,
+        width: 0.1,
+        softness: 0.2,
+        strength: 0.8,
+      },
+      spatialReference: { x: 0.1, y: 0.2, width: 0.5, height: 0.6 },
+      ...(focusMode === VideoMotionFocusMode.MANUAL_AREA
+        ? { focusArea: { x: 100, y: 100, width: 400, height: 240 } }
+        : {}),
+    };
+    const props = {
+      ...original,
+      region,
+      project: { ...original.project, version: 19 as const, motionRegions: [region] },
+    };
+    const before = structuredClone(props.project);
+    const inspect = vi.fn();
+    function View({ overview }: { overview: boolean }) {
+      inspect(useFramingInteraction(props, overview).camera);
+      return null;
+    }
+    act(() => root.render(<View overview={false} />));
+    expect(inspect.mock.lastCall?.[0]).toMatchObject({
+      spatial: {
+        rotation: [
+          0,
+          expect.closeTo(Math.sin((17.5 * Math.PI) / 180), 9),
+          0,
+          expect.closeTo(Math.cos((17.5 * Math.PI) / 180), 9),
+        ],
+        perspective: 1,
+        reference: { x: 100, y: 120, width: 500, height: 360 },
+        focus: [{ settings: region.depthOfField, weight: 1 }],
+      },
+    });
+    act(() => root.render(<View overview={true} />));
+    expect(inspect.mock.lastCall?.[0].spatial).toBeUndefined();
+    expect(props.project).toEqual(before);
+    expect(props.onCommit).not.toHaveBeenCalled();
+  }
+);

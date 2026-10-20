@@ -1,4 +1,4 @@
-import type { ReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { createReviewWindowRaster } from '../../workflows/video-review/window-header';
 import {
   drawReviewSceneShadow,

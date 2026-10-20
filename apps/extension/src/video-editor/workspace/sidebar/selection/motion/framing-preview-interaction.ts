@@ -1,3 +1,4 @@
+import { evaluateMotionSpatial } from '../../../../../features/video/composition/motion/spatial';
 import { useEffect, useRef, useState } from 'react';
 import {
   createMotionFocusAreaFromPointScale,
@@ -87,10 +88,12 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     setAreaDraft(null);
   };
 
+  const spatial = overview ? undefined : evaluateMotionSpatial(project, null, region, 1);
   return {
     areaMode,
     area,
     camera: {
+      ...(spatial ? { spatial } : {}),
       viewportX: left,
       viewportY: top,
       viewportWidth: width,

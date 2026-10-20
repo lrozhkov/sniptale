@@ -105,5 +105,7 @@ export function mapScenePointToVideoActionOccurrence(
       ? mapCompositionPointThroughCamera(point, camera)
       : point;
   const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, currentTime);
-  return mapping ? mapVisualLayerPointToSourceNormalized({ ...mapping, point: mapped }) : null;
+  return mapping && mapped
+    ? mapVisualLayerPointToSourceNormalized({ ...mapping, point: mapped })
+    : null;
 }

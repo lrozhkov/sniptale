@@ -1,3 +1,5 @@
+import { getProjectExportSpatialRenderer } from '../../../runtime';
+import type { ReviewSpatialRenderer } from '../../../../../features/video/composition/canvas/spatial-renderer';
 import { syncVideoClipFrame } from '../../../media';
 import { drawProjectFrame, type LoadedImagesMap } from '../../../renderer';
 import { renderOffscreenProjectEffectFrames } from '../../../effect-runtime';
@@ -24,6 +26,7 @@ type DrawProjectFrame = (
   options?: {
     compositionIndex?: RenderFrameDrivenCompositeFrameArgs['compositionIndex'];
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
+    spatialRenderer?: () => ReviewSpatialRenderer;
   }
 ) => void;
 
@@ -60,6 +63,7 @@ function renderFrameDrivenEffectFrames(args: RenderFrameDrivenCompositeFrameArgs
     loadedImages: args.loadedImages as LoadedImagesMap,
     ownerDocument: args.canvas.ownerDocument,
     project: args.project,
+    spatialRenderer: () => getProjectExportSpatialRenderer(args.job, args.signal),
   };
   return args.effectRuntime
     ? args.effectRuntime.renderProjectFrames(frameArgs)
@@ -71,6 +75,7 @@ function drawFrameDrivenProjectFrame(
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined
 ) {
   const frameOptions = {
+    spatialRenderer: () => getProjectExportSpatialRenderer(args.job, args.signal),
     ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
   };
   if (args.compositionIndex) {

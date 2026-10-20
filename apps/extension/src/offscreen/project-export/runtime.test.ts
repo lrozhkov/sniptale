@@ -20,7 +20,23 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
-import { cleanupJob, getSupportedWebmExportMimeType, sendProgress, waitForDelay } from './runtime';
+import {
+  cleanupJob,
+  getProjectExportSpatialRenderer,
+  getSupportedWebmExportMimeType,
+  sendProgress,
+  waitForDelay,
+} from './runtime';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import type { ProjectExportRuntimeState } from './types';
+vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
+  createReviewSpatialRenderer: vi.fn(() => ({
+    validateSizes: vi.fn(),
+    surface: vi.fn(),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  })),
+}));
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
 
@@ -65,12 +81,20 @@ function createCleanupJob() {
   const disposers = createCleanupDisposers();
   const cleanupNode = document.createElement('div');
   const captionRenderer = { prepare: vi.fn(), clear: vi.fn() };
+  const cameraSpatialRenderer = {
+    validateSizes: vi.fn(),
+    surface: vi.fn(),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  };
 
   return {
     ...disposers,
     captionRenderer,
+    cameraSpatialRenderer,
     job: {
       captionRenderer,
+      cameraSpatialRenderer,
       mediaRecorder: null,
       clipMediaElements: new Map([
         [
@@ -113,6 +137,8 @@ function createCleanupJob() {
 }
 
 function expectCleanupJobState(cleanup: ReturnType<typeof createCleanupJob>) {
+  expect(cleanup.cameraSpatialRenderer.dispose).toHaveBeenCalledOnce();
+  expect(cleanup.job).not.toHaveProperty('cameraSpatialRenderer');
   expect(cleanup.captionRenderer.clear).toHaveBeenCalledOnce();
   expect(cleanup.job.captionRenderer).toBeUndefined();
   expect(cleanup.disconnectSource).toHaveBeenCalledOnce();
@@ -249,4 +275,44 @@ it('reserves completion until DONE and maps rendering into the overall budget', 
       })
     );
   }
+});
+
+it('creates one spatial GPU owner per export job and replaces a lost instance only on explicit reuse', () => {
+  const job: Pick<ProjectExportRuntimeState, 'cameraSpatialRenderer'> = {};
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  const first = getProjectExportSpatialRenderer(job);
+  expect(getProjectExportSpatialRenderer(job)).toBe(first);
+  expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
+  const lost = vi.mocked(createReviewSpatialRenderer).mock.calls[0]![0]!;
+  lost();
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(job).not.toHaveProperty('cameraSpatialRenderer');
+  const next = getProjectExportSpatialRenderer(job);
+  expect(next).not.toBe(first);
+  expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);
+  lost();
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(next.dispose).not.toHaveBeenCalled();
+  expect(getProjectExportSpatialRenderer(job)).toBe(next);
+});
+
+it('refuses GPU acquisition after cancellation or abort without recreating disposed resources', () => {
+  const job: Pick<ProjectExportRuntimeState, 'cameraSpatialRenderer'> & { cancelled?: boolean } = {
+    cancelled: true,
+  };
+  expect(() => getProjectExportSpatialRenderer(job)).toThrow('PROJECT_EXPORT_CANCELLED');
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  job.cancelled = false;
+  const controller = new AbortController();
+  controller.abort();
+  expect(() => getProjectExportSpatialRenderer(job, controller.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(createReviewSpatialRenderer).not.toHaveBeenCalled();
+  const renderer = getProjectExportSpatialRenderer(job);
+  expect(() => getProjectExportSpatialRenderer(job, controller.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
+  expect(job.cameraSpatialRenderer).toBe(renderer);
 });

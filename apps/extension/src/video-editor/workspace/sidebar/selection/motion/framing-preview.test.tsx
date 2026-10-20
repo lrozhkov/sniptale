@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../../../features/video/project/motion/spatial';
+import { translate } from '../../../../../platform/i18n';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -353,4 +355,48 @@ it('shows a full-scene navigator and switches to the composed result without ano
   pointer('pointerup', 200, 120);
   expect(commit).not.toHaveBeenCalled();
   expect(mocks.create).toHaveBeenCalledOnce();
+});
+
+it('uses the presented spatial region for the thumbnail without authoring its accepted target', async () => {
+  const panel = createMotionPanelProps();
+  const selected = panel.selectedMotionRegion!;
+  const displayed = {
+    ...selected,
+    perspective: { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateY: 35 },
+  };
+  panel.project = { ...panel.project, motionRegions: [displayed] };
+  panel.onUpdateMotionRegion = vi.fn();
+  act(() =>
+    root.render(
+      <RuntimePreviewContext.Provider
+        value={{
+          assetUrls,
+          registerPreviewRuntime: vi.fn(),
+          setTimelinePreviewSuspended: vi.fn(),
+          setTimelinePreviewViewport: vi.fn(),
+          timelinePreviews: {},
+        }}
+      >
+        <MotionFramingPreview motionRegion={selected} panel={panel} />
+      </RuntimePreviewContext.Provider>
+    )
+  );
+  await ready();
+  const result = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === translate('videoEditor.sidebar.framingResultView')
+  )!;
+  act(() => result.click());
+  expect(pending.at(-1)!.camera).toMatchObject({
+    spatial: {
+      perspective: 0.5,
+      rotation: [
+        0,
+        expect.closeTo(Math.sin((35 * Math.PI) / 360), 12),
+        0,
+        expect.closeTo(Math.cos((35 * Math.PI) / 360), 12),
+      ],
+    },
+  });
+  expect(selected.perspective).toBeUndefined();
+  expect(panel.onUpdateMotionRegion).not.toHaveBeenCalled();
 });

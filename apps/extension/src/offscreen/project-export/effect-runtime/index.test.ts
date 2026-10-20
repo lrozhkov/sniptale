@@ -86,6 +86,12 @@ describe('offscreen EffectV1 runtime authority forwarding', () => {
     vi.stubGlobal('Document', class DocumentMock {});
     const fallbackDocument = new Document();
     const requestDocument = new Document();
+    const spatialRenderer = vi.fn(() => ({
+      validateSizes: vi.fn(),
+      surface: vi.fn(),
+      draw: vi.fn(),
+      dispose: vi.fn(),
+    }));
     const compositionIndex = { clipsByTrackId: new Map(), tracksInRenderOrder: [] };
     mocks.resolveRenderPasses.mockReturnValue(createRenderPasses(true, false));
     const runtime = createOffscreenProjectEffectRuntime({ ownerDocument: fallbackDocument });
@@ -94,6 +100,7 @@ describe('offscreen EffectV1 runtime authority forwarding', () => {
       ...createRenderArgs(createProject(true)),
       compositionIndex,
       ownerDocument: requestDocument,
+      spatialRenderer,
     });
 
     expect(mocks.resolveRenderPasses).toHaveBeenCalledWith(expect.anything(), 1, {
@@ -101,8 +108,9 @@ describe('offscreen EffectV1 runtime authority forwarding', () => {
     });
     expect(mocks.createExecutor).toHaveBeenCalledWith({ ownerDocument: requestDocument });
     expect(mocks.renderComposition).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerDocument: requestDocument })
+      expect.objectContaining({ ownerDocument: requestDocument, spatialRenderer })
     );
+    expect(spatialRenderer).not.toHaveBeenCalled();
     runtime.dispose();
 
     await renderOffscreenProjectEffectFrames({

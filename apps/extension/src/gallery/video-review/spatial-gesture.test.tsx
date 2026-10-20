@@ -3,9 +3,9 @@ import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-} from '../../features/video/review/advanced/spatial';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+} from '../../features/video/project/motion/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { useSpatialGesture, type SpatialHandle } from './spatial-gesture';
 

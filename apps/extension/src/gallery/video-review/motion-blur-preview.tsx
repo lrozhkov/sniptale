@@ -1,5 +1,5 @@
 import { ReviewButton } from './controls';
-import { createReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { translate } from '../../platform/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {

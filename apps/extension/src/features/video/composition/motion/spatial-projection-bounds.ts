@@ -1,8 +1,8 @@
 import { roundedWindowClearance } from '../../project/window-geometry';
-import { cameraTrajectoryBounds } from '../../composition/motion/camera-trajectory';
-import type { CameraPanBounds, CameraTrajectory } from '../../composition/motion/camera-trajectory';
-import type { CameraProjectionProof } from '../../composition/motion/camera-plan-proof';
-import type { QuickEditRect } from './types';
+import { cameraTrajectoryBounds } from './camera-trajectory';
+import type { CameraPanBounds, CameraTrajectory } from './camera-trajectory';
+import type { CameraProjectionProof } from './camera-plan-proof';
+import type { CameraSpatialRect as QuickEditRect } from '../../project/motion/spatial';
 
 type Range = readonly [number, number];
 type Derivatives = readonly [Range, Range, Range];
@@ -368,6 +368,29 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
       outY: unrotatedOutputCoordinate(input, motion, jets, 'y'),
     };
   }
+  const center = (origin: number, size: number, translation: ProjectionJet) =>
+    add(subtract(constant(origin), multiply(weight, translation)), multiply(k, constant(size / 2)));
+  return projectPlaneJets(
+    input,
+    g,
+    qx,
+    qy,
+    k,
+    center(windowRect.x, windowRect.width, tx),
+    center(windowRect.y, windowRect.height, ty)
+  );
+}
+
+function projectPlaneJets(
+  input: Pick<QuickEditCameraProjectionInterval, 'window' | 'perspective' | 'from'>,
+  g: ProjectionJet,
+  qx: ProjectionJet,
+  qy: ProjectionJet,
+  k: ProjectionJet,
+  centerX: ProjectionJet,
+  centerY: ProjectionJet
+) {
+  const windowRect = input.window;
   const angle = (axis: 'rotateX' | 'rotateY' | 'rotateZ') => {
     const start = input.from?.perspective[axis] ?? 0;
     const delta = input.perspective[axis] - start;
@@ -402,14 +425,12 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
   );
   const inverseDenominator = reciprocal(denominator);
   if (!inverseDenominator) return null;
-  const center = (origin: number, size: number, translation: ProjectionJet) =>
-    add(subtract(constant(origin), multiply(weight, translation)), multiply(k, constant(size / 2)));
   const outX = add(
-    center(windowRect.x, windowRect.width, tx),
+    centerX,
     multiply(multiply(k, add(multiply(r00, x), multiply(r01, y))), inverseDenominator)
   );
   const outY = add(
-    center(windowRect.y, windowRect.height, ty),
+    centerY,
     multiply(multiply(k, add(multiply(r10, x), multiply(r11, y))), inverseDenominator)
   );
   return { qx, qy, outX, outY, denominator };
@@ -483,4 +504,65 @@ export function boundQuickEditCameraMotion(input: QuickEditCameraProjectionInter
     );
   };
   return { speed: norm(0), acceleration: norm(1), jerk: norm(2) };
+}
+
+/** Scene-plane projection with an independent reference; source raster clipping belongs to the caller. */
+export function boundCameraPlaneProjection(input: {
+  start: number;
+  end: number;
+  phase: number | CameraTrajectory;
+  targetScale: number;
+  pan: CameraPanBounds;
+  perspective: QuickEditCameraProjectionInterval['perspective'];
+  reference: QuickEditRect;
+  source: { x: Range; y: Range };
+  output: { width: number; height: number };
+  offset: { x: number; y: number };
+}): Pick<CameraProjectionProof, 'denominator' | 'viewport'> | null {
+  const bounds =
+    typeof input.phase === 'number'
+      ? null
+      : cameraTrajectoryBounds(input.phase, input.start, input.end);
+  const g =
+    typeof input.phase === 'number' ? constant(input.phase) : boxed([bounds!.minX, bounds!.maxX]);
+  const scale = add(constant(1), multiply(constant(input.targetScale - 1), g));
+  const { reference } = input;
+  const center = (axis: 'x' | 'y', size: 'width' | 'height') =>
+    subtract(
+      add(
+        constant(input.offset[axis]),
+        multiply(scale, constant(reference[axis] + reference[size] / 2))
+      ),
+      multiply(
+        g,
+        boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY])
+      )
+    );
+  const result = projectPlaneJets(
+    { window: reference, perspective: input.perspective },
+    g,
+    subtract(boxed(input.source.x), constant(reference.x)),
+    subtract(boxed(input.source.y), constant(reference.y)),
+    scale,
+    center('x', 'width'),
+    center('y', 'height')
+  );
+  if (!result) return null;
+  return {
+    denominator: { low: result.denominator.value[0], high: result.denominator.value[1] },
+    viewport: {
+      low: Math.min(
+        result.outX.value[0],
+        result.outY.value[0],
+        input.output.width - result.outX.value[1],
+        input.output.height - result.outY.value[1]
+      ),
+      high: Math.min(
+        result.outX.value[1],
+        result.outY.value[1],
+        input.output.width - result.outX.value[0],
+        input.output.height - result.outY.value[0]
+      ),
+    },
+  };
 }

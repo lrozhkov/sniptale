@@ -85,8 +85,8 @@ it('keeps a centred frame stationary throughout zoom-in and zoom-out animations'
         cursorSample: null,
       });
       const centre = mapCompositionPointThroughCamera({ x: 400, y: 300 }, camera);
-      expect(centre.x).toBeCloseTo(400, 8);
-      expect(centre.y).toBeCloseTo(300, 8);
+      expect(centre!.x).toBeCloseTo(400, 8);
+      expect(centre!.y).toBeCloseTo(300, 8);
     }
   }
 });
@@ -116,8 +116,8 @@ it('keeps the centre fixed when a connection crosses original scale', () => {
     });
     expect(camera.scale).toBeCloseTo(currentTime - 0.5);
     const centre = mapCompositionPointThroughCamera({ x: 400, y: 300 }, camera);
-    expect(centre.x).toBeCloseTo(400);
-    expect(centre.y).toBeCloseTo(300);
+    expect(centre!.x).toBeCloseTo(400);
+    expect(centre!.y).toBeCloseTo(300);
   }
 });
 

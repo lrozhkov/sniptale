@@ -12,6 +12,11 @@ import type { VideoCompositionVisualLayer } from '../../types';
 import { createEffectRuntimeInputMaterializer } from './inputs';
 import type { EffectRuntimeFramePlan } from '../runtime/types';
 
+import { drawSpatialCompositionGroup } from '../../draw/spatial';
+import { createDefaultCameraState } from '../../motion/defaults';
+import type { EffectRuntimeRenderedFrameMap } from '../runtime/types';
+vi.mock('../../draw/spatial', () => ({ drawSpatialCompositionGroup: vi.fn(() => true) }));
+
 const { drawLayer } = vi.hoisted(() => ({ drawLayer: vi.fn() }));
 vi.mock('../../draw/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../draw/index')>()),
@@ -314,4 +319,103 @@ it('keeps captured actions outside FX input and draws them once in the final ove
   expect(source.draw).toHaveBeenCalledOnce();
   expect(context.arc).toHaveBeenCalledTimes(1);
   bitmap.close();
+});
+
+it('projects unbaked group inputs before FX and refuses a missing spatial renderer', async () => {
+  vi.mocked(drawSpatialCompositionGroup).mockClear();
+  const camera = {
+    ...createDefaultCameraState({ width: 20, height: 10 }),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 0.5,
+      windowMotion: 1,
+      lockBackground: true,
+      focus: [],
+      reference: { x: 0, y: 0, width: 20, height: 10 },
+    },
+  };
+  const renderer = { validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() };
+  const spatialRenderer = vi.fn(() => renderer),
+    createBitmap = vi.fn(async () => new FakeBitmap(20, 10));
+  const args = {
+    camera,
+    spatialRenderer,
+    createBitmap,
+    clipMediaElements: new Map(),
+    imageBank: {},
+    visualLayers: [createLayer('a'), createLayer('b')],
+  };
+  await createEffectRuntimeInputMaterializer(args).materializeTargetSource(
+    createPlan({ kind: 'track', trackId: 'track', clipIds: ['a', 'b'] })
+  );
+  expect(drawSpatialCompositionGroup).toHaveBeenCalledOnce();
+  expect(drawSpatialCompositionGroup).toHaveBeenCalledWith(
+    expect.objectContaining({
+      camera,
+      renderer,
+      logicalSize: { width: 20, height: 10 },
+      rasterScale: 1,
+    })
+  );
+  expect(drawLayer).not.toHaveBeenCalled();
+  const { spatialRenderer: _renderer, ...withoutRenderer } = args;
+  await expect(
+    createEffectRuntimeInputMaterializer(withoutRenderer).materializeTargetSource(
+      createPlan({ kind: 'track', trackId: 'track', clipIds: ['a', 'b'] })
+    )
+  ).rejects.toThrow('SPATIAL_RENDERER');
+});
+
+it('keeps already camera-baked group rasters locked instead of applying spatial projection twice', async () => {
+  vi.mocked(drawSpatialCompositionGroup).mockClear();
+  context.drawImage = vi.fn();
+  context.globalAlpha = 1;
+  const camera = {
+    ...createDefaultCameraState({ width: 20, height: 10 }),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 0.5,
+      windowMotion: 1,
+      lockBackground: true,
+      focus: [],
+      reference: { x: 0, y: 0, width: 20, height: 10 },
+    },
+  };
+  const frames: EffectRuntimeRenderedFrameMap = new Map([
+    [
+      'baked',
+      {
+        effectInstanceId: 'baked',
+        bitmap: new FakeBitmap(20, 10),
+        logicalWidth: 20,
+        logicalHeight: 10,
+        width: 20,
+        height: 10,
+        snapshotId: 'snapshot',
+        kind: 'targetEffect',
+        target: { kind: 'track', trackId: 'track', clipIds: ['a', 'b'] },
+      },
+    ],
+  ]);
+  const spatialRenderer = vi.fn(() => ({
+    validateSizes: vi.fn(),
+    surface: vi.fn(),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  }));
+  const materializer = createEffectRuntimeInputMaterializer({
+    camera,
+    spatialRenderer,
+    createBitmap: vi.fn(async () => new FakeBitmap(20, 10)),
+    clipMediaElements: new Map(),
+    imageBank: {},
+    visualLayers: [createLayer('a'), createLayer('b')],
+  });
+  await materializer.materializeTargetSource(
+    createPlan({ kind: 'track', trackId: 'track', clipIds: ['a', 'b'] }),
+    frames
+  );
+  expect(drawSpatialCompositionGroup).not.toHaveBeenCalled();
+  expect(spatialRenderer).not.toHaveBeenCalled();
+  expect(context.drawImage).toHaveBeenCalledOnce();
 });

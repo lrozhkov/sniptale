@@ -2,7 +2,7 @@ import { ReviewFocusRoundness, ReviewFocusAreaFields } from './focus-area-fields
 import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
 import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
 import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';

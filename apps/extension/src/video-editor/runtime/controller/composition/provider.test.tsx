@@ -91,7 +91,12 @@ const mocks = vi.hoisted(() => {
     closeLibraryPanel: action,
     confirm: { dialog: null, onCancel: action, onConfirm: action, request: action },
     grid: { magnetEnabled: false },
-    inspector: { mode: 'selection', openSelection: action },
+    inspector: {
+      mode: 'selection',
+      openSelection: action,
+      motionSpatialPreview: null,
+      previewMotionSpatial: action,
+    },
     leftSidebarCollapsed: false,
     libraryPanelOpen: false,
     openAudioRecordingDialog: action,

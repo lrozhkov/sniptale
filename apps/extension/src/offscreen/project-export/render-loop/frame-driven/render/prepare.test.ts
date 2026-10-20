@@ -6,10 +6,18 @@ import {
   VideoExportFormat,
   VideoExportQualityPreset,
 } from '../../../../../features/video/project/types';
-import type { LoadedImagesMap } from '../../../renderer';
+import { drawProjectFrame, type LoadedImagesMap } from '../../../renderer';
+import type { RenderOffscreenProjectEffectFramesInput } from '../../../effect-runtime';
 import type { RenderLoopJobState } from '../../shared/index';
 import type { RenderFrameDrivenCompositeFrameArgs } from './types';
 
+const spatialOwner = vi.hoisted(() => ({
+  get: vi.fn(() => ({ validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() })),
+}));
+vi.mock('../../../runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime')>()),
+  getProjectExportSpatialRenderer: spatialOwner.get,
+}));
 const syncVideoClipFrameMock = vi.hoisted(() => vi.fn());
 const drawProjectFrameMock = vi.hoisted(() => vi.fn());
 const renderOffscreenProjectEffectFramesMock = vi.hoisted(() => vi.fn());
@@ -92,7 +100,7 @@ it('prepares the frame by syncing and drawing project content', async () => {
     2.5,
     { image: 'loaded' },
     ['clip'],
-    {}
+    { spatialRenderer: expect.any(Function) }
   );
 });
 
@@ -109,6 +117,7 @@ it('uses the owned effect runtime when preparing indexed frames', async () => {
     currentTime: 2.5,
     loadedImages: fixture.loadedImages,
     ownerDocument: undefined,
+    spatialRenderer: expect.any(Function),
     project: fixture.project,
   });
   expect(drawProjectFrameMock).toHaveBeenCalledWith(
@@ -121,6 +130,7 @@ it('uses the owned effect runtime when preparing indexed frames', async () => {
     {
       compositionIndex: fixture.compositionIndex,
       effectRuntimeFrames: fixture.effectRuntimeFrames,
+      spatialRenderer: expect.any(Function),
     }
   );
 });
@@ -129,7 +139,9 @@ function createIndexedEffectRuntimeFrameFixture() {
   const effectRuntimeFrames = { framesByTime: new Map(), overlayFrames: new Map() };
   const effectRuntime = {
     dispose: vi.fn(),
-    renderProjectFrames: vi.fn(async () => effectRuntimeFrames),
+    renderProjectFrames: vi.fn(
+      async (_args: RenderOffscreenProjectEffectFramesInput) => effectRuntimeFrames
+    ),
   };
   const project = createEmptyVideoProject('Renderer project');
   const compositionIndex = createVideoCompositionTimelineIndex(project);
@@ -183,3 +195,17 @@ function createExportSettings() {
     width: 1280,
   };
 }
+
+it('passes lazy spatial factories to effect capture and final draw under the same export job', async () => {
+  syncVideoClipFrameMock.mockResolvedValue(undefined);
+  spatialOwner.get.mockClear();
+  const fixture = createIndexedEffectRuntimeFrameFixture();
+  await prepareFrameDrivenCompositeFrame(fixture.args);
+  expect(spatialOwner.get).not.toHaveBeenCalled();
+  const capture = fixture.effectRuntime.renderProjectFrames.mock.calls[0]![0].spatialRenderer!;
+  const paint = vi.mocked(drawProjectFrame).mock.calls[0]![6]!.spatialRenderer!;
+  capture();
+  paint();
+  expect(spatialOwner.get).toHaveBeenNthCalledWith(1, fixture.job, fixture.args.signal);
+  expect(spatialOwner.get).toHaveBeenNthCalledWith(2, fixture.job, fixture.args.signal);
+});

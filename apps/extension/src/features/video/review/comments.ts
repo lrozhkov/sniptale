@@ -2,7 +2,7 @@ import {
   projectQuickEditPoint,
   invertQuickEditProjection,
   type QuickEditHomography,
-} from './advanced/spatial-geometry';
+} from '../composition/motion/spatial-geometry';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import type { CanvasComment, ReviewAnnotation, ReviewDocument } from './types';
 import {

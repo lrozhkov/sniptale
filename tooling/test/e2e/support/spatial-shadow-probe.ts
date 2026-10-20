@@ -2,7 +2,7 @@ import { calculatePreviewRenderAllocation } from '../../../../apps/extension/src
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import { reviewSpatialSourceRect } from '../../../../apps/extension/src/workflows/video-review/scene-shadow';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneShadow } from '../../../../apps/extension/src/workflows/video-review/scene-shadow';
 import { computeQuickEditSceneLayout } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 

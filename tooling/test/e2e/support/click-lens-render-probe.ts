@@ -3,7 +3,7 @@ import { createPreviewRenderResources } from '../../../../apps/extension/src/wor
 import { resolvePreviewRenderAllocation } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/workflows/video-review/spatial-renderer';
+import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
 import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,

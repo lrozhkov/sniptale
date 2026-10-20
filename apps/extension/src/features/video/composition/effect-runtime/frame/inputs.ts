@@ -1,3 +1,7 @@
+import { drawSpatialCompositionGroup } from '../../draw/spatial';
+import { resolveEffectRuntimeVisualLayers } from '../../draw/effect-runtime';
+import { segmentVisualLayersByViewportLock } from '../../motion/layer-camera';
+import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
 import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import type { VideoCompositionCameraState } from '../../types';
 import type { EffectRuntimeRenderedFrameMap } from '../runtime/types';
@@ -19,6 +23,7 @@ import {
 
 export function createEffectRuntimeInputMaterializer(args: {
   camera?: VideoCompositionCameraState;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   createBitmap?: (source: CanvasImageSource) => Promise<ImageBitmap>;
   imageBank: Record<string, HTMLImageElement>;
@@ -135,6 +140,7 @@ async function drawIsolatedLayer(args: {
   layer?: VideoCompositionVisualLayer;
   layers?: readonly VideoCompositionVisualLayer[];
   camera?: VideoCompositionCameraState;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   ownerDocument: Document;
   renderDimensions: { height: number; width: number };
   resourceScope: EffectRuntimeFrameResourceScope;
@@ -157,44 +163,46 @@ async function drawIsolatedLayer(args: {
     context.reset?.();
     context.clearRect(0, 0, canvas.width, canvas.height);
     const state = createEffectRuntimeDrawState();
-    for (const layer of args.layers ?? (args.layer ? [args.layer] : [])) {
-      context.save();
-      const grouped = [...args.frames.values()].some(
-        (frame) =>
-          (frame.target.kind === 'track' || frame.target.kind === 'video-group') &&
-          frame.target.clipIds.includes(layer.clipId)
-      );
-      if (
-        args.layers &&
-        args.camera &&
-        !grouped &&
-        !shouldLockVisualLayerToViewport(layer, args.camera)
-      ) {
-        context.scale(args.camera.scale, args.camera.scale);
-        context.translate(
-          (-args.camera.viewportX * args.renderDimensions.width) / args.dimensions.width,
-          (-args.camera.viewportY * args.renderDimensions.height) / args.dimensions.height
+    if (!drawSpatialInputLayers(args, context, state)) {
+      for (const layer of args.layers ?? (args.layer ? [args.layer] : [])) {
+        context.save();
+        const grouped = [...args.frames.values()].some(
+          (frame) =>
+            (frame.target.kind === 'track' || frame.target.kind === 'video-group') &&
+            frame.target.clipIds.includes(layer.clipId)
         );
+        if (
+          args.layers &&
+          args.camera &&
+          !grouped &&
+          !shouldLockVisualLayerToViewport(layer, args.camera)
+        ) {
+          context.scale(args.camera.scale, args.camera.scale);
+          context.translate(
+            (-args.camera.viewportX * args.renderDimensions.width) / args.dimensions.width,
+            (-args.camera.viewportY * args.renderDimensions.height) / args.dimensions.height
+          );
+        }
+        if (
+          !drawEffectRuntimeVisualLayer({
+            context,
+            frames: args.frames,
+            layer,
+            scaleX: args.renderDimensions.width / args.dimensions.width,
+            scaleY: args.renderDimensions.height / args.dimensions.height,
+            state,
+          })
+        )
+          drawCompositionVisualLayer(
+            context,
+            layer,
+            args.renderDimensions.width / args.dimensions.width,
+            args.renderDimensions.height / args.dimensions.height,
+            args.imageBank,
+            args.clipMediaElements
+          );
+        context.restore();
       }
-      if (
-        !drawEffectRuntimeVisualLayer({
-          context,
-          frames: args.frames,
-          layer,
-          scaleX: args.renderDimensions.width / args.dimensions.width,
-          scaleY: args.renderDimensions.height / args.dimensions.height,
-          state,
-        })
-      )
-        drawCompositionVisualLayer(
-          context,
-          layer,
-          args.renderDimensions.width / args.dimensions.width,
-          args.renderDimensions.height / args.dimensions.height,
-          args.imageBank,
-          args.clipMediaElements
-        );
-      context.restore();
     }
     const bitmap = await args.createBitmap(canvas);
     if (bitmap.width !== canvas.width || bitmap.height !== canvas.height) {
@@ -212,6 +220,64 @@ async function drawIsolatedLayer(args: {
     lease?.release();
     releaseCanvas();
   }
+}
+
+/** Camera-baked track/group inputs retain viewport rasters and project only unbaked scene segments. */
+function drawSpatialInputLayers(
+  args: Parameters<typeof drawIsolatedLayer>[0],
+  context: CanvasRenderingContext2D,
+  state: ReturnType<typeof createEffectRuntimeDrawState>
+): boolean {
+  if (!args.layers || !args.camera?.spatial) return false;
+  const sx = args.renderDimensions.width / args.dimensions.width;
+  const sy = args.renderDimensions.height / args.dimensions.height;
+  const layers = resolveEffectRuntimeVisualLayers([...args.layers], args.frames);
+  for (const segment of segmentVisualLayersByViewportLock(layers, args.camera)) {
+    if (!segment.isLocked) {
+      if (!args.spatialRenderer) throw new Error('EFFECT_RUNTIME_SPATIAL_RENDERER_UNAVAILABLE');
+      drawSpatialCompositionGroup({
+        camera: args.camera,
+        context,
+        renderer: args.spatialRenderer(),
+        clipMediaElements: args.clipMediaElements,
+        imageBank: args.imageBank,
+        layers: segment.layers,
+        frames: args.frames,
+        effectState: state,
+        logicalSize: args.dimensions,
+        output: args.renderDimensions,
+        rasterScale: sx,
+        destination: { x: 0, y: 0, ...args.renderDimensions },
+      });
+      continue;
+    }
+    for (const layer of segment.layers) {
+      context.save();
+      try {
+        if (
+          !drawEffectRuntimeVisualLayer({
+            context,
+            layer,
+            frames: args.frames,
+            scaleX: sx,
+            scaleY: sy,
+            state,
+          })
+        )
+          drawCompositionVisualLayer(
+            context,
+            layer,
+            sx,
+            sy,
+            args.imageBank,
+            args.clipMediaElements
+          );
+      } finally {
+        context.restore();
+      }
+    }
+  }
+  return true;
 }
 
 function findLayer(

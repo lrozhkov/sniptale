@@ -1,3 +1,5 @@
+import { drawSpatialSceneOverlays } from '../../../../features/video/composition/draw/spatial';
+import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
   drawSceneActionCompositionStates,
@@ -45,6 +47,7 @@ function mapPreviewScenePoint(
   viewport: PreviewSceneViewport
 ) {
   const mappedPoint = mapCompositionPointThroughCamera(point, camera);
+  if (!mappedPoint) return null;
 
   return {
     x: viewport.offsetX + mappedPoint.x * viewport.scale,
@@ -57,15 +60,44 @@ function drawPreviewSceneOverlays(params: {
   context: CanvasRenderingContext2D;
   frame: ReturnType<typeof resolveVideoCompositionFrame>;
   viewport: PreviewSceneViewport;
+  logicalSize: { width: number; height: number };
+  rasterScale: number;
+  spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
 }) {
+  if (
+    drawSpatialSceneOverlays({
+      actions: params.frame.actions,
+      camera: params.camera,
+      cursor: params.frame.cursor,
+      context: params.context,
+      destination: {
+        x: params.viewport.offsetX,
+        y: params.viewport.offsetY,
+        width: params.viewport.width,
+        height: params.viewport.height,
+      },
+      logicalSize: params.logicalSize,
+      output: {
+        width: Math.ceil(params.logicalSize.width * params.rasterScale),
+        height: Math.ceil(params.logicalSize.height * params.rasterScale),
+      },
+      rasterScale: params.rasterScale,
+      spatialRenderer: params.spatialRenderer,
+    })
+  )
+    return;
   const overlayScale = params.viewport.scale * params.camera.scale;
-  const scaledCursor = params.frame.cursor
-    ? {
-        ...params.frame.cursor,
-        ...mapPreviewScenePoint(params.frame.cursor, params.camera, params.viewport),
-        scale: params.frame.cursor.scale * overlayScale,
-      }
-    : null;
+  const cursorPoint =
+    params.frame.cursor &&
+    mapPreviewScenePoint(params.frame.cursor, params.camera, params.viewport);
+  const scaledCursor =
+    params.frame.cursor && cursorPoint
+      ? {
+          ...params.frame.cursor,
+          ...cursorPoint,
+          scale: params.frame.cursor.scale * overlayScale,
+        }
+      : null;
   drawSceneActionCompositionStates(params.context, params.frame.actions, params.camera, {
     offsetX: params.viewport.offsetX,
     offsetY: params.viewport.offsetY,
@@ -82,6 +114,9 @@ export async function renderPreviewScene(params: {
   cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
   captionRenderer?: VideoProjectCaptionRenderer;
+  /** The preview runtime owns this reusable transaction canvas. */
+  stagingCanvas?: () => HTMLCanvasElement;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   currentTime: number;
   imageBank: Record<string, HTMLImageElement>;
   effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
@@ -174,15 +209,72 @@ function arePreviewSceneVideosReady(
   );
 }
 
-function drawResolvedPreviewScene(args: {
+type ResolvedPreviewSceneArgs = {
   captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   clipMediaElements: Map<string, HTMLMediaElement>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
-}): boolean {
+};
+
+function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): boolean {
+  const spatial = [
+    args.renderPasses.overlayFrame,
+    ...args.renderPasses.visualPasses.map((pass) => pass.frame),
+  ].some((frame) => frame.camera.spatial !== undefined);
+  if (!spatial) return drawResolvedPreviewSceneContent(args);
+  const presented = args.params.canvas;
+  const owned = !args.params.stagingCanvas;
+  const staging = args.params.stagingCanvas?.() ?? presented.ownerDocument.createElement('canvas');
+  if (staging === presented || staging.ownerDocument !== presented.ownerDocument)
+    throw new Error('Preview frame canvas is unavailable.');
+  try {
+    const drawn = drawResolvedPreviewSceneContent(
+      { ...args, params: { ...args.params, canvas: staging } },
+      presented
+    );
+    if (!drawn || args.params.signal?.aborted) return false;
+    publishCompletedPreviewFrame(presented, staging);
+    return true;
+  } finally {
+    if (owned) {
+      staging.width = 0;
+      staging.height = 0;
+    }
+  }
+}
+
+function publishCompletedPreviewFrame(
+  presented: HTMLCanvasElement,
+  staging: HTMLCanvasElement
+): void {
+  const context = presented.getContext('2d');
+  if (!context) throw new Error('Preview frame context is unavailable.');
+  if (presented.width !== staging.width) presented.width = staging.width;
+  if (presented.height !== staging.height) presented.height = staging.height;
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'copy';
+    context.filter = 'none';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(staging, 0, 0);
+  } finally {
+    context.restore();
+  }
+}
+
+function drawResolvedPreviewSceneContent(
+  args: ResolvedPreviewSceneArgs,
+  viewportCanvas?: HTMLCanvasElement
+): boolean {
   const visualPassArgs = {
     canvas: args.params.canvas,
+    ...(args.params.spatialRenderer ? { spatialRenderer: args.params.spatialRenderer } : {}),
+    ...(viewportCanvas ? { viewportCanvas } : {}),
     clipMediaElements: args.clipMediaElements,
     currentTime: args.params.currentTime,
     ...(args.effectRuntimeFrames ? { effectRuntimeFrames: args.effectRuntimeFrames } : {}),
@@ -202,6 +294,9 @@ function drawResolvedPreviewScene(args: {
     context: overlayPrepared.context,
     frame: args.renderPasses.overlayFrame,
     viewport: overlayPrepared.viewport,
+    logicalSize: { width: args.params.project.width, height: args.params.project.height },
+    rasterScale: overlayPrepared.viewport.scale * overlayPrepared.dpr,
+    spatialRenderer: args.params.spatialRenderer,
   });
   const { context, viewport } = overlayPrepared;
   if (!args.captions.plan.cues.length) return true;
@@ -236,6 +331,7 @@ async function resolvePreviewEffectRuntimeFrames(
     imageBank: params.imageBank,
     overlayFrame: renderPasses.overlayFrame,
     overlayTime: params.currentTime,
+    ...(params.spatialRenderer ? { spatialRenderer: params.spatialRenderer } : {}),
     ownerDocument: params.canvas.ownerDocument,
     rasterScale: resolvePreviewEffectRuntimeRasterScale({
       canvas: params.canvas,

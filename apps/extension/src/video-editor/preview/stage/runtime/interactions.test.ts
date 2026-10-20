@@ -193,3 +193,82 @@ it('keeps locked overlay interactions on viewport-fixed deltas even when the cam
     })
   );
 });
+
+it('uses unequal inverse-projected move deltas across the tilted plane', () => {
+  const xs: number[] = [];
+  for (const startX of [100, 300]) {
+    const f = createUnlockedStageScenario();
+    createStageRectSpy(f.stage);
+    const radians = (35 * Math.PI) / 180;
+    const camera = {
+      ...f.camera,
+      spatial: {
+        reference: { x: 0, y: 0, width: 200, height: 100 },
+        rotation: [0, Math.sin(radians / 2), 0, Math.cos(radians / 2)] as const,
+        perspective: 1,
+        windowMotion: 1,
+        lockBackground: false,
+        focus: [],
+      },
+    };
+    beginPreviewStageInteraction({
+      ...f,
+      camera,
+      event: createPointerEvent(startX, 60),
+      mode: 'move',
+      interactionRef: { current: null },
+      tracks: f.project.tracks,
+    });
+    act(() => {
+      dispatchPointerMove(startX + 40, 90);
+      window.dispatchEvent(new Event('pointerup'));
+    });
+    const inverse = (x: number, y: number) => {
+      const g = (0.7 * Math.sin(radians)) / Math.hypot(200, 100);
+      const dx = (x / 2 - 100) / (Math.cos(radians) - g * (x / 2 - 100));
+      return { x: 100 + dx, y: 50 + (y / 2 - 50) * (1 + g * dx) };
+    };
+    const origin = inverse(startX, 60),
+      end = inverse(startX + 40, 90);
+    expect(f.onUpdateClipTransform).toHaveBeenCalledExactlyOnceWith(
+      f.clip.id,
+      expect.objectContaining({
+        x: expect.closeTo(f.clip.transform.x + end.x - origin.x, 9),
+        y: expect.closeTo(f.clip.transform.y + end.y - origin.y, 9),
+      })
+    );
+    xs.push(end.x - origin.x);
+  }
+  expect(Math.abs(xs[0]! - xs[1]!)).toBeGreaterThan(5);
+});
+
+it('does not start a spatial transform gesture when the camera inverse is singular', () => {
+  const f = createUnlockedStageScenario();
+  createStageRectSpy(f.stage);
+  const onBegin = vi.fn();
+  beginPreviewStageInteraction({
+    ...f,
+    camera: {
+      ...f.camera,
+      scale: 0,
+      spatial: {
+        reference: { x: 0, y: 0, width: 200, height: 100 },
+        rotation: [0, 0, 0, 1],
+        perspective: 1,
+        windowMotion: 1,
+        lockBackground: false,
+        focus: [],
+      },
+    },
+    event: createPointerEvent(100, 60),
+    mode: 'move',
+    gestureHooks: { onBegin },
+    interactionRef: { current: null },
+    tracks: f.project.tracks,
+  });
+  expect(onBegin).not.toHaveBeenCalled();
+  expect(f.cleanupRef.current).toBeNull();
+  dispatchPointerMove(140, 90);
+  window.dispatchEvent(new Event('pointerup'));
+  expect(f.onUpdateClipTransform).not.toHaveBeenCalled();
+});

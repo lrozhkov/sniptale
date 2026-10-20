@@ -25,7 +25,10 @@ export function MotionFramingPreview(props: {
     <FramingPreviewSurface
       key={props.motionRegion.id}
       project={props.panel.project}
-      region={props.motionRegion}
+      region={
+        props.panel.project.motionRegions?.find((region) => region.id === props.motionRegion.id) ??
+        props.motionRegion
+      }
       assetUrls={runtime.assetUrls}
       onCommitArea={(focusArea) => {
         props.panel.onClearPlacementMode();
@@ -53,8 +56,10 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
       : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { areaMode, area, camera, viewport, left, top, width, height, handlers } =
-    useFramingInteraction(props, overview);
+  const { area, camera, viewport, left, top, width, height, handlers } = useFramingInteraction(
+    props,
+    overview
+  );
   const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
 
   return (
@@ -102,14 +107,6 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
         <InspectorActionButton compact onClick={reload}>
           {translate('common.actions.retry')}
         </InspectorActionButton>
-      ) : overview && !following ? (
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate(
-            areaMode
-              ? 'videoEditor.sidebar.framingAreaPreviewHint'
-              : 'videoEditor.sidebar.framingPreviewHint'
-          )}
-        </p>
       ) : null}
     </div>
   );

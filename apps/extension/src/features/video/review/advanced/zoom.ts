@@ -1,5 +1,8 @@
 import { fitCameraTransitionDurations } from '../../project/motion/transitions';
-import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
+import {
+  parseCameraPerspective as parseQuickEditPerspective,
+  parseCameraDepth as parseQuickEditDepth,
+} from '../../project/motion/spatial';
 import {
   quickEditFocusType,
   quickEditFocusConflicts,

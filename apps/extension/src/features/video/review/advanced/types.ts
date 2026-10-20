@@ -1,3 +1,14 @@
+import type {
+  CameraPerspective as QuickEditPerspective,
+  CameraDepthOfField as QuickEditDepthOfField,
+  CameraSpatialFrame as QuickEditSpatialFrame,
+} from '../../project/motion/spatial';
+export type {
+  CameraPerspective as QuickEditPerspective,
+  CameraDepthOfField as QuickEditDepthOfField,
+  CameraSpatialFrame as QuickEditSpatialFrame,
+  SpatialQuaternion,
+} from '../../project/motion/spatial';
 import type { CameraTransition } from '../../project/motion/transitions';
 import type { MotionBlurPhases } from '../../project/motion/blur';
 import type { Gradient, Paint } from '@sniptale/foundation/paint';
@@ -50,34 +61,6 @@ export type QuickEditZoomTransition = CameraTransition<'none' | 'linear' | 'ease
 
 /** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
 export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
-
-export interface QuickEditPerspective {
-  enabled: boolean;
-  rotateX: number;
-  rotateY: number;
-  rotateZ: number;
-  strength: number;
-}
-
-export interface QuickEditDepthOfField {
-  enabled: boolean;
-  mode: 'area' | 'depth';
-  x: number;
-  y: number;
-  width: number;
-  softness: number;
-  strength: number;
-}
-
-export type SpatialQuaternion = readonly [number, number, number, number];
-/** Disposable evaluated pose; never admitted from persisted camera objects. */
-export interface QuickEditSpatialFrame {
-  rotation: SpatialQuaternion;
-  perspective: number;
-  windowMotion: number;
-  lockBackground: boolean;
-  focus: readonly { settings: QuickEditDepthOfField; weight: number }[];
-}
 
 export interface QuickEditRect {
   x: number;

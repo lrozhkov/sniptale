@@ -20,6 +20,9 @@ describe('workspace/sidebar-props', () => {
     expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
     expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);
     expect(props.gridSettings).toBe(controller.state.gridSettings);
+    expect(props.onPreviewMotionSpatial).toBe(controller.projectActions.onPreviewMotionSpatial);
+    props.onPreviewMotionSpatial?.(null);
+    expect(controller.projectActions.onPreviewMotionSpatial).toHaveBeenCalledExactlyOnceWith(null);
     expect(props.onApplyMediaClipVisualsToTrack).toBe(
       controller.clipActions.onApplyMediaClipVisualsToTrack
     );

@@ -1,3 +1,4 @@
+import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../runtime/resource-limits';
 // policyStateIds: [] - empty render maps are immutable sentinels, not authority state.
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
@@ -22,6 +23,7 @@ export async function renderEffectRuntimeComposition(args: {
   overlayFrame: VideoCompositionFrame;
   overlayTime: number;
   ownerDocument?: Document;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   rasterScale?: number;
   signal?: AbortSignal;
   visualPasses: readonly VideoCompositionVisualPass[];
@@ -57,6 +59,7 @@ export async function renderEffectRuntimeComposition(args: {
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
         camera: frame.camera,
+        ...(args.spatialRenderer ? { spatialRenderer: args.spatialRenderer } : {}),
         clipMediaElements: args.clipMediaElements,
         imageBank: args.imageBank,
         ...(args.ownerDocument ? { ownerDocument: args.ownerDocument } : {}),

@@ -4,8 +4,9 @@ import {
   invertQuickEditProjection,
   projectQuickEditPoint,
 } from './spatial-geometry';
-import { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } from './spatial';
-import { createQuickEditZoomRegion } from './zoom';
+import { quickEditSpatialTargetCamera } from '../../review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../project/motion/spatial';
+import { createQuickEditZoomRegion } from '../../review/advanced/zoom';
 
 it('projects identity and inverse points without losing the decorated header coordinates', () => {
   const base = { x: 80, y: 30, width: 900, height: 600 };
@@ -53,7 +54,7 @@ it('ordinary zoom endpoint retains its original crop while the background remain
     computeQuickEditSceneLayout,
     computeQuickEditSpatialWindow,
     computeQuickEditSpatialRasterLayout,
-  } = await import('./scene');
+  } = await import('../../review/advanced/scene');
   const region = createQuickEditZoomRegion({ id: 'plain', at: 0 });
   const spatial = {
     rotation: [0, 0, 0, 1] as const,
@@ -82,7 +83,8 @@ it('ordinary zoom endpoint retains its original crop while the background remain
 });
 
 it('keeps the entire transition front-facing between the strongest supported tilts', async () => {
-  const { interpolateQuickEditSpatial } = await import('./spatial');
+  const { interpolateCameraSpatial: interpolateQuickEditSpatial } =
+    await import('../../project/motion/spatial');
   const { quickEditRotationMatrix } = await import('./spatial-geometry');
   const poses = [];
   for (const rotateX of [-60, 60])

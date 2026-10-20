@@ -15,7 +15,7 @@ import {
 } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
-import { ReviewPreviewNumberRow } from './number-row';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
 type Settings = QuickEditPresentationSettings;

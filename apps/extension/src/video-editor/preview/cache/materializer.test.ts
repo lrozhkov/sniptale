@@ -11,13 +11,25 @@ import {
   type VideoProjectVideoClip,
 } from '../../../features/video/project/types';
 
-const renderPreviewScene = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+type PreviewSceneInput = Parameters<
+  typeof import('../stage/scene/render-preview').renderPreviewScene
+>[0];
+const renderPreviewScene = vi.hoisted(() =>
+  vi.fn<(args: PreviewSceneInput) => Promise<void | false>>(async () => {})
+);
+const spatial = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
+  createReviewSpatialRenderer: spatial.create,
+}));
 
 vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene }));
 
 import { createVideoPreviewFrameMaterializer } from './materializer';
 
-beforeEach(() => renderPreviewScene.mockClear());
+beforeEach(() => {
+  renderPreviewScene.mockClear();
+  spatial.create.mockReset();
+});
 
 function createVideoClip(trackId: string): VideoProjectVideoClip {
   return {
@@ -241,4 +253,117 @@ it('reuses the decoded source and media element for camera-only redraws', async 
   expect(document.querySelectorAll('video')).toHaveLength(1);
   expect(renderPreviewScene).toHaveBeenLastCalledWith(expect.objectContaining({ cameraOverride }));
   materializer.dispose();
+});
+
+function resourceFixture() {
+  const project = createEmptyVideoProject('Spatial frame owner', 320, 180);
+  project.duration = 2;
+  return createVideoPreviewFrameMaterializer({
+    project,
+    ownerDocument: document,
+    assetUrls: {},
+    rasterSize: { width: 480, height: 270 },
+  });
+}
+
+it('owns lazy reusable GPU and staging resources and ignores stale context-loss callbacks', async () => {
+  const lost: (() => void)[] = [];
+  const renderers: { dispose: ReturnType<typeof vi.fn> }[] = [];
+  spatial.create.mockImplementation((onLost: () => void) => {
+    lost.push(onLost);
+    const renderer = { validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() };
+    renderers.push(renderer);
+    return renderer;
+  });
+  const createElement = vi.spyOn(document, 'createElement');
+  const owner = resourceFixture();
+  const initialCanvases = createElement.mock.calls.filter(([tag]) => tag === 'canvas').length;
+  const signal = new AbortController().signal;
+  await owner.renderFrame(0, signal);
+  expect(spatial.create).not.toHaveBeenCalled();
+  expect(createElement.mock.calls.filter(([tag]) => tag === 'canvas')).toHaveLength(
+    initialCanvases
+  );
+  const first = renderPreviewScene.mock.lastCall![0];
+  const renderer = first.spatialRenderer!();
+  const staging = first.stagingCanvas!();
+  staging.width = 480;
+  staging.height = 270;
+  await owner.renderFrame(0.1, signal);
+  const second = renderPreviewScene.mock.lastCall![0];
+  expect(second.spatialRenderer!()).toBe(renderer);
+  expect(second.stagingCanvas!()).toBe(staging);
+  expect(spatial.create).toHaveBeenCalledOnce();
+  lost[0]!();
+  expect(renderers[0]!.dispose).toHaveBeenCalledOnce();
+  const replacement = second.spatialRenderer!();
+  expect(replacement).not.toBe(renderer);
+  expect(spatial.create).toHaveBeenCalledTimes(2);
+  lost[0]!();
+  expect(renderers[1]!.dispose).not.toHaveBeenCalled();
+  expect(second.spatialRenderer!()).toBe(replacement);
+  owner.dispose();
+  owner.dispose();
+  expect(renderers[1]!.dispose).toHaveBeenCalledOnce();
+  expect(staging.width).toBe(0);
+  expect(staging.height).toBe(0);
+});
+
+it('refuses delayed resource factories after abort or disposal without creating GPU or effects', async () => {
+  const owner = resourceFixture();
+  const controller = new AbortController();
+  await owner.renderFrame(0, controller.signal);
+  const first = renderPreviewScene.mock.lastCall![0];
+  controller.abort();
+  for (const factory of [first.spatialRenderer, first.stagingCanvas, first.effectRuntimeExecutor]) {
+    expect(typeof factory).toBe('function');
+    if (typeof factory === 'function')
+      expect(() => factory()).toThrow(expect.objectContaining({ name: 'AbortError' }));
+  }
+  await owner.renderFrame(0.1, new AbortController().signal);
+  const second = renderPreviewScene.mock.lastCall![0];
+  owner.dispose();
+  for (const factory of [
+    second.spatialRenderer,
+    second.stagingCanvas,
+    second.effectRuntimeExecutor,
+  ]) {
+    expect(typeof factory).toBe('function');
+    if (typeof factory === 'function')
+      expect(() => factory()).toThrow(expect.objectContaining({ name: 'AbortError' }));
+  }
+  await expect(owner.renderFrame(0.2, new AbortController().signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(spatial.create).not.toHaveBeenCalled();
+});
+
+it('rejects a render that finishes after its materializer closes', async () => {
+  const owner = resourceFixture();
+  let release!: () => void, enter!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve;
+  });
+  renderPreviewScene.mockImplementationOnce(async () => {
+    enter();
+    await gate;
+  });
+  const pending = owner.renderFrame(0, new AbortController().signal);
+  await entered;
+  owner.dispose();
+  release();
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(spatial.create).not.toHaveBeenCalled();
+});
+
+it('does not admit a retained previous canvas as a newly rendered framing result', async () => {
+  const owner = resourceFixture();
+  renderPreviewScene.mockResolvedValueOnce(false);
+  await expect(owner.renderFrame(0, new AbortController().signal)).rejects.toThrow(
+    'Preview frame is unavailable.'
+  );
+  owner.dispose();
 });

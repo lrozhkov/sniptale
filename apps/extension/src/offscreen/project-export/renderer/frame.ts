@@ -1,3 +1,5 @@
+import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
 import { resolveProjectOutputTransform } from '../../../features/video/project/export/output-dimensions';
 import {
@@ -65,6 +67,8 @@ function drawVisualPasses(params: {
   scaleX: number;
   scaleY: number;
   settings: VideoProjectExportSettings;
+  logicalSize: { width: number; height: number };
+  spatialRenderer?: () => ReviewSpatialRenderer;
 }) {
   const segments = segmentVisualLayersByViewportLock(
     resolveEffectRuntimeVisualLayers(
@@ -190,8 +194,53 @@ function drawUnlockedOverlayGroup(
   const drawContext = passBuffer?.context ?? params.context;
 
   try {
+    if (
+      params.renderPasses.visualPasses.length > 1 &&
+      params.renderPasses.visualPasses.some((pass) => pass.frame.camera.spatial) &&
+      !passBuffer
+    )
+      throw new Error('Motion blur buffer is unavailable.');
     for (const pass of params.renderPasses.visualPasses) {
       const paint = (drawContext: CanvasRenderingContext2D) => {
+        if (pass.frame.camera.spatial) {
+          if (!params.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
+          drawContext.save();
+          try {
+            drawContext.globalAlpha *= passBuffer ? 1 : pass.alpha;
+            drawSpatialCompositionGroup({
+              camera: pass.frame.camera,
+              context: drawContext,
+              renderer: params.spatialRenderer(),
+              clipMediaElements: params.clipMediaElements,
+              imageBank: params.loadedImages,
+              layers: resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+              effectState: resolveExportEffectDrawState(effectRuntimeStates, pass.time),
+              ...(getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time)
+                ? {
+                    frames: getEffectRuntimeVisualPassFrames(
+                      params.effectRuntimeFrames,
+                      pass.time
+                    )!,
+                  }
+                : {}),
+              logicalSize: params.logicalSize,
+              rasterScale: params.scaleX,
+              output: {
+                width: Math.max(1, Math.ceil(params.logicalSize.width * params.scaleX)),
+                height: Math.max(1, Math.ceil(params.logicalSize.height * params.scaleY)),
+              },
+              destination: {
+                x: params.offsetX,
+                y: params.offsetY,
+                width: params.logicalSize.width * params.scaleX,
+                height: params.logicalSize.height * params.scaleY,
+              },
+            });
+          } finally {
+            drawContext.restore();
+          }
+          return;
+        }
         beginExportCameraPass(drawContext, pass, params);
         drawVisualPassLayers(
           drawContext,
@@ -222,6 +271,7 @@ export function drawProjectFrame(
   clipMediaElements: ClipMediaSources,
   options: {
     backgroundCache?: ExportSceneBackgroundCache;
+    spatialRenderer?: () => ReviewSpatialRenderer;
     compositionIndex?: VideoCompositionTimelineIndex;
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
   } = {}
@@ -256,6 +306,8 @@ export function drawProjectFrame(
     offsetX,
     offsetY,
     renderPasses,
+    logicalSize: { width: project.width, height: project.height },
+    ...(options.spatialRenderer ? { spatialRenderer: options.spatialRenderer } : {}),
     scaleX: scale,
     scaleY: scale,
     settings,
@@ -270,7 +322,10 @@ export function drawProjectFrame(
   if (offsetX !== 0 || offsetY !== 0) {
     context.translate(offsetX, offsetY);
   }
-  drawExportOverlayPass(context, renderPasses.overlayFrame, scale, scale);
+  drawExportOverlayPass(context, renderPasses.overlayFrame, scale, scale, {
+    logicalSize: { width: project.width, height: project.height },
+    spatialRenderer: options.spatialRenderer,
+  });
   context.restore();
 
   context.restore();

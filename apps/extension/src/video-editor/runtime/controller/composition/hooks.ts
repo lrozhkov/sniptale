@@ -1,4 +1,5 @@
 import { useContext, useMemo, type Context } from 'react';
+import { presentWorkspaceMotionSpatialPreview } from '../workspace-state';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -235,13 +236,18 @@ export function useVideoEditorHeaderController() {
 function usePresentedProject() {
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const sceneBackground = useWorkspaceSceneBackgroundContext();
+  const { motionSpatialPreview } = useWorkspaceInspectorContext();
+  const selection = useVideoEditorClipSelectionPort((port) => port.selection);
   return useMemo(() => {
-    if (!project || !sceneBackground.preview) return project;
-    return {
-      ...project,
-      ...syncProjectSceneBackground(project, sceneBackground.preview),
-    };
-  }, [project, sceneBackground.preview]);
+    if (!project) return project;
+    const presented = presentWorkspaceMotionSpatialPreview(
+      project,
+      selection,
+      motionSpatialPreview
+    );
+    if (!sceneBackground.preview) return presented;
+    return { ...presented, ...syncProjectSceneBackground(presented, sceneBackground.preview) };
+  }, [project, selection, motionSpatialPreview, sceneBackground.preview]);
 }
 
 export function useVideoEditorPreviewController() {

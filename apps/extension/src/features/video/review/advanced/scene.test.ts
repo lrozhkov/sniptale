@@ -11,12 +11,15 @@ import {
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { DEFAULT_QUICK_EDIT_PERSPECTIVE, DEFAULT_QUICK_EDIT_DEPTH } from './spatial';
+import {
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+} from '../../project/motion/spatial';
 import {
   quickEditPlaneProjection,
   projectQuickEditPoint,
   invertQuickEditProjection,
-} from './spatial-geometry';
+} from '../../composition/motion/spatial-geometry';
 import {
   computeQuickEditSpatialWindow,
   computeQuickEditSpatialRasterLayout,

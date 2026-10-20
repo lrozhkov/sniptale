@@ -152,3 +152,31 @@ it('converts authored background pixels to preview coordinates before applying D
   );
   expect(context.setTransform).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
 });
+
+it('sizes a detached drawing canvas from the presented viewport without resizing the presented canvas', () => {
+  const canvas = document.createElement('canvas');
+  const viewportCanvas = document.createElement('canvas');
+  viewportCanvas.width = 320;
+  viewportCanvas.height = 180;
+  Object.defineProperty(viewportCanvas, 'clientWidth', { get: () => 960 });
+  Object.defineProperty(viewportCanvas, 'clientHeight', { get: () => 540 });
+  const context = createContextMock();
+  Object.defineProperty(canvas, 'getContext', { value: () => context });
+  const args = {
+    canvas,
+    viewportCanvas,
+    imageBank: {},
+    project: createEmptyVideoProject('Detached', 1280, 720),
+    shouldClearCanvas: true,
+    stage: null,
+    previewRasterSize: { width: 480, height: 270 },
+  };
+  const prepared = resolvePreparedPreviewSceneCanvas(args)!;
+  expect(prepared.bounds).toEqual({ width: 960, height: 540 });
+  expect(prepared.viewport.scale).toBe(0.75);
+  expect(prepared.dpr).toBe(0.5);
+  expect(canvas.width).toBe(480);
+  expect(canvas.height).toBe(270);
+  expect(viewportCanvas.width).toBe(320);
+  expect(viewportCanvas.height).toBe(180);
+});

@@ -13,9 +13,9 @@ import type {
 } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-} from '../../features/video/review/advanced/spatial';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
+} from '../../features/video/project/motion/spatial';
 import {
   resolveReviewSpatialFocusGeometry,
   reviewSpatialFocusPatch,

@@ -1,4 +1,11 @@
 import type { CSSProperties } from 'react';
+import { motionCameraProjection } from '../../../../features/video/composition/motion/spatial';
+import {
+  invertQuickEditProjection,
+  projectQuickEditPoint,
+  quickEditProjectionCss,
+  type QuickEditHomography,
+} from '../../../../features/video/composition/motion/spatial-geometry';
 
 import {
   mapCompositionPointThroughCamera,
@@ -87,6 +94,7 @@ export function mapClientPointToCompositionPoint(params: {
   clientX: number;
   clientY: number;
   lockToViewport?: boolean;
+  clampToViewport?: boolean;
   project: VideoProject;
   stage: HTMLDivElement;
 }) {
@@ -95,8 +103,10 @@ export function mapClientPointToCompositionPoint(params: {
     return null;
   }
 
-  const viewportX = clampNumber(params.clientX - bounds.left - viewport.offsetX, 0, viewport.width);
-  const viewportY = clampNumber(params.clientY - bounds.top - viewport.offsetY, 0, viewport.height);
+  const x = params.clientX - bounds.left - viewport.offsetX;
+  const y = params.clientY - bounds.top - viewport.offsetY;
+  const viewportX = params.clampToViewport === false ? x : clampNumber(x, 0, viewport.width);
+  const viewportY = params.clampToViewport === false ? y : clampNumber(y, 0, viewport.height);
 
   const viewportPoint = {
     x: (viewportX / viewport.width) * params.project.width,
@@ -117,6 +127,7 @@ export function getCompositionPointStageStyle(
 ): CSSProperties {
   const { bounds, viewport } = resolvePreviewStageViewportMetrics(stage, project);
   const mappedPoint = lockToViewport ? point : mapCompositionPointThroughCamera(point, camera);
+  if (!mappedPoint || bounds.width <= 0 || bounds.height <= 0) return { display: 'none' };
 
   return {
     left: `${((viewport.offsetX + mappedPoint.x * viewport.scale) / bounds.width) * 100}%`,
@@ -126,13 +137,59 @@ export function getCompositionPointStageStyle(
 
 export function getCompositionRectStageStyle(
   project: VideoProject,
-  rect: { height: number; width: number; x: number; y: number },
+  rect: { height: number; width: number; x: number; y: number; rotation?: number },
   camera: PreviewStageCanvasProps['camera'],
   lockToViewport: boolean,
   stage: HTMLDivElement
 ): CSSProperties {
   const { bounds, viewport } = resolvePreviewStageViewportMetrics(stage, project);
+  if (bounds.width <= 0 || bounds.height <= 0) return { display: 'none' };
+  if (!lockToViewport && camera.spatial) {
+    if (rect.width === 0 && rect.height === 0)
+      return getCompositionPointStageStyle(project, rect, camera, false, stage);
+    const matrix = motionCameraProjection(camera, viewport.scale);
+    if (!matrix || !matrix.every(Number.isFinite) || !invertQuickEditProjection(matrix))
+      return { display: 'none' };
+    const radians = ((rect.rotation ?? 0) * Math.PI) / 180;
+    const c = Math.cos(radians),
+      s = Math.sin(radians);
+    const width = rect.width * viewport.scale,
+      height = rect.height * viewport.scale;
+    const x = rect.x * viewport.scale + (width / 2) * (1 - c) + (height / 2) * s;
+    const y = rect.y * viewport.scale + (height / 2) * (1 - c) - (width / 2) * s;
+    const [a, b, d, e, f, j, g, h, i] = matrix;
+    const local: QuickEditHomography = [
+      a * c + b * s,
+      -a * s + b * c,
+      a * x + b * y + d,
+      e * c + f * s,
+      -e * s + f * c,
+      e * x + f * y + j,
+      g * c + h * s,
+      -g * s + h * c,
+      g * x + h * y + i,
+    ];
+    if (
+      !local.every(Number.isFinite) ||
+      [
+        { x: 0, y: 0 },
+        { x: width, y: 0 },
+        { x: width, y: height },
+        { x: 0, y: height },
+      ].some((point) => !projectQuickEditPoint(local, point))
+    )
+      return { display: 'none' };
+    return {
+      left: `${(viewport.offsetX / bounds.width) * 100}%`,
+      top: `${(viewport.offsetY / bounds.height) * 100}%`,
+      width: `${(width / bounds.width) * 100}%`,
+      height: `${(height / bounds.height) * 100}%`,
+      transform: quickEditProjectionCss(local),
+      transformOrigin: '0 0',
+    };
+  }
   const mappedRect = lockToViewport ? rect : mapCompositionRectThroughCamera(rect, camera);
+  if (!mappedRect) return { display: 'none' };
 
   return {
     height: `${((mappedRect.height * viewport.scale) / bounds.height) * 100}%`,

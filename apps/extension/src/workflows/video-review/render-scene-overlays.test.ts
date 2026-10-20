@@ -5,12 +5,10 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditSpatialWindow,
 } from '../../features/video/review/advanced/scene';
-import {
-  quickEditSpatialTargetCamera,
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-} from '../../features/video/review/advanced/spatial';
+import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/project/motion/spatial';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import type { ReviewSpatialRenderer } from './spatial-renderer';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
 vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
 vi.mock('./render-click-animation', () => ({ drawReviewClicks: vi.fn() }));
@@ -64,6 +62,7 @@ it.each([false, true])(
       transform: { x: 0.2, y: 0.3, width: 0.4, height: 0.1, rotation: 0.2 },
     };
     const renderer: ReviewSpatialRenderer = {
+      validateSizes: vi.fn(),
       surface: vi.fn(() => ({ canvas, context: overlay })),
       draw: vi.fn(() => events.push('projection')),
       dispose: vi.fn(),
@@ -130,6 +129,7 @@ it.each([false, true])(
       camera: quickEditSpatialTargetCamera(region),
     });
     const renderer: ReviewSpatialRenderer = {
+      validateSizes: vi.fn(),
       surface: () => ({ canvas, context }),
       draw: vi.fn(),
       dispose: vi.fn(),
@@ -181,6 +181,7 @@ it('forwards managed resources and uses canonical spatial content before viewpor
   const overlayContext = {} as CanvasRenderingContext2D;
   const resources = { canvas: vi.fn(), bytes: vi.fn() };
   const renderer = {
+    validateSizes: vi.fn(),
     surface: () => ({ canvas, context: overlayContext }),
     draw: vi.fn(),
     dispose: vi.fn(),
@@ -259,6 +260,7 @@ it.each(['absent', 'hidden', 'outside-time', 'not-exported'] as const)(
       ...(condition === 'not-exported' ? { renderToVideo: false } : {}),
     };
     const renderer = {
+      validateSizes: vi.fn(),
       surface: vi.fn(() => ({ canvas, context })),
       draw: vi.fn(),
       dispose: vi.fn(),

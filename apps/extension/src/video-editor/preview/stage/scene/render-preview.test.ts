@@ -162,3 +162,169 @@ it('keeps the presented scene when caption preparation fails or completes after 
   expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
   expect(draw).not.toHaveBeenCalled();
 });
+
+it('preserves the last complete spatial frame through paint failure cancellation resize and retry', async () => {
+  const { job } = setup();
+  const { createDefaultCameraState } =
+    await import('../../../../features/video/composition/motion/defaults');
+  const staging = document.createElement('canvas');
+  job.canvas.width = 320;
+  job.canvas.height = 180;
+  const presented = job.canvas.getContext('2d')!;
+  const publish = vi.spyOn(presented, 'drawImage');
+  const cameraOverride = {
+    ...createDefaultCameraState(job.project),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 0,
+      windowMotion: 0,
+      lockBackground: false,
+      focus: [],
+      reference: { x: 0, y: 0, width: 1280, height: 720 },
+    },
+  };
+  const input = { ...job, cameraOverride, stagingCanvas: () => staging };
+  const paint = (canvas: HTMLCanvasElement, width = 640, height = 360) => {
+    canvas.width = width;
+    canvas.height = height;
+    return {
+      context: canvas.getContext('2d')!,
+      bounds: { width, height },
+      dpr: 1,
+      viewport: { width, height, offsetX: 0, offsetY: 0, scale: 0.5 },
+    };
+  };
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+    paint(canvas);
+    throw new Error('projection failed');
+  });
+  await expect(renderPreviewScene(input)).rejects.toThrow('projection failed');
+  expect(job.canvas.width).toBe(320);
+  expect(job.canvas.height).toBe(180);
+  expect(publish).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+    const result = paint(canvas);
+    controller.abort();
+    return result;
+  });
+  expect(await renderPreviewScene({ ...input, signal: controller.signal })).toBe(false);
+  expect(publish).not.toHaveBeenCalled();
+  expect(job.canvas.width).toBe(320);
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas, viewportCanvas }) => {
+    expect(canvas).toBe(staging);
+    expect(viewportCanvas).toBe(job.canvas);
+    return paint(canvas);
+  });
+  await renderPreviewScene(input);
+  expect(job.canvas.width).toBe(640);
+  expect(job.canvas.height).toBe(360);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(publish).toHaveBeenCalledWith(staging, 0, 0);
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+    paint(canvas, 1920, 1080);
+    throw new Error('resized GPU failed');
+  });
+  await expect(renderPreviewScene(input)).rejects.toThrow('resized GPU failed');
+  expect(job.canvas.width).toBe(640);
+  expect(job.canvas.height).toBe(360);
+  expect(publish).toHaveBeenCalledOnce();
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) =>
+    paint(canvas, 1920, 1080)
+  );
+  await renderPreviewScene(input);
+  expect(job.canvas.width).toBe(1920);
+  expect(job.canvas.height).toBe(1080);
+  expect(publish).toHaveBeenCalledTimes(2);
+});
+
+it('avoids staging for plain frames and releases temporary spatial canvas after failure', async () => {
+  const { job } = setup();
+  const stagingCanvas = vi.fn(() => document.createElement('canvas'));
+  await renderPreviewScene({ ...job, stagingCanvas });
+  expect(stagingCanvas).not.toHaveBeenCalled();
+  const { createDefaultCameraState } =
+    await import('../../../../features/video/composition/motion/defaults');
+  const cameraOverride = {
+    ...createDefaultCameraState(job.project),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 0,
+      windowMotion: 0,
+      lockBackground: false,
+      focus: [],
+      reference: { x: 0, y: 0, width: 1280, height: 720 },
+    },
+  };
+  const observed: HTMLCanvasElement[] = [];
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+    observed.push(canvas);
+    canvas.width = 960;
+    canvas.height = 540;
+    throw new Error('temporary frame failed');
+  });
+  await expect(renderPreviewScene({ ...job, cameraOverride })).rejects.toThrow(
+    'temporary frame failed'
+  );
+  expect(observed[0]).not.toBe(job.canvas);
+  expect(observed[0]!.width).toBe(0);
+  expect(observed[0]!.height).toBe(0);
+});
+
+it('retains the complete live frame when sharp overlays fail after successful spatial media painting', async () => {
+  const { job } = setup();
+  job.project.duration = 5;
+  job.project.actionEvents = [
+    {
+      id: 'manual',
+      kind: 'CLICK',
+      anchor: { kind: 'project', time: 0.8 },
+      point: { x: 100, y: 80 },
+      label: 'Click',
+      data: {},
+    },
+  ];
+  const { createDefaultCameraState } =
+    await import('../../../../features/video/composition/motion/defaults');
+  const cameraOverride = {
+    ...createDefaultCameraState(job.project),
+    spatial: {
+      rotation: [0, 0, 0, 1] as const,
+      perspective: 1,
+      windowMotion: 1,
+      lockBackground: false,
+      focus: [],
+      reference: { x: 0, y: 0, width: 1280, height: 720 },
+    },
+  };
+  job.canvas.width = 320;
+  job.canvas.height = 180;
+  const presented = job.canvas.getContext('2d')!;
+  presented.fillStyle = '#22d3ee';
+  presented.fillRect(0, 0, 320, 180);
+  const publish = vi.spyOn(presented, 'drawImage');
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+    canvas.width = 640;
+    canvas.height = 360;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#ff0000';
+    context.fillRect(0, 0, 640, 360);
+    return {
+      context,
+      bounds: { width: 640, height: 360 },
+      dpr: 1,
+      viewport: { width: 640, height: 360, offsetX: 0, offsetY: 0, scale: 0.5 },
+    };
+  });
+  const spatialRenderer = vi.fn(() => {
+    throw new Error('sharp GPU failed');
+  });
+  await expect(renderPreviewScene({ ...job, cameraOverride, spatialRenderer })).rejects.toThrow(
+    'sharp GPU failed'
+  );
+  expect(spatialRenderer).toHaveBeenCalledOnce();
+  expect(job.canvas.width).toBe(320);
+  expect(job.canvas.height).toBe(180);
+  expect(publish).not.toHaveBeenCalled();
+  expect(Array.from(presented.getImageData(20, 20, 1, 1).data)).toEqual([34, 211, 238, 255]);
+});

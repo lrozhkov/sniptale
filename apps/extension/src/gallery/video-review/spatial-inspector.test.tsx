@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ReviewSpatialInspector } from './spatial-inspector';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/project/motion/spatial';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -148,7 +148,8 @@ it.each(['tilt', 'rotation', 'focus'] as const)(
 );
 
 it('edits focus area and strength through the existing unit fields', async () => {
-  const { DEFAULT_QUICK_EDIT_DEPTH } = await import('../../features/video/review/advanced/spatial');
+  const { DEFAULT_CAMERA_DEPTH: DEFAULT_QUICK_EDIT_DEPTH } =
+    await import('../../features/video/project/motion/spatial');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -204,8 +205,8 @@ it.each([
 ] as const)(
   'accepts %s once on Enter, clears its preview and leaves numeric editing',
   async (label, nextLabel, group, key, expected) => {
-    const { DEFAULT_QUICK_EDIT_DEPTH } =
-      await import('../../features/video/review/advanced/spatial');
+    const { DEFAULT_CAMERA_DEPTH: DEFAULT_QUICK_EDIT_DEPTH } =
+      await import('../../features/video/project/motion/spatial');
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const host = document.createElement('div');
     document.body.append(host);

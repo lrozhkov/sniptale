@@ -6,10 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewStageGeometry, resolveReviewClickRaster } from './stage-geometry';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import {
-  DEFAULT_QUICK_EDIT_PERSPECTIVE,
-  quickEditSpatialTargetCamera,
-} from '../../features/video/review/advanced/spatial';
+import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
+import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../features/video/project/motion/spatial';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditWindowTransform,
@@ -19,7 +17,7 @@ import {
 import {
   projectQuickEditPoint,
   quickEditPlaneProjection,
-} from '../../features/video/review/advanced/spatial-geometry';
+} from '../../features/video/composition/motion/spatial-geometry';
 
 let host: HTMLDivElement;
 let root: Root;

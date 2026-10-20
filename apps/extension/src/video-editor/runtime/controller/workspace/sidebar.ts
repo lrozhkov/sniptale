@@ -169,6 +169,7 @@ function createWorkspaceSidebarProjectActions(args: {
     onUpdateActionEventDetails: args.projectUpdaters.updateActionEventDetails,
     onDeleteMotionRegion: args.projectUpdaters.deleteMotionRegion,
 
+    onPreviewMotionSpatial: args.workspace.inspector.previewMotionSpatial,
     onUpdateMotionRegion: args.projectUpdaters.updateMotionRegion,
     onUpdateTransitionDuration: args.projectUpdaters.updateTransitionDuration,
     onUpdateTransitionEasing: args.projectUpdaters.updateTransitionEasing,

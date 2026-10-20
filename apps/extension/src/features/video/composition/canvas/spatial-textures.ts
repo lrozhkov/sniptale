@@ -1,4 +1,4 @@
-import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
+import type { RenderResources } from './render-resources';
 import { REVIEW_SPATIAL_FILTER_FRAGMENT, REVIEW_SPATIAL_FILTER_VERTEX } from './spatial-shaders';
 
 /** Centered low-pass levels support arbitrary canvas sizes without POT padding or extensions. */

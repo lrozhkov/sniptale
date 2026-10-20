@@ -109,7 +109,7 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
     2.5,
     { image: 'loaded' },
     ['clip'],
-    {}
+    { spatialRenderer: expect.any(Function) }
   );
   expect(waitForEncoderQueueCapacityMock).toHaveBeenCalledWith(
     { encode: encodeMock },

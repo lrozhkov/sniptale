@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../features/video/project/motion/spatial';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { isHydratableVideoProject } from '../../../features/video/project/validation/root';
+import { VideoEditorSelectionKind } from '../../contracts/selection';
+import { presentWorkspaceMotionSpatialPreview } from './workspace-state';
 import {
   createWorkspaceLayoutController,
   createWorkspaceHeaderController,
@@ -312,4 +317,141 @@ it('keeps recording leave admission scoped to the registered mounted recorder', 
   releaseSecond();
   await expect(workspaceState!.voiceRecording.request()).resolves.toBe(true);
   expect(first).toHaveBeenCalledOnce();
+});
+
+it('keeps a spatial gesture disposable and exposes a stable cancellation callback', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const callback = workspaceState!.inspector.previewMotionSpatial;
+  const project = createEmptyVideoProject('Gesture');
+  const preview = {
+    project,
+    regionId: 'region',
+    edit: { kind: 'perspective' as const, rotateY: 20 },
+  };
+  act(() => callback(preview));
+  expect(workspaceState!.inspector.motionSpatialPreview).toBe(preview);
+  expect(workspaceState!.inspector.previewMotionSpatial).toBe(callback);
+  act(() => callback(null));
+  expect(workspaceState!.inspector.motionSpatialPreview).toBeNull();
+});
+
+it('presents a scalar spatial draft without changing accepted data or sibling fields', () => {
+  const project = createEmptyVideoProject('Spatial');
+  project.version = 19;
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    id: 'target',
+    perspective: { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateX: 10 },
+    spatialReference: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+  };
+  const sibling = { ...region, id: 'sibling' };
+  project.motionRegions = [region, sibling];
+  const snapshot = JSON.stringify(project);
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const presented = presentWorkspaceMotionSpatialPreview(project, selection, {
+    project,
+    regionId: region.id,
+    edit: { kind: 'perspective', rotateY: 35 },
+  });
+  expect(JSON.stringify(project)).toBe(snapshot);
+  expect(presented.version).toBe(19);
+  expect(presented.motionRegions?.[0]).toMatchObject({
+    perspective: { enabled: true, rotateX: 10, rotateY: 35 },
+    spatialReference: region.spatialReference,
+  });
+  expect(presented.motionRegions?.[1]).toBe(sibling);
+  expect(presented.clips).toBe(project.clips);
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  const reset = presentWorkspaceMotionSpatialPreview(project, selection, {
+    project,
+    regionId: region.id,
+    edit: { kind: 'reference', reset: true },
+  });
+  expect(reset.motionRegions?.[0]).not.toHaveProperty('spatialReference');
+  expect(reset.motionRegions?.[0]?.perspective).toBe(region.perspective);
+});
+
+it('rejects stale, foreign, unselected, missing, locked, invalid and unchanged spatial drafts', () => {
+  const project = createEmptyVideoProject('Spatial');
+  const region = { ...createVideoProjectMotionRegion(project, 0), id: 'target' };
+  project.motionRegions = [region];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const preview = {
+    project,
+    regionId: region.id,
+    edit: { kind: 'perspective' as const, rotateY: 35 },
+  };
+  expect(presentWorkspaceMotionSpatialPreview(project, selection, null)).toBe(project);
+  expect(presentWorkspaceMotionSpatialPreview(project, { kind: 'scene' }, preview)).toBe(project);
+  expect(
+    presentWorkspaceMotionSpatialPreview(
+      project,
+      { ...selection, motionRegionId: 'other' },
+      preview
+    )
+  ).toBe(project);
+  for (const changed of [
+    { ...project },
+    { ...project, motionRegions: [] },
+    { ...project, motionRegions: [{ ...region }] },
+    {
+      ...project,
+      utilityLanes: {
+        actions: { visible: true, locked: false },
+        camera: { visible: true, locked: true },
+      },
+    },
+  ]) {
+    expect(presentWorkspaceMotionSpatialPreview(changed, selection, preview)).toBe(changed);
+  }
+  expect(
+    presentWorkspaceMotionSpatialPreview(project, selection, { ...preview, regionId: 'missing' })
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionSpatialPreview(project, selection, {
+      ...preview,
+      edit: { kind: 'perspective', rotateY: 90 },
+    })
+  ).toBe(project);
+  expect(
+    presentWorkspaceMotionSpatialPreview(project, selection, {
+      ...preview,
+      edit: { kind: 'perspective', rotateY: 0 },
+    })
+  ).toBe(project);
+  const locked = {
+    ...project,
+    utilityLanes: {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    },
+  };
+  expect(
+    presentWorkspaceMotionSpatialPreview(locked, selection, { ...preview, project: locked })
+  ).toBe(locked);
+});
+
+it('upgrades only the presented legacy snapshot and refuses a missing selected region', () => {
+  const project = createEmptyVideoProject('Legacy');
+  project.version = 18;
+  const region = { ...createVideoProjectMotionRegion(project, 0), id: 'legacy' };
+  project.motionRegions = [region];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const preview = {
+    project,
+    regionId: region.id,
+    edit: { kind: 'perspective' as const, rotateY: 35, enabled: true },
+  };
+  const presented = presentWorkspaceMotionSpatialPreview(project, selection, preview);
+  expect(project.version).toBe(18);
+  expect(project.motionRegions[0]).toBe(region);
+  expect(project.motionRegions[0]!.perspective).toBeUndefined();
+  expect(presented.version).toBe(19);
+  expect(isHydratableVideoProject(presented)).toBe(true);
+  const deleted = { ...project, motionRegions: [] };
+  expect(
+    presentWorkspaceMotionSpatialPreview(deleted, selection, { ...preview, project: deleted })
+  ).toBe(deleted);
 });

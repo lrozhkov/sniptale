@@ -586,8 +586,10 @@ it('derives preset presentation through canonical history, rejected edits and pe
 it('switches attachment in real perspective geometry as one history edit and restores exact state', async () => {
   const { save, render } = setup(true);
   const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
-  const { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+  const { quickEditSpatialTargetCamera } =
     await import('../../features/video/review/advanced/spatial');
+  const { DEFAULT_CAMERA_PERSPECTIVE: DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+    await import('../../features/video/project/motion/spatial');
   const { createQuickEditZoomRegion } = await import('../../features/video/review/advanced/zoom');
   const region = {
     ...createQuickEditZoomRegion({ id: 'tilt', at: 0, duration: 4 }),

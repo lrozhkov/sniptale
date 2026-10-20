@@ -1,3 +1,8 @@
+import {
+  MotionPerspectiveFields,
+  MotionDepthFields,
+  MotionSpatialReferenceFields,
+} from '../motion/spatial';
 import { MotionBlurField } from '../motion/fields';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
@@ -87,6 +92,36 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
             content: (
               <MotionInspectorFieldset locked={isLocked}>
                 <MotionCameraFields motionRegion={motionRegion} panel={props} />
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'perspective',
+            semantic: 'perspective' as const,
+            label: translate('gallery.videoReview.perspective'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionPerspectiveFields motionRegion={motionRegion} panel={props} />
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'depth',
+            semantic: 'depth' as const,
+            label: translate('gallery.videoReview.depthOfField'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionDepthFields motionRegion={motionRegion} panel={props} />
+              </MotionInspectorFieldset>
+            ),
+          },
+          {
+            id: 'spatial-reference',
+            semantic: 'framing' as const,
+            label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
+            content: (
+              <MotionInspectorFieldset locked={isLocked}>
+                <MotionSpatialReferenceFields motionRegion={motionRegion} panel={props} />
               </MotionInspectorFieldset>
             ),
           },

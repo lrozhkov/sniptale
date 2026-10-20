@@ -1,3 +1,5 @@
+import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
+import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import { resolveOrderedVisualPassLayers } from '../../../../features/video/composition/visual-pass-layers';
 import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
 import {
@@ -71,9 +73,46 @@ function drawPreparedPreviewVisualPass(params: {
   layers: ReturnType<typeof mapVisualLayerToViewportSpace>[];
   pass: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'][number];
   prepared: PreparedPreviewSceneCanvas;
+  spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
   effectRuntimeFrames: EffectRuntimeRenderedFrameMap | undefined;
   effectRuntimeState: EffectRuntimeDrawState;
 }) {
+  if (params.pass.frame.camera.spatial) {
+    if (!params.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
+    const { viewport, dpr, context } = params.prepared;
+    context.save();
+    try {
+      context.globalAlpha *= params.pass.alpha;
+      drawSpatialCompositionGroup({
+        camera: params.pass.frame.camera,
+        context,
+        renderer: params.spatialRenderer(),
+        clipMediaElements: params.clipMediaElements,
+        imageBank: params.imageBank,
+        layers: params.layers,
+        effectState: params.effectRuntimeState,
+        ...(params.effectRuntimeFrames ? { frames: params.effectRuntimeFrames } : {}),
+        logicalSize: {
+          width: viewport.width / viewport.scale,
+          height: viewport.height / viewport.scale,
+        },
+        output: {
+          width: Math.max(1, Math.ceil(viewport.width * dpr)),
+          height: Math.max(1, Math.ceil(viewport.height * dpr)),
+        },
+        destination: {
+          x: viewport.offsetX,
+          y: viewport.offsetY,
+          width: viewport.width,
+          height: viewport.height,
+        },
+        rasterScale: viewport.scale * dpr,
+      });
+    } finally {
+      context.restore();
+    }
+    return;
+  }
   beginPreviewCameraPass(params.prepared, params.pass.frame.camera);
 
   for (const layer of params.layers) {
@@ -105,6 +144,8 @@ function drawPreparedPreviewVisualPass(params: {
 
 export function drawPreviewVisualPasses(params: {
   canvas: HTMLCanvasElement;
+  viewportCanvas?: HTMLCanvasElement;
+  spatialRenderer?: () => ReviewSpatialRenderer;
   clipMediaElements: Map<string, HTMLMediaElement>;
   currentTime?: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -117,6 +158,7 @@ export function drawPreviewVisualPasses(params: {
 }) {
   const prepared = resolvePreparedPreviewSceneCanvas({
     canvas: params.canvas,
+    ...(params.viewportCanvas ? { viewportCanvas: params.viewportCanvas } : {}),
     currentTime: params.currentTime ?? 0,
     imageBank: params.imageBank,
     project: params.project,
@@ -136,6 +178,7 @@ export function drawPreviewVisualPasses(params: {
     passes: params.passes,
     prepared,
     effectRuntimeFrames: params.effectRuntimeFrames,
+    spatialRenderer: params.spatialRenderer,
   });
   drawPreviewTransitionOverlays({
     canvas: params.canvas,
@@ -154,6 +197,7 @@ function drawPreviewOrderedVisualLayers(params: {
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   passes: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'];
   prepared: PreparedPreviewSceneCanvas;
+  spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
 }) {
   const segments = segmentVisualLayersByViewportLock(
     resolveEffectRuntimeVisualLayers(
@@ -192,6 +236,7 @@ function drawPreviewOrderedVisualLayers(params: {
       layers: segment.layers,
       passes: params.passes,
       prepared: params.prepared,
+      spatialRenderer: params.spatialRenderer,
     });
   }
 }
@@ -205,6 +250,7 @@ function drawPreviewUnlockedLayerGroup(params: {
   layers: ReturnType<typeof mapVisualLayerToViewportSpace>[];
   passes: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'];
   prepared: PreparedPreviewSceneCanvas;
+  spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
 }) {
   const passTarget = resolvePreviewPassTarget({
     canvas: params.canvas,
@@ -217,6 +263,12 @@ function drawPreviewUnlockedLayerGroup(params: {
       : { ...params.prepared, context: passTarget.context };
 
   try {
+    if (
+      params.passes.length > 1 &&
+      params.passes.some((pass) => pass.frame.camera.spatial) &&
+      !passTarget.drawPass
+    )
+      throw new Error('Motion blur buffer is unavailable.');
     for (const pass of params.passes) {
       const paint = (context: CanvasRenderingContext2D) =>
         drawPreparedPreviewVisualPass({
@@ -230,6 +282,7 @@ function drawPreviewUnlockedLayerGroup(params: {
           layers: resolveOrderedVisualPassLayers(params.layers, pass.frame.visualLayers),
           pass: passTarget.drawPass ? { ...pass, alpha: 1 } : pass,
           prepared: { ...groupedPrepared, context },
+          spatialRenderer: params.spatialRenderer,
         });
       if (passTarget.drawPass) passTarget.drawPass(pass.alpha, paint);
       else paint(groupedPrepared.context);

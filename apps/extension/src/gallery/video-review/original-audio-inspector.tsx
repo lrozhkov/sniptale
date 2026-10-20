@@ -2,7 +2,7 @@ import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sec
 import { Trash2, VolumeX, AudioLines, Clock3 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { useReviewAudio } from './use-review-audio';
-import { ReviewNumberRow } from './number-row';
+import { DraftNumericRow as ReviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
 import {
   ReviewButton,
   ReviewInterval,

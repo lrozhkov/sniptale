@@ -2,11 +2,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewSpatialTextures } from './spatial-textures';
 import { createReviewSpatialRenderer } from './spatial-renderer';
-import { createPreviewRenderResources } from './preview-render-resources';
+import { createPreviewRenderResources } from '../../../../workflows/video-review/preview-render-resources';
 import {
-  DEFAULT_QUICK_EDIT_DEPTH,
-  type QuickEditSpatialFrame,
-} from '../../features/video/review/advanced/spatial';
+  DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
+  type CameraSpatialFrame as QuickEditSpatialFrame,
+} from '../../project/motion/spatial';
 
 afterEach(() => vi.restoreAllMocks());
 function graphics() {
@@ -537,5 +537,40 @@ it.each(['viewport', 'framebuffer', 'accepted-buffer', 'source-rect', 'unsafe-by
     renderer.dispose();
     resources.dispose();
     expect(resources.counters.managedBytes).toBe(0);
+  }
+);
+
+it.each([true, false])(
+  'refuses invalid or unsupported surfaces before allocation and permits a valid retry with managed=%s',
+  (managed) => {
+    const { gl } = graphics();
+    const resources = managed ? resourceSession() : undefined;
+    const renderer = createReviewSpatialRenderer(undefined, resources);
+    const admitted = resources ? vi.spyOn(resources, 'canvas') : null;
+    const setWidth = vi.spyOn(HTMLCanvasElement.prototype, 'width', 'set');
+    const setHeight = vi.spyOn(HTMLCanvasElement.prototype, 'height', 'set');
+    for (const kind of ['plane', 'overlay', 'exposure'] as const) {
+      for (const width of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER])
+        expect(() => renderer.surface(kind, width, 10)).toThrow('output size');
+    }
+    gl.getParameter.mockImplementation((name) =>
+      name === gl.MAX_VIEWPORT_DIMS ? new Int32Array([16, 16]) : 16
+    );
+    expect(() => renderer.surface('plane', 17, 10)).toThrow('output size');
+    expect(() => renderer.surface('overlay', 10, 17)).toThrow('output size');
+    expect(() => renderer.surface('exposure', 17, 10)).toThrow('output size');
+    expect(setWidth).not.toHaveBeenCalled();
+    expect(setHeight).not.toHaveBeenCalled();
+    if (admitted) expect(admitted).not.toHaveBeenCalled();
+    const plane = renderer.surface('plane', 10, 10);
+    expect(plane.canvas.width).toBe(10);
+    expect(plane.canvas.height).toBe(10);
+    renderer.dispose();
+    if (resources) {
+      // The session retains the released 10×10 canvas until its own disposal.
+      expect(resources.counters.managedBytes).toBe(400);
+      resources.dispose();
+      expect(resources.counters.managedBytes).toBe(0);
+    }
   }
 );

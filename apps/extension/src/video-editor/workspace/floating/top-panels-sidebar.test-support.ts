@@ -73,6 +73,7 @@ function createProjectEditActions(): Omit<
 
     onInsertCursorSample: noop(),
     onMoveEffectInstance: noop(),
+    onPreviewMotionSpatial: noop(),
     onPreviewSceneBackground: noop(),
     onRememberRecentColor: noop(),
     onRenameTrack: noop(),

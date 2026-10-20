@@ -18,7 +18,10 @@ import type {
   VideoProjectAnnotationTemplatePatch,
 } from '../../../../features/video/project/annotation/contract';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
-import type { VideoEditorInspectorMode } from '../../../contracts/workspace';
+import type {
+  VideoEditorInspectorMode,
+  VideoEditorMotionSpatialPreview,
+} from '../../../contracts/workspace';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoObjectTrack } from '../../../../features/video/project/object-tracks';
 import type { VideoObjectTrackCorrectionAnchor } from '../../../../features/video/project/object-tracks';
@@ -162,6 +165,7 @@ export interface WorkspaceSidebarProps {
     clipId: string,
     templateKind: VideoProjectAnnotationClip['templateKind']
   ) => void;
+  onPreviewMotionSpatial?: (preview: VideoEditorMotionSpatialPreview | null) => void;
   onUpdateMotionRegion?: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpdateShapeStyle: (clipId: string, patch: Record<string, string | number>) => void;
   onUpdateSubtitleTrackStyle?: (trackId: string, patch: Record<string, string | number>) => void;

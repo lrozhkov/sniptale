@@ -3,7 +3,7 @@ import {
   type ReviewSpotlightClip,
 } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
 import type { QuickEditSpotlightFrame } from '../../../../apps/extension/src/features/video/review/advanced/focus';
-import type { QuickEditHomography } from '../../../../apps/extension/src/features/video/review/advanced/spatial-geometry';
+import type { QuickEditHomography } from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
 import type { RenderResources } from '../../../../apps/extension/src/features/video/composition/canvas/render-resources';
 import { createUntiledSpotlightMasks } from './spotlight-mask-reference';
 

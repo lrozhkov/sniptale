@@ -1,5 +1,5 @@
 import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
-import { hasQuickEditPerspective } from '../../features/video/review/advanced/spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
   presentationMainColorOpacity,
   presentationMainColor,
@@ -34,7 +34,7 @@ import {
   calculatePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
-import { createReviewSpatialRenderer } from './spatial-renderer';
+import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import { drawReviewSceneFrame } from './scene-frame';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { drawReviewWebcam } from './render-webcam';
