@@ -15,6 +15,7 @@ type PreparedPreview = {
   source: MediaStream | null;
   preparation: CameraSourceLease | null;
   cancelPreparation: (() => void) | null;
+  readiness: Promise<void>;
 };
 
 export function createCountdownPreviewOwner(deps: {
@@ -44,39 +45,56 @@ export function createCountdownPreviewOwner(deps: {
       stream?: MediaStream | null;
     }): Promise<void> {
       cleanup();
+      const readiness = Promise.withResolvers<void>();
       const target: PreparedPreview = {
         binding: args.binding,
         retired: false,
         source: null,
         preparation: null,
         cancelPreparation: null,
+        readiness: readiness.promise,
       };
       current = target;
       if ('stream' in args) {
         target.source = args.stream ?? null;
+        readiness.resolve();
         return;
       }
-      if (args.captureMode === CaptureMode.CAMERA || !args.settings.webcamEnabled) return;
+      if (args.captureMode === CaptureMode.CAMERA || !args.settings.webcamEnabled) {
+        readiness.resolve();
+        return;
+      }
       await new Promise<void>((resolve) => {
         let settled = false;
         const finish = () => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
-          target.cancelPreparation = null;
           resolve();
         };
         const timer = setTimeout(finish, 2000);
-        target.cancelPreparation = finish;
-        void deps.acquireCamera(args.settings).then((preparation) => {
-          if (settled || current !== target || target.retired) {
-            preparation.release();
-          } else {
-            target.preparation = preparation;
-            target.source = preparation.stream;
-          }
+        target.cancelPreparation = () => {
+          readiness.resolve();
           finish();
-        }, finish);
+        };
+        void deps.acquireCamera(args.settings).then(
+          (preparation) => {
+            if (current !== target || target.retired) {
+              preparation.release();
+            } else {
+              target.preparation = preparation;
+              target.source = preparation.stream;
+            }
+            target.cancelPreparation = null;
+            readiness.resolve();
+            finish();
+          },
+          () => {
+            target.cancelPreparation = null;
+            readiness.resolve();
+            finish();
+          }
+        );
       });
     },
 
@@ -93,6 +111,7 @@ export function createCountdownPreviewOwner(deps: {
         peerId: args.peerId,
         offer: { type: 'offer', sdp: args.sdp },
         source: async () => {
+          await target.readiness;
           if (current !== target || target.retired)
             throw new Error('Countdown camera source is unavailable.');
           const track = target.source?.getVideoTracks()[0];

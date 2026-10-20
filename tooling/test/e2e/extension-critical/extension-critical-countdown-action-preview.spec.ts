@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { expect, test, type Browser } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext } from '@playwright/test';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -64,18 +64,103 @@ async function saveActionScreenshot(browser: Browser, targetId: string, path: st
   }
 }
 
+async function installControlledTabCamera(
+  context: BrowserContext,
+  browser: Browser,
+  delayMs: number
+) {
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  await worker.evaluate(async () => {
+    await chrome.offscreen.createDocument({
+      url: `apps/extension/src/offscreen/offscreen.html?offscreenStartupId=${crypto.randomUUID()}`,
+      reasons: [
+        chrome.offscreen.Reason.USER_MEDIA,
+        chrome.offscreen.Reason.CLIPBOARD,
+        chrome.offscreen.Reason.DISPLAY_MEDIA,
+      ],
+      justification: 'Test a controlled camera with native tab capture',
+    });
+  });
+  const session = await browser.newBrowserCDPSession();
+  let targetId: string;
+  try {
+    await expect
+      .poll(async () => {
+        const { targetInfos } = await session.send('Target.getTargets');
+        return targetInfos.some((target) => target.url.includes('/offscreen/offscreen.html'));
+      })
+      .toBe(true);
+    const { targetInfos } = await session.send('Target.getTargets');
+    const offscreen = targetInfos.find((target) =>
+      target.url.includes('/offscreen/offscreen.html')
+    );
+    if (!offscreen) throw new Error('Controlled camera offscreen target is unavailable');
+    targetId = offscreen.targetId;
+  } finally {
+    await session.detach();
+  }
+  const install = (acquisitionDelay: number) => {
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    const probe = { requests: 0, streams: [] as MediaStream[] };
+    Reflect.set(globalThis, '__countdownCameraSource', probe);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const video = constraints?.video;
+      const mandatory = typeof video === 'object' ? Reflect.get(video, 'mandatory') : undefined;
+      const tabSource =
+        typeof mandatory === 'object' &&
+        mandatory !== null &&
+        Reflect.get(mandatory, 'chromeMediaSource') === 'tab';
+      if (!video || tabSource) return original(constraints);
+      probe.requests += 1;
+      await new Promise<void>((resolve) => setTimeout(resolve, acquisitionDelay));
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 360;
+      const drawing = canvas.getContext('2d');
+      if (!drawing) throw new Error('Controlled camera drawing context is unavailable');
+      let frame = 0;
+      const draw = () => {
+        drawing.fillStyle = frame % 2 ? '#ff6600' : '#2244ff';
+        drawing.fillRect(0, 0, canvas.width, canvas.height);
+        drawing.fillStyle = '#fff';
+        drawing.font = '32px sans-serif';
+        drawing.fillText(`Camera frame ${++frame}`, 32, 96);
+        window.setTimeout(draw, 33);
+      };
+      draw();
+      const stream = canvas.captureStream(30);
+      probe.streams.push(stream);
+      return stream;
+    };
+  };
+  await evaluateInTarget(context, targetId, `(${install.toString()})(${delayMs})`);
+  return targetId;
+}
+
+const scenarios = [
+  { captureMode: CaptureMode.SCREEN, countdownSeconds: 3, cameraDelay: null },
+  { captureMode: CaptureMode.CAMERA, countdownSeconds: 3, cameraDelay: null },
+  { captureMode: CaptureMode.TAB, countdownSeconds: 3, cameraDelay: 0 },
+  { captureMode: CaptureMode.TAB, countdownSeconds: 3, cameraDelay: 2_600 },
+  { captureMode: CaptureMode.TAB, countdownSeconds: 10, cameraDelay: 2_600, reopen: true },
+] as const;
+
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  for (const captureMode of [CaptureMode.SCREEN, CaptureMode.CAMERA]) {
-    test(`actual action popup camera countdown ${captureMode} ${viewport.name}`, async ({}, info) => {
+  for (const scenario of scenarios) {
+    const { captureMode, countdownSeconds, cameraDelay } = scenario;
+    const reopen = 'reopen' in scenario && scenario.reopen;
+    const name = `actual action popup camera countdown ${captureMode} ${countdownSeconds}s`;
+    test(`${name} ${cameraDelay ?? 'native'}ms ${reopen ? 'reopen' : 'record'} ${viewport.name}`, async ({}, info) => {
       const server = await startHostServer();
       const launched = await launchExtensionBrowser({
         viewport: viewport.size,
-        fakeMediaDevices: true,
+        fakeMediaDevices: cameraDelay === null,
       });
       try {
         const { context, browser, extensionId } = launched;
         const settings = {
           ...DEFAULT_VIDEO_SETTINGS,
+          countdownSeconds,
           webcamEnabled: true,
           microphoneEnabled: false,
           systemAudioEnabled: false,
@@ -98,6 +183,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         );
         await gallery.getByText('Your Library is empty', { exact: true }).waitFor();
         await gallery.close();
+        const offscreen =
+          cameraDelay === null
+            ? null
+            : await installControlledTabCamera(context, browser, cameraDelay);
         const target = await context.newPage();
         await target.goto(`${server.origin}/fixtures/host-page.html?actual-countdown=1`);
         const tabId = await seed.evaluate(async (url) => {
@@ -107,7 +196,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         }, target.url());
         await seed.close();
         await target.bringToFront();
-        const action = await triggerExtensionAction(context, extensionId, target);
+        let action = await triggerExtensionAction(context, extensionId, target);
         await expect
           .poll(() =>
             evaluateInTarget(
@@ -122,24 +211,54 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           action,
           `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
         );
-        const started = await sendRuntimeMessageInTarget(context, action, {
-          type: VideoMessageType.START_RECORDING,
-          captureMode,
-          tabId,
-          viewportPresetId: null,
-          settings,
-        });
-        expect(
-          z
-            .object({
-              success: z.boolean(),
-              error: z.string().optional(),
-              failureCode: z.string().optional(),
-            })
-            .parse(started)
-        ).toEqual({ success: true });
-        const inspect = () =>
-          evaluateInTarget(
+        const started = await sendRuntimeMessageInTarget(
+          context,
+          action,
+          {
+            type: VideoMessageType.START_RECORDING,
+            captureMode,
+            tabId,
+            viewportPresetId: null,
+            settings,
+          },
+          captureMode !== CaptureMode.TAB
+        );
+        if (captureMode !== CaptureMode.TAB)
+          expect(
+            z
+              .object({
+                success: z.boolean(),
+                error: z.string().optional(),
+                failureCode: z.string().optional(),
+              })
+              .parse(started)
+          ).toEqual({ success: true });
+        const inspect = async () => {
+          const session = await browser.newBrowserCDPSession();
+          try {
+            const { targetInfos } = await session.send('Target.getTargets');
+            if (!targetInfos.some((candidate) => candidate.targetId === action)) {
+              await target.bringToFront();
+              action = await triggerExtensionAction(context, extensionId, target);
+              await expect
+                .poll(() =>
+                  evaluateInTarget(
+                    context,
+                    action,
+                    `Boolean(document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]'))`
+                  )
+                )
+                .toBe(true);
+              await evaluateInTarget(
+                context,
+                action,
+                `document.querySelector('[data-ui="popup.app.tabs"] button[data-page="video"]')?.click()`
+              );
+            }
+          } finally {
+            await session.detach();
+          }
+          return evaluateInTarget(
             context,
             action,
             `(() => {
@@ -156,7 +275,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           };
         })()`
           );
-        await expect.poll(inspect, { intervals: [50, 100], timeout: 4_000 }).toEqual({
+        };
+        await expect.poll(inspect, { intervals: [50, 100], timeout: 7_000 }).toEqual({
           hasFrames: true,
           unavailable: false,
           cameraIcons: 1,
@@ -173,7 +293,26 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           );
           return response.success ? response.state?.status : null;
         };
-        await expect.poll(readStatus).toBe(VideoRecordingStatus.RECORDING);
+        if (reopen) {
+          const previous = action;
+          const session = await browser.newBrowserCDPSession();
+          try {
+            await session.send('Target.closeTarget', { targetId: previous });
+            await expect
+              .poll(async () => {
+                const { targetInfos } = await session.send('Target.getTargets');
+                return targetInfos.some((candidate) => candidate.targetId === previous);
+              })
+              .toBe(false);
+          } finally {
+            await session.detach();
+          }
+          await expect.poll(inspect, { intervals: [50, 100] }).toMatchObject({ hasFrames: true });
+          await expect.poll(readStatus).toBe(VideoRecordingStatus.COUNTDOWN);
+        }
+        await expect
+          .poll(readStatus, { timeout: countdownSeconds * 1_000 + 10_000 })
+          .toBe(VideoRecordingStatus.RECORDING);
         expect(
           await evaluateInTarget(
             context,
@@ -181,6 +320,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             `document.querySelectorAll('[data-ui="popup.video-active.countdown-camera-preview"]').length`
           )
         ).toBe(0);
+        if (offscreen) {
+          const source = await evaluateInTarget(
+            context,
+            offscreen,
+            `(() => {
+            const source = globalThis.__countdownCameraSource;
+            return { requests: source.requests, live: source.streams.every(stream =>
+              stream.getVideoTracks().every(track => track.readyState === 'live')) };
+          })()`
+          );
+          expect(source).toEqual({ requests: 1, live: true });
+        }
       } finally {
         await closeExtensionBrowser(launched);
         server.server.closeAllConnections();
