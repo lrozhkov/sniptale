@@ -278,6 +278,137 @@ test('native context-menu recording handoff keeps the explicit source tab throug
 });
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`native recording left microphone toggle ${viewport.name}`, async ({}, info) => {
+    const launched = await launchExtensionBrowser({
+      viewport: viewport.size,
+      fakeMediaDevices: true,
+    });
+    try {
+      const { context, extensionId } = launched;
+      const browser = context.browser();
+      if (!browser) throw new Error('Recording microphone browser is unavailable');
+      const session = await browser.newBrowserCDPSession();
+      try {
+        for (const name of ['microphone', 'camera']) {
+          await session.send('Browser.setPermission', {
+            origin: `chrome-extension://${extensionId}`,
+            permission: { name },
+            setting: 'granted',
+          });
+        }
+      } finally {
+        await session.detach();
+      }
+      const seed = await openRealPopup(context, extensionId);
+      const microphoneLabel = await seed.evaluate(
+        async ({ defaults, resolution }) => {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const microphone = devices.find((device) => device.kind === 'audioinput');
+          const webcam = devices.find((device) => device.kind === 'videoinput');
+          if (!microphone?.label || !webcam)
+            throw new Error('Fake recording devices are unavailable');
+          await chrome.storage.local.set({
+            sniptale_video_settings: {
+              ...defaults,
+              microphoneDeviceId: microphone.deviceId,
+              microphoneEnabled: true,
+              webcamDeviceId: webcam.deviceId,
+              webcamEnabled: true,
+              systemAudioEnabled: false,
+              countdownSeconds: 0,
+              warnWithoutMicrophone: false,
+              qualityProfileId: null,
+              outputProfile: { ...defaults.outputProfile, resolution },
+            },
+            sniptale_video_ui_state: { captureMode: 'CAMERA', viewportPresetId: null },
+            'sniptale-locale-preference': 'en',
+          });
+          return microphone.label;
+        },
+        { defaults: DEFAULT_VIDEO_SETTINGS, resolution: VideoResolutionPreset.P240 }
+      );
+      await seed.close();
+      const libraryPopup = await openVideoSetup(context, extensionId);
+      const galleryOpened = context.waitForEvent('page');
+      await libraryPopup.locator('[data-ui="popup.video-setup.gallery-button"]').click();
+      const gallery = await galleryOpened;
+      await gallery.waitForURL('**/gallery/index.html*');
+      await expect(
+        gallery
+          .locator('[data-ui="gallery.content.surface"]')
+          .getByText('Your Library is empty', { exact: true })
+      ).toBeVisible();
+      await expect(gallery.getByText('Error', { exact: true })).toHaveCount(0);
+      await gallery.close();
+      const popup = await openVideoSetup(context, extensionId);
+      try {
+        await expect(
+          popup.locator('[data-ui="popup.icon-state-button"][aria-label="Microphone"]')
+        ).toHaveAttribute('aria-pressed', 'true');
+        await expect(
+          popup.locator('button[aria-label="Camera"]:not([data-ui="popup.icon-state-button"])')
+        ).toHaveAttribute('aria-pressed', 'true');
+        await expect(
+          popup.getByRole('button', { name: 'Microphone device', exact: true })
+        ).toContainText(microphoneLabel);
+        await popup.locator(START).click();
+        await expect(popup.getByText('Recording', { exact: true })).toBeVisible();
+        expect((await readState(popup)).state.status).toBe(VideoRecordingStatus.RECORDING);
+      } catch (error) {
+        await info.attach('left-microphone-start-diagnostics', {
+          body: JSON.stringify(
+            {
+              popupText: await popup
+                .evaluate(() => document.body.innerText.slice(0, 12_000))
+                .catch(() => null),
+              runtimeState: await readState(popup).catch(() => null),
+            },
+            null,
+            2
+          ),
+          contentType: 'application/json',
+        });
+        throw error;
+      }
+      const mute = popup.getByRole('button', { name: 'Mute microphone', exact: true });
+      const row = mute.locator('..');
+      await expect(row.locator('svg')).toHaveCount(1);
+      await expect(mute.locator('svg')).toHaveCount(1);
+      expect(
+        await mute.evaluate((button) => button.parentElement?.firstElementChild === button)
+      ).toBe(true);
+      const deviceName = row.locator('[title]').filter({ hasText: microphoneLabel });
+      await expect(deviceName).toHaveText(microphoneLabel);
+      const buttonBounds = await mute.boundingBox();
+      const nameBounds = await deviceName.boundingBox();
+      expect(buttonBounds).not.toBeNull();
+      expect(nameBounds).not.toBeNull();
+      expect(buttonBounds!.x + buttonBounds!.width).toBeLessThan(nameBounds!.x);
+      await mute.click();
+      await expect
+        .poll(async () => (await readState(popup)).state.liveMedia?.microphoneEnabled)
+        .toBe(false);
+      const unmute = popup.getByRole('button', { name: 'Unmute microphone', exact: true });
+      await expect(unmute).toBeEnabled();
+      expect(await unmute.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
+      await unmute.focus();
+      await popup.keyboard.press('Space');
+      await expect
+        .poll(async () => (await readState(popup)).state.liveMedia?.microphoneEnabled)
+        .toBe(true);
+      await expect(mute).toBeEnabled();
+      await expect(deviceName).toHaveText(microphoneLabel);
+      expect((await readState(popup)).state.liveMedia?.microphoneSelected).toBe(true);
+      await popup.screenshot({
+        path: info.outputPath('recording-left-microphone-toggle.png'),
+        fullPage: false,
+      });
+      await discardRecording(popup);
+    } finally {
+      await closeExtensionBrowser(launched);
+    }
+  });
+
   test(`native content toolbar confirms recording without microphone ${viewport.name}`, async ({}, info) => {
     test.setTimeout(100_000);
     const host = await startHostServer();

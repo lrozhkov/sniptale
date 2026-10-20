@@ -21,8 +21,9 @@ export interface VideoActiveMediaSelection {
   webcamLabel: string | null;
 }
 
-const ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[18px_minmax(0,1fr)_28px] items-center gap-2';
-const STATUS_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-center gap-2';
+const ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2';
+const MICROPHONE_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2';
+const STATUS_ROW_CLASS_NAME = 'grid min-w-0 grid-cols-[28px_minmax(0,1fr)] items-center gap-2';
 const LABEL_CLASS_NAME = 'truncate text-[11px] text-[var(--sniptale-color-text-muted-strong)]';
 const VALUE_CLASS_NAME = 'truncate text-xs font-medium text-[var(--sniptale-color-text-primary)]';
 const STATUS_TEXT_CLASS_NAME = 'truncate text-xs text-[var(--sniptale-color-text-muted-strong)]';
@@ -58,7 +59,7 @@ function InactiveMicrophoneStatus() {
   const statusText = translate('popup.video.activeMicrophoneNotRecorded');
   return (
     <div className={STATUS_ROW_CLASS_NAME}>
-      <MicOff className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
+      <MicOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeMicrophoneLabel')}</div>
         <div className={STATUS_TEXT_CLASS_NAME} title={statusText}>
@@ -84,18 +85,7 @@ function ActiveMicrophoneStatus({
   );
 
   return (
-    <div className={ROW_CLASS_NAME}>
-      {selection.microphoneEnabled ? (
-        <Mic className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
-      ) : (
-        <MicOff className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
-      )}
-      <div className="min-w-0">
-        <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeMicrophoneLabel')}</div>
-        <div className={VALUE_CLASS_NAME} title={selectedName}>
-          {selectedName}
-        </div>
-      </div>
+    <div className={MICROPHONE_ROW_CLASS_NAME}>
       <ActiveMediaMuteButton
         readOnly={readOnly}
         enabled={selection.microphoneEnabled}
@@ -106,6 +96,12 @@ function ActiveMicrophoneStatus({
         }
         type="microphone"
       />
+      <div className="min-w-0">
+        <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeMicrophoneLabel')}</div>
+        <div className={VALUE_CLASS_NAME} title={selectedName}>
+          {selectedName}
+        </div>
+      </div>
     </div>
   );
 }
@@ -136,7 +132,7 @@ function InactiveWebcamStatus() {
   const statusText = translate('popup.video.activeWebcamNotRecorded');
   return (
     <div className={STATUS_ROW_CLASS_NAME}>
-      <VideoOff className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
+      <VideoOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeWebcamLabel')}</div>
         <div className={STATUS_TEXT_CLASS_NAME} title={statusText}>
@@ -165,9 +161,9 @@ function ActiveWebcamStatus({
   return (
     <div className={ROW_CLASS_NAME}>
       {selection.webcamEnabled ? (
-        <Video className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
+        <Video className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       ) : (
-        <VideoOff className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]" />
+        <VideoOff className="h-4 w-4 justify-self-center text-[var(--sniptale-color-text-muted-strong)]" />
       )}
       <div className="min-w-0">
         <div className={LABEL_CLASS_NAME}>{translate('popup.video.activeWebcamLabel')}</div>

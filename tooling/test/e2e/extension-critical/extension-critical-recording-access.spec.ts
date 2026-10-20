@@ -194,6 +194,12 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         const popup = await openRealPopup(context, extensionId);
         await popup.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
         await expect(popup.locator(deviceToggle(name))).toHaveAttribute('aria-pressed', 'true');
+        await expect(
+          popup.getByRole('button', {
+            name: name === 'microphone' ? 'Microphone device' : 'Camera device',
+            exact: true,
+          })
+        ).toBeVisible();
         await expect(popup.locator(PERMISSION_NOTICES)).toHaveCount(0);
         await popup.screenshot({
           path: info.outputPath(`native-${name}-grant-reopened-popup.png`),
@@ -327,6 +333,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         0
       );
       await expect(popup.getByText('Camera access is blocked', { exact: false })).toHaveCount(0);
+      await expect(
+        popup.getByRole('button', { name: 'Microphone device', exact: true })
+      ).toBeVisible();
+      await expect(popup.getByRole('button', { name: 'Camera device', exact: true })).toBeVisible();
       await expect(popup.getByText('Microphone 1', { exact: true })).toHaveCount(0);
       await expect(popup.getByText('Camera 1', { exact: true })).toHaveCount(0);
       await expect(popup.locator('[data-ui$="-request-access"]')).toHaveCount(0);

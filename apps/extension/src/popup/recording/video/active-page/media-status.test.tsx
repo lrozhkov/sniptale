@@ -101,6 +101,19 @@ it('shows mute controls for media selected before recording', async () => {
   expect(onActiveRecordingSettingsChange).toHaveBeenCalledWith({ webcamEnabled: false });
 });
 
+it('uses one left microphone icon button before the selected device name', async () => {
+  await renderStatus();
+
+  const button = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="popup.video.activeMicrophoneMute"]'
+  )!;
+  const row = button.parentElement!;
+  expect(row.firstElementChild).toBe(button);
+  expect(row.querySelectorAll('svg')).toHaveLength(1);
+  expect(button.querySelectorAll('svg')).toHaveLength(1);
+  expect(row.lastElementChild?.textContent).toContain('Studio mic');
+});
+
 it('renders not-recorded copy without mute controls when media was not selected before recording', async () => {
   await renderStatus({
     selection: createMediaSelection({

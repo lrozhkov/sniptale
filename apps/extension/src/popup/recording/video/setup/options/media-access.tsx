@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   readPopupMediaAccessState,
   subscribeToPopupMediaAccessChanges,
@@ -6,11 +6,10 @@ import {
   type PopupMediaPermissionName,
 } from '../../../media-devices';
 
-function useMediaAccess(
+function useMediaAccessRefresh(
   permissionName: PopupMediaPermissionName,
   onGranted?: () => Promise<unknown>
 ) {
-  const [access, setAccess] = useState<PopupMediaAccessState>('unknown');
   const observationRevision = useRef(0);
   const observedAccess = useRef<PopupMediaAccessState>('unknown');
   const onGrantedRef = useRef(onGranted);
@@ -25,7 +24,6 @@ function useMediaAccess(
       const previous = observedAccess.current;
       const current = state === 'unknown' && previous === 'granted' ? previous : state;
       observedAccess.current = current;
-      setAccess(current);
       if (current === 'granted' && (previous === 'prompt' || previous === 'denied')) {
         void Promise.resolve()
           .then(() => (disposed ? undefined : onGrantedRef.current?.()))
@@ -50,8 +48,6 @@ function useMediaAccess(
       window.removeEventListener('focus', refresh);
     };
   }, [permissionName]);
-
-  return access;
 }
 
 export function MediaAccessBoundary({
@@ -65,6 +61,6 @@ export function MediaAccessBoundary({
   onGranted?: (() => Promise<unknown>) | undefined;
   permissionName: PopupMediaPermissionName;
 }) {
-  const access = useMediaAccess(permissionName, onGranted);
-  return enabled && access === 'granted' ? children : null;
+  useMediaAccessRefresh(permissionName, onGranted);
+  return enabled ? children : null;
 }

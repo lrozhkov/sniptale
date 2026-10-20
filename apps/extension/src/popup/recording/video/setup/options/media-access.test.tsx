@@ -59,7 +59,7 @@ function boundary(permissionName: 'microphone' | 'camera', onGranted = vi.fn(), 
 }
 
 it.each(['microphone', 'camera'] as const)(
-  'renders no permission notice or recovery action for %s',
+  'shows enabled %s independently of advisory access without permission notices',
   async (permissionName) => {
     for (const enabled of [false, true]) {
       for (const access of [
@@ -74,7 +74,7 @@ it.each(['microphone', 'camera'] as const)(
         await render(
           <div key={`${enabled}-${access}`}>{boundary(permissionName, vi.fn(), enabled)}</div>
         );
-        expect(container.textContent).toBe('');
+        expect(container.querySelector('[data-ready]') !== null).toBe(enabled);
         expect(
           container.querySelector('button, [role="status"], [role="alert"], [data-ui]')
         ).toBeNull();
@@ -102,18 +102,23 @@ it('keeps disabled devices off after an external grant', async () => {
   expect(container.childElementCount).toBe(0);
   expect(mocks.requestMicrophone).not.toHaveBeenCalled();
 });
-it('renders nothing while the initial permission query is unresolved', async () => {
-  mocks.read.mockReturnValue(new Promise(() => undefined));
-  await render(boundary('camera'));
-  expect(container.childElementCount).toBe(0);
-  expect(mocks.openSettings).not.toHaveBeenCalled();
-});
+it.each(['microphone', 'camera'] as const)(
+  'keeps enabled %s visible while the initial permission query is unresolved',
+  async (permissionName) => {
+    mocks.read.mockReturnValue(new Promise(() => undefined));
+    await render(boundary(permissionName));
+    expect(container.querySelector('[data-ready]')).not.toBeNull();
+    expect(mocks.openSettings).not.toHaveBeenCalled();
+    expect(mocks.requestMicrophone).not.toHaveBeenCalled();
+    expect(mocks.requestCamera).not.toHaveBeenCalled();
+  }
+);
 it('refreshes on browser permission changes and focus without starting a request', async () => {
   mocks.read.mockResolvedValue('granted');
   await render(boundary('microphone'));
   expect(container.querySelector('[data-ready]')).not.toBeNull();
   act(() => change('denied'));
-  expect(container.childElementCount).toBe(0);
+  expect(container.querySelector('[data-ready]')).not.toBeNull();
   mocks.read.mockResolvedValue('granted');
   await act(async () => window.dispatchEvent(new Event('focus')));
   expect(container.querySelector('[data-ready]')).not.toBeNull();
@@ -153,15 +158,18 @@ it('retains granted access when a later advisory read is unknown', async () => {
   expect(container.querySelector('[data-ready]')).not.toBeNull();
 });
 it('ignores an older permission query that finishes after a permission change', async () => {
+  const refresh = vi.fn().mockResolvedValue(undefined);
   let finishRead!: (state: string) => void;
   mocks.read.mockReturnValue(
     new Promise<string>((resolve) => {
       finishRead = resolve;
     })
   );
-  await render(boundary('camera'));
+  await render(boundary('camera', refresh));
   await act(async () => change('granted'));
   await act(async () => finishRead('denied'));
+  await act(async () => change('granted'));
+  expect(refresh).not.toHaveBeenCalled();
   expect(container.querySelector('[data-ready]')).not.toBeNull();
 });
 it('retires delayed subscriptions and ignores permission changes after unmount', async () => {
