@@ -141,21 +141,23 @@ function OutputOptionGroup<TValue extends string | number>(props: {
   options: Array<OutputOption<TValue>>;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div role="group" aria-label={props.label} className="grid gap-1.5">
       <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {props.label}
       </div>
-      <div className="grid gap-1">
+      <div className="flex flex-wrap gap-1">
         {props.options.map((option) => (
           <button
             key={option.value}
             type="button"
+            aria-pressed={option.value === props.activeValue}
             className={[
-              'min-h-7 rounded-[7px] px-2 text-left text-xs font-medium transition-colors',
+              'min-h-8 min-w-0 max-w-full flex-[1_0_auto] rounded-[6px] px-2 py-1',
+              'text-center text-xs font-normal transition-colors',
               option.value === props.activeValue
                 ? [
-                    'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-                    'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]',
+                    'bg-[var(--sniptale-color-surface-hover)]',
+                    'text-[var(--sniptale-color-text-primary)]',
                   ].join(' ')
                 : [
                     'text-[var(--sniptale-color-text-secondary)]',

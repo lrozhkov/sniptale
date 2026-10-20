@@ -529,6 +529,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Экспортировать',
     en: 'Export',
   },
+  saveToLibraryButton: {
+    ru: 'Сохранить в библиотеку',
+    en: 'Save to Library',
+  },
   prepareExportError: {
     ru: 'Не удалось подготовить экспорт',
     en: 'Failed to prepare export',

@@ -4,6 +4,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanupRenderedNode, getContainer, renderNode } from './popup-home.test.helpers';
 import { DEFAULT_SCREENSHOT_SETUP_STATE } from '../../../../composition/persistence/capture-settings';
 
+const mocks = vi.hoisted(() => ({ openLibrary: vi.fn() }));
+
+vi.mock('../../navigation/actions', () => ({ openLibrary: mocks.openLibrary }));
+
 vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
@@ -110,24 +114,21 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
   expect(captureButton?.className).toContain('justify-start');
-  for (const label of [
-    'popup.home.captureButtonLabel',
-    'popup.home.imageEditorLabel',
-    'popup.home.libraryLabel',
-  ]) {
+  for (const label of ['popup.home.captureButtonLabel', 'popup.home.libraryLabel']) {
     const button = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
       (candidate) => candidate.textContent === label
     );
     expect(button?.dataset['iconClass']).toContain(
-      'group-hover:text-[var(--sniptale-color-accent)]'
+      'group-hover:text-[var(--sniptale-color-text-primary)]'
     );
   }
-  expect(
-    [...(getContainer()?.querySelectorAll('button') ?? [])]
-      .find((button) => button.textContent === 'popup.home.imageEditorLabel')
-      ?.querySelector('svg')
-      ?.getAttribute('data-ui')
-  ).toBe('popup.image-editor-icon');
+  expect(getContainer()?.textContent).not.toContain('popup.home.imageEditorLabel');
+  expect(captureButton?.parentElement?.className).toContain('grid-cols-[minmax(0,1fr)_48px]');
+  const libraryButton = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'popup.home.libraryLabel'
+  );
+  libraryButton?.click();
+  expect(mocks.openLibrary).toHaveBeenCalledWith('screenshot');
   captureButton?.click();
   expect(onCapture).toHaveBeenCalledOnce();
 });
@@ -226,6 +227,12 @@ it('renders tab settings, applies field changes, and disables a pending capture'
     const webp = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
       (button) => button.textContent === 'imageSettings.section.formatWebpLabel'
     );
+    expect(webp?.getAttribute('aria-pressed')).toBe('false');
+    expect(webp?.className).toContain('text-xs font-normal');
+    expect(webp?.className).not.toContain('accent');
+    const acceptedFormat = getContainer()?.querySelector('button[aria-pressed="true"]');
+    expect(acceptedFormat?.className).toContain('var(--sniptale-color-surface-hover)');
+    expect(acceptedFormat?.className).not.toContain('accent');
     webp?.click();
     const quality = getContainer()?.querySelector('input[type="range"]') as HTMLInputElement;
     expect(quality.classList).toContain('sniptale-range');

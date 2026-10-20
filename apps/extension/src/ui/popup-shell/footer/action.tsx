@@ -17,7 +17,7 @@ const POPUP_FOOTER_ACTION_BASE_CLASS_NAME = [
 function getPopupFooterActionClassName(iconOnlyMode: boolean) {
   return cx(
     POPUP_FOOTER_ACTION_BASE_CLASS_NAME,
-    iconOnlyMode ? 'h-8 w-8 rounded-full px-0' : 'h-8 rounded-full px-3 text-[12px] font-medium'
+    iconOnlyMode ? 'h-8 w-8 rounded-[6px] px-0' : 'h-8 rounded-[6px] px-2 text-[12px] font-normal'
   );
 }
 

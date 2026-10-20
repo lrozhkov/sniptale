@@ -10,14 +10,13 @@ import {
   TabCaptureCountdownField,
   TabCaptureSizeField,
 } from './setup-fields';
-import { openImageEditor, openLibrary } from '../../navigation/actions';
+import { openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
-import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 
-const HOVER_ACCENT_ICON_CLASS_NAME = [
+const ACTION_ICON_CLASS_NAME = [
   'text-[var(--sniptale-color-text-secondary)]',
-  'group-hover:text-[var(--sniptale-color-accent)]',
-  'group-focus-visible:text-[var(--sniptale-color-accent)]',
+  'group-hover:text-[var(--sniptale-color-text-primary)]',
+  'group-focus-visible:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 export function ScreenshotSetupPanel(props: {
@@ -50,32 +49,20 @@ export function ScreenshotSetupPanel(props: {
         </div>
       </div>
       <div className={`mt-3 ${actionFooterSurfaceClassName}`}>
-        <div className="grid grid-cols-[minmax(0,1fr)_48px_48px] gap-1.5">
+        <div className="grid grid-cols-[minmax(0,1fr)_48px] gap-1.5">
           <PopupActionButton
             icon={Camera}
             label={translate('popup.home.captureButtonLabel')}
-            iconClassName={[
-              'text-[var(--sniptale-color-text-secondary)]',
-              'group-hover:text-[var(--sniptale-color-accent)]',
-              'group-focus-visible:text-[var(--sniptale-color-accent)]',
-            ].join(' ')}
+            iconClassName={ACTION_ICON_CLASS_NAME}
             tone="primary"
             disabled={props.pending || Boolean(props.disabledReason)}
             title={props.disabledReason ?? translate('popup.home.captureButtonTitle')}
             onClick={props.onCapture}
           />
           <PopupActionButton
-            icon={ImageEditorIcon}
-            label={translate('popup.home.imageEditorLabel')}
-            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
-            compact
-            title={translate('popup.home.imageEditorTitle')}
-            onClick={openImageEditor}
-          />
-          <PopupActionButton
             icon={Library}
             label={translate('popup.home.libraryLabel')}
-            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
+            iconClassName={ACTION_ICON_CLASS_NAME}
             compact
             title={translate('popup.home.libraryTitle')}
             onClick={() => openLibrary('screenshot')}

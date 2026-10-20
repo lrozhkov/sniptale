@@ -17,9 +17,9 @@ export function footerActionGridClassName(
 }
 
 export const footerCopyButtonBaseClassName = [
-  'group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px]',
+  'group inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[6px]',
   'transition-all',
-  'outline-none focus-visible:outline-none',
+  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 export const footerCopyButtonEnabledClassName = [
@@ -34,8 +34,4 @@ export const footerCopyButtonDisabledClassName = [
 
 export const footerPrimaryButtonIconClassName = 'text-[var(--sniptale-color-text-primary)]';
 
-export const footerPrimaryIdleButtonIconClassName = [
-  'text-[var(--sniptale-color-text-primary)]',
-  'group-hover:text-[var(--sniptale-color-accent-emphasis)]',
-  'group-focus-visible:text-[var(--sniptale-color-accent-emphasis)]',
-].join(' ');
+export const footerPrimaryIdleButtonIconClassName = 'text-[var(--sniptale-color-text-primary)]';

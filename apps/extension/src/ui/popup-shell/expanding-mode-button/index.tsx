@@ -6,7 +6,7 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 
 const BUTTON_BASE_CLASS_NAME = [
   'group relative h-[58px] min-h-[58px] min-w-0 basis-0 overflow-hidden',
-  'rounded-[12px] border',
+  'rounded-[8px] border',
 ].join(' ');
 const BUTTON_ACTIVE_CLASS_NAME = [
   'grow-[1.9] border-[var(--sniptale-color-border-soft)]',
@@ -116,15 +116,15 @@ export function PopupExpandingModeButton({
         )}
       />
       <span aria-hidden="true" className={getCompactLayerClassName(active, animate)}>
-        <span className="absolute inset-x-1 bottom-[8px] block truncate text-[9px] font-medium leading-tight">
+        <span className="absolute inset-x-1 bottom-[6px] line-clamp-2 text-[10px] font-normal leading-tight">
           {label}
         </span>
       </span>
 
       <span aria-hidden="true" className={getExpandedLayerClassName(active, animate)}>
-        <span className="w-[108px] shrink-0">
-          <span className="block truncate text-[11px] font-semibold leading-tight">{label}</span>
-          <span className="mt-0.5 block text-[8px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-xs font-medium leading-tight">{label}</span>
+          <span className="mt-0.5 line-clamp-2 text-[9px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
             {description}
           </span>
         </span>

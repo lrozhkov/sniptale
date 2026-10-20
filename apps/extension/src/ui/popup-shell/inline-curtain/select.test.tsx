@@ -154,7 +154,10 @@ it('opens over a theme-aware blurred backdrop and dismisses from the covered are
   expect(container?.querySelector('[title="Studio microphone with a long name"]')).not.toBeNull();
   expect(container?.querySelector('[title="Full device path"]')).not.toBeNull();
   expect(container?.querySelector('[aria-current="true"]')?.className).toContain(
-    'var(--sniptale-color-accent)'
+    'var(--sniptale-color-surface-hover)'
+  );
+  expect(container?.querySelector('[aria-current="true"]')?.className).not.toContain(
+    'text-[var(--sniptale-color-text-secondary)]'
   );
   expect(container?.querySelector('[data-testid="option-icon"]')?.getAttribute('class')).toContain(
     'h-4 w-4'

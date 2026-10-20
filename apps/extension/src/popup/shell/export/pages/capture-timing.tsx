@@ -49,7 +49,7 @@ function TimingSelect(props: {
 }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 py-2">
-      <span className="min-w-0 flex-1 text-[11px] leading-4 text-[var(--sniptale-color-text-primary)]">
+      <span className="min-w-0 flex-1 text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
         {props.label}
       </span>
       <PopupSelect
@@ -88,7 +88,7 @@ export function PageCaptureTimingSettings(props: {
         values={[0, 1_000, 2_000, 3_000, 5_000, 10_000]}
         onChange={(settleDelayMs) => props.onChange({ ...props.timing, settleDelayMs })}
       />
-      <p className="py-2 text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+      <p className="py-2 text-[11px] leading-4 text-[var(--sniptale-color-text-dim)]">
         {translate('popup.export.pageTimingHelp')}
       </p>
     </div>

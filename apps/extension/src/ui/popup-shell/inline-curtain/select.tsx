@@ -63,7 +63,23 @@ export function InlineCurtainSelect({
   useInlineCurtainLifecycle({ openPanel, panelId, rootRef, setOpenPanel, triggerRef });
   useLayoutEffect(() => onOpenChange?.(openPanel === 'options'), [onOpenChange, openPanel]);
   return (
-    <div ref={rootRef} className={INLINE_CURTAIN_ROW_CLASS_NAME} data-open={openPanel !== null}>
+    <div
+      ref={rootRef}
+      className={INLINE_CURTAIN_ROW_CLASS_NAME}
+      data-open={openPanel !== null}
+      onPointerDownCapture={(event) => {
+        const active = document.activeElement;
+        if (
+          event.target instanceof Element &&
+          event.target.closest('button') &&
+          active instanceof HTMLButtonElement &&
+          rootRef.current?.contains(active) &&
+          active.matches(':focus-visible')
+        ) {
+          active.blur();
+        }
+      }}
+    >
       <InlineCurtainSelectTrigger
         ariaLabel={ariaLabel}
         label={label}

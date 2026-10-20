@@ -13,7 +13,7 @@ import {
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoSetupPageProps } from './types';
-import { getGalleryTitle, getVideoSetupViewModel } from './view-model';
+import { getVideoSetupViewModel } from './view-model';
 
 type VideoSetupViewModelTestProps = Pick<
   VideoSetupPageProps,
@@ -86,7 +86,7 @@ it('derives a startable setup view model when the preset and mode are available'
       canStart: true,
       controlledCursorDisabled: false,
       controlledCursorDisabledReason: null,
-      galleryTitle: 't:popup.video.galleryTitle. 3 projects',
+      galleryTitle: 't:popup.video.galleryTitle',
       selectedPreset: expect.objectContaining({ id: 'preset-1' }),
       startButtonLabel: 't:popup.video.startButton',
       startDisabledReason: null,
@@ -181,8 +181,11 @@ it('keeps camera mode startable while disabling incompatible setup options', () 
   );
 });
 
-it('formats the gallery title consistently', () => {
-  expect(getGalleryTitle(null)).toBe('t:popup.video.galleryTitle');
+it('keeps the library hint independent of storage occupancy and project counts', () => {
+  expect(getVideoSetupViewModel(createProps()).galleryTitle).toBe('t:popup.video.galleryTitle');
+  expect(getVideoSetupViewModel(createProps({ galleryStatus: null })).galleryTitle).toBe(
+    't:popup.video.galleryTitle'
+  );
 });
 
 it('blocks a known TAB output that exceeds the shared live pixel-rate budget', () => {

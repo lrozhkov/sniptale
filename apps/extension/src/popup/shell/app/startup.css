@@ -105,7 +105,7 @@ body {
   padding: 3px 5px;
   overflow: visible;
   border: 1px solid var(--popup-initial-border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--popup-initial-panel);
 }
 

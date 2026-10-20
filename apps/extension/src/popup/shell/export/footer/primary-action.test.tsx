@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileArchive, FileCode, Library } from 'lucide-react';
 
 const popupActionButtonMock = vi.hoisted(() => vi.fn());
 
@@ -12,6 +13,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     dataUi,
     disabled,
     iconClassName,
+    icon,
     label,
     onClick,
     tone,
@@ -19,6 +21,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     dataUi?: string;
     disabled?: boolean;
     iconClassName: string;
+    icon: unknown;
     label: string;
     onClick: () => void;
     tone?: string;
@@ -27,6 +30,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
       dataUi,
       disabled,
       iconClassName,
+      icon,
       label,
       onClick,
       tone,
@@ -95,12 +99,31 @@ describe('ExportFooterPrimaryActionButton', () => {
     ).toContain('Экспортировать');
     expect(popupActionButtonMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        iconClassName: expect.stringContaining(
-          'group-hover:text-[var(--sniptale-color-accent-emphasis)]'
-        ),
+        iconClassName: 'text-[var(--sniptale-color-text-primary)]',
       })
     );
   });
+
+  it.each([
+    ['save', 'Сохранить в библиотеку', Library],
+    ['html', 'Скачать HTML', FileCode],
+    ['export', 'Скачать ZIP', FileArchive],
+  ] as const)(
+    'names the %s destination without changing its start handler',
+    async (destination, label, icon) => {
+      const props = createProps({ destination });
+      await renderButton(props);
+      const button = container?.querySelector<HTMLButtonElement>(
+        '[data-ui="popup.export.export-button"]'
+      );
+      expect(button?.textContent).toBe(label);
+      expect(popupActionButtonMock).toHaveBeenLastCalledWith(expect.objectContaining({ icon }));
+      await act(async () => button?.click());
+      expect(props.onStartExport).toHaveBeenCalledTimes(1);
+      expect(props.onResetExportView).not.toHaveBeenCalled();
+      expect(props.onCancelExport).not.toHaveBeenCalled();
+    }
+  );
 
   it('renders the cancel action when export is active', async () => {
     const props = createProps({ isExporting: true });

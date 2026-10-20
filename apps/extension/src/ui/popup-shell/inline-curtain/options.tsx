@@ -6,14 +6,15 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 }
 
 const INLINE_CURTAIN_OPTION_CLASS_NAME = [
-  'flex min-h-7 w-full min-w-0 items-center justify-between gap-2 rounded-[6px] px-1.5 py-1',
-  'text-left text-[11px] text-[var(--sniptale-color-text-secondary)] transition-colors',
+  'flex min-h-8 w-full min-w-0 items-center justify-between gap-2 rounded-[6px] px-2 py-1',
+  'text-left text-xs transition-colors',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_56%,transparent)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_10%,transparent)]',
-  'text-[var(--sniptale-color-accent)]',
+  'bg-[var(--sniptale-color-surface-hover)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const INLINE_CURTAIN_DETAIL_CLASS_NAME = [
   'mx-1.5 mt-1.5 rounded-[7px] px-2 py-1.5 text-[10px] leading-3',
@@ -125,7 +126,9 @@ function InlineCurtainOptionButton({
       aria-disabled={option.disabled || undefined}
       className={cx(
         INLINE_CURTAIN_OPTION_CLASS_NAME,
-        active && INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME,
+        active
+          ? INLINE_CURTAIN_OPTION_ACTIVE_CLASS_NAME
+          : 'text-[var(--sniptale-color-text-secondary)]',
         option.disabled && 'cursor-not-allowed opacity-55'
       )}
       onClick={() => {
@@ -138,7 +141,7 @@ function InlineCurtainOptionButton({
       <span className="flex min-w-0 items-center gap-2">
         {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
         <span className="min-w-0">
-          <span className="block truncate font-medium" title={option.label}>
+          <span className="block whitespace-normal break-words font-normal" title={option.label}>
             {option.label}
           </span>
           {option.description ? (

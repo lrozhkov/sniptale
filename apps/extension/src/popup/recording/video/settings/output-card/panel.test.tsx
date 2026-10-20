@@ -151,3 +151,20 @@ it('disables 4K at 60 fps instead of silently changing the selected cadence', ()
   act(() => fourK?.click());
   expect(onChange).not.toHaveBeenCalled();
 });
+
+it('exposes one neutral accepted choice in each output parameter group', () => {
+  act(() =>
+    root?.render(<OutputSettingsPanel onChange={vi.fn()} settings={DEFAULT_VIDEO_SETTINGS} />)
+  );
+
+  const groups = Array.from(container?.querySelectorAll('[role="group"]') ?? []);
+  expect(groups).toHaveLength(5);
+  for (const group of groups) {
+    expect(group.getAttribute('aria-label')).toBeTruthy();
+    const acceptedChoices = group.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]');
+    expect(acceptedChoices).toHaveLength(1);
+    expect(acceptedChoices[0]?.className).toContain('sniptale-color-surface-hover');
+    expect(acceptedChoices[0]?.className).not.toContain('accent');
+    expect(group.querySelectorAll('[aria-pressed="false"]').length).toBeGreaterThan(0);
+  }
+});

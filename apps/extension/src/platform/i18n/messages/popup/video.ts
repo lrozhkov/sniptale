@@ -92,8 +92,8 @@ export const popupVideoMessages = defineMessageSource({
     en: 'Window',
   },
   modeScreenHint: {
-    ru: 'Окно, вкладка или экран через системный диалог',
-    en: 'Choose a window, tab, or screen via the system picker',
+    ru: 'Окно, вкладка или экран',
+    en: 'Window, tab or screen',
   },
   presetRowLabel: {
     ru: 'Размер окна',

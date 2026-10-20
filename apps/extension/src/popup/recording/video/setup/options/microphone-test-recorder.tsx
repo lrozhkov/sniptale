@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { Mic, Play, Square } from 'lucide-react';
+import { Mic, Pause, Play, Square } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n/popup';
 
 const TEST_RECORDING_MAX_MS = 30_000;
@@ -23,6 +23,9 @@ type StartTestRecordingParams = {
 export function MicrophoneTestRecorder({ stream }: { stream: MediaStream | null }) {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
+  const playbackRevisionRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -31,8 +34,38 @@ export function MicrophoneTestRecorder({ stream }: { stream: MediaStream | null 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canPlay = audioUrl !== null && !recording;
 
+  const stopPlayback = () => {
+    playbackRevisionRef.current += 1;
+    setPlaying(false);
+  };
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
+    }
+    if (playing) {
+      audio.pause();
+      stopPlayback();
+      return;
+    }
+    const revision = ++playbackRevisionRef.current;
+    setPlaybackError(false);
+    setPlaying(true);
+    try {
+      await audio.play();
+    } catch {
+      if (playbackRevisionRef.current === revision) {
+        stopPlayback();
+        setPlaybackError(true);
+      }
+    }
+  };
+
   useEffect(
-    () => () => cleanupTestRecording({ audioUrlRef, recorderRef, saveOnStopRef, timeoutRef }),
+    () => () => {
+      playbackRevisionRef.current += 1;
+      cleanupTestRecording({ audioUrlRef, recorderRef, saveOnStopRef, timeoutRef });
+    },
     []
   );
 
@@ -42,10 +75,11 @@ export function MicrophoneTestRecorder({ stream }: { stream: MediaStream | null 
         <TestRecorderHeader canPlay={canPlay} recording={recording} />
         <TestRecorderControls
           canPlay={canPlay}
-          onPlay={() => {
-            void audioRef.current?.play();
-          }}
-          onRecord={() =>
+          onPlay={() => void togglePlayback()}
+          onRecord={() => {
+            audioRef.current?.pause();
+            stopPlayback();
+            setPlaybackError(false);
             startTestRecording({
               chunksRef,
               audioUrlRef,
@@ -55,14 +89,31 @@ export function MicrophoneTestRecorder({ stream }: { stream: MediaStream | null 
               setRecording,
               stream,
               timeoutRef,
-            })
-          }
+            });
+          }}
           onStop={() => stopTestRecording({ recorderRef, timeoutRef })}
           recording={recording}
+          playing={playing}
           stream={stream}
         />
       </div>
-      {audioUrl ? <audio ref={audioRef} src={audioUrl} /> : null}
+      {audioUrl ? (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onEnded={stopPlayback}
+          onPause={stopPlayback}
+          onError={() => {
+            stopPlayback();
+            setPlaybackError(true);
+          }}
+        />
+      ) : null}
+      {playbackError ? (
+        <div role="alert" className="text-[11px] text-[var(--sniptale-color-danger)]">
+          {translate('popup.video.microphoneTestPlaybackError')}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -99,6 +150,7 @@ function TestRecorderControls({
   onRecord,
   onStop,
   recording,
+  playing,
   stream,
 }: {
   canPlay: boolean;
@@ -106,6 +158,7 @@ function TestRecorderControls({
   onRecord: () => void;
   onStop: () => void;
   recording: boolean;
+  playing: boolean;
   stream: MediaStream | null;
 }) {
   return (
@@ -124,8 +177,10 @@ function TestRecorderControls({
       />
       <IconButton
         disabled={!canPlay}
-        icon={<Play className="h-3.5 w-3.5" />}
-        label={translate('popup.video.microphoneTestPlay')}
+        icon={playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+        label={translate(
+          playing ? 'popup.video.microphoneTestPause' : 'popup.video.microphoneTestPlay'
+        )}
         onClick={onPlay}
       />
     </div>

@@ -188,7 +188,7 @@ export function ExportSelectionSectionShell({
         >
           <span
             className={[
-              'min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
+              'min-w-0 flex-1 text-[12px] font-medium',
               'text-[var(--sniptale-color-text-muted-strong)]',
             ].join(' ')}
             data-ui="popup.export.selection-heading"

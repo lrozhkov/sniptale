@@ -239,3 +239,20 @@ it('reopens the probe stream when browser audio constraints change', async () =>
   expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
   expect(stream.track.stop).toHaveBeenCalledOnce();
 });
+
+it('keeps probe feedback after all controls while constraints reopen the probe', async () => {
+  await renderPanel();
+  let resolveProbe: ((stream: FakeStream) => void) | undefined;
+  vi.mocked(navigator.mediaDevices.getUserMedia).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveProbe = (stream) => resolve(stream as unknown as MediaStream);
+      })
+  );
+  await rerenderPanel({ ...createSettings(), echoCancellation: false });
+  const panel = container?.firstElementChild;
+  expect(panel?.lastElementChild?.textContent).toContain('popup.video.microphoneSettingsLoading');
+  expect(panel?.lastElementChild?.getAttribute('role')).toBe('status');
+  await act(async () => resolveProbe?.(new FakeStream()));
+  expect(panel?.lastElementChild?.getAttribute('role')).toBe('status');
+});

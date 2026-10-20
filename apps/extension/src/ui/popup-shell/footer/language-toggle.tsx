@@ -24,7 +24,7 @@ export function PopupFooterLanguageToggle() {
       type="button"
       aria-label={translate('popup.common.footerLanguageToggleAria')}
       className={[
-        'inline-flex h-7 min-w-7 items-center justify-center rounded-full border-none px-1',
+        'inline-flex h-8 min-w-8 items-center justify-center rounded-[6px] border-none px-1',
         'bg-transparent text-[9px] font-semibold uppercase',
         'text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',

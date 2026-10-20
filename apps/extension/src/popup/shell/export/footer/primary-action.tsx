@@ -1,11 +1,13 @@
-import { Check, Download, X } from 'lucide-react';
+import { Check, Download, FileArchive, FileCode, Library, X } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import { footerPrimaryButtonIconClassName, footerPrimaryIdleButtonIconClassName } from './tokens';
+import type { PopupPackageDestination } from '../data-type/package-controls';
 
 export function ExportFooterPrimaryActionButton(props: {
   canExport: boolean;
+  destination?: PopupPackageDestination | undefined;
   exportTitle: string;
   isExporting: boolean;
   isResultReady: boolean;
@@ -41,15 +43,24 @@ export function ExportFooterPrimaryActionButton(props: {
     );
   }
 
+  const action =
+    props.destination === 'save'
+      ? { icon: Library, label: translate('popup.export.saveToLibraryButton') }
+      : props.destination === 'html'
+        ? { icon: FileCode, label: translate('popup.export.packageDestinationHtml') }
+        : props.destination === 'export'
+          ? { icon: FileArchive, label: translate('popup.export.packageDestinationDownload') }
+          : { icon: Download, label: translate('popup.export.exportButton') };
+
   return (
     <PopupActionButton
-      icon={Download}
-      label={translate('popup.export.exportButton')}
+      icon={action.icon}
+      label={action.label}
       iconClassName={footerPrimaryIdleButtonIconClassName}
       tone="primary"
       dataUi="popup.export.export-button"
       disabled={!props.canExport}
-      title={props.exportTitle}
+      title={props.canExport ? action.label : props.exportTitle}
       onClick={props.onStartExport}
     />
   );

@@ -31,7 +31,8 @@ export function PopupActionButtonIcon({
     >
       <Icon
         className={cx(
-          'h-[18px] w-[18px] transition-[color,filter]',
+          'h-[18px] w-[18px] stroke-[1.75] transition-[color,filter,stroke-width]',
+          'group-hover:stroke-2 group-focus-visible:stroke-2',
           'group-hover:brightness-110 group-focus-visible:brightness-110 group-disabled:brightness-100',
           disabled ? 'text-[var(--sniptale-color-text-dim)]' : iconClassName
         )}

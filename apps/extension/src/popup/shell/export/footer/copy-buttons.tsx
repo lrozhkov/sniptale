@@ -1,4 +1,5 @@
-import { Braces, Check, FileText } from 'lucide-react';
+import { Check, FileJson2 } from 'lucide-react';
+import type { SVGProps } from 'react';
 
 import { type PreviewFormat, cx } from '../selection/utils';
 import {
@@ -7,11 +8,29 @@ import {
   footerCopyButtonEnabledClassName,
 } from './tokens';
 
+function MarkdownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M5 15V9l3 3 3-3v6m6-6v6m-2-2 2 2 2-2" />
+    </svg>
+  );
+}
+
 function FooterCopyButton(props: {
   copiedFormat: PreviewFormat | null;
   disabled: boolean;
   format: PreviewFormat;
-  icon: typeof Braces;
+  icon: typeof FileJson2 | typeof MarkdownIcon;
   onClick: () => void;
   title: string;
 }) {
@@ -36,11 +55,13 @@ function FooterCopyButton(props: {
           'group-hover:scale-110 group-focus-visible:scale-110',
           'group-hover:brightness-110 group-focus-visible:brightness-110',
           'group-disabled:scale-100 group-disabled:brightness-100 motion-reduce:transition-none',
-          'group-hover:text-[var(--sniptale-color-accent)]',
-          'group-focus-visible:text-[var(--sniptale-color-accent)]',
           isCopied
             ? 'text-[var(--sniptale-color-success)]'
-            : 'text-[var(--sniptale-color-text-primary)]'
+            : [
+                'text-[var(--sniptale-color-text-secondary)]',
+                'group-hover:text-[var(--sniptale-color-text-primary)]',
+                'group-focus-visible:text-[var(--sniptale-color-text-primary)]',
+              ].join(' ')
         )}
       />
     </button>
@@ -62,7 +83,7 @@ export function ExportFooterCopyButtons(props: {
         copiedFormat={props.copiedFormat}
         disabled={!props.canCopyJson}
         format="json"
-        icon={Braces}
+        icon={FileJson2}
         title={props.copyJsonTitle}
         onClick={props.onCopyJson}
       />
@@ -70,7 +91,7 @@ export function ExportFooterCopyButtons(props: {
         copiedFormat={props.copiedFormat}
         disabled={!props.canCopyMarkdown}
         format="markdown"
-        icon={FileText}
+        icon={MarkdownIcon}
         title={props.copyMarkdownTitle}
         onClick={props.onCopyMarkdown}
       />

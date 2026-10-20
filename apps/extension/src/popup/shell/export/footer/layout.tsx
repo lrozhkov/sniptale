@@ -4,11 +4,13 @@ import { ExportFooterCopyButtons } from './copy-buttons';
 import { ExportFooterPrimaryActionButton } from './primary-action';
 import { Library } from 'lucide-react';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
+import type { PopupPackageDestination } from '../data-type/package-controls';
 
 type ExportFooterLayoutProps = {
   canCopyJson: boolean;
   canCopyMarkdown: boolean;
   canExport: boolean;
+  destination?: PopupPackageDestination | undefined;
   copyJsonTitle: string;
   copyMarkdownTitle: string;
   copiedFormat: PreviewFormat | null;
@@ -36,6 +38,7 @@ export function ExportFooterLayout(props: ExportFooterLayoutProps) {
       >
         <ExportFooterPrimaryActionButton
           canExport={props.canExport}
+          destination={props.destination}
           exportTitle={props.exportTitle}
           isExporting={props.isExporting}
           isResultReady={props.isResultReady}

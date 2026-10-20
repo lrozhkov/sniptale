@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
+import { GalleryThumbnails, Wrench, TvMinimalPlay, Upload } from 'lucide-react';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
 import type { AppLocale } from '../../../platform/i18n/types';
@@ -14,7 +14,7 @@ const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'menu', icon: <ShellIcon path="M5 7h14M5 12h14M5 17h14" /> },
   {
     page: 'tools',
-    icon: <Paintbrush aria-hidden="true" />,
+    icon: <Wrench aria-hidden="true" />,
   },
   { page: 'export', icon: <Upload aria-hidden="true" /> },
 ];

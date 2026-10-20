@@ -189,6 +189,14 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Воспроизвести',
     en: 'Play',
   },
+  microphoneTestPause: {
+    ru: 'Пауза',
+    en: 'Pause',
+  },
+  microphoneTestPlaybackError: {
+    ru: 'Не удалось воспроизвести тест. Попробуйте ещё раз или запишите новый.',
+    en: 'Could not play the test. Try again or record a new test.',
+  },
   microphoneTestDelete: {
     ru: 'Удалить тест',
     en: 'Delete test',

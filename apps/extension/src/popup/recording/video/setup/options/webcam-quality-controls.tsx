@@ -16,10 +16,10 @@ import { formatKnownWebcamActualSettings } from '../../webcam-actual-settings';
 type WebcamQualityOption<TValue extends string> = { label: string; value: TValue };
 
 const QUALITY_OPTION_BASE_CLASS_NAME =
-  'min-h-7 rounded-[7px] px-2 text-left text-xs font-medium transition-colors';
+  'min-h-7 min-w-0 flex-1 rounded-[7px] px-2 py-1 text-center text-xs font-medium transition-colors';
 const QUALITY_OPTION_ACTIVE_CLASS_NAME = [
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]',
-  'text-[var(--sniptale-popup-color-text-accent,var(--sniptale-color-accent))]',
+  'bg-[var(--sniptale-color-surface-hover)]',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const QUALITY_OPTION_INACTIVE_CLASS_NAME = [
   'text-[var(--sniptale-color-text-secondary)]',
@@ -109,7 +109,7 @@ export function WebcamQualityOptionGroup<TValue extends string>({
       <div className="px-0.5 text-[10px] font-medium text-[var(--sniptale-color-text-muted-strong)]">
         {translate(labelKey)}
       </div>
-      <div className="grid gap-1">
+      <div className="flex flex-wrap gap-1">
         {options.map((option) => (
           <WebcamQualityOptionButton
             key={option.value}
@@ -135,6 +135,7 @@ function WebcamQualityOptionButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={[
         QUALITY_OPTION_BASE_CLASS_NAME,
         active ? QUALITY_OPTION_ACTIVE_CLASS_NAME : QUALITY_OPTION_INACTIVE_CLASS_NAME,

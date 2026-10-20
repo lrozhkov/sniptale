@@ -14,11 +14,11 @@ describe('popup-action-button.styles', () => {
     expect(primaryClassName).not.toContain(
       'focus-visible:text-[var(--sniptale-color-accent-emphasis)]'
     );
-    expect(primaryClassName).toContain('hover:bg-[');
+    expect(primaryClassName).toContain('hover:bg-transparent');
     expect(galleryClassName).toContain('border-none');
     expect(galleryClassName).toContain('bg-transparent');
     expect(galleryClassName).toContain('var(--sniptale-color-text-primary)');
-    expect(galleryClassName).toContain('hover:bg-[');
+    expect(galleryClassName).toContain('hover:bg-transparent');
   });
 
   it('keeps disabled buttons on the quiet neutral contract', () => {
@@ -26,7 +26,7 @@ describe('popup-action-button.styles', () => {
 
     expect(disabledClassName).toContain('cursor-not-allowed');
     expect(disabledClassName).toContain('border-none');
-    expect(disabledClassName).not.toContain('bg-transparent');
+    expect(disabledClassName).toContain('bg-transparent');
   });
 
   it('uses destructive emphasis only when a danger action is hovered or focused', () => {

@@ -1,11 +1,13 @@
 import { translate } from '../../../../platform/i18n/popup';
 import { ExportFooterLayout } from './layout';
 import { type PreviewFormat } from '../selection/utils';
+import type { PopupPackageDestination } from '../data-type/package-controls';
 
 type ExportFooterActionsProps = {
   canCopyJson: boolean;
   canCopyMarkdown: boolean;
   canExport: boolean;
+  destination?: PopupPackageDestination | undefined;
   copyJsonTitle: string;
   copyMarkdownTitle: string;
   copiedFormat: PreviewFormat | null;
@@ -29,6 +31,7 @@ export function ExportFooterActions(props: ExportFooterActionsProps) {
       canCopyJson={props.canCopyJson}
       canCopyMarkdown={props.canCopyMarkdown}
       canExport={props.canExport}
+      destination={props.destination}
       copyJsonTitle={props.copyJsonTitle}
       copyMarkdownTitle={props.copyMarkdownTitle}
       copiedFormat={props.copiedFormat}

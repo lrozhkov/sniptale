@@ -59,9 +59,15 @@ describe('ExportFooterCopyButtons', () => {
     expect(buttons?.[0]?.getAttribute('title')).toBe('Copy JSON current tab');
     expect(buttons?.[1]?.getAttribute('title')).toBe('Copy Markdown current tab');
     expect(buttons?.[0]?.querySelector('svg')?.getAttribute('class')).toContain(
+      'text-[var(--sniptale-color-text-secondary)]'
+    );
+    expect(buttons?.[0]?.querySelector('svg')?.getAttribute('class')).toContain(
+      'group-hover:text-[var(--sniptale-color-text-primary)]'
+    );
+    expect(buttons?.[0]?.querySelector('svg')?.getAttribute('class')).not.toContain(
       'group-hover:text-[var(--sniptale-color-accent)]'
     );
-    expect(buttons?.[1]?.querySelector('svg')?.getAttribute('class')).toContain(
+    expect(buttons?.[1]?.querySelector('svg')?.getAttribute('class')).not.toContain(
       'group-hover:text-[var(--sniptale-color-accent)]'
     );
 

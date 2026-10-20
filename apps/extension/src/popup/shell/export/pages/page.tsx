@@ -130,7 +130,7 @@ function ExportPageLayout({
           webCopyResources={webCopyResources}
         />
         <div className="mt-auto shrink-0 pt-3" data-ui="popup.export.actions">
-          <ExportFooterActions {...footerProps} />
+          <ExportFooterActions {...footerProps} destination={destination} />
         </div>
       </section>
     </div>

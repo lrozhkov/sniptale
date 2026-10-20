@@ -72,9 +72,9 @@ describe('ExportSelectionSectionShell', () => {
     );
 
     expect(button.getAttribute('aria-expanded')).toBe('false');
-    expect(heading?.className).toContain('text-[10px]');
-    expect(heading?.className).toContain('font-semibold');
-    expect(heading?.className).toContain('tracking-[0.08em]');
+    expect(heading?.className).toContain('text-[12px]');
+    expect(heading?.className).toContain('font-medium');
+    expect(heading?.className).not.toContain('uppercase');
     expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
     expect(button.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
     expect(button.textContent).not.toContain('t:popup.export.editButton');

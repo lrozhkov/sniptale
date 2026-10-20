@@ -148,7 +148,7 @@ it('keeps application launchers out of the menu footer', async () => {
 
   const footer = container?.querySelector('footer');
 
-  expect(footer?.className).toContain('rounded-[16px]');
+  expect(footer?.className).toContain('rounded-[12px]');
   expect(footer?.querySelector('[data-ui="popup.footer.application-actions"]')).toBeNull();
   expect(footer?.querySelector('[data-ui="popup.footer.application-separator"]')).toBeNull();
 });

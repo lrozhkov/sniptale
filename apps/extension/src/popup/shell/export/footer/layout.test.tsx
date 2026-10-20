@@ -90,7 +90,8 @@ afterEach(() => {
 it('renders only Export and preview copy actions while idle', async () => {
   await renderLayout();
 
-  expect(container?.firstElementChild?.className).toContain('rounded-[16px]');
+  expect(container?.firstElementChild?.className).toContain('pt-2');
+  expect(container?.firstElementChild?.className).not.toContain('border');
   expect(container?.querySelector('[data-ui="popup.export.export-button"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="popup.export.web-snapshot-disclosure"]')).toBeNull();
   expect(container?.querySelector('[aria-label="Save web snapshot"]')).toBeNull();

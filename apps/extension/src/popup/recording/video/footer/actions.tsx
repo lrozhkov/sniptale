@@ -1,9 +1,6 @@
-import { Circle, Film, Library } from 'lucide-react';
+import { Circle, Library } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/popup';
-import {
-  openGalleryPage,
-  openVideoEditorPage,
-} from '../../../../platform/navigation/extension-pages';
+import { openGalleryPage } from '../../../../platform/navigation/extension-pages';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 import {
@@ -12,21 +9,12 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoActiveFooterControls } from './active-controls';
 
-const HOVER_ACCENT_ICON_CLASS_NAME = [
+const ACTION_ICON_CLASS_NAME = [
   'text-[var(--sniptale-color-text-secondary)]',
-  'group-hover:text-[var(--sniptale-color-accent)]',
-  'group-focus-visible:text-[var(--sniptale-color-accent)]',
+  'group-hover:text-[var(--sniptale-color-text-primary)]',
+  'group-focus-visible:text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
-const START_RECORDING_ICON_CLASS_NAME = [
-  'fill-current text-[var(--sniptale-color-danger)]',
-  'group-hover:text-[var(--sniptale-color-accent)]',
-  'group-focus-visible:text-[var(--sniptale-color-accent)]',
-].join(' ');
-
-function openVideoEditor() {
-  void openVideoEditorPage();
-  window.close();
-}
+const START_RECORDING_ICON_CLASS_NAME = 'fill-current text-[var(--sniptale-color-danger)]';
 
 function openGallery() {
   void openGalleryPage({ folder: 'recording' });
@@ -117,7 +105,7 @@ function IdleVideoSetupFooter({
 }) {
   return (
     <div className={actionFooterSurfaceClassName}>
-      <div className="grid grid-cols-[minmax(0,1fr)_48px_48px] gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_48px] gap-1.5">
         <VideoSetupStartButton
           canStart={canStart}
           startButtonLabel={startButtonLabel}
@@ -125,18 +113,9 @@ function IdleVideoSetupFooter({
           onStart={onStart}
         />
         <PopupActionButton
-          icon={Film}
-          label={translate('popup.video.videoEditorLabel')}
-          iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
-          compact
-          dataUi="popup.video-setup.video-editor-button"
-          title={translate('popup.video.videoEditorTitle')}
-          onClick={openVideoEditor}
-        />
-        <PopupActionButton
           icon={Library}
           label={translate('popup.video.galleryLabel')}
-          iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
+          iconClassName={ACTION_ICON_CLASS_NAME}
           tone="gallery"
           compact
           dataUi="popup.video-setup.gallery-button"

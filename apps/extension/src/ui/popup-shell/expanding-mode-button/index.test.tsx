@@ -24,10 +24,10 @@ it('renders the initial active mode at its final fixed-height layout without ani
   expect(markup).not.toContain('transition-[flex-grow');
   expect(markup).not.toContain('transition-opacity');
   expect(markup).toContain('Capture the current tab');
-  expect(markup).toContain('w-[108px] shrink-0');
-  expect(markup).toContain('block text-[8px]');
-  expect(markup).not.toContain('block truncate text-[8px]');
-  expect(markup).not.toContain('line-clamp-2');
+  expect(markup).toContain('min-w-0 flex-1');
+  expect(markup).toContain('line-clamp-2 text-[9px]');
+  expect(markup).toContain('line-clamp-2 text-xs');
+  expect(markup).not.toContain('w-[108px]');
   expect(markup).toContain('aria-pressed="true"');
 });
 

@@ -8,18 +8,23 @@ import {
 const COMPACT_BUTTON_CLASS_NAME =
   'relative flex h-12 min-h-12 w-full min-w-0 items-center justify-center overflow-hidden';
 
-const COMPACT_BUTTON_SURFACE_CLASS_NAME = 'rounded-[12px] px-0 outline-none transition-all';
+const COMPACT_BUTTON_SURFACE_CLASS_NAME = 'rounded-[6px] px-0 outline-none transition-all';
 
 const DEFAULT_BUTTON_CLASS_NAME =
   'relative flex h-12 min-h-12 min-w-0 items-center gap-2 overflow-hidden';
 
 const DEFAULT_BUTTON_SURFACE_CLASS_NAME =
-  'rounded-[12px] px-3.5 text-[12px] font-medium leading-tight';
+  'rounded-[6px] px-2 text-[13px] font-normal leading-tight hover:font-medium focus-visible:font-medium';
 
-const DEFAULT_BUTTON_INTERACTION_CLASS_NAME =
-  'group outline-none transition-all focus-visible:outline-none';
+const DEFAULT_BUTTON_INTERACTION_CLASS_NAME = [
+  'group outline-none transition-all focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
+  'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+].join(' ');
 
-const COMPACT_BUTTON_INTERACTION_CLASS_NAME = 'group focus-visible:outline-none';
+const COMPACT_BUTTON_INTERACTION_CLASS_NAME = [
+  'group focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
+  'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+].join(' ');
 
 interface PopupActionButtonVariantProps {
   icon: ComponentType<{ className?: string }>;

@@ -52,7 +52,7 @@ export function WebcamSettingsPanel({
   };
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2.5">
       {embeddedPresentationAvailable && presentation ? (
         <WebcamPlacementControl presentation={presentation} onChange={updatePresentation} />
       ) : null}
@@ -121,7 +121,7 @@ function WebcamEmbeddedPresentationControls({
   onChange: (patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>) => void;
 }) {
   return (
-    <div className="grid gap-3 border-b border-[var(--sniptale-color-border-soft)] pb-3">
+    <div className="grid gap-2.5 border-b border-[var(--sniptale-color-border-soft)] pb-2.5">
       <WebcamQualityOptionGroup
         activeValue={presentation.shape}
         labelKey="popup.video.webcamPresentationShapeLabel"
