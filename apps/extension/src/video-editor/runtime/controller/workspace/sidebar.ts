@@ -52,6 +52,7 @@ import { requestTrackDeletion } from './timeline-track-actions';
 import { createWorkspaceSidebarPlacementActions } from './sidebar-placement-actions';
 
 interface CreateWorkspaceSidebarArgs {
+  watermarkImagePreviewUrl?: string | undefined;
   actions: SidebarCommandHandlers;
   libraries: VideoEditorLibrariesState;
   selections: VideoEditorSelections;
@@ -233,6 +234,7 @@ function createWorkspaceSidebarBackgroundActions(args: {
 }
 
 function createWorkspaceSidebarState(args: {
+  watermarkImagePreviewUrl?: string | undefined;
   libraries: VideoEditorLibrariesState;
   project: NonNullable<EditorStore['project']>;
   selections: VideoEditorSelections;
@@ -240,6 +242,11 @@ function createWorkspaceSidebarState(args: {
   workspace: SidebarWorkspace;
 }) {
   return {
+    watermark: {
+      onPreview: args.workspace.inspector.previewWatermark,
+      registerAbort: args.workspace.inspector.registerWatermarkAbort,
+      ...(args.watermarkImagePreviewUrl ? { imagePreviewUrl: args.watermarkImagePreviewUrl } : {}),
+    },
     activeProjectId: args.project.id,
     collapsed: args.workspace.leftSidebarCollapsed,
     gridSettings: {
@@ -289,6 +296,7 @@ export function createWorkspaceSidebarController(
       workspace: args.workspace,
     }),
     state: createWorkspaceSidebarState({
+      watermarkImagePreviewUrl: args.watermarkImagePreviewUrl,
       libraries: args.libraries,
       project,
       selections: args.selections,

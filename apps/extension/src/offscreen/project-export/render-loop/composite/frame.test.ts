@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -332,4 +333,47 @@ it('rejects unsafe caption layout before drawing or progress', async () => {
   expect(drawProjectFrameMock).not.toHaveBeenCalled();
   expect(draw).not.toHaveBeenCalled();
   expect(sendCompositeRenderProgressMock).not.toHaveBeenCalled();
+});
+
+it('paints the final watermark after captions and refuses preparation failures before drawing', async () => {
+  const project = createProject();
+  project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const order: string[] = [];
+  const draw = vi.fn(() => {
+    order.push('watermark');
+  });
+  const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
+  const job = createJob();
+  job.watermarkRenderer = { prepare, clear: vi.fn() };
+  const captionDraw = vi.fn(() => {
+    order.push('captions');
+  });
+  const { createVideoProjectCaptionRenderer } =
+    await import('../../../../workflows/video-review/project-captions');
+  const captions = await createVideoProjectCaptionRenderer().prepare(project, createSettings());
+  job.captionRenderer = {
+    prepare: vi.fn(async () => ({ ...captions, draw: captionDraw })),
+    clear: vi.fn(),
+  };
+  drawProjectFrameMock.mockImplementation(() => {
+    order.push('scene');
+  });
+  const args = {
+    context: createRenderContext(),
+    currentTime: 0,
+    frameIndex: 0,
+    job,
+    loadedImages: createLoadedImages(),
+    project,
+    settings: createSettings(),
+    lastProgressSent: 0,
+    totalFrames: 4,
+  };
+  await renderCompositeFrame(args);
+  expect(order).toEqual(['scene', 'captions', 'watermark']);
+  expect(prepare).toHaveBeenCalledWith(project, args.settings, undefined);
+  prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
+  await expect(renderCompositeFrame(args)).rejects.toThrow('Logo unavailable');
+  expect(drawProjectFrameMock).toHaveBeenCalledTimes(1);
+  expect(draw).toHaveBeenCalledTimes(1);
 });

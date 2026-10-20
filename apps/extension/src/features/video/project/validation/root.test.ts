@@ -91,7 +91,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 20])
+  for (const version of [2, 3, 4, 21])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -129,7 +129,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 20])
+    for (const version of [2, 3, 4, 5, 6, 7, 21])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -156,7 +156,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 20])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 21])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -214,7 +214,7 @@ it('fences circle at schema ten and retains dormant camera settings without open
   expect(changed.version).toBe(10);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 20])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 21])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const parsed = parseHydratableVideoProject({ ...project, version });
@@ -256,7 +256,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   expect(changed.version).toBe(11);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 20])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 21])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     const parsed = parseHydratableVideoProject({
@@ -297,7 +297,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   ).toBe(11);
 });
 
-it.each([1, 2.5, 16.5, 20, NaN, Infinity, '12', null, undefined])(
+it.each([1, 2.5, 16.5, 21, NaN, Infinity, '12', null, undefined])(
   'refuses unsupported or malformed schema version %j',
   (version) => {
     expect(isHydratableVideoProject({ ...createEmptyVideoProject('Version'), version })).toBe(
@@ -326,7 +326,7 @@ it('fences per-media source crop at schema thirteen and retains the version afte
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version <= 12; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 20 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 21 })).toBe(false);
   for (const sourceCrop of [
     null,
     [],
@@ -375,7 +375,7 @@ it('fences decorated window radius at schema fifteen without rewriting old proje
     expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
     for (let version = 2; version <= 14; version++)
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 20 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 21 })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: project.clips }).version).toBe(15);
   }
   for (const radius of [null, '12', NaN, Infinity, -1, 4096.01, {}, []])
@@ -387,4 +387,90 @@ it('fences decorated window radius at schema fifteen without rewriting old proje
   for (let version = 2; version <= 15; version++)
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   expect(project).toEqual(before);
+});
+
+it('admits watermark at schema twenty without writing defaults and retains the version after clearing', async () => {
+  const { createQuickEditWatermark } = await import('../scene/watermark');
+  const { parseHydratableVideoProject } = await import('./root');
+  const legacy = createEmptyVideoProject('Watermark');
+  const before = structuredClone(legacy);
+  expect(parseHydratableVideoProject(legacy)).toBe(legacy);
+  expect(legacy).toEqual(before);
+  expect(legacy).not.toHaveProperty('watermark');
+  const watermark = { ...createQuickEditWatermark('Latin Кириллица'), mode: 'text' as const };
+  const authored = applyVideoProjectMutationPatch(legacy, { watermark });
+  expect(authored.version).toBe(20);
+  expect(isHydratableVideoProject(authored)).toBe(true);
+  for (let version = 2; version < 20; version++) {
+    expect(isHydratableVideoProject({ ...authored, version })).toBe(false);
+  }
+  expect(isHydratableVideoProject({ ...authored, version: 21 })).toBe(false);
+  expect(isHydratableVideoProject({ ...authored, watermark: null })).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...authored,
+      watermark: { ...watermark, tile: { spacing: 1, rotation: Infinity } },
+    })
+  ).toBe(false);
+  const { watermark: _removed, ...withoutWatermark } = authored;
+  const cleared = applyVideoProjectMutationPatch(withoutWatermark, {});
+  expect(cleared.version).toBe(20);
+  expect(isHydratableVideoProject(cleared)).toBe(true);
+  expect(legacy).toEqual(before);
+});
+
+it('requires declared IMAGE materials for active and dormant watermark references', async () => {
+  const { createQuickEditWatermark, getVideoProjectWatermarkAsset } =
+    await import('../scene/watermark');
+  const { createVideoProjectAsset } = await import('../factories/creation');
+  const { isExportReadyVideoProject } = await import('./root');
+  const asset = createVideoProjectAsset(
+    'Logo',
+    'IMAGE',
+    { kind: 'project-asset', projectAssetId: 'immutable-bytes' },
+    {
+      width: 400,
+      height: 200,
+      duration: null,
+      mimeType: 'image/png',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  for (const mode of ['none', 'text', 'image'] as const) {
+    const watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      image: {
+        assetId: `project-asset:${asset.id}`,
+        width: 400,
+        height: 200,
+        size: 0.2,
+        opacity: 1,
+      },
+    };
+    const project = applyVideoProjectMutationPatch(createEmptyVideoProject('Logo'), {
+      assets: [asset],
+      watermark,
+    });
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    expect(getVideoProjectWatermarkAsset(project)).toBe(asset);
+    expect(isExportReadyVideoProject({ ...project, assets: [] })).toBe(false);
+    expect(isExportReadyVideoProject({ ...project, assets: [{ ...asset, type: 'VIDEO' }] })).toBe(
+      false
+    );
+    expect(
+      isExportReadyVideoProject({
+        ...project,
+        watermark: {
+          ...watermark,
+          image: { ...watermark.image, assetId: 'project-asset:immutable-bytes' },
+        },
+      })
+    ).toBe(false);
+    expect(
+      getVideoProjectWatermarkAsset({ ...project, assets: [{ ...asset, id: 'another-alias' }] })
+    ).toBeUndefined();
+  }
 });

@@ -37,7 +37,8 @@ Rules cover Collections, Selection, Buttons, Properties, Fields, Layers, Navigat
 
 Inspected source paths use `apps/extension/src/`:
 
-- `gallery/video-review/{inspector,inspector-sections,scene-inspector,background-inspector,presentation-inspector,watermark-inspector}.tsx`
+- `gallery/video-review/{inspector,inspector-sections,scene-inspector,background-inspector,presentation-inspector}.tsx`
+- `ui/watermark/inspector.tsx`
 - `workflows/browser-frame/settings.tsx`
 - `popup/recording/video/setup/body.tsx`
 - `popup/recording/video/settings/layout.tsx`

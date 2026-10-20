@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
@@ -499,5 +500,62 @@ it('shows dormant text sources as in use without offering an unavailable clip ju
   )!;
   expect(cleanup.disabled).toBe(true);
   act(() => cleanup.click());
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('reveals a dormant watermark as a watermark and protects its material from removal', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  asset.type = VideoProjectAssetType.IMAGE;
+  asset.name = 'Logo.png';
+  project.version = 20;
+  project.watermark = {
+    ...createQuickEditWatermark('Retained'),
+    image: {
+      assetId: `project-asset:${asset.id}`,
+      width: asset.metadata.width,
+      height: asset.metadata.height,
+      size: 0.2,
+      opacity: 1,
+    },
+  };
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  const watermark = options.find(
+    (option) => option.textContent === translate('gallery.videoReview.watermark')
+  );
+  expect(watermark).toBeDefined();
+  expect(
+    options.some(
+      (option) => option.textContent === translate('videoEditor.sidebar.materialsSceneUse')
+    )
+  ).toBe(false);
+  await act(async () => watermark!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({ assetId: asset.id, kind: 'watermark' });
+  expect(onSelect).not.toHaveBeenCalled();
   expect(onRemoveUnused).not.toHaveBeenCalled();
 });

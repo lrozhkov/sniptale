@@ -1,4 +1,4 @@
-import { getProjectExportSpatialRenderer } from '../../runtime';
+import { getProjectExportSpatialRenderer, getProjectExportWatermarkRenderer } from '../../runtime';
 import { type LoadedImagesMap, drawProjectFrame } from '../../renderer';
 import type { VideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { syncClipPlayback } from '../../media';
@@ -50,6 +50,11 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
   job.captionRenderer ??= createVideoProjectCaptionRenderer();
   const captions = await job.captionRenderer.prepare(project, settings, signal);
   captions.assertExportable(resolveProjectExportRange(project, settings));
+  const watermark =
+    project.watermark && project.watermark.mode !== 'none'
+      ? await getProjectExportWatermarkRenderer(job, signal).prepare(project, settings, signal)
+      : undefined;
+  if (!watermark) job.watermarkRenderer?.clear();
   const effectRuntimeFrames = await renderCompositeEffectFrames(args);
   try {
     if (job.cancelled || signal?.aborted) {
@@ -70,6 +75,7 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
       frameOptions
     );
     captions.draw(context, currentTime);
+    watermark?.draw(context);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

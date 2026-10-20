@@ -1,3 +1,4 @@
+import { SceneWatermarkFields } from './watermark';
 import { InspectProjectTextPanel } from './text';
 import { InspectCursorPathSettings } from './cursor-path';
 import { GridSettingsPanel } from '../../settings';
@@ -66,6 +67,20 @@ function createSceneGroups(
           sceneBackground={sceneBackground}
         />
       ),
+    },
+    {
+      id: 'watermark',
+      semantic: 'watermark' as const,
+      label: translate('gallery.videoReview.watermark'),
+      visible: Boolean(props.watermark && props.onImportImage),
+      content:
+        props.watermark && props.onImportImage ? (
+          <SceneWatermarkFields
+            project={props.typingProject ?? props.project}
+            runtime={props.watermark}
+            onImportImage={props.onImportImage}
+          />
+        ) : null,
     },
     {
       id: 'text',

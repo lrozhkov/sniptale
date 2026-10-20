@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -327,4 +328,47 @@ it('retains the complete live frame when sharp overlays fail after successful sp
   expect(job.canvas.height).toBe(180);
   expect(publish).not.toHaveBeenCalled();
   expect(Array.from(presented.getImageData(20, 20, 1, 1).data)).toEqual([34, 211, 238, 255]);
+});
+
+it('paints watermark without captions and publishes only a completed overlay frame', async () => {
+  const { job } = setup();
+  job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const draw = vi.fn();
+  const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
+  const watermarkRenderer = { prepare, clear: vi.fn() };
+  const observed: HTMLCanvasElement[] = [];
+  vi.mocked(drawPreviewVisualPasses).mockImplementation(({ canvas }) => {
+    observed.push(canvas);
+    canvas.width = 640;
+    canvas.height = 360;
+    return {
+      context: canvas.getContext('2d')!,
+      bounds: { width: 640, height: 360 },
+      dpr: 1,
+      viewport: { width: 640, height: 360, offsetX: 0, offsetY: 0, scale: 0.5 },
+    };
+  });
+  const presented = job.canvas.getContext('2d')!;
+  const publish = vi.spyOn(presented, 'drawImage');
+  await renderPreviewScene({ ...job, watermarkRenderer });
+  expect(draw).toHaveBeenCalledTimes(1);
+  expect(observed[0]).not.toBe(job.canvas);
+  expect(publish).toHaveBeenCalledTimes(1);
+  expect(prepare).toHaveBeenCalledWith(job.project, job.project, undefined);
+  draw.mockImplementationOnce(() => {
+    throw new Error('Overlay failed');
+  });
+  await expect(renderPreviewScene({ ...job, watermarkRenderer })).rejects.toThrow('Overlay failed');
+  expect(publish).toHaveBeenCalledTimes(1);
+  await renderPreviewScene({ ...job, watermarkRenderer });
+  expect(publish).toHaveBeenCalledTimes(2);
+  prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
+  await expect(renderPreviewScene({ ...job, watermarkRenderer })).rejects.toThrow(
+    'Logo unavailable'
+  );
+  expect(publish).toHaveBeenCalledTimes(2);
+  expect(watermarkRenderer.clear).not.toHaveBeenCalled();
+  job.project.watermark.mode = 'none';
+  await renderPreviewScene({ ...job, watermarkRenderer });
+  expect(watermarkRenderer.clear).toHaveBeenCalledTimes(1);
 });

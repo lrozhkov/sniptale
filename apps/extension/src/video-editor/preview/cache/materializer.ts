@@ -1,3 +1,5 @@
+import { createVideoProjectWatermarkRenderer } from '../../../features/video/composition/canvas/project-watermark';
+import { loadVideoEditorAssetBlob } from '../../runtime/session/asset-urls';
 import {
   createReviewSpatialRenderer,
   type ReviewSpatialRenderer,
@@ -33,6 +35,7 @@ interface VideoPreviewMaterializerState {
   spatialRenderer: ReviewSpatialRenderer | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
+  watermarkRenderer: ReturnType<typeof createVideoProjectWatermarkRenderer>;
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
   videoRefs: Record<string, HTMLVideoElement | null>;
@@ -207,6 +210,7 @@ function createMaterializerMediaState(
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
+    watermarkRenderer: createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob),
     effectRuntime: null,
     imageBank: {},
     videoRefs: {},
@@ -260,6 +264,7 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   });
   state.effectRuntime?.dispose();
   state.captionRenderer.clear();
+  state.watermarkRenderer.clear();
   state.effectRuntime = null;
   stage.remove();
 }
@@ -284,6 +289,7 @@ async function renderMaterializedFrame(
   assertActive();
   const drawn = await renderPreviewScene({
     captionRenderer: state.captionRenderer,
+    watermarkRenderer: state.watermarkRenderer,
     stagingCanvas: () => {
       assertActive();
       state.stagingCanvas ??= params.ownerDocument.createElement('canvas');

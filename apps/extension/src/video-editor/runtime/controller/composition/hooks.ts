@@ -1,5 +1,9 @@
+import { getVideoProjectWatermarkAsset } from '../../../../features/video/project/scene/watermark';
 import { useContext, useMemo, type Context } from 'react';
-import { presentWorkspaceMotionSpatialPreview } from '../workspace-state';
+import {
+  presentWorkspaceWatermarkPreview,
+  presentWorkspaceMotionSpatialPreview,
+} from '../workspace-state';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -236,18 +240,19 @@ export function useVideoEditorHeaderController() {
 function usePresentedProject() {
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const sceneBackground = useWorkspaceSceneBackgroundContext();
-  const { motionSpatialPreview } = useWorkspaceInspectorContext();
+  const { motionSpatialPreview, watermarkPreview } = useWorkspaceInspectorContext();
   const selection = useVideoEditorClipSelectionPort((port) => port.selection);
   return useMemo(() => {
     if (!project) return project;
-    const presented = presentWorkspaceMotionSpatialPreview(
-      project,
+    let presented = presentWorkspaceMotionSpatialPreview(project, selection, motionSpatialPreview);
+    presented = presentWorkspaceWatermarkPreview(
+      presented,
       selection,
-      motionSpatialPreview
+      watermarkPreview?.project === project ? { ...watermarkPreview, project: presented } : null
     );
     if (!sceneBackground.preview) return presented;
     return { ...presented, ...syncProjectSceneBackground(presented, sceneBackground.preview) };
-  }, [project, selection, motionSpatialPreview, sceneBackground.preview]);
+  }, [project, selection, motionSpatialPreview, watermarkPreview, sceneBackground.preview]);
 }
 
 export function useVideoEditorPreviewController() {
@@ -305,6 +310,7 @@ export function useVideoEditorPreviewController() {
 }
 
 export function useVideoEditorSidebarController() {
+  const { assetUrls } = useRuntimePreviewContext();
   const project = usePresentedProject();
   const playback = useVideoEditorPlaybackPort(({ currentTime, setCurrentTime, setPlaying }) => ({
     currentTime,
@@ -349,7 +355,15 @@ export function useVideoEditorSidebarController() {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
   });
   return createWorkspaceSidebarController(
-    { actions, libraries, selections, store, workspace },
+    {
+      actions,
+      libraries,
+      selections,
+      store,
+      workspace,
+      watermarkImagePreviewUrl:
+        assetUrls[getVideoProjectWatermarkAsset(lifecycle.project)?.id ?? ''],
+    },
     project,
     projectUpdaters
   );

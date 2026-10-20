@@ -1,7 +1,10 @@
 import { editMotionSpatialSettings } from '../../../features/video/project/motion/spatial';
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
 import type { VideoProject } from '../../../features/video/project/types';
-import type { VideoEditorMotionSpatialPreview } from '../../contracts/workspace';
+import type {
+  VideoEditorWatermarkPreview,
+  VideoEditorMotionSpatialPreview,
+} from '../../contracts/workspace';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import { useWorkspacePreference } from './workspace-preferences';
 import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
@@ -36,6 +39,10 @@ interface VideoEditorWorkspaceConfirmState {
 }
 
 interface VideoEditorWorkspaceInspectorState {
+  watermarkPreview: VideoEditorWatermarkPreview | null;
+  previewWatermark: (preview: VideoEditorWatermarkPreview | null) => void;
+  registerWatermarkAbort: (abort: () => void) => () => void;
+  cancelWatermarkAcquisition: () => void;
   mode: VideoEditorInspectorMode;
   openSelection: () => void;
   motionSpatialPreview: VideoEditorMotionSpatialPreview | null;
@@ -200,6 +207,20 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
 function useVideoEditorInspectorState(
   setCollapsed: (collapsed: boolean) => void
 ): VideoEditorWorkspaceInspectorState {
+  const [watermarkPreview, previewWatermark] = useState<VideoEditorWatermarkPreview | null>(null);
+  const watermarkAbort = useRef<(() => void) | null>(null);
+  const registerWatermarkAbort = useCallback((abort: () => void) => {
+    watermarkAbort.current = abort;
+    return () => {
+      if (watermarkAbort.current === abort) watermarkAbort.current = null;
+    };
+  }, []);
+  const cancelWatermarkAcquisition = useCallback(() => {
+    const abort = watermarkAbort.current;
+    watermarkAbort.current = null;
+    abort?.();
+    previewWatermark(null);
+  }, []);
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
   const [motionSpatialPreview, previewMotionSpatial] =
     useState<VideoEditorMotionSpatialPreview | null>(null);
@@ -210,8 +231,24 @@ function useVideoEditorInspectorState(
   }, [setCollapsed]);
 
   return useMemo(
-    () => ({ mode, openSelection, motionSpatialPreview, previewMotionSpatial }),
-    [mode, openSelection, motionSpatialPreview]
+    () => ({
+      mode,
+      openSelection,
+      motionSpatialPreview,
+      previewMotionSpatial,
+      watermarkPreview,
+      previewWatermark,
+      registerWatermarkAbort,
+      cancelWatermarkAcquisition,
+    }),
+    [
+      mode,
+      openSelection,
+      motionSpatialPreview,
+      watermarkPreview,
+      registerWatermarkAbort,
+      cancelWatermarkAcquisition,
+    ]
   );
 }
 
@@ -350,9 +387,20 @@ export function presentWorkspaceMotionSpatialPreview(
   const { spatialReference: _reference, ...retained } = region;
   return {
     ...project,
-    version: 19,
+    version: project.version === 20 ? 20 : 19,
     motionRegions: project.motionRegions!.map((item) =>
       item === region ? { ...retained, ...edited } : item
     ),
   };
+}
+
+/** Present a scene gesture without changing the source document or its history. */
+export function presentWorkspaceWatermarkPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorWatermarkPreview | null
+): VideoProject {
+  if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
+    return project;
+  return { ...project, version: 20, watermark: preview.settings };
 }

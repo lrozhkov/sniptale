@@ -357,7 +357,9 @@ function MaterialRow(props: {
         )}
       </div>
       <MaterialName {...props} />
-      {props.uses.some((use) => use.kind === 'clip' || use.kind === 'scene') && (
+      {props.uses.some(
+        (use) => use.kind === 'clip' || use.kind === 'scene' || use.kind === 'watermark'
+      ) && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
             menuAnchorRef={rowRef}
@@ -372,15 +374,21 @@ function MaterialRow(props: {
             placeholder={translate('videoEditor.sidebar.materialsShowUses')}
             onChange={(value) => {
               const use = props.uses[Number(value)];
-              if (use && (use.kind === 'clip' || use.kind === 'scene')) props.onShowUse(use);
+              if (use && (use.kind === 'clip' || use.kind === 'scene' || use.kind === 'watermark'))
+                props.onShowUse(use);
             }}
             options={props.uses.flatMap((use, index) => {
-              if (use.kind !== 'clip' && use.kind !== 'scene') return [];
-              if (use.kind === 'scene')
+              if (use.kind !== 'clip' && use.kind !== 'scene' && use.kind !== 'watermark')
+                return [];
+              if (use.kind === 'scene' || use.kind === 'watermark')
                 return [
                   {
                     value: String(index),
-                    label: translate('videoEditor.sidebar.materialsSceneUse'),
+                    label: translate(
+                      use.kind === 'watermark'
+                        ? 'gallery.videoReview.watermark'
+                        : 'videoEditor.sidebar.materialsSceneUse'
+                    ),
                   },
                 ];
               const clip = props.project.clips.find((clip) => clip.id === use.clipId);

@@ -13,6 +13,7 @@ import type {
 import type { WorkspaceSidebarProps } from './props';
 
 export interface WorkspaceSidebarSelectionPanelProps {
+  watermark?: WorkspaceSidebarProps['watermark'];
   recognition?: WorkspaceSidebarProps['recognition'];
   textRewrite?: WorkspaceSidebarProps['textRewrite'];
   textVoice?: WorkspaceSidebarProps['textVoice'];

@@ -56,7 +56,9 @@ export function VideoEditorWorkspaceMain({
     toggleMaterials,
     inspector,
   } = useWorkspacePanels();
-  const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
+  const [inspectorGroupFocus, setInspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(
+    null
+  );
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
   const panelSizes = useWorkspacePanelSizes(materialsOpen || effectsLibraryDockOpen);
@@ -86,6 +88,9 @@ export function VideoEditorWorkspaceMain({
                 <VideoProjectStorageStatus />
                 <VideoEditorWorkspaceCanvas
                   inspectorPanel={inspector}
+                  onRevealWatermark={() =>
+                    setInspectorGroupFocus({ groupId: 'watermark', token: crypto.randomUUID() })
+                  }
                   onMaterialsOpenChange={toggleMaterials}
                   inspectorFullHeight={inspectorFullHeight}
                   materialsPanel={{

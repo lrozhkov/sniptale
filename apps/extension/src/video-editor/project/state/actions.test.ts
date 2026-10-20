@@ -503,3 +503,45 @@ it('keeps a dormant background image through unused cleanup and history', () => 
   if (undo?.status !== 'applied') throw new Error('Expected undo');
   expect(undo.project.assets).toEqual([retained, unused]);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'protects the %s watermark logo from unused cleanup and restores it with history',
+  async (mode) => {
+    const { createQuickEditWatermark } =
+      await import('../../../features/video/project/scene/watermark');
+    const store = createVideoEditorTestStore();
+    const source = createVideoAsset('Logo');
+    const logo = {
+      ...source,
+      type: 'IMAGE' as const,
+      metadata: { ...source.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+    };
+    const unused = { ...logo, id: 'unused-logo' };
+    const watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 400,
+        height: 200,
+        size: 0.2,
+        opacity: 1,
+      },
+    };
+    store.getState().setProject({
+      ...createEmptyVideoProject('Watermark'),
+      version: 20,
+      assets: [logo, unused],
+      watermark,
+    });
+    store.getState().removeUnusedAssets();
+    const after = store.getState().project!;
+    expect(after.assets).toEqual([logo]);
+    expect(after.watermark).toEqual(watermark);
+    const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+    expect(undo?.status).toBe('applied');
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.assets).toEqual([logo, unused]);
+    expect(undo.project.watermark).toEqual(watermark);
+  }
+);

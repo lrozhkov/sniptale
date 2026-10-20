@@ -3,7 +3,7 @@ import { createEmptyVideoProject, createVideoProjectAsset } from './factories/cr
 import { createAudioClipFromAsset, createVideoClipFromAsset } from './factories/clip';
 import { createShapeClip } from './factories/overlay-clip';
 import { VideoProjectAssetType, VideoProjectShapeType } from './types';
-import { getProjectAssetUseCounts } from './media-usage';
+import { getProjectAssetUseCounts, getProjectAssetUses } from './media-usage';
 
 it('protects hidden media, linked audio, scene backgrounds, embedded images and analysis sources', () => {
   const project = createEmptyVideoProject();
@@ -140,3 +140,42 @@ it('protects dormant scene images without counting the same active image twice',
     ['retained', 1],
   ]);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'retains a %s watermark material by logical identity',
+  async (mode) => {
+    const { createQuickEditWatermark } = await import('./scene/watermark');
+    const asset = createVideoProjectAsset(
+      'Logo',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'bytes' },
+      {
+        width: 400,
+        height: 200,
+        duration: null,
+        mimeType: 'image/png',
+        size: 10,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    const project = createEmptyVideoProject('Watermark');
+    project.version = 20;
+    project.assets = [asset];
+    project.watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      image: {
+        assetId: `project-asset:${asset.id}`,
+        width: 400,
+        height: 200,
+        size: 0.2,
+        opacity: 1,
+      },
+    };
+    const before = structuredClone(project);
+    expect(getProjectAssetUses(project)).toEqual([{ assetId: asset.id, kind: 'watermark' }]);
+    expect([...getProjectAssetUseCounts(project)]).toEqual([[asset.id, 1]]);
+    expect(project).toEqual(before);
+  }
+);

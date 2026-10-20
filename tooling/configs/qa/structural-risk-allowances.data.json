@@ -567,11 +567,11 @@
       "file": "apps/extension/src/gallery/video-review/advanced-panels.tsx",
       "symbol": "ReviewSceneProperties",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One JSX composition orders scene sections and passes existing callbacks. The candidate forwards the existing text-track lock to caption controls. The binding retains lock-state authority. Caption controls retain disabled presentation. This function has no state, effects, writer or recovery authority. Independent read-only diagnosis checked the exact diff. Final architecture review must validate the complete candidate.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-16",
-      "astHash": "34297f5c7a0b82510258cc063763f0e5ca8cb85bac454b8aaef32e9d5599bb74",
-      "signatureHash": "64a50dbe99393258ba872341940cfa442dbe0243c42c6a259dc14b303d4e4387"
+      "reason": "tool-noise: One JSX composition orders scene sections and passes existing callbacks. The shared watermark inspector receives the Gallery disclosure component. This function has no state, effects, writer or recovery authority. Independent read-only diagnosis checked this exact diff. Final architecture review must check the complete candidate.",
+      "removalCondition": "Remove when the body or signature changes. Reassess new independent state, effects, writers or recovery behavior. Remove when the analyzer recognizes this composition.",
+      "astHash": "f81830e34f9fac58dcd5af3168883ca77630e710b1fd1766ac5724cd91624bcb",
+      "signatureHash": "788bd53ee99346d7f267a4e0cbfc076928c4183f5ca01a26c3d90116590c9440",
+      "reviewDate": "2026-10-20"
     },
     {
       "rule": "structural-file-risk",
@@ -1694,6 +1694,28 @@
       "reviewDate": "2026-10-20",
       "astHash": "a3f4b3d516fac8aff0f77682f5c2ac7622b64071e504955a6b77dcc2f2dbf590",
       "signatureHash": "a11ab1391dfe7ae96a8a24102d264fe5c331be4fe1af613111e8191e23fda9a7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/surface/main.tsx",
+      "symbol": "VideoEditorWorkspaceMain",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: This component composes existing workspace surfaces. Its callback updates the existing local inspector focus intent. It adds no runtime, resource or persistence authority. Independent read-only diagnosis checked this exact diff. Final architecture review must check the complete candidate.",
+      "removalCondition": "Remove when the body or signature changes. Reassess independent runtime, resource or persistence authority, or a forbidden dependency. Remove when the analyzer recognizes this workspace composition.",
+      "astHash": "ad628eedbe6c68294d2737bdec444d153ce1ec76df656a0f7b1a9601936af6c5",
+      "signatureHash": "297761bc2d02931ed4e6d8ee529f9c71c03f92a2346c4ab962e388ae47a8c779",
+      "reviewDate": "2026-10-20"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: These cases use one publisher, database fixture and staged-object helper family to test video-project reference remapping. The watermark cases distinguish logical material IDs from private-resource IDs. The line limit causes this finding. Independent read-only diagnosis checked the shared fixture and operation. Final architecture review must check the complete candidate.",
+      "removalCondition": "Remove when the file body or signature changes. Reassess unrelated proof or an independent fixture or lifecycle. Remove when the analyzer recognizes this reference-remap proof boundary.",
+      "astHash": "5a70beb1cb6c23ae873ecbdaf10c64846172b46d595e06ec4e6729a5428e93a6",
+      "signatureHash": "f728932e0c9ff177b308ecb6f29eddccd20e4460b7686cb4d0e827a3b85637a5",
+      "reviewDate": "2026-10-20"
     }
   ]
 }

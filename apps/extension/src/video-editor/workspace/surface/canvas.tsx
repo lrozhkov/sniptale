@@ -112,6 +112,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  onRevealWatermark: () => void;
   inspectorPanel: { isOpen: boolean; onToggle: () => void };
   onMaterialsOpenChange: (open: boolean) => void;
   materialsPanel: { resize: WorkspacePanelResize; fullHeight: boolean; onToggle: () => void };
@@ -193,8 +194,7 @@ function VideoEditorWorkspaceUpper(
               setSourceActive(false);
               setSelectedAssetId(null);
               revealWorkspaceMaterial(use, preview, props.onRevealClip);
-              if (use.kind === 'scene' && !props.inspectorPanel.isOpen)
-                props.inspectorPanel.onToggle();
+              if (use.kind === 'watermark') props.onRevealWatermark();
             }}
             onRename={renameAsset}
             onRemoveUnused={removeUnusedAssets}
@@ -397,7 +397,7 @@ function revealWorkspaceMaterial(
   >,
   onRevealClip: (clipId: string) => void
 ) {
-  if (use.kind === 'scene') preview.selection.onSelectScene();
+  if (use.kind === 'scene' || use.kind === 'watermark') preview.selection.onSelectScene();
   if (use.kind !== 'clip') return;
   const clip = preview.project.clips.find((clip) => clip.id === use.clipId);
   if (!clip) return;

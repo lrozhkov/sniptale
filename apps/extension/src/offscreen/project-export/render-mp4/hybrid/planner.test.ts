@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -334,4 +335,22 @@ it('composites authored captions independently of the legacy subtitle toggle', (
   expect(
     planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
   ).toBe(true);
+});
+
+it.each(['text', 'image'] as const)(
+  'composites a same-size clean MP4 when the %s watermark is active',
+  (mode) => {
+    const watermark = { ...createQuickEditWatermark('Mark'), mode };
+    const spans = planMp4VideoRenderSpans(createProject({ watermark }), createSettings());
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.kind).not.toBe('clean-source');
+  }
+);
+
+it('retains clean-source eligibility with dormant watermark settings', () => {
+  const watermark = createQuickEditWatermark('Retained');
+  watermark.image = { assetId: 'project-asset:logo', width: 20, height: 10, size: 0.2, opacity: 1 };
+  expect(planMp4VideoRenderSpans(createProject({ watermark }), createSettings())[0]?.kind).toBe(
+    'clean-source'
+  );
 });

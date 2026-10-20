@@ -425,3 +425,60 @@ it('propagates review admission failure before persisting the recording project'
   await expect(loadInitialProjectFromLocation()).rejects.toThrow('Review admission failed');
   expect(saveVideoProject).not.toHaveBeenCalled();
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'copies %s watermark authoring while sharing only immutable logo bytes',
+  async (mode) => {
+    const { createVideoProjectAsset } =
+      await import('../../../features/video/project/factories/creation');
+    const { createQuickEditWatermark, getVideoProjectWatermarkAsset } =
+      await import('../../../features/video/project/scene/watermark');
+    const { parseHydratableVideoProject } =
+      await import('../../../features/video/project/validation/root');
+    const original = createEmptyVideoProject('Original');
+    const logo = createVideoProjectAsset(
+      'Logo',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-logo-bytes' },
+      {
+        width: 80,
+        height: 40,
+        mimeType: 'image/png',
+        size: 6,
+        duration: null,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    original.version = 20;
+    original.assets.push(logo);
+    original.watermark = {
+      ...createQuickEditWatermark('Original mark'),
+      mode,
+      layout: 'tiled',
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 80,
+        height: 40,
+        size: 0.2,
+        opacity: 0.4,
+      },
+    };
+    const before = structuredClone(original);
+    saveVideoProject.mockImplementation(async (project) => project);
+    const copy = await copyProject(original, 'Copy');
+    expect(parseHydratableVideoProject(copy)).not.toBeNull();
+    expect(copy.id).not.toBe(original.id);
+    expect(copy.watermark).toEqual(original.watermark);
+    expect(copy.watermark).not.toBe(original.watermark);
+    expect(copy.watermark!.text).not.toBe(original.watermark.text);
+    expect(copy.assets[0]).not.toBe(logo);
+    expect(getVideoProjectWatermarkAsset(copy)?.source).toEqual(logo.source);
+    expect(getVideoProjectWatermarkAsset(copy)?.id).toBe(logo.id);
+    expect(saveVideoProject).toHaveBeenLastCalledWith(copy, { baseRevision: null });
+    copy.watermark!.text.value = 'Copy edit';
+    copy.watermark!.placement.margin = 0.1;
+    copy.assets[0]!.name = 'Copy logo';
+    expect(original).toEqual(before);
+  }
+);

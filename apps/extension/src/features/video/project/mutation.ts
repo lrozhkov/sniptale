@@ -11,6 +11,8 @@ function getMutationSchemaVersion(
   project: VideoProject,
   patch: Omit<Partial<VideoProject>, 'updatedAt'>
 ): VideoProject['version'] {
+  if (project.version === 20 || project.watermark !== undefined || patch.watermark !== undefined)
+    return 20;
   if (
     project.version === 19 ||
     (patch.motionRegions ?? project.motionRegions)?.some(

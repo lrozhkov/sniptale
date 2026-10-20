@@ -1,3 +1,4 @@
+import { getProjectExportWatermarkRenderer } from './runtime';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -315,4 +316,31 @@ it('refuses GPU acquisition after cancellation or abort without recreating dispo
   );
   expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
   expect(job.cameraSpatialRenderer).toBe(renderer);
+});
+
+it('keeps one watermark renderer per export job and releases it on cleanup', () => {
+  const job: ProjectExportRuntimeState = {
+    mediaRecorder: null,
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+    audioContext: null,
+    audioDestination: null,
+    exportAudioSettings: null,
+    assetUrls: [],
+    cleanupNode: null,
+    exportAbortController: null,
+    exportStream: null,
+  };
+  const owner = getProjectExportWatermarkRenderer(job);
+  expect(getProjectExportWatermarkRenderer(job)).toBe(owner);
+  const clear = vi.spyOn(owner, 'clear');
+  cleanupJob(job);
+  expect(clear).toHaveBeenCalledTimes(1);
+  expect(job.watermarkRenderer).toBeUndefined();
+  const cancelled = new AbortController();
+  cancelled.abort();
+  expect(() => getProjectExportWatermarkRenderer(job, cancelled.signal)).toThrow(
+    'PROJECT_EXPORT_CANCELLED'
+  );
+  expect(job.watermarkRenderer).toBeUndefined();
 });

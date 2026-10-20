@@ -1,7 +1,21 @@
-import { RotateCcw } from 'lucide-react';
+import {
+  RotateCcw,
+  ArrowUpLeft,
+  ArrowUp,
+  ArrowUpRight,
+  ArrowLeft,
+  Dot,
+  ArrowRight,
+  ArrowDownLeft,
+  ArrowDown,
+  ArrowDownRight,
+} from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { InspectorDisclosureProps } from '../compact-inspector-controls/shared';
+import './inspector.css';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
-import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
+import { SegmentedRow } from '../compact-inspector-controls';
+import { InspectorParameterRow } from '../compact-inspector-controls/layout';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { prepareStaticLogo, StaticLogoError } from '../../workflows/background-images/static-logo';
 import {
@@ -12,15 +26,12 @@ import {
   type QuickEditWatermarkSettings,
 } from '../../features/video/project/scene/watermark';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { ReviewButton, ReviewDetails } from './controls';
-import {
-  WatermarkTextFields,
-  WatermarkNumber,
-  type WatermarkBinding as Binding,
-} from './watermark-controls';
+import { WatermarkTextFields, WatermarkNumber, type WatermarkBinding as Binding } from './controls';
 
 /** Controlled scene settings; acquisition, preview resources and history remain with the scene owner. */
-export interface ReviewWatermarkInspectorProps {
+export interface WatermarkInspectorProps {
+  Disclosure: ComponentType<InspectorDisclosureProps>;
+  dataUi?: string;
   settings: QuickEditWatermarkSettings | undefined;
   output: { width: number; height: number };
   onChange(settings: QuickEditWatermarkSettings): Promise<boolean>;
@@ -40,17 +51,22 @@ const modes = [
 ] as const;
 
 /** Each local text or numeric gesture proposes one authored change only at acceptance. */
-export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
+export function WatermarkInspector(props: WatermarkInspectorProps) {
   useAppLocale();
   const settings =
     props.settings ?? createQuickEditWatermark(translate('gallery.videoReview.watermarkSeed'));
-  const binding = { settings, onChange: props.onChange, onPreview: props.onPreview };
+  const binding = {
+    settings,
+    onChange: props.onChange,
+    onPreview: props.onPreview,
+    Disclosure: props.Disclosure,
+  };
   return (
     <fieldset
       disabled={props.pending}
       aria-busy={props.pending}
       className="sniptale-parameter-stack"
-      data-ui="gallery.videoReview.watermarkInspector"
+      data-ui={props.dataUi ?? 'watermark.inspector'}
     >
       <SegmentedRow
         columns={3}
@@ -87,7 +103,7 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
         </div>
       )}
       {settings.mode !== 'none' && (
-        <div className="review-inspector-columns">
+        <div className="sniptale-watermark-columns">
           <div className="sniptale-parameter-stack">
             {settings.mode === 'text' ? (
               <WatermarkTextFields {...binding} output={props.output} />
@@ -99,9 +115,13 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
         </div>
       )}
       {settings.mode !== 'none' && (
-        <ReviewButton
+        <ContentToolbarButton
+          type="button"
+          tone="outline"
+          size="compact"
           className="flex w-full items-center justify-center gap-2"
-          label={translate('gallery.videoReview.watermarkReset')}
+          aria-label={translate('gallery.videoReview.watermarkReset')}
+          title={translate('gallery.videoReview.watermarkReset')}
           onClick={() => {
             props.onPreview(null);
             void props.onChange(
@@ -111,7 +131,7 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
         >
           <RotateCcw size={14} aria-hidden="true" />
           {translate('gallery.videoReview.watermarkReset')}
-        </ReviewButton>
+        </ContentToolbarButton>
       )}
     </fieldset>
   );
@@ -126,7 +146,7 @@ function logoError(error: unknown): string {
   return translate('gallery.videoReview.watermarkImageFailed');
 }
 
-function WatermarkImageFields(props: ReviewWatermarkInspectorProps & Binding) {
+function WatermarkImageFields(props: WatermarkInspectorProps & Binding) {
   const { settings } = props;
   const image = settings.image;
   return (
@@ -177,15 +197,15 @@ function WatermarkImageFields(props: ReviewWatermarkInspectorProps & Binding) {
 }
 
 const anchorOptions = [
-  ['top-left', '↖'],
-  ['top', '↑'],
-  ['top-right', '↗'],
-  ['left', '←'],
-  ['center', '·'],
-  ['right', '→'],
-  ['bottom-left', '↙'],
-  ['bottom', '↓'],
-  ['bottom-right', '↘'],
+  ['top-left', ArrowUpLeft],
+  ['top', ArrowUp],
+  ['top-right', ArrowUpRight],
+  ['left', ArrowLeft],
+  ['center', Dot],
+  ['right', ArrowRight],
+  ['bottom-left', ArrowDownLeft],
+  ['bottom', ArrowDown],
+  ['bottom-right', ArrowDownRight],
 ] as const;
 function WatermarkPlacementFields(props: Binding) {
   const { settings, onChange } = props;
@@ -247,23 +267,23 @@ function WatermarkSinglePlacement(props: Binding) {
           role="group"
           aria-label={translate('gallery.videoReview.watermarkAnchor')}
           data-ui="watermark.anchors"
+          data-inspector-choices=""
           className="ml-auto grid w-max grid-cols-3 gap-1"
         >
-          {anchorOptions.map(([anchor, arrow]) => (
+          {anchorOptions.map(([anchor, Icon]) => (
             <ContentToolbarButton
               key={anchor}
-              tone="utility"
+              tone="property"
               aria-label={translate(`gallery.videoReview.watermarkAnchor_${anchor}`)}
               aria-pressed={!settings.placement.position && anchor === settings.placement.anchor}
-              className="aria-pressed:bg-[var(--sniptale-color-surface-hover)]"
               onClick={() => onChange(setQuickEditWatermarkAnchor(settings, anchor))}
             >
-              <span aria-hidden="true">{arrow}</span>
+              <Icon size={14} aria-hidden="true" />
             </ContentToolbarButton>
           ))}
         </div>
       </InspectorParameterRow>
-      <ReviewDetails
+      <props.Disclosure
         label={translate('gallery.videoReview.watermarkPositionExact')}
         preferenceId="watermark.position"
       >
@@ -298,7 +318,7 @@ function WatermarkSinglePlacement(props: Binding) {
             })}
           />
         ))}
-      </ReviewDetails>
+      </props.Disclosure>
     </>
   );
 }

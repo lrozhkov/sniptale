@@ -80,9 +80,11 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
   const encodeMock = vi.fn();
   const throwIfPipelineFailed = vi.fn();
 
+  const context = { stroke: vi.fn(), save: vi.fn(), restore: vi.fn() };
+
   await renderFrameDrivenCompositeFrame({
     canvas: { tagName: 'CANVAS' } as HTMLCanvasElement,
-    context: { stroke: vi.fn() } as never,
+    context: context as never,
     currentTime: 2.5,
     frameDurationUs: 4_000,
     frameIndex: 3,
@@ -90,7 +92,14 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
     keyframeInterval: 3,
     loadedImages: { image: 'loaded' } as never,
     project: { duration: 10 } as never,
-    settings: { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' } as never,
+    settings: {
+      fps: 30,
+      width: 1280,
+      height: 720,
+      format: 'MP4',
+      mp4VideoCodec: 'AVC',
+      quality: 'HIGH',
+    } as never,
     throwIfPipelineFailed,
     videoEncoder: { encode: encodeMock } as never,
   });
@@ -103,9 +112,9 @@ it('renders, queues, and encodes a frame with keyframe metadata', async () => {
     undefined
   );
   expect(drawProjectFrameMock).toHaveBeenCalledWith(
-    { stroke: expect.any(Function) },
+    context,
     { duration: 10 },
-    { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' },
+    { fps: 30, width: 1280, height: 720, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' },
     2.5,
     { image: 'loaded' },
     ['clip'],

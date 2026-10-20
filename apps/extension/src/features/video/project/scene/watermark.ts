@@ -1,3 +1,4 @@
+import type { VideoProject, VideoProjectAsset } from '../types/model';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../validation/primitives';
@@ -350,4 +351,14 @@ export function resolveQuickEditWatermarkTile(
   const count = columns * rows;
   if (count > 4096 || stepX * stepY > 4_194_304) throw new Error('Watermark tile budget exceeded.');
   return { width, height, stepX, stepY, columns, rows, count, rotation };
+}
+
+/** Resolves a Native watermark reference within its declared project material graph. */
+export function getVideoProjectWatermarkAsset(
+  project: VideoProject
+): VideoProjectAsset | undefined {
+  const reference = project.watermark?.image?.assetId;
+  if (!reference?.startsWith('project-asset:')) return undefined;
+  const id = reference.slice('project-asset:'.length);
+  return project.assets.find((asset) => asset.id === id && asset.type === 'IMAGE');
 }

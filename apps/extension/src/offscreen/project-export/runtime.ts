@@ -1,4 +1,9 @@
 import {
+  createVideoProjectWatermarkRenderer,
+  type VideoProjectWatermarkRenderer,
+} from '../../features/video/composition/canvas/project-watermark';
+import { loadBlobForAsset } from './media-loading/blob';
+import {
   createReviewSpatialRenderer,
   type ReviewSpatialRenderer,
 } from '../../features/video/composition/canvas/spatial-renderer';
@@ -86,10 +91,22 @@ export function getProjectExportSpatialRenderer(
   return renderer;
 }
 
+/** The export job owns prepared final-canvas watermark resources. */
+export function getProjectExportWatermarkRenderer(
+  job: Pick<ProjectExportRuntimeState, 'watermarkRenderer'> & { cancelled?: boolean },
+  signal?: AbortSignal
+): VideoProjectWatermarkRenderer {
+  if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+  job.watermarkRenderer ??= createVideoProjectWatermarkRenderer(loadBlobForAsset);
+  return job.watermarkRenderer;
+}
+
 export function cleanupJob(job: ProjectExportRuntimeState): void {
   const spatialRenderer = job.cameraSpatialRenderer;
   delete job.cameraSpatialRenderer;
   spatialRenderer?.dispose();
+  job.watermarkRenderer?.clear();
+  delete job.watermarkRenderer;
   job.captionRenderer?.clear();
   delete job.captionRenderer;
   for (const audioNode of job.clipAudioNodes.values()) {

@@ -367,3 +367,15 @@ it('does not admit a retained previous canvas as a newly rendered framing result
   );
   owner.dispose();
 });
+
+it('retains one watermark preparation owner across frames and clears it when the materializer closes', async () => {
+  const owner = resourceFixture();
+  await owner.renderFrame(0, new AbortController().signal);
+  const prepared = renderPreviewScene.mock.lastCall![0].watermarkRenderer!;
+  const clear = vi.spyOn(prepared, 'clear');
+  await owner.renderFrame(0.1, new AbortController().signal);
+  expect(renderPreviewScene.mock.lastCall![0].watermarkRenderer).toBe(prepared);
+  owner.dispose();
+  owner.dispose();
+  expect(clear).toHaveBeenCalledTimes(1);
+});

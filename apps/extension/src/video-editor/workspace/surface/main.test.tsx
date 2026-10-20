@@ -1,3 +1,6 @@
+import * as canvasSurface from './canvas';
+import { InspectorGroupedPanel } from '../sidebar/selection/grouped-inspector';
+import type { ComponentProps } from 'react';
 // @vitest-environment jsdom
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { act } from 'react';
@@ -20,6 +23,7 @@ const timelineSpy = vi.fn();
 const hookMocks = vi.hoisted(() => ({
   controller: null as unknown,
   sourceActive: false,
+  watermarkFocusProbe: false,
   exportOpen: false,
   closeExport: vi.fn(),
   setSourceActive: vi.fn(),
@@ -62,6 +66,26 @@ vi.mock('./effects-library', () => ({
 vi.mock('../floating/inspector-stack', () => ({
   VideoEditorFloatingInspectorStack: (props: unknown) => {
     inspectorSpy(props);
+    if (hookMocks.watermarkFocusProbe)
+      return (
+        <InspectorGroupedPanel
+          groups={[
+            {
+              id: 'canvas',
+              semantic: 'canvas',
+              label: 'Canvas',
+              defaultActive: true,
+              content: 'Canvas controls',
+            },
+            {
+              id: 'watermark',
+              semantic: 'watermark',
+              label: 'Watermark',
+              content: 'Watermark controls',
+            },
+          ]}
+        />
+      );
     return <div data-testid="context-inspector" />;
   },
 }));
@@ -630,4 +654,49 @@ it('mutes the Montage preview while the mounted microphone owns playback', () =>
     </RuntimeProjectContext.Provider>
   );
   expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(false);
+});
+
+it('reveals the watermark group through the workspace intent and repeats after manual navigation', async () => {
+  hookMocks.controller = createWorkspaceController();
+  hookMocks.watermarkFocusProbe = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const canvas = vi.spyOn(canvasSurface, 'VideoEditorWorkspaceCanvas').mockImplementation(
+    (
+      props: ComponentProps<typeof canvasSurface.VideoEditorWorkspaceCanvas> & {
+        onRevealWatermark?: () => void;
+      }
+    ) => (
+      <>
+        <button data-ui="test.reveal-watermark" onClick={props.onRevealWatermark}>
+          Reveal watermark
+        </button>
+        {props.inspector}
+      </>
+    )
+  );
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />));
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-watermark"]')!.click()
+    );
+    expect(container.textContent).toContain('Watermark controls');
+    expect(container.textContent).not.toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('nav button[aria-label="Canvas"]')!.click()
+    );
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-watermark"]')!.click()
+    );
+    expect(container.textContent).toContain('Watermark controls');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    canvas.mockRestore();
+    hookMocks.watermarkFocusProbe = false;
+  }
 });

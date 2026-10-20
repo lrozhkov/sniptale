@@ -29,36 +29,30 @@ function getVideoEditorAssetSourceFingerprint(asset: VideoProject['assets'][numb
   return `project-asset:${asset.source.projectAssetId}`;
 }
 
+/** Read declared Native media through its existing persistence owner. */
+export async function loadVideoEditorAssetBlob(
+  asset: VideoProject['assets'][number]
+): Promise<Blob | null> {
+  if (asset.source.kind === 'library-asset')
+    return (await getMediaAssetBlob(asset.source.mediaId)) ?? null;
+  if (asset.source.kind === 'recording') {
+    return (await getRecording(asset.source.recordingId))?.file ?? null;
+  }
+  if (asset.source.kind === 'scenario-asset') {
+    return (await getScenarioAsset(asset.source.scenarioAssetId))?.file ?? null;
+  }
+  const entry = await getProjectAsset(asset.source.projectAssetId);
+  if (entry.status === 'ready') return entry.entry.file;
+  if (entry.status === 'not-found') return null;
+  throw new Error(`Project asset ${asset.source.projectAssetId} ${entry.status}.`);
+}
+
 async function loadVideoEditorAssetUrl(
   asset: VideoProject['assets'][number]
 ): Promise<LoadedVideoEditorAssetUrl | null> {
   const sourceFingerprint = getVideoEditorAssetSourceFingerprint(asset);
-
-  if (asset.source.kind === 'library-asset') {
-    const blob = await getMediaAssetBlob(asset.source.mediaId);
-    return blob ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(blob) } : null;
-  }
-
-  if (asset.source.kind === 'recording') {
-    const entry = await getRecording(asset.source.recordingId);
-    return entry
-      ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.file) }
-      : null;
-  }
-
-  if (asset.source.kind === 'scenario-asset') {
-    const entry = await getScenarioAsset(asset.source.scenarioAssetId);
-    return entry
-      ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.file) }
-      : null;
-  }
-
-  const entry = await getProjectAsset(asset.source.projectAssetId);
-  if (entry.status === 'ready') {
-    return { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(entry.entry.file) };
-  }
-  if (entry.status === 'not-found') return null;
-  throw new Error(`Project asset ${asset.source.projectAssetId} ${entry.status}.`);
+  const blob = await loadVideoEditorAssetBlob(asset);
+  return blob ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(blob) } : null;
 }
 
 function revokeVideoEditorAssetUrl(url: string): void {

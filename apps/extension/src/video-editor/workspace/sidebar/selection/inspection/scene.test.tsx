@@ -1,3 +1,4 @@
+import type { VideoProject } from '../../../../../features/video/project/types/model';
 // @vitest-environment jsdom
 import { WorkspaceSidebarSelectionBody } from './body';
 
@@ -18,6 +19,12 @@ import {
 import { createSceneSelection } from '../../../../project/selection/model';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
+
+vi.mock('./watermark', () => ({
+  SceneWatermarkFields: ({ project }: { project: VideoProject }) => (
+    <span data-ui="native-watermark-binding">{project.name}</span>
+  ),
+}));
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -278,4 +285,20 @@ it('names the scene document manager by its document scope', () => {
   ).toBeNull();
   clickGroup('videoEditor.sidebar.textDocuments');
   expect(container!.querySelector('[data-ui="video-editor.text.panel"]')).not.toBeNull();
+});
+
+it('opens a dedicated watermark group with the authored project instead of the presented draft', () => {
+  const original = createProps();
+  const authored = { ...original.project, name: 'Authored' };
+  renderInspectPanel({
+    ...original,
+    project: { ...authored, name: 'Presented' },
+    typingProject: authored,
+    watermark: { onPreview: vi.fn(), registerAbort: vi.fn(() => () => undefined) },
+    onImportImage: vi.fn(),
+  });
+  clickGroup('gallery.videoReview.watermark');
+  expect(container!.querySelector('[data-ui="native-watermark-binding"]')!.textContent).toBe(
+    'Authored'
+  );
 });

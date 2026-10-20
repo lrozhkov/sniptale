@@ -1,11 +1,23 @@
-export interface VideoEditorImportPlacement {
-  destination?: 'materials' | 'timeline' | 'background';
-  /** Original Library identity when freezing a selected background presentation. */
-  backgroundOriginMediaId?: string;
+interface VideoEditorImportCoordinates {
   startTime?: number;
   timelineLaneId?: string | null;
   trackId?: string | null;
 }
+
+export type VideoEditorImportPlacement = VideoEditorImportCoordinates &
+  (
+    | {
+        destination?: 'materials' | 'timeline' | 'background';
+        /** Original Library identity when freezing a selected background presentation. */
+        backgroundOriginMediaId?: string;
+      }
+    | {
+        destination: 'watermark';
+        /** The invoking inspector cancels attachment when its project lifetime ends. */
+        signal: AbortSignal;
+        watermarkOriginMediaId?: string;
+      }
+  );
 
 export type VideoEditorImportKind = 'audio' | 'image' | 'video';
 

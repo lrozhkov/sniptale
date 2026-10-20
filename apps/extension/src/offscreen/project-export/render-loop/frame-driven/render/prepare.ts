@@ -1,4 +1,9 @@
-import { getProjectExportSpatialRenderer } from '../../../runtime';
+import { createVideoProjectCaptionRenderer } from '../../../../../workflows/video-review/project-captions';
+import { resolveProjectExportRange } from '../../../../../features/video/project/export/range';
+import {
+  getProjectExportSpatialRenderer,
+  getProjectExportWatermarkRenderer,
+} from '../../../runtime';
 import type { ReviewSpatialRenderer } from '../../../../../features/video/composition/canvas/spatial-renderer';
 import { syncVideoClipFrame } from '../../../media';
 import { drawProjectFrame, type LoadedImagesMap } from '../../../renderer';
@@ -44,12 +49,22 @@ export async function prepareFrameDrivenCompositeFrame(
 
   throwIfPipelineFailed();
   await syncVideoClipFrameForRender(job, project, currentTime, signal);
+  job.captionRenderer ??= createVideoProjectCaptionRenderer();
+  const captions = await job.captionRenderer.prepare(project, args.settings, signal);
+  captions.assertExportable(resolveProjectExportRange(project, args.settings));
+  const watermark =
+    project.watermark && project.watermark.mode !== 'none'
+      ? await getProjectExportWatermarkRenderer(job, signal).prepare(project, args.settings, signal)
+      : undefined;
+  if (!watermark) job.watermarkRenderer?.clear();
   const effectRuntimeFrames = await renderFrameDrivenEffectFrames(args);
   try {
     if (job.cancelled || signal?.aborted) {
       throw new Error('PROJECT_EXPORT_CANCELLED');
     }
     drawFrameDrivenProjectFrame(args, effectRuntimeFrames);
+    captions.draw(args.context, currentTime);
+    watermark?.draw(args.context);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

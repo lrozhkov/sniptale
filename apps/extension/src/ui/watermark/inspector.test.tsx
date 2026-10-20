@@ -2,10 +2,7 @@
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  ReviewWatermarkInspector,
-  type ReviewWatermarkInspectorProps,
-} from './watermark-inspector';
+import { WatermarkInspector, type WatermarkInspectorProps } from './inspector';
 import {
   createQuickEditWatermark,
   parseQuickEditWatermark,
@@ -28,7 +25,7 @@ vi.mock('../../workflows/background-images/static-logo', () => ({
 }));
 let root: Root;
 let host: HTMLDivElement;
-let props: ReviewWatermarkInspectorProps;
+let props: WatermarkInspectorProps;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
@@ -43,6 +40,12 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   props = {
+    Disclosure: ({ label, children }) => (
+      <details open>
+        <summary>{label}</summary>
+        {children}
+      </details>
+    ),
     settings: { ...createQuickEditWatermark('Saved text'), mode: 'text' },
     output: { width: 1920, height: 1080 },
     onChange: vi.fn(async () => true),
@@ -60,7 +63,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 async function render() {
-  await act(async () => root.render(<ReviewWatermarkInspector {...props} />));
+  await act(async () => root.render(<WatermarkInspector {...props} />));
 }
 async function type(value: string) {
   const node = host.querySelector('textarea')!;
@@ -208,11 +211,11 @@ it('clears custom coordinates when choosing any of the nine anchors', async () =
 
 it('keeps canvas preview separate from authored text until Enter and blur commit once', async () => {
   function ControlledInspector() {
-    const [preview, setPreview] = useState<ReviewWatermarkInspectorProps['settings']>(undefined);
+    const [preview, setPreview] = useState<WatermarkInspectorProps['settings']>(undefined);
     return (
       <>
         <output>{preview?.text.value}</output>
-        <ReviewWatermarkInspector
+        <WatermarkInspector
           {...props}
           onPreview={(settings) => {
             props.onPreview(settings);
@@ -339,9 +342,9 @@ it('ignores a stale text acknowledgement after external settings replace the pen
 
 it('commits slider changes when canvas previews are echoed into settings', async () => {
   function Controlled() {
-    const [draft, setDraft] = useState<ReviewWatermarkInspectorProps['settings']>(undefined);
+    const [draft, setDraft] = useState<WatermarkInspectorProps['settings']>(undefined);
     return (
-      <ReviewWatermarkInspector
+      <WatermarkInspector
         {...props}
         settings={draft ?? props.settings}
         onPreview={(value) => setDraft(value ?? undefined)}
@@ -392,4 +395,41 @@ it('hides reset when watermark is off and exposes italic when text is selected',
   props.settings = { ...props.settings!, mode: 'text' };
   await render();
   expect(host.querySelector('[aria-label="gallery.videoReview.watermarkItalic"]')).not.toBeNull();
+});
+
+it('uses nine SVG anchor controls with stable accessible names and pressed state', async () => {
+  await render();
+  const anchors = host.querySelector('[data-ui="watermark.anchors"]')!;
+  expect(anchors.hasAttribute('data-inspector-choices')).toBe(true);
+  const buttons = [...anchors.querySelectorAll('button')];
+  expect(buttons).toHaveLength(9);
+  expect(buttons.every((button) => button.querySelector('svg'))).toBe(true);
+  expect(
+    buttons.every((button) =>
+      button.getAttribute('aria-label')?.startsWith('gallery.videoReview.watermarkAnchor_')
+    )
+  ).toBe(true);
+  expect(anchors.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+  const first = buttons[0]!;
+  await act(async () => first.click());
+  expect(props.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ placement: expect.objectContaining({ anchor: 'top-left' }) })
+  );
+});
+
+it('delegates disclosure identity and children to the supplied workspace adapter', async () => {
+  const Disclosure = vi.fn(() => null);
+  props.Disclosure = Disclosure;
+  await render();
+  expect(Disclosure).toHaveBeenCalledWith(
+    expect.objectContaining({
+      preferenceId: 'watermark.text.advanced',
+      children: expect.anything(),
+    }),
+    undefined
+  );
+  expect(Disclosure).toHaveBeenCalledWith(
+    expect.objectContaining({ preferenceId: 'watermark.position', children: expect.anything() }),
+    undefined
+  );
 });

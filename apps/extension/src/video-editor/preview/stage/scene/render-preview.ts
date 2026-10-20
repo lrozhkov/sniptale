@@ -1,3 +1,8 @@
+import {
+  createVideoProjectWatermarkRenderer,
+  type VideoProjectWatermarkRenderer,
+} from '../../../../features/video/composition/canvas/project-watermark';
+import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import { drawSpatialSceneOverlays } from '../../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
@@ -110,7 +115,8 @@ function drawPreviewSceneOverlays(params: {
   }
 }
 
-export async function renderPreviewScene(params: {
+type PreviewSceneParams = {
+  watermarkRenderer?: VideoProjectWatermarkRenderer;
   cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
   captionRenderer?: VideoProjectCaptionRenderer;
@@ -129,7 +135,28 @@ export async function renderPreviewScene(params: {
   signal?: AbortSignal;
   stage: HTMLDivElement | null;
   videoRefs: PreviewStageVideoRefs;
-}): Promise<void | false> {
+};
+
+export async function renderPreviewScene(params: PreviewSceneParams): Promise<void | false> {
+  if (!params.project.watermark || params.project.watermark.mode === 'none') {
+    params.watermarkRenderer?.clear();
+    return renderPreparedPreviewScene(params);
+  }
+  const owner =
+    params.watermarkRenderer ?? createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob);
+  try {
+    const watermark = await owner.prepare(params.project, params.project, params.signal);
+    params.signal?.throwIfAborted();
+    return await renderPreparedPreviewScene(params, watermark);
+  } finally {
+    if (!params.watermarkRenderer) owner.clear();
+  }
+}
+
+async function renderPreparedPreviewScene(
+  params: PreviewSceneParams,
+  watermark?: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>>
+): Promise<void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
   if (params.cameraOverride) {
     renderPasses.overlayFrame.camera = params.cameraOverride;
@@ -182,6 +209,7 @@ export async function renderPreviewScene(params: {
     const drawn = drawResolvedPreviewScene({
       clipMediaElements,
       captions,
+      watermark,
       effectRuntimeFrames,
       params,
       renderPasses,
@@ -210,6 +238,7 @@ function arePreviewSceneVideosReady(
 }
 
 type ResolvedPreviewSceneArgs = {
+  watermark: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>> | undefined;
   captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   clipMediaElements: Map<string, HTMLMediaElement>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
@@ -222,7 +251,7 @@ function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): boolean {
     args.renderPasses.overlayFrame,
     ...args.renderPasses.visualPasses.map((pass) => pass.frame),
   ].some((frame) => frame.camera.spatial !== undefined);
-  if (!spatial) return drawResolvedPreviewSceneContent(args);
+  if (!spatial && !args.watermark) return drawResolvedPreviewSceneContent(args);
   const presented = args.params.canvas;
   const owned = !args.params.stagingCanvas;
   const staging = args.params.stagingCanvas?.() ?? presented.ownerDocument.createElement('canvas');
@@ -299,12 +328,13 @@ function drawResolvedPreviewSceneContent(
     spatialRenderer: args.params.spatialRenderer,
   });
   const { context, viewport } = overlayPrepared;
-  if (!args.captions.plan.cues.length) return true;
+  if (!args.captions.plan.cues.length && !args.watermark) return true;
   context.save();
   try {
     context.translate(viewport.offsetX, viewport.offsetY);
     context.scale(viewport.scale, viewport.scale);
-    args.captions.draw(context, args.params.currentTime);
+    if (args.captions.plan.cues.length) args.captions.draw(context, args.params.currentTime);
+    args.watermark?.draw(context);
   } finally {
     context.restore();
   }

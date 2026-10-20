@@ -728,3 +728,95 @@ it('retains camera defaults and overrides through portable backup admission and 
   expect(restored.version).toBe(4);
   expect(project).toEqual(before);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'duplicates portable %s watermark without confusing material and private resource identities',
+  async (mode) => {
+    const { createVideoProjectAsset } =
+      await import('../../../../features/video/project/factories/creation');
+    const { createQuickEditWatermark, getVideoProjectWatermarkAsset } =
+      await import('../../../../features/video/project/scene/watermark');
+    const { parseVideoProjectEntry, parseProjectAssetEntry } =
+      await import('../../../../composition/persistence/projects/read-guards');
+    const base = createVideoProjectEntryWithMediaClip();
+    base.id = 'p';
+    base.project.id = 'p';
+    base.project.version = 20;
+    const logo = createVideoProjectAsset(
+      'Logo',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-logo' },
+      {
+        width: 80,
+        height: 40,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    base.project.assets.push(logo);
+    base.project.watermark = {
+      ...createQuickEditWatermark('Portable mark'),
+      mode,
+      layout: 'tiled',
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 80,
+        height: 40,
+        size: 0.2,
+        opacity: 0.4,
+      },
+    };
+    const before = structuredClone(base);
+    const values = new Map<string, unknown[]>();
+    const db = publisherDatabase(values);
+    db.get = async (name, key) => (name === 'video_projects' && key === 'p' ? base : undefined);
+    mocks.database.mockReturnValue(db);
+    mocks.mutate.mockImplementation(async (callback) => callback(db));
+    const metadata = portableMetadata({
+      entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+      projectAssets: [
+        portableProjectAsset('project-asset-1'),
+        {
+          ...portableProjectAsset('private-logo'),
+          entry: { id: 'private-logo', mimeType: 'image/png', createdAt: 1, size: 6 },
+          filename: 'logo.png',
+        },
+      ],
+      projectExports: [],
+    });
+    const metadataBefore = structuredClone(metadata);
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(metadata, [
+          stagedObject('o-project-asset-1', 'restored-video-bytes', 'video/webm', 6),
+          stagedObject('o-private-logo', 'restored-logo-bytes', 'image/png', 6),
+        ])
+      )
+    ).resolves.toMatchObject({ imported: true });
+    const restored = (values.get('video_projects') ?? [])
+      .map(parseVideoProjectEntry)
+      .find((entry) => entry !== null)?.project;
+    expect(restored).toBeDefined();
+    expect(restored!.id).not.toBe(base.id);
+    expect(restored!.watermark).toEqual(base.project.watermark);
+    const restoredLogo = getVideoProjectWatermarkAsset(restored!);
+    expect(restoredLogo?.id).toBe(logo.id);
+    if (restoredLogo?.source.kind !== 'project-asset')
+      throw new Error('Missing restored logo source.');
+    const restoredPrivateId = restoredLogo.source.projectAssetId;
+    expect(restoredPrivateId).not.toBe('private-logo');
+    const stored = (values.get('project_assets') ?? [])
+      .map(parseProjectAssetEntry)
+      .find((entry) => entry?.id === restoredPrivateId);
+    expect(stored).toMatchObject({
+      assetId: 'restored-logo-bytes',
+      mimeType: 'image/png',
+      size: 6,
+    });
+    expect(metadata).toEqual(metadataBefore);
+    expect(base).toEqual(before);
+  }
+);

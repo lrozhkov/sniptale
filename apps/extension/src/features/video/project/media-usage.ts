@@ -1,3 +1,4 @@
+import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject } from './types';
 import { VideoProjectClipType, VideoSceneBackgroundKind } from './types';
 
@@ -5,6 +6,7 @@ import { VideoProjectClipType, VideoSceneBackgroundKind } from './types';
 export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'clip'; clipId: string }
   | { kind: 'scene' }
+  | { kind: 'watermark' }
   | { kind: 'analysis'; objectTrackId: string }
   | { kind: 'text'; documentId: string }
 );
@@ -21,6 +23,8 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   if (project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE) {
     uses.push({ assetId: project.sceneBackground.assetId, kind: 'scene' });
   }
+  const watermarkAsset = getVideoProjectWatermarkAsset(project);
+  if (watermarkAsset) uses.push({ assetId: watermarkAsset.id, kind: 'watermark' });
   const rememberedImage = project.sceneBackground?.remembered?.image;
   if (
     rememberedImage &&

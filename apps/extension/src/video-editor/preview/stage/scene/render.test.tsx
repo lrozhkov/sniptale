@@ -173,3 +173,34 @@ it('lazily owns preview GPU resources across retry and rejects stale context-los
   expect(factory).toThrow();
   expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);
 });
+
+it('keeps watermark preparation in the preview session and clears it on failure, retry and unmount', async () => {
+  await act(async () => {
+    root?.render(<RenderHarness />);
+  });
+  const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+  const job = {
+    canvas: document.createElement('canvas'),
+    currentTime: 0,
+    imageBank: {},
+    project: createEmptyVideoProject('Watermark owner'),
+    stage: null,
+    videoRefs: { current: {} },
+  };
+  await options.render(job);
+  const owner = vi.mocked(renderPreviewScene).mock.lastCall![0].watermarkRenderer!;
+  const clear = vi.spyOn(owner, 'clear');
+  await options.render({ ...job, currentTime: 1 });
+  expect(vi.mocked(renderPreviewScene).mock.lastCall![0].watermarkRenderer).toBe(owner);
+  options.onError(new Error('Preview failed'));
+  expect(clear).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    root?.render(<RenderHarness retryVersion={1} />);
+  });
+  expect(clear).toHaveBeenCalledTimes(2);
+  await act(async () => {
+    root?.unmount();
+  });
+  root = null;
+  expect(clear).toHaveBeenCalledTimes(3);
+});

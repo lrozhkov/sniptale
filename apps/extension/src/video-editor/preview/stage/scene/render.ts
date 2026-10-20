@@ -1,3 +1,5 @@
+import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
+import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import {
   createReviewSpatialRenderer,
   type ReviewSpatialRenderer,
@@ -160,14 +162,18 @@ function usePreviewRenderSchedulerRef(
   feedbackRef.current = { onFailure, onRecovery };
   const schedulerRef = useRef<ReturnType<typeof createPreviewSceneRenderScheduler> | null>(null);
   const captionsRef = useRef<ReturnType<typeof createVideoProjectCaptionRenderer> | null>(null);
+  const watermarkRef = useRef<ReturnType<typeof createVideoProjectWatermarkRenderer> | null>(null);
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
   const retryRef = useRef(retryVersion);
   if (!schedulerRef.current) {
     const captionRenderer = createVideoProjectCaptionRenderer();
     captionsRef.current = captionRenderer;
+    const watermarkRenderer = createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob);
+    watermarkRef.current = watermarkRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
       onError: (error) => {
+        watermarkRenderer.clear();
         const spatial = spatialRef.current;
         spatialRef.current = null;
         spatial?.dispose();
@@ -182,6 +188,7 @@ function usePreviewRenderSchedulerRef(
           renderPreviewScene({
             ...input,
             captionRenderer,
+            watermarkRenderer,
             spatialRenderer: () => {
               input.signal?.throwIfAborted();
               if (spatialRef.current) return spatialRef.current;
@@ -219,6 +226,7 @@ function usePreviewRenderSchedulerRef(
   useLayoutEffect(() => {
     if (retryRef.current === retryVersion) return;
     retryRef.current = retryVersion;
+    watermarkRef.current?.clear();
     const spatial = spatialRef.current;
     spatialRef.current = null;
     spatial?.dispose();
@@ -228,6 +236,7 @@ function usePreviewRenderSchedulerRef(
     return () => {
       scheduler?.dispose();
       captionsRef.current?.clear();
+      watermarkRef.current?.clear();
       const spatial = spatialRef.current;
       spatialRef.current = null;
       spatial?.dispose();

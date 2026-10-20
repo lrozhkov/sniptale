@@ -9,3 +9,16 @@ export interface VideoEditorMotionSpatialPreview {
   regionId: string;
   edit: MotionSpatialEdit;
 }
+
+/** A scene draft is valid only for its accepted document snapshot. */
+export interface VideoEditorWatermarkPreview {
+  project: VideoProject;
+  settings: NonNullable<VideoProject['watermark']>;
+}
+
+/** The workspace owns preview admission and cancellation before a project transition. */
+export interface VideoEditorWatermarkInspectorRuntime {
+  onPreview(preview: VideoEditorWatermarkPreview | null): void;
+  registerAbort(abort: () => void): () => void;
+  imagePreviewUrl?: string;
+}

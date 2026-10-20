@@ -49,6 +49,7 @@ import type {
 import type { ProjectListItem, RecordingListItem } from '../../../library/contracts/items';
 
 export interface WorkspaceSidebarProps {
+  watermark?: import('../../../contracts/workspace').VideoEditorWatermarkInspectorRuntime;
   recognition?: VideoProjectRecognitionController;
   textRewrite?: VideoProjectTextRewriteController;
   textVoice?: VideoProjectTextVoiceController;

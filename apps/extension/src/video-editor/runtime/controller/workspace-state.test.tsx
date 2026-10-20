@@ -1,3 +1,5 @@
+import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
+import { presentWorkspaceWatermarkPreview } from './workspace-state';
 // @vitest-environment jsdom
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../features/video/project/motion/spatial';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
@@ -454,4 +456,53 @@ it('upgrades only the presented legacy snapshot and refuses a missing selected r
   expect(
     presentWorkspaceMotionSpatialPreview(deleted, selection, { ...preview, project: deleted })
   ).toBe(deleted);
+});
+
+it('scopes watermark presentation to the accepted scene snapshot without writing source data', () => {
+  const project = createEmptyVideoProject('Authored');
+  const settings = { ...createQuickEditWatermark('Draft'), mode: 'text' as const };
+  const before = structuredClone(project);
+  const preview = { project, settings };
+  const result = presentWorkspaceWatermarkPreview(project, { kind: 'scene' }, preview);
+  expect(result.watermark).toBe(settings);
+  expect(isHydratableVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+  expect(
+    presentWorkspaceWatermarkPreview(project, { kind: 'clip', clipId: 'other' }, preview)
+  ).toBe(project);
+  const changed = { ...project, name: 'Renamed' };
+  expect(presentWorkspaceWatermarkPreview(changed, { kind: 'scene' }, preview)).toBe(changed);
+});
+
+it('cancels the registered watermark owner while ignoring stale unregister callbacks', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const first = vi.fn(),
+    second = vi.fn();
+  const release = workspaceState!.inspector.registerWatermarkAbort(first);
+  workspaceState!.inspector.registerWatermarkAbort(second);
+  release();
+  act(() => workspaceState!.inspector.cancelWatermarkAcquisition());
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalledTimes(1);
+  act(() => workspaceState!.inspector.cancelWatermarkAcquisition());
+  expect(second).toHaveBeenCalledTimes(1);
+  expect(workspaceState!.inspector.watermarkPreview).toBeNull();
+});
+
+it('keeps schema20 and the authored watermark when spatial draft presentation is active', () => {
+  const project = createEmptyVideoProject('Spatial and watermark');
+  project.version = 20;
+  project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const region = { ...createVideoProjectMotionRegion(project, 0), id: 'region' };
+  project.motionRegions = [region];
+  const selection = { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: region.id };
+  const presented = presentWorkspaceMotionSpatialPreview(project, selection, {
+    project,
+    regionId: region.id,
+    edit: { kind: 'perspective', rotateY: 20 },
+  });
+  expect(presented.version).toBe(20);
+  expect(presented.watermark).toBe(project.watermark);
 });

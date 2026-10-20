@@ -1,6 +1,7 @@
 import type React from 'react';
 
 export type InspectorSectionSemantic =
+  | 'watermark'
   | 'info'
   | 'timing'
   | 'placement'

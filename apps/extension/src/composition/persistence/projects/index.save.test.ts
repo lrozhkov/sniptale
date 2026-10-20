@@ -653,3 +653,59 @@ it('saves dormant background images with the existing asset graph without schedu
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
   expect(project).toEqual(before);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'retains private logo bytes when another project has a %s watermark',
+  async (mode) => {
+    const { createQuickEditWatermark, getVideoProjectWatermarkAsset } =
+      await import('../../../features/video/project/scene/watermark');
+    const shared: VideoProjectAsset = {
+      ...createProjectOwnedVideoAsset('logical-logo'),
+      type: 'IMAGE',
+      source: { kind: 'project-asset', projectAssetId: 'private-logo' },
+      metadata: {
+        width: 80,
+        height: 40,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      },
+    };
+    const watermark = {
+      ...createQuickEditWatermark('Logo'),
+      mode: 'image' as const,
+      image: {
+        assetId: 'project-asset:logical-logo',
+        width: 80,
+        height: 40,
+        size: 0.2,
+        opacity: 1,
+      },
+    };
+    const original = createVideoProject({ assets: [shared], version: 20, watermark });
+    const held = createVideoProject({
+      assets: [structuredClone(shared)],
+      version: 20,
+      id: 'project-2',
+      watermark: { ...structuredClone(watermark), mode },
+    });
+    const heldBefore = structuredClone(held);
+    const detached = { ...original, assets: [] };
+    delete detached.watermark;
+    projectsDbMocks.txGetMock.mockResolvedValue(createVideoProjectEntry(original));
+    projectsDbMocks.txGetAllMock.mockResolvedValue([
+      createVideoProjectEntry(original),
+      createVideoProjectEntry(held, { id: held.id }),
+    ]);
+    await saveVideoProject(detached);
+    expect(getVideoProjectWatermarkAsset(held)?.source).toEqual({
+      kind: 'project-asset',
+      projectAssetId: 'private-logo',
+    });
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('private-logo');
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:private-logo');
+    expect(held).toEqual(heldBefore);
+  }
+);

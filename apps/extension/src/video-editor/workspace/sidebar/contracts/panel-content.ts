@@ -88,6 +88,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'recordingId'
   | 'recordings'
   | 'currentTime'
+  | 'watermark'
   | 'typingProject'
   | 'recordingTelemetry'
   | 'onApplyTypingCompression'

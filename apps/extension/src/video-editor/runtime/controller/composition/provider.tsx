@@ -145,6 +145,17 @@ function useVideoEditorRuntimeComposition(
     libraries,
   });
 
+  const applyRuntimeProject = runtime.applyLoadedProject;
+  const cancelWatermarkAcquisition = workspace.inspector.cancelWatermarkAcquisition;
+  const applyLoadedProject = useMemo(
+    () =>
+      (...args: Parameters<typeof runtime.applyLoadedProject>) => {
+        cancelWatermarkAcquisition();
+        applyRuntimeProject(...args);
+      },
+    [applyRuntimeProject, cancelWatermarkAcquisition]
+  );
+
   useVideoEditorOverlayPlayback({
     blockingOverlayOpen,
     enabled:
@@ -157,7 +168,15 @@ function useVideoEditorRuntimeComposition(
   });
   useRecordingTelemetry(lifecycle.project, telemetry.setRecordingTelemetry);
 
-  return { blockingOverlayOpen, exportPort, history, lifecycle, runtime, selections, timeline };
+  return {
+    blockingOverlayOpen,
+    exportPort,
+    history,
+    lifecycle,
+    runtime: { ...runtime, applyLoadedProject },
+    selections,
+    timeline,
+  };
 }
 
 function useVideoEditorCommandComposition(
@@ -221,13 +240,19 @@ function useVideoEditorCommandComposition(
     }),
     [libraries.refreshProjectExports, libraries.refreshProjects]
   );
+  const requestLeave = workspace.voiceRecording.request;
+  const cancelWatermarkAcquisition = workspace.inspector.cancelWatermarkAcquisition;
   const projectCommandPort = useMemo(
     () => ({
       getCurrentProject: getCurrentVideoEditorProjectSnapshot,
       projects: libraries.projects,
       libraries: projectCommandLibraries,
       applyLoadedProject: runtime.applyLoadedProject,
-      beforeLeave: workspace.voiceRecording.request,
+      beforeLeave: async () => {
+        if (!(await requestLeave())) return false;
+        cancelWatermarkAcquisition();
+        return true;
+      },
       setError: lifecycle.setError,
     }),
     [
@@ -235,7 +260,8 @@ function useVideoEditorCommandComposition(
       lifecycle.setError,
       projectCommandLibraries,
       runtime.applyLoadedProject,
-      workspace.voiceRecording.request,
+      requestLeave,
+      cancelWatermarkAcquisition,
     ]
   );
   const commandPorts = useMemo(

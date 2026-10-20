@@ -94,6 +94,10 @@ const mocks = vi.hoisted(() => {
     inspector: {
       mode: 'selection',
       openSelection: action,
+      watermarkPreview: null,
+      previewWatermark: () => undefined,
+      registerWatermarkAbort: () => () => undefined,
+      cancelWatermarkAcquisition: fn(),
       motionSpatialPreview: null,
       previewMotionSpatial: action,
     },
@@ -118,7 +122,7 @@ const mocks = vi.hoisted(() => {
   };
   const runtime = {
     isPreparingPlayback: false,
-    applyLoadedProject: action,
+    applyLoadedProject: fn(),
     assetUrls: {},
     pausePlayback: action,
     registerPreviewRuntime: action,
@@ -137,6 +141,10 @@ const mocks = vi.hoisted(() => {
   };
   return {
     commands,
+    commandHook: fn(
+      (_ports: Parameters<typeof import('../../commands').useVideoEditorActionHandlers>[0]) =>
+        commands
+    ),
     effects: { updateEffectInstance: fn() },
     exportPort,
     history,
@@ -155,7 +163,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('../../commands', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../commands')>()),
-  useVideoEditorActionHandlers: () => mocks.commands,
+  useVideoEditorActionHandlers: mocks.commandHook,
 }));
 vi.mock('../../session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../session')>()),
@@ -231,6 +239,9 @@ beforeEach(() => {
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
+  mocks.commandHook.mockClear();
+  mocks.workspace.inspector.cancelWatermarkAcquisition.mockClear();
+  mocks.workspace.voiceRecording.request.mockReset().mockResolvedValue(true);
   mocks.exportPort.openExportDialog.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -441,4 +452,29 @@ it('keeps recording-owned video playback out of overlay pause while blocking glo
   expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(false);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
   mocks.workspace.voiceRecording.capturing = false;
+});
+
+it('cancels a watermark gesture only after the existing leave admission succeeds', async () => {
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  const leave = mocks.commandHook.mock.lastCall![0].project.beforeLeave!;
+  mocks.workspace.voiceRecording.request.mockResolvedValueOnce(false);
+  await expect(leave()).resolves.toBe(false);
+  expect(mocks.workspace.inspector.cancelWatermarkAcquisition).not.toHaveBeenCalled();
+  await expect(leave()).resolves.toBe(true);
+  expect(mocks.workspace.inspector.cancelWatermarkAcquisition).toHaveBeenCalledTimes(1);
+});
+
+it('cancels an acquisition started during project loading before applying the loaded document', () => {
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  const order: string[] = [];
+  mocks.workspace.inspector.cancelWatermarkAcquisition.mockImplementationOnce(() => {
+    order.push('cancel');
+  });
+  mocks.runtime.applyLoadedProject.mockImplementationOnce(() => {
+    order.push('apply');
+  });
+  const project = createEmptyVideoProject('Reloaded');
+  mocks.commandHook.mock.lastCall![0].project.applyLoadedProject(project, null);
+  expect(order).toEqual(['cancel', 'apply']);
+  expect(mocks.runtime.applyLoadedProject).toHaveBeenLastCalledWith(project, null);
 });

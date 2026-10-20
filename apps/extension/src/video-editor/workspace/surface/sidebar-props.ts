@@ -258,6 +258,7 @@ function getWorkspaceSidebarSelectionProps(
   controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
+  | 'watermark'
   | 'typingProject'
   | 'recordingTelemetry'
   | 'currentTime'
@@ -274,6 +275,7 @@ function getWorkspaceSidebarSelectionProps(
     ...(controller.state.currentTime === undefined
       ? {}
       : { currentTime: controller.state.currentTime }),
+    ...(controller.state.watermark ? { watermark: controller.state.watermark } : {}),
     ...(controller.state.typingProject ? { typingProject: controller.state.typingProject } : {}),
     ...(controller.state.recordingTelemetry
       ? { recordingTelemetry: controller.state.recordingTelemetry }

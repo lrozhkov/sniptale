@@ -151,6 +151,10 @@ export function createCleanSourceSpan(
   end: number,
   timelineIndex: VideoCompositionTimelineIndex
 ): Mp4VideoRenderSpan {
+  if (project.watermark && project.watermark.mode !== 'none') {
+    return createCompositeSpan(start, end, 'visual-layer');
+  }
+
   if (settings.burnInSubtitles === true || hasVideoProjectCaptions(project, { start, end })) {
     return createCompositeSpan(start, end, 'subtitles');
   }

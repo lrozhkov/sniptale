@@ -74,3 +74,14 @@ it('forwards camera layout actions and preserves false split eligibility', () =>
   expect(onApplyCameraLayout).toHaveBeenCalledWith('camera', 'OVERLAY', 'TOP_RIGHT');
   expect(props.onEditCameraPosition).toBe(onEditCameraPosition);
 });
+
+it('preserves the Native watermark runtime binding through the workspace projection', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const watermark = {
+    onPreview: vi.fn(),
+    registerAbort: vi.fn(() => () => undefined),
+    imagePreviewUrl: 'blob:logo',
+  };
+  controller.state.watermark = watermark;
+  expect(getWorkspaceSidebarProps(controller).watermark).toBe(watermark);
+});

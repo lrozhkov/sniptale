@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+import type { InspectorDisclosureProps } from '../compact-inspector-controls/shared';
 import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Strikethrough } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -6,16 +8,16 @@ import {
   TextareaField,
   SegmentedRow,
   ToggleField,
-} from '../../ui/compact-inspector-controls';
+} from '../compact-inspector-controls';
 import {
   parseQuickEditWatermark,
   type QuickEditWatermarkSettings,
 } from '../../features/video/project/scene/watermark';
 import { translate } from '../../platform/i18n';
-import { ReviewDetails, reviewSelectFieldClassName } from './controls';
-import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
+import { PreviewNumericRow as ReviewPreviewNumberRow } from '../compact-inspector-controls/numeric-preview';
 
 export type WatermarkBinding = {
+  Disclosure: ComponentType<InspectorDisclosureProps>;
   settings: QuickEditWatermarkSettings;
   onChange(settings: QuickEditWatermarkSettings): Promise<boolean>;
   onPreview(settings: QuickEditWatermarkSettings | null): void;
@@ -141,7 +143,7 @@ export function WatermarkTextFields(
         }
       />
       <ColorField
-        className={reviewSelectFieldClassName}
+        className="w-full min-w-0"
         label={translate('gallery.videoReview.watermarkColor')}
         title={translate('gallery.videoReview.watermarkColor')}
         value={text.color}
@@ -224,7 +226,7 @@ export function WatermarkTextFields(
           />
         </div>
       </div>
-      <ReviewDetails
+      <props.Disclosure
         label={translate('gallery.videoReview.watermarkAdvanced')}
         preferenceId="watermark.text.advanced"
       >
@@ -243,7 +245,7 @@ export function WatermarkTextFields(
           label={translate('gallery.videoReview.watermarkShadow')}
           onChange={(shadow) => onChange(patch({ shadow }))}
         />
-      </ReviewDetails>
+      </props.Disclosure>
     </>
   );
 }

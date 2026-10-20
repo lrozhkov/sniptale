@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 import { videoProjectCaptionInput } from '../../../features/video/project/text/captions';
 import { planReviewCaptions } from '../../../features/video/review/caption-plan';
 import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
@@ -371,4 +372,15 @@ it('invalidates a cached segment when source slip preserves the phrase range but
   await expect(createVideoPreviewSegmentRevision(slipped, range)).resolves.not.toBe(
     await createVideoPreviewSegmentRevision(project, range)
   );
+});
+
+it('invalidates exact frames and every segment for authored final-canvas watermark changes', async () => {
+  const project = { ...createEmptyVideoProject(), duration: 4 };
+  const before = await createVideoPreviewRenderRevision(project);
+  const segment = await createVideoPreviewSegmentRevision(project, { startFrame: 0, endFrame: 20 });
+  project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  expect(await createVideoPreviewRenderRevision(project)).not.toBe(before);
+  expect(
+    await createVideoPreviewSegmentRevision(project, { startFrame: 0, endFrame: 20 })
+  ).not.toBe(segment);
 });

@@ -1,4 +1,5 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { createQuickEditWatermark } from '../../../../../features/video/project/scene/watermark';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createVideoCompositionTimelineIndex } from '../../../../../features/video/composition/timeline/frame/index';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
@@ -10,6 +11,23 @@ import { drawProjectFrame, type LoadedImagesMap } from '../../../renderer';
 import type { RenderOffscreenProjectEffectFramesInput } from '../../../effect-runtime';
 import type { RenderLoopJobState } from '../../shared/index';
 import type { RenderFrameDrivenCompositeFrameArgs } from './types';
+
+const captionOwner = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  draw: vi.fn(),
+  assertExportable: vi.fn(),
+}));
+vi.mock('../../../../../workflows/video-review/project-captions', () => ({
+  createVideoProjectCaptionRenderer: () => ({ prepare: captionOwner.prepare, clear: vi.fn() }),
+}));
+beforeEach(() => {
+  captionOwner.prepare.mockReset().mockResolvedValue({
+    draw: captionOwner.draw,
+    assertExportable: captionOwner.assertExportable,
+  });
+  captionOwner.draw.mockReset();
+  captionOwner.assertExportable.mockReset();
+});
 
 const spatialOwner = vi.hoisted(() => ({
   get: vi.fn(() => ({ validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() })),
@@ -208,4 +226,46 @@ it('passes lazy spatial factories to effect capture and final draw under the sam
   paint();
   expect(spatialOwner.get).toHaveBeenNthCalledWith(1, fixture.job, fixture.args.signal);
   expect(spatialOwner.get).toHaveBeenNthCalledWith(2, fixture.job, fixture.args.signal);
+});
+
+it('paints watermark after scene and captions and rejects unavailable watermark before drawing', async () => {
+  const fixture = createIndexedEffectRuntimeFrameFixture();
+  fixture.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const order: string[] = [];
+  const draw = vi.fn(() => {
+    order.push('watermark');
+  });
+  const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
+  fixture.job.watermarkRenderer = { prepare, clear: vi.fn() };
+  drawProjectFrameMock.mockImplementation(() => {
+    order.push('scene');
+  });
+  captionOwner.draw.mockImplementation(() => order.push('captions'));
+  await prepareFrameDrivenCompositeFrame(fixture.args);
+  expect(order).toEqual(['scene', 'captions', 'watermark']);
+  expect(prepare).toHaveBeenCalledWith(fixture.project, fixture.settings, undefined);
+  prepare.mockRejectedValueOnce(new Error('Logo unavailable'));
+  await expect(prepareFrameDrivenCompositeFrame(fixture.args)).rejects.toThrow('Logo unavailable');
+  expect(draw).toHaveBeenCalledTimes(1);
+  expect(drawProjectFrameMock).toHaveBeenCalledTimes(1);
+});
+
+it('refuses caption preparation before painting and permits a fresh frame retry', async () => {
+  const fixture = createIndexedEffectRuntimeFrameFixture();
+  captionOwner.prepare.mockRejectedValueOnce(new Error('Caption font is unavailable'));
+  await expect(prepareFrameDrivenCompositeFrame(fixture.args)).rejects.toThrow(
+    'Caption font is unavailable'
+  );
+  expect(drawProjectFrameMock).not.toHaveBeenCalled();
+  expect(captionOwner.draw).not.toHaveBeenCalled();
+  expect(fixture.args.videoEncoder.encode).not.toHaveBeenCalled();
+  await prepareFrameDrivenCompositeFrame(fixture.args);
+  expect(captionOwner.prepare).toHaveBeenLastCalledWith(
+    fixture.project,
+    fixture.settings,
+    undefined
+  );
+  expect(captionOwner.assertExportable).toHaveBeenCalledOnce();
+  expect(drawProjectFrameMock).toHaveBeenCalledOnce();
+  expect(captionOwner.draw).toHaveBeenCalledWith(fixture.context, fixture.args.currentTime);
 });

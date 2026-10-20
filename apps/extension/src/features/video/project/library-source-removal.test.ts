@@ -363,3 +363,52 @@ it.each(
   expect(isExportReadyVideoProject(result)).toBe(true);
   expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'clears only the deleted %s watermark logo and retains authored presentation',
+  async (mode) => {
+    const { createQuickEditWatermark } = await import('./scene/watermark');
+    const project = createEmptyVideoProject('Watermark source removal');
+    const source = { kind: 'project-asset' as const, projectAssetId: 'physical-logo' };
+    const logo = createVideoProjectAsset('Logo', 'IMAGE', source, {
+      width: 400,
+      height: 200,
+      duration: null,
+      mimeType: 'image/png',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    });
+    project.version = 20;
+    project.assets = [logo];
+    project.watermark = {
+      ...createQuickEditWatermark('Retained text'),
+      mode,
+      layout: 'tiled',
+      image: {
+        assetId: `project-asset:${logo.id}`,
+        width: 400,
+        height: 200,
+        size: 0.3,
+        opacity: 0.5,
+      },
+    };
+    const before = structuredClone(project);
+    expect(
+      removeVideoProjectLibrarySources(project, [
+        { kind: 'project-asset', projectAssetId: logo.id },
+      ])
+    ).toBe(project);
+    const next = removeVideoProjectLibrarySources(project, [source]);
+    expect(next.watermark).not.toHaveProperty('image');
+    expect(next.watermark).toEqual({
+      ...project.watermark,
+      image: undefined,
+      mode: mode === 'image' ? 'none' : mode,
+    });
+    expect(next.assets).toEqual([]);
+    expect(next.version).toBe(20);
+    expect(isExportReadyVideoProject(next)).toBe(true);
+    expect(project).toEqual(before);
+  }
+);

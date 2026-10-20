@@ -1,3 +1,4 @@
+import { getVideoProjectWatermarkAsset, parseQuickEditWatermark } from '../scene/watermark';
 import { parseSceneBackgroundSettings } from '../scene/background-settings';
 import {
   parseVideoProjectTextDocuments,
@@ -93,8 +94,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 19) &&
+    isBoundedNumber(version, 2, 20) &&
     Number.isInteger(version) &&
+    (version >= 20 || value['watermark'] === undefined) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
     (version >= 4 ||
@@ -176,6 +178,7 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['actionEvents'], isActionEvent) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
+    (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
     (value['sceneBackground'] === undefined ||
       parseSceneBackgroundSettings(value['sceneBackground']) !== null) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&
@@ -196,6 +199,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   return (
     project.clips.every((clip) => hasValidClipReferences(clip, assetIds, trackIds)) &&
     hasValidSceneBackgroundReferences(project, assetIds) &&
+    (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
     (project.transitions ?? []).every(
       (transition) =>
         clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)

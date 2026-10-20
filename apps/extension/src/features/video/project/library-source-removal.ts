@@ -1,3 +1,4 @@
+import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject, VideoProjectAssetSource } from './types';
 import { VideoClipTransitionKind } from './types';
 import { assertExportReadyVideoProject } from './validation/root';
@@ -81,6 +82,7 @@ export function removeVideoProjectLibrarySources(
       ? { transitions: project.transitions.filter(({ id }) => !removedTransitionIds.has(id)) }
       : {}),
     ...removeSourceBackground(project, removedAssetIds),
+    ...removeSourceWatermark(project, removedAssetIds),
     ...(project.cursorTrack
       ? {
           cursorTrack: {
@@ -208,4 +210,16 @@ function removeSourceObjectTracks(
           }
         : {}),
     }));
+}
+
+function removeSourceWatermark(
+  project: VideoProject,
+  removedAssetIds: ReadonlySet<string>
+): Partial<Pick<VideoProject, 'watermark'>> {
+  const asset = getVideoProjectWatermarkAsset(project);
+  if (!project.watermark || !asset || !removedAssetIds.has(asset.id)) return {};
+  const { image: _removedLogo, ...watermark } = project.watermark;
+  return {
+    watermark: { ...watermark, mode: watermark.mode === 'image' ? 'none' : watermark.mode },
+  };
 }

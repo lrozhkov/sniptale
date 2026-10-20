@@ -1,3 +1,4 @@
+import type { VideoProjectWatermarkRenderer } from '../../features/video/composition/canvas/project-watermark';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../features/video/project/export/time-estimate';
 import type { ExportAudioSettings } from './codecs/types';
@@ -7,6 +8,7 @@ import type { VideoProjectCaptionRenderer } from '../../workflows/video-review/p
 export interface ProjectExportRuntimeState {
   cameraSpatialRenderer?: ReviewSpatialRenderer;
   captionRenderer?: VideoProjectCaptionRenderer;
+  watermarkRenderer?: VideoProjectWatermarkRenderer;
   mediaRecorder: MediaRecorder | null;
   clipMediaElements: Map<string, HTMLMediaElement>;
   clipAudioNodes: Map<string, ClipAudioNode>;

@@ -18,7 +18,11 @@ import {
   getFrameDrivenRenderCurrentTime,
   getFrameDrivenRenderTiming,
 } from '../../render-loop/frame-driven/timing';
-import { sendProgress } from '../../runtime';
+import {
+  sendProgress,
+  getProjectExportWatermarkRenderer,
+  getProjectExportSpatialRenderer,
+} from '../../runtime';
 import type { Mp4AcceleratedCompositeRenderSpan, Mp4HybridVideoPipelineArgs } from './types';
 import {
   createWebmFrameProviders,
@@ -198,11 +202,17 @@ async function drawDecodedCompositeFrame(
   job.captionRenderer ??= createVideoProjectCaptionRenderer();
   const captions = await job.captionRenderer.prepare(project, settings, signal);
   captions.assertExportable(resolveProjectExportRange(project, settings));
+  const watermark =
+    project.watermark && project.watermark.mode !== 'none'
+      ? await getProjectExportWatermarkRenderer(job, signal).prepare(project, settings, signal)
+      : undefined;
+  if (!watermark) job.watermarkRenderer?.clear();
   const ownerDocument = getDecodedCompositeOwnerDocument(args);
   const effectRuntimeFrames = await args.effectRuntime.renderProjectFrames({
     clipMediaElements,
     compositionIndex: args.compositionIndex,
     currentTime: args.projectTime,
+    spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
     loadedImages: args.request.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
     project: args.request.project,
@@ -218,11 +228,13 @@ async function drawDecodedCompositeFrame(
       clipMediaElements,
       {
         backgroundCache: args.backgroundCache,
+        spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
         compositionIndex: args.compositionIndex,
         ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
       }
     );
     captions.draw(args.request.context, args.projectTime);
+    watermark?.draw(args.request.context);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

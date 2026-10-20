@@ -1,3 +1,4 @@
+import type { VideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../../../features/video/project/export/time-estimate';
 import type { ProjectExportMediaState } from '../../media';
@@ -11,6 +12,7 @@ export type RenderLoopJobState = Pick<
   'clipMediaElements' | 'clipAudioNodes'
 > & {
   captionRenderer?: VideoProjectCaptionRenderer;
+  watermarkRenderer?: VideoProjectWatermarkRenderer;
   cameraSpatialRenderer?: ReviewSpatialRenderer;
   cancelled: boolean;
   timeEstimator?: ExportTimeEstimator;

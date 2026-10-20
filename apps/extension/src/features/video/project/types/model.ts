@@ -304,7 +304,7 @@ export type VideoProjectClip =
 
 export interface VideoProject {
   videoEffectsBypassed?: boolean;
-  version: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19;
+  version: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20;
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
   id: string;
@@ -316,6 +316,8 @@ export interface VideoProject {
   fps: number;
   backgroundColor: string;
   sceneBackground?: VideoProjectSceneBackground;
+  /** Final-canvas watermark; image references name a declared project material. */
+  watermark?: import('../scene/watermark').QuickEditWatermarkSettings;
   timelinePlacementMode: VideoTimelinePlacementMode;
   duration: number;
   createdAt: number;
