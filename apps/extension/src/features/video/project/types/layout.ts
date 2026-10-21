@@ -1,5 +1,19 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 
+/** Controls whether retained content extends the montage clock. */
+export const VideoProjectDurationMode = {
+  CONTENT: 'content',
+  PROJECT: 'project',
+} as const;
+
+export type VideoProjectDurationMode =
+  (typeof VideoProjectDurationMode)[keyof typeof VideoProjectDurationMode];
+
+/** Admits only the two serialized policies shared by retained audio and text. */
+export function isVideoProjectDurationMode(value: unknown): value is VideoProjectDurationMode {
+  return value === VideoProjectDurationMode.CONTENT || value === VideoProjectDurationMode.PROJECT;
+}
+
 export const VideoTrackKind = {
   PRIMARY: 'PRIMARY',
   AUDIO: 'AUDIO',

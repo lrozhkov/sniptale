@@ -3,6 +3,9 @@ import {
   VideoClipLinkMode,
   type VideoProject,
   type VideoProjectClip,
+  type VideoProjectAudioClip,
+  VideoProjectDurationMode,
+  isVideoProjectDurationMode,
   VideoProjectClipType,
   type VideoProjectTrack,
 } from '../types/index';
@@ -48,7 +51,14 @@ export function getClipEndTime(clip: VideoProjectClip): number {
 }
 
 export function calculateProjectDuration(project: VideoProject): number {
-  let duration = project.clips.reduce((maxEnd, clip) => Math.max(maxEnd, getClipEndTime(clip)), 0);
+  let duration = project.clips.reduce(
+    (maxEnd, clip) =>
+      clip.type === VideoProjectClipType.AUDIO &&
+      clip.durationMode === VideoProjectDurationMode.PROJECT
+        ? maxEnd
+        : Math.max(maxEnd, getClipEndTime(clip)),
+    0
+  );
   for (const entry of project.textDocuments ?? []) {
     if (entry.binding.kind !== 'project' || entry.durationMode === 'project') continue;
     for (const fragment of entry.document.fragments) duration = Math.max(duration, fragment.end);
@@ -117,4 +127,24 @@ export function getLinkedClipIds(project: VideoProject, clipId: string): string[
     (item) => item.groupId === clip.groupId && item.linkMode === VideoClipLinkMode.LINKED
   );
   return linkedClips.length > 0 ? linkedClips.map((item) => item.id) : [clip.id];
+}
+
+/** Changes only the current, unlocked take; retained samples and fades remain intact. */
+export function updateProjectAudioDurationMode(
+  project: VideoProject,
+  basis: VideoProjectAudioClip,
+  durationMode: unknown
+): VideoProject {
+  if (
+    !isVideoProjectDurationMode(durationMode) ||
+    !project.clips.includes(basis) ||
+    !project.tracks.some((track) => track.id === basis.trackId && !track.locked) ||
+    durationMode === (basis.durationMode ?? VideoProjectDurationMode.CONTENT)
+  )
+    return project;
+  return syncProjectDuration(
+    applyVideoProjectMutationPatch(project, {
+      clips: project.clips.map((clip) => (clip === basis ? { ...basis, durationMode } : clip)),
+    })
+  );
 }

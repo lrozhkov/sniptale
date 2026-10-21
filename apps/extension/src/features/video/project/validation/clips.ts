@@ -9,6 +9,7 @@ import {
   VideoClipTransitionKind,
   VideoMediaFitMode,
   VideoProjectClipType,
+  isVideoProjectDurationMode,
   VideoProjectShapeType,
 } from '../types/index';
 import {
@@ -251,6 +252,13 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
     value['cameraPositions'].some(
       (position: unknown) => isRecord(position) && position['crop'] !== undefined
     )
+  )
+    return false;
+
+  if (
+    value['durationMode'] !== undefined &&
+    (value['type'] !== VideoProjectClipType.AUDIO ||
+      !isVideoProjectDurationMode(value['durationMode']))
   )
     return false;
 

@@ -662,7 +662,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 30, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 31, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -672,4 +672,36 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   ).toBe(false);
   for (let version = 2; version <= 28; version++)
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+});
+
+it('requires schema30 for explicit audio duration modes', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { hydrateVideoProject } = await import('../hydration');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'clip.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: true,
+  });
+  const clips = project.clips.map((clip) =>
+    clip.type === 'AUDIO' ? { ...clip, durationMode: 'project' as const } : clip
+  );
+  const changed = applyVideoProjectMutationPatch(project, { clips });
+  expect(changed.version).toBe(30);
+  expect(isHydratableVideoProject(changed)).toBe(true);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  expect(hydrateVideoProject(changed).clips.find((clip) => clip.type === 'AUDIO')).toMatchObject({
+    durationMode: 'project',
+    duration: 10,
+  });
+  for (let version = 2; version <= 29; version++) {
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+    expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+  }
+  expect(isHydratableVideoProject({ ...changed, version: 31 })).toBe(false);
+  expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });

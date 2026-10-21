@@ -148,10 +148,10 @@ for (const variant of [
       const modeRow = panel
         .locator('[data-ui="shared.ui.compact-inspector.segmented-field"]')
         .filter({
-          hasText: label('videoEditor.sidebar.textDuration'),
+          hasText: label('videoEditor.sidebar.contentDuration'),
         });
       const followProject = modeRow.getByRole('button', {
-        name: label('videoEditor.sidebar.textDurationProject'),
+        name: label('videoEditor.sidebar.contentDurationProject'),
         exact: true,
       });
       const includeText = modeRow.getByRole('button', {

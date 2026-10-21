@@ -83,3 +83,25 @@ it('admits bounded audio-only original bindings and refuses malformed or self ta
     })
   ).toBe(true);
 });
+
+it('admits duration policy only on audio clips', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'clip.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: true,
+  });
+  const video = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const audio = createAudioClipFromAsset('audio-track', project.assets[0]!);
+  for (const durationMode of ['project', 'content']) {
+    expect(isVideoProjectClip({ ...audio, durationMode })).toBe(true);
+    expect(isVideoProjectClip({ ...video, durationMode })).toBe(false);
+  }
+  for (const durationMode of [null, 'invalid', 1, {}, false])
+    expect(isVideoProjectClip({ ...audio, durationMode })).toBe(false);
+  expect(isVideoProjectClip(audio)).toBe(true);
+});

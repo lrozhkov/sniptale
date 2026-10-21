@@ -1,3 +1,4 @@
+import { ProjectAudioDurationModeField } from '../shared/duration-mode';
 import { ProjectSourceAudioEditor } from './source-audio';
 import { ProjectOriginalAudioEditor } from './original-audio';
 import { InspectorDetails } from '../shared/details';
@@ -64,7 +65,7 @@ export function renderAudioFields(
   if (!clip || !isAudioClip(clip)) return null;
   return (
     <>
-      {' '}
+      <ProjectAudioDurationModeField project={props.project} clip={clip} />
       {renderSharedAudioFields({
         clip,
         disabled: !areProjectClipsEditable(props.project, [clip.id]),

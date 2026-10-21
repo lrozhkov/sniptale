@@ -89,6 +89,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['durationMode'] !== undefined) return 30;
   if (
     (value['type'] === 'VIDEO' || value['type'] === 'AUDIO') &&
     typeof value['playbackRate'] === 'number' &&
@@ -117,7 +118,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 29) &&
+    isBoundedNumber(version, 2, 30) &&
     Number.isInteger(version) &&
     (version >= 29 ||
       !Array.isArray(value['textDocuments']) ||

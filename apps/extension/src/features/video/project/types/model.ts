@@ -12,6 +12,7 @@ import type {
 import type { VideoObjectTrack } from '../object-tracks/types';
 import type { VideoProjectAnnotationFields } from './annotation';
 import type {
+  VideoProjectDurationMode,
   VideoProjectSceneBackground,
   VideoProjectShapeStyle,
   VideoProjectTextStyle,
@@ -234,6 +235,8 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  /** Retain the full take without extending the montage when set to project. */
+  durationMode?: VideoProjectDurationMode;
   /** Independent attenuation follows this take; targets confer no resource ownership. */
   originalAudioMute?: {
     volume: number;
@@ -332,7 +335,8 @@ export interface VideoProject {
     | 26
     | 27
     | 28
-    | 29;
+    | 29
+    | 30;
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];

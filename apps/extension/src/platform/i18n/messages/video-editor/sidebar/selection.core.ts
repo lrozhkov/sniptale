@@ -3,8 +3,9 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
-  textDuration: { ru: 'Длительность видео', en: 'Video duration' },
-  textDurationProject: { ru: 'Монтаж', en: 'Timeline' },
+  contentDuration: { ru: 'Длительность видео', en: 'Video duration' },
+  contentDurationProject: { ru: 'Монтаж', en: 'Timeline' },
+  audioDurationContent: { ru: 'Монтаж и аудио', en: 'Timeline and audio' },
   textDurationContent: { ru: 'Монтаж и текст', en: 'Timeline and text' },
   sceneBackgroundImageFit: { en: 'Image fit', ru: 'Масштаб' },
   sceneBackgroundImageCover: { en: 'Fill', ru: 'Заполнить' },

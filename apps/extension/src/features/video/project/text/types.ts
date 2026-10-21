@@ -1,3 +1,4 @@
+import type { VideoProjectDurationMode } from '../types/layout';
 import type {
   ReviewCaptionSettings,
   ReviewTextDocument,
@@ -14,7 +15,7 @@ export interface VideoProjectTextDocument {
   id: string;
   binding: VideoProjectTextBinding;
   /** Project-time text can follow the montage without extending its duration. */
-  durationMode?: 'content' | 'project';
+  durationMode?: VideoProjectDurationMode;
   document: ReviewTextDocument;
   captions?: ReviewCaptionSettings;
 }

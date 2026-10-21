@@ -1,3 +1,4 @@
+import { ProjectDurationModeField } from '../shared/duration-mode';
 import type { VideoProjectTextDocument } from '../../../../../features/video/project/text/types';
 import { applyVideoProjectTextEdit } from '../../../../../features/video/project/text/authoring';
 import {
@@ -10,7 +11,7 @@ import type {
 } from '../../../../../features/video/review/text-types';
 import { translate } from '../../../../../platform/i18n';
 import { CaptionStyleFields } from '../../../../../ui/video-text/caption-style';
-import { SegmentedRow, ToggleField } from '../../../../../ui/compact-inspector-controls';
+import { ToggleField } from '../../../../../ui/compact-inspector-controls';
 import { InspectorDetails } from '../shared/details';
 import { NumberInput } from '../inputs/number';
 import type { ProjectTextEditor } from './text-editing';
@@ -51,22 +52,12 @@ export function DocumentCaptions({
   return (
     <div className="min-w-0 space-y-2">
       {entry.binding.kind === 'project' && (
-        <SegmentedRow<'project' | 'content'>
-          label={translate('videoEditor.sidebar.textDuration')}
-          ariaLabel={translate('videoEditor.sidebar.textDuration')}
-          layout="stacked"
-          columns={2}
+        <ProjectDurationModeField
+          contentKind="text"
           value={entry.durationMode ?? 'content'}
-          options={[
-            { value: 'project', label: translate('videoEditor.sidebar.textDurationProject') },
-            { value: 'content', label: translate('videoEditor.sidebar.textDurationContent') },
-          ]}
-          onChange={(durationMode) => {
-            if (durationMode !== (entry.durationMode ?? 'content'))
-              editor.accept((current) =>
-                applyVideoProjectTextEdit(current, entry, { durationMode })
-              );
-          }}
+          onChange={(durationMode) =>
+            editor.accept((current) => applyVideoProjectTextEdit(current, entry, { durationMode }))
+          }
         />
       )}
       <ToggleField

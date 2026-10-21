@@ -1,3 +1,4 @@
+import { isVideoProjectDurationMode } from '../types/layout';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseReviewCaptionSettings, parseReviewTextDocument } from '../../review/text-validation';
 import type { VideoProject } from '../types/model';
@@ -52,7 +53,7 @@ function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
   const durationMode = value['durationMode'];
   if (
     durationMode !== undefined &&
-    (binding.kind !== 'project' || (durationMode !== 'content' && durationMode !== 'project'))
+    (binding.kind !== 'project' || !isVideoProjectDurationMode(durationMode))
   )
     return null;
   const domain = binding.kind === 'source' ? 'source' : 'result';

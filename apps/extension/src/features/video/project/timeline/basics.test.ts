@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   calculateProjectDuration,
+  updateProjectAudioDurationMode,
   clampNumber,
   getAssetById,
   getClipById,
@@ -354,4 +355,59 @@ it('keeps montage-following text dormant without changing ordinary text duration
   project.clips = [];
   expect(syncProjectDuration(project).duration).toBe(0);
   expect(project.textDocuments[0]!.document.fragments[0]!.end).toBe(20);
+});
+
+it('follows montage duration without trimming retained audio', () => {
+  const audio = {
+    ...createAudioClip({ startTime: 0, duration: 12, sourceDuration: 12, fadeOutMs: 1500 }),
+    durationMode: 'project' as const,
+  };
+  const project = createProject([createVideoClip({ startTime: 0, duration: 2 }), audio]);
+  const before = structuredClone(audio);
+  expect(calculateProjectDuration(project)).toBe(2);
+  const changed = syncProjectDuration(project);
+  expect(changed.duration).toBe(2);
+  expect(changed.clips.find((clip) => clip.id === audio.id)).toEqual(before);
+  expect(calculateProjectDuration({ ...project, clips: [audio] })).toBe(0);
+  expect(
+    calculateProjectDuration({
+      ...project,
+      clips: [audio, createImageClip({ startTime: 9, duration: 5 })],
+    })
+  ).toBe(14);
+  expect(
+    calculateProjectDuration({
+      ...project,
+      clips: [{ ...audio, durationMode: 'content' as const }],
+    })
+  ).toBe(12);
+});
+
+it('updates only the current editable audio duration basis', () => {
+  const audio = createAudioClip({ startTime: 0, duration: 12, sourceStart: 0, sourceDuration: 12 });
+  const project = createProject([createVideoClip({ startTime: 0, duration: 2 }), audio]);
+  for (const mode of ['invalid', null, 0, 'content'])
+    expect(updateProjectAudioDurationMode(project, audio, mode)).toBe(project);
+  expect(updateProjectAudioDurationMode(project, { ...audio }, 'project')).toBe(project);
+  expect(updateProjectAudioDurationMode({ ...project, tracks: [] }, audio, 'project').clips).toBe(
+    project.clips
+  );
+  const locked = {
+    ...project,
+    tracks: project.tracks.map((track) => ({ ...track, locked: true })),
+  };
+  expect(updateProjectAudioDurationMode(locked, audio, 'project')).toBe(locked);
+  const changed = updateProjectAudioDurationMode(project, audio, 'project');
+  expect(changed.duration).toBe(2);
+  expect(changed.version).toBe(30);
+  expect(changed.clips[1]).toEqual({ ...audio, durationMode: 'project' });
+  expect(audio).not.toHaveProperty('durationMode');
+  expect(updateProjectAudioDurationMode(changed, audio, 'content')).toBe(changed);
+  const current = changed.clips[1];
+  if (current?.type !== 'AUDIO') throw new Error('Missing take');
+  expect(updateProjectAudioDurationMode(changed, current, 'project')).toBe(changed);
+  const restored = updateProjectAudioDurationMode(changed, current, 'content');
+  expect(restored.duration).toBe(12);
+  expect(restored.version).toBe(30);
+  expect(syncProjectDuration({ ...restored, clips: [] }).version).toBe(30);
 });
