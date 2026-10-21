@@ -12,6 +12,7 @@ import {
   removeContextMenuNode,
   reactivateContextMenuCommand,
   restoreContextMenuSections,
+  restoreContextMenuSectionCommands,
   updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
@@ -33,6 +34,24 @@ const tree: ContextMenuTree = {
     { type: 'command', command: 'sniptale.gallery', enabled: true },
   ],
 };
+
+it('restores section commands without stealing active commands or changing the source tree', () => {
+  const before = structuredClone(tree);
+  const restored = restoreContextMenuSectionCommands(tree, 'tools', [
+    'sniptale.settings',
+    'sniptale.image-editor',
+  ]);
+  expect(restored.nodes[0]).toEqual(tree.nodes[0]);
+  expect(restored.nodes[1]).toMatchObject({
+    children: [
+      { command: 'sniptale.video.tab' },
+      { command: 'sniptale.video.area' },
+      { command: 'sniptale.image-editor' },
+    ],
+  });
+  expect(tree).toEqual(before);
+  expect(restoreContextMenuSectionCommands(tree, 'missing', ['sniptale.gallery'])).toBe(tree);
+});
 
 describe('context menu tree mutations', () => {
   it('restores disabled empty sections without enabling their disabled commands', () => {

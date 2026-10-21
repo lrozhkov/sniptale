@@ -11,6 +11,17 @@ import type { SettingsCollectionItem } from './types';
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
+it('leaves vertical scrolling to the settings section instead of nesting a list scrollbar', () => {
+  act(() =>
+    root.render(
+      <SettingsCollection ariaLabel="One scroll owner" items={items} onAction={vi.fn()} />
+    )
+  );
+  const list = container.querySelector<HTMLElement>('[data-settings-collection-root]')!;
+  expect(list.className).not.toContain('overflow-y-auto');
+  expect(list.style.maxHeight).toBe('');
+});
+
 const items: readonly SettingsCollectionItem[] = [
   {
     id: 'first',
@@ -227,9 +238,12 @@ describe('SettingsCollection', () => {
     expect(container.querySelector('[aria-label="Изменить позицию"]')).toBeNull();
     expect(container.textContent).not.toContain('Переместить вверх');
   });
+});
 
+describe('SettingsCollection pending and drag controls', () => {
   it('keeps disabled reasons and busy state in the presentation contract', () => {
     const onAction = vi.fn();
+    const onMove = vi.fn();
     act(() =>
       root.render(
         <SettingsCollection
@@ -240,9 +254,10 @@ describe('SettingsCollection', () => {
               busy: true,
               disabledActions: { toggle: 'Keep one enabled', delete: 'System item' },
             },
+            items[1]!,
           ]}
           onAction={onAction}
-          onMove={vi.fn()}
+          onMove={onMove}
         />
       )
     );
@@ -254,8 +269,20 @@ describe('SettingsCollection', () => {
       true
     );
     expect(
-      container.querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')?.disabled
-    ).toBe(true);
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')
+        ?.getAttribute('aria-disabled')
+    ).toBe('true');
+    const handle = container.querySelector<HTMLButtonElement>('[aria-label="Изменить позицию"]')!;
+    act(() => {
+      handle.focus();
+      for (const key of ['Enter', 'ArrowDown', 'Enter'])
+        handle.dispatchEvent(
+          new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        );
+    });
+    expect(document.activeElement).toBe(handle);
+    expect(onMove).not.toHaveBeenCalled();
     expect(onAction).not.toHaveBeenCalled();
   });
 

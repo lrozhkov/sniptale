@@ -46,7 +46,7 @@ export function ToolPresetsSettings() {
     if (action.type === 'delete') void actions.deletePreset(preset.id);
   };
   const onMove = (intent: SettingsCollectionMoveIntent) => {
-    void actions.movePreset(intent.itemId, intent.beforeItemId);
+    return actions.movePreset(intent.itemId, intent.beforeItemId);
   };
 
   return (

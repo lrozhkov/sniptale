@@ -35,6 +35,26 @@ export function restoreContextMenuSections(tree: ContextMenuTree): ContextMenuTr
   return next;
 }
 
+/** Restores section commands without relocating commands active elsewhere in a custom menu. */
+export function restoreContextMenuSectionCommands(
+  tree: ContextMenuTree,
+  sectionId: string,
+  commands: readonly string[]
+): ContextMenuTree {
+  if (findContextMenuNode(tree, `section:${sectionId}`)?.type !== 'section') return tree;
+  let next = updateContextMenuNode(tree, `section:${sectionId}`, { enabled: true });
+  for (const command of commands) {
+    if (isContextMenuCommandActive(next, command)) continue;
+    const section = findContextMenuNode(next, `section:${sectionId}`);
+    if (section?.type !== 'section') return tree;
+    next = addContextMenuCommand(next, command, {
+      parentId: sectionId,
+      index: section.children.length,
+    });
+  }
+  return next;
+}
+
 export function isContextMenuDescendant(
   tree: ContextMenuTree,
   key: string,
@@ -242,7 +262,8 @@ export function updateContextMenuNode(
 
 export function visibleContextMenuNodes(
   tree: ContextMenuTree,
-  expanded: ReadonlySet<string>
+  expanded: ReadonlySet<string>,
+  includeDisabledSections = false
 ): Array<{ key: string; node: ContextMenuTreeNode; level: number; parentId: string | null }> {
   const result: Array<{
     key: string;
@@ -252,9 +273,9 @@ export function visibleContextMenuNodes(
   }> = [];
   const visit = (nodes: ContextMenuTreeNode[], parentId: string | null, level: number) => {
     for (const node of nodes) {
-      if (!node.enabled) continue;
+      if (!node.enabled && !(includeDisabledSections && node.type === 'section')) continue;
       result.push({ key: contextMenuNodeKey(node), node, level, parentId });
-      if (node.type === 'section' && expanded.has(node.id))
+      if (node.type === 'section' && node.enabled && expanded.has(node.id))
         visit(node.children, node.id, level + 1);
     }
   };

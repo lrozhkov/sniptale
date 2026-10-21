@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 const { productSelectSpy } = vi.hoisted(() => ({ productSelectSpy: vi.fn() }));
 
@@ -106,7 +107,13 @@ function createController(overrides: ControllerOverrides = {}): VoiceInputSettin
 }
 
 function render(controller: VoiceInputSettingsController): void {
-  act(() => root.render(<VoiceInputSettingsContent {...controller} />));
+  act(() =>
+    root.render(
+      <CommandPressScope value>
+        <VoiceInputSettingsContent {...controller} />
+      </CommandPressScope>
+    )
+  );
 }
 
 function button(label: string): HTMLButtonElement | undefined {

@@ -99,9 +99,6 @@ function NewItemsSection(
           />
         </SettingsControlRow>
       ))}
-      <p className="pb-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-        {translate('settings.storageDrafts.destinationDescription')}
-      </p>
     </section>
   );
 }
@@ -114,7 +111,6 @@ function RetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.cleanupTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.cleanupEnabled')}
-        description={translate('settings.storageDrafts.cleanupEnabledDescription')}
         keepInline
         valueMinimum={32}
         valueClassName="flex justify-end"
@@ -164,7 +160,6 @@ function TrashRetentionSection(
       <SectionLabel>{translate('settings.storageDrafts.trashTitle')}</SectionLabel>
       <SettingsControlRow
         label={translate('settings.storageDrafts.trashCleanupEnabled')}
-        description={translate('settings.storageDrafts.trashCleanupDescription')}
         keepInline
         valueMinimum={32}
         valueClassName="flex justify-end"
@@ -176,11 +171,6 @@ function TrashRetentionSection(
           onClick={() => props.updatePolicy({ trashCleanupEnabled: !enabled })}
         />
       </SettingsControlRow>
-      {!enabled ? (
-        <p className="pb-2 text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('settings.storageDrafts.trashCleanupDisabled')}
-        </p>
-      ) : null}
       <RetentionRow
         disabled={props.busy || !enabled}
         label={translate('settings.storageDrafts.trashRetention')}

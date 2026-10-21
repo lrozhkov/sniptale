@@ -141,7 +141,7 @@ export function StepBadgePresetsPanel({
         }
         onAction={onAction}
         onMove={(intent: SettingsCollectionMoveIntent) =>
-          void controller.actions.moveBefore(intent.itemId, intent.beforeItemId)
+          controller.actions.moveBefore(intent.itemId, intent.beforeItemId)
         }
       />
     </div>

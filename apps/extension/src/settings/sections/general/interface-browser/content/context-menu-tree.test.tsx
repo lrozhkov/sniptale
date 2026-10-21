@@ -211,16 +211,35 @@ it('moves keyboard focus to the first rendered child when an earlier child is di
   expect(document.activeElement).toBe(row('command:sniptale.settings'));
 });
 
-it('offers one-time recovery when an imported section is disabled and empty', async () => {
+it('keeps a disabled empty section visible and allows enabling it in place', async () => {
   const start: ContextMenuTree = {
     version: 2,
     nodes: [{ type: 'section', id: 'hidden', title: 'Hidden', enabled: false, children: [] }],
   };
   await act(async () => root.render(<Harness key="hidden" start={start} />));
-  expect(container.querySelector('[data-tree-key="section:hidden"]')).toBeNull();
-  await click('Restore hidden sections');
+  expect(row('section:hidden').querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe(
+    'false'
+  );
+  await click('Hidden');
   expect(row('section:hidden')).toBeTruthy();
   expect(container.textContent).not.toContain('Restore hidden sections');
+});
+
+it('creates an editable sibling beside a selected disabled section and can cancel it', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [{ type: 'section', id: 'disabled', title: 'Disabled', enabled: false, children: [] }],
+  };
+  await act(async () => root.render(<Harness key="disabled-creation" start={start} />));
+  await act(async () => row('section:disabled').focus());
+  await click('Add');
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]');
+  expect(input).not.toBeNull();
+  expect(latest.nodes[0]).toEqual(start.nodes[0]);
+  expect(latest.nodes).toHaveLength(2);
+  expect(document.activeElement).toBe(input);
+  await key(input!, 'Escape');
+  expect(latest).toEqual(start);
 });
 
 it('explains an expanded empty user section without changing its contents', async () => {

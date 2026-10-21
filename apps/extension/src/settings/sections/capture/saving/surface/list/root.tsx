@@ -73,7 +73,7 @@ export function PresetsList(props: SavePresetsListProps) {
           }}
           onAction={onAction}
           onMove={(intent: SettingsCollectionMoveIntent) =>
-            void props.onMoveBefore(intent.itemId, intent.beforeItemId)
+            props.onMoveBefore(intent.itemId, intent.beforeItemId)
           }
         />
       </div>

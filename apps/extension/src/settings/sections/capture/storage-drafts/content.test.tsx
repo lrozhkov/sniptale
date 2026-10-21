@@ -61,6 +61,23 @@ async function select(label: string, optionLabel: string) {
   await act(async () => option!.click());
 }
 
+it('keeps deletion consequences without redundant explanations in the drafts form', () => {
+  render();
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.destinationDescription')
+  );
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.cleanupEnabledDescription')
+  );
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.trashCleanupDescription')
+  );
+  expect(container.textContent).toContain(translate('settings.storageDrafts.retentionConsequence'));
+  expect(container.textContent).toContain(
+    translate('settings.storageDrafts.trashRetentionConsequence')
+  );
+});
+
 it('routes destination, cleanup, and numeric retention selections to their policy fields', async () => {
   render();
   for (const [label, key] of [
@@ -102,13 +119,7 @@ it('shows retention and deletion consequences without the repeated Details expla
   expect(container.textContent).not.toContain(
     translate('settings.storageDrafts.newItemsDescription')
   );
-  for (const message of [
-    'destinationDescription',
-    'cleanupEnabledDescription',
-    'retentionConsequence',
-    'trashCleanupDescription',
-    'trashRetentionConsequence',
-  ] as const) {
+  for (const message of ['retentionConsequence', 'trashRetentionConsequence'] as const) {
     expect(container.textContent).toContain(translate(`settings.storageDrafts.${message}`));
   }
 });
@@ -155,7 +166,9 @@ it('keeps management in Library and preserves cleanup warnings and privacy navig
   );
   expect(button(translate('settings.storageDrafts.ordinaryRetention')).disabled).toBe(true);
   expect(button(translate('settings.storageDrafts.trashRetention')).disabled).toBe(true);
-  expect(container.textContent).toContain(translate('settings.storageDrafts.trashCleanupDisabled'));
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.trashCleanupDisabled')
+  );
   expect(container.textContent).toContain(
     translate('settings.storageDrafts.cleanupDisabledWarning')
   );

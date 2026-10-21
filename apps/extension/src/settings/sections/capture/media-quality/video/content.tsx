@@ -50,7 +50,7 @@ function ProfileCollection(props: {
     if (action.type === 'delete') props.root.dialogs.setDeleteProfile(profile);
   };
   const onMove = (intent: SettingsCollectionMoveIntent) => {
-    void props.root.actions.reorderProfile(intent.itemId, intent.beforeItemId);
+    return props.root.actions.reorderProfile(intent.itemId, intent.beforeItemId);
   };
   return (
     <SettingsCollection

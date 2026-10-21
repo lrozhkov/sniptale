@@ -85,7 +85,7 @@ export function QuickActionsList(props: {
       }}
       onAction={onAction}
       onMove={(intent: SettingsCollectionMoveIntent) =>
-        void props.state.handleMoveBefore(intent.itemId, intent.beforeItemId)
+        props.state.handleMoveBefore(intent.itemId, intent.beforeItemId)
       }
     />
   );

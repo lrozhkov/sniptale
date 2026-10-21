@@ -30,6 +30,87 @@ async function route(page: Page, extensionId: string, section: string, view?: st
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const view of ['backgrounds', 'palettes'] as const) {
+    test(`${view} drop preserves focus while saving ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await route(page, extensionId, 'editor-resources', view);
+      const rows = page.locator('[data-settings-collection-item]');
+      const secondId = await rows.nth(1).getAttribute('data-settings-collection-item');
+      const secondText = (await rows.nth(1).innerText()).split('\n')[0]!;
+      const source = rows.first().getByRole('button', { name: /Изменить позицию|Change position/ });
+      await source.scrollIntoViewIfNeeded();
+      await source.evaluate((element) =>
+        element.setAttribute('data-preserved-background-handle', '')
+      );
+      const preserved = page.locator('[data-preserved-background-handle]');
+      await source.focus();
+      await page.evaluate(
+        (domain) => {
+          void navigator.locks.request(
+            `sniptale:persistence:privacy-erasure:${domain}`,
+            async () => {
+              document.documentElement.setAttribute('data-background-write-held', '');
+              await new Promise<void>((resolve) =>
+                document.addEventListener('sniptale-release-background-write', () => resolve(), {
+                  once: true,
+                })
+              );
+            }
+          );
+        },
+        view === 'backgrounds' ? 'background-presets' : 'drawing-palette'
+      );
+      await expect(page.locator('html')).toHaveAttribute('data-background-write-held', '');
+      const from = (await source.boundingBox())!;
+      const target = (await rows.nth(1).boundingBox())!;
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(target.x + target.width / 2, target.y + target.height - 4, {
+        steps: 4,
+      });
+      await page.mouse.up();
+      if (view === 'backgrounds') await expect(preserved).toHaveAttribute('aria-disabled', 'true');
+      expect(await preserved.evaluate((element) => element.matches(':disabled'))).toBe(false);
+      await expect(preserved).toBeFocused();
+      await expect(rows.first()).toHaveAttribute('data-settings-collection-item', secondId!);
+      await settled(page);
+      await page.screenshot({
+        path: info.outputPath(`${view}-drop-pending.png`),
+        fullPage: false,
+      });
+      const stableOrder = await rows.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-settings-collection-item'))
+      );
+      const frameOrders = await page.evaluate(async () => {
+        document.dispatchEvent(new Event('sniptale-release-background-write'));
+        const orders: (string | null)[][] = [];
+        for (let frame = 0; frame < 24; frame++) {
+          await new Promise(requestAnimationFrame);
+          orders.push(
+            [...document.querySelectorAll('[data-settings-collection-item]')].map((element) =>
+              element.getAttribute('data-settings-collection-item')
+            )
+          );
+        }
+        return orders;
+      });
+      expect(
+        frameOrders.every((order) => JSON.stringify(order) === JSON.stringify(stableOrder))
+      ).toBe(true);
+      await expect(preserved).not.toHaveAttribute('aria-disabled', 'true');
+      await expect(rows.first()).toContainText(secondText);
+      await settled(page);
+      await expect(preserved).toBeFocused();
+      await expect(rows.nth(1).locator('[data-preserved-background-handle]')).toHaveCount(1);
+      await page.screenshot({ path: info.outputPath(`${view}-drop-saved.png`), fullPage: false });
+      await page.reload();
+      await expect(rows.first()).toContainText(secondText);
+    });
+  }
+
   test(`rapid collection drag stays bounded ${viewport.name}`, async ({
     page,
     extensionId,
@@ -45,6 +126,13 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect(original.length).toBeGreaterThan(3);
       const height = await list.evaluate((element) => element.scrollHeight);
       const bounds = (await list.boundingBox())!;
+      const scrollBounds = (await page
+        .locator('[data-ui="settings.page.content-scroll"]')
+        .boundingBox())!;
+      const visibleBottom = Math.min(
+        bounds.y + bounds.height,
+        scrollBounds.y + scrollBounds.height
+      );
       const handle = rows.first().getByRole('button', { name: /Изменить позицию|Change position/ });
       const source = (await handle.boundingBox())!;
       await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
@@ -52,7 +140,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       for (let index = 0; index < 20; index++) {
         await page.mouse.move(
           source.x + source.width / 2,
-          bounds.y + (index % 2 ? 8 : bounds.height - 8)
+          index % 2 ? bounds.y + 8 : visibleBottom - 8
         );
         expect(await list.evaluate((element) => element.scrollHeight)).toBeLessThanOrEqual(
           height + 1
@@ -80,7 +168,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         )
       ).toEqual(original);
       const commitSource = (await handle.boundingBox())!;
-      const commitBounds = (await list.boundingBox())!;
+      const commitBounds = (await rows.nth(2).boundingBox())!;
       await page.mouse.move(
         commitSource.x + commitSource.width / 2,
         commitSource.y + commitSource.height / 2
@@ -91,7 +179,26 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         commitBounds.y + commitBounds.height - 4,
         { steps: 4 }
       );
-      await page.mouse.up();
+      const previewOrder = await rows.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-settings-collection-item'))
+      );
+      expect(previewOrder).not.toEqual(original);
+      const [releaseOrders] = await Promise.all([
+        page.evaluate(async () => {
+          const orders: (string | null)[][] = [];
+          for (let frame = 0; frame < 24; frame++) {
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            orders.push(
+              [...document.querySelectorAll('[data-settings-collection-item]')].map((element) =>
+                element.getAttribute('data-settings-collection-item')
+              )
+            );
+          }
+          return orders;
+        }),
+        page.mouse.up(),
+      ]);
+      for (const order of releaseOrders) expect(order).toEqual(previewOrder);
       await expect
         .poll(() => rows.first().getAttribute('data-settings-collection-item'))
         .not.toBe(original[0]);
@@ -108,6 +215,102 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         )
         .toEqual(committed);
     }
+  });
+
+  test(`AI model drop keeps handle geometry and focus ${viewport.name}`, async ({
+    page,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await route(page, extensionId, 'ai-connections');
+    const locale = (await page.locator('html').getAttribute('lang')) === 'ru' ? 'ru' : 'en';
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const providerName = `Drag fixture ${viewport.name}`;
+    const providers = page.getByRole('region', { name: /^(Providers|Провайдеры)$/ });
+    await providers.getByRole('button', { name: /^(Add|Добавить)$/ }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('input').nth(0).fill(providerName);
+    await dialog.locator('input').nth(1).fill(`${hostOrigin}/v1`);
+    await dialog.locator('input').nth(2).fill('synthetic-drag-fixture-key');
+    await dialog.getByRole('button', { name: /^(Add|Добавить)$/ }).click();
+    await expect(providers).toContainText(providerName);
+    const models = page.getByRole('region', { name: /^(Models|Модели)$/ });
+    for (const number of [1, 2]) {
+      await models.getByRole('button', { name: /^(Add|Добавить)$/ }).click();
+      await dialog
+        .getByRole('button', {
+          name: label('settings.aiProviders.modelProviderPlaceholder'),
+          exact: true,
+        })
+        .click();
+      await page.getByRole('option', { name: providerName, exact: true }).click();
+      await dialog
+        .getByPlaceholder(label('settings.aiProviders.modelNamePlaceholder'), { exact: true })
+        .fill(`Model ${number} ${viewport.name}`);
+      await dialog
+        .getByPlaceholder(label('settings.aiProviders.modelCodePlaceholder'), { exact: true })
+        .fill(`fixture-${number}`);
+      await dialog.getByRole('button', { name: /^(Add|Добавить)$/ }).click();
+      await expect(
+        models.getByText(`Model ${number} ${viewport.name}`, { exact: true })
+      ).toBeVisible();
+    }
+    const list = models.locator('[data-settings-collection-root]');
+    const rows = list.locator('[data-settings-collection-item]').filter({ hasText: viewport.name });
+    await expect(rows).toHaveCount(2);
+    const secondModelId = await rows.last().getAttribute('data-settings-collection-item');
+    if (!secondModelId) throw new Error('Model ID is missing');
+    const source = rows.first().getByRole('button', { name: /Изменить позицию|Change position/ });
+    await source.scrollIntoViewIfNeeded();
+    await source.evaluate((element) => element.setAttribute('data-review-preserved-handle', ''));
+    await source.focus();
+    const preserved = page.locator('[data-review-preserved-handle]');
+    const title = page.getByText(`Model 1 ${viewport.name}`, { exact: true });
+    const before = (await title.boundingBox())!.x;
+    await page.evaluate(() => {
+      const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+      const release = new Promise<void>((resolve) =>
+        document.addEventListener('sniptale-test-release-move', () => resolve(), { once: true })
+      );
+      Object.defineProperty(chrome.runtime, 'sendMessage', {
+        configurable: true,
+        value: (message: unknown) => {
+          if (
+            message &&
+            typeof message === 'object' &&
+            'type' in message &&
+            message.type === 'AI_SETTINGS_MUTATION' &&
+            'operation' in message &&
+            message.operation === 'move-model'
+          )
+            return release.then(() => send(message));
+          return send(message);
+        },
+      });
+    });
+    const from = (await source.boundingBox())!;
+    const to = (await rows.last().boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, to.y + to.height - 4, { steps: 4 });
+    await page.mouse.up();
+    await expect(preserved).toHaveAttribute('aria-disabled', 'true');
+    await expect(
+      rows.getByRole('button', { name: /Изменить позицию|Change position/ })
+    ).toHaveCount(2);
+    await expect(preserved).toBeFocused();
+    await preserved.press('Enter');
+    await settled(page);
+    expect(Math.abs((await title.boundingBox())!.x - before)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath('model-drop-pending.png'), fullPage: false });
+    await page.evaluate(() => document.dispatchEvent(new Event('sniptale-test-release-move')));
+    await expect(preserved).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(preserved).toBeFocused();
+    await expect(rows.first()).toHaveAttribute('data-settings-collection-item', secondModelId);
+    expect(Math.abs((await title.boundingBox())!.x - before)).toBeLessThanOrEqual(1);
+    await page.reload();
+    await expect(rows.first()).toHaveAttribute('data-settings-collection-item', secondModelId);
   });
 
   test(`context menu drag gap stays aligned ${viewport.name}`, async ({
@@ -290,18 +493,10 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       ).toBeVisible();
       const list = page.locator('[data-ui="settings.collection.list-scroll"]');
       const toolbar = page.locator('[data-ui="settings.collection.toolbar"]');
-      const before = (await toolbar.boundingBox())!.y;
-      const ownerBottom = (await page
-        .locator('[data-ui="settings.page.content-scroll"]')
-        .boundingBox())!;
-      const listBounds = (await list.boundingBox())!;
-      expect(listBounds.y + listBounds.height).toBeLessThanOrEqual(
-        ownerBottom.y + ownerBottom.height + 1
-      );
-      await list.evaluate((element) => {
-        element.scrollTop = element.scrollHeight;
-      });
-      await expect.poll(async () => (await toolbar.boundingBox())!.y).toBe(before);
+      await expect(list).toHaveCSS('overflow-y', 'visible');
+      await list.locator('[data-settings-collection-item]').last().scrollIntoViewIfNeeded();
+      expect(await list.evaluate((element) => element.scrollTop)).toBe(0);
+      await toolbar.scrollIntoViewIfNeeded();
       const filter = page.getByRole('button', {
         name: text('highlighter.templateTags.filterLabel'),
         exact: true,

@@ -31,6 +31,7 @@ import {
 } from './context-menu-tree-controller';
 import {
   contextMenuNodePosition,
+  restoreContextMenuSectionCommands,
   countContextMenuSections,
   findContextMenuNode,
   hasDisabledContextMenuSection,
@@ -161,7 +162,7 @@ function useContextMenuTree(props: TreeViewProps) {
   );
   const [pendingSectionRemoval, setPendingSectionRemoval] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const rows = visibleContextMenuNodes(tree, expanded);
+  const rows = visibleContextMenuNodes(tree, expanded, true);
   const { rootRef, select } = useTreeFocus(props, editing?.key);
   useEffect(() => {
     inputRef.current?.focus();
@@ -243,8 +244,11 @@ function useContextMenuTree(props: TreeViewProps) {
       setEditing(null);
       if (!editing?.isNew) select(key);
     },
-    toggleEnabled: (key: string, enabled: boolean) =>
-      apply(updateContextMenuNode(tree, key, { enabled }), key),
+    toggleEnabled: (key: string, enabled: boolean) => {
+      apply(updateContextMenuNode(tree, key, { enabled }), key);
+      const node = findContextMenuNode(tree, key);
+      if (enabled && node?.type === 'section') onExpanded(new Set([...expanded, node.id]));
+    },
     moveRelative,
     moveInside,
     moveOutside,
@@ -266,6 +270,39 @@ function useContextMenuTree(props: TreeViewProps) {
   };
 }
 
+function EmptyContextMenuSection(props: {
+  sectionId: string;
+  level: number;
+  locale: AppLocale;
+  catalog: readonly ContextMenuCatalogItem[];
+  onAddWindowSizes(sectionId: string): void;
+}) {
+  const hasWindowSizes =
+    (props.sectionId === 'window' || props.sectionId.endsWith('-window')) &&
+    props.catalog.some(
+      (item) => item.available && item.command.startsWith('sniptale.window-resize.preset.')
+    );
+  return (
+    <div
+      className="px-3 py-2 text-[13px] text-[var(--sniptale-color-text-muted)]"
+      style={{ paddingInlineStart: props.level * 18 + 12 }}
+    >
+      {hasWindowSizes ? (
+        <button
+          type="button"
+          className={settingsAddButtonClassName}
+          onClick={() => props.onAddWindowSizes(props.sectionId)}
+        >
+          <Plus size={14} aria-hidden="true" />
+          {translate('settings.appearance.contextMenuAddWindowSizes', props.locale)}
+        </button>
+      ) : (
+        translate('settings.appearance.contextMenuEmptySection', props.locale)
+      )}
+    </div>
+  );
+}
+
 export function ContextMenuTreeView(props: TreeViewProps) {
   const instructionsId = useId();
   const { tree, catalog, locale, selectedKey, expanded, drop } = props;
@@ -281,6 +318,13 @@ export function ContextMenuTreeView(props: TreeViewProps) {
     confirmSectionRemoval,
   } = useContextMenuTree(props);
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const addWindowSizes = (sectionId: string) => {
+    const commands = catalog
+      .filter((item) => item.available && item.command.startsWith('sniptale.window-resize.preset.'))
+      .map((item) => item.command);
+    props.onChange(restoreContextMenuSectionCommands(tree, sectionId, commands));
+    props.onExpanded(new Set([...expanded, sectionId]));
+  };
   const dropRow = rows.find((row) => row.key === drop?.rowKey);
   let afterKey = dropRow?.key;
   if (drop?.edge === 'after' && dropRow) {
@@ -375,14 +419,16 @@ export function ContextMenuTreeView(props: TreeViewProps) {
                 actions={rowActions}
               />
               {node.type === 'section' &&
+              node.enabled &&
               expanded.has(node.id) &&
               !node.children.some((child) => child.enabled) ? (
-                <p
-                  className="px-3 py-2 text-[13px] text-[var(--sniptale-color-text-muted)]"
-                  style={{ paddingInlineStart: row.level * 18 + 12 }}
-                >
-                  {t('settings.appearance.contextMenuEmptySection')}
-                </p>
+                <EmptyContextMenuSection
+                  sectionId={node.id}
+                  level={row.level}
+                  locale={locale}
+                  catalog={catalog}
+                  onAddWindowSizes={addWindowSizes}
+                />
               ) : null}
             </Fragment>
           );

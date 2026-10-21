@@ -102,8 +102,12 @@ it('restores the recommended hierarchy without changing the master switch', asyn
 it('restores window commands when their projected legacy section is recovered', async () => {
   editorState = { ...editorState, contextMenuViewportPresets: createSystemViewportPresetCatalog() };
   await renderEditor();
-  expect(container.querySelector('[data-tree-key="section:recommended-window"]')).toBeNull();
-  await click('Restore hidden sections');
+  expect(
+    container
+      .querySelector('[data-tree-key="section:recommended-window"] [role="switch"]')
+      ?.getAttribute('aria-checked')
+  ).toBe('false');
+  await click('Window size');
   const section = container.querySelector<HTMLElement>(
     '[data-tree-key="section:recommended-window"]'
   )!;
@@ -142,9 +146,7 @@ it('explains an existing empty window section and restores only the explicitly s
   await act(async () =>
     section.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
   );
-  expect(container.textContent).toContain(
-    'No commands in this section. Select a command from the catalog to add it.'
-  );
+  expect(button('Add window sizes')).toBeTruthy();
   expect(
     container.querySelectorAll(
       '[data-context-menu-catalog] button[data-command-key^="command:sniptale.window-resize.preset."]'
@@ -173,6 +175,42 @@ it('explains an existing empty window section and restores only the explicitly s
     id: 'window',
     children: children.map((child, index) => ({ ...child, enabled: index === 0 })),
   });
+});
+
+it('fills an empty window section from real presets without resetting unrelated customization', async () => {
+  const presets = createSystemViewportPresetCatalog();
+  editorState = {
+    ...editorState,
+    contextMenuViewportPresets: presets,
+    contextMenu: {
+      ...editorState.contextMenu,
+      layout: {
+        version: 2,
+        nodes: [
+          {
+            type: 'section',
+            id: 'recommended-window',
+            title: 'Window size',
+            enabled: true,
+            children: [],
+          },
+          { type: 'command', command: 'sniptale.gallery', enabled: true, title: 'My library' },
+        ],
+      },
+    },
+  };
+  await renderEditor();
+  await click('Expand: Window size');
+  await click('Add window sizes');
+  for (const preset of presets)
+    expect(
+      container.querySelector(
+        `[data-tree-key="command:sniptale.window-resize.preset.${encodeURIComponent(preset.id)}"]`
+      )
+    ).not.toBeNull();
+  expect(container.textContent).toContain('My library');
+  await settleDebounce();
+  expect(update).toHaveBeenCalledTimes(1);
 });
 
 it('retains failed edits and retries the current draft', async () => {

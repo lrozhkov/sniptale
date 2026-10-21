@@ -173,7 +173,7 @@ function FilterMenuContent(
   };
 
   return (
-    <>
+    <div className="grid gap-0.5">
       {props.tags.map((tag) => (
         <FilterMenuOption
           active={props.activeFilterTagIds.includes(tag.id)}
@@ -202,7 +202,7 @@ function FilterMenuContent(
           {props.clearLabel ?? translate('highlighter.templateTags.clearFilter')}
         </button>
       ) : null}
-    </>
+    </div>
   );
 }
 

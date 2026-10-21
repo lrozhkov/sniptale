@@ -1,7 +1,6 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AlertCircle, ChevronDown, Download, Info, Mic, RefreshCw, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
-import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
 import { ProductSelect, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { usePushToTalk } from '@sniptale/ui/voice-input/use-push-to-talk';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
@@ -12,7 +11,6 @@ import {
 } from '../../../section-surface';
 import type { VoiceInputSettingsController } from './controller-contract';
 
-const primaryButtonClassName = getControlPrimaryButtonClassName({ density: 'compact' });
 const activeMicrophoneIndicatorClassName = 'text-[var(--sniptale-color-accent)]';
 function statusKey(value: string): TranslationKey {
   const keys: Record<string, TranslationKey> = {
@@ -368,8 +366,9 @@ function VoiceInputActions({
           {translate('settings.voiceInput.install')}
         </ProductActionButton>
       ) : null}
-      <button
-        className={primaryButtonClassName}
+      <ProductActionButton
+        compact
+        tone="primary"
         disabled={!active && startDisabled}
         type="button"
         onClick={(event) => {
@@ -385,7 +384,7 @@ function VoiceInputActions({
           : active
             ? translate('settings.voiceInput.microphoneActive')
             : translate('settings.voiceInput.start')}
-      </button>
+      </ProductActionButton>
       {active ? (
         <ProductActionButton
           compact

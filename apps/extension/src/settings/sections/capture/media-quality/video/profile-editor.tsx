@@ -1,4 +1,3 @@
-import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import {
   getDefaultVideoOutputCodec,
@@ -47,7 +46,6 @@ function VideoProfileFormatFields(props: {
   configuration: VideoOutputProfile;
   onChange: (configuration: VideoOutputProfile) => void;
 }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const codecOptions = Object.values(VideoOutputCodec)
     .filter((codec) => isVideoOutputCodecCompatible(props.configuration.container, codec))
     .map((value) => ({ value, label: getCodecLabel(value) }));
@@ -116,27 +114,18 @@ function VideoProfileFormatFields(props: {
           ))}
         </div>
       </fieldset>
-      <InspectorDisclosureView
-        dataUi="settings.video-quality.codecs"
-        variant="structural"
-        label={translate('settings.videoQuality.advanced')}
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        bodyClassName="pt-2"
-      >
-        <div>
-          <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
-            <ProductSelect
-              aria-label={translate('settings.videoQuality.codecLabel')}
-              menuPlacement="auto"
-              menuScrollable={false}
-              value={props.configuration.codec}
-              options={codecOptions}
-              onChange={(codec) => props.onChange({ ...props.configuration, codec })}
-            />
-          </SettingsControlRow>
-        </div>
-      </InspectorDisclosureView>
+      <div className="mt-2">
+        <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
+          <ProductSelect
+            aria-label={translate('settings.videoQuality.codecLabel')}
+            menuPlacement="auto"
+            menuScrollable={false}
+            value={props.configuration.codec}
+            options={codecOptions}
+            onChange={(codec) => props.onChange({ ...props.configuration, codec })}
+          />
+        </SettingsControlRow>
+      </div>
     </>
   );
 }

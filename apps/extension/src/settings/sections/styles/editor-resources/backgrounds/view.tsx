@@ -41,6 +41,7 @@ export function BackgroundPresetsSettings() {
     id: item.id,
     title: item.name,
     enabled: item.enabled,
+    busy,
     isBuiltIn: item.bundled,
     meta: item.available ? undefined : translate('settings.editor.backgrounds.unavailable'),
     preview: item.url ? (
@@ -55,35 +56,34 @@ export function BackgroundPresetsSettings() {
       {(failed || catalog.status === 'failed') && (
         <p role="alert">{translate('settings.editor.backgrounds.failed')}</p>
       )}
-      <fieldset disabled={busy}>
-        <SettingsCollection
-          ariaLabel={translate('settings.editor.backgrounds.title')}
-          items={items}
-          state={catalog.status === 'ready' ? 'ready' : 'loading'}
-          addAction={{
-            label: translate('settings.editor.backgrounds.add'),
-            onInvoke: () => {
-              setName('');
-              setAdding(true);
-            },
-          }}
-          onAction={(action) => {
-            if (action.type === 'toggle')
-              void run(() => catalog.edit({ type: 'toggle', id: action.itemId }));
-            if (action.type === 'delete')
-              void run(() => catalog.edit({ type: 'remove', id: action.itemId }));
-            if (action.type === 'edit') {
-              setRenaming(action.itemId);
-              setName(catalog.presets.find((p) => p.id === action.itemId)?.name ?? '');
-            }
-          }}
-          onMove={(intent) => {
-            const ids = movePresetOrder(catalog.presets, intent);
-            if (!ids) return;
-            void run(() => catalog.edit({ type: 'reorder', ids }));
-          }}
-        />
-      </fieldset>
+      <SettingsCollection
+        ariaLabel={translate('settings.editor.backgrounds.title')}
+        items={items}
+        state={catalog.status === 'ready' ? 'ready' : 'loading'}
+        addAction={{
+          label: translate('settings.editor.backgrounds.add'),
+          disabled: busy,
+          onInvoke: () => {
+            setName('');
+            setAdding(true);
+          },
+        }}
+        onAction={(action) => {
+          if (action.type === 'toggle')
+            void run(() => catalog.edit({ type: 'toggle', id: action.itemId }));
+          if (action.type === 'delete')
+            void run(() => catalog.edit({ type: 'remove', id: action.itemId }));
+          if (action.type === 'edit') {
+            setRenaming(action.itemId);
+            setName(catalog.presets.find((p) => p.id === action.itemId)?.name ?? '');
+          }
+        }}
+        onMove={(intent) => {
+          const ids = movePresetOrder(catalog.presets, intent);
+          if (!ids) return;
+          return run(() => catalog.edit({ type: 'reorder', ids }));
+        }}
+      />
       <ProductModal
         isOpen={adding || Boolean(renaming)}
         onClose={() => {

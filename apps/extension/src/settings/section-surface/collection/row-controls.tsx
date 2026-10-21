@@ -27,12 +27,18 @@ export function SettingsCollectionReorderHandle(props: {
       aria-describedby={props.dragInstructionsId}
       aria-pressed={props.active}
       title={translate('settings.collection.dragHandle')}
-      disabled={props.item.busy}
+      aria-disabled={props.item.busy || undefined}
       className={[
         'touch-none rounded focus-visible:outline-none focus-visible:ring-2',
+        'aria-disabled:cursor-wait aria-disabled:opacity-55',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
       onKeyDown={(event) => {
+        if (props.item.busy) {
+          if (['Escape', ' ', 'Enter', 'ArrowUp', 'ArrowDown'].includes(event.key))
+            event.preventDefault();
+          return;
+        }
         if (event.key === 'Escape' && props.active) {
           event.preventDefault();
           props.onKeyboardCancel();

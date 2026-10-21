@@ -38,14 +38,8 @@ export const settingsStorageDraftsMessages = defineMessageSource({
       '“Move expired drafts to Trash” is unavailable while automatic cleanup is off.',
   },
   retentionConsequence: {
-    ru:
-      'Сокращение срока может сделать уже сохранённые черновики просроченными. ' +
-      'Они переместятся в корзину при следующей штатной очистке или после подтверждённого действия ' +
-      '«Переместить просроченные в корзину». Увеличение срока не восстановит безвозвратно удалённое.',
-    en:
-      'Shortening a period can make existing drafts expired. ' +
-      'They move to Trash at the next regular cleanup or after you confirm “Move expired drafts to Trash”. ' +
-      'A longer period cannot restore permanently deleted drafts.',
+    ru: 'Новый срок действует и на сохранённые черновики. Просроченные материалы перемещаются в корзину при очистке.',
+    en: 'The new period also applies to existing drafts. Cleanup moves expired items to Trash.',
   },
   ordinaryRetention: { ru: 'Изображения и веб-архивы', en: 'Images and web archives' },
   videoRetention: { ru: 'Исходные видеозаписи', en: 'Source video recordings' },
@@ -64,14 +58,8 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   },
   trashRetention: { ru: 'Срок хранения в корзине', en: 'Trash retention period' },
   trashRetentionConsequence: {
-    ru:
-      'Срок отсчитывается с перемещения в корзину. При включённой автоочистке сокращение срока ' +
-      'может безвозвратно удалить уже просроченные материалы при следующем открытии или ' +
-      'обновлении библиотеки. Увеличение срока не восстановит безвозвратно удалённое.',
-    en:
-      'The period starts when an item moves to Trash. With automatic cleanup on, shortening it ' +
-      'may permanently remove already expired items at the next Library opening or refresh. ' +
-      'A longer period cannot restore deleted items.',
+    ru: 'Срок отсчитывается с перемещения в корзину. Автоочистка безвозвратно удаляет просроченное при открытии или обновлении библиотеки, включая уже сохранённые материалы. Медиа в проектах сохраняются.',
+    en: 'The period starts when items move to Trash. Automatic cleanup permanently deletes expired items when Library opens or refreshes, including existing items. Project media is retained.',
   },
   trashSaving: { ru: 'Сохраняем настройку корзины…', en: 'Saving Trash setting…' },
   trashSaved: { ru: 'Настройка корзины сохранена', en: 'Trash setting saved' },

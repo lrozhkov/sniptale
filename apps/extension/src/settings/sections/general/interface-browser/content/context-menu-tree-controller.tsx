@@ -99,13 +99,13 @@ export function toggleTreeSection(
 export function createSectionAtSelection(tree: ContextMenuTree, selectedKey: string | null) {
   const position = selectedKey ? contextMenuNodePosition(tree, selectedKey) : null;
   const selected = selectedKey ? findContextMenuNode(tree, selectedKey) : null;
-  const parentId = selected?.type === 'section' ? selected.id : (position?.parentId ?? null);
-  const index =
-    selected?.type === 'section'
-      ? selected.children.length
-      : position
-        ? position.index + 1
-        : tree.nodes.length;
+  const parentSection = selected?.type === 'section' && selected.enabled ? selected : null;
+  const parentId = parentSection ? parentSection.id : (position?.parentId ?? null);
+  const index = parentSection
+    ? parentSection.children.length
+    : position
+      ? position.index + 1
+      : tree.nodes.length;
   const result = addContextMenuSection(tree, index, parentId);
   return result && { ...result, parentId };
 }
