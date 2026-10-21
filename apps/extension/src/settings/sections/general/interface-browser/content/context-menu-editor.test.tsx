@@ -99,25 +99,15 @@ it('restores the recommended hierarchy without changing the master switch', asyn
   expect(update.mock.calls[0]?.[0]).not.toHaveProperty('enabled');
 });
 
-it('restores window commands when their projected legacy section is recovered', async () => {
+it('offers legacy hidden window commands in the catalog without section switches', async () => {
   editorState = { ...editorState, contextMenuViewportPresets: createSystemViewportPresetCatalog() };
   await renderEditor();
-  expect(
-    container
-      .querySelector('[data-tree-key="section:recommended-window"] [role="switch"]')
-      ?.getAttribute('aria-checked')
-  ).toBe('false');
-  await click('Window size');
-  const section = container.querySelector<HTMLElement>(
-    '[data-tree-key="section:recommended-window"]'
-  )!;
-  await act(async () =>
-    section.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
+  expect(container.querySelector('[data-tree-key="section:recommended-window"]')).toBeNull();
+  expect(container.querySelector('[role="tree"] [role="switch"]')).toBeNull();
   for (const preset of editorState.contextMenuViewportPresets) {
     expect(
       container.querySelector(
-        `[data-tree-key="command:sniptale.window-resize.preset.${encodeURIComponent(preset.id)}"]`
+        `[data-command-key="command:sniptale.window-resize.preset.${encodeURIComponent(preset.id)}"]`
       )
     ).not.toBeNull();
   }

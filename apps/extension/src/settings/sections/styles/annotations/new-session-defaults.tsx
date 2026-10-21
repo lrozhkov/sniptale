@@ -2,6 +2,7 @@ import type { AnnotationSessionDefaults } from '@sniptale/runtime-contracts/high
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { SettingsControlRow } from '../../../section-surface';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
+import { settingsPendingControlClassName } from '../../../section-surface/classes';
 
 export function AnnotationNewSessionDefaults(props: {
   copy: {
@@ -16,6 +17,7 @@ export function AnnotationNewSessionDefaults(props: {
   };
   defaults: AnnotationSessionDefaults;
   disabled: boolean;
+  pending?: boolean;
   onEnabledChange: (enabled: boolean) => void;
   onTemplateSourceChange: (source: AnnotationSessionDefaults['templateSource']) => void;
 }) {
@@ -29,6 +31,7 @@ export function AnnotationNewSessionDefaults(props: {
           aria-label={props.copy.enabledLabel}
           checked={props.defaults.enabled}
           disabled={props.disabled}
+          className={props.pending ? settingsPendingControlClassName : undefined}
           onClick={() => props.onEnabledChange(!props.defaults.enabled)}
         />
       </SettingsControlRow>
@@ -36,6 +39,7 @@ export function AnnotationNewSessionDefaults(props: {
         <ProductSelect<AnnotationSessionDefaults['templateSource']>
           aria-label={props.copy.sourceLabel}
           disabled={props.disabled}
+          className={props.pending ? settingsPendingControlClassName : undefined}
           onChange={props.onTemplateSourceChange}
           options={[
             { label: props.copy.frameTemplate, value: 'frame-default' },

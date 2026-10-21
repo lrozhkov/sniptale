@@ -2,6 +2,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Pencil } from 'lucide-react';
 
 import { translate } from '../../../platform/i18n';
+import { settingsPendingControlClassName } from '../classes';
 import { SettingsDragHandle, SettingsSwitch } from '../panel-controls';
 import type { SettingsCollectionAction, SettingsCollectionItem } from './types';
 
@@ -30,7 +31,7 @@ export function SettingsCollectionReorderHandle(props: {
       aria-disabled={props.item.busy || undefined}
       className={[
         'touch-none rounded focus-visible:outline-none focus-visible:ring-2',
-        'aria-disabled:cursor-wait aria-disabled:opacity-55',
+        'aria-disabled:cursor-wait',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
       onKeyDown={(event) => {
@@ -87,6 +88,11 @@ export function SettingsCollectionPrimaryActions(props: {
           size="sm"
           aria-label={toggleLabel}
           disabled={item.busy || item.disabledActions?.toggle !== undefined}
+          className={
+            item.busy && item.disabledActions?.toggle === undefined
+              ? settingsPendingControlClassName
+              : undefined
+          }
           title={item.disabledActions?.toggle ?? toggleLabel}
           onClick={() =>
             onAction({
@@ -110,6 +116,9 @@ export function SettingsCollectionPrimaryActions(props: {
             'hover:bg-[var(--sniptale-color-surface-hover)]',
             'focus-visible:outline-none focus-visible:ring-2',
             'focus-visible:ring-[var(--sniptale-color-focus-ring)] disabled:opacity-45',
+            item.busy && item.disabledActions?.edit === undefined
+              ? settingsPendingControlClassName
+              : '',
           ].join(' ')}
           onClick={() => onAction({ type: 'edit', itemId: item.id })}
         >

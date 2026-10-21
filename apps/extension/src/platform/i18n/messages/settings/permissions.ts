@@ -74,14 +74,8 @@ export const settingsPermissionsMessages = defineMessageSource({
     en: 'Required permissions',
   },
   requiredGrantsDescription: {
-    ru: sentence(
-      'Эти разрешения включены при установке, потому что без них основные функции Sniptale не смогут работать.',
-      'Доступ к сайтам и приложению Sniptale остаётся отдельным опциональным разрешением.'
-    ),
-    en: sentence(
-      'These permissions are enabled at install time because core Sniptale features need them to work.',
-      'Site access and the Sniptale app remain separate optional permissions.'
-    ),
+    ru: 'Эти разрешения включены при установке, потому что без них основные функции Sniptale не смогут работать.',
+    en: 'These permissions are enabled at install time because core Sniptale features need them to work.',
   },
   requiredGrantPermission: {
     ru: 'Manifest permission',

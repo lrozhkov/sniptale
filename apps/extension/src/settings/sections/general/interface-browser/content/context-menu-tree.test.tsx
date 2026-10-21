@@ -211,27 +211,26 @@ it('moves keyboard focus to the first rendered child when an earlier child is di
   expect(document.activeElement).toBe(row('command:sniptale.settings'));
 });
 
-it('keeps a disabled empty section visible and allows enabling it in place', async () => {
+it('omits legacy disabled sections and has no folder state switch', async () => {
   const start: ContextMenuTree = {
     version: 2,
     nodes: [{ type: 'section', id: 'hidden', title: 'Hidden', enabled: false, children: [] }],
   };
   await act(async () => root.render(<Harness key="hidden" start={start} />));
-  expect(row('section:hidden').querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe(
-    'false'
-  );
-  await click('Hidden');
-  expect(row('section:hidden')).toBeTruthy();
+  expect(container.querySelector('[data-tree-key="section:hidden"]')).toBeNull();
+  expect(container.querySelector('[role="switch"]')).toBeNull();
   expect(container.textContent).not.toContain('Restore hidden sections');
+  await act(async () => root.render(<Harness key="active-section" />));
+  expect(row('section:tools').querySelector('[role="switch"]')).toBeNull();
 });
 
-it('creates an editable sibling beside a selected disabled section and can cancel it', async () => {
+it('creates a visible section when only legacy disabled sections exist and can cancel it', async () => {
   const start: ContextMenuTree = {
     version: 2,
     nodes: [{ type: 'section', id: 'disabled', title: 'Disabled', enabled: false, children: [] }],
   };
   await act(async () => root.render(<Harness key="disabled-creation" start={start} />));
-  await act(async () => row('section:disabled').focus());
+  expect(container.querySelector('[data-tree-key="section:disabled"]')).toBeNull();
   await click('Add');
   const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]');
   expect(input).not.toBeNull();

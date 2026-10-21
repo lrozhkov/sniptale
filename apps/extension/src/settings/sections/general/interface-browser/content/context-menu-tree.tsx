@@ -20,7 +20,7 @@ import type {
 import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/context-menu-layout';
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
 import { contextMenuCommandLabel } from './context-menu-catalog';
-import { ContextMenuTreeRow, treeIconButton } from './context-menu-tree-row';
+import { ContextMenuTreeRow } from './context-menu-tree-row';
 import type { ContextMenuDropTarget } from './context-menu-tree-drop';
 import {
   createSectionAtSelection,
@@ -34,10 +34,7 @@ import {
   restoreContextMenuSectionCommands,
   countContextMenuSections,
   findContextMenuNode,
-  hasDisabledContextMenuSection,
   removeContextMenuNode,
-  restoreContextMenuSections,
-  updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
 
@@ -162,7 +159,7 @@ function useContextMenuTree(props: TreeViewProps) {
   );
   const [pendingSectionRemoval, setPendingSectionRemoval] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const rows = visibleContextMenuNodes(tree, expanded, true);
+  const rows = visibleContextMenuNodes(tree, expanded);
   const { rootRef, select } = useTreeFocus(props, editing?.key);
   useEffect(() => {
     inputRef.current?.focus();
@@ -243,11 +240,6 @@ function useContextMenuTree(props: TreeViewProps) {
       if (editing?.isNew) removeNode(key);
       setEditing(null);
       if (!editing?.isNew) select(key);
-    },
-    toggleEnabled: (key: string, enabled: boolean) => {
-      apply(updateContextMenuNode(tree, key, { enabled }), key);
-      const node = findContextMenuNode(tree, key);
-      if (enabled && node?.type === 'section') onExpanded(new Set([...expanded, node.id]));
     },
     moveRelative,
     moveInside,
@@ -344,15 +336,6 @@ export function ContextMenuTreeView(props: TreeViewProps) {
         ].join(' ')}
       >
         <h3 className="text-[13px] font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
-        {hasDisabledContextMenuSection(tree.nodes) ? (
-          <button
-            type="button"
-            className={`${treeIconButton} w-auto px-2`}
-            onClick={() => props.onChange(restoreContextMenuSections(tree))}
-          >
-            {t('settings.appearance.contextMenuRestoreHiddenSections')}
-          </button>
-        ) : null}
         <button
           type="button"
           className={`${settingsAddButtonClassName} !w-auto gap-1.5`}

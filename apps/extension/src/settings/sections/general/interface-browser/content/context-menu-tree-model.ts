@@ -15,26 +15,6 @@ export function countContextMenuSections(nodes: ContextMenuTreeNode[]): number {
   );
 }
 
-export function hasDisabledContextMenuSection(nodes: ContextMenuTreeNode[]): boolean {
-  return nodes.some(
-    (node) =>
-      node.type === 'section' && (!node.enabled || hasDisabledContextMenuSection(node.children))
-  );
-}
-
-export function restoreContextMenuSections(tree: ContextMenuTree): ContextMenuTree {
-  if (!hasDisabledContextMenuSection(tree.nodes)) return tree;
-  const next = structuredClone(tree);
-  const pending = [...next.nodes];
-  while (pending.length) {
-    const node = pending.pop()!;
-    if (node.type !== 'section') continue;
-    node.enabled = true;
-    pending.push(...node.children);
-  }
-  return next;
-}
-
 /** Restores section commands without relocating commands active elsewhere in a custom menu. */
 export function restoreContextMenuSectionCommands(
   tree: ContextMenuTree,
@@ -262,8 +242,7 @@ export function updateContextMenuNode(
 
 export function visibleContextMenuNodes(
   tree: ContextMenuTree,
-  expanded: ReadonlySet<string>,
-  includeDisabledSections = false
+  expanded: ReadonlySet<string>
 ): Array<{ key: string; node: ContextMenuTreeNode; level: number; parentId: string | null }> {
   const result: Array<{
     key: string;
@@ -273,7 +252,7 @@ export function visibleContextMenuNodes(
   }> = [];
   const visit = (nodes: ContextMenuTreeNode[], parentId: string | null, level: number) => {
     for (const node of nodes) {
-      if (!node.enabled && !(includeDisabledSections && node.type === 'section')) continue;
+      if (!node.enabled) continue;
       result.push({ key: contextMenuNodeKey(node), node, level, parentId });
       if (node.type === 'section' && node.enabled && expanded.has(node.id))
         visit(node.children, node.id, level + 1);

@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import type { AppLocale } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
-import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 import type { ContextMenuTreeNode } from '../../../../../contracts/settings/context-menu-layout';
 
 type TreeRow = {
@@ -38,10 +37,9 @@ type RowActions = {
   commitRename(): void;
   cancelRename(key: string): void;
   remove(key: string): void;
-  toggleEnabled(key: string, enabled: boolean): void;
 };
 
-export const treeIconButton = [
+const treeIconButton = [
   'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
   'text-[var(--sniptale-color-text-muted)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
@@ -218,14 +216,6 @@ function RowControls(props: {
   const t = (id: Parameters<typeof translate>[0]) => translate(id, props.locale);
   return (
     <div className="flex shrink-0 items-center justify-end">
-      {node.type === 'section' ? (
-        <SettingsSwitch
-          size="sm"
-          aria-label={label}
-          checked={node.enabled}
-          onClick={() => actions.toggleEnabled(key, !node.enabled)}
-        />
-      ) : null}
       <button
         type="button"
         className={`${treeIconButton} context-menu-quiet-icon context-menu-remove`}

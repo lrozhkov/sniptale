@@ -29,7 +29,7 @@ for (const theme of ['light', 'dark'] as const) {
                     type: 'section',
                     id: 'recommended-window',
                     title: 'Window size',
-                    enabled: false,
+                    enabled: true,
                     children: [],
                   },
                   {
@@ -58,12 +58,10 @@ for (const theme of ['light', 'dark'] as const) {
         });
       };
       await open('interface-browser', 'context-menu');
-      const windowSwitch = page.getByRole('switch', {
-        name: text('settings.appearance.contextMenuGroupWindow'),
-        exact: true,
-      });
-      await expect(windowSwitch).toHaveAttribute('aria-checked', 'false');
-      await page.locator('[data-tree-key="section:recommended-window"]').click();
+      const windowSection = page.locator('[data-tree-key="section:recommended-window"]');
+      await expect(windowSection).toBeVisible();
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
+      await page.locator('[data-tree-key="command:sniptale.gallery"]').click();
       await page
         .getByRole('button', {
           name: text('settings.appearance.contextMenuCreateSection'),
@@ -81,8 +79,8 @@ for (const theme of ['light', 'dark'] as const) {
         '1'
       );
       await sectionName.press('Escape');
-      await expect(windowSwitch).toHaveAttribute('aria-checked', 'false');
-      await windowSwitch.click();
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
+      await windowSection.press('ArrowRight');
       await page
         .getByRole('button', {
           name: text('settings.appearance.contextMenuAddWindowSizes'),
@@ -103,7 +101,8 @@ for (const theme of ['light', 'dark'] as const) {
         () => document.querySelector('.context-menu-editor')?.getAttribute('aria-busy') === 'false'
       );
       await page.reload();
-      await expect(windowSwitch).toHaveAttribute('aria-checked', 'true');
+      await expect(windowSection).toBeVisible();
+      await expect(windowSection.getByRole('switch')).toHaveCount(0);
       await page
         .getByRole('button', {
           name: `${text('settings.appearance.contextMenuExpand')}: ${text('settings.appearance.contextMenuGroupWindow')}`,

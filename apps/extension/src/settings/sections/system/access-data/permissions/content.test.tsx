@@ -89,6 +89,16 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
 
+it('uses neutral category icons independently of the permission state', async () => {
+  await renderContent();
+  const icons = [...container!.querySelectorAll('div.h-7.w-7')];
+  expect(icons.length).toBeGreaterThan(0);
+  for (const icon of icons) {
+    expect(icon.className).toContain('text-[var(--sniptale-color-text-secondary)]');
+    expect(icon.className).not.toContain('sniptale-color-success');
+  }
+});
+
 it('explains the successful popup handoff and temporary permission lifetime only after enable', async () => {
   await renderContent();
   expect(container?.querySelector('[data-ui="settings.permissions.recording-ready"]')).toBeNull();

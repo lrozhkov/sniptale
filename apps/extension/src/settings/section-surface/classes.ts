@@ -79,3 +79,4 @@ export const settingsMetaLabelClassName =
 
 export const settingsDividerClassName =
   'h-px bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_64%,transparent)]';
+export const settingsPendingControlClassName = 'disabled:!opacity-100';

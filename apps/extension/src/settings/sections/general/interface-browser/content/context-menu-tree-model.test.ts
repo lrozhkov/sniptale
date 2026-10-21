@@ -7,11 +7,9 @@ import {
   addContextMenuCommand,
   addContextMenuSection,
   contextMenuNodePosition,
-  hasDisabledContextMenuSection,
   moveContextMenuNode,
   removeContextMenuNode,
   reactivateContextMenuCommand,
-  restoreContextMenuSections,
   restoreContextMenuSectionCommands,
   updateContextMenuNode,
   visibleContextMenuNodes,
@@ -54,7 +52,7 @@ it('restores section commands without stealing active commands or changing the s
 });
 
 describe('context menu tree mutations', () => {
-  it('restores disabled empty sections without enabling their disabled commands', () => {
+  it('omits legacy disabled sections without modifying their stored commands', () => {
     const hidden: ContextMenuTree = {
       version: 2,
       nodes: [
@@ -68,13 +66,10 @@ describe('context menu tree mutations', () => {
         },
       ],
     };
-    expect(hasDisabledContextMenuSection(hidden.nodes)).toBe(true);
-    const restored = restoreContextMenuSections(hidden);
-    expect(restored.nodes).toMatchObject([
-      { id: 'empty', enabled: true, children: [] },
-      { id: 'tools', enabled: true, children: [{ enabled: false }] },
-    ]);
-    expect(parseContextMenuTree(restored)).not.toBeNull();
+    const before = structuredClone(hidden);
+    expect(visibleContextMenuNodes(hidden, new Set(['empty', 'tools']))).toEqual([]);
+    expect(hidden).toEqual(before);
+    expect(parseContextMenuTree(hidden)).not.toBeNull();
   });
   it('reactivates a retained command with its disabled ancestor chain and placement', () => {
     const disabled: ContextMenuTree = {

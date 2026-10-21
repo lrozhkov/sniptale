@@ -89,6 +89,18 @@ it('requires confirmation before deleting local data with preserved preferences 
   expect(container?.textContent).toContain('settings.privacy.success');
 });
 
+it('uses compact settings rows without changing the confirmation flow', async () => {
+  await renderSection();
+  expect(container?.querySelector('.max-w-\\[720px\\]')).not.toBeNull();
+  expect(container?.querySelectorAll('.grid').length).toBe(2);
+  for (const button of container!.querySelectorAll('button')) {
+    expect(button.getAttribute('data-command-tone')).toBe('danger');
+  }
+  await act(async () => findButton('settings.privacy.startFactoryReset').click());
+  expect(findButton('settings.privacy.confirmFactoryReset')).toBeDefined();
+  expect(requestErasureMock).not.toHaveBeenCalled();
+});
+
 it('runs factory reset with preferences and AI provider secrets included', async () => {
   await renderSection();
 

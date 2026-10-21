@@ -104,6 +104,7 @@ export function StepBadgePresetsPanel({
         }}
         defaults={controller.catalog?.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS}
         disabled={controller.isLoading || controller.isSaving || !controller.catalog}
+        pending={controller.isSaving}
         onEnabledChange={(enabled) => void controller.actions.setNewSessionEnabled(enabled)}
         onTemplateSourceChange={(source) =>
           void controller.actions.setNewSessionTemplateSource(source)

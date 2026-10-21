@@ -48,6 +48,30 @@ function getMenuTrigger(itemId: string): HTMLButtonElement | null {
   );
 }
 
+it('keeps busy controls visually stable while retaining native mutation locks', () => {
+  const onAction = vi.fn();
+  act(() =>
+    root.render(
+      <SettingsCollection
+        ariaLabel="Pending"
+        items={[{ ...items[0]!, busy: true }]}
+        onAction={onAction}
+        onMove={vi.fn()}
+      />
+    )
+  );
+  const handle = container.querySelector<HTMLButtonElement>('[aria-describedby]')!;
+  const toggle = container.querySelector<HTMLButtonElement>('[role=switch]')!;
+  const edit = container.querySelector<HTMLButtonElement>('button[title="Редактировать"]')!;
+  expect(handle.className).not.toContain('aria-disabled:opacity-55');
+  for (const control of [toggle, edit]) {
+    expect(control.disabled).toBe(true);
+    expect(control.className).toContain('disabled:!opacity-100');
+    control.click();
+  }
+  expect(onAction).not.toHaveBeenCalled();
+});
+
 function dispatchPointer(
   target: Element | null,
   type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
@@ -183,8 +207,8 @@ describe('SettingsCollection', () => {
     );
     expect(directAction?.title).toBe('Сделать по умолчанию');
     expect(directAction?.className).toContain('opacity-0');
-    expect(directAction?.className).toContain('group-hover:opacity-100');
-    expect(directAction?.className).toContain('group-focus-within:opacity-100');
+    expect(directAction?.className).toContain('group-hover:!opacity-100');
+    expect(directAction?.className).toContain('group-focus-within:!opacity-100');
     expect(directAction?.tabIndex).toBe(0);
     act(() => directAction?.click());
     expect(onAction).toHaveBeenCalledWith({ type: 'set-default', itemId: 'profile' });

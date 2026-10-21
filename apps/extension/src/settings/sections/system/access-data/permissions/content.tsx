@@ -26,7 +26,7 @@ const revokeButtonClassName = getControlSecondaryButtonClassName({
 
 const permissionIconClassName = [
   'flex h-7 w-7 flex-shrink-0 items-center justify-center',
-  'text-[var(--sniptale-color-success)]',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 function StatusBadge({ state }: { state: PermissionState }) {
