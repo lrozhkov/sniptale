@@ -51,7 +51,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     );
     const selectedSurface = await activeRoute.evaluate((element) => {
       const probe = document.createElement('span');
-      probe.style.color = 'var(--sniptale-color-text-primary)';
+      probe.style.color = 'var(--sniptale-color-surface-hover)';
       element.append(probe);
       const color = getComputedStyle(probe).color;
       probe.remove();
@@ -82,6 +82,56 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     { locale: 'ru', theme: 'light' },
     { locale: 'en', theme: 'dark' },
   ] as const) {
+    test(`settings dropdown typography ${viewport.name} ${variant.locale}-${variant.theme}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(viewport.size);
+      await route(page, extensionId, 'interface-browser', 'interface');
+      await page.evaluate(async (variant) => {
+        localStorage.setItem('sniptale-theme-preference', variant.theme);
+        localStorage.setItem('sniptale-locale-preference', variant.locale);
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        });
+      }, variant);
+      for (const section of SETTINGS_SECTION_IDS) {
+        const views = SETTINGS_SECTION_VIEWS[section];
+        for (const view of views.length ? views : [undefined]) {
+          await route(page, extensionId, section, view);
+          const triggers = page.locator('.sniptale-select:visible');
+          for (const trigger of await triggers.all()) {
+            await expect(trigger).toHaveCSS('font-weight', '400');
+            await expect(trigger).toHaveCSS('font-size', '13px');
+            await expect(trigger).toHaveCSS('line-height', '18px');
+          }
+          const trigger = page.locator('.sniptale-select:visible:enabled').first();
+          if (!(await trigger.count())) continue;
+          await trigger.click();
+          const menu = page.getByRole('listbox');
+          await expect(menu).toBeVisible();
+          for (const option of await menu.getByRole('option').all()) {
+            await expect(option).toHaveCSS('font-weight', '400');
+            await expect(option).toHaveCSS('font-size', '13px');
+            await expect(option).toHaveCSS('line-height', '18px');
+          }
+          const family = await trigger.evaluate((element) => getComputedStyle(element).fontFamily);
+          await expect(menu).toHaveCSS('font-family', family);
+          if (section === 'interface-browser' || section === 'media-quality') {
+            await settled(page);
+            await page.screenshot({
+              path: info.outputPath(`dropdown-${section}-${view ?? 'main'}.png`),
+              fullPage: false,
+            });
+          }
+          await page.keyboard.press('Escape');
+          await expect(menu).toHaveCount(0);
+        }
+      }
+    });
+
     test(`settings polish ${viewport.name} ${variant.locale}-${variant.theme}`, async ({
       page,
       extensionId,

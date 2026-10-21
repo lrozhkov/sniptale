@@ -16,8 +16,7 @@ const SETTINGS_NAV_CLASS_NAME = 'flex min-h-0 flex-col overflow-hidden';
 
 const SETTINGS_ITEM_ACTIVE_CLASS_NAME = [
   'border-[var(--sniptale-color-border-soft)]',
-  '[--sniptale-command-selected-surface:var(--sniptale-color-text-primary)]',
-  '[--sniptale-command-selected-foreground:var(--sniptale-color-surface-panel)]',
+  'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const SETTINGS_ITEM_IDLE_CLASS_NAME = 'text-[var(--sniptale-color-text-muted-strong)]';
@@ -70,13 +69,7 @@ function SettingsSidebarItem(props: {
         }
       `}
     >
-      <span
-        className={
-          isActive
-            ? 'flex-none text-current'
-            : 'flex-none text-[var(--sniptale-color-text-secondary)]'
-        }
-      >
+      <span className="flex-none text-[var(--sniptale-color-text-secondary)]">
         <Icon size={16} />
       </span>
       <span className="min-w-0 text-[13px] leading-[18px] font-medium">

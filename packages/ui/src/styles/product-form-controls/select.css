@@ -299,7 +299,7 @@
   --sniptale-field-gap: 6px;
   --sniptale-field-radius: 4px;
   --sniptale-field-font-size: 13px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-compact-workspace .sniptale-select-chevron-edge {
   right: 8px;
@@ -309,7 +309,7 @@
   gap: 2px;
   padding: 5px;
   border-radius: 4px;
-  font: 500 13px / 18px var(--sniptale-font-interface);
+  font: 400 13px / 18px var(--sniptale-font-interface);
 }
 .sniptale-select-menu.sniptale-compact-workspace .sniptale-select-option {
   min-height: 36px;
