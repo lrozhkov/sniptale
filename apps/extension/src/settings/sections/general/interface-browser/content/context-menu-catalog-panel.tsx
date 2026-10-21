@@ -87,9 +87,10 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
           <button
             key={item.command}
             type="button"
+            data-settings-reorder-handle
             data-context-menu-source="catalog"
             data-command-key={`command:${item.command}`}
-            className="touch-pan-y cursor-grab block h-10 w-full truncate rounded-[4px] px-3 text-left text-[13px]
+            className="touch-pan-y block h-10 w-full truncate rounded-[4px] px-3 text-left text-[13px]
               hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
 "
             title={item.label}

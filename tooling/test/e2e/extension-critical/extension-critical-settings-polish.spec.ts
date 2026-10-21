@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -29,7 +29,75 @@ async function route(page: Page, extensionId: string, section: string, view?: st
   await settled(page);
 }
 
+async function verifyReorderCursor(page: Page, handle: Locator) {
+  await handle.scrollIntoViewIfNeeded();
+  await handle.hover();
+  await expect(handle).toHaveCSS('cursor', 'grab');
+  const bounds = (await handle.boundingBox())!;
+  const hitCursor = await page.evaluate(
+    ({ x, y }) => {
+      const hit = document.elementFromPoint(x, y);
+      return hit ? getComputedStyle(hit).cursor : null;
+    },
+    { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+  );
+  expect(hitCursor).toBe('grab');
+  await page.mouse.down();
+  await expect(handle).toHaveCSS('cursor', 'grabbing');
+  await page.mouse.move(bounds.x + bounds.width / 2 + 16, bounds.y + bounds.height / 2 + 3);
+  await expect(handle).toHaveCSS('cursor', 'grabbing');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await handle.hover();
+  await expect(handle).toHaveCSS('cursor', 'grab');
+}
+
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark']) {
+    test(`settings reorder cursor ${theme} ${viewport.name}`, async ({
+      page,
+      extensionId,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await route(page, extensionId, 'quick-actions');
+      await page.evaluate(async (theme) => {
+        localStorage.setItem('sniptale-theme-preference', theme);
+        await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+      }, theme);
+      for (const [section, view] of [
+        ['quick-actions', undefined],
+        ['screen-sizes', undefined],
+        ['editor-resources', 'palettes'],
+      ] as const) {
+        await route(page, extensionId, section, view);
+        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        const handle = page
+          .locator('[data-settings-collection-item]')
+          .first()
+          .getByRole('button', { name: /Изменить позицию|Change position/ });
+        await verifyReorderCursor(page, handle);
+      }
+      await route(page, extensionId, 'interface-browser', 'context-menu');
+      await verifyReorderCursor(page, page.locator('[data-context-menu-source="tree"]').first());
+      await verifyReorderCursor(page, page.locator('[data-context-menu-source="catalog"]').first());
+      await page.screenshot({
+        path: info.outputPath('settings-reorder-cursor.png'),
+        fullPage: false,
+      });
+      await page.setViewportSize({ width: 960, height: viewport.size.height });
+      await route(page, extensionId, 'quick-actions');
+      await verifyReorderCursor(
+        page,
+        page
+          .locator('[data-settings-collection-item]')
+          .first()
+          .getByRole('button', { name: /Изменить позицию|Change position/ })
+      );
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+    });
+  }
   for (const view of ['backgrounds', 'palettes'] as const) {
     test(`${view} drop preserves focus while saving ${viewport.name}`, async ({
       page,

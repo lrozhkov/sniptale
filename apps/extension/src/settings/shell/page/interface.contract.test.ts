@@ -7,6 +7,19 @@ const inspector = readFileSync(
   'utf8'
 );
 
+it('owns reorder cursor roles separately from ordinary command cursors', () => {
+  const role = '.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled)';
+  for (const [state, cursor] of [
+    ['', 'grab'],
+    [':active', 'grabbing'],
+    ["[aria-disabled='true']", 'wait'],
+  ]) {
+    const start = settings.indexOf(`${role}${state},`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(settings.slice(start, settings.indexOf('}', start))).toContain(`cursor: ${cursor};`);
+  }
+});
+
 it('keeps Settings selection feedback separate from command pressure', () => {
   expect(settings).toContain("[data-ui='settings.subpage-tabs'] button");
   expect(settings).toContain("button[data-command-tone='toggle']");

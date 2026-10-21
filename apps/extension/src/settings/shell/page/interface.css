@@ -100,6 +100,18 @@
 .sniptale-settings-workspace :is(button, input, textarea, select):disabled {
   cursor: default;
 }
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled),
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled) * {
+  cursor: grab;
+}
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled):active,
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled):active * {
+  cursor: grabbing;
+}
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled)[aria-disabled='true'],
+.sniptale-settings-workspace [data-settings-reorder-handle]:not(:disabled)[aria-disabled='true'] * {
+  cursor: wait;
+}
 .sniptale-settings-workspace [role='listbox'],
 .sniptale-settings-workspace [role='option'] {
   font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);

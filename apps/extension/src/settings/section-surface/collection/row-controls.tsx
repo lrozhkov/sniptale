@@ -24,6 +24,7 @@ export function SettingsCollectionReorderHandle(props: {
   return (
     <button
       type="button"
+      data-settings-reorder-handle
       aria-label={translate('settings.collection.dragHandle')}
       aria-describedby={props.dragInstructionsId}
       aria-pressed={props.active}
@@ -31,7 +32,6 @@ export function SettingsCollectionReorderHandle(props: {
       aria-disabled={props.item.busy || undefined}
       className={[
         'touch-none rounded focus-visible:outline-none focus-visible:ring-2',
-        'aria-disabled:cursor-wait',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
       onKeyDown={(event) => {
