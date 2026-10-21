@@ -67,6 +67,7 @@ export function PalettesSettings() {
           </p>
         ) : null}
         <SettingsCollection
+          layout="tiles"
           ariaLabel={translate('settings.editor.paletteTitle')}
           items={items}
           onAction={() => undefined}

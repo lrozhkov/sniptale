@@ -10,7 +10,7 @@ import type { PopupPage } from '../navigation/actions';
 import { preloadPopupPage } from '../startup/resource';
 import { usePopupRouteController } from '../startup/use-route-controller';
 import { usePopupStartupReconciliation } from './use-startup-reconciliation';
-import { PopupHints } from '../../../ui/popup-shell/hints';
+import { NativeHints } from '../../../ui/native-hints';
 
 const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'screenshots', icon: <GalleryThumbnails aria-hidden="true" /> },
@@ -62,7 +62,7 @@ export function PopupApp() {
 
   return (
     <div className="popup-react-shell sniptale-extension-surface" data-ui="popup.app.root">
-      <PopupHints />
+      <NativeHints />
       <PopupNavigation locale={locale} route={route} />
       <PopupRouteError
         locale={locale}

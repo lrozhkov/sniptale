@@ -7,6 +7,7 @@ import {
   VideoActiveStatusHeader,
 } from './surface';
 import { useVideoActiveViewModel } from './view-model';
+import { VideoRecordingQualitySummary } from './surface/quality-summary';
 
 interface VideoActivePageProps {
   recordingState: VideoRecordingRuntimeState;
@@ -25,6 +26,7 @@ export default function VideoActivePage({
     <div className="flex h-full flex-col gap-3">
       <section className={ACTIVE_PANEL_CLASS_NAME}>
         <VideoActiveStatusHeader recordingState={recordingState} modeLabel={viewModel.modeLabel} />
+        <VideoRecordingQualitySummary profile={recordingState.outputProfile} />
         <VideoActiveDisplay
           recordingState={recordingState}
           value={viewModel.value}

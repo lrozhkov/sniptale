@@ -5,6 +5,7 @@ import {
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { useVideoActiveViewModel } from '../active-page/view-model';
 import { VideoCountdownReadiness } from '../active-page/countdown-readiness';
+import { VideoRecordingQualitySummary } from '../active-page/surface/quality-summary';
 import { translate } from '../../../../platform/i18n/popup';
 import {
   VideoActiveMediaStatus,
@@ -42,6 +43,7 @@ export function VideoSetupRecordingPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-3 pr-1">
       <div className={RECORDING_PANEL_CLASS_NAME}>
         <VideoActiveStatusHeader recordingState={recordingState} modeLabel={viewModel.modeLabel} />
+        <VideoRecordingQualitySummary profile={recordingState.outputProfile} />
         <div className="min-h-0 flex-1">
           <div className={showReadiness ? 'grid grid-cols-[minmax(0,1fr)_112px] gap-3' : undefined}>
             <VideoActiveDisplay

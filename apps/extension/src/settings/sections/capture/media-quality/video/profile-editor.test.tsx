@@ -186,7 +186,7 @@ it('keeps the codec status slot mounted through format checks and their result',
   codecSupport.mockReturnValue('checking');
   renderEditor();
   expect(container?.querySelector('[role="status"]')).toBe(status);
-  expect(status?.textContent).toBe('settings.videoQuality.codecChecking');
+  expect(status?.textContent).toBe('');
   codecSupport.mockReturnValue('unavailable');
   renderEditor();
   expect(container?.querySelector('[role="status"]')).toBe(status);

@@ -1,3 +1,4 @@
+import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import {
   getDefaultVideoOutputCodec,
@@ -46,6 +47,7 @@ function VideoProfileFormatFields(props: {
   configuration: VideoOutputProfile;
   onChange: (configuration: VideoOutputProfile) => void;
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const codecOptions = Object.values(VideoOutputCodec)
     .filter((codec) => isVideoOutputCodecCompatible(props.configuration.container, codec))
     .map((value) => ({ value, label: getCodecLabel(value) }));
@@ -125,11 +127,15 @@ function VideoProfileFormatFields(props: {
           ))}
         </div>
       </fieldset>
-      <details className="mt-2 border-t border-[var(--sniptale-color-border-subtle)] pt-3">
-        <summary className="cursor-pointer text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.videoQuality.advanced')}
-        </summary>
-        <div className="pt-3">
+      <InspectorDisclosureView
+        dataUi="settings.video-quality.codecs"
+        variant="structural"
+        label={translate('settings.videoQuality.advanced')}
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        bodyClassName="pt-2"
+      >
+        <div>
           <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
             <ProductSelect
               aria-label={translate('settings.videoQuality.codecLabel')}
@@ -147,7 +153,7 @@ function VideoProfileFormatFields(props: {
             {translate('settings.videoQuality.compressionHelp')}
           </p>
         </div>
-      </details>
+      </InspectorDisclosureView>
     </>
   );
 }
@@ -292,14 +298,12 @@ export function VideoQualityProfileEditor(props: {
             role="status"
             className="min-h-8 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]"
           >
-            {codecSupport === 'available'
+            {codecSupport === 'available' || codecSupport === 'checking'
               ? ''
               : translate(
-                  codecSupport === 'checking'
-                    ? 'settings.videoQuality.codecChecking'
-                    : codecSupport === 'unavailable'
-                      ? 'settings.videoQuality.codecUnavailable'
-                      : 'settings.videoQuality.codecUnknown'
+                  codecSupport === 'unavailable'
+                    ? 'settings.videoQuality.codecUnavailable'
+                    : 'settings.videoQuality.codecUnknown'
                 )}
           </p>
         </div>

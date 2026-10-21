@@ -200,6 +200,9 @@ export function isVideoMicrophoneActivity(value: unknown): value is VideoMicroph
 export function isVideoRecordingRuntimeState(value: unknown): value is VideoRecordingRuntimeState {
   return (
     isRecord(value) &&
+    (value['outputProfile'] === undefined ||
+      value['outputProfile'] === null ||
+      isVideoOutputProfile(value['outputProfile'])) &&
     (value['microphoneActivity'] === undefined ||
       value['microphoneActivity'] === null ||
       isVideoMicrophoneActivity(value['microphoneActivity'])) &&

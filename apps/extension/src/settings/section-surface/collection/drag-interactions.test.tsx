@@ -19,12 +19,13 @@ let root: Root;
 function dispatchPointer(
   target: Element | null,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
-  options: { clientY?: number; pointerId?: number } = {}
+  options: { clientX?: number; clientY?: number; pointerId?: number } = {}
 ) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     cancelable: true,
+    clientX: options.clientX ?? 0,
     clientY: options.clientY ?? 0,
   });
   Object.defineProperty(event, 'pointerId', { value: options.pointerId ?? 1 });
@@ -63,6 +64,38 @@ afterEach(() => {
 });
 
 describe('SettingsCollection drag lifecycle', () => {
+  it('uses horizontal pointer movement to reorder tiles in the same row', () => {
+    const onMove = vi.fn();
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Palette tiles"
+          layout="tiles"
+          items={items}
+          onAction={vi.fn()}
+          onMove={onMove}
+        />
+      )
+    );
+    for (const [index, row] of [
+      ...container.querySelectorAll<HTMLElement>('[data-settings-collection-item]'),
+    ].entries()) {
+      row.getBoundingClientRect = () =>
+        ({ top: 0, left: index * 200, width: 190, height: 44, bottom: 44 }) as DOMRect;
+    }
+    const handle = container.querySelector<HTMLElement>('[aria-label="Изменить позицию"]');
+    act(() => dispatchPointer(handle, 'pointerdown', { clientX: 20, clientY: 20 }));
+    act(() => dispatchPointer(document.body, 'pointermove', { clientX: 350, clientY: 20 }));
+    expect(onMove).not.toHaveBeenCalled();
+    act(() => dispatchPointer(document.body, 'pointerup', { clientX: 350, clientY: 20 }));
+    expect(onMove).toHaveBeenCalledExactlyOnceWith({
+      itemId: 'first',
+      beforeItemId: null,
+      groupId: null,
+      source: 'drag',
+    });
+  });
+
   it('announces rejected self and cross-group drops as cancelled', () => {
     const onMove = vi.fn();
     act(() =>

@@ -1,10 +1,11 @@
+import { useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { LucideIcon } from 'lucide-react';
-import { Camera } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
-import { TextField } from '../../../../ui/compact-inspector-controls';
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
+import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { QuickAction, QuickActionDelay, ViewportPreset } from '../../../../contracts/settings';
 import { HotkeyInput } from './hotkey-input';
 import { allowedQuickActionIcons, delayOptions, quickActionIconMap } from './section/constants';
@@ -46,24 +47,50 @@ function buildViewportPresetOptions(viewportPresets: ViewportPreset[] | undefine
 }
 
 export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSectionState }) {
+  const [expanded, setExpanded] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const initialIcons: readonly string[] = allowedQuickActionIcons.slice(0, 24);
+  const selected = props.state.editForm?.icon;
+  const visibleIcons = expanded
+    ? allowedQuickActionIcons
+    : selected && !initialIcons.includes(selected)
+      ? [...initialIcons.slice(0, 23), selected]
+      : initialIcons;
   return (
     <div className="sniptale-parameter-stack">
-      <div>
-        <TextField
-          label={translate('settings.quickActions.nameLabel')}
-          type="text"
-          value={props.state.editForm?.name ?? ''}
-          onChange={(event) => props.state.updateFormField('name', event.target.value)}
-          placeholder={translate('settings.quickActions.namePlaceholder')}
-        />
-      </div>
+      <SettingsControlRow label={translate('settings.quickActions.nameLabel')}>
+        <div className="sniptale-text-value">
+          <ProductInput
+            ref={nameInput}
+            autoFocus
+            aria-label={translate('settings.quickActions.nameLabel')}
+            type="text"
+            value={props.state.editForm?.name ?? ''}
+            onChange={(event) => props.state.updateFormField('name', event.target.value)}
+            placeholder={translate('settings.quickActions.namePlaceholder')}
+          />
+          {props.state.editForm?.name ? (
+            <InspectorFieldClear
+              label={translate('settings.quickActions.nameLabel')}
+              target={nameInput}
+            />
+          ) : null}
+        </div>
+      </SettingsControlRow>
 
       <div>
         <label className={`mb-1.5 block ${settingsMetaLabelClassName}`}>
           {translate('settings.quickActions.iconLabel')}
         </label>
-        <div className={iconPickerClassName}>
-          {allowedQuickActionIcons.map((iconName) => (
+        <div
+          data-ui="settings.quick-actions.icons"
+          className={[
+            iconPickerClassName,
+            'max-h-[72px] overflow-y-hidden',
+            expanded ? '!max-h-40 !overflow-y-auto' : '',
+          ].join(' ')}
+        >
+          {visibleIcons.map((iconName) => (
             <ProductActionButton
               compact
               tone="toggle"
@@ -82,11 +109,24 @@ export function QuickActionsEditorIdentityFields(props: { state: QuickActionsSec
                     ].join(' ')
               }`}
               title={iconName}
+              aria-label={iconName}
             >
               <DynamicIcon name={iconName} className="h-4 w-4" />
             </ProductActionButton>
           ))}
         </div>
+        <ProductActionButton
+          compact
+          tone="secondary"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1"
+        >
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {translate(
+            expanded ? 'settings.quickActions.fewerIcons' : 'settings.quickActions.moreIcons'
+          )}
+        </ProductActionButton>
       </div>
     </div>
   );

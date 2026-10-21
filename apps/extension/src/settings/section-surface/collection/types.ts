@@ -58,6 +58,7 @@ export type SettingsCollectionGroup = {
 };
 
 export type SettingsCollectionProps = {
+  layout?: 'rows' | 'tiles';
   ariaLabel: string;
   title?: ReactNode;
   description?: ReactNode;

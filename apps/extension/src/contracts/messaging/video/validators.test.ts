@@ -254,6 +254,28 @@ it('accepts runtime state snapshots with nullable capture fields', () => {
   ).toBe(true);
 });
 
+it('validates optional admitted recording quality without rejecting older snapshots', () => {
+  const state = {
+    captureMode: null,
+    captureSource: null,
+    countdownEndsAt: null,
+    duration: 0,
+    error: null,
+    status: 'COUNTDOWN',
+    viewportPresetId: null,
+  };
+  for (const outputProfile of [undefined, null, DEFAULT_VIDEO_SETTINGS.outputProfile]) {
+    expect(isVideoRecordingRuntimeState({ ...state, outputProfile })).toBe(true);
+  }
+  for (const outputProfile of [
+    {},
+    'VP9',
+    { ...DEFAULT_VIDEO_SETTINGS.outputProfile, frameRate: -1 },
+  ]) {
+    expect(isVideoRecordingRuntimeState({ ...state, outputProfile })).toBe(false);
+  }
+});
+
 it('validates runtime state capture source variants', () => {
   const state = {
     captureMode: CaptureMode.TAB,

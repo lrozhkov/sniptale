@@ -16,7 +16,14 @@ vi.mock('../runtime/session-state', async (importOriginal) => ({
 }));
 
 import { videoManagerSession } from '../manager/session';
-import { beginVideoRecordingPreparation, resetVideoRecordingStartSession } from './preparation';
+import {
+  beginVideoRecordingPreparation,
+  clearVideoRecordingOffscreenStartDispatched,
+  markVideoRecordingOffscreenStartDispatched,
+  markVideoRecordingPreparationSettled,
+  resetVideoRecordingStartSession,
+  restoreVideoRecordingOffscreenStartPending,
+} from './preparation';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -65,6 +72,7 @@ it('resets controlled cursor state when a new recording preparation begins', () 
     captureSource: null,
     cropRegion: null,
     viewportPresetId: null,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: VideoQuality.HIGH },
     liveMedia: {
       microphoneDeviceId: 'mic-1',
       microphoneEnabled: true,
@@ -78,6 +86,18 @@ it('resets controlled cursor state when a new recording preparation begins', () 
   });
 });
 
+it('retains the admitted quality when recording defaults change later', () => {
+  const settings = {
+    ...DEFAULT_VIDEO_SETTINGS,
+    outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
+  };
+  beginVideoRecordingPreparation(CaptureMode.TAB, settings, null);
+  const admitted = setVideoRecordingRuntimeState.mock.calls[0]?.[0];
+  const frameRate = settings.outputProfile.frameRate;
+  settings.outputProfile.frameRate = 24;
+  expect(admitted.outputProfile.frameRate).toBe(frameRate);
+});
+
 it('drops controlled cursor state when the start session is reset early', () => {
   resetVideoRecordingStartSession();
 
@@ -87,4 +107,20 @@ it('drops controlled cursor state when the start session is reset early', () => 
   expect(videoManagerSession.controlledCursorNavigationPending).toBe(false);
   expect(videoManagerSession.controlledCursorOffsetSeconds).toBe(0);
   expect(videoManagerSession.controlledCursorTelemetry).toBeNull();
+});
+
+it('tracks offscreen preparation through dispatch, restoration and settlement', () => {
+  beginVideoRecordingPreparation(CaptureMode.TAB, DEFAULT_VIDEO_SETTINGS, null);
+  expect(videoManagerSession.isStarting).toBe(true);
+  expect(videoManagerSession.offscreenStartDispatched).toBe(false);
+  markVideoRecordingOffscreenStartDispatched();
+  expect(videoManagerSession.offscreenStartDispatched).toBe(true);
+  clearVideoRecordingOffscreenStartDispatched();
+  expect(videoManagerSession.offscreenStartDispatched).toBe(false);
+  restoreVideoRecordingOffscreenStartPending();
+  expect(videoManagerSession.isStarting).toBe(true);
+  expect(videoManagerSession.offscreenStartDispatched).toBe(true);
+  markVideoRecordingPreparationSettled();
+  expect(videoManagerSession.isStarting).toBe(false);
+  expect(videoManagerSession.offscreenStartDispatched).toBe(false);
 });

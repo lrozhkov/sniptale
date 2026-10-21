@@ -922,7 +922,7 @@ test('native settings preset drafts clear names and cancel without changing thei
       rows.evaluateAll((nodes) =>
         nodes.map((node) => ({
           id: node.getAttribute('data-settings-collection-item'),
-          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+          title: node.querySelector('.truncate')?.textContent?.trim(),
         }))
       );
     const before = await catalog();
@@ -1012,7 +1012,7 @@ test('native settings resource create forms clear names and cancel without catal
       page.locator('[data-settings-collection-item]').evaluateAll((nodes) =>
         nodes.map((node) => ({
           id: node.getAttribute('data-settings-collection-item'),
-          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+          title: node.querySelector('.truncate')?.textContent?.trim(),
         }))
       );
     await settle(page);
@@ -1062,7 +1062,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect.soft(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
     await route(page, extensionId, 'screen-sizes');
     const row = page.locator('[data-settings-collection-item]').first();
-    const title = row.locator('div[title]').first();
+    const title = row.locator(':scope > div.min-w-0 > div').first();
     const metadata = row.locator(':scope > div.min-w-0 > div').nth(1);
     await expect(metadata).toBeVisible();
     await expect.soft(title).toHaveCSS('font-weight', '400', { timeout: 500 });

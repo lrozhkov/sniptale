@@ -125,16 +125,16 @@ export const settingsAiProvidersModelMessages = defineMessageSource({
     en: 'Name *',
   },
   modelNamePlaceholder: {
-    ru: 'Например: GPT-4o, Claude 3 Opus',
-    en: 'Example: GPT-4o, Claude 3 Opus',
+    ru: 'Название модели',
+    en: 'Model name',
   },
   modelCodeLabel: {
     ru: 'Код модели (ID) *',
     en: 'Model code (ID) *',
   },
   modelCodePlaceholder: {
-    ru: 'Например: gpt-4o, claude-3-opus-20240229',
-    en: 'Example: gpt-4o, claude-3-opus-20240229',
+    ru: 'model-id',
+    en: 'model-id',
   },
   modelCodeHint: {
     ru: 'Точное имя модели для API запроса',

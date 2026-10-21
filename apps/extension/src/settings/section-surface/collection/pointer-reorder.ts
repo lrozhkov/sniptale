@@ -19,9 +19,23 @@ function getCollectionRows(
 export function movePointerPreviewToClientY(
   root: HTMLElement,
   preview: SettingsCollectionKeyboardPreview,
-  clientY: number
+  clientY: number,
+  clientX?: number
 ): SettingsCollectionKeyboardPreview {
   const rows = getCollectionRows(root, preview);
+  if (root.dataset['settingsCollectionLayout'] === 'tiles' && clientX !== undefined) {
+    const target = rows.find((row) => {
+      const bounds = row.getBoundingClientRect();
+      return (
+        clientY < bounds.bottom &&
+        (clientY < bounds.top || clientX < bounds.left + bounds.width / 2)
+      );
+    });
+    const beforeId = target?.dataset['settingsCollectionItem'];
+    if (beforeId) return moveReorderPreviewToTarget(preview, beforeId, 'before');
+    const finalId = rows.at(-1)?.dataset['settingsCollectionItem'];
+    return finalId ? moveReorderPreviewToTarget(preview, finalId, 'after') : preview;
+  }
   const rowBeforePointer = rows.find((row) => {
     const bounds = row.getBoundingClientRect();
     return clientY < bounds.top + bounds.height / 2;

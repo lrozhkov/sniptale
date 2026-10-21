@@ -136,6 +136,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('bounds the icon picker and retains selection after collapsing it', () => {
+  const state = renderFields();
+  const picker = container!.querySelector('[data-ui="settings.quick-actions.icons"]')!;
+  expect(picker.querySelectorAll('button')).toHaveLength(24);
+  const more = container!.querySelector<HTMLButtonElement>('[aria-expanded]')!;
+  act(() => more.click());
+  expect(picker.querySelectorAll('button')).toHaveLength(60);
+  act(() => picker.querySelector<HTMLButtonElement>('[aria-label="Star"]')!.click());
+  expect(state.updateFormField).toHaveBeenCalledWith('icon', 'Star');
+  act(() => more.click());
+  expect(picker.querySelectorAll('button')).toHaveLength(24);
+});
+
 function verifyQuickActionEditorFieldInteractions() {
   const state = renderFields();
   const inputs = Array.from(container?.querySelectorAll<HTMLInputElement>('input') ?? []);

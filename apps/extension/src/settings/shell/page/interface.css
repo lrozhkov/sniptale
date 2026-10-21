@@ -35,8 +35,15 @@
   width: 100%;
   min-width: 0;
 }
+.sniptale-settings-workspace
+  .settings-control-value
+  > [data-ui='shared.ui.compact-inspector.numeric-row'] {
+  max-width: 220px;
+  margin-inline-start: auto;
+}
 .sniptale-settings-workspace .settings-range-field {
   display: grid;
+  max-width: 400px;
   gap: 4px;
 }
 .sniptale-settings-workspace .settings-range-heading {
@@ -73,6 +80,33 @@
   font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
   letter-spacing: normal;
   text-transform: none;
+}
+.sniptale-settings-workspace .sniptale-parameter-check {
+  border-radius: 50%;
+}
+.sniptale-settings-workspace
+  [data-settings-collection-layout='tiles']
+  [data-settings-collection-item] {
+  min-height: 44px;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 4px;
+}
+.sniptale-settings-workspace :is(button, input, textarea, select):disabled {
+  cursor: default;
+}
+.sniptale-settings-workspace [role='listbox'],
+.sniptale-settings-workspace [role='option'] {
+  font: var(--sniptale-font-weight-interface) 13px / 18px var(--sniptale-font-interface);
+}
+.sniptale-settings-workspace.sniptale-compact-workspace
+  :is(.sniptale-input, .sniptale-textarea):not(.sniptale-input-error):not(
+    [aria-invalid='true']
+  ):focus {
+  border-color: var(--sniptale-color-border-strong) !important;
+  box-shadow: none !important;
+  outline: none;
 }
 .sniptale-settings-workspace .sniptale-text-value > .sniptale-textarea {
   padding: 8px 32px 8px 8px;

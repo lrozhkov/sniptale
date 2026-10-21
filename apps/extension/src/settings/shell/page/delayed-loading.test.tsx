@@ -8,6 +8,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../ui/native-hints', () => ({ NativeHints: () => null }));
+
 const settingsPageDelayMocks = vi.hoisted(() => ({
   loadedSectionModules: [] as string[],
   loadSettingsMock: vi.fn(),

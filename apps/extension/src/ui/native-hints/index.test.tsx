@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { PopupHints, resolvePopupHint } from './index';
+import { NativeHints, resolveNativeHint } from './index';
 
 let root: Root | null = null;
 const resizeCallbacks = new Set<() => void>();
@@ -36,7 +36,7 @@ function mountHints() {
   const container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  act(() => root?.render(<PopupHints />));
+  act(() => root?.render(<NativeHints />));
 }
 
 function hover(element: Element) {
@@ -57,9 +57,65 @@ function button(label: string, hint = label) {
   return element;
 }
 
+it('does not restore a native title removed by its declarative owner while suppressed', async () => {
+  mountHints();
+  const element = button('Download');
+  delete element.dataset['popupHint'];
+  element.title = 'Download';
+  hover(element);
+  await act(async () => {
+    element.removeAttribute('title');
+    element.textContent = 'Export';
+  });
+  expect(element.hasAttribute('title')).toBe(false);
+  act(() =>
+    element.dispatchEvent(
+      new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(element.hasAttribute('title')).toBe(false);
+});
+
+it('suppresses duplicate native titles through nested pointer transitions and restores them', async () => {
+  mountHints();
+  const element = button('Download');
+  delete element.dataset['popupHint'];
+  element.title = 'Download';
+  const child = document.createElement('span');
+  element.append(child);
+  hover(element);
+  expect(element.getAttribute('title')).toBe('');
+  hover(child);
+  expect(element.getAttribute('title')).toBe('');
+  await act(async () => {
+    element.title = 'Includes all files';
+  });
+  expect(element.title).toBe('Includes all files');
+  act(() =>
+    element.dispatchEvent(
+      new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(element.title).toBe('Includes all files');
+});
+
+it('keeps native clipped labels on focus without changing content or adding UI', () => {
+  mountHints();
+  const element = button('A long name');
+  delete element.dataset['popupHint'];
+  element.title = 'A long name';
+  Object.defineProperties(element, { scrollWidth: { value: 240 }, clientWidth: { value: 100 } });
+  act(() => element.focus());
+  expect(element.title).toBe('A long name');
+  expect(element.textContent).toBe('A long name');
+  expect(tooltip()).toBeNull();
+  act(() => element.blur());
+  expect(element.title).toBe('A long name');
+});
+
 it('does not repeat a fully visible label', () => {
   const element = button('Download');
-  expect(resolvePopupHint(element)).toBeNull();
+  expect(resolveNativeHint(element)).toBeNull();
   expect(element.textContent).toBe('Download');
   expect(element.hasAttribute('title')).toBe(false);
 });
@@ -70,9 +126,9 @@ it('exposes the full label only while it is clipped', () => {
     scrollWidth: { value: 240, configurable: true },
     clientWidth: { value: 100, configurable: true },
   });
-  expect(resolvePopupHint(element)).toBe('A long microphone name');
+  expect(resolveNativeHint(element)).toBe('A long microphone name');
   Object.defineProperty(element, 'clientWidth', { value: 240 });
-  expect(resolvePopupHint(element)).toBeNull();
+  expect(resolveNativeHint(element)).toBeNull();
 });
 
 it('detects clipped descendants and multiline clamping', () => {
@@ -83,12 +139,12 @@ it('detects clipped descendants and multiline clamping', () => {
   label.style.overflowY = 'hidden';
   Object.defineProperties(label, { scrollHeight: { value: 48 }, clientHeight: { value: 32 } });
   element.append(label);
-  expect(resolvePopupHint(element)).toBe('A long project name');
+  expect(resolveNativeHint(element)).toBe('A long project name');
 });
 
 it('keeps an explanation available without label clipping', () => {
   const element = button('Export', 'Includes images and page content');
-  expect(resolvePopupHint(element)).toBe('Includes images and page content');
+  expect(resolveNativeHint(element)).toBe('Includes images and page content');
 });
 
 it('keeps a visual hint for an icon button with an accessible name', () => {
@@ -99,7 +155,7 @@ it('keeps a visual hint for an icon button with an accessible name', () => {
   hidden.className = 'sr-only';
   hidden.textContent = 'Settings';
   element.append(hidden);
-  expect(resolvePopupHint(element)).toBe('Settings');
+  expect(resolveNativeHint(element)).toBe('Settings');
   expect(element.getAttribute('aria-label')).toBe('Settings');
 });
 
@@ -108,9 +164,9 @@ it('does not repeat a visible description or composed quick-action hint', () => 
     'Visible area Current tab Ctrl+Shift+1',
     'Visible area • Current tab • Ctrl+Shift+1'
   );
-  expect(resolvePopupHint(element)).toBeNull();
+  expect(resolveNativeHint(element)).toBeNull();
   element.dataset['popupHint'] = 'Current tab';
-  expect(resolvePopupHint(element)).toBeNull();
+  expect(resolveNativeHint(element)).toBeNull();
 });
 
 it('uses browser titles for explanations without rendering a tooltip', () => {

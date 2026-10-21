@@ -31,7 +31,7 @@ Visible button text supplies its accessible name. Icon-only buttons require an a
 
 Additional explanations remain available regardless of label clipping. Keep required instructions and recovery actions visible, or provide an explicit detail action. Put irreversible-deletion warnings in the confirmation, not only in a hint. Use an accessible description for supplemental instructions. Do not replace the action name with its explanation.
 
-The popup hint owner controls conditional `title` attributes. The browser owns hint presentation and dismissal. Native hints are not reliable visual disclosure on keyboard focus. Preserve full accessible names and existing choice or detail surfaces for keyboard access. Do not add custom hint layers, focus-only text wrapping, or control resizing.
+The shared `ui/native-hints` owner controls conditional `title` attributes in popup, Settings, and Design System pages. The browser owns hint presentation and dismissal. Native hints are not reliable visual disclosure on keyboard focus. Preserve full accessible names and existing choice or detail surfaces for keyboard access. Do not add custom hint layers, focus-only text wrapping, or control resizing.
 
 [W3C accessible names and descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/) explains the naming and description techniques.
 

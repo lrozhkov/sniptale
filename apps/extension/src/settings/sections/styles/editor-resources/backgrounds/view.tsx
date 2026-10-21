@@ -65,7 +65,10 @@ export function BackgroundPresetsSettings() {
           state={catalog.status === 'ready' ? 'ready' : 'loading'}
           addAction={{
             label: translate('settings.editor.backgrounds.add'),
-            onInvoke: () => setAdding(true),
+            onInvoke: () => {
+              setName('');
+              setAdding(true);
+            },
           }}
           onAction={(action) => {
             if (action.type === 'toggle')
@@ -106,25 +109,26 @@ export function BackgroundPresetsSettings() {
           }}
         />
         <ProductModalBody compact>
-          {adding ? (
-            <BackgroundImagePicker
-              showPresets={false}
-              onSelect={async (image) => {
-                await catalog.add(image);
-                setAdding(false);
-              }}
+          <label className="grid gap-1 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
+            {translate('settings.editor.backgrounds.name')}
+            <ProductInput
+              placeholder={translate('settings.editor.backgrounds.name')}
+              maxLength={120}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
             />
-          ) : (
-            <label className="grid gap-1 text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
-              {translate('settings.editor.backgrounds.name')}
-              <ProductInput
-                placeholder={translate('settings.editor.backgrounds.name')}
-                maxLength={120}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
+          </label>
+          {adding ? (
+            <div className="mt-3">
+              <BackgroundImagePicker
+                showPresets={false}
+                onSelect={async (image) => {
+                  await catalog.add(image, name.trim() || undefined);
+                  setAdding(false);
+                }}
               />
-            </label>
-          )}
+            </div>
+          ) : null}
         </ProductModalBody>
         {renaming && (
           <ProductModalFooter compact>

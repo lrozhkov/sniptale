@@ -97,7 +97,7 @@ export function AnnotationTemplateTagEditor(props: {
               />
             ) : null}
           </div>
-          {editingTag?.origin !== 'system' && options.length > 0 ? (
+          {editingTag && editingTag.origin !== 'system' && options.length > 0 ? (
             <div className="mt-3 border-t border-[var(--sniptale-color-border-soft)] pt-3">
               <label className={settingsMetaLabelClassName}>
                 {translate('highlighter.templateTags.mergeTarget')}

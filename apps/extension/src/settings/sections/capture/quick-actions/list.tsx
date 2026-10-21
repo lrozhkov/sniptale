@@ -39,7 +39,7 @@ export function QuickActionsList(props: {
       id: action.id,
       title: getQuickActionDisplayName(action),
       meta,
-      preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-accent)]" />,
+      preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-text-secondary)]" />,
       enabled: action.status,
       busy: props.state.isLoading,
       isBuiltIn: isBundledQuickAction(action),

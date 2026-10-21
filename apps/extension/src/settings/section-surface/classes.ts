@@ -47,7 +47,7 @@ export const settingsEmptyStateClassName = [
 export const settingsToggleRowClassName = 'flex min-h-8 items-center justify-between gap-2 py-0';
 
 export const settingsAddButtonClassName = [
-  'flex w-full',
+  'inline-flex w-fit',
   getControlSecondaryButtonClassName({ density: 'default' }),
 ].join(' ');
 

@@ -169,7 +169,7 @@ it('shows microphone readiness with read-only controls before the start response
   const props = countdownProps();
   await act(async () => renderNode(<VideoSetupRecordingPanel {...props} />));
 
-  expect(container?.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('40');
+  expect(container?.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('87');
   expect(container?.textContent).toContain('popup.video.countdownMediaReadOnly');
   expect(container?.textContent).toContain('Internal mic');
   const microphoneButton = container?.querySelector<HTMLButtonElement>(

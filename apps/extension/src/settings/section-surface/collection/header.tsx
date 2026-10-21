@@ -41,6 +41,7 @@ export function SettingsCollectionHeader(props: HeaderProps) {
       <div className="flex flex-none items-center gap-3">
         {props.addAction === undefined ? null : (
           <ProductActionButton
+            compact
             tone="secondary"
             title={props.addAction.label}
             type="button"

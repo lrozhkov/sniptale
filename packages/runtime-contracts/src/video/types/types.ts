@@ -303,6 +303,7 @@ export interface VideoMicrophoneActivity {
 }
 
 export interface VideoRecordingRuntimeState {
+  outputProfile?: VideoOutputProfile | null;
   microphoneActivity?: VideoMicrophoneActivity | null;
   completion?: VideoRecordingCompletionState | null;
   status: VideoRecordingStatus;

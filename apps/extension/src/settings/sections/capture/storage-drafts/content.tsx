@@ -6,7 +6,7 @@ import type { LocalStorageDestination, LocalStoragePolicy } from '../../../../co
 import { LOCAL_STORAGE_RETENTION_DAY_OPTIONS } from '../../../../composition/persistence/library-lifecycle';
 import { formatBytes } from '../../../../platform/i18n/format-bytes';
 import { translate } from '../../../../platform/i18n';
-import { openGalleryPage, openSettingsPage } from '../../../../platform/navigation/extension-pages';
+import { openSettingsPage } from '../../../../platform/navigation/extension-pages';
 import { SettingsSwitch } from '../../../section-surface/panel-controls';
 import {
   SettingsControlRow,
@@ -57,7 +57,6 @@ export function StorageDraftsContent(props: StorageDraftsContentProps) {
       <NewItemsSection {...props} />
       <RetentionSection {...props} />
       <TrashRetentionSection {...props} />
-      <DraftActionsSection {...props} />
     </div>
   );
 }
@@ -193,29 +192,17 @@ function TrashRetentionSection(
       <p className="pb-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
         {translate('settings.storageDrafts.trashRetentionConsequence')}
       </p>
-      {props.trashPolicyFeedback ? (
-        <div className="flex flex-wrap items-center gap-2 pb-2 text-xs" role="status">
-          <span>
-            {translate(
-              props.trashPolicyFeedback === 'saving'
-                ? 'settings.storageDrafts.trashSaving'
-                : props.trashPolicyFeedback === 'saved'
-                  ? 'settings.storageDrafts.trashSaved'
-                  : 'settings.storageDrafts.trashSaveFailed'
-            )}
-          </span>
-          {props.trashPolicyFeedback === 'error' ? (
-            <ProductActionButton
-              compact
-              tone="secondary"
-              type="button"
-              className={getControlSecondaryButtonClassName({ density: 'compact' })}
-              disabled={props.busy}
-              onClick={props.retryTrashPolicy}
-            >
-              {translate('settings.storageDrafts.retry')}
-            </ProductActionButton>
-          ) : null}
+      {props.trashPolicyFeedback === 'error' ? (
+        <div className="flex items-center gap-2 pb-2 text-xs" role="alert">
+          <span>{translate('settings.storageDrafts.trashSaveFailed')}</span>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            disabled={props.busy}
+            onClick={props.retryTrashPolicy}
+          >
+            {translate('settings.storageDrafts.retry')}
+          </ProductActionButton>
         </div>
       ) : null}
     </section>
@@ -265,50 +252,6 @@ function StorageUsageSection(props: Pick<StorageDraftsContentProps, 'usage'>) {
           }
         >
           {translate('settings.storageDrafts.privacyLink')}
-        </ProductActionButton>
-      </div>
-    </section>
-  );
-}
-
-function DraftActionsSection(
-  props: Pick<
-    StorageDraftsContentProps,
-    'busy' | 'onDeleteAllRequest' | 'onDeleteExpiredRequest' | 'policy' | 'policyLoaded'
-  >
-) {
-  return (
-    <section className="space-y-3 border-t border-[var(--sniptale-color-border-subtle)] pt-5">
-      <SectionLabel>{translate('settings.storageDrafts.draftActionsTitle')}</SectionLabel>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        type="button"
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
-        onClick={() => void openGalleryPage({ scope: 'temporary' })}
-      >
-        {translate('settings.storageDrafts.openDrafts')}
-      </ProductActionButton>
-      <div className="flex flex-wrap gap-2 pt-2">
-        <ProductActionButton
-          compact
-          tone="secondary"
-          type="button"
-          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
-          disabled={props.busy || !props.policyLoaded || !props.policy.cleanupEnabled}
-          onClick={props.onDeleteExpiredRequest}
-        >
-          {translate('settings.storageDrafts.deleteExpired')}
-        </ProductActionButton>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          type="button"
-          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
-          disabled={props.busy || !props.policyLoaded}
-          onClick={props.onDeleteAllRequest}
-        >
-          {translate('settings.storageDrafts.deleteAll')}
         </ProductActionButton>
       </div>
     </section>

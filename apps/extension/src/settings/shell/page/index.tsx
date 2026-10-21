@@ -1,3 +1,4 @@
+import { NativeHints } from '../../../ui/native-hints';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import '../../../ui/compact-inspector-controls/inspector-surface.css';
@@ -166,6 +167,7 @@ export function SettingsPage() {
   return (
     <CommandPressScope value={true}>
       <InspectorLayout>
+        <NativeHints />
         <div className="sniptale-settings-viewport">
           {isAIUnlockPage ? (
             <AISecretUnlockPage />

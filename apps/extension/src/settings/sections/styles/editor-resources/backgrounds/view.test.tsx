@@ -120,12 +120,23 @@ it('renames, reorders, removes and adds custom presets, reporting failed writes'
     );
     expect(io.edit).toHaveBeenLastCalledWith({ type: 'rename', id: 'user:one', name: 'Renamed' });
     await act(async () => io.props!.addAction?.onInvoke());
+    const backgroundName = host.querySelector<HTMLInputElement>('input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        backgroundName,
+        'My background'
+      );
+      backgroundName.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await act(async () =>
       Array.from(host.querySelectorAll('button'))
         .find((button) => button.textContent === 'pick-upload')
         ?.click()
     );
-    expect(io.add).toHaveBeenCalled();
+    expect(io.add).toHaveBeenCalledWith(
+      expect.objectContaining({ file: expect.any(File) }),
+      'My background'
+    );
     io.edit.mockRejectedValueOnce(new Error('failed'));
     await act(async () => io.props!.onAction?.({ type: 'delete', itemId: 'user:one' }));
     expect(host.querySelector('[role=alert]')).not.toBeNull();

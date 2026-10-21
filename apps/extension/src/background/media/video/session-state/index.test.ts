@@ -64,6 +64,7 @@ it('transitions preparation and stop state through the folder facade', () => {
     captureSource: null,
     cropRegion: null,
     viewportPresetId: 'wide',
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
     liveMedia: expect.any(Object),
     error: null,
   });
@@ -96,6 +97,7 @@ it('writes a null viewport preset when preparation starts without an explicit pr
     captureSource: null,
     cropRegion: null,
     viewportPresetId: null,
+    outputProfile: DEFAULT_VIDEO_SETTINGS.outputProfile,
     liveMedia: expect.any(Object),
     error: null,
   });

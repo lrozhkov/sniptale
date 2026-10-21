@@ -58,6 +58,7 @@ it('clears the tag name without saving and returns focus for replacement', async
   const state = controller();
   const onClose = vi.fn();
   const input = await render({ controller: state, editor: { mode: 'create' }, onClose });
+  expect(document.querySelector('[aria-label="highlighter.templateTags.mergeTarget"]')).toBeNull();
   await act(async () => change(input, 'New tag'));
   const clear = document.querySelector<HTMLButtonElement>('.sniptale-field-clear')!;
   await act(async () => clear.click());

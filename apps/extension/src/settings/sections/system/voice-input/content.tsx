@@ -1,14 +1,5 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  Download,
-  Info,
-  Mic,
-  RefreshCw,
-  Square,
-} from 'lucide-react';
+import { AlertCircle, ChevronDown, Download, Info, Mic, RefreshCw, Square } from 'lucide-react';
 import { AudioAmplitudeBars } from '@sniptale/ui/audio-amplitude-bars';
 import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
 import { ProductSelect, ProductTextarea } from '@sniptale/ui/product-form-controls';
@@ -84,23 +75,23 @@ function StatusCard(props: {
   error?: boolean;
 }) {
   return (
-    <div className="min-w-0 py-2.5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 py-1.5">
       <p className="text-[13px] font-normal leading-[18px] text-[var(--sniptale-color-text-muted)]">
         {props.label}
       </p>
-      <div className="mt-1 flex items-center gap-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+      <div
+        className={[
+          'flex items-center justify-end gap-2 text-[13px] leading-[18px]',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
         {props.error ? (
           <AlertCircle aria-hidden="true" className="h-4 w-4 text-[var(--sniptale-color-danger)]" />
-        ) : (
-          <CheckCircle2
-            aria-hidden="true"
-            className="h-4 w-4 text-[var(--sniptale-color-success)]"
-          />
-        )}
+        ) : null}
         {props.value}
       </div>
       {props.description ? (
-        <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        <p className="col-span-2 text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
           {props.description}
         </p>
       ) : null}
@@ -202,7 +193,7 @@ function VoiceInputStatusGrid({ controller }: { controller: VoiceInputSettingsCo
 
   return (
     <div
-      className={`${settingsCompactWorkbenchClassName} grid gap-x-8 sm:grid-cols-2`}
+      className={`${settingsCompactWorkbenchClassName} grid divide-y divide-[var(--sniptale-color-border-subtle)]`}
       aria-live="polite"
     >
       <StatusCard
@@ -519,7 +510,7 @@ function VoiceInputTestPanel({
     (controller.status.snapshot.localAvailability === 'downloadable' ||
       controller.status.snapshot.localAvailability === 'downloading');
   return (
-    <div className={`${settingsCompactWorkbenchClassName} space-y-4`}>
+    <div className={`${settingsCompactWorkbenchClassName} space-y-2`}>
       <div>
         <h2
           className="text-[14px] leading-5 font-[var(--sniptale-font-weight-interface-heading)]
@@ -537,7 +528,7 @@ function VoiceInputTestPanel({
       >
         <span>{translate('settings.voiceInput.textareaLabel')}</span>
         <ProductTextarea
-          className="min-h-28 w-full resize-y !text-[13px] !leading-5"
+          className="!min-h-20 w-full resize-y !text-[13px] !leading-5"
           placeholder={translate('settings.voiceInput.textareaPlaceholder')}
           readOnly={active}
           value={transcript}

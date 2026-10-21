@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const HINT_SELECTOR = '[data-popup-hint]';
+const HINT_SELECTOR = '[data-popup-hint], [title]';
 const FOCUSABLE_SELECTOR = 'button, a[href], input, select, textarea, [tabindex]';
 function clipped(element: HTMLElement): boolean {
   const style = getComputedStyle(element);
@@ -35,8 +35,11 @@ function normalize(text: string): string {
   return text.replace(/[\s.•]+/gu, ' ').trim();
 }
 
-export function resolvePopupHint(element: HTMLElement): string | null {
-  const hint = element.dataset['popupHint']?.trim();
+export function resolveNativeHint(
+  element: HTMLElement,
+  nativeTitle = element.getAttribute('title')
+): string | null {
+  const hint = (element.dataset['popupHint'] ?? nativeTitle)?.trim();
   if (!hint) return null;
   if (!normalize(visibleText(element)).includes(normalize(hint))) return hint;
   return [element, ...element.querySelectorAll<HTMLElement>('*')].some(
@@ -46,25 +49,34 @@ export function resolvePopupHint(element: HTMLElement): string | null {
     : null;
 }
 
-function findPopupHintTarget(target: EventTarget | null) {
+function findNativeHintTarget(
+  target: EventTarget | null,
+  known: Map<HTMLElement, { title: string | null; applied: string | null }>
+) {
   if (!(target instanceof Element)) return null;
+  let ancestor: Element | null = target;
+  while (ancestor) {
+    if (ancestor instanceof HTMLElement && (known.has(ancestor) || ancestor.matches(HINT_SELECTOR)))
+      return ancestor;
+    ancestor = ancestor.parentElement;
+  }
   return (
-    target.closest<HTMLElement>(HINT_SELECTOR) ??
     [
       ...(target.closest(FOCUSABLE_SELECTOR)?.querySelectorAll<HTMLElement>(HINT_SELECTOR) ?? []),
-    ].find((element) => resolvePopupHint(element)) ??
-    null
+    ].find((element) => resolveNativeHint(element)) ?? null
   );
 }
 
-function bindPopupHints() {
-  const originals = new Map<HTMLElement, { title: string | null }>();
+function bindNativeHints() {
+  const originals = new Map<HTMLElement, { title: string | null; applied: string | null }>();
   const observed = new Set<HTMLElement>();
   let hovered: HTMLElement | null = null;
   let focused: HTMLElement | null = null;
   const restore = (element: HTMLElement) => {
     const original = originals.get(element);
     if (!original) return;
+    if (element.getAttribute('title') !== original.applied)
+      original.title = element.getAttribute('title');
     if (original.title === null) element.removeAttribute('title');
     else element.setAttribute('title', original.title);
     resize.unobserve(element);
@@ -82,10 +94,18 @@ function bindPopupHints() {
       if (!originals.has(element))
         originals.set(element, {
           title: element.getAttribute('title'),
+          applied: element.getAttribute('title'),
         });
-      const hint = resolvePopupHint(element);
-      if (hint) element.setAttribute('title', hint);
-      else element.removeAttribute('title');
+      const original = originals.get(element)!;
+      if (element.getAttribute('title') !== original.applied)
+        original.title = element.getAttribute('title');
+      const hint = resolveNativeHint(element, original.title);
+      const title = hint ?? (original.title === null ? null : '');
+      if (element.getAttribute('title') !== title) {
+        if (title !== null) element.setAttribute('title', title);
+        else element.removeAttribute('title');
+      }
+      original.applied = title;
       if (!observed.has(element)) {
         observed.add(element);
         resize.observe(element);
@@ -93,18 +113,18 @@ function bindPopupHints() {
     }
   };
   const enter = (event: Event) => {
-    hovered = findPopupHintTarget(event.target);
+    hovered = findNativeHintTarget(event.target, originals);
     update();
   };
   const focus = (event: Event) => {
-    focused = findPopupHintTarget(event.target);
+    focused = findNativeHintTarget(event.target, originals);
     update();
   };
   const leave = (event: Event) => {
     const next =
       event instanceof MouseEvent || event instanceof FocusEvent ? event.relatedTarget : null;
-    if (event.type === 'focusout') focused = findPopupHintTarget(next);
-    else hovered = findPopupHintTarget(next);
+    if (event.type === 'focusout') focused = findNativeHintTarget(next, originals);
+    else hovered = findNativeHintTarget(next, originals);
     update();
   };
   const resize = new ResizeObserver(update);
@@ -114,7 +134,7 @@ function bindPopupHints() {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['data-popup-hint'],
+    attributeFilter: ['data-popup-hint', 'title'],
   });
   document.addEventListener('pointerover', enter);
   document.addEventListener('pointerout', leave);
@@ -133,7 +153,7 @@ function bindPopupHints() {
   };
 }
 
-export function PopupHints() {
-  useEffect(bindPopupHints, []);
+export function NativeHints() {
+  useEffect(bindNativeHints, []);
   return null;
 }

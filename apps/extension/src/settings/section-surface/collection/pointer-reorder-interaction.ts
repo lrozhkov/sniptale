@@ -78,7 +78,8 @@ export function useSettingsCollectionPointerReorder(props: {
       const next = movePointerPreviewToClientY(
         session.root,
         previewRef.current ?? session.preview,
-        event.clientY
+        event.clientY,
+        event.clientX
       );
       if (next !== previewRef.current) updatePreview(next);
     };
