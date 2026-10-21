@@ -579,6 +579,21 @@ async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
     .filter({ hasText: t('settings.voiceInput.diagnosticsTitle') });
   await diagnostics.click();
   await expect(page.getByText(t('settings.voiceInput.apiStatus'), { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailable'), { exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+  ).toBeVisible();
+  await page
+    .getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+  ).toBeInViewport({ ratio: 1 });
+  await expect(
+    page.getByRole('button', { name: t('settings.voiceInput.install'), exact: true })
+  ).toHaveCount(0);
   await expect(field).toHaveValue('Текст проверки микрофона');
   await screenshot(page, info, 'voice-diagnostics');
   await diagnostics.click();
@@ -595,6 +610,16 @@ for (const theme of ['light', 'dark'] as const)
   ]) {
     test(`native voice test field ${theme} ${size.width}`, async ({ page, extensionId }, info) => {
       await page.setViewportSize(size);
+      await page.addInitScript(() => {
+        Object.defineProperty(window, 'SpeechRecognition', {
+          configurable: true,
+          value: class {
+            static async available() {
+              return 'unavailable';
+            }
+          },
+        });
+      });
       await configure(page, extensionId, 'ru', theme);
       await route(page, extensionId, 'voice-input');
       await voiceTestField(page, 'ru', info);

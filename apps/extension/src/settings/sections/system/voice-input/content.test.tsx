@@ -138,6 +138,48 @@ afterEach(() => {
 });
 
 describe('voice input Settings content', () => {
+  it('explains unavailable local dictation without offering an impossible installation', () => {
+    render(
+      createController({
+        status: {
+          microphoneAccess: 'granted',
+          snapshot: { localAvailability: 'unavailable' },
+        },
+      })
+    );
+    expect(container.textContent).toContain('settings.voiceInput.localPackageUnavailable');
+    expect(container.textContent).toContain(
+      'settings.voiceInput.localPackageUnavailableDescription'
+    );
+    expect(button('settings.voiceInput.install')).toBeUndefined();
+    expect(button('settings.voiceInput.start')?.disabled).toBe(false);
+  });
+
+  it.each(['network', 'service-not-allowed'] as const)(
+    'distinguishes the %s recognition error',
+    (errorCode) => {
+      render(createController({ status: { snapshot: { errorCode, phase: 'error' } } }));
+      const expected = errorCode === 'network' ? 'errorNetwork' : 'errorServiceNotAllowed';
+      expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+        `settings.voiceInput.${expected}`
+      );
+    }
+  );
+
+  it('does not claim recognition is listening while only the microphone has a signal', () => {
+    render(
+      createController({
+        status: {
+          audioLevel: 0.8,
+          microphoneAccess: 'granted',
+          snapshot: { phase: 'starting', sessionId: 'pending-audio' },
+        },
+      })
+    );
+    expect(container.textContent).toContain('settings.voiceInput.phaseStarting');
+    expect(container.textContent).not.toContain('settings.voiceInput.phaseListening');
+  });
+
   it('requires microphone permission and exposes disclosure and language controls', () => {
     const controller = createController();
     render(controller);

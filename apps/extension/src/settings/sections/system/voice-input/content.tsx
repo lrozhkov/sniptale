@@ -138,7 +138,10 @@ function resolveErrorNoticeMessage(args: {
   if (args.errorCode === 'language-not-supported') {
     return translate('settings.voiceInput.errorLanguage');
   }
-  if (args.errorCode === 'network' || args.errorCode === 'service-not-allowed') {
+  if (args.errorCode === 'service-not-allowed') {
+    return translate('settings.voiceInput.errorServiceNotAllowed');
+  }
+  if (args.errorCode === 'network') {
     return translate('settings.voiceInput.errorNetwork');
   }
   if (args.errorCode === 'timeout') return translate('settings.voiceInput.errorTimeout');
@@ -212,7 +215,16 @@ function VoiceInputStatusGrid({ controller }: { controller: VoiceInputSettingsCo
       />
       <StatusCard
         label={translate('settings.voiceInput.packageStatus')}
-        value={translate(statusKey(controller.status.snapshot.localAvailability))}
+        value={translate(
+          controller.status.snapshot.localAvailability === 'unavailable'
+            ? 'settings.voiceInput.localPackageUnavailable'
+            : statusKey(controller.status.snapshot.localAvailability)
+        )}
+        description={
+          controller.status.snapshot.localAvailability === 'unavailable'
+            ? translate('settings.voiceInput.localPackageUnavailableDescription')
+            : ''
+        }
         error={controller.status.snapshot.localAvailability === 'unsupported'}
       />
       <StatusCard
