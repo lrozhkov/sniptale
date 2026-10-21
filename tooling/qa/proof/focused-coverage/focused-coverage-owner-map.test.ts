@@ -450,3 +450,12 @@ it('executes real tour library and workspace proof when the page test substitute
     `${root}/tour/workspace.test.tsx`,
   ]);
 });
+
+it('includes linked clip proof in the exclusive duration owner scope', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/features/video/project/timeline/basics.ts'
+    )
+  ).toContain('apps/extension/src/features/video/project/timeline/basics.waveforms.test.ts');
+});

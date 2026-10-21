@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
+import { checkInspectorPaintedFont } from '../support/inspector-utilities';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 
 async function savedProject(page: Page) {
@@ -144,6 +145,62 @@ for (const variant of [
           exact: true,
         })
       ).toHaveAttribute('aria-checked', 'true');
+      const modeRow = panel
+        .locator('[data-ui="shared.ui.compact-inspector.segmented-field"]')
+        .filter({
+          hasText: label('videoEditor.sidebar.textDuration'),
+        });
+      const followProject = modeRow.getByRole('button', {
+        name: label('videoEditor.sidebar.textDurationProject'),
+        exact: true,
+      });
+      const includeText = modeRow.getByRole('button', {
+        name: label('videoEditor.sidebar.textDurationContent'),
+        exact: true,
+      });
+      await followProject.scrollIntoViewIfNeeded();
+      await followProject.click();
+      await expect.poll(async () => (await savedProject(page))?.duration).toBe(0);
+      await expect
+        .poll(async () => (await savedProject(page))?.textDocuments?.[0]?.durationMode)
+        .toBe('project');
+      await expect
+        .poll(
+          async () => (await savedProject(page))?.textDocuments?.[0]?.document.fragments[0]?.end
+        )
+        .toBe(3);
+      await page.keyboard.press('Control+z');
+      await expect.poll(async () => (await savedProject(page))?.duration).toBe(3);
+      await page.keyboard.press('Control+Shift+z');
+      await expect.poll(async () => (await savedProject(page))?.duration).toBe(0);
+      await page.reload();
+      await textCategory().click();
+      await expect(followProject).toHaveAttribute('aria-pressed', 'true');
+      await followProject.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('text-duration-project.png'),
+        fullPage: false,
+      });
+      await includeText.click();
+      await expect.poll(async () => (await savedProject(page))?.duration).toBe(3);
+      await expect.poll(async () => (await savedProject(page))?.version).toBe(29);
+      await expect
+        .poll(async () => (await savedProject(page))?.textDocuments?.[0]?.durationMode)
+        .toBe('content');
+      await expect
+        .poll(
+          async () => (await savedProject(page))?.textDocuments?.[0]?.document.fragments[0]?.text
+        )
+        .toBe('Montage text / Текст');
+      await page.evaluate(() => document.fonts.ready);
+      await checkInspectorPaintedFont(page, includeText, 'text-duration-font');
+      await page.screenshot({
+        path: info.outputPath('text-duration-content.png'),
+        fullPage: false,
+      });
+      const phraseToggle = panel.locator('article > button[aria-expanded]');
+      if ((await phraseToggle.getAttribute('aria-expanded')) !== 'true') await phraseToggle.click();
+      await expect(field).toHaveValue('Montage text / Текст');
       await field.scrollIntoViewIfNeeded();
       await expect(field).toBeInViewport();
       await page.screenshot({ path: info.outputPath('text-authoring.png'), fullPage: false });

@@ -306,3 +306,52 @@ it('retains project-time text duration independently from caption visibility and
   project.textDocuments = project.textDocuments.filter((entry) => entry.binding.kind === 'source');
   expect(syncProjectDuration(project).duration).toBe(0);
 });
+
+it('keeps montage-following text dormant without changing ordinary text duration', () => {
+  const project = createProject([{ ...createVideoClip(), startTime: 0, duration: 6 }]);
+  project.version = 29;
+  const fragment = {
+    id: 'phrase',
+    text: 'Retained',
+    originalText: '',
+    start: 2,
+    end: 20,
+    timeDomain: 'result' as const,
+    alignment: 'manual' as const,
+    revision: 0,
+    timingRevision: 0,
+    showInVideo: true,
+  };
+  project.textDocuments = [
+    {
+      id: 'follow',
+      binding: { kind: 'project' },
+      durationMode: 'project',
+      document: { version: 1, fragments: [fragment] },
+    },
+    {
+      id: 'ordinary',
+      binding: { kind: 'project' },
+      document: { version: 1, fragments: [{ ...fragment, end: 8 }] },
+    },
+    {
+      id: 'source',
+      binding: { kind: 'source', assetId: 'asset-video', sourceInstanceId: 'source' },
+      document: { version: 1, fragments: [{ ...fragment, timeDomain: 'source', end: 100 }] },
+    },
+    { id: 'empty', binding: { kind: 'project' }, document: { version: 1, fragments: [] } },
+  ];
+  const before = structuredClone(project.textDocuments);
+  expect(calculateProjectDuration(project)).toBe(8);
+  expect(syncProjectDuration(project).duration).toBe(8);
+  expect(project.textDocuments).toEqual(before);
+  project.textDocuments[1]!.durationMode = 'project';
+  expect(syncProjectDuration(project).duration).toBe(6);
+  project.textDocuments[1]!.durationMode = 'content';
+  expect(syncProjectDuration(project).duration).toBe(8);
+  project.textDocuments = project.textDocuments.filter((entry) => entry.id !== 'ordinary');
+  expect(syncProjectDuration(project).duration).toBe(6);
+  project.clips = [];
+  expect(syncProjectDuration(project).duration).toBe(0);
+  expect(project.textDocuments[0]!.document.fragments[0]!.end).toBe(20);
+});

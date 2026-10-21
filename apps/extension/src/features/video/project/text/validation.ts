@@ -49,9 +49,21 @@ function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
   const captions =
     value['captions'] === undefined ? undefined : parseReviewCaptionSettings(value['captions']);
   if (!binding || !document || captions === null) return null;
+  const durationMode = value['durationMode'];
+  if (
+    durationMode !== undefined &&
+    (binding.kind !== 'project' || (durationMode !== 'content' && durationMode !== 'project'))
+  )
+    return null;
   const domain = binding.kind === 'source' ? 'source' : 'result';
   if (document.fragments.some((fragment) => fragment.timeDomain !== domain)) return null;
-  return { id: value['id'], binding, document, ...(captions ? { captions } : {}) };
+  return {
+    id: value['id'],
+    binding,
+    document,
+    ...(durationMode === undefined ? {} : { durationMode }),
+    ...(captions ? { captions } : {}),
+  };
 }
 
 /** Uses the gallery text parser and its aggregate budgets across all montage placements. */

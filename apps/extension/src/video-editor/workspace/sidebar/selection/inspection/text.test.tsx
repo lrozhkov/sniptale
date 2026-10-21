@@ -213,6 +213,7 @@ it('mounts retained source text with its native clock and disables jumping when 
   mount();
   act(() => host.querySelector<HTMLButtonElement>('article > button')!.click());
   expect(host.textContent).toContain('textClockSource');
+  expect(host.textContent).not.toContain('videoEditor.sidebar.textDuration');
   expect(host.textContent).toContain('textSourceExcluded');
   expect(
     host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.speechJump"]')!.disabled
@@ -346,4 +347,29 @@ it('restores the single voice trigger after remount and leaves its phrase collap
   await act(async () => click('gallery.videoReview.textVoiceBack'));
   expect(document.activeElement).toBe(trigger());
   expect(host.querySelector('article > button')?.getAttribute('aria-expanded')).toBe('false');
+});
+
+it('changes text duration through the actual store with one history step and retained text', () => {
+  mount();
+  click('videoEditor.sidebar.newProjectText');
+  type('Retained tail');
+  act(() => host.querySelector('textarea')!.blur());
+  const before = structuredClone(fragment());
+  expect(useVideoEditorStore.getState().project!.duration).toBe(3);
+  const history = useVideoEditorStore.getState().projectHistory.past.length;
+  click('videoEditor.sidebar.textDurationProject');
+  expect(useVideoEditorStore.getState().project!.duration).toBe(0);
+  expect(useVideoEditorStore.getState().project!.version).toBe(29);
+  expect(fragment()).toEqual(before);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history + 1);
+  click('videoEditor.sidebar.textDurationProject');
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history + 1);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.duration).toBe(3);
+  expect(fragment()).toEqual(before);
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(useVideoEditorStore.getState().project!.duration).toBe(0);
+  click('videoEditor.sidebar.textDurationContent');
+  expect(useVideoEditorStore.getState().project!.duration).toBe(3);
+  expect(fragment()).toEqual(before);
 });

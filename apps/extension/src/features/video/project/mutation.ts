@@ -96,6 +96,12 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (
+    (patch.textDocuments ?? project.textDocuments)?.some(
+      (entry) => entry.durationMode !== undefined
+    )
+  )
+    return 29;
   if (project.sourceAudioDocuments !== undefined || patch.sourceAudioDocuments !== undefined)
     return 28;
   const presets = patch.bookendPresets ?? project.bookendPresets;

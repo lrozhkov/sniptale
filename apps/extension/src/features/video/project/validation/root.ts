@@ -117,8 +117,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 28) &&
+    isBoundedNumber(version, 2, 29) &&
     Number.isInteger(version) &&
+    (version >= 29 ||
+      !Array.isArray(value['textDocuments']) ||
+      value['textDocuments'].every(
+        (entry: unknown) => !isRecord(entry) || entry['durationMode'] === undefined
+      )) &&
     (version >= 28 || value['sourceAudioDocuments'] === undefined) &&
     (version >= 26 ||
       (value['compositionJoins'] === undefined &&

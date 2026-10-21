@@ -107,3 +107,27 @@ it('applies the gallery fragment and text budgets across all documents', () => {
     )
   ).toBeNull();
 });
+
+it('preserves explicit duration modes only on project-time documents', () => {
+  const entry = document();
+  for (const durationMode of ['project', 'content']) {
+    expect(parseVideoProjectTextDocuments([{ ...entry, durationMode }])).toEqual([
+      { ...entry, durationMode },
+    ]);
+  }
+  for (const durationMode of ['clip', '', null, false, 1]) {
+    expect(parseVideoProjectTextDocuments([{ ...entry, durationMode }])).toBeNull();
+  }
+  const source = {
+    ...entry,
+    binding: { kind: 'source', assetId: 'video', sourceInstanceId: 'first' },
+    document: {
+      version: 1,
+      fragments: entry.document.fragments.map((fragment) => ({
+        ...fragment,
+        timeDomain: 'source',
+      })),
+    },
+  };
+  expect(parseVideoProjectTextDocuments([{ ...source, durationMode: 'project' }])).toBeNull();
+});

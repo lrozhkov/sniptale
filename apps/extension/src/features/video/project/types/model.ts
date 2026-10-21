@@ -331,7 +331,8 @@ export interface VideoProject {
     | 25
     | 26
     | 27
-    | 28;
+    | 28
+    | 29;
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];

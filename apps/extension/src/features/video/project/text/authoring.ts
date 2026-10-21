@@ -7,7 +7,6 @@ import {
   createReviewCaptionSettings,
   createReviewTextDocument,
 } from '../../review/text-document';
-import type { ReviewCaptionSettings, ReviewTextDocument } from '../../review/text-types';
 import { getMediaClipSourceTime } from '../timeline/rate';
 import { isTextSourceClip } from './projection';
 import type { VideoProjectTextDocument } from './types';
@@ -113,7 +112,7 @@ type TextMutation =
 export function applyVideoProjectTextEdit(
   project: VideoProject,
   basis: VideoProjectTextDocument,
-  patch: { document?: ReviewTextDocument; captions?: ReviewCaptionSettings }
+  patch: Partial<Pick<VideoProjectTextDocument, 'document' | 'captions' | 'durationMode'>>
 ): TextMutation {
   if (!project.textDocuments?.includes(basis)) return { ok: false, reason: 'stale' };
   const next = { ...basis, ...patch };

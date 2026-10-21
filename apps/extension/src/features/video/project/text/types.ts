@@ -13,6 +13,8 @@ export type VideoProjectTextBinding =
 export interface VideoProjectTextDocument {
   id: string;
   binding: VideoProjectTextBinding;
+  /** Project-time text can follow the montage without extending its duration. */
+  durationMode?: 'content' | 'project';
   document: ReviewTextDocument;
   captions?: ReviewCaptionSettings;
 }

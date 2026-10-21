@@ -50,7 +50,7 @@ export function getClipEndTime(clip: VideoProjectClip): number {
 export function calculateProjectDuration(project: VideoProject): number {
   let duration = project.clips.reduce((maxEnd, clip) => Math.max(maxEnd, getClipEndTime(clip)), 0);
   for (const entry of project.textDocuments ?? []) {
-    if (entry.binding.kind !== 'project') continue;
+    if (entry.binding.kind !== 'project' || entry.durationMode === 'project') continue;
     for (const fragment of entry.document.fragments) duration = Math.max(duration, fragment.end);
   }
   return duration;

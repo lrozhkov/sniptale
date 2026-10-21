@@ -321,3 +321,113 @@ it('admits only explicit current original targets and freezes them separately fr
     ).toBeNull();
   }
 });
+
+it('retains a project-time tail through montage sync, growth, shortening, captions, and reopen', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { syncProjectDuration } = await import('../timeline/basics');
+  const { projectVideoProjectTextFragment } = await import('./projection');
+  const { videoProjectCaptionInput, hasVideoProjectCaptions } = await import('./captions');
+  const { exportVideoProjectSubtitles } = await import('./subtitle-export');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } =
+    await import('../validation/root');
+  const { applyVideoProjectMutationPatch } = await import('../mutation');
+  const base = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'Video.webm',
+    width: 640,
+    height: 360,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+  });
+  const added = addVideoProjectManualText(base, {
+    documentId: 'retained',
+    fragmentId: 'tail',
+    start: 7,
+  });
+  if (!added.ok) throw new Error('Text creation failed');
+  added.entry.document.fragments[0]!.text = 'Retained phrase';
+  const before = structuredClone(added.project);
+  const authored = applyVideoProjectTextEdit(added.project, added.entry, {
+    durationMode: 'project',
+    captions: { ...added.entry.captions!, enabled: true },
+  });
+  if (!authored.ok) throw new Error('Duration mode edit failed');
+  expect(authored.project.version).toBe(29);
+  expect(authored.entry.document.fragments[0]!.end).toBe(10);
+  const synced = syncProjectDuration(authored.project);
+  expect(synced.duration).toBe(8);
+  expect(isExportReadyVideoProject(synced)).toBe(true);
+  expect(
+    projectVideoProjectTextFragment(synced, authored.entry, authored.entry.document.fragments[0]!)
+      .ranges
+  ).toEqual([{ start: 7, end: 8 }]);
+  const captionInput = videoProjectCaptionInput(synced);
+  expect(captionInput.project(captionInput.document.fragments[0]!).ranges).toEqual([
+    { start: 7, end: 8 },
+  ]);
+  expect(hasVideoProjectCaptions(synced, { start: 7, end: 8 })).toBe(true);
+  expect(hasVideoProjectCaptions(synced, { start: 8, end: 10 })).toBe(false);
+  for (const format of ['srt', 'vtt'] as const) {
+    const subtitles = exportVideoProjectSubtitles(synced, { format });
+    if (!subtitles.ok) throw new Error(subtitles.reason);
+    expect(subtitles.text).toContain(
+      format === 'srt' ? '00:00:07,000 --> 00:00:08,000' : '00:00:07.000 --> 00:00:08.000'
+    );
+    expect(subtitles.text).toContain('Retained phrase');
+  }
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(synced)));
+  expect(reopened?.textDocuments).toEqual(synced.textDocuments);
+  expect(syncProjectDuration(reopened!).duration).toBe(8);
+  const second = { ...structuredClone(synced.clips[0]!), id: 'second', startTime: 8 };
+  const grown = syncProjectDuration({ ...synced, clips: [...synced.clips, second] });
+  expect(grown.duration).toBe(16);
+  expect(
+    projectVideoProjectTextFragment(grown, authored.entry, authored.entry.document.fragments[0]!)
+      .ranges
+  ).toEqual([{ start: 7, end: 10 }]);
+  const shortened = syncProjectDuration({ ...grown, clips: synced.clips });
+  expect(shortened.duration).toBe(8);
+  expect(shortened.textDocuments).toEqual(synced.textDocuments);
+  const extended = applyVideoProjectTextEdit(shortened, authored.entry, {
+    durationMode: 'content',
+  });
+  if (!extended.ok) throw new Error('Content mode edit failed');
+  expect(syncProjectDuration(extended.project).duration).toBe(10);
+  expect(applyVideoProjectMutationPatch(extended.project, { textDocuments: [] }).version).toBe(29);
+  expect(added.project).toEqual(before);
+});
+
+it('refuses invalid source-duration mode edits and allows a current-basis retry without losing text', () => {
+  const { project, entry } = fixture();
+  const stale = { ...project, textDocuments: [structuredClone(entry)] };
+  expect(applyVideoProjectTextEdit(stale, entry, { durationMode: 'project' })).toEqual({
+    ok: false,
+    reason: 'stale',
+  });
+  const retried = applyVideoProjectTextEdit(stale, stale.textDocuments[0]!, {
+    durationMode: 'project',
+  });
+  expect(retried.ok).toBe(true);
+  if (!retried.ok) throw new Error('Retry refused');
+  expect(retried.entry.document).toEqual(entry.document);
+  const source = {
+    ...entry,
+    binding: { kind: 'source' as const, assetId: 'asset', sourceInstanceId: 'source' },
+    document: {
+      ...entry.document,
+      fragments: entry.document.fragments.map((fragment) => ({
+        ...fragment,
+        timeDomain: 'source' as const,
+      })),
+    },
+  };
+  const sourceProject = { ...project, textDocuments: [source] };
+  const before = structuredClone(sourceProject);
+  expect(applyVideoProjectTextEdit(sourceProject, source, { durationMode: 'project' })).toEqual({
+    ok: false,
+    reason: 'invalid',
+  });
+  expect(sourceProject).toEqual(before);
+});

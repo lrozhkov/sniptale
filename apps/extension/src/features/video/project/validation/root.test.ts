@@ -651,3 +651,25 @@ it.each(['VIDEO', 'AUDIO'] as const)(
       expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
 );
+
+it('requires schema29 for explicit text duration modes and retains old roots without the field', () => {
+  const project = createEmptyVideoProject('Text extent');
+  const entry = {
+    id: 'text',
+    binding: { kind: 'project' },
+    document: { version: 1, fragments: [] },
+    durationMode: 'project',
+  };
+  expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
+  expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 30, textDocuments: [entry] })).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      version: 29,
+      textDocuments: [{ ...entry, durationMode: 'clip' }],
+    })
+  ).toBe(false);
+  for (let version = 2; version <= 28; version++)
+    expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+});

@@ -10,7 +10,7 @@ import type {
 } from '../../../../../features/video/review/text-types';
 import { translate } from '../../../../../platform/i18n';
 import { CaptionStyleFields } from '../../../../../ui/video-text/caption-style';
-import { ToggleField } from '../../../../../ui/compact-inspector-controls';
+import { SegmentedRow, ToggleField } from '../../../../../ui/compact-inspector-controls';
 import { InspectorDetails } from '../shared/details';
 import { NumberInput } from '../inputs/number';
 import type { ProjectTextEditor } from './text-editing';
@@ -50,6 +50,25 @@ export function DocumentCaptions({
     editor.accept((current) => applyVideoProjectTextEdit(current, entry, { captions }));
   return (
     <div className="min-w-0 space-y-2">
+      {entry.binding.kind === 'project' && (
+        <SegmentedRow<'project' | 'content'>
+          label={translate('videoEditor.sidebar.textDuration')}
+          ariaLabel={translate('videoEditor.sidebar.textDuration')}
+          layout="stacked"
+          columns={2}
+          value={entry.durationMode ?? 'content'}
+          options={[
+            { value: 'project', label: translate('videoEditor.sidebar.textDurationProject') },
+            { value: 'content', label: translate('videoEditor.sidebar.textDurationContent') },
+          ]}
+          onChange={(durationMode) => {
+            if (durationMode !== (entry.durationMode ?? 'content'))
+              editor.accept((current) =>
+                applyVideoProjectTextEdit(current, entry, { durationMode })
+              );
+          }}
+        />
+      )}
       <ToggleField
         label={translate('gallery.videoReview.captionsEnabled')}
         value={settings.enabled}
