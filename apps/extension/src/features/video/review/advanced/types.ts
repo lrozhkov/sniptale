@@ -278,8 +278,8 @@ export interface QuickEditAdvancedContent {
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
   keyAnimations?: import('../../project/action-feedback/key-animation').ReviewKeyAnimation[];
-  clickAnimations?: import('./click-animation').ReviewClickAnimation[];
-  actionAudio?: import('./action-audio').ReviewActionAudioSetting[];
+  clickAnimations?: import('../../project/action-feedback/types').ReviewClickAnimation[];
+  actionAudio?: import('../../project/action-feedback/types').ReviewActionAudioSetting[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
   zoom: QuickEditZoomState;
@@ -287,7 +287,7 @@ export interface QuickEditAdvancedContent {
   canvas?: QuickEditCanvasSize;
   windowHeader?: QuickEditWindowHeader;
   webcam?: QuickEditWebcam;
-  watermark?: import('../../project/scene/watermark').QuickEditWatermarkSettings;
+  watermark?: import('../../project/scene/watermark-types').QuickEditWatermarkSettings;
   presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }

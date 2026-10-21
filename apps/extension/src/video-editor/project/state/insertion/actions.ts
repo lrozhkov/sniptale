@@ -11,6 +11,7 @@ import {
   createTextInsertionAction,
   createVideoBlockInsertionAction,
 } from './helpers';
+import { createBookendPlacementAction } from './bookend';
 import { createMaterialPlacementAction } from './material';
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
@@ -24,6 +25,7 @@ export function createVideoEditorProjectInsertionActions(
   | 'addAssetClip'
   | 'placeMaterial'
   | 'appendMaterial'
+  | 'placeBookendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'addAnnotationOverlay'
@@ -35,6 +37,7 @@ export function createVideoEditorProjectInsertionActions(
   return {
     placeMaterial: (assetId, target, telemetry) =>
       createMaterialPlacementAction(set, 'drop', target)(assetId, undefined, telemetry),
+    placeBookendMaterial: createBookendPlacementAction(set),
     appendMaterial: createMaterialPlacementAction(set, 'append'),
     insertMaterial: createMaterialPlacementAction(set, 'insert'),
     overlayMaterial: createMaterialPlacementAction(set, 'overlay'),

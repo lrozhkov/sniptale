@@ -40,6 +40,7 @@ type TimelineTrackAction =
 type TimelineClipAction =
   | 'placeMaterial'
   | 'appendMaterial'
+  | 'placeBookendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'renameAsset'

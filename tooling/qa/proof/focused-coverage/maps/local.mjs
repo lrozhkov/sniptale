@@ -1,5 +1,87 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'shared-watermark-contract-consumers',
+    productionPrefix: 'apps/extension/src/features/video/project/scene/watermark',
+    allowCrossOwner: true,
+    reason:
+      'The shared watermark contract preserves parser, rendering, inspector and retained project assets.',
+    testFiles: [
+      'apps/extension/src/features/video/project/scene/watermark.test.ts',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/media-usage.test.ts',
+      'apps/extension/src/features/video/project/library-source-removal.test.ts',
+      'apps/extension/src/features/video/composition/canvas/watermark.test.ts',
+      'apps/extension/src/features/video/composition/canvas/project-watermark.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.save.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+      'apps/extension/src/video-editor/project/operations/workspace.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/watermark.test.tsx',
+      'apps/extension/src/ui/watermark/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/watermark-overlay.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-watermark.test.tsx',
+      'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+      'apps/extension/src/workflows/video-review/render-export-watermark.test.ts',
+    ],
+  },
+  {
+    owner: 'canonical-dropdown-command-consumers',
+    productionFile: 'packages/ui/src/product-menus/dropdown/index.tsx',
+    reason:
+      'Command semantics must preserve existing shell, disabled, selection and wheel behavior.',
+    testFiles: [
+      'packages/ui/src/product-menus/dropdown.test.tsx',
+      'packages/ui/src/product-menus/dropdown/index.test.tsx',
+      'packages/ui/src/product-menus/dropdown/wheel.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-command-consumers',
+    productionFile: 'apps/extension/src/video-editor/contracts/commands/project.ts',
+    allowCrossOwner: true,
+    reason:
+      'The exact-snapshot command is admitted by project state and invoked through the inspector port.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/state/actions.test.ts',
+      'apps/extension/src/video-editor/project/state/insertion/bookend.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/store.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookends.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-port-consumers',
+    productionFile: 'apps/extension/src/video-editor/contracts/controller-store.ts',
+    allowCrossOwner: true,
+    reason: 'Explicit controller projections must expose the command used by the Scene inspector.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/store.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookends.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-composition-prefix-consumers',
+    productionFile: 'apps/extension/src/features/video/project/timeline/composition-prefix.ts',
+    allowCrossOwner: true,
+    reason:
+      'Whole-composition translation must preserve source clocks through Native reconciliation, history and persistence.',
+    testFiles: [
+      'apps/extension/src/features/video/project/timeline/composition-prefix.test.ts',
+      'apps/extension/src/video-editor/project/state/insertion/bookend.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookends.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-edges.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/composition/provider.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/store.test.tsx',
+      'apps/extension/src/features/video/project/validation/root.test.ts',
+      'apps/extension/src/features/video/project/comments/projection.test.ts',
+      'apps/extension/src/features/video/project/text/projection.test.ts',
+      'apps/extension/src/features/video/project/effect-instance/time-map.test.ts',
+      'apps/extension/src/video-editor/project/operations/source-timed-clips.test.ts',
+      'apps/extension/src/video-editor/project/history/index.test.ts',
+      'apps/extension/src/composition/persistence/projects/backup-restore.test.ts',
+    ],
+  },
+  {
     owner: 'shared-camera-motion-blur-phases',
     productionFile: 'apps/extension/src/features/video/project/motion/blur.ts',
     allowCrossOwner: true,

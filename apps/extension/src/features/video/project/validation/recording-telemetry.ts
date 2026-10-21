@@ -12,7 +12,7 @@ import type {
   RecordingPointTransform,
   RecordingActionEvent,
   VideoProjectCursorTrack,
-} from '../types';
+} from '../types/interaction';
 import {
   isBoolean,
   isNumber,

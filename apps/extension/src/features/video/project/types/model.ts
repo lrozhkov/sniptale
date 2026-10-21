@@ -341,7 +341,7 @@ export interface VideoProject {
   backgroundColor: string;
   sceneBackground?: VideoProjectSceneBackground;
   /** Final-canvas watermark; image references name a declared project material. */
-  watermark?: import('../scene/watermark').QuickEditWatermarkSettings;
+  watermark?: import('../scene/watermark-types').QuickEditWatermarkSettings;
   /** Project-clock presentation after the complete visual and audio composition. */
   sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
   timelinePlacementMode: VideoTimelinePlacementMode;

@@ -70,3 +70,16 @@ export interface VideoEditorMaterialTarget {
   startTime: number;
   timelineLaneId: string;
 }
+
+/** Edge placement can refuse a stale inspector or an unavailable atomic history snapshot. */
+export type VideoEditorBookendPlacementResult =
+  | { status: 'placed'; clipId: string }
+  | {
+      status: 'rejected';
+      reason:
+        | Extract<VideoEditorMaterialPlacementResult, { status: 'rejected' }>['reason']
+        | 'stale-project'
+        | 'history-busy'
+        | 'history-unavailable'
+        | 'invalid-project';
+    };

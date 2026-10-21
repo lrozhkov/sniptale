@@ -58,6 +58,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     applyTypingCompression: state.applyTypingCompression,
     placeMaterial: state.placeMaterial,
     appendMaterial: state.appendMaterial,
+    placeBookendMaterial: state.placeBookendMaterial,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,
     addAssetClip: state.addAssetClip,

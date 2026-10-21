@@ -467,7 +467,7 @@ it('retains the complete known source history when only a narrow range is insert
   expect(store.getState().project!.actionEvents).toEqual(facts);
 });
 
-it('lets appended captured keys inherit global keystroke visibility', () => {
+it('keeps appended captured keys under source feedback settings', () => {
   const { store, asset } = setup();
   asset.source = { kind: 'recording', recordingId: 'source' };
   const telemetry: RecordingTelemetryEntry = {
@@ -499,6 +499,19 @@ it('lets appended captured keys inherit global keystroke visibility', () => {
     ...getVideoProjectActionPresentation(project),
     showKeystrokes: true,
   };
+  expect(resolveVideoProjectActionPresentations(project)[0]?.enabled).toBe(false);
+  const facts = structuredClone(project.actionEvents);
+  project.actionFeedback![0]!.keyStyles = [
+    {
+      id: 'key',
+      enabled: true,
+      before: 0.1,
+      after: 0.7,
+      offset: 0,
+      style: resolveVideoProjectActionPresentations(project)[0]!.keyStyle,
+    },
+  ];
+  expect(project.actionEvents).toEqual(facts);
   expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
     enabled: true,
     renderKind: 'keystroke',

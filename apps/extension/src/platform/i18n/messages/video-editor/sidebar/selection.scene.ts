@@ -1,6 +1,24 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  bookendInsertIntro: { ru: 'Вставить заставку', en: 'Insert intro' },
+  bookendInsertOutro: { ru: 'Вставить концовку', en: 'Insert outro' },
+  bookendNoMaterials: {
+    ru: 'Добавьте изображение или видео в материалы',
+    en: 'Add an image or video to materials',
+  },
+  bookendLocked: {
+    ru: 'Разблокируйте затронутые дорожки и повторите вставку.',
+    en: 'Unlock the affected tracks and try again.',
+  },
+  bookendBusy: {
+    ru: 'Завершите текущее редактирование и повторите вставку.',
+    en: 'Finish the current edit and try again.',
+  },
+  bookendStale: {
+    ru: 'Проект изменился. Выберите материал ещё раз.',
+    en: 'The project changed. Choose the material again.',
+  },
   sceneEdges: { ru: 'Начало и конец', en: 'Start and end' },
   comments: { ru: 'Заметки', en: 'Notes' },
   commentDeleteDocument: {

@@ -16,6 +16,7 @@ import {
   useVideoEditorHistoryPort,
   useVideoEditorTimelineEditingPort,
 } from '../../../../runtime/controller/store';
+import { SceneBookendFields } from './scene-bookends';
 import { InspectorDetails } from '../shared/details';
 
 /** Scalar authoring and disposable gestures reuse the existing Native authorities. */
@@ -71,6 +72,7 @@ export function SceneEdgesFields(props: {
                 onPreview={(patch) => editor.preview(side, patch)}
               />
             )}
+            <SceneBookendFields project={props.project} side={side} />
           </InspectorDetails>
         );
       })}

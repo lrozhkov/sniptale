@@ -1,7 +1,7 @@
 import { isRecord, isBoundedNumber } from '../validation/primitives';
 import { isActionKeyStyle } from '../validation/action-style';
 import { getActionKeyStyle } from '../action-style';
-import type { VideoActionKeyStyle } from '../types';
+import type { VideoActionKeyStyle } from '../types/interaction';
 
 /** Authored caption lengths use a stable viewport width in preview and export. */
 export const REVIEW_KEY_VIEWPORT_WIDTH = 1920;

@@ -45,6 +45,7 @@ type VideoEditorProjectActionKeys =
   | 'addAssetClip'
   | 'placeMaterial'
   | 'appendMaterial'
+  | 'placeBookendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'addAnnotationOverlay'

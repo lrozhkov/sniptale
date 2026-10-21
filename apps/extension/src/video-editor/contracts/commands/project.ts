@@ -9,6 +9,7 @@ import type {
   VideoBlockKind,
   VideoMediaFitMode,
   VideoMediaShadowMode,
+  VideoProject,
   VideoProjectAsset,
   VideoProjectClip,
   VideoProjectShapeType,
@@ -23,6 +24,7 @@ import type {
   VideoEditorTransitionPatch,
 } from './patches';
 import type {
+  VideoEditorBookendPlacementResult,
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
   VideoEditorMaterialTarget,
@@ -57,6 +59,12 @@ export interface VideoEditorProjectActions
     range?: VideoEditorMaterialSourceRange,
     telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
+  /** Inserts an editable edge material against the exact accepted inspector snapshot. */
+  placeBookendMaterial: (
+    assetId: string,
+    side: 'intro' | 'outro',
+    expectedProject: VideoProject
+  ) => VideoEditorBookendPlacementResult;
   /** Inserts at the playhead and opens an equal gap across the montage. */
   insertMaterial: (
     assetId: string,

@@ -114,6 +114,7 @@ const expectedKeys = {
   timeline: [
     'placeMaterial',
     'appendMaterial',
+    'placeBookendMaterial',
     'insertMaterial',
     'overlayMaterial',
     'addAssetClip',

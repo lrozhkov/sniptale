@@ -1,6 +1,7 @@
 import {
   forwardRef,
   type CSSProperties,
+  type AriaRole,
   type HTMLAttributes,
   type MouseEventHandler,
   type ReactNode,
@@ -14,6 +15,8 @@ export interface ProductDropdownMenuProps extends HTMLAttributes<HTMLDivElement>
 }
 
 export interface ProductDropdownItemProps {
+  role?: AriaRole;
+  tabIndex?: number;
   children: ReactNode;
   className?: string;
   danger?: boolean;
@@ -77,6 +80,8 @@ export function ProductDropdownItem({
   selected = false,
   disabled = false,
   type = 'button',
+  role,
+  tabIndex,
   onClick,
   onMouseDown,
   title,
@@ -93,6 +98,8 @@ export function ProductDropdownItem({
   return (
     <button
       type={type}
+      role={role}
+      tabIndex={tabIndex}
       className={resolvedClassName}
       disabled={disabled}
       onClick={onClick}
