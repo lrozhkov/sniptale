@@ -1755,11 +1755,11 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure converter owns one detached project result and one admission decision. Existing named planners own timeline, documents, audio and scene projections. It has no DOM access, writer, resource lifetime or publication authority. The analyzer reports a DOM effect because it matches the domain identifier document in call text. Independent read-only scene_structural_diagnosis confirmed this classification for this exact body.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any independent result, authority, resource lifetime or recovery. Remove when the analyzer models this cohesive operation. Independent final architecture review must assess this exact classification.",
+      "reason": "tool-noise: This pure converter prepares one detached project or one refusal. Existing planners own scene, timeline, documents and audio projections. Image additions pass admitted resources and reject identity collisions without adding a writer or resource lifetime. The analyzer matches the domain identifier document as a DOM effect, but this body accesses no DOM. Independent read-only image_structural_diagnosis confirmed this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
       "reviewDate": "2026-10-21",
-      "astHash": "e842d303388e6ef9e40e3a84278e197f859f2576b0b42de5fbd3e000ff510064",
-      "signatureHash": "e2e3b56ab90caf823537a5e2676d9deaded169c1214ee983dac642e38581c9c0"
+      "astHash": "24a416f8130fb338ccbac61167dc2907a27865941be8e8df0052d0d21a0bc821",
+      "signatureHash": "99eea4daa04004c7bbc577627d0f58a947c07182d35656836598aba46a058dc1"
     },
     {
       "rule": "structural-function-risk",
@@ -1851,14 +1851,47 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/review/project-scene.ts",
-      "symbol": "planReviewProjectScene",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure mapper admits supported authored scene fields and returns one Native scene and media projection. Existing Gallery functions own geometry. Conditional presence guards preserve paint, header and shadow data and refuse unmapped settings. It has one owner, full cohesion, no state, effects, resources or recovery. Mechanical helper splits would distribute the same mapping contract. Independent read-only scene_structural_diagnosis confirmed this classification for this exact body.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any independent result, authority, resource lifetime or recovery. Remove when the analyzer models this cohesive operation. Independent final architecture review must assess this exact classification.",
+      "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
+      "symbol": "prepareReviewResources",
+      "owner": "extension:video-editor:project",
+      "reason": "tool-noise: This single read-only acquisition resolves immutable references for one document before publication. Existing intake and metadata owners validate media and release decoding objects. The caller rechecks the Gallery snapshot and owns the final guarded commit. The dependency groups describe orchestration rather than competing writers. No resource publication, durable mutation or independent recovery occurs here. Independent read-only image_structural_diagnosis confirmed this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
       "reviewDate": "2026-10-21",
-      "astHash": "0c658f2d925dccdd0bfc9f5f4fd6b503e9c3268f5526d86f019fa512ab1cd249",
-      "signatureHash": "8263092085e80ace2692f0411c910e903ee5f595addb3bc222623ac4bfe02938"
+      "astHash": "5e75dc03e30c620c2c56e7a8499f6fb5039efa3a5686a5d34ec7f55d78a1b5fd",
+      "signatureHash": "bb32035eb94ed96cceac25177cb3a48564ed47bd587d731c459e8e2b81b5df04"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: The test-profile score is file scale only. These cases prove material identity and retention through montage using existing harness adapters. Reported receivers are per-test pages, fixture transactions, storage bootstrap and disposable canvas objects. No shared production state or product authority is introduced. Independent read-only image_structural_diagnosis confirmed this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "22b7cf2308b5718f4780d857efe2b16b029443aa984b6e8f7102f8b33d24da9c",
+      "signatureHash": "d58f987978650d80817d3b82274ee8d4a0c4f894e0418d9e705517d0b22c9c44"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
+      "symbol": "test callback#2",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One continuous user chain carries an authored Gallery snapshot into one Native root, edits images, adds footage and effects, reopens, removes only the Gallery project and exports that surviving root. Continuity establishes acceptance. Branches select active and remembered image variants across two viewports. One host lifecycle ends in finally. Existing export helpers own encoding and decoding; there is no independent recovery domain. Independent read-only image_structural_diagnosis confirmed this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "caea6fe0458e24218e2cb41822d02bb192f3a225f7be1a1ed88f121f998a0f58",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/projects/index.stale-save.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: File scale supplies both score points. These tests use the existing database mock and canonical workspace fixture to prove one guarded publication contract. Local seed identities and transaction observations are proof data, not independent persistence authorities. Promise gates control preparation and commits follow IndexedDB ordering. The asset-read spy is restored in finally. No production or harness authority is added. Independent read-only image_structural_diagnosis confirmed this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent fixture lifecycle, shared mutable test authority, unrelated persistence contract or production write bypass. Remove when the analyzer models this cohesive proof boundary. Final independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "089fb48763a3137ac83c6b0e5919c70c4d372c891c0d78cae55cebfd89773454",
+      "signatureHash": "f91dd62b8698efdfcb53b623335e3d48703425104c758d2849540c341c4732ba"
     }
   ]
 }

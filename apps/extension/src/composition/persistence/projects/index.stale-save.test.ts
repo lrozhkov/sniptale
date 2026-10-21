@@ -594,3 +594,277 @@ it.each([
     );
   }
 );
+
+async function convertedGalleryImageFixture(backgroundMode: 'active' | 'remembered' = 'active') {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  fixture.rows.set('project_export_inputs', new Map());
+  projectsDbMocks.initDBMock.mockResolvedValue({
+    ...fixture.database,
+    get: async (store: string, id: string) => fixture.rows.get(store)?.get(id),
+  });
+  const { openVideoWorkspace, saveVideoWorkspaceAdvanced } =
+    await import('../review-workspaces/store');
+  const { createVideoProjectFromRecording } =
+    await import('../../../features/video/project/factories/creation');
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/project/scene/watermark');
+  const { planReviewProjectConversion } =
+    await import('../../../features/video/review/project-conversion');
+  const { replayReviewHistory, reviewDocumentBaseline } =
+    await import('../../../features/video/review/document');
+  const id = 'recording:beta-v1-recording';
+  const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
+  const opened = await openVideoWorkspace(id, source);
+  const imageAssets = ['background', 'logo'].map((name) => {
+    const physical = `gallery-${name}`;
+    fixture.rows.get('project_assets')!.set(physical, {
+      id: physical,
+      assetId: `${physical}-bytes`,
+      createdAt: 1,
+      mimeType: 'image/png',
+      size: 3,
+    });
+    fixture.rows.get('asset_refs')!.set(`${physical}-bytes`, {
+      assetId: `${physical}-bytes`,
+      createdAt: 1,
+      mimeType: 'image/png',
+      size: 3,
+      sha256: null,
+      location: { kind: 'opfs', objectKey: `objects/${physical}-bytes` },
+    });
+    fixture.rows.get('asset_owners')!.set(JSON.stringify(['project-asset', physical, 'body']), {
+      assetId: `${physical}-bytes`,
+      ownerKind: 'project-asset',
+      ownerId: physical,
+      role: 'body',
+    });
+    return {
+      reviewAssetId: `project-asset:${physical}`,
+      asset: {
+        id: `native-${name}`,
+        name: `${name}.png`,
+        createdAt: 1,
+        type: 'IMAGE' as const,
+        source: { kind: 'project-asset' as const, projectAssetId: physical },
+        metadata: {
+          width: 80,
+          height: 40,
+          duration: null,
+          mimeType: 'image/png',
+          size: 3,
+          hasAudio: false,
+          audioPeaks: null,
+        },
+      },
+    };
+  });
+  const captured = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    advanced: {
+      ...opened.workspace.advanced,
+      ui: { ...opened.workspace.advanced.ui, mode: 'advanced' },
+      background:
+        backgroundMode === 'active'
+          ? {
+              enabled: true,
+              type: 'image',
+              assetId: 'project-asset:gallery-background',
+              imageFit: 'cover',
+              zoomBehavior: 'window',
+              layout: { padding: 20, cornerRadius: 10 },
+            }
+          : {
+              enabled: false,
+              rememberedImage: { assetId: 'project-asset:gallery-background', imageFit: 'contain' },
+            },
+      watermark: {
+        ...createQuickEditWatermark('Retained logo'),
+        mode: 'none',
+        image: {
+          assetId: 'project-asset:gallery-logo',
+          width: 80,
+          height: 40,
+          size: 0.2,
+          opacity: 0.5,
+        },
+      },
+    },
+  });
+  const document = replayReviewHistory(
+    captured.workspace.history,
+    captured.workspace.cursor,
+    captured.workspace.source,
+    reviewDocumentBaseline(captured.workspace)
+  );
+  const convert = (projectId: string) => {
+    const seed = createVideoProjectFromRecording({
+      ...source,
+      recordingId: 'beta-v1-recording',
+      filename: 'Source.webm',
+      hasAudio: false,
+    });
+    seed.id = projectId;
+    const result = planReviewProjectConversion({
+      seed,
+      name: projectId,
+      source,
+      document,
+      ui: captured.workspace.advanced.ui,
+      imageAssets,
+    });
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    return result.project;
+  };
+  return { ...fixture, id, captured, convert };
+}
+
+it.each(['active', 'remembered'] as const)(
+  'keeps transferred %s background and inactive logo bytes after Gallery purge ' +
+    'and deletion of one parallel destination',
+  async (backgroundMode) => {
+    vi.resetModules();
+    const fixture = await convertedGalleryImageFixture(backgroundMode);
+    const { commitVideoProjectMutation } = await import('./index-mutations');
+    const { deleteVideoProject, getProjectAsset, getVideoProject } = await import('./index');
+    const { deleteVideoWorkspaceProject } = await import('../review-workspaces/project-commands');
+    const { releaseExpiredPrivateSources } = await import('../assets/private-source-retention');
+    const { parsePhysicalDeleteAssetOperation, parseAssetOwner, parseAssetRef } =
+      await import('../assets/guards');
+    const images = ['gallery-background', 'gallery-logo'];
+    const roots = [fixture.convert('transferred-1'), fixture.convert('transferred-2')];
+    const options = {
+      expectedWorkspaceRevision: null,
+      expectedReviewWorkspace: fixture.captured.workspace,
+    };
+    const gates = roots.map(() => {
+      let enter!: () => void;
+      let release!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        enter = resolve;
+      });
+      const hold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      projectsDbMocks.recoverProjectMediaPublicationsMock.mockImplementationOnce(async () => {
+        enter();
+        await hold;
+      });
+      return { entered, release };
+    });
+    const pending = roots.map((root) => commitVideoProjectMutation(root, options));
+    await Promise.all(gates.map((gate) => gate.entered));
+    // IndexedDB serializes write transactions; this snapshot fixture needs that ordering explicitly.
+    gates[0]!.release();
+    await pending[0];
+    gates[1]!.release();
+    await pending[1];
+    expect(fixture.rows.get('video_projects')!.size).toBe(2);
+    for (const root of roots) {
+      const saved = await getVideoProject(root.id);
+      if (saved.status !== 'ready') throw new Error('Converted root did not reopen');
+      expect(saved.project.sceneBackground).toMatchObject(
+        backgroundMode === 'active'
+          ? { kind: 'image', assetId: 'native-background' }
+          : { kind: 'solid', remembered: { image: { assetId: 'native-background' } } }
+      );
+      expect(saved.project.watermark).toMatchObject({
+        mode: 'none',
+        image: { assetId: 'project-asset:native-logo' },
+      });
+    }
+    await deleteVideoWorkspaceProject(fixture.id, fixture.captured.workspace.revision);
+    expect(fixture.rows.get('video_workspaces')!.has(fixture.id)).toBe(false);
+    const owners = [...fixture.rows.get('asset_owners')!.values()]
+      .map(parseAssetOwner)
+      .filter((entry) => entry !== null);
+    const refs = [...fixture.rows.get('asset_refs')!.values()]
+      .map(parseAssetRef)
+      .filter((entry) => entry !== null);
+    expect(owners).toHaveLength(2);
+    expect(refs).toHaveLength(2);
+    const authority = {
+      authorityValid: true,
+      archiveSessions: [],
+      embeddedBinaryMetadata: [],
+      expectedOwnerAssets: new Map<string, string>(),
+      expectedOwners: owners,
+      owners,
+      operationIds: new Set<string>(),
+      protectedRollbackAssetIds: new Set<string>(),
+      publishedProjectAssetIds: new Set<string>(),
+      refs,
+    };
+    const operations = [...fixture.rows.get('asset_operations')!.values()];
+    expect(operations).toHaveLength(1);
+    for (const raw of operations) {
+      const operation = parsePhysicalDeleteAssetOperation(raw);
+      if (!operation) throw new Error('Invalid retirement fixture');
+      const retained = await releaseExpiredPrivateSources(operation, authority, []);
+      expect(retained.assetIds).toEqual([]);
+      expect(retained.privateSources?.map((entry) => entry.projectAssetId).sort()).toEqual(images);
+    }
+    await expect(deleteVideoProject(roots[0]!.id)).resolves.toEqual([]);
+    expect(fixture.rows.get('video_projects')!.has(roots[1]!.id)).toBe(true);
+    const assets = await import('../assets');
+    const read = vi
+      .spyOn(assets, 'readAssetFile')
+      .mockImplementation(
+        async (_ref, name) => new File(['png'], `${name}.png`, { type: 'image/png' })
+      );
+    try {
+      for (const image of images) {
+        await expect(getProjectAsset(image)).resolves.toMatchObject({
+          status: 'ready',
+          entry: { id: image, assetId: `${image}-bytes` },
+        });
+        expect(
+          fixture.rows.get('asset_owners')!.get(JSON.stringify(['project-asset', image, 'body']))
+        ).toMatchObject({ assetId: `${image}-bytes` });
+      }
+      expect(read).toHaveBeenCalledTimes(2);
+    } finally {
+      read.mockRestore();
+    }
+    await expect(deleteVideoProject(roots[1]!.id)).resolves.toEqual(images);
+    for (const image of images) expect(fixture.rows.get('project_assets')!.has(image)).toBe(false);
+  }
+);
+
+it.each(['image-row-missing', 'gallery-project-purged'] as const)(
+  'refuses a transferred image root after %s during actual commit preparation without partial writes',
+  async (change) => {
+    vi.resetModules();
+    const fixture = await convertedGalleryImageFixture();
+    const { commitVideoProjectMutation } = await import('./index-mutations');
+    const { deleteVideoWorkspaceProject } = await import('../review-workspaces/project-commands');
+    const destination = fixture.convert('late-image-transfer');
+    let enter!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    projectsDbMocks.recoverProjectMediaPublicationsMock.mockImplementationOnce(async () => {
+      enter();
+      await hold;
+    });
+    const pending = commitVideoProjectMutation(destination, {
+      expectedWorkspaceRevision: null,
+      expectedReviewWorkspace: fixture.captured.workspace,
+    });
+    await started;
+    if (change === 'image-row-missing') fixture.rows.get('project_assets')!.delete('gallery-logo');
+    else await deleteVideoWorkspaceProject(fixture.id, fixture.captured.workspace.revision);
+    const before = structuredClone(fixture.rows);
+    projectsDbMocks.publishMediaHubLibraryChangedMock.mockClear();
+    release();
+    await expect(pending).rejects.toThrow();
+    expect(fixture.rows).toEqual(before);
+    expect(fixture.rows.get('video_projects')!.has(destination.id)).toBe(false);
+    expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+  }
+);

@@ -6,7 +6,13 @@ import {
 import { planReviewProjectConversion } from '../../../features/video/review/project-conversion';
 import type { ReviewProjectAudioResources } from '../../../features/video/review/project-audio';
 import type { ReviewDocument } from '../../../features/video/review/types';
-import { loadAudioMetadata } from '../media-metadata';
+import { loadAudioMetadata, loadImageMetadata } from '../media-metadata';
+import {
+  reviewProjectSceneImageReferences,
+  type ReviewProjectSceneImageResource,
+} from '../../../features/video/review/project-scene';
+import { prepareBackgroundImage } from '../../../workflows/background-images/intake';
+import { prepareStaticLogo } from '../../../workflows/background-images/static-logo';
 import { buildMaterialPlacement } from '../state/insertion/material-plan';
 import { syncProjectDuration } from '../../../features/video/project/timeline/basics';
 import { projectRecordingObservationClock } from '../../../features/video/project/observation-clock';
@@ -157,13 +163,16 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
   return commitVideoProjectMutation(nextProject, { baseRevision: null });
 }
 
-/** Resolves existing immutable audio before the new root claims its references. */
-async function prepareReviewAudioResources(
+/** Resolve existing immutable media before the new root claims its references. */
+async function prepareReviewResources(
   project: VideoProject,
   document: ReviewDocument
-): Promise<ReviewProjectAudioResources | undefined> {
+): Promise<{
+  audio?: ReviewProjectAudioResources;
+  images: readonly ReviewProjectSceneImageResource[];
+}> {
   const audio = document.advancedContent.audio;
-  const ids = new Set([
+  const audioIds = new Set([
     ...[...audio.voiceover, ...audio.music].flatMap((take) => [
       take.assetId,
       ...(take.transcript?.replacements ?? []).map((replacement) => replacement.assetId),
@@ -172,38 +181,90 @@ async function prepareReviewAudioResources(
       (replacement) => replacement.assetId
     ),
   ]);
-  if (!ids.size && audio.laneVolumes === undefined) return undefined;
-  const assets: ReviewProjectAudioResources['assets'][number][] = [];
-  for (const id of ids) {
+  const imageIds = new Set(reviewProjectSceneImageReferences(document.advancedContent));
+  const audioAssets: ReviewProjectAudioResources['assets'][number][] = [];
+  const images: ReviewProjectSceneImageResource[] = [];
+  for (const id of new Set([...audioIds, ...imageIds])) {
+    const image = imageIds.has(id);
+    const unavailable = () =>
+      new Error(
+        image ? 'Review image resource is unavailable.' : 'Review audio resource is unavailable.'
+      );
+    if (image && audioIds.has(id)) throw new Error('Review resource roles conflict.');
     if (!id.startsWith('project-asset:') || id.length <= 'project-asset:'.length)
-      throw new Error('Review audio resource is unavailable.');
+      throw unavailable();
     const projectAssetId = id.slice('project-asset:'.length);
     const result = await getProjectAsset(projectAssetId);
-    if (result.status !== 'ready' || result.entry.id !== projectAssetId)
-      throw new Error('Review audio resource is unavailable.');
-    const metadata = await loadAudioMetadata(result.entry.file);
-    const asset = createVideoProjectAsset(
-      result.entry.file.name || id,
-      'AUDIO',
-      { kind: 'project-asset', projectAssetId },
-      { ...metadata, width: 0, height: 0 }
-    );
-    assets.push({ reviewAssetId: id, asset: { ...asset, id } });
+    if (result.status !== 'ready' || result.entry.id !== projectAssetId) throw unavailable();
+    if (image) {
+      const file = result.entry.file;
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw unavailable();
+      const admitted =
+        document.advancedContent.watermark?.image?.assetId === id
+          ? await prepareStaticLogo(file)
+          : await prepareBackgroundImage(file);
+      if (admitted.type !== file.type || admitted.size !== file.size) throw unavailable();
+      if (admitted !== file) {
+        const [original, normalized] = await Promise.all([
+          file.arrayBuffer(),
+          admitted.arrayBuffer(),
+        ]);
+        const bytes = new Uint8Array(normalized);
+        // Admission must describe the immutable bytes referenced by the destination.
+        if (!new Uint8Array(original).every((value, index) => value === bytes[index]))
+          throw unavailable();
+      }
+
+      const metadata = await loadImageMetadata(admitted);
+      if (metadata.mimeType !== result.entry.mimeType || metadata.size !== result.entry.size)
+        throw unavailable();
+      images.push({
+        reviewAssetId: id,
+        asset: createVideoProjectAsset(
+          file.name && file.name !== projectAssetId
+            ? file.name
+            : translate(
+                document.advancedContent.watermark?.image?.assetId === id
+                  ? 'gallery.videoReview.watermark'
+                  : 'gallery.videoReview.background'
+              ),
+          'IMAGE',
+          { kind: 'project-asset', projectAssetId },
+          { ...metadata, duration: null, hasAudio: false, audioPeaks: null }
+        ),
+      });
+    } else {
+      const metadata = await loadAudioMetadata(result.entry.file);
+      const asset = createVideoProjectAsset(
+        result.entry.file.name || id,
+        'AUDIO',
+        { kind: 'project-asset', projectAssetId },
+        { ...metadata, width: 0, height: 0 }
+      );
+      audioAssets.push({ reviewAssetId: id, asset: { ...asset, id } });
+    }
   }
   return {
-    assets,
-    tracks: {
-      voiceover: createVideoProjectTrack(
-        translate('gallery.videoReview.audioVoiceover'),
-        project.tracks.length + 1,
-        'AUDIO'
-      ),
-      music: createVideoProjectTrack(
-        translate('gallery.videoReview.audioMusic'),
-        project.tracks.length + 2,
-        'AUDIO'
-      ),
-    },
+    images,
+    ...(audioIds.size || audio.laneVolumes !== undefined
+      ? {
+          audio: {
+            assets: audioAssets,
+            tracks: {
+              voiceover: createVideoProjectTrack(
+                translate('gallery.videoReview.audioVoiceover'),
+                project.tracks.length + 1,
+                'AUDIO'
+              ),
+              music: createVideoProjectTrack(
+                translate('gallery.videoReview.audioMusic'),
+                project.tracks.length + 2,
+                'AUDIO'
+              ),
+            },
+          },
+        }
+      : {}),
   };
 }
 
@@ -266,14 +327,15 @@ async function createProjectFromReview(
       buildMaterialPlacement({ ...empty, assets }, primary, 0, 'append').project
     );
   }
-  const externalAudio = await prepareReviewAudioResources(seed, document);
+  const resources = await prepareReviewResources(seed, document);
   const result = planReviewProjectConversion({
     seed,
     name: name ?? primary.name,
     source: snapshot.workspace.source,
     document,
     ui: snapshot.workspace.advanced.ui,
-    ...(externalAudio ? { externalAudio } : {}),
+    ...(resources.audio ? { externalAudio: resources.audio } : {}),
+    imageAssets: resources.images,
   });
   if (result.status !== 'prepared')
     throw new Error('Review project settings cannot be transferred.');

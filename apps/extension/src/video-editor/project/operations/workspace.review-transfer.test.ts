@@ -65,8 +65,16 @@ vi.mock('../media-metadata', async (importOriginal) => {
     ...actual,
     loadVideoMetadata: vi.fn(),
     loadAudioMetadata: vi.fn(),
+    loadImageMetadata: vi.fn(),
   };
 });
+
+vi.mock('../../../workflows/background-images/intake', () => ({
+  prepareBackgroundImage: vi.fn(async (file: File) => file),
+}));
+vi.mock('../../../workflows/background-images/static-logo', () => ({
+  prepareStaticLogo: vi.fn(async (file: File) => file),
+}));
 
 vi.mock('./assets', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./assets')>();
@@ -548,3 +556,171 @@ it.each([undefined, '', 'a'.repeat(257)])(
     expect(saveVideoProject).not.toHaveBeenCalled();
   }
 );
+
+it('claims one immutable image for background and retained watermark, and retries missing bytes', async () => {
+  const snapshot = await transferFixture();
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/project/scene/watermark');
+  snapshot.workspace.advanced.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:scene-image',
+    imageFit: 'contain',
+    layout: { padding: 12, cornerRadius: 8 },
+  };
+  snapshot.workspace.advanced.watermark = {
+    ...createQuickEditWatermark('Retained logo'),
+    mode: 'none',
+    image: { assetId: 'project-asset:scene-image', width: 32, height: 16, size: 0.2, opacity: 0.7 },
+  };
+  const before = structuredClone(snapshot);
+  getProjectAsset.mockResolvedValue({ status: 'not-found' });
+  await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+    'Review image resource is unavailable.'
+  );
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+  getProjectAsset.mockClear();
+  getProjectAsset.mockResolvedValue({
+    status: 'ready',
+    entry: {
+      id: 'scene-image',
+      assetId: 'immutable-image-bytes',
+      mimeType: 'image/png',
+      size: 4,
+      createdAt: 1,
+      file: new File(['logo'], 'scene-image', { type: 'image/png' }),
+    },
+  });
+  const { loadImageMetadata } = await import('../media-metadata');
+  const { prepareBackgroundImage } = await import('../../../workflows/background-images/intake');
+  const { prepareStaticLogo } = await import('../../../workflows/background-images/static-logo');
+  vi.mocked(prepareBackgroundImage).mockImplementation(async (file) => file);
+  vi.mocked(prepareStaticLogo).mockImplementation(async (file) => file);
+  vi.mocked(loadImageMetadata).mockResolvedValue({
+    width: 32,
+    height: 16,
+    mimeType: 'image/png',
+    size: 4,
+  });
+  const result = await loadInitialProjectFromLocation();
+  const image = result.project!.assets.find((asset) => asset.type === 'IMAGE');
+  expect(image).toMatchObject({
+    source: { kind: 'project-asset', projectAssetId: 'scene-image' },
+    metadata: { width: 32, height: 16 },
+  });
+  const { translate } = await import('../../../platform/i18n');
+  expect(image!.name).toBe(translate('gallery.videoReview.watermark'));
+  expect(result.project!.sceneBackground).toMatchObject({
+    kind: 'image',
+    assetId: image!.id,
+    imageFit: 'contain',
+  });
+  expect(result.project!.watermark).toMatchObject({
+    mode: 'none',
+    image: { assetId: `project-asset:${image!.id}` },
+  });
+  expect(getProjectAsset).toHaveBeenCalledTimes(1);
+  expect(prepareStaticLogo).toHaveBeenCalledTimes(1);
+  expect(saveVideoProject).toHaveBeenCalledTimes(1);
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+  expect(snapshot).toEqual(before);
+});
+
+it.each(['mime', 'metadata', 'intake', 'changed-bytes'] as const)(
+  'refuses invalid image %s before any destination save',
+  async (failure) => {
+    const snapshot = await transferFixture();
+    snapshot.workspace.advanced.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'project-asset:scene-image',
+      imageFit: 'cover',
+      layout: { padding: 8, cornerRadius: 4 },
+    };
+    const mimeType = failure === 'mime' ? 'image/svg+xml' : 'image/png';
+    getProjectAsset.mockResolvedValue({
+      status: 'ready',
+      entry: {
+        id: 'scene-image',
+        assetId: 'immutable-image',
+        mimeType,
+        size: 4,
+        createdAt: 1,
+        file: new File(['logo'], 'Logo.png', { type: mimeType }),
+      },
+    });
+    const { loadImageMetadata } = await import('../media-metadata');
+    const { prepareBackgroundImage } = await import('../../../workflows/background-images/intake');
+    vi.mocked(prepareBackgroundImage).mockImplementation(async (file) => file);
+    vi.mocked(loadImageMetadata).mockResolvedValue({
+      width: 32,
+      height: 16,
+      mimeType,
+      size: failure === 'metadata' ? 5 : 4,
+    });
+    if (failure === 'intake')
+      vi.mocked(prepareBackgroundImage).mockRejectedValue(
+        new Error('Unsupported background image')
+      );
+    if (failure === 'changed-bytes') {
+      const entry = await getProjectAsset('scene-image');
+      if (entry.status !== 'ready') throw new Error('Missing image fixture');
+      Object.defineProperty(entry.entry.file, 'arrayBuffer', {
+        value: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+      });
+      const changed = new File(['evil'], 'Logo.png', { type: mimeType });
+      Object.defineProperty(changed, 'arrayBuffer', {
+        value: async () => new Uint8Array([4, 3, 2, 1]).buffer,
+      });
+      vi.mocked(prepareBackgroundImage).mockResolvedValue(changed);
+    }
+    const before = structuredClone(snapshot);
+    await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+      failure === 'intake'
+        ? 'Unsupported background image'
+        : 'Review image resource is unavailable.'
+    );
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+    expect(snapshot).toEqual(before);
+  }
+);
+
+it('refuses a Gallery snapshot changed while image metadata is pending', async () => {
+  const snapshot = await transferFixture();
+  snapshot.workspace.advanced.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:scene-image',
+    imageFit: 'cover',
+    layout: { padding: 8, cornerRadius: 4 },
+  };
+  getProjectAsset.mockResolvedValue({
+    status: 'ready',
+    entry: {
+      id: 'scene-image',
+      assetId: 'immutable-image',
+      mimeType: 'image/png',
+      size: 4,
+      createdAt: 1,
+      file: new File(['logo'], 'Logo.png', { type: 'image/png' }),
+    },
+  });
+  const { prepareBackgroundImage } = await import('../../../workflows/background-images/intake');
+  vi.mocked(prepareBackgroundImage).mockImplementation(async (file) => file);
+  const { loadImageMetadata } = await import('../media-metadata');
+  const ready = Promise.withResolvers<void>();
+  const metadata = Promise.withResolvers<Awaited<ReturnType<typeof loadImageMetadata>>>();
+  vi.mocked(loadImageMetadata).mockImplementation(() => {
+    ready.resolve();
+    return metadata.promise;
+  });
+  const pending = loadInitialProjectFromLocation();
+  await ready.promise;
+  snapshot.workspace.revision++;
+  metadata.resolve({ width: 32, height: 16, mimeType: 'image/png', size: 4 });
+  await expect(pending).rejects.toThrow('Review project changed before transfer.');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});

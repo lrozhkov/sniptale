@@ -1,4 +1,4 @@
-import { planReviewProjectScene } from './project-scene';
+import { planReviewProjectScene, type ReviewProjectSceneImageResource } from './project-scene';
 import { loadQuickEditAdvancedState } from './advanced/validation';
 import { resolveQuickEditEffectiveFeatures } from './advanced/effective';
 import { buildReviewTimeMap } from './timeline';
@@ -34,6 +34,7 @@ type ReviewProjectConversionIssue =
         | 'invalid-seed'
         | 'invalid-document'
         | 'changed-source'
+        | 'scene-resources'
         | 'unmapped-content'
         | 'source-transition'
         | 'interaction-source'
@@ -54,6 +55,7 @@ export function planReviewProjectConversion(args: {
   source: ReviewSource;
   document: ReviewDocument;
   externalAudio?: ReviewProjectAudioResources;
+  imageAssets?: readonly ReviewProjectSceneImageResource[];
   ui: QuickEditUiState;
 }): ReviewProjectConversionPlan {
   const blocked = (...issues: ReviewProjectConversionIssue[]): ReviewProjectConversionPlan => ({
@@ -83,9 +85,16 @@ export function planReviewProjectConversion(args: {
     content: document.advancedContent,
     ui: args.ui,
     source: args.source,
+    ...(args.imageAssets ? { imageAssets: args.imageAssets } : {}),
   });
   if (scene.status === 'blocked')
-    pending.push(...scene.fields.map((field) => ({ kind: 'unmapped-content' as const, field })));
+    pending.push(
+      ...scene.fields.map((field) => ({
+        kind:
+          field === 'scene-assets' ? ('scene-resources' as const) : ('unmapped-content' as const),
+        field,
+      }))
+    );
   const recordingId = recordingIdForProjectAsset(asset);
   const hasFeedback =
     document.advancedContent.actionAudio !== undefined ||
@@ -145,6 +154,12 @@ export function planReviewProjectConversion(args: {
     externalAudio.tracks.some((track) => args.seed.tracks.some((entry) => entry.id === track.id))
   )
     return blocked({ kind: 'audio-resources', field: 'seed-identity' });
+  if (
+    scene.assets.some((asset) =>
+      [...args.seed.assets, ...externalAudio.assets].some((entry) => entry.id === asset.id)
+    )
+  )
+    return blocked({ kind: 'scene-resources', field: 'identity' });
   const original = document.advancedContent.audio.original;
   const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
     mute.kind === 'range'
@@ -178,7 +193,7 @@ export function planReviewProjectConversion(args: {
     backgroundColor: '#00000000',
     ...scene.scene,
     ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),
-    assets: [...structuredClone(args.seed.assets), ...externalAudio.assets],
+    assets: [...structuredClone(args.seed.assets), ...externalAudio.assets, ...scene.assets],
     tracks: [...structuredClone(args.seed.tracks), ...externalAudio.tracks],
     clips: [
       ...timeline.videoClips.map((clip) => ({ ...master(clip), ...scene.video })),
@@ -386,7 +401,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     canvas: false,
     windowHeader: false,
     webcam: content.webcam !== undefined,
-    watermark: content.watermark !== undefined,
+    watermark: false,
     presentation:
       content.presentation !== undefined &&
       (content.presentation.intro.mode !== 'none' ||
