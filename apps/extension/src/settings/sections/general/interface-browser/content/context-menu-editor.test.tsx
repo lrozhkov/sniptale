@@ -92,15 +92,31 @@ it('automatically saves a valid edited tree and exposes a committed result', asy
 });
 
 it('restores the recommended hierarchy without changing the master switch', async () => {
+  editorState = {
+    ...editorState,
+    contextMenu: { ...editorState.contextMenu, enabled: false },
+    contextMenuViewportPresets: createSystemViewportPresetCatalog(),
+  };
+  await renderEditor();
   await click('Restore recommended configuration');
   await settleDebounce();
   const layout = update.mock.calls[0]?.[0].layout;
   expect(layout.nodes[0]).toMatchObject({ type: 'section', id: 'recommended-screenshots' });
   expect(update.mock.calls[0]?.[0]).not.toHaveProperty('enabled');
+  expect(
+    layout.nodes.find((node: { id?: string }) => node.id === 'recommended-window')
+  ).toMatchObject({
+    enabled: true,
+    children: expect.arrayContaining([expect.objectContaining({ type: 'command', enabled: true })]),
+  });
 });
 
 it('offers legacy hidden window commands in the catalog without section switches', async () => {
-  editorState = { ...editorState, contextMenuViewportPresets: createSystemViewportPresetCatalog() };
+  editorState = {
+    ...editorState,
+    contextMenu: { ...editorState.contextMenu, showWindowResize: false },
+    contextMenuViewportPresets: createSystemViewportPresetCatalog(),
+  };
   await renderEditor();
   expect(container.querySelector('[data-tree-key="section:recommended-window"]')).toBeNull();
   expect(container.querySelector('[role="tree"] [role="switch"]')).toBeNull();

@@ -4,7 +4,7 @@ import { AlertCircle, Check } from 'lucide-react';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 
 import { translate } from '../../../../../platform/i18n';
-import { settingsSectionClassName, SettingsSubpageTabs } from '../../../../section-surface';
+import { settingsSectionClassName } from '../../../../section-surface';
 import { getPermissionContent, type PermissionInfo, type PermissionState } from './permissions-lib';
 import { RequiredManifestPermissionDisclosureList } from './required-disclosure-list';
 import { DISABLED_PERMISSION_BORDER_CLASS_NAME } from './content.constants.ts';
@@ -270,9 +270,21 @@ function PermissionStatusChecks(props: {
   );
 }
 
-function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
+function PermissionFooterActions(props: {
+  onRefresh: () => void;
+  onOpenBrowserSettings: () => void;
+}) {
   return (
-    <div className="mt-3 flex justify-end">
+    <div className="mt-3 flex flex-wrap justify-end gap-2">
+      <ProductActionButton
+        compact
+        tone="secondary"
+        onClick={props.onOpenBrowserSettings}
+        className={requestButtonClassName}
+        data-ui="settings.permissions.open-browser-settings"
+      >
+        {translate('settings.permissions.openBrowserSettingsButton')}
+      </ProductActionButton>
       <ProductActionButton
         compact
         tone="secondary"
@@ -289,6 +301,7 @@ function RefreshPermissionStatusesButton(props: { onRefresh: () => void }) {
 }
 
 export function PermissionsSectionContent(props: {
+  onOpenBrowserSettings: () => void;
   onOpenMediaSettings?: ((permission: 'microphone' | 'camera') => void) | undefined;
   mediaNavigationFailed?: boolean;
   mediaEnableFailed?: boolean;
@@ -299,21 +312,10 @@ export function PermissionsSectionContent(props: {
   onRevokePermission?: (id: string) => void;
   permissions: PermissionInfo[];
   view?: 'optional' | 'required';
-  onViewChange?: (view: 'optional' | 'required') => void;
 }) {
   const view = props.view ?? 'optional';
   return (
     <div className={`${settingsSectionClassName} max-w-4xl`}>
-      <SettingsSubpageTabs
-        placement="inline"
-        activeId={view}
-        ariaLabel={translate('settings.permissions.permissionKindTabsLabel')}
-        items={[
-          { id: 'optional', label: translate('settings.permissions.statusChecksTitle') },
-          { id: 'required', label: translate('settings.permissions.requiredGrantsTitle') },
-        ]}
-        onChange={(nextView) => props.onViewChange?.(nextView as 'optional' | 'required')}
-      />
       {view === 'optional' ? (
         <>
           <PermissionStatusChecks
@@ -346,7 +348,10 @@ export function PermissionsSectionContent(props: {
               {translate('settings.permissions.recordingAccessSessionFailed')}
             </p>
           ) : null}
-          <RefreshPermissionStatusesButton onRefresh={props.onRefresh} />
+          <PermissionFooterActions
+            onRefresh={props.onRefresh}
+            onOpenBrowserSettings={props.onOpenBrowserSettings}
+          />
         </>
       ) : (
         <RequiredManifestPermissionDisclosureList />

@@ -53,6 +53,7 @@ async function renderContent(
   const onRequestPermission = vi.fn();
   const onRevokePermission = vi.fn();
   const onOpenMediaSettings = vi.fn();
+  const onOpenBrowserSettings = vi.fn();
 
   await act(async () => {
     root?.render(
@@ -70,6 +71,7 @@ async function renderContent(
           }
           onRefresh={onRefresh}
           onOpenMediaSettings={onOpenMediaSettings}
+          onOpenBrowserSettings={onOpenBrowserSettings}
           mediaNavigationFailed={mediaNavigationFailed}
           mediaEnableFailed={mediaEnableFailed}
           mediaRecordingReady={mediaRecordingReady}
@@ -82,11 +84,32 @@ async function renderContent(
     );
   });
 
-  return { onRefresh, onRequestPermission, onRevokePermission, onOpenMediaSettings };
+  return {
+    onRefresh,
+    onRequestPermission,
+    onRevokePermission,
+    onOpenMediaSettings,
+    onOpenBrowserSettings,
+  };
 }
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+});
+
+it('offers browser permission settings beside refresh even when media access is granted', async () => {
+  const { onOpenBrowserSettings, onRequestPermission } = await renderContent('optional', [
+    createPermission('microphone', 'granted'),
+    createPermission('camera', 'granted'),
+  ]);
+  const browserButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="settings.permissions.open-browser-settings"]'
+  );
+  expect(browserButton).not.toBeNull();
+  expect(browserButton?.parentElement?.textContent).toContain('settings.permissions.refreshButton');
+  act(() => browserButton?.click());
+  expect(onOpenBrowserSettings).toHaveBeenCalledTimes(1);
+  expect(onRequestPermission).not.toHaveBeenCalled();
 });
 
 it('uses neutral category icons independently of the permission state', async () => {
@@ -187,17 +210,17 @@ it('renders all permission states and wires refresh/request handlers', async () 
   const { onRefresh, onRequestPermission, onRevokePermission } = await renderContent();
   const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
 
-  expect(container?.textContent).toContain('settings.permissions.requiredGrantsTitle');
+  expect(container?.textContent).not.toContain('settings.permissions.requiredGrantsTitle');
   expect(container?.textContent).not.toContain('settings.permissions.requiredTabCaptureName');
-  expect(container?.textContent).toContain('settings.permissions.statusChecksTitle');
+  expect(
+    container?.querySelector('[aria-label="settings.permissions.statusChecksTitle"]')
+  ).not.toBeNull();
   expect(container?.textContent).toContain('settings.permissions.statusGranted');
   expect(container?.textContent).toContain('settings.permissions.statusDenied');
   expect(container?.textContent).toContain('settings.permissions.statusError');
   expect(container?.textContent).not.toContain('settings.permissions.requiredGrantPermission');
 
-  expect(container!.textContent!.indexOf('settings.permissions.statusChecksTitle')).toBeLessThan(
-    container!.textContent!.indexOf('settings.permissions.requiredGrantsTitle')
-  );
+  expect(container?.querySelector('[data-ui="settings.subpage-tabs"]')).toBeNull();
 
   const allSitesButton = buttons.find(
     (button) => button.textContent === 'settings.permissions.siteAccessAllSitesMode'

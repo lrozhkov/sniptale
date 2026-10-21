@@ -19,7 +19,7 @@ describe('context menu layout boundary', () => {
     expect(createRecommendedContextMenuSettings()).toMatchObject({
       showImageEditor: false,
       showVideoEditor: false,
-      showWindowResize: false,
+      showWindowResize: true,
       showScreenshots: true,
     });
   });

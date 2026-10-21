@@ -10,6 +10,16 @@ import {
 const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
+  it('round trips required permissions without losing a media permission intent', () => {
+    const route = { section: 'access-data', view: 'required-permissions' } as const;
+    const url = buildSettingsRouteUrl(`${BASE}?requestMediaAccess=camera`, route);
+    expect(resolveSettingsRoute(url).route).toEqual(route);
+    expect(url.searchParams.get('requestMediaAccess')).toBe('camera');
+    expect(updateSettingsRouteView(route, 'permissions')).toEqual({
+      section: 'access-data',
+      view: 'permissions',
+    });
+  });
   it('exposes the canonical leaf and view inventory', () => {
     expect(SETTINGS_SECTION_IDS).toHaveLength(16);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
@@ -21,7 +31,7 @@ describe('settings route codec', () => {
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
-      'access-data': ['permissions', 'privacy'],
+      'access-data': ['permissions', 'required-permissions', 'privacy'],
       'settings-transfer': [],
       'events-logs': [],
     });

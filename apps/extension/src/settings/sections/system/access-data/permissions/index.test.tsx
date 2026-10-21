@@ -190,11 +190,11 @@ it('forwards permissions state and actions into the permissions content shell', 
     onRequestPermission: sectionState.requestPermission,
     onRevokePermission: undefined,
     onOpenMediaSettings: expect.any(Function),
+    onOpenBrowserSettings: expect.any(Function),
     mediaNavigationFailed: false,
     mediaEnableFailed: false,
     mediaRecordingReady: false,
     mediaSessionFailed: false,
-    onViewChange: expect.any(Function),
     view: 'optional',
   });
   expect(container?.querySelector('[data-testid="permissions-section-content"]')).not.toBeNull();
@@ -532,13 +532,17 @@ it('opens only the requested native settings destination and exposes a retryable
     const props = permissionsSectionContentSpy.mock.lastCall?.[0];
     props.onOpenMediaSettings('microphone');
   });
-  expect(openMediaSettingsSpy).toHaveBeenCalledExactlyOnceWith('microphone');
+  expect(openMediaSettingsSpy).toHaveBeenCalledExactlyOnceWith('microphone', 'extension');
   expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaNavigationFailed).toBe(true);
   await act(async () => {
     permissionsSectionContentSpy.mock.lastCall?.[0].onOpenMediaSettings('camera');
   });
-  expect(openMediaSettingsSpy).toHaveBeenLastCalledWith('camera');
+  expect(openMediaSettingsSpy).toHaveBeenLastCalledWith('camera', 'extension');
   expect(permissionsSectionContentSpy.mock.lastCall?.[0].mediaNavigationFailed).toBe(false);
+  await act(async () => {
+    permissionsSectionContentSpy.mock.lastCall?.[0].onOpenBrowserSettings();
+  });
+  expect(openMediaSettingsSpy).toHaveBeenLastCalledWith('microphone', 'extension');
 });
 
 it('does not publish a failed browser navigation after the permission section unmounts', async () => {

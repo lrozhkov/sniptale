@@ -318,7 +318,7 @@ export function createRecommendedContextMenuSettings(): Record<
     showVideoEditor: false,
     showGallery: true,
     showPageLinkCopy: true,
-    showWindowResize: false,
+    showWindowResize: true,
     showSettings: true,
   };
 }

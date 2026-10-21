@@ -29,6 +29,16 @@ const viewportPresets = [
 const leaf = { type: 'command' as const, command: 'sniptale.video.tab', enabled: true };
 
 describe('v2 command tree', () => {
+  it('restores enabled window presets in the recommended window section', () => {
+    const tree = createRecommendedContextMenuTree(quickActions, viewportPresets);
+    expect(
+      tree.nodes.find((node) => node.type === 'section' && node.id === 'recommended-window')
+    ).toMatchObject({
+      enabled: true,
+      children: [{ command: 'sniptale.window-resize.preset.system%3Awindow-hd', enabled: true }],
+    });
+    expect(createRecommendedContextMenuSettings().showWindowResize).toBe(true);
+  });
   it('accepts deeply nested sections and rejects duplicate identities anywhere', () => {
     const nested = {
       version: 2 as const,
@@ -246,6 +256,7 @@ describe('legacy context menu migration', () => {
     for (const layout of [undefined, createContextMenuLayout()]) {
       const settings = {
         ...createRecommendedContextMenuSettings(),
+        showWindowResize: false,
         ...(layout ? { layout } : {}),
       };
       const tree = resolveContextMenuTree(settings, quickActions, viewportPresets);

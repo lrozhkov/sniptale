@@ -85,8 +85,7 @@ function useTargetedMediaPermissionEnable(
   return { mediaEnableFailed, mediaRecordingReady };
 }
 
-export function PermissionsSection() {
-  const [view, setView] = useState<'optional' | 'required'>('optional');
+export function PermissionsSection(props: { view?: 'optional' | 'required' }) {
   const [mediaNavigationFailed, setMediaNavigationFailed] = useState(false);
   const mounted = useRef(false);
   const navigating = useRef(false);
@@ -109,7 +108,7 @@ export function PermissionsSection() {
     navigating.current = true;
     setMediaNavigationFailed(false);
     try {
-      await openMediaPermissionSettingsPage(permission);
+      await openMediaPermissionSettingsPage(permission, 'extension');
     } catch {
       if (mounted.current) setMediaNavigationFailed(true);
     } finally {
@@ -124,12 +123,12 @@ export function PermissionsSection() {
       onRequestPermission={requestPermission}
       onRevokePermission={revokePermission}
       onOpenMediaSettings={(permission) => void openMediaSettings(permission)}
+      onOpenBrowserSettings={() => void openMediaSettings('microphone')}
       mediaNavigationFailed={mediaNavigationFailed}
       mediaEnableFailed={mediaEnableFailed}
       mediaRecordingReady={mediaRecordingReady}
       mediaSessionFailed={recordingMediaAccess.failed}
-      view={view}
-      onViewChange={setView}
+      view={props.view ?? 'optional'}
     />
   );
 }
