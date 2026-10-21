@@ -104,22 +104,16 @@ export function resolveVideoProjectCompositionJoinPlans(
       );
       if (!clip) throw new Error('Missing composition join anchor.');
       const seam = boundary.edge === 'start' ? clip.startTime : clip.startTime + clip.duration;
-      return [{ boundary, clip, seam }];
+      return [{ boundary, seam }];
     })
     .sort((a, b) => a.seam - b.seam);
   const plans: VideoProjectCompositionJoinPlan[] = [];
   for (const [index, position] of positions.entries()) {
-    const { boundary, clip, seam } = position;
+    const { boundary, seam } = position;
     const transition = boundary.transition;
     if (!transition || seam <= 0 || seam >= project.duration) continue;
-    const beforeStart = Math.max(
-      positions[index - 1]?.seam ?? 0,
-      boundary.edge === 'end' ? clip.startTime : 0
-    );
-    const afterEnd = Math.min(
-      positions[index + 1]?.seam ?? project.duration,
-      boundary.edge === 'start' ? clip.startTime + clip.duration : project.duration
-    );
+    const beforeStart = positions[index - 1]?.seam ?? 0;
+    const afterEnd = positions[index + 1]?.seam ?? project.duration;
     if (beforeStart >= seam || afterEnd <= seam)
       throw new Error('Composition join regions have collapsed.');
     plans.push({

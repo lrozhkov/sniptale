@@ -359,6 +359,40 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           })
         )
         .toBeLessThanOrEqual(1);
+      const opening = accepted.clips.find((clip) => clip.type === 'IMAGE')!;
+      await page.locator(`[data-project-timeline-clip="${opening.id}"]`).click();
+      const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await playhead.press('ArrowLeft');
+      await playhead.press('ArrowLeft');
+      const split = page.getByRole('button', {
+        name: label('videoEditor.timeline.split'),
+        exact: true,
+      });
+      await expect(split).toBeEnabled();
+      await split.click();
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.clips.length)
+        .toBe(accepted.clips.length + 2);
+      const divided = (await readNativeVideoProject(page))!;
+      expect(divided.duration).toBe(accepted.duration);
+      expect(divided.compositionJoins![0]!.clipId).not.toBe(opening.id);
+      await playhead.press('ArrowLeft');
+      await expect
+        .poll(async () =>
+          page.locator('[data-preview-stage-canvas]').evaluate((node) => {
+            if (!(node instanceof HTMLCanvasElement)) throw new Error('Missing preview canvas');
+            const pixel = node
+              .getContext('2d')!
+              .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data;
+            return Math.max(Math.abs(pixel[0]! - 191), Math.abs(pixel[1]! - 64), pixel[2]!);
+          })
+        )
+        .toBeLessThanOrEqual(1);
+      await select();
+      await page.screenshot({
+        path: info.outputPath('composition-join-split.png'),
+        fullPage: false,
+      });
       await chooseInspectorValue(
         page,
         firstJoin,
@@ -425,7 +459,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
       ).toBe(true);
-      const output = structuredClone(accepted);
+      const output = structuredClone(divided);
       const card = output.assets.find((asset) => asset.type === 'IMAGE')!;
       output.sceneEdges = {
         intro: { enabled: true, duration: 5.2, color: '#000000ff', audioFade: false },

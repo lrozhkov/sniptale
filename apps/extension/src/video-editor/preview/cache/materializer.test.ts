@@ -382,7 +382,7 @@ it('retains one watermark preparation owner across frames and clears it when the
   expect(clear).toHaveBeenCalledTimes(1);
 });
 
-function compositionFixture(type: 'dissolve' | 'fade-black' = 'dissolve') {
+function compositionFixture(type: 'dissolve' | 'fade-black' = 'dissolve', splitAt?: number) {
   const project = createEmptyVideoProject('Whole composition');
   project.fps = 4;
   project.duration = 2;
@@ -395,6 +395,14 @@ function compositionFixture(type: 'dissolve' | 'fade-black' = 'dissolve') {
       transition: { type, before: 0.5, after: 0.5, color: '#ffffff' },
     },
   ];
+  if (splitAt !== undefined) {
+    const intro = project.clips[0]!;
+    project.clips = [
+      { ...intro, duration: splitAt },
+      { ...intro, id: 'intro-tail', startTime: splitAt, duration: 1 - splitAt },
+    ];
+    project.compositionJoins[0]!.clipId = 'intro-tail';
+  }
   const completedScene = async (input: PreviewSceneInput) => {
     const context = input.canvas.getContext('2d')!;
     context.fillStyle = input.currentTime < 1 ? '#ff0000' : '#0000ff';
@@ -521,4 +529,17 @@ it('uses the explicitly selected sample fps without changing the accepted projec
   expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.875, 1]);
   expect(f.project.fps).toBe(4);
   owner.dispose();
+});
+
+it('samples the complete region across a short split tail at the project cadence', async () => {
+  const f = compositionFixture('dissolve', 0.95);
+  try {
+    await f.owner.renderFrame(0.8, new AbortController().signal);
+    expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.75, 1]);
+    const center = f.pixel();
+    for (const [index, expected] of [179, 0, 77, 255].entries())
+      expect(Math.abs(center[index]! - expected)).toBeLessThanOrEqual(1);
+  } finally {
+    f.owner.dispose();
+  }
 });

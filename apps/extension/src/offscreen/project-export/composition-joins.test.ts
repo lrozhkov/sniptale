@@ -171,9 +171,27 @@ it('refuses an unrepresentable dissolve at the requested fps and leaves unrelate
   args.project.clips[0]!.startTime = 0.005;
   args.project.clips[0]!.duration = 0.005;
   args.project.clips[1]!.startTime = 0.01;
+  args.project.compositionJoins!.unshift({ id: 'region-start', clipId: 'intro', edge: 'start' });
   args.currentTime = 0.01;
   await expect(renderProjectCompositionFrame(args)).rejects.toThrow('Composition join');
   expect(owners.scene).not.toHaveBeenCalled();
   await renderProjectCompositionFrame({ ...args, currentTime: 1.5 });
   expect(owners.scene).toHaveBeenCalledOnce();
+});
+
+it('mixes the complete region when its outgoing anchor is a short split descendant', async () => {
+  const args = input();
+  const intro = args.project.clips[0]!;
+  args.project.clips = [
+    { ...intro, duration: 0.9 },
+    { ...intro, id: 'intro-tail', startTime: 0.9, duration: 0.1 },
+    ...args.project.clips.slice(1),
+  ];
+  args.project.compositionJoins![0]!.clipId = 'intro-tail';
+  await renderProjectCompositionFrame(args);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.currentTime)).toEqual([0.875, 1]);
+  const center = pixel(args);
+  for (const [index, expected] of [191, 0, 64, 255].entries())
+    expect(Math.abs(center[index]! - expected)).toBeLessThanOrEqual(1);
+  args.job.compositionJoinRenderer!.dispose();
 });

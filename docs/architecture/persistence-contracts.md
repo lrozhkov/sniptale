@@ -599,6 +599,8 @@ A join descriptor references the start or end of one ordinary image or video cli
 
 Insertion records a boundary even when its transition is None. These boundaries limit adjacent composition regions. An intro boundary follows the trailing descendant after a split. An outro boundary follows the original leading clip. Movement, trim and rate changes follow the referenced edge. Deletion removes the exact anchor descriptor. Clip duplication does not copy its boundary. Project duplication preserves clip and descriptor identities.
 
+The anchor edge selects the boundary time. Adjacent explicit boundaries, including None, and the project limits define each complete composition region. Splitting a clip preserves the region and transition window. The anchor clip length does not limit them.
+
 A preset transition configures future insertions. Editing a preset never changes existing instances. Instance edits require the exact accepted project and an idle history owner. Invalid proposals, stale projects and history failures preserve the project and history. Accepted edits create one history step.
 
 Dissolve samples two complete compositions around the boundary. Samples include all tracks, camera settings, effects, captions and watermark. Samples exclude recursive joins and outer fades. The renderer applies outer fades once after the mix. Color transitions cover the current complete frame. Joins never change montage duration or crossfade audio.

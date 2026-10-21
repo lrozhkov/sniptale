@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../features/video/project/scene/joins';
 import { getFittedMediaContentFrame } from '../../../features/video/composition/draw/fitted-media';
 import { getClipAudioGain } from '../../../features/video/project/timeline/presentation.gain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -429,4 +430,38 @@ describe('preset to independent ordinary instance', () => {
     });
     expect(store.getState()).toBe(before);
   });
+});
+
+it('preserves a placed join window through an ordinary short-tail split and history replay', () => {
+  const { store, project, presets, asset } = setup();
+  const recipe = {
+    ...presets,
+    introTransition: { type: 'dissolve' as const, before: 1, after: 0.2 },
+  };
+  expect(store.getState().updateBookendPresets(recipe, project).status).toBe('updated');
+  const placed = store
+    .getState()
+    .placeBookendMaterial(asset.id, 'intro', store.getState().project!);
+  if (placed.status !== 'placed') throw new Error('Expected placement');
+  const before = store.getState().project!;
+  const clip = before.clips.find(({ id }) => id === placed.clipId)!;
+  const plan = resolveVideoProjectCompositionJoinPlans(before)[0]!;
+  store.getState().splitClipAt(placed.clipId, clip.startTime + clip.duration - 0.1);
+  const after = store.getState();
+  const split = after.project!;
+  expect(split.compositionJoins![0]!.clipId).not.toBe(placed.clipId);
+  expect(resolveVideoProjectCompositionJoinPlans(split)[0]).toMatchObject({
+    before: plan.before,
+    after: plan.after,
+    seam: plan.seam,
+  });
+  expect(split.duration).toBe(before.duration);
+  const undo = undoVideoEditorProjectHistory(after.projectHistory, split, after.selection);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(resolveVideoProjectCompositionJoinPlans(undo.project)).toEqual([plan]);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project, undo.selection);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(resolveVideoProjectCompositionJoinPlans(redo.project)).toEqual(
+    resolveVideoProjectCompositionJoinPlans(split)
+  );
 });

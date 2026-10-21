@@ -1,3 +1,6 @@
+import { buildReviewTimeMap } from '../../review/timeline';
+import { planReviewCutTransitions } from '../../review/cuts';
+import type { ReviewEdit } from '../../review/types';
 import { expect, it } from 'vitest';
 import {
   createImageClip,
@@ -222,4 +225,108 @@ it('confirmed source purge removes only exact clip anchors and keeps remembered 
   expect(next.compositionJoins).toEqual([]);
   expect(next.bookendPresets?.introTransition).toEqual(transition);
   expect(project.compositionJoins).toHaveLength(2);
+});
+
+it.each(['start', 'end'] as const)(
+  'keeps the full composition region after a split beside its %s anchor',
+  (edge) => {
+    const left = createImageClip({ id: 'left', duration: 1 });
+    const right = createImageClip({ id: 'right', startTime: 1, duration: 1 });
+    const project = createProject([left, right]);
+    project.duration = 2;
+    project.compositionJoins = [
+      { id: 'join', clipId: edge === 'end' ? left.id : right.id, edge, transition },
+    ];
+    const before = resolveVideoProjectCompositionJoinPlans(project)[0]!;
+    const split =
+      edge === 'end'
+        ? [
+            { ...left, duration: 0.95 },
+            { ...left, id: 'tail', startTime: 0.95, duration: 0.05 },
+            right,
+          ]
+        : [
+            left,
+            { ...right, duration: 0.05 },
+            { ...right, id: 'tail', startTime: 1.05, duration: 0.95 },
+          ];
+    const after = reconcileVideoProjectCompositionJoins(
+      { ...project, clips: split },
+      new Map([[edge === 'end' ? left.id : right.id, 'tail']])
+    );
+    const plan = resolveVideoProjectCompositionJoinPlans(after)[0]!;
+    expect({ ...plan, boundary: before.boundary }).toEqual(before);
+    expect(resolveVideoProjectCompositionJoinEndpoints(plan, 4)).toEqual({
+      outgoingTime: 0.75,
+      incomingTime: 1,
+    });
+    expect(after.duration).toBe(project.duration);
+    expect(after.compositionJoins![0]!.transition).toEqual(transition);
+  }
+);
+
+it('represents a Gallery cut across several speed clips without shortening either side', () => {
+  const cutTransition = { ...transition, before: 0.8, after: 0.8 };
+  const edits: ReviewEdit[] = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      transition: cutTransition,
+    },
+    {
+      id: 'speed-left',
+      kind: 'speed',
+      start: 3,
+      end: 4,
+      requestedStart: 3,
+      requestedEnd: 4,
+      rate: 4,
+      audio: 'speed',
+    },
+    {
+      id: 'speed-right',
+      kind: 'speed',
+      start: 6,
+      end: 7,
+      requestedStart: 6,
+      requestedEnd: 7,
+      rate: 4,
+      audio: 'speed',
+    },
+  ];
+  const segments = buildReviewTimeMap(8, edits).filter((segment) => segment.kind !== 'cut');
+  const clips = segments.map((segment, index) =>
+    createVideoClip({
+      id: `part-${index}`,
+      startTime: segment.resultStart,
+      duration: segment.resultEnd - segment.resultStart,
+      sourceStart: segment.sourceStart,
+      sourceDuration: segment.sourceEnd - segment.sourceStart,
+      playbackRate: segment.rate,
+    })
+  );
+  const project = createProject(clips);
+  project.duration = segments.at(-1)!.resultEnd;
+  const reference = planReviewCutTransitions(8, edits)[0]!;
+  project.compositionJoins = [
+    {
+      id: 'cut',
+      clipId: clips[1]!.id,
+      edge: 'end',
+      transition: cutTransition,
+    },
+  ];
+  const before = structuredClone(project);
+  expect(resolveVideoProjectCompositionJoinPlans(project)[0]).toMatchObject({
+    seam: reference.seam,
+    before: reference.before,
+    after: reference.after,
+    outgoingStart: 0,
+    incomingEnd: project.duration,
+  });
+  expect(project).toEqual(before);
 });
