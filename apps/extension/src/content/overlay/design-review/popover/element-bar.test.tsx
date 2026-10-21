@@ -16,6 +16,7 @@ const selection = {
   textPreview: 'Heading',
 };
 const base = {
+  navigation: { parent: null, child: null },
   deleteRequested: false,
   hasFeedback: true,
   onCopyPath: vi.fn(),

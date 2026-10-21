@@ -171,17 +171,17 @@ describe('browser annotation session live identity', () => {
     expect(session.getAnnotationId(target)).toBeNull();
   });
 
-  it('uses monotonic comment numbers when an empty record is removed and re-added', () => {
+  it('keeps the marker number when an empty record is removed and re-added', () => {
     const session = createBrowserAnnotationSession();
     const evidence = createEvidence();
     const target = createTarget();
 
     expect(session.setComment({ comment: 'First', evidence, target })).toBe(1);
     expect(session.setComment({ comment: '', evidence, target })).toBeNull();
-    expect(session.setComment({ comment: 'Again', evidence, target })).toBe(2);
+    expect(session.setComment({ comment: 'Again', evidence, target })).toBe(1);
 
     expect(session.captureSnapshot().domRecords).toEqual([
-      expect.objectContaining({ annotationId: 2, markerNumber: 2 }),
+      expect.objectContaining({ annotationId: 2, markerNumber: 1 }),
     ]);
   });
 
@@ -232,7 +232,7 @@ describe('browser annotation session live identity', () => {
     session.setComment({ comment: 'New', evidence, target });
     expect(session.captureSnapshot().domRecords[0]).toMatchObject({
       annotationId: 2,
-      markerNumber: 2,
+      markerNumber: 1,
     });
   });
 
@@ -281,6 +281,57 @@ describe('browser annotation session live identity', () => {
 });
 
 describe('Design Review annotation state', () => {
+  it('reuses the element marker after repeated net-zero property changes without exporting empty records', () => {
+    const session = createBrowserAnnotationSession();
+    const target = createTarget();
+    const evidence = createEvidence();
+    for (let index = 0; index < 4; index++) {
+      session.recordPropertyChanges({
+        target,
+        evidence,
+        changes: [createPropertyChange({ property: 'font-weight', before: '400', after: '700' })],
+      });
+      expect(session.captureSnapshot().domRecords[0]?.markerNumber).toBe(1);
+      session.recordPropertyChanges({
+        target,
+        evidence,
+        changes: [createPropertyChange({ property: 'font-weight', before: '700', after: '400' })],
+      });
+      expect(session.captureSnapshot().domRecords).toEqual([]);
+    }
+    expect(session.setComment({ target: createTarget(), evidence, comment: 'Other' })).toBe(2);
+    expect(session.setComment({ target, evidence, comment: 'Same element' })).toBe(1);
+  });
+
+  it('keeps markers through Undo/Redo and review removal, but resets them for a new document', () => {
+    const session = createBrowserAnnotationSession();
+    const target = createTarget();
+    const evidence = createEvidence();
+    session.setComment({ target, evidence, comment: 'First' });
+    const active = session.captureSnapshot();
+    session.clearDesignReview(target);
+    const removed = session.captureSnapshot();
+    session.applySnapshot(active);
+    session.applySnapshot(removed);
+    expect(session.setComment({ target, evidence, comment: 'Restored' })).toBe(1);
+    session.resetForDocument();
+    expect(session.setComment({ target: createTarget(), evidence, comment: 'New document' })).toBe(
+      1
+    );
+    expect(session.setComment({ target, evidence, comment: 'Old target, new session' })).toBe(2);
+  });
+
+  it('discards a failed mutation marker reservation before another target claims that number', () => {
+    const session = createBrowserAnnotationSession();
+    const target = createTarget();
+    const evidence = createEvidence();
+    const point = session.captureFailedMutationRollbackPoint();
+    session.setComment({ target, evidence, comment: 'Failed' });
+    expect(session.rollbackFailedMutation(point)).toBe(true);
+    expect(session.setComment({ target: createTarget(), evidence, comment: 'Other' })).toBe(1);
+    expect(session.setComment({ target, evidence, comment: 'Retry' })).toBe(2);
+  });
+
   it('stores action metadata and clears only review-owned evidence', () => {
     const session = createBrowserAnnotationSession();
     const evidence = createEvidence();

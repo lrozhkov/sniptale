@@ -114,7 +114,13 @@ for (const theme of ['light', 'dark'] as const) {
         const footerTextBounds = (await popover
           .locator('[data-ui="content.design-review.element-text"]')
           .boundingBox())!;
-        expect(Math.abs(footerTextBounds.x - panelBounds.x - 13)).toBeLessThanOrEqual(1);
+        const navigationBoundsFooter = (await popover
+          .locator('[data-ui="content.design-review.tree-navigation"]')
+          .boundingBox())!;
+        expect(Math.abs(navigationBoundsFooter.x - panelBounds.x - 13)).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(footerTextBounds.x - navigationBoundsFooter.x - navigationBoundsFooter.width - 8)
+        ).toBeLessThanOrEqual(1);
         await expect.soft(commentLayer).toHaveCSS('padding-top', '32px', { timeout: 500 });
         expect.soft(closeBounds.width, 'Close retains a compact target').toBe(24);
         expect.soft(closeBounds.height).toBe(24);
@@ -210,6 +216,23 @@ for (const theme of ['light', 'dark'] as const) {
             fullPage: false,
             animations: 'disabled',
           });
+        }
+        await categories.nth(0).click();
+        const bold = popover.getByRole('button', { name: /^(Weight|Насыщенность)$/u });
+        const marker = page.locator('[data-ui="content.annotation-marker-button"]');
+        for (let iteration = 0; iteration < 3; iteration++) {
+          await bold.click();
+          await expect(marker).toHaveCount(1);
+          await expect(marker).toContainText('1');
+          await expect(marker.locator('span')).toHaveText('1');
+          if (iteration === 2)
+            await page.screenshot({
+              path: info.outputPath('stable-marker.png'),
+              fullPage: false,
+              animations: 'disabled',
+            });
+          await bold.click();
+          await expect(marker).toHaveCount(0);
         }
         const comment = popover.getByRole('textbox', {
           name: /Element comment|Комментарий к элементу/u,
@@ -344,7 +367,10 @@ for (const theme of ['light', 'dark'] as const) {
           const child = document.createElement('span');
           child.id = 'review-tree-child';
           child.textContent = 'Tree child';
-          parent.append(hidden, child);
+          const otherChild = document.createElement('span');
+          otherChild.id = 'review-tree-other';
+          otherChild.textContent = 'Other child';
+          parent.append(hidden, child, otherChild);
           document.body.append(parent);
         });
         await page.mouse.click(410, 110);
@@ -352,18 +378,27 @@ for (const theme of ['light', 'dark'] as const) {
         const treeComment = popover.getByRole('textbox', {
           name: /Element comment|Комментарий к элементу/u,
         });
-        await treeComment.fill('Сохранить при переходе по дереву');
         const down = popover.getByRole('button', {
           name: /^(Select child element|Выбрать дочерний элемент)$/u,
         });
         const up = popover.getByRole('button', {
           name: /^(Select parent element|Выбрать родительский элемент)$/u,
         });
+        await expect(up).toBeEnabled();
+        await expect(down).toBeDisabled();
+        await close.click();
+        const otherChildBounds = (await page.locator('#review-tree-other').boundingBox())!;
+        await page.mouse.click(otherChildBounds.x + 5, otherChildBounds.y + 5);
+        await expect(tag).toHaveText('SPAN');
+        await up.click();
+        await expect(tag).toHaveText('DIV');
+        await expect(down).toBeEnabled();
+        await treeComment.fill('Сохранить при переходе по дереву');
         await down.click();
         await expect(tag).toHaveText('SPAN');
         await expect(
           popover.locator('[data-ui="content.design-review.element-selector"]')
-        ).toContainText('review-tree-child');
+        ).toContainText('review-tree-other');
         await expect(down).toBeDisabled();
         await up.click();
         await expect(tag).toHaveText('DIV');

@@ -40,6 +40,7 @@ afterEach(() => {
 
 it('keeps direct appearance controls and omits background asset and gradient inputs', () => {
   const state: DesignReviewViewState = {
+    treeNavigation: { parent: null, child: null },
     action: 'refine',
     anchor: null,
     comment: { commitFailed: false, draft: '', marker: null },
@@ -82,6 +83,7 @@ it('applies a selected background color from the picker', () => {
         actions={{ ...actions, updateValue: onChange }}
         disabled={false}
         state={{
+          treeNavigation: { parent: null, child: null },
           action: 'refine',
           anchor: null,
           comment: { commitFailed: false, draft: '', marker: null },

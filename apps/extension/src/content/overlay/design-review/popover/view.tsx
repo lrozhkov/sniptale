@@ -240,6 +240,7 @@ export function DesignReviewPopover(props: {
               props.actions.setSettingsOpen(open);
             }}
             selection={props.state.selection}
+            navigation={props.state.treeNavigation}
             settingsOpen={props.state.settingsOpen}
           />
           {view.deleteRequested && !props.state.settingsOpen ? (

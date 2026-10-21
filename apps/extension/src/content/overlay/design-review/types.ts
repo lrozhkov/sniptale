@@ -16,6 +16,7 @@ export interface DesignReviewViewState {
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
   text: DesignReviewTextViewState;
+  treeNavigation: { parent: Element | null; child: Element | null };
   sideFieldLinks?: Record<string, boolean>;
   values: PageStyleDeclarationValueMap;
   voice: DesignReviewCommentVoiceViewState;

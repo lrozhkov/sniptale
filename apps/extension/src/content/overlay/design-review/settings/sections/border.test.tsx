@@ -47,6 +47,7 @@ const borderValues = {
 } as const;
 
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: null,
   comment: { commitFailed: false, draft: '', marker: null },

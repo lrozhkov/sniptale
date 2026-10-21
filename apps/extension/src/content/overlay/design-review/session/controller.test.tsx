@@ -136,6 +136,10 @@ function Harness() {
 }
 
 beforeEach(async () => {
+  Object.defineProperty(document.body, 'getClientRects', {
+    configurable: true,
+    value: () => [new DOMRect(0, 0, 1280, 560)],
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   controllerMocks.closeComment.mockReturnValue(true);
   controllerMocks.openTarget.mockReturnValue(true);
@@ -150,6 +154,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(document.body, 'getClientRects');
   act(() => root?.unmount());
   root = null;
   latest = null;

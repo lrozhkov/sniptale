@@ -36,6 +36,7 @@ const actions: DesignReviewActions = {
 
 const element = document.createElement('h1');
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: { x: 40, y: 40 },
   comment: { commitFailed: false, draft: '', marker: 1 },
@@ -164,8 +165,10 @@ it('uses native non-layout hints for the element tag and full path', () => {
     )?.textContent
   ).toBe('H1');
   expect(
-    root.querySelector('[data-ui="content.design-review.element-text"]')?.previousElementSibling
-  ).toBeNull();
+    root
+      .querySelector('[data-ui="content.design-review.element-text"]')
+      ?.previousElementSibling?.getAttribute('data-ui')
+  ).toBe('content.design-review.tree-navigation');
   expect(root.querySelector('[role="tooltip"]')).toBeNull();
 });
 

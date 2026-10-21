@@ -66,6 +66,7 @@ function createController(): ReturnType<typeof useDesignReviewController> {
     },
     sessionRevision: 0,
     viewState: {
+      treeNavigation: { parent: null, child: null },
       action: 'refine',
       anchor: { x: 20, y: 30 },
       comment: { commitFailed: false, draft: '', marker: null },

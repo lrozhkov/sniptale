@@ -28,6 +28,7 @@ const actions: DesignReviewActions = {
 
 it('gives long width values the whole available field row', () => {
   const state: DesignReviewViewState = {
+    treeNavigation: { parent: null, child: null },
     action: 'refine',
     anchor: null,
     comment: { commitFailed: false, draft: '', marker: null },

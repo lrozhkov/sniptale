@@ -32,6 +32,7 @@ const actions: DesignReviewActions = {
 };
 
 const state: DesignReviewViewState = {
+  treeNavigation: { parent: null, child: null },
   action: 'refine',
   anchor: { x: 40, y: 40 },
   comment: { commitFailed: false, draft: '', marker: null },
