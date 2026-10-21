@@ -349,7 +349,8 @@ export const backgroundIngressTabRouteGroups = [
     ],
   },
   {
-    acceptedSenderClass: 'owned top-frame content document bound to its tab',
+    acceptedSenderClass:
+      'owned top-frame content document bound to its tab, or exact owned permission child frame for read-only device access validation',
     actionKind: 'tab',
     alternateAuthorizationPolicyIds: [],
     alternateAuthorityFamilies: [],

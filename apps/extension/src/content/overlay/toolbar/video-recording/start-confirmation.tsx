@@ -22,6 +22,7 @@ export function RecordingStartConfirmation({
   onContinue: (event: Event, rememberChoice: boolean) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const [rememberChoice, setRememberChoice] = useState(false);
   const [menuHeight, setMenuHeight] = useState(180);
   const titleId = useId();
@@ -42,7 +43,7 @@ export function RecordingStartConfirmation({
   }, [onCancel]);
   useLayoutEffect(() => {
     const surface = menuRef.current?.querySelector<HTMLElement>('.sniptale-popover-menu');
-    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    dialogRef.current?.focus({ preventScroll: true });
     if (!surface) return;
     const measure = () => setMenuHeight(surface.offsetHeight || 180);
     measure();
@@ -55,9 +56,11 @@ export function RecordingStartConfirmation({
   return (
     <div ref={menuRef}>
       <ProductToolbarMenu
+        className="sniptale-content-menu-adopted"
+        compact
         placement={resolveToolbarMenuPlacement(displayMode, placement)}
         style={{
-          width: 320,
+          width: 380,
           color: 'var(--sniptale-color-text-primary)',
           fontSize: 12,
           lineHeight: 1.5,
@@ -65,22 +68,31 @@ export function RecordingStartConfirmation({
             anchorEl: triggerRef.current,
             displayMode,
             menuHeight,
-            menuWidth: 320,
+            menuWidth: 380,
             placement,
           }),
         }}
       >
         <section
+          ref={dialogRef}
+          tabIndex={-1}
           role="alertdialog"
+          data-ui="content.toolbar.video-recording.start-confirmation"
           aria-labelledby={titleId}
-          className="flex flex-col gap-3 p-2"
+          className={[
+            'sniptale-recording-start-confirmation sniptale-compact-workspace',
+            'flex flex-col gap-3 p-2 outline-none',
+          ].join(' ')}
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => {
             if (event.key !== 'Tab') return;
             const controls = event.currentTarget.querySelectorAll<HTMLElement>('input, button');
             const first = controls[0];
             const last = controls[controls.length - 1];
-            if (event.shiftKey && event.target === first) {
+            if (
+              event.shiftKey &&
+              (event.target === first || event.target === event.currentTarget)
+            ) {
               event.preventDefault();
               last?.focus();
             } else if (!event.shiftKey && event.target === last) {
@@ -89,29 +101,31 @@ export function RecordingStartConfirmation({
             }
           }}
         >
-          <strong id={titleId}>
+          <p id={titleId} className="text-[13px] leading-5 font-medium">
             {translate('content.toolbar.videoRecordingWithoutMicrophone')}
-          </strong>
-          <label className="flex cursor-pointer select-none items-center gap-2">
-            <input
-              type="checkbox"
-              checked={rememberChoice}
-              onChange={(event) => setRememberChoice(event.target.checked)}
-              className="accent-[var(--sniptale-color-accent)]"
-            />
-            {translate('content.toolbar.videoRecordingWithoutMicrophoneRemember')}
-          </label>
-          <div className="flex justify-end gap-2">
-            <ProductActionButton compact tone="secondary" onClick={onCancel}>
-              {translate('common.actions.cancel')}
-            </ProductActionButton>
-            <ProductActionButton
-              compact
-              tone="primary"
-              onClick={(event) => onContinue(event.nativeEvent, rememberChoice)}
-            >
-              {translate('content.toolbar.videoRecordingWithoutMicrophoneContinue')}
-            </ProductActionButton>
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={rememberChoice}
+                onChange={(event) => setRememberChoice(event.target.checked)}
+                className="sniptale-parameter-check"
+              />
+              {translate('content.toolbar.videoRecordingWithoutMicrophoneRemember')}
+            </label>
+            <div className="flex justify-end gap-2">
+              <ProductActionButton compact tone="secondary" onClick={onCancel}>
+                {translate('common.actions.cancel')}
+              </ProductActionButton>
+              <ProductActionButton
+                compact
+                tone="primary"
+                onClick={(event) => onContinue(event.nativeEvent, rememberChoice)}
+              >
+                {translate('content.toolbar.videoRecordingWithoutMicrophoneContinue')}
+              </ProductActionButton>
+            </div>
           </div>
         </section>
       </ProductToolbarMenu>

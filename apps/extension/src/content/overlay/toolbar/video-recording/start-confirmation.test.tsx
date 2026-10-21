@@ -52,9 +52,9 @@ function renderConfirmation() {
   return { onCancel, onContinue, checkbox, cancel: buttons[0]!, continueButton: buttons[1]! };
 }
 
-it('focuses Cancel, ignores other keys, and cancels with Escape', () => {
-  const { cancel, onCancel } = renderConfirmation();
-  expect(document.activeElement).toBe(cancel);
+it('focuses the dialog without a button ring, ignores other keys, and cancels with Escape', () => {
+  const { onCancel } = renderConfirmation();
+  expect(document.activeElement).toBe(host.querySelector('[role="alertdialog"]'));
   act(() =>
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
   );

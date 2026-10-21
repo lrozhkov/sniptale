@@ -1041,7 +1041,11 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
 }
 
 /* Accepted circular selection drawing is shared by automatic blur and Settings. */
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace).sniptale-compact-workspace
+:is(
+    .sniptale-auto-blur-modal,
+    .sniptale-settings-workspace,
+    .sniptale-recording-start-confirmation
+  ).sniptale-compact-workspace
   .sniptale-parameter-check {
   appearance: none;
   position: relative;
@@ -1054,7 +1058,8 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   border-radius: 50%;
   background: transparent;
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::before {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
+  .sniptale-parameter-check::before {
   content: '';
   position: absolute;
   inset: 5px;
@@ -1066,7 +1071,8 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   background: rgb(from var(--sniptale-color-surface-hover) r g b);
   pointer-events: none;
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::after {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
+  .sniptale-parameter-check::after {
   content: '';
   position: absolute;
   inset: 8px;
@@ -1081,11 +1087,11 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   opacity: 0;
   pointer-events: none;
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
   .sniptale-parameter-check:checked::after {
   opacity: 1;
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
   .sniptale-parameter-check:indeterminate::after {
   inset: 13px 10px;
   width: 8px;
@@ -1094,21 +1100,31 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   mask: none;
   opacity: 1;
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
   .sniptale-parameter-check:hover:not(:disabled)::before {
   box-shadow: 0 0 6px 1px color-mix(in srgb, var(--sniptale-color-text-primary) 18%, transparent);
 }
-:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation)
   .sniptale-parameter-check:focus-visible {
   outline-color: var(--sniptale-color-text-secondary);
   outline-offset: 0;
 }
 @media (forced-colors: active) {
-  :is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::before {
+  :is(
+      .sniptale-auto-blur-modal,
+      .sniptale-settings-workspace,
+      .sniptale-recording-start-confirmation
+    )
+    .sniptale-parameter-check::before {
     border-color: ButtonText;
     background: Canvas;
   }
-  :is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::after {
+  :is(
+      .sniptale-auto-blur-modal,
+      .sniptale-settings-workspace,
+      .sniptale-recording-start-confirmation
+    )
+    .sniptale-parameter-check::after {
     background: Highlight;
   }
 }

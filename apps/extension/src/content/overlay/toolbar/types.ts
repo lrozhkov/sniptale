@@ -41,7 +41,10 @@ export interface ToolbarVideoRecordingProps {
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
   onMicrophoneDeviceChange?: (deviceId: string) => Promise<void> | void;
-  onLoadMediaDevices?: (kind: 'audioinput' | 'videoinput') => Promise<VideoRecordingMediaDevice[]>;
+  onLoadMediaDevices?: (
+    kind: 'audioinput' | 'videoinput',
+    requestPermission?: boolean
+  ) => Promise<VideoRecordingMediaDevice[]>;
   onPause: () => Promise<void> | void;
   onResume: () => Promise<void> | void;
   onSpotlightEnabledChange: (enabled: boolean) => Promise<void> | void;

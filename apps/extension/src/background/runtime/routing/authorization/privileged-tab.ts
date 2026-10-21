@@ -61,7 +61,10 @@ export function authorizePrivilegedTabRoute(
 ): IpcAuthorizationResult {
   const reason = getUnauthorizedPrivilegedTabRouteSenderReason({
     family: request.family,
-    ...(request.family === 'capture' && request.message ? { message: request.message } : {}),
+    ...((request.family === 'capture' || request.family === 'video-recording-surface') &&
+    request.message
+      ? { message: request.message }
+      : {}),
     resolvedTabId: request.resolvedTabId,
     sender: request.sender,
   });

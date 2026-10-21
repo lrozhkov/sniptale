@@ -102,7 +102,11 @@ export interface VideoRecordingSurfaceSnapshotMessage {
 
 export type VideoRecordingSurfaceCommand =
   | { kind: 'cancel-start' | 'pause' | 'resume' | 'stop' }
-  | { kind: 'list-media-devices'; deviceKind: 'audioinput' | 'videoinput' }
+  | {
+      kind: 'list-media-devices';
+      deviceKind: 'audioinput' | 'videoinput';
+      requestPermission?: boolean;
+    }
   | { kind: 'set-toolbar-requested'; enabled: boolean }
   | { kind: 'set-auto-fade-delay'; delay: VideoAutoFadeDelay }
   | {
@@ -129,6 +133,67 @@ export interface VideoRecordingSurfaceCommandMessage {
   documentGeneration: number;
   recordingId: string | null;
   command: VideoRecordingSurfaceCommand;
+}
+
+export interface RecordingMediaPermissionBootstrap {
+  type: 'recording-media-permission';
+  request: VideoRecordingSurfaceCommandMessage & {
+    command: {
+      kind: 'list-media-devices';
+      deviceKind: 'audioinput' | 'videoinput';
+      requestPermission: false;
+    };
+  };
+  locale: 'ru' | 'en';
+  theme: 'light' | 'dark';
+}
+
+export type RecordingMediaPermissionResult =
+  | { status: 'ready' | 'granted' | 'cancelled' }
+  | { status: 'failed'; reason: 'denied' | 'unavailable' | 'policy' | 'unauthorized' };
+
+export function isRecordingMediaPermissionBootstrap(
+  value: unknown
+): value is RecordingMediaPermissionBootstrap {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['type', 'request', 'locale', 'theme']) &&
+    value['type'] === 'recording-media-permission' &&
+    (value['locale'] === 'ru' || value['locale'] === 'en') &&
+    (value['theme'] === 'light' || value['theme'] === 'dark') &&
+    isVideoRecordingSurfaceCommandMessage(value['request']) &&
+    value['request'].surfaceToken.length > 0 &&
+    value['request'].surfaceSessionId.length > 0 &&
+    value['request'].command.kind === 'list-media-devices' &&
+    value['request'].command.requestPermission === false
+  );
+}
+
+export function isRecordingMediaPermissionResult(
+  value: unknown
+): value is RecordingMediaPermissionResult {
+  if (!isRecord(value)) return false;
+  if (
+    value['status'] === 'ready' ||
+    value['status'] === 'granted' ||
+    value['status'] === 'cancelled'
+  ) {
+    return hasExactKeys(value, ['status']);
+  }
+  return (
+    value['status'] === 'failed' &&
+    hasExactKeys(value, ['status', 'reason']) &&
+    (value['reason'] === 'denied' ||
+      value['reason'] === 'unavailable' ||
+      value['reason'] === 'policy' ||
+      value['reason'] === 'unauthorized')
+  );
+}
+
+export function isRecordingMediaPermissionCancellation(
+  value: unknown
+): value is { type: 'cancel' } {
+  return isRecord(value) && hasExactKeys(value, ['type']) && value['type'] === 'cancel';
 }
 
 interface VideoRecordingCameraPeerIdentity {
@@ -350,7 +415,10 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   }
   if (value['kind'] === 'list-media-devices') {
     return (
-      hasExactKeys(value, ['kind', 'deviceKind']) &&
+      (hasExactKeys(value, ['kind', 'deviceKind']) ||
+        hasExactKeys(value, ['kind', 'deviceKind', 'requestPermission'])) &&
+      (value['requestPermission'] === undefined ||
+        typeof value['requestPermission'] === 'boolean') &&
       (value['deviceKind'] === 'audioinput' || value['deviceKind'] === 'videoinput')
     );
   }

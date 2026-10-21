@@ -222,6 +222,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `content` → `apps/extension/src/content`
 - `camera-recorder` → `apps/extension/src/camera-recorder`
 - `popup` → `apps/extension/src/popup`
+- `media-permission` → `apps/extension/src/media-permission`
 - `settings` → `apps/extension/src/settings`
 - `gallery` → `apps/extension/src/gallery`
 - `design-system` → `apps/extension/src/design-system`

@@ -84,6 +84,19 @@ it('requires confirmation before page access, storage admission, or recording ac
   expect(mocks.patchVideoSettings).not.toHaveBeenCalled();
 });
 
+it('does not treat saved enabled sources as available when permission is absent', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({
+    ...DEFAULT_VIDEO_SETTINGS,
+    microphoneEnabled: true,
+    webcamEnabled: true,
+  });
+  await expect(
+    startSavedTabVideoRecording(12, 'https://example.test/page', 'doc-12')
+  ).resolves.toEqual({ success: true, confirmationRequired: true });
+  expect(mocks.startRecording).not.toHaveBeenCalled();
+  expect(mocks.patchVideoSettings).not.toHaveBeenCalled();
+});
+
 it('opens the video popup when a previous recording must be resolved', async () => {
   mocks.startRecording.mockResolvedValueOnce({
     error: 'Resolve the previous recording before starting another.',

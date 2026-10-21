@@ -121,3 +121,46 @@ it('does not flash the loading row for a fast device catalog', async () => {
   expect(host.textContent).toContain('Camera 1');
   vi.useRealTimers();
 });
+
+it('keeps the explicit permission result authoritative across native prompt focus changes', async () => {
+  let grant!: (devices: { deviceId: string; kind: 'videoinput'; label: string }[]) => void;
+  const onLoadDevices = vi.fn().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        grant = resolve;
+      })
+  );
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active={false}
+        activeIcon={Camera}
+        disabled={false}
+        inactiveIcon={CameraOff}
+        kind="videoinput"
+        dataUi="test.camera"
+        displayMode="horizontal"
+        label="Camera"
+        selectedDeviceId={null}
+        onLoadDevices={onLoadDevices}
+        onToggle={vi.fn()}
+      />
+    )
+  );
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')?.click();
+  });
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(onLoadDevices).toHaveBeenCalledExactlyOnceWith(true);
+  await act(async () =>
+    grant([
+      { deviceId: '', kind: 'videoinput', label: '' },
+      { deviceId: 'camera-real', kind: 'videoinput', label: 'Actual camera' },
+    ])
+  );
+  expect(host.textContent).toContain('Actual camera');
+  expect(host.querySelectorAll('.sniptale-popover-item')).toHaveLength(1);
+});

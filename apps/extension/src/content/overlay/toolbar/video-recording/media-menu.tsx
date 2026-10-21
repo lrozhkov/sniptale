@@ -26,7 +26,7 @@ type RecordingMediaSplitControlProps = {
   selectedDeviceId: string | null;
   menuType?: Extract<ToolbarPopoverMenu, 'recording-camera' | 'recording-microphone'>;
   toolbarMenuState?: ToolbarMenuState;
-  onLoadDevices?: () => Promise<VideoRecordingMediaDevice[]>;
+  onLoadDevices?: (requestPermission?: boolean) => Promise<VideoRecordingMediaDevice[]>;
   onDeviceChange?: (deviceId: string) => Promise<void> | void;
   onToggle(): Promise<void> | void;
 };
@@ -62,29 +62,36 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   useEffect(() => {
     if (!open) return;
     let active = true;
+    let sequence = 0;
     const loadingDelay = window.setTimeout(() => {
       if (active) setShowLoading(true);
     }, 500);
     setError(null);
     setLoading(true);
     setShowLoading(false);
-    void Promise.resolve(onLoadDevices ? onLoadDevices() : [])
-      .then((entries) => {
-        if (active) {
-          window.clearTimeout(loadingDelay);
-          setDevices(entries.filter((entry) => entry.kind === kind));
-          setLoading(false);
-          setShowLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          window.clearTimeout(loadingDelay);
-          setError(translate('content.toolbar.unknownError'));
-          setLoading(false);
-          setShowLoading(false);
-        }
-      });
+    const load = (requestPermission: boolean) => {
+      const request = ++sequence;
+      void Promise.resolve(onLoadDevices ? onLoadDevices(requestPermission) : [])
+        .then((entries) => {
+          if (active && request === sequence) {
+            window.clearTimeout(loadingDelay);
+            setDevices(
+              entries.filter((entry) => entry.kind === kind && entry.deviceId && entry.label.trim())
+            );
+            setLoading(false);
+            setShowLoading(false);
+          }
+        })
+        .catch(() => {
+          if (active && request === sequence) {
+            window.clearTimeout(loadingDelay);
+            setError(translate('content.toolbar.unknownError'));
+            setLoading(false);
+            setShowLoading(false);
+          }
+        });
+    };
+    load(true);
     return () => {
       active = false;
       window.clearTimeout(loadingDelay);
@@ -179,7 +186,7 @@ function RecordingMediaDeviceMenu(props: {
             />
           </ProductToolbarMenuItem>
         ) : null}
-        {control.devices.map((device, index) => (
+        {control.devices.map((device) => (
           <ProductToolbarMenuItem
             key={device.deviceId}
             selected={device.deviceId === props.selectedDeviceId}
@@ -189,7 +196,7 @@ function RecordingMediaDeviceMenu(props: {
             }}
             onClick={() => void control.selectDevice(device.deviceId)}
           >
-            <ProductToolbarMenuItemCopy label={device.label || `${props.label} ${index + 1}`} />
+            <ProductToolbarMenuItemCopy label={device.label} />
           </ProductToolbarMenuItem>
         ))}
       </ProductToolbarMenu>

@@ -13,6 +13,7 @@ import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import { startRecording } from '../manager';
 import { resolveVideoRecordingViewportPreset } from './preset';
 import { createVideoRecordingSurfaceSnapshot } from './snapshot';
+import { resolveRecordingMediaAccess } from './media-access';
 import {
   ensureVideoRecordingSurfaceLeaseHydrated,
   requestVideoRecordingSurface,
@@ -52,8 +53,9 @@ async function openPreviousRecordingResolution(tabId: number): Promise<void> {
 }
 
 export async function activateVideoRecordingSurface(tabId: number) {
-  const settings = await loadVideoSettings();
+  const stored = await loadVideoSettings();
   const existingLease = await ensureVideoRecordingSurfaceLeaseHydrated();
+  const settings = existingLease?.recordingId ? stored : await resolveRecordingMediaAccess(stored);
   const lease =
     existingLease?.tabId === tabId
       ? existingLease
@@ -71,7 +73,7 @@ export async function activateVideoRecordingSurface(tabId: number) {
 }
 
 export async function openVideoRecordingSurfaceFromPopup(tabId: number): Promise<void> {
-  const settings = await loadVideoSettings();
+  const settings = await resolveRecordingMediaAccess(await loadVideoSettings());
   const lease = await requestVideoRecordingSurface({
     entry: 'popup',
     tabId,
@@ -151,11 +153,11 @@ async function loadConfirmedRecordingSettings(
     'confirmedWithoutMicrophone' | 'rememberWithoutMicrophone'
   >
 ): Promise<VideoRecordingSettings | null> {
-  const settings = await loadVideoSettings();
+  const settings = await resolveRecordingMediaAccess(await loadVideoSettings());
   if (settings.microphoneEnabled || settings.warnWithoutMicrophone === false) return settings;
   if (confirmation.confirmedWithoutMicrophone !== true) return null;
   return confirmation.rememberWithoutMicrophone === true
-    ? patchVideoSettings({ warnWithoutMicrophone: false })
+    ? resolveRecordingMediaAccess(await patchVideoSettings({ warnWithoutMicrophone: false }))
     : settings;
 }
 

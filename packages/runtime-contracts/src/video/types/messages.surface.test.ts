@@ -10,6 +10,9 @@ import {
   isVideoRecordingSurfaceCommandMessage,
   isVideoRecordingSurfaceActivation,
   isVideoRecordingSurfaceSnapshotMessage,
+  isRecordingMediaPermissionBootstrap,
+  isRecordingMediaPermissionResult,
+  isRecordingMediaPermissionCancellation,
 } from './messages.surface';
 import { VideoRecordingStatus } from './types';
 import { DEFAULT_VIDEO_SETTINGS } from './defaults';
@@ -22,6 +25,42 @@ const identity = {
 };
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
+
+it('accepts only the bounded private permission protocol and read-only authority request', () => {
+  const request = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: 'surface-1',
+    surfaceToken: 'token-1',
+    documentGeneration: 1,
+    capabilityEpoch: 1,
+    recordingId: null,
+    command: { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: false },
+  };
+  const bootstrap = { type: 'recording-media-permission', request, locale: 'en', theme: 'dark' };
+  expect(isRecordingMediaPermissionBootstrap(bootstrap)).toBe(true);
+  for (const command of [
+    { kind: 'set-microphone-enabled', enabled: true },
+    { kind: 'list-media-devices', deviceKind: 'audioinput' },
+    { kind: 'list-media-devices', deviceKind: 'audioinput', requestPermission: true },
+  ]) {
+    expect(
+      isRecordingMediaPermissionBootstrap({ ...bootstrap, request: { ...request, command } })
+    ).toBe(false);
+  }
+  expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, locale: 'fr' })).toBe(false);
+  expect(isRecordingMediaPermissionBootstrap({ ...bootstrap, extra: true })).toBe(false);
+  expect(
+    isRecordingMediaPermissionBootstrap({ ...bootstrap, request: { ...request, surfaceToken: '' } })
+  ).toBe(false);
+  for (const status of ['ready', 'granted', 'cancelled']) {
+    expect(isRecordingMediaPermissionResult({ status })).toBe(true);
+    expect(isRecordingMediaPermissionResult({ status, token: 'forged' })).toBe(false);
+  }
+  expect(isRecordingMediaPermissionResult({ status: 'failed', reason: 'policy' })).toBe(true);
+  expect(isRecordingMediaPermissionResult({ status: 'failed', reason: 'arbitrary' })).toBe(false);
+  expect(isRecordingMediaPermissionCancellation({ type: 'cancel' })).toBe(true);
+  expect(isRecordingMediaPermissionCancellation({ type: 'cancel', source: 'page' })).toBe(false);
+});
 
 it('validates explicit microphone confirmation flags without allowing forged settings', () => {
   const message = {

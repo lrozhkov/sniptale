@@ -8,6 +8,14 @@ function stopStream(stream: MediaStream): void {
 }
 
 async function hydrateDeviceLabels(kind: 'audioinput' | 'videoinput'): Promise<void> {
+  try {
+    const name = kind === 'audioinput' ? 'microphone' : 'camera';
+    if ((await navigator.permissions.query({ name: name as PermissionName })).state !== 'granted') {
+      return;
+    }
+  } catch {
+    return;
+  }
   let stream: MediaStream | null = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -38,6 +46,8 @@ export async function listVideoRecordingMediaDevices(
   return devices.flatMap((device) => {
     if (
       !RECORDING_DEVICE_KINDS.has(device.kind) ||
+      !device.deviceId ||
+      !device.label.trim() ||
       (requestedKind && device.kind !== requestedKind)
     ) {
       return [];

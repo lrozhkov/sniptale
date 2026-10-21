@@ -31,6 +31,16 @@
     "entrypointFiles": ["apps/extension/src/popup/index.tsx", "apps/extension/src/popup/index.html"]
   },
   {
+    "id": "media-permission",
+    "root": "apps/extension/src/media-permission",
+    "manifestOwned": true,
+    "featureRoot": false,
+    "entrypointFiles": [
+      "apps/extension/src/media-permission/index.ts",
+      "apps/extension/src/media-permission/index.html"
+    ]
+  },
+  {
     "id": "settings",
     "root": "apps/extension/src/settings",
     "manifestOwned": true,

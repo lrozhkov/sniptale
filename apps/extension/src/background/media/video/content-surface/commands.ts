@@ -26,6 +26,7 @@ import {
 } from './camera-peer';
 import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 import { cancelSavedTabVideoRecordingStart } from './start';
+import { hasRecordingMediaAccess, resolveRecordingMediaAccess } from './media-access';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
   'set-microphone-enabled',
@@ -89,7 +90,10 @@ export async function runVideoRecordingSurfaceCommand(
     return {
       success: true,
       result,
-      snapshot: createVideoRecordingSurfaceSnapshot(currentLease ?? authorizedLease, settings),
+      snapshot: createVideoRecordingSurfaceSnapshot(
+        currentLease ?? authorizedLease,
+        message.recordingId ? settings : await resolveRecordingMediaAccess(settings)
+      ),
     };
   };
 
@@ -108,8 +112,12 @@ async function applySurfaceCommand(
   message: VideoRecordingSurfaceCommandMessage
 ): Promise<unknown> {
   switch (message.command.kind) {
-    case 'list-media-devices':
+    case 'list-media-devices': {
+      if (!(await hasRecordingMediaAccess(message.command.deviceKind))) {
+        return { mediaDevices: [], permissionRequired: true };
+      }
       return { mediaDevices: await listVideoRecordingMediaDevices(message.command.deviceKind) };
+    }
     case 'set-toolbar-requested':
       await updateVideoRecordingSurface(message.surfaceSessionId, {
         toolbarRequested: message.command.enabled,
@@ -145,12 +153,18 @@ async function applySurfaceCommand(
     case 'stop':
       return requireAcceptedResult(await stopRecording(false), ['accepted', 'already-stopping']);
     case 'set-microphone-enabled':
+      if (message.command.enabled && !(await hasRecordingMediaAccess('audioinput'))) {
+        return { result: 'permission-required', permissionRequired: true };
+      }
       return applyLiveSettingsWithDurableCommit(
         message,
         { microphoneEnabled: message.command.enabled },
         buildMicrophoneLivePatch
       );
     case 'set-webcam-enabled':
+      if (message.command.enabled && !(await hasRecordingMediaAccess('videoinput'))) {
+        return { result: 'permission-required', permissionRequired: true };
+      }
       await applyLiveSettingsWithDurableCommit(
         message,
         { webcamEnabled: message.command.enabled },

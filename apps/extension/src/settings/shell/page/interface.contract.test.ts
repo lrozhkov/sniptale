@@ -17,11 +17,11 @@ it('keeps Settings selection feedback separate from command pressure', () => {
 });
 
 it('reuses the accepted circular checkbox drawing in Settings', () => {
-  expect(inspector).toContain(
-    ':is(.sniptale-auto-blur-modal, .sniptale-settings-workspace).sniptale-compact-workspace'
-  );
-  expect(inspector).toContain(
-    ':is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::after'
+  expect(inspector).toContain('.sniptale-recording-start-confirmation');
+  const owners =
+    '.sniptale-auto-blur-modal, .sniptale-settings-workspace, .sniptale-recording-start-confirmation';
+  expect(inspector.replace(/\s+/g, ' ')).toContain(
+    `:is(${owners}) .sniptale-parameter-check::after`
   );
 });
 

@@ -31,6 +31,7 @@ const REQUIRED_APP_HTML_OUTPUTS = [
   'apps/extension/src/design-system/index.html',
   'apps/extension/src/editor/index.html',
   'apps/extension/src/gallery/index.html',
+  'apps/extension/src/media-permission/index.html',
   'apps/extension/src/offscreen/offscreen.html',
   'apps/extension/src/scenario-editor/index.html',
   'apps/extension/src/settings/index.html',

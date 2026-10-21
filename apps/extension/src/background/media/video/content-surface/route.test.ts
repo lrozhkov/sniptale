@@ -1,4 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+afterEach(() => vi.unstubAllGlobals());
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -121,6 +123,9 @@ import {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
+  vi.stubGlobal('navigator', {
+    permissions: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+  });
   vi.clearAllMocks();
   resetVideoRecordingCameraPeerCleanupForTests();
   resetVideoRecordingCameraPeerRetryForTests();

@@ -11,6 +11,42 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  videoRecordingPermissionTitle: {
+    ru: 'Доступ к устройствам',
+    en: 'Device access',
+  },
+  videoRecordingMicrophonePermissionTitle: {
+    ru: 'Доступ к микрофону',
+    en: 'Microphone access',
+  },
+  videoRecordingCameraPermissionTitle: {
+    ru: 'Доступ к камере',
+    en: 'Camera access',
+  },
+  videoRecordingMediaPermissionDescription: {
+    ru: 'Подтвердите доступ в запросе Chrome. Запись не начнётся.',
+    en: 'Confirm access in the Chrome prompt. Recording will not start.',
+  },
+  videoRecordingPermissionCancelled: {
+    ru: 'Запрос доступа отменён.',
+    en: 'The access request was cancelled.',
+  },
+  videoRecordingPermissionFailed: {
+    ru: 'Не удалось открыть устройство. Проверьте подключение и попробуйте снова.',
+    en: 'The device could not be opened. Check its connection and try again.',
+  },
+  videoRecordingPermissionDenied: {
+    ru: 'Chrome не предоставил доступ к устройству.',
+    en: 'Chrome did not allow access to the device.',
+  },
+  videoRecordingPermissionPolicy: {
+    ru: 'Этот сайт не разрешает встроенный запрос доступа к устройству.',
+    en: 'This site does not allow an embedded device access request.',
+  },
+  videoRecordingPermissionUnauthorized: {
+    ru: 'Панель записи больше не активна. Откройте её снова.',
+    en: 'The recording toolbar is no longer active. Open it again.',
+  },
   videoRecordingWithoutMicrophone: {
     ru: 'Продолжить запись без микрофона?',
     en: 'Continue recording without a microphone?',

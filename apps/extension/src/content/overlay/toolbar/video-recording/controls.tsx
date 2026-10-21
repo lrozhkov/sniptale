@@ -218,11 +218,13 @@ function MediaControls(props: {
   const busy =
     props.recording.state.phase === 'starting' || props.recording.state.phase === 'stopping';
   const loadMicrophones = useCallback(
-    () => onLoadMediaDevices?.('audioinput') ?? Promise.resolve([]),
+    (requestPermission = true) =>
+      onLoadMediaDevices?.('audioinput', requestPermission) ?? Promise.resolve([]),
     [onLoadMediaDevices]
   );
   const loadCameras = useCallback(
-    () => onLoadMediaDevices?.('videoinput') ?? Promise.resolve([]),
+    (requestPermission = true) =>
+      onLoadMediaDevices?.('videoinput', requestPermission) ?? Promise.resolve([]),
     [onLoadMediaDevices]
   );
   return (
