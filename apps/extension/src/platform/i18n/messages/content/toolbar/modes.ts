@@ -339,6 +339,22 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Сбросить всё',
     en: 'Reset all',
   },
+  clearDrawings: {
+    ru: 'Очистить рисунки',
+    en: 'Clear drawings',
+  },
+  clearAnnotations: {
+    ru: 'Очистить аннотации',
+    en: 'Clear annotations',
+  },
+  restorePageContent: {
+    ru: 'Восстановить содержимое',
+    en: 'Restore page content',
+  },
+  clearReviewChanges: {
+    ru: 'Сбросить правки и замечания',
+    en: 'Clear edits and feedback',
+  },
   resetPagePreparationMessage: {
     ru: 'Сбросить все изменения Sniptale на этой странице за текущую сессию?',
     en: 'Reset all Sniptale changes on this page from the current session?',
@@ -348,20 +364,20 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Changes in the current mode reset',
   },
   resetDrawingMessage: {
-    ru: 'Сбросить все рисунки в Drawing? Изменения остальных режимов сохранятся.',
-    en: 'Reset all drawings in Drawing? Changes from other modes will be kept.',
+    ru: 'Удалить все рисунки с этой страницы? Изменения в других режимах останутся.',
+    en: 'Remove all drawings from this page? Changes in other modes will be kept.',
   },
   resetAnnotationMessage: {
-    ru: 'Сбросить все рамки, эффекты и комментарии Annotation? Изменения остальных режимов сохранятся.',
-    en: 'Reset all frames, effects and comments in Annotation? Changes from other modes will be kept.',
+    ru: 'Удалить все рамки, эффекты и аннотации? Изменения в других режимах останутся.',
+    en: 'Remove all frames, effects and annotations? Changes in other modes will be kept.',
   },
   resetContentEditingMessage: {
-    ru: 'Сбросить все изменения Content Editing? Изменения остальных режимов сохранятся.',
-    en: 'Reset all Content Editing changes? Changes from other modes will be kept.',
+    ru: 'Восстановить исходное содержимое страницы? Изменения в других режимах останутся.',
+    en: 'Restore the original page content? Changes in other modes will be kept.',
   },
   resetDesignReviewMessage: {
-    ru: 'Сбросить все свойства и комментарии Design Review? Изменения остальных режимов сохранятся.',
-    en: 'Reset all Design Review properties and comments? Changes from other modes will be kept.',
+    ru: 'Отменить правки текста и свойств, удалить все замечания? Изменения в других режимах останутся.',
+    en: 'Undo text and property edits and remove all feedback? Changes in other modes will be kept.',
   },
   autoBlur: {
     ru: 'Размытие данных',

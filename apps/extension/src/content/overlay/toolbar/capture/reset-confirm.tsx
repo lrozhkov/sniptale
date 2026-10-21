@@ -22,6 +22,14 @@ const RESET_MESSAGES = {
   'design-review': 'content.toolbar.resetDesignReviewMessage',
 } as const;
 
+const RESET_LABELS = {
+  all: 'content.toolbar.clearPagePreparation',
+  drawing: 'content.toolbar.clearDrawings',
+  annotation: 'content.toolbar.clearAnnotations',
+  'content-editing': 'content.toolbar.restorePageContent',
+  'design-review': 'content.toolbar.clearReviewChanges',
+} as const;
+
 export function ToolbarResetConfirmControl(props: {
   available: boolean;
   scope?: PagePreparationResetScope;
@@ -37,6 +45,7 @@ export function ToolbarResetConfirmControl(props: {
   const [menuHeight, setMenuHeight] = useState(160);
   const titleId = useId();
   const messageId = useId();
+  const actionLabel = translate(RESET_LABELS[props.scope ?? 'all']);
   const { closeMenu, toggleMenu, activeMenuType } = props.toolbarMenuState;
   const open = props.available && activeMenuType === 'reset-confirm';
   const close = useCallback(() => closeMenu('reset-confirm'), [closeMenu]);
@@ -82,8 +91,8 @@ export function ToolbarResetConfirmControl(props: {
         ref={triggerRef}
         type="button"
         dataUi="content.toolbar.reset-all-button"
-        title={translate('content.toolbar.clearPagePreparation')}
-        aria-label={translate('content.toolbar.clearPagePreparation')}
+        title={actionLabel}
+        aria-label={actionLabel}
         aria-expanded={open}
         aria-haspopup="dialog"
         disabled={!props.available}
@@ -129,7 +138,7 @@ export function ToolbarResetConfirmControl(props: {
               (event.shiftKey ? buttons[buttons.length - 1] : buttons[0])?.focus();
             }}
           >
-            <strong id={titleId}>{translate('content.toolbar.clearPagePreparation')}</strong>
+            <strong id={titleId}>{actionLabel}</strong>
             <p id={messageId}>{translate(RESET_MESSAGES[props.scope ?? 'all'])}</p>
             <div className="flex justify-end gap-2">
               <ProductActionButton
@@ -149,7 +158,7 @@ export function ToolbarResetConfirmControl(props: {
                   props.onConfirm?.();
                 }}
               >
-                {translate('content.toolbar.clearPagePreparation')}
+                {actionLabel}
               </ProductActionButton>
             </div>
           </div>
