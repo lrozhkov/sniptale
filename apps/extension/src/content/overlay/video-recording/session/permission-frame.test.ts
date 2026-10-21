@@ -48,6 +48,7 @@ it('uses a private exact-origin bootstrap, coalesces requests and retains one-ti
   const pending = owner.request(identity, 'audioinput');
   expect(owner.request(identity, 'audioinput')).toBe(pending);
   const frame = document.querySelector('iframe')!;
+  expect(frame.style.borderRadius).toBe('8px');
   expect(frame.src).not.toContain('private-token');
   expect(frame.allow).toBe('camera chrome-extension://owned; microphone chrome-extension://owned');
   frame.src = 'chrome-extension://dynamic-resource/apps/extension/src/media-permission/index.html';

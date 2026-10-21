@@ -3,7 +3,16 @@ import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
-const mocks = vi.hoisted(() => ({ send: vi.fn(), acquire: vi.fn(), stop: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  send: vi.fn(),
+  acquire: vi.fn(),
+  stop: vi.fn(),
+  query: vi.fn(),
+  openSettings: vi.fn(),
+}));
+vi.mock('../platform/navigation/extension-pages', () => ({
+  openMediaPermissionSettingsPage: mocks.openSettings,
+}));
 vi.mock('../platform/runtime-messaging', () => ({
   createRuntimeMessagingTransport: () => ({ sendRuntimeMessage: mocks.send }),
 }));
@@ -57,11 +66,19 @@ beforeEach(async () => {
   status.dataset['ui'] = 'recording.media-permission.status';
   const cancel = document.createElement('button');
   cancel.dataset['ui'] = 'recording.media-permission.cancel';
-  main.append(heading, status, cancel);
+  const settings = document.createElement('button');
+  settings.hidden = true;
+  settings.dataset['ui'] = 'recording.media-permission.settings';
+  main.append(heading, status, cancel, settings);
   document.body.append(main);
   mocks.send.mockResolvedValue({ success: true, snapshot });
   mocks.acquire.mockResolvedValue({ getTracks: () => [{ stop: mocks.stop }] });
-  vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: mocks.acquire } });
+  mocks.query.mockResolvedValue({ state: 'prompt' });
+  mocks.openSettings.mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', {
+    mediaDevices: { getUserMedia: mocks.acquire },
+    permissions: { query: mocks.query },
+  });
   Reflect.set(document, 'permissionsPolicy', undefined);
   Reflect.set(document, 'featurePolicy', undefined);
   listeners = vi.spyOn(window, 'addEventListener');
@@ -181,6 +198,90 @@ it('honors a restrictive host feature policy', async () => {
   expect(allowsFeature).toHaveBeenCalledWith('microphone');
   expect(mocks.acquire).not.toHaveBeenCalled();
   expect(document.querySelector('[role="alert"]')!.textContent).toContain('PermissionPolicy');
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-ui="recording.media-permission.settings"]')!
+      .hidden
+  ).toBe(true);
+});
+
+it.each(['audioinput', 'videoinput'] as const)(
+  'opens extension permission settings only after blocked %s recovery is clicked',
+  async (deviceKind) => {
+    mocks.acquire.mockRejectedValue(new DOMException('Blocked', 'NotAllowedError'));
+    mocks.query.mockResolvedValue({ state: 'denied' });
+    deliver({
+      ...bootstrap,
+      request: { ...bootstrap.request, command: { ...bootstrap.request.command, deviceKind } },
+    });
+    const settings = document.querySelector<HTMLButtonElement>(
+      '[data-ui="recording.media-permission.settings"]'
+    )!;
+    await vi.waitFor(() => expect(settings.hidden).toBe(false));
+    expect(mocks.query).toHaveBeenCalledWith({
+      name: deviceKind === 'audioinput' ? 'microphone' : 'camera',
+    });
+    expect(mocks.openSettings).not.toHaveBeenCalled();
+    settings.click();
+    await vi.waitFor(() =>
+      expect(mocks.openSettings).toHaveBeenCalledExactlyOnceWith(
+        deviceKind === 'audioinput' ? 'microphone' : 'camera',
+        'extension'
+      )
+    );
+  }
+);
+
+it('keeps recovery retryable when Chrome settings cannot open', async () => {
+  mocks.acquire.mockRejectedValue(new DOMException('Blocked', 'NotAllowedError'));
+  mocks.query.mockResolvedValue({ state: 'denied' });
+  mocks.openSettings.mockRejectedValueOnce(new Error('Unavailable'));
+  deliver();
+  const settings = document.querySelector<HTMLButtonElement>(
+    '[data-ui="recording.media-permission.settings"]'
+  )!;
+  await vi.waitFor(() => expect(settings.hidden).toBe(false));
+  settings.click();
+  await vi.waitFor(() =>
+    expect(document.querySelector('[role="alert"]')!.textContent).toContain(
+      'PermissionSettingsFailed'
+    )
+  );
+  expect(settings.disabled).toBe(false);
+  settings.click();
+  await vi.waitFor(() => expect(mocks.openSettings).toHaveBeenCalledTimes(2));
+});
+
+it.each(['prompt', 'query-failed'])('does not offer blocked recovery for %s', async (state) => {
+  mocks.acquire.mockRejectedValue(new DOMException('Dismissed', 'NotAllowedError'));
+  if (state === 'query-failed') mocks.query.mockRejectedValue(new Error('Unavailable'));
+  const port = deliver();
+  await vi.waitFor(() =>
+    expect(port.postMessage).toHaveBeenCalledWith({ status: 'failed', reason: 'denied' })
+  );
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-ui="recording.media-permission.settings"]')!
+      .hidden
+  ).toBe(true);
+  expect(mocks.openSettings).not.toHaveBeenCalled();
+});
+
+it('does not reveal stale recovery UI after disposal during a permission query', async () => {
+  let resolve!: (value: { state: string }) => void;
+  mocks.acquire.mockRejectedValue(new DOMException('Blocked', 'NotAllowedError'));
+  mocks.query.mockReturnValue(
+    new Promise((accept) => {
+      resolve = accept;
+    })
+  );
+  deliver();
+  await vi.waitFor(() => expect(mocks.query).toHaveBeenCalled());
+  window.dispatchEvent(new Event('pagehide'));
+  resolve({ state: 'denied' });
+  await Promise.resolve();
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-ui="recording.media-permission.settings"]')!
+      .hidden
+  ).toBe(true);
 });
 
 it('tolerates an unavailable policy API while keeping native acquisition authoritative', async () => {

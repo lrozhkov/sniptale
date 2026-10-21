@@ -157,6 +157,17 @@ describe('extension page settings helpers', () => {
     await expect(openMediaPermissionSettingsPage('microphone')).rejects.toBe(error);
   });
 
+  it.each(['microphone', 'camera'] as const)(
+    'opens only this extension site details for blocked %s',
+    async (permission) => {
+      const { openMediaPermissionSettingsPage } = await import('./index');
+      await openMediaPermissionSettingsPage(permission, 'extension');
+      expect(browserTabsCreateMock).toHaveBeenCalledExactlyOnceWith({
+        url: 'chrome://settings/content/siteDetails?site=chrome-extension%3A%2F%2Ftest%2F',
+      });
+    }
+  );
+
   it('identifies extension-owned settings page urls', expectOwnedSettingsPageIdentity);
 
   it('opens the settings page through the shared browser tabs seam', async () => {

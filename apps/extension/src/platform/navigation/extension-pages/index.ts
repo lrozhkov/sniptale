@@ -200,12 +200,15 @@ export async function openExtensionDetailsPage(): Promise<void> {
 
 /** Opens the fixed browser settings surface for a blocked recording device permission. */
 export async function openMediaPermissionSettingsPage(
-  permission: 'microphone' | 'camera'
+  permission: 'microphone' | 'camera',
+  scope: 'device' | 'extension' = 'device'
 ): Promise<void> {
   const url =
-    permission === 'microphone'
-      ? 'chrome://settings/content/microphone'
-      : 'chrome://settings/content/camera';
+    scope === 'extension'
+      ? `chrome://settings/content/siteDetails?site=${encodeURIComponent(runtimeInfo.getURL(''))}`
+      : permission === 'microphone'
+        ? 'chrome://settings/content/microphone'
+        : 'chrome://settings/content/camera';
   await browserTabs.create({ url });
 }
 

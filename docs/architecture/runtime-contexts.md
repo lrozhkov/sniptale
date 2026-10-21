@@ -60,6 +60,8 @@ After native permission succeeds, content retries the original enable or device-
 
 Cancellation stops pending acquisition and any late stream. Denial or host policy failure leaves the requested device disabled and shows a localized error. The flow grants no permission to the host site. It does not bypass host policy or automatically open another tab.
 
+After native denial, the frame checks the extension permission state. A blocked permission exposes an explicit action that opens Chrome site details for this extension. Prompt dismissal and host policy failure do not expose this action. Opening settings does not grant access, enable a source or start recording. Navigation failure preserves the action for retry.
+
 ## Recording clock
 
 TAB recording calibration stays in the offscreen source/encoder owner. Before countdown, it samples an original frame from the same freshly acquired track. It bounds the native epoch offset by acquisition and receipt. It maps initial/resumed source timestamps to the encoder’s chosen PTS. Reader cancellation never stops the borrowed track.

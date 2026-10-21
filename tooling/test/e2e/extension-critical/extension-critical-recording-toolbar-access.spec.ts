@@ -499,14 +499,21 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         autoGrantMediaPermissions: false,
       });
       try {
-        const { page } = await openToolbar(launched.context, launched.extensionId, host.origin);
+        const { page } = await openToolbar(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          viewport.name === '1280x560'
+            ? { locale: 'ru', theme: 'light' }
+            : { locale: 'en', theme: 'dark' }
+        );
         await gatePermissionRequest(launched.context);
         const pagesBeforeRequest = launched.context.pages().map((candidate) => candidate.url());
         await page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`).click();
         const frame = await permissionFrame(page);
         await resolvePermissionRequest(launched, page, frame, kind, 'denied');
         await expect(frame.locator('[data-ui="recording.media-permission.status"]')).toContainText(
-          /access|permission|denied/i
+          /access|permission|denied|доступ/i
         );
         await expect(
           page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`)
@@ -517,6 +524,36 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         expect(
           await frame.evaluate(() => document.documentElement.scrollHeight)
         ).toBeLessThanOrEqual(92);
+        const cardRadius = await frame
+          .locator('main')
+          .evaluate((node) => getComputedStyle(node).borderRadius);
+        expect(cardRadius).toBe('8px');
+        await expect(page.locator(permissionFrameSelector)).toHaveCSS('border-radius', cardRadius);
+        const recovery = frame.locator('[data-ui="recording.media-permission.settings"]');
+        await expect(recovery).toBeVisible();
+        const settingsOpened = launched.context.waitForEvent('page');
+        await recovery.click();
+        const settings = await settingsOpened;
+        await settings.waitForLoadState();
+        const settingsUrl = new URL(settings.url());
+        expect(`${settingsUrl.protocol}//${settingsUrl.host}${settingsUrl.pathname}`).toBe(
+          'chrome://settings/content/siteDetails'
+        );
+        expect(settingsUrl.searchParams.get('site')).toBe(
+          `chrome-extension://${launched.extensionId}/`
+        );
+        await expect(
+          settings.getByRole('heading', { name: 'Permissions', exact: true })
+        ).toBeVisible();
+        await expect(
+          settings.getByRole('heading', { name: new RegExp(launched.extensionId) })
+        ).toBeVisible();
+        await settings.screenshot({
+          path: info.outputPath('extension-permissions-settings.png'),
+          fullPage: false,
+        });
+        await settings.close();
+        await expectRecordingNotStarted(page);
         await frame.locator('[data-ui="recording.media-permission.cancel"]').click();
         await expect(page.locator(permissionFrameSelector)).toHaveCount(0);
         expect(launched.context.pages().map((candidate) => candidate.url())).toEqual(
@@ -551,6 +588,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(frame.locator('[data-ui="recording.media-permission.status"]')).toContainText(
           /page|site|policy|blocked/i
         );
+        await expect(frame.locator('[data-ui="recording.media-permission.settings"]')).toBeHidden();
         await expect(
           page.locator(`[data-ui="content.toolbar.video-recording.${kind}.toggle"]`)
         ).toHaveAttribute('aria-pressed', 'false');

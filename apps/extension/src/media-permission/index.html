@@ -17,7 +17,7 @@
       main {
         box-sizing: border-box;
         min-height: 100vh;
-        padding: 8px 12px 10px;
+        padding: 8px 12px;
         background: var(--sniptale-color-surface-panel);
         color: var(--sniptale-color-text-primary);
         border: 1px solid var(--sniptale-color-border-soft);
@@ -60,6 +60,15 @@
         outline: 2px solid var(--sniptale-color-border-strong);
         outline-offset: 2px;
       }
+      [hidden] {
+        display: none !important;
+      }
+      .settings {
+        width: auto;
+        height: 24px;
+        margin: 4px 0 0 auto;
+        padding: 0 4px;
+      }
     </style>
   </head>
   <body>
@@ -82,6 +91,12 @@
         </button>
       </header>
       <p role="status" aria-live="polite" data-ui="recording.media-permission.status"></p>
+      <button
+        type="button"
+        class="settings"
+        data-ui="recording.media-permission.settings"
+        hidden
+      ></button>
     </main>
     <script type="module" src="./index.ts"></script>
   </body>

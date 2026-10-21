@@ -60,7 +60,7 @@ export function createRecordingPermissionFrameOwner(
       width: 'min(340px, calc(100vw - 32px))',
       height: '92px',
       border: '0',
-      borderRadius: '12px',
+      borderRadius: '8px',
       zIndex: '2147483647',
       pointerEvents: 'auto',
       visibility: 'hidden',

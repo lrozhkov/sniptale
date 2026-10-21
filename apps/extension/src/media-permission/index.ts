@@ -7,6 +7,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import { createRuntimeMessagingTransport } from '../platform/runtime-messaging';
 import { createTranslator } from '../platform/i18n';
+import { openMediaPermissionSettingsPage } from '../platform/navigation/extension-pages';
 import { createRecordingMediaPermissionSession } from './session';
 import '@sniptale/ui/styles';
 
@@ -27,11 +28,13 @@ function mountPermissionSession(bootstrap: RecordingMediaPermissionBootstrap, po
   const heading = document.getElementById('heading');
   const status = document.querySelector('[data-ui="recording.media-permission.status"]');
   const cancel = document.querySelector('[data-ui="recording.media-permission.cancel"]');
+  const settings = document.querySelector('[data-ui="recording.media-permission.settings"]');
   if (
     !(main instanceof HTMLElement) ||
     !heading ||
     !status ||
-    !(cancel instanceof HTMLButtonElement)
+    !(cancel instanceof HTMLButtonElement) ||
+    !(settings instanceof HTMLButtonElement)
   ) {
     port.close();
     return;
@@ -49,6 +52,31 @@ function mountPermissionSession(bootstrap: RecordingMediaPermissionBootstrap, po
   status.textContent = translate('content.toolbar.videoRecordingMediaPermissionDescription');
   cancel.setAttribute('aria-label', translate('common.actions.close'));
   cancel.title = translate('common.actions.close');
+  settings.textContent = translate('content.toolbar.videoRecordingPermissionSettings');
+  let disposed = false;
+  const permission =
+    bootstrap.request.command.deviceKind === 'audioinput' ? 'microphone' : 'camera';
+  const showBlockedRecovery = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: permission as PermissionName });
+      if (disposed || result.state !== 'denied') return;
+      status.textContent = translate('content.toolbar.videoRecordingPermissionBlocked');
+      settings.hidden = false;
+    } catch {
+      settings.hidden = true;
+    }
+  };
+  settings.addEventListener('click', async () => {
+    settings.disabled = true;
+    try {
+      await openMediaPermissionSettingsPage(permission, 'extension');
+    } catch {
+      if (!disposed)
+        status.textContent = translate('content.toolbar.videoRecordingPermissionSettingsFailed');
+    } finally {
+      if (!disposed) settings.disabled = false;
+    }
+  });
   const messaging = createRuntimeMessagingTransport();
   const report = (result: RecordingMediaPermissionResult) => {
     if (result.status === 'failed') {
@@ -62,6 +90,7 @@ function mountPermissionSession(bootstrap: RecordingMediaPermissionBootstrap, po
               ? 'content.toolbar.videoRecordingPermissionUnauthorized'
               : 'content.toolbar.videoRecordingPermissionFailed'
       );
+      if (result.reason === 'denied') void showBlockedRecovery();
     }
     port.postMessage(result);
   };
@@ -79,10 +108,14 @@ function mountPermissionSession(bootstrap: RecordingMediaPermissionBootstrap, po
     report,
   });
   const dispose = () => {
+    disposed = true;
     session.dispose();
     port.close();
   };
-  cancel.addEventListener('click', () => session.cancel());
+  cancel.addEventListener('click', () => {
+    disposed = true;
+    session.cancel();
+  });
   port.onmessage = (event: MessageEvent<unknown>) => {
     if (isRecordingMediaPermissionCancellation(event.data)) session.cancel();
   };

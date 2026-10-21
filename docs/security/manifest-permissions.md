@@ -31,6 +31,8 @@ The recording permission frame requests access for the extension, not the host s
 
 Chrome shows the native permission prompt without an additional pending card. The frame remains hidden during the request and after success. Only a failure makes its error card visible.
 
+When Chrome reports a denied extension permission, the error card offers an explicit settings action. Its fixed destination is site details for the canonical extension origin. Host input cannot select the destination. The action does not grant access or start recording. It adds no manifest permission.
+
 Background admits this exact child document only for `list-media-devices` with `requestPermission: false`. It requires the sender-owned tab and child frame/document metadata. The existing surface owner checks the complete lease, generations, epoch, recording identity and expiry. This exception permits no mutating command.
 
 The frame retains its permission stream through countdown to preserve one-time access. Content releases it after recording acquires its sources, accepted disable, toolbar deactivation or disposal. Live enable releases its probe after the recording owner accepts the source. Recording completion releases remaining recording probes. Denial, cancellation or host policy failure leaves the requested device disabled. The UI reports failure without opening a tab or bypassing host policy.

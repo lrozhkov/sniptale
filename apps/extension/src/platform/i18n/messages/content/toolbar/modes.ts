@@ -39,6 +39,18 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Chrome не предоставил доступ к устройству.',
     en: 'Chrome did not allow access to the device.',
   },
+  videoRecordingPermissionBlocked: {
+    ru: 'Доступ заблокирован в Chrome.',
+    en: 'Access is blocked in Chrome.',
+  },
+  videoRecordingPermissionSettings: {
+    ru: 'Открыть разрешения',
+    en: 'Open permissions',
+  },
+  videoRecordingPermissionSettingsFailed: {
+    ru: 'Не удалось открыть настройки.',
+    en: 'Chrome settings could not be opened.',
+  },
   videoRecordingPermissionPolicy: {
     ru: 'Этот сайт не разрешает встроенный запрос доступа к устройству.',
     en: 'This site does not allow an embedded device access request.',
