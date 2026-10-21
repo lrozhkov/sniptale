@@ -82,11 +82,9 @@ describe('content entrypoint styles', () => {
     );
     expect(calloutSettingsStyles).toContain('cursor: inherit !important;');
     expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-header');
-    expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-mode-action');
-    expect(settingsPopoverStyles).toContain('min-height: 22px;');
-    expect(settingsPopoverStyles).toContain(
-      '.sniptale-content-popover--compact .sniptale-settings-popover-header {'
-    );
+    expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-icon-action');
+    expect(settingsPopoverStyles).toContain('.sniptale-settings-popover-source-switch');
+    expect(settingsPopoverStyles).toContain('min-height: 24px;');
     expect(settingsPopoverStyles).toContain('align-items: center;');
     expect(settingsPopoverStyles).toContain('padding-bottom: 4px;');
     expect(settingsPopoverStyles).not.toMatch(
@@ -224,12 +222,20 @@ it('does not resolve removed Manrope resources', () => {
   expect(runtimeInfoGetUrlMock).not.toHaveBeenCalled();
 });
 
+it('isolates host-page text stroke at the content shadow boundary', () => {
+  const styles = readFileSync(HOST_STYLES_PATH, 'utf8');
+  expect(styles).toContain('-webkit-text-stroke: 0 !important;');
+});
+
 it('keeps embedded settings header commands neutral and aligned', () => {
   const styles = readFileSync(SETTINGS_POPOVER_STYLES_PATH, 'utf8');
-  const selector =
-    '.sniptale-content-appearance-surface .sniptale-settings-popover-header-actions > button {';
+  const selector = '.sniptale-settings-popover-header .sniptale-settings-popover-icon-action {';
   const block = styles.slice(styles.indexOf(selector)).split('}')[0];
   expect(block).toContain('background: transparent');
-  expect(block).toContain('border-color: transparent');
-  expect(styles).toContain('align-self: flex-start');
+  expect(block).toContain('border: 0');
+  expect(block).toContain('width: 28px');
+  expect(block).toContain('align-items: center');
+  const header = styles.split('}')[0];
+  expect(header).toContain('min-height: 32px');
+  expect(header).toContain('align-items: center');
 });

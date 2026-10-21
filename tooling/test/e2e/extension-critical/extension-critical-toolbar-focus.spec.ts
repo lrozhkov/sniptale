@@ -11,6 +11,91 @@ function readFocusPaint(element: Element) {
   };
 }
 let opened: Awaited<ReturnType<typeof openDesignReview>> | null = null;
+
+for (const appearance of [
+  { theme: 'dark', locale: 'en', width: 1280, height: 560 },
+  { theme: 'light', locale: 'ru', width: 1280, height: 560 },
+  { theme: 'dark', locale: 'ru', width: 1920, height: 900 },
+  { theme: 'light', locale: 'en', width: 1920, height: 900 },
+  { theme: 'dark', locale: 'en', width: 960, height: 560 },
+] as const) {
+  test(`toolbar menu text stays regular ${appearance.theme} ${appearance.locale} ${appearance.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    await worker.evaluate(async ({ theme, locale }) => {
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      });
+    }, appearance);
+    opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
+    const { page } = opened;
+    await page.addStyleTag({
+      content: `body { background: ${appearance.theme === 'dark' ? '#222' : '#fff'}; } * { -webkit-text-stroke: 0.35px !important; }`,
+    });
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+    await page.evaluate(() => document.fonts.ready);
+    for (const compact of [false, true]) {
+      await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+      const toggle = page
+        .locator('.sniptale-toolbar-menu-item')
+        .filter({ hasText: /Compact menu view|Компактный вид меню/ });
+      const selected = await toggle.evaluate((element) =>
+        element.classList.contains('sniptale-popover-item-selected')
+      );
+      if (selected !== compact) await toggle.click();
+      await page.keyboard.press('Escape');
+      for (const name of ['mode-selector', 'settings', 'viewport']) {
+        await page.locator(`[data-ui="content.toolbar.${name}-button"]`).click();
+        const menu = page.locator('.sniptale-toolbar-menu:visible').last();
+        await expect(menu).toBeVisible();
+        expect(
+          await menu.evaluate((element) =>
+            element.classList.contains('sniptale-toolbar-menu--compact')
+          )
+        ).toBe(compact);
+        const labels = menu.locator('.sniptale-toolbar-menu-item-label');
+        expect(await labels.count()).toBeGreaterThan(0);
+        const typography = await labels.evaluateAll((elements) =>
+          elements.map((element) => {
+            const style = getComputedStyle(element);
+            return {
+              weight: style.fontWeight,
+              stroke: style.webkitTextStrokeWidth,
+              family: style.fontFamily,
+            };
+          })
+        );
+        for (const style of typography) {
+          expect(style.weight).toBe('400');
+          expect(style.stroke).toBe('0px');
+          expect(style.family).toContain('Sniptale Interface');
+        }
+        const option = menu.getByRole('button').first();
+        await option.hover();
+        await expect(labels.first()).toHaveCSS('font-weight', '400');
+        await option.focus();
+        await expect(labels.first()).toHaveCSS('font-weight', '400');
+        await expect(labels.first()).toHaveCSS('-webkit-text-stroke-width', '0px');
+        if (compact || name === 'mode-selector') {
+          await page.screenshot({
+            path: info.outputPath(`${compact ? 'compact' : 'expanded'}-${name}.png`),
+            fullPage: false,
+          });
+        }
+        await page.keyboard.press('Escape');
+      }
+    }
+    await expect(page.locator('h1').first()).toHaveCSS('-webkit-text-stroke-width', '0.35px');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+  });
+}
 test.afterEach(async () => {
   await opened?.page.close();
   await opened?.popup.close();

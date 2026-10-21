@@ -3,6 +3,7 @@
   --sniptale-content-ui-viewport-height: 100vh;
   --sniptale-content-ui-viewport-width: 100vw;
   all: initial;
+  -webkit-text-stroke: 0 !important;
   display: block;
   box-sizing: border-box;
   margin: 0;
