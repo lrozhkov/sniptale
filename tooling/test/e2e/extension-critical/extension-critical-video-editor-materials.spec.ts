@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { GALLERY_SAVED_VIEWS_STORAGE_KEY } from '../../../../apps/extension/src/composition/persistence/gallery-saved-views/contract';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -359,16 +360,56 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
       await seedReviewWebcamBundle(page);
-      await page.evaluate(async () => {
+      const capturedCursor = createVideoProjectCursorTrack('embedded-fallback');
+      capturedCursor.skin.hidden = true;
+      capturedCursor.samples = [
+        { id: 'handoff-cursor:0', time: 0, x: 0.1, y: 0.2, visible: true },
+        { id: 'handoff-cursor:removed', time: 3, x: 0.8, y: 0.7, visible: true },
+        { id: 'handoff-cursor:6', time: 6, x: 0.3, y: 0.4, visible: true },
+        { id: 'handoff-cursor:outside', time: 8, x: 0.3, y: 0.4, visible: false },
+        { id: 'handoff-cursor:return', time: 9, x: 0.7, y: 0.6, visible: true },
+        { id: 'handoff-cursor:end', time: 12, x: 0.9, y: 0.8, visible: true },
+      ].map((sample) => ({
+        ...sample,
+        observation: sample.visible ? 'observed' : 'outside',
+        captureSegment: sample.time >= 9 ? 1 : 0,
+        recordingPoint: sample.visible ? { x: sample.x, y: sample.y } : null,
+        x: sample.x * 160,
+        y: sample.y * 90,
+      }));
+      await page.evaluate(async (cursorTrack) => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('sniptale-db');
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error);
         });
-        const tx = db.transaction(['media_library', 'recordings', 'asset_owners'], 'readwrite');
+        const tx = db.transaction(
+          ['media_library', 'recordings', 'asset_owners', 'recording_telemetry'],
+          'readwrite'
+        );
         const done = new Promise<void>((resolve, reject) => {
           tx.oncomplete = () => resolve();
           tx.onabort = () => reject(tx.error);
+        });
+        tx.objectStore('recording_telemetry').put({
+          recordingId: 'beta-v1-recording',
+          captureMode: 'TAB',
+          createdAt: 1,
+          updatedAt: 1,
+          viewport: null,
+          cursorTrack,
+          actionEvents: [],
+          signals: [
+            {
+              id: 'handoff-dwell',
+              kind: 'cursor-idle',
+              startTime: 4.5,
+              endTime: 5.5,
+              point: { x: 64, y: 36 },
+              recordingPoint: { x: 0.4, y: 0.4 },
+              data: {},
+            },
+          ],
         });
         const library = tx.objectStore('media_library');
         const original = library.get('recording:beta-v1-recording');
@@ -397,7 +438,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         };
         await done;
         db.close();
-      });
+      }, capturedCursor);
       await page.reload();
       await page
         .getByRole('button', { name: /: Screen$/ })
@@ -427,6 +468,52 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      const galleryFocusRow = dialog.locator('[data-ui="cursorFocusPath.timelineKeys"]');
+      await galleryFocusRow.dblclick({
+        position: { x: ((await galleryFocusRow.boundingBox())!.width * 4.5) / duration, y: 10 },
+      });
+      const galleryFocus = dialog.locator('[data-ui="cursorFocusPath.inspector"]:visible');
+      await galleryFocus.getByRole('textbox', { name: 'X', exact: true }).fill('0.35');
+      await galleryFocus.getByRole('textbox', { name: 'X', exact: true }).press('Enter');
+      await expect
+        .poll(async () => {
+          const saved = (await readNativeReviewWorkspace(page, aggregateId))!;
+          return replayReviewHistory(
+            saved.history,
+            saved.cursor,
+            saved.source,
+            reviewDocumentBaseline(saved)
+          ).advancedContent.cursorFocusPath;
+        })
+        .toMatchObject({
+          segments: expect.arrayContaining([
+            expect.objectContaining({
+              keys: expect.arrayContaining([
+                expect.objectContaining({ anchor: 'manual', x: 0.35 }),
+              ]),
+            }),
+          ]),
+        });
+      const authoredWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      const authoredCursorKey = replayReviewHistory(
+        authoredWorkspace.history,
+        authoredWorkspace.cursor,
+        authoredWorkspace.source,
+        reviewDocumentBaseline(authoredWorkspace)
+      )
+        .advancedContent.cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+        .find((key) => key.anchor === 'manual' && key.x === 0.35)!;
+      // Pointer placement has one CSS-pixel tolerance; transfer preserves its exact source time.
+      expect(Math.abs(authoredCursorKey.time - 4.5)).toBeLessThan(
+        duration / (await galleryFocusRow.boundingBox())!.width
+      );
+      await page.screenshot({
+        path: info.outputPath('gallery-authored-cursor.png'),
+        fullPage: false,
+      });
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
         .click();
@@ -727,6 +814,66 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const originalVideos = migrated.clips.filter(
         (clip) => clip.type === 'VIDEO' && clip.trackId === primaryTrack.id
       );
+      const cursorFacts = migrated.cursorTrack!.sourceObservations!;
+      expect(cursorFacts).toHaveLength(1);
+      expect(cursorFacts[0]).toMatchObject({
+        recordingId: 'beta-v1-recording',
+        sourceInstanceId: originalVideos[0]!.sourceInstanceId,
+      });
+      expect(
+        cursorFacts[0]!.samples.map((sample) => ({
+          id: sample.id,
+          time: sample.time,
+          recordingPoint: sample.recordingPoint,
+          observation: sample.observation,
+          captureSegment: sample.captureSegment,
+        }))
+      ).toEqual(
+        capturedCursor.samples.map((sample) => ({
+          id: sample.id,
+          time: sample.time,
+          recordingPoint: sample.recordingPoint,
+          observation: sample.observation,
+          captureSegment: sample.captureSegment,
+        }))
+      );
+      expect(migrated.cursorTrack!.skin.hidden).toBe(true);
+      const transferredFocusKey = migrated
+        .cursorFocusPath!.segments.flatMap((segment) => segment.keys)
+        .find((key) => key.anchor === 'manual' && key.time === authoredCursorKey.time)!;
+      expect(transferredFocusKey.x).toBe(0.35);
+      const nativeFocusKey = page
+        .locator(`[data-cursor-focus-key="${transferredFocusKey.id}"]`)
+        .first();
+      await nativeFocusKey.scrollIntoViewIfNeeded();
+      await nativeFocusKey.click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.cursorFocusPathTitle'),
+          exact: true,
+        })
+        .click();
+      const nativeFocus = page.locator('[data-ui="cursorFocusPath.inspector"]');
+      await expect(nativeFocus.getByRole('textbox', { name: 'X', exact: true })).toHaveValue(
+        '0.35'
+      );
+      await nativeFocus.getByRole('textbox', { name: 'X', exact: true }).fill('0.4');
+      await nativeFocus.getByRole('textbox', { name: 'X', exact: true }).press('Enter');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.cursorFocusPath?.segments
+              .flatMap((segment) => segment.keys)
+              .find((key) => key.id === transferredFocusKey.id)?.x
+        )
+        .toBe(0.4);
+      await checkInspectorPaintedFont(
+        page,
+        nativeFocus.getByRole('textbox', { name: 'X', exact: true }),
+        'cursor-focus-coordinate'
+      );
+      await page.screenshot({ path: info.outputPath('native-edited-cursor.png'), fullPage: false });
       const cameraTrack = migrated.tracks.find((track) => track.role === 'CAMERA')!;
       expect(cameraTrack).toMatchObject({ visible: true, isRoot: false });
       const cameraClips = migrated.clips.filter(

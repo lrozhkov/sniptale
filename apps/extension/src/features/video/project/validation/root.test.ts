@@ -2,7 +2,7 @@ import { createQuickEditBorder, createQuickEditSpotlight } from '../scene/focus-
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
 import { getVideoProjectActionPresentation } from '../action-presentation';
-import { isHydratableVideoProject } from './root';
+import { isHydratableVideoProject, isExportReadyVideoProject } from './root';
 import { createCameraFollowSettings } from '../camera/cursor-policy';
 import { createVideoProjectMotionRegion } from '../motion';
 import { applyVideoProjectMutationPatch } from '../mutation';
@@ -662,7 +662,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 33, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 34, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -702,6 +702,111 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 33 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 34 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
+});
+
+it('admits complete source cursor observations only at schema33 without changing older cursor projects', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { normalizeVideoProjectCursorSkin } = await import('../cursor');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+  });
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.sourceInstanceId = 'instance';
+  const group = {
+    recordingId: 'recording',
+    sourceInstanceId: 'instance',
+    samples: [
+      {
+        id: 'captured',
+        time: 8,
+        x: 640,
+        y: 360,
+        visible: true,
+        recordingPoint: { x: 1, y: 1 },
+        observation: 'observed' as const,
+      },
+    ],
+  };
+  const track = {
+    captureMode: 'embedded-fallback' as const,
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [group],
+  };
+  const changed = applyVideoProjectMutationPatch(project, { cursorTrack: track });
+  expect(changed.version).toBe(33);
+  expect(isHydratableVideoProject(changed)).toBe(true);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  for (let version = 2; version < 33; version++)
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 34 })).toBe(false);
+  expect(isHydratableVideoProject(project)).toBe(true);
+  for (const invalid of [
+    null,
+    { ...group, samples: null },
+    { ...group, samples: [null] },
+    { ...group, samples: [{ ...group.samples[0], id: '' }] },
+    { ...group, samples: [{ ...group.samples[0], x: NaN }] },
+    { ...group, samples: [{ ...group.samples[0], visible: 'yes' }] },
+    { ...group, samples: [{ ...group.samples[0], observationClockId: 12 }] },
+    { ...group, samples: [{ ...group.samples[0], interpolation: 'unknown' }] },
+    { ...group, samples: [{ ...group.samples[0], interpolationRange: { start: 0.8, end: 0.2 } }] },
+    { ...group, samples: [{ ...group.samples[0], skinOverride: { hidden: true } }] },
+    { ...group, samples: [{ ...group.samples[0], recordingPoint: { x: 1, y: 1, other: true } }] },
+    { ...group, other: true },
+    { ...group, recordingId: 'other' },
+    { ...group, sourceInstanceId: 'other' },
+    { ...group, recordingId: ' recording' },
+    { ...group, samples: [{ ...group.samples[0], time: 9 }] },
+    { ...group, samples: [{ ...group.samples[0], time: Infinity }] },
+    { ...group, samples: [{ ...group.samples[0], recordingPoint: { x: 2, y: 0 } }] },
+    {
+      ...group,
+      samples: [
+        {
+          ...group.samples[0],
+          sourceAnchor: {
+            kind: 'recording-source',
+            recordingId: 'recording',
+            sourceClipId: clip.id,
+            sourceTime: 8,
+          },
+        },
+      ],
+    },
+    { ...group, samples: [{ ...group.samples[0], timeBasis: 'project' }] },
+    { ...group, samples: [{ ...group.samples[0], captureSegment: 0.5 }] },
+    { ...group, samples: [{ ...group.samples[0], observation: 'invented' }] },
+    { ...group, samples: [...group.samples, ...group.samples] },
+    {
+      ...group,
+      samples: [
+        { ...group.samples[0], time: 7 },
+        { ...group.samples[0], id: 'out-of-order', time: 6 },
+      ],
+    },
+  ])
+    expect(
+      isExportReadyVideoProject({
+        ...changed,
+        cursorTrack: { ...track, sourceObservations: [invalid] },
+      }),
+      JSON.stringify(invalid)
+    ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...changed,
+      cursorTrack: { ...track, sourceObservations: [group, group] },
+    })
+  ).toBe(false);
 });

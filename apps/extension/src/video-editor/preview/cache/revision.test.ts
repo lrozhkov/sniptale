@@ -470,3 +470,49 @@ it('invalidates rendered camera frames when actual media timing changes', async 
   clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
   await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
 });
+
+it('invalidates cached frames when full cursor facts outside the segment change', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../features/video/project/factories/creation');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../features/video/project/cursor');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cursor',
+    filename: 'cursor.webm',
+    width: 1280,
+    height: 720,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  project.version = 33;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected source');
+  clip.sourceInstanceId = 'instance';
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'cursor',
+        sourceInstanceId: 'instance',
+        samples: [
+          {
+            id: 'outside',
+            time: 8,
+            x: 1280,
+            y: 720,
+            visible: true,
+            recordingPoint: { x: 1, y: 1 },
+          },
+        ],
+      },
+    ],
+  };
+  const range = { startFrame: 0, endFrame: project.fps * 2 };
+  const before = await createVideoPreviewSegmentRevision(project, range);
+  const group = project.cursorTrack.sourceObservations![0]!;
+  group.samples[0] = { ...group.samples[0]!, recordingPoint: { x: 0.8, y: 1 } };
+  await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
+});

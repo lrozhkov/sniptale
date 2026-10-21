@@ -1,3 +1,4 @@
+import { deriveRecordedCursorFocusPath } from './recorded';
 import {
   simplifyCursorFocusPath,
   finishCapturedCursorSegment,
@@ -34,7 +35,7 @@ export function deriveProjectCursorFocusPath(
   appendProjectDwellAnchors(segments, project);
   appendProjectReleaseAnchors(segments, occurrences);
   segments.forEach(finishCapturedCursorSegment);
-  return simplifyCursorFocusPath(
+  const legacy = simplifyCursorFocusPath(
     {
       version: 1,
       smoothing: 0.5,
@@ -47,6 +48,135 @@ export function deriveProjectCursorFocusPath(
     },
     retainedKeyId
   );
+  return {
+    ...legacy,
+    segments: [...legacy.segments, ...deriveSourceObservationFocusSegments(project, retainedKeyId)],
+  };
+}
+
+function deriveSourceObservationFocusSegments(
+  project: VideoProject,
+  retainedKeyId?: string,
+  observed = false
+): CursorFocusSegment[] {
+  return (project.cursorTrack?.sourceObservations ?? []).flatMap((group) => {
+    const clip = project.clips.find(
+      (item) => item.type === 'VIDEO' && item.sourceInstanceId === group.sourceInstanceId
+    );
+    const asset =
+      clip?.type === 'VIDEO' ? project.assets.find((item) => item.id === clip.assetId) : undefined;
+    if (!asset || !project.cursorTrack || !asset.metadata.duration) return [];
+    const source = { ...asset.metadata, duration: asset.metadata.duration };
+    const actionEvents = project.actionEvents.flatMap((event) => {
+      const anchor = event.anchor;
+      return anchor.kind === 'recording-source' &&
+        anchor.recordingId === group.recordingId &&
+        anchor.sourceInstanceId === group.sourceInstanceId
+        ? [
+            {
+              id: event.id,
+              kind: event.kind,
+              time: anchor.sourceTime,
+              recordingPoint: event.point,
+              data: event.data,
+            },
+          ]
+        : [];
+    });
+    const signals = (project.actionFeedback ?? []).flatMap((feedback) =>
+      feedback.recordingId === group.recordingId &&
+      feedback.sourceInstanceId === group.sourceInstanceId
+        ? feedback.signals.map((signal) => ({
+            ...signal,
+            id: `${group.sourceInstanceId}:${signal.id}`,
+          }))
+        : []
+    );
+    const path = deriveRecordedCursorFocusPath(
+      {
+        cursorTrack: {
+          ...project.cursorTrack,
+          samples: group.samples.map((sample) => ({
+            ...sample,
+            id: `${group.sourceInstanceId}:${sample.id}`,
+          })),
+        },
+        actionEvents,
+        signals,
+      },
+      source,
+      observed,
+      retainedKeyId
+    );
+    return path.segments.map((segment) => ({
+      ...segment,
+      binding: {
+        kind: 'recording-source' as const,
+        recordingId: group.recordingId,
+        sourceInstanceId: group.sourceInstanceId,
+      },
+    }));
+  });
+}
+
+const sourceObservationPaths = new WeakMap<VideoProject, CursorFocusSegment[]>();
+
+/** Trusted captured geometry uses the complete source run, independently of focus edits and skin. */
+export function resolveProjectSourceCursorObservation(
+  project: VideoProject,
+  time: number,
+  sourceClipId?: string,
+  options?: { includeSourceEnd?: boolean }
+): VideoProjectCursorSample | null | undefined {
+  const groups = project.cursorTrack?.sourceObservations;
+  if (!groups?.length) return undefined;
+  const clip = project.clips.find(
+    (item) =>
+      item.type === 'VIDEO' &&
+      (!sourceClipId || item.id === sourceClipId) &&
+      time >= item.startTime &&
+      (time < item.startTime + item.duration ||
+        (options?.includeSourceEnd && time === item.startTime + item.duration)) &&
+      groups.some((group) => group.sourceInstanceId === item.sourceInstanceId)
+  );
+  if (!clip || clip.type !== 'VIDEO') return undefined;
+  const group = groups.find((item) => item.sourceInstanceId === clip.sourceInstanceId)!;
+  let segments = sourceObservationPaths.get(project);
+  if (!segments) {
+    segments = deriveSourceObservationFocusSegments(project, undefined, true);
+    sourceObservationPaths.set(project, segments);
+  }
+  const sourceTime =
+    time === clip.startTime + clip.duration
+      ? clip.sourceStart + clip.sourceDuration
+      : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
+  for (const [index, segment] of segments.entries()) {
+    if (
+      segment.binding.kind !== 'recording-source' ||
+      segment.binding.sourceInstanceId !== group.sourceInstanceId
+    )
+      continue;
+    const point = evaluateCursorFocusSegment(segment, sourceTime, 0.5);
+    if (!point) continue;
+    return {
+      id: segment.id,
+      time,
+      x: point.x * project.width,
+      y: point.y * project.height,
+      visible: true,
+      observation: 'observed',
+      captureSegment: index,
+      recordingPoint: { x: point.x, y: point.y },
+      interpolation: 'LINEAR',
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: group.recordingId,
+        sourceClipId: clip.id,
+        sourceTime,
+      },
+    };
+  }
+  return null;
 }
 
 /** Resolves one retained source run; a cut, gap or independent instance cannot be interpolated. */
@@ -229,6 +359,15 @@ function deriveCapturedCursorSegments(project: VideoProject): CursorFocusSegment
     .flatMap((sample) => {
       const clip = sample.sourceAnchor ? clips.get(sample.sourceAnchor.sourceClipId) : undefined;
       if (sample.sourceAnchor && !clip) return [];
+      if (
+        clip?.type === 'VIDEO' &&
+        project.cursorTrack?.sourceObservations?.some(
+          (group) =>
+            group.sourceInstanceId === clip.sourceInstanceId &&
+            group.recordingId === sample.sourceAnchor?.recordingId
+        )
+      )
+        return [];
       const binding: CursorFocusBinding =
         sample.sourceAnchor && clip
           ? {

@@ -35,12 +35,16 @@ export const LOCAL_OWNER_MAPPINGS = [
   {
     owner: 'review-project-conversion-branches',
     productionFile: 'apps/extension/src/features/video/review/project-conversion.ts',
+    allowCrossOwner: true,
     reason:
-      'Conversion admission preserves core, recorded action and whole voice document branches.',
+      'Conversion preserves source branches and rejects stale snapshots before destination publication.',
     testFiles: [
       'apps/extension/src/features/video/review/project-conversion.test.ts',
       'apps/extension/src/features/video/review/project-conversion.actions.test.ts',
       'apps/extension/src/features/video/review/project-conversion.voiceover.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.cursor.test.ts',
+      'apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
     ],
   },
   {

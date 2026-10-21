@@ -9,7 +9,7 @@ export { isBoolean, isString };
 export const isRecord = isPlainRecord;
 export const isFiniteNumber = isNumber;
 
-const MAX_VIDEO_PROJECT_ITEMS = 5_000;
+export const MAX_VIDEO_PROJECT_ITEMS = 5_000;
 export const MAX_VIDEO_PROJECT_DIMENSION = 16_384;
 export const MAX_VIDEO_PROJECT_DURATION_SECONDS = 86_400;
 export const MAX_VIDEO_PROJECT_FPS = 240;

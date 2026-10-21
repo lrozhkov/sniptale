@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../../../features/video/project/cursor-source-observations';
 import { resolveVideoCompositionActionSourceMapping } from '../../../features/video/composition/timeline/frame/actions';
 import { mapSourceNormalizedPointToVisualLayer } from '../../../features/video/composition/draw/fitted-media';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
@@ -215,7 +216,11 @@ function reconcileCursorTrack(
   timelines: Map<string, RecordingClipTimeline>,
   splitLineage?: ReadonlyMap<string, string>
 ): VideoProject['cursorTrack'] {
-  if (nextProject.cursorTrack !== previousProject.cursorTrack || nextProject.cursorTrack === null) {
+  if (
+    nextProject.cursorTrack === null ||
+    (nextProject.cursorTrack !== previousProject.cursorTrack &&
+      !nextProject.cursorTrack.sourceObservations?.length)
+  ) {
     return nextProject.cursorTrack;
   }
 
@@ -225,6 +230,15 @@ function reconcileCursorTrack(
         return [sample];
       }
       const recordingId = sample.sourceAnchor.recordingId;
+      const owner = nextProject.clips.find((clip) => clip.id === sample.sourceAnchor?.sourceClipId);
+      if (
+        owner?.type === 'VIDEO' &&
+        nextProject.cursorTrack?.sourceObservations?.some(
+          (group) =>
+            group.recordingId === recordingId && group.sourceInstanceId === owner.sourceInstanceId
+        )
+      )
+        return [sample];
       const { previousClips, nextClips } = timelines.get(recordingId) ?? {
         previousClips: [],
         nextClips: [],
@@ -246,7 +260,22 @@ function reconcileCursorTrack(
     })
     .sort((left, right) => left.time - right.time);
 
-  return samples.length > 0 ? { ...nextProject.cursorTrack, samples } : null;
+  const inheritedClips = new Map(
+    previousProject.clips.flatMap((clip) => {
+      const trailingId = splitLineage?.get(clip.id);
+      return clip.type === 'VIDEO' && trailingId ? [[trailingId, clip] as const] : [];
+    })
+  );
+  return materializeVideoProjectCursorSourceObservations(
+    {
+      ...nextProject,
+      cursorTrack:
+        samples.length > 0 || nextProject.cursorTrack.sourceObservations
+          ? { ...nextProject.cursorTrack, samples }
+          : null,
+    },
+    inheritedClips
+  );
 }
 
 function reconcileMotionRegions(
@@ -333,6 +362,10 @@ export function reconcileRecordingInteractionAnchors(
   splitLineage?: ReadonlyMap<string, string>
 ): VideoProject {
   if (previousProject.id !== nextProject.id) return nextProject;
+  nextProject = {
+    ...nextProject,
+    ...reconcileVideoProjectInteractionSources(previousProject, nextProject),
+  };
   const timelines = collectRecordingClipTimelines(previousProject, nextProject);
   const events = reconcileActionEvents(nextProject);
   const motionRegions = reconcileMotionRegions(
@@ -357,7 +390,6 @@ export function reconcileRecordingInteractionAnchors(
   }
   return {
     ...nextProject,
-    ...reconcileVideoProjectInteractionSources(previousProject, nextProject),
     actionEvents: events,
     cursorTrack: reconcileCursorTrack(previousProject, nextProject, timelines, splitLineage),
     ...(objectTracks === undefined ? {} : { objectTracks }),

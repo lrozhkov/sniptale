@@ -311,3 +311,61 @@ it('retains the complete ordinary click style through Gallery handoff and projec
   expect(result.actionFeedback![0]!.gestureStyles).toEqual(accepted);
   expect(project).toEqual(before);
 });
+
+it('keeps full-source movement controls stable when the handoff is retried', () => {
+  const project = recording();
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Expected source instance');
+  const samples = [0, 4, 8].map((time, index) => ({
+    id: `raw:${index}`,
+    time,
+    x: [0.2, 0.7, 0.6][index]! * project.width,
+    y: 0.5 * project.height,
+    visible: true,
+    recordingPoint: { x: [0.2, 0.7, 0.6][index]!, y: 0.5 },
+    observation: 'observed' as const,
+    captureSegment: 0,
+  }));
+  const rawTrack: VideoProjectCursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: { ...normalizeVideoProjectCursorSkin(undefined), hidden: true },
+    samples,
+  };
+  project.version = 33;
+  project.cursorTrack = {
+    ...rawTrack,
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'recording',
+        sourceInstanceId: clip.sourceInstanceId,
+        samples: structuredClone(samples),
+      },
+    ],
+  };
+  const original = structuredClone(project);
+  const path = updateCursorFocusKey(
+    deriveReviewCursorFocusPath({ cursorTrack: rawTrack, actionEvents: [], signals: [] }, project),
+    'raw:1',
+    { outgoing: { x: 0.75, y: 0.65 } }
+  );
+  const content = {
+    ...createQuickEditAdvancedContent(),
+    cursorFocusPath: authoredCursorFocusPath(path),
+  };
+  const first = applyRecordingReviewInteractions(project, 'recording', content);
+  const retried = applyRecordingReviewInteractions(first, 'recording', content);
+  expect(retried.cursorFocusPath).toEqual(first.cursorFocusPath);
+  expect(retried.cursorFocusPath?.segments[0]?.id).toBe(`segment:${clip.sourceInstanceId}:raw:0`);
+  expect(
+    resolveProjectCursorFocusPath(retried).segments.flatMap((segment) => segment.keys)
+  ).toContainEqual(
+    expect.objectContaining({
+      id: `${clip.sourceInstanceId}:raw:1`,
+      outgoing: { x: 0.75, y: 0.65 },
+      authored: true,
+    })
+  );
+  expect(retried.cursorTrack?.sourceObservations).toEqual(original.cursorTrack?.sourceObservations);
+  expect(project).toEqual(original);
+});

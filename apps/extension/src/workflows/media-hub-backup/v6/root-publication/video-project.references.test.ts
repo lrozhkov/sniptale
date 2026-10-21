@@ -336,6 +336,82 @@ it('publishes a recording source only after resolving it through the restored ro
   expect(projects[0]!.project.assets[0]!.source.recordingId).toBe('restored-recording');
 });
 
+it('restores schema33 cursor source facts when duplicate restore remaps the recording', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../features/video/project/factories/creation');
+  const { createVideoProjectCursorTrack } =
+    await import('../../../../features/video/project/defaults');
+  const { materializeVideoProjectCursorSourceObservations } =
+    await import('../../../../features/video/project/cursor-source-observations');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } =
+    await import('../../../../features/video/project/validation/root');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cursor-original',
+    filename: 'cursor.webm',
+    width: 100,
+    height: 100,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 6,
+  });
+  project.id = 'p';
+  project.version = 33;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Expected source instance');
+  const samples = [0, 3, 5].map((time) => ({
+    id: `raw:${time}`,
+    time,
+    x: 20,
+    y: 30,
+    visible: true,
+    recordingPoint: { x: 0.2, y: 0.3 },
+    observation: 'observed' as const,
+    captureSegment: 0,
+    observationClockId: 'clock:original',
+  }));
+  project.cursorTrack = {
+    ...createVideoProjectCursorTrack('embedded-fallback'),
+    sourceObservations: [
+      { recordingId: 'cursor-original', sourceInstanceId: clip.sourceInstanceId, samples },
+    ],
+  };
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const before = structuredClone(project);
+  const base = createVideoProjectEntryWithMediaClip();
+  const metadata = portableMetadata({
+    entry: { ...base, id: 'p', project: encodePortableVideoProjectAssetRefs(project) },
+    projectAssets: [],
+    projectExports: [],
+  });
+  const values = new Map<string, unknown[]>();
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  await expect(
+    videoProjectRootPublisher.publish(
+      publishArgs(metadata, [], {
+        'media:library-item:recording:cursor-original': 'recording:cursor-restored',
+      })
+    )
+  ).resolves.toMatchObject({ imported: true });
+  const entries = values.get('video_projects') as Array<{ project: typeof project }>;
+  const restored = entries[0]!.project;
+  expect(parseHydratableVideoProject(restored)).not.toBeNull();
+  expect(isExportReadyVideoProject(restored)).toBe(true);
+  expect(restored.cursorTrack!.sourceObservations).toEqual([
+    {
+      recordingId: 'cursor-restored',
+      sourceInstanceId: clip.sourceInstanceId,
+      samples,
+    },
+  ]);
+  expect(
+    restored.cursorTrack!.samples.every(
+      (sample) => sample.sourceAnchor?.recordingId === 'cursor-restored'
+    )
+  ).toBe(true);
+  expect(project).toEqual(before);
+});
+
 it('publishes scenario project and child sources only after exact restored mappings exist', async () => {
   const values = new Map<string, unknown[]>();
   mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));

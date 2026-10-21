@@ -1,3 +1,4 @@
+import { hasValidVideoProjectCursorSourceObservations } from '../cursor-source-observations';
 import {
   parseVideoProjectSourceVoiceoverDocuments,
   hasValidVideoProjectSourceVoiceoverReferences,
@@ -123,8 +124,11 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 32) &&
+    isBoundedNumber(version, 2, 33) &&
     Number.isInteger(version) &&
+    (version >= 33 ||
+      !isRecord(value['cursorTrack']) ||
+      value['cursorTrack']['sourceObservations'] === undefined) &&
     (version >= 31 ||
       (value['sourceVoiceoverDocuments'] === undefined &&
         (!Array.isArray(value['sourceAudioDocuments']) ||
@@ -296,7 +300,8 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
               occurrence.clipId === region.targetAction.clipId
           ))
     ) &&
-    hasValidInteractionAnchorReferences(project)
+    hasValidInteractionAnchorReferences(project) &&
+    hasValidVideoProjectCursorSourceObservations(project)
   );
 }
 

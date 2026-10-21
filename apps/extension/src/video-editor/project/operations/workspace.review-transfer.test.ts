@@ -369,9 +369,10 @@ it.each([
   expect(saveVideoProject).not.toHaveBeenCalled();
 });
 
-it('keeps unsupported cursor facts intact and refuses conversion before save', async () => {
-  await transferFixture();
-  getRecordingTelemetry.mockResolvedValue({
+it('transfers captured cursor facts without changing Gallery or painting a new pointer', async () => {
+  const snapshot = await transferFixture();
+  const before = structuredClone(snapshot);
+  const telemetry = {
     recordingId: 'recording-1',
     createdAt: 1,
     updatedAt: 2,
@@ -390,11 +391,26 @@ it('keeps unsupported cursor facts intact and refuses conversion before save', a
       },
     },
     actionEvents: [],
+  };
+  const captured = structuredClone(telemetry);
+  getRecordingTelemetry.mockResolvedValue(telemetry);
+  const result = await loadInitialProjectFromLocation();
+  expect(result.project!.cursorTrack).toMatchObject({
+    skin: { ...telemetry.cursorTrack.skin, hidden: true },
+    sourceObservations: [
+      {
+        recordingId: 'recording-1',
+        samples: [expect.objectContaining({ id: 'sample', time: 0.5, visible: true })],
+      },
+    ],
   });
-  await expect(loadInitialProjectFromLocation()).rejects.toThrow(
-    'Review project settings cannot be transferred.'
+  expect(saveVideoProject).toHaveBeenCalledTimes(1);
+  expect(saveVideoProject).toHaveBeenCalledWith(
+    expect.objectContaining({ id: result.project!.id }),
+    { baseRevision: null, expectedReviewWorkspace: snapshot.workspace }
   );
-  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(telemetry).toEqual(captured);
+  expect(snapshot).toEqual(before);
 });
 
 it('claims existing accepted audio resources without copying bytes and retries a missing resource', async () => {

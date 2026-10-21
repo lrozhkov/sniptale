@@ -629,3 +629,18 @@ Gallery conversion creates a linked camera placement for each retained source sl
 Preview, export, thumbnails, and crop previews use the media clock. Source text and camera controls use the authored clock. Unmuted camera audio uses only the covered media interval. Project audio scopes retain authored intervals. Recognition maps those intervals to media time for decoding. Recognized text retains authored time. Existing gain and fade phases retain their authored times.
 
 The existing project mutation owner promotes edits that contain `cameraTiming` to schema 32. Existing history, resource admission, retention, and guarded publication owners retain authority. This field adds no writer, store, or physical database migration.
+
+
+## Montage cursor source observations
+
+Montage schema 33 admits optional `cursorTrack.sourceObservations`. Earlier schemas refuse this field. Each group names one recording and one live video source instance. Its samples retain native source time, normalized recording points, capture segments, observation clocks, and observation gaps.
+
+Raw recording observations follow the existing recording admission policy. The group collection and manual timeline samples retain the existing project item limits. Complete source observations can exceed the manual sample limit. Admission bounds projected samples by the retained source count and the number of owning clips. Missing instances, conflicting assets, invalid source times, duplicate identities, and malformed observation fields refuse admission.
+
+The existing cursor owner materializes ordinary project-time samples for each retained clip. It interpolates cut boundaries from the full source observations. Trim, rate, move, split, and hydration repeat this projection without deleting source facts. Stable sample identities retain explicit Native appearance and interpolation edits. Duplication gives the copied group a new source instance. Removal of the last owning clip removes only that instance. History retains the previous snapshot for Undo.
+
+Both editors use the same captured focus derivation. Full-source movement, click, release, and dwell facts determine the preferred trajectory before montage projection. Sparse manual geometry and Bezier controls remain separate authored state. Trusted observations use their complete source coverage and linear captured geometry. A cursor skin or focus edit cannot create an observation inside a capture gap.
+
+Gallery conversion retains every observation, including observations inside cuts. It maps authored focus identities to the destination source instance. Gallery paints no independent cursor. The destination retains captured appearance controls with a hidden skin until the user changes them.
+
+The existing immutable project revision owns derived focus caches. Preview cache signatures include complete retained source observations. A source fact outside the visible clip can affect its inferred trajectory. This field adds no storage writer, resource store, or deletion authority. Existing guarded publication and source retention contracts remain authoritative.

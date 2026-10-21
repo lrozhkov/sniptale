@@ -148,7 +148,15 @@ export interface VideoProjectCursorSkin {
   shadow: boolean;
 }
 
+/** Full captured source observations survive cuts; authored focus remains separate. */
+export interface VideoProjectCursorSourceObservations {
+  recordingId: string;
+  sourceInstanceId: string;
+  samples: VideoProjectCursorSample[];
+}
+
 export interface VideoProjectCursorTrack {
+  sourceObservations?: VideoProjectCursorSourceObservations[];
   captureMode: VideoCursorCaptureMode;
   samples: VideoProjectCursorSample[];
   skin: VideoProjectCursorSkin;

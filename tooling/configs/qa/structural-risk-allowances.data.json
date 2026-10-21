@@ -1711,10 +1711,10 @@
       "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Optional schema26 joins extend the existing portable bookend duplicate matrix. All cases use the same publisher, database capture, portable encoder and staged-object helpers. Preset transitions and clip-edge joins add root data, with no independent fixture, operation or lifecycle. Each invocation creates its own database capture. Independent read-only diagnosis inspected the exact baseline and candidate bodies. Complete-candidate architecture review remains required.",
+      "reason": "tool-noise: The file tests the existing portable project reference-remap contract. The candidate adds one schema33 cursor group case through the same publisher, database capture, and portable encoder. Each invocation creates its own capture. No independent fixture, writer, or lifecycle enters the file. Score4 and cohesion1 remain unchanged. Main inspected the exact diff and failed-before restore proof. Final independent architecture review must validate this classification.",
       "removalCondition": "Remove when the file body or signature changes. Reassess unrelated proof or an independent fixture, operation or lifecycle. Remove when the analyzer recognizes this reference-remap proof boundary.",
-      "astHash": "8ceb4e171ad471c039309023d0355e55e6c9a5e006ed9a2543812e0c04952ae0",
-      "signatureHash": "88547062d221fa4397cc7320aa5aab74e7ef56c25a512cc8d0d1e566286ce526",
+      "astHash": "4bb6d791b4730f3a158b6ece35aca987beb05f1c645ff5d6754a3bfcf81f356b",
+      "signatureHash": "5b2992839794719a9ad0e40d9b6a4d9fc4d9fec863b0c167dbec310ee3eb7b02",
       "reviewDate": "2026-10-21"
     },
     {
@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: The converter returns one detached project or one refusal. Clip identities, linked groups, schema admission, and final validation share that result. The document variable is domain data. It is not a DOM authority. The mapper owns camera projection. Splitting the conversion by property group would fragment the admission. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: The planner returns one detached project or one typed refusal. The separate cursor codec admits source facts. Timeline, group, and project receivers belong to the same candidate. Source rebinding changes a prepared clone. No DOM, writer, acquisition, or recovery authority enters this function. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "414521be3c2625ff7d22c4d98dbbfd65630267af39cec1966c2c92bf0a7ae6f0",
+      "astHash": "dc26eb02724efb95a4bebd761a9a9124a6d11751b4f045c53a4bfb79f5259f0f",
       "signatureHash": "4723efd60b994dfbbad28fa1cfb6e50a6a8faeb21d3ab9bd0c06f17c43462415"
     },
     {
@@ -1788,10 +1788,10 @@
       "file": "apps/extension/src/features/video/project/library-source-removal.ts",
       "symbol": "removeVideoProjectLibrarySources",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This existing pure removal transaction filters one project and admits one reconciled result. Its callbacks use the domain name document. The analyzer incorrectly counts those call arguments as DOM effects. There is no DOM access or durable writer. The candidate retains passive replacement references under the same removal contract. Its score and authority count do not increase.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: The function builds one detached source-removal candidate. Cursor materialization depends on completed source reconciliation. It adds no writer, resource lifetime, or recovery authority. The document receiver is project data, not DOM state. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "afdc6d191f69839a3f4182bb6ef8b2c5df2fe63b824a87206cc598dfdb4f9c60",
+      "astHash": "b56f758aaed9e6366e295a2bc940491c0d2ed5626e516367c96c14b9f28e53a2",
       "signatureHash": "58c03c15049ca1538b319a2ae8e3d3b8e3b4631a64a5e8980feff8d6b566a8d3"
     },
     {
@@ -1832,10 +1832,10 @@
       "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
       "symbol": "<file>",
       "owner": "qa:focused-coverage",
-      "reason": "tool-noise: This existing file contains one declarative owner mapping list. The candidate adds five exact mappings for moved consumer proof. It adds no executable state, effects, runtime authority, or fallback selection. The analyzer reports zero owner and state receivers. File length alone exceeds the budget. The same resolver checks every entry and its referenced test files.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new authority or fallback behavior. Remove when the analyzer models this data or pure codec. Independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: The file contains the existing declarative owner mapping list. This candidate adds three exact test consumers to one conversion mapping. It adds no executable state, effects, runtime authority, or fallback selection. The analyzer reports zero owner and state receivers. The existing resolver uses the mapped test paths. Main inspected the exact diff. Final independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive proof or declarative mapping.",
       "reviewDate": "2026-10-21",
-      "astHash": "b3f0f5c63d442a31253d37081259aec76cf564346060235808f7e10c36c97138",
+      "astHash": "ef8637d151af213aee3c8256ad426c413efafeed7e28c74fe401befc9142a9a0",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -1865,21 +1865,21 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: These tests prove material identity and retention through montage with existing harness adapters. The pages, storage fixtures, and disposable canvases are local test receivers. The tests add no shared production state or product authority. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: The file contains two independent acceptance scenarios. Each scenario owns its local data. Existing helpers own encoding. There is no shared mutable fixture authority. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "424d923ba3c0eb94048de65052408e91611f6e482cdb7e62b1eea7deb937da13",
-      "signatureHash": "0ab65f1c6d0605a59b6b3aee07bda86be69005d9503c6399f5a8bb3a2d788aa9"
+      "astHash": "c06e7adf5eb19f9bf52e1e554b732bae45ac38ac96fe1b88ec48ca32dfdddb8b",
+      "signatureHash": "3814c13aa76db84153db5f3bd107073b598bef134c25e1a7714356426b972ecd"
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "test callback#2",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One continuous chain carries an authored Gallery snapshot into one Native root. It edits the transferred camera and images, adds footage and effects, reopens, removes the Gallery project, and exports the surviving root. Continuity proves acceptance. One host lifetime ends in finally. Existing export helpers own encoding and decoding. There is no independent recovery domain. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: The callback proves one continuous Gallery-to-montage identity, authored cursor and camera edits, source purge, reopen, and export. Splitting phases into seeded tests would lose the continuity proof. The existing host cleanup remains in one finally block. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "49a0bfd17afe876176de4f391a80549de2b3f090e9116d458ba1030f76357578",
+      "astHash": "7c6a92b05e488dba5479643f167711dc5f916209e6e76b58926e887fd059d86c",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -1920,11 +1920,44 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This fixture tests one resource acquisition and publication protocol. Codec admission, render order, controlled pending reads, refusal, and retry use the same receiver. Local observations do not own product state. Each case resets the fixture. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: The file tests one saved Gallery transfer contract with local recording and workspace fixtures. This candidate replaces an obsolete cursor refusal expectation with successful transfer, unchanged source data, and guarded save assertions. It adds no shared mutable fixture, writer, or recovery authority. Main inspected the exact diff. Final independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive proof or declarative mapping.",
       "reviewDate": "2026-10-21",
-      "astHash": "1163f1a28fb8581a34f5fed3c21e155a97be2ebc8e4a20d9b0f058997dd4e27a",
+      "astHash": "7983d608a510e9053d2472f111af315e5fb9140ece6deb69bc810630208d5ad3",
       "signatureHash": "edd3a82a1855a71d86918c661ffc42be5d76cb51af17de2539b8302a3a7b74c1"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/project/validation/root.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This file proves one canonical project admission and schema contract. Its fixtures are local. It has one owner, no effects, and no shared mutable fixture authority. A split would separate variants of the same admission contract. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
+      "astHash": "e0dca729c5e71437f89242589af746727d6610828055e254765aaa78ed7e85bd",
+      "signatureHash": "b167bb3909d41021acd6e910f40bb1e2d179212c910e44305c4d7cc95fb1f5ea",
+      "reviewDate": "2026-10-21"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/project/state/clip-timeline/split.ts",
+      "symbol": "duplicateProjectClipsWithResult",
+      "owner": "extension:video-editor:project",
+      "reason": "tool-noise: The function owns one clip-copy operation. Source, action, cursor, and clip maps share the same copy result. The new ephemeral clip lineage preserves controls during cursor materialization before the existing placement decision. It adds no state authority, writer, resource lifetime, or recovery operation. Main inspected the exact diff. Final independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, state authority, resource lifetime, recovery, or mutable shared receiver. Remove when the analyzer models this cohesive operation.",
+      "astHash": "15a613608dc352809230f00465bb657695ed99065b7f0e65130c9c845391d885",
+      "signatureHash": "2abd97726f02c737e2c12169636897aa31d5b4841dc800499a98ed5eff07a40d",
+      "reviewDate": "2026-10-21"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/project/cursor-source-observations.ts",
+      "symbol": "materializeVideoProjectCursorSourceObservations",
+      "owner": "extension:app-core:features",
+      "astHash": "f9f17eaf6508995dce69bd53b70290413a7603014584b32ff18b6a79347bfa6d",
+      "signatureHash": "5f5b890416ea0b4deb1e2d54dd91251b2bf12997e913836bfda80c12effafba3",
+      "reviewDate": "2026-10-21",
+      "reason": "tool-noise: The pure function produces one ordinary cursor track from retained source facts. Clip filtering, source boundaries, stable IDs, and inherited appearance controls share that result. Explicit caller-owned clip lineage carries no writer or lifetime authority. The function has zero effects and cohesion1. Main inspected the exact implementation and failed-before split/copy proof. Final independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, state authority, resource lifetime, recovery, or mutable shared receiver. Remove when the analyzer models this cohesive operation."
     }
   ]
 }

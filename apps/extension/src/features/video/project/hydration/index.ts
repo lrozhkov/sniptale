@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../cursor-source-observations';
 import { createVideoProjectSource } from '../defaults';
 import { getDefaultCursorHidden, normalizeVideoProjectCursorSkin } from '../cursor';
 import { normalizeClip } from './clip';
@@ -186,7 +187,10 @@ export function hydrateVideoProject(
   } satisfies VideoProject;
 
   const synchronizedProject = syncProjectTransitions(
-    hydrateRecordingInteractionAnchors(hydratedProject)
+    hydrateRecordingInteractionAnchors({
+      ...hydratedProject,
+      cursorTrack: materializeVideoProjectCursorSourceObservations(hydratedProject),
+    })
   );
   return {
     ...synchronizedProject,

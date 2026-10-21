@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { expect, it } from 'vitest';
 import { setup } from '../insertion/material.test-support';
@@ -154,4 +155,234 @@ it('rejects locks and end-of-track commands without publishing a document or his
   store.getState().swapClip(first.id, 'right');
   expect(store.getState().project).toBe(before.project);
   expect(store.getState().projectHistory).toBe(before.projectHistory);
+});
+
+it('preserves cursor source facts and independent keys through split, duplicate, removal, Undo and reopen', () => {
+  const { store, asset } = setup();
+  asset.source = { kind: 'recording', recordingId: 'cursor-recording' };
+  store.getState().appendMaterial(asset.id, { start: 0, end: 6 });
+  const project = store.getState().project!;
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Expected source');
+  const instance = clip.sourceInstanceId;
+  const raw = [
+    {
+      id: 'raw-a',
+      time: 0,
+      x: 0,
+      y: 0,
+      visible: true,
+      observation: 'observed' as const,
+      recordingPoint: { x: 0, y: 0 },
+      interpolation: 'LINEAR' as const,
+    },
+    {
+      id: 'raw-b',
+      time: 6,
+      x: 1280,
+      y: 720,
+      visible: true,
+      observation: 'observed' as const,
+      recordingPoint: { x: 1, y: 1 },
+      interpolation: 'LINEAR' as const,
+    },
+  ];
+  store.setState({
+    project: {
+      ...project,
+      version: 33,
+      cursorTrack: {
+        captureMode: VideoCursorCaptureMode.SEPARATE,
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [],
+        sourceObservations: [
+          { recordingId: 'cursor-recording', sourceInstanceId: instance, samples: raw },
+        ],
+      },
+      cursorFocusPath: {
+        version: 1,
+        smoothing: 0.5,
+        sensitivity: 1,
+        mode: 'follow',
+        gapPolicy: 'hold',
+        segments: [
+          {
+            id: 'authoring',
+            binding: {
+              kind: 'recording-source',
+              recordingId: 'cursor-recording',
+              sourceInstanceId: instance,
+            },
+            start: 0,
+            end: 6,
+            keys: [
+              {
+                id: `focus-override:${instance}:raw-a`,
+                time: 0,
+                x: 0.2,
+                y: 0.3,
+                anchor: 'manual',
+                authored: true,
+                interpolation: 'smooth',
+              },
+              {
+                id: `${instance}:raw-b`,
+                time: 6,
+                x: 1,
+                y: 1,
+                anchor: 'movement',
+                authored: true,
+                interpolation: 'smooth',
+              },
+              {
+                id: `end:segment:${instance}:raw-b`,
+                time: 6,
+                x: 1,
+                y: 1,
+                anchor: 'boundary',
+                authored: true,
+                interpolation: 'smooth',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  });
+  const capturedProject = store.getState().project!;
+  store.setState({
+    project: {
+      ...capturedProject,
+      cursorTrack: materializeVideoProjectCursorSourceObservations(capturedProject),
+    },
+  });
+  const endSample = store
+    .getState()
+    .project!.cursorTrack!.samples.find((sample) => sample.sourceAnchor?.sourceTime === 6)!;
+  store.getState().updateCursorSampleSkinOverride(endSample.id, { color: '#00ffaa' });
+  const editedProject = store.getState().project!;
+  store.setState({
+    project: {
+      ...editedProject,
+      cursorTrack: {
+        ...editedProject.cursorTrack!,
+        samples: editedProject.cursorTrack!.samples.map((sample) =>
+          sample.id === endSample.id ? { ...sample, interpolation: 'EASE_OUT' as const } : sample
+        ),
+      },
+    },
+  });
+  store.getState().splitClipAt(clip.id, 3);
+  const split = store.getState().project!;
+  expect
+    .soft(split.cursorTrack!.samples.find((sample) => sample.sourceAnchor?.sourceTime === 6))
+    .toMatchObject({ skinOverride: { color: '#00ffaa' }, interpolation: 'EASE_OUT' });
+  expect(split.cursorTrack?.sourceObservations).toEqual([
+    { recordingId: 'cursor-recording', sourceInstanceId: instance, samples: raw },
+  ]);
+  expect(
+    split.cursorTrack?.samples.filter((sample) => sample.sourceAnchor?.sourceTime === 3)
+  ).toHaveLength(2);
+  const firstSample = split.cursorTrack!.samples[0]!;
+  store.getState().updateCursorSampleSkinOverride(firstSample.id, { color: '#ff00aa' });
+  expect(
+    store.getState().project!.cursorTrack!.samples.find((sample) => sample.id === firstSample.id)
+      ?.skinOverride?.color
+  ).toBe('#ff00aa');
+  const headBoundary = store
+    .getState()
+    .project!.cursorTrack!.samples.find(
+      (sample) =>
+        sample.sourceAnchor?.sourceClipId === clip.id && sample.sourceAnchor.sourceTime === 3
+    )!;
+  const tailBoundary = store
+    .getState()
+    .project!.cursorTrack!.samples.find(
+      (sample) =>
+        sample.sourceAnchor?.sourceClipId !== clip.id && sample.sourceAnchor?.sourceTime === 3
+    )!;
+  store.getState().updateCursorSampleSkinOverride(headBoundary.id, { color: '#0000ff' });
+  const boundaryProject = store.getState().project!;
+  store.setState({
+    project: {
+      ...boundaryProject,
+      cursorTrack: {
+        ...boundaryProject.cursorTrack!,
+        samples: boundaryProject.cursorTrack!.samples.map((sample) =>
+          sample.id === headBoundary.id ? { ...sample, interpolation: 'INSTANT' as const } : sample
+        ),
+      },
+    },
+  });
+  store.getState().updateCursorSampleSkinOverride(tailBoundary.id, { color: '#ffff00' });
+  store.getState().duplicateClip(clip.id);
+  const duplicated = store.getState().project!;
+  const copy = duplicated.clips.find(
+    (item) => item.type === 'VIDEO' && item.sourceInstanceId !== instance
+  );
+  if (copy?.type !== 'VIDEO' || !copy.sourceInstanceId) throw new Error('Expected duplicate');
+  const copiedSamples = duplicated.cursorTrack!.samples.filter(
+    (sample) => sample.sourceAnchor?.sourceClipId === copy.id
+  );
+  expect
+    .soft(copiedSamples.find((sample) => sample.sourceAnchor?.sourceTime === 0))
+    .toMatchObject({ skinOverride: { color: '#ff00aa' } });
+  expect
+    .soft(copiedSamples.find((sample) => sample.sourceAnchor?.sourceTime === 3))
+    .toMatchObject({ skinOverride: { color: '#0000ff' }, interpolation: 'INSTANT' });
+  expect(
+    duplicated.cursorTrack!.samples.find((sample) => sample.id === tailBoundary.id)
+  ).toMatchObject({ skinOverride: { color: '#ffff00' } });
+  expect(duplicated.cursorTrack?.sourceObservations).toHaveLength(2);
+  expect(duplicated.cursorTrack?.sourceObservations?.[1]).toEqual({
+    recordingId: 'cursor-recording',
+    sourceInstanceId: copy.sourceInstanceId,
+    samples: raw,
+  });
+  expect(duplicated.cursorTrack!.sourceObservations![1]!.samples).not.toBe(
+    duplicated.cursorTrack!.sourceObservations![0]!.samples
+  );
+  const copiedFirst = copiedSamples.find((sample) => sample.sourceAnchor?.sourceTime === 0)!;
+  store.getState().updateCursorSampleSkinOverride(copiedFirst.id, { color: '#11aa00' });
+  expect(
+    store.getState().project!.cursorTrack!.samples.find((sample) => sample.id === firstSample.id)
+  ).toMatchObject({ skinOverride: { color: '#ff00aa' } });
+  expect(
+    store.getState().project!.cursorTrack!.samples.find((sample) => sample.id === copiedFirst.id)
+  ).toMatchObject({ skinOverride: { color: '#11aa00' } });
+  const copiedKeys = duplicated.cursorFocusPath!.segments.find(
+    (segment) =>
+      segment.binding.kind === 'recording-source' &&
+      segment.binding.sourceInstanceId === copy.sourceInstanceId
+  )!.keys;
+  expect(copiedKeys[0]).not.toBe(duplicated.cursorFocusPath!.segments[0]!.keys[0]);
+  expect(copiedKeys.map((key) => key.id)).toEqual([
+    `focus-override:${copy.sourceInstanceId}:raw-a`,
+    `${copy.sourceInstanceId}:raw-b`,
+    `end:segment:${copy.sourceInstanceId}:raw-b`,
+  ]);
+  store.getState().updateClipPlaybackRate(copy.id, 2);
+  const rated = store.getState().project!;
+  expect(
+    rated.cursorTrack?.samples
+      .filter((sample) => sample.sourceAnchor?.sourceClipId === copy.id)
+      .at(-1)?.time
+  ).toBeCloseTo(copy.startTime + copy.duration / 2);
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(rated)));
+  expect(reopened.cursorTrack?.sourceObservations).toEqual(rated.cursorTrack?.sourceObservations);
+  expect(reopened.cursorTrack?.samples).toEqual(
+    rated.cursorTrack?.samples.map((sample) => ({
+      ...sample,
+      skinOverride: sample.skinOverride ?? null,
+    }))
+  );
+  store.getState().deleteClip(copy.id);
+  const removed = store.getState();
+  expect(removed.project!.cursorTrack?.sourceObservations).toHaveLength(1);
+  const undo = undoVideoEditorProjectHistory(removed.projectHistory, removed.project!);
+  if (undo?.status !== 'applied') throw new Error('Undo did not apply');
+  expect(undo.project.cursorTrack?.sourceObservations).toEqual(
+    rated.cursorTrack?.sourceObservations
+  );
+  expect(undo.project.cursorFocusPath).toEqual(rated.cursorFocusPath);
 });

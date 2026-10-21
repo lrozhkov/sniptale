@@ -1,3 +1,6 @@
+import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
+import { planReviewProjectCursor } from './project-cursor';
+import { applyRecordingReviewInteractions } from './standalone-interactions';
 import { planReviewProjectScene, type ReviewProjectSceneImageResource } from './project-scene';
 import { loadQuickEditAdvancedState } from './advanced/validation';
 import { resolveQuickEditEffectiveFeatures } from './advanced/effective';
@@ -107,7 +110,15 @@ export function planReviewProjectConversion(args: {
     document.advancedContent.actionAudio !== undefined ||
     document.advancedContent.clickAnimations !== undefined ||
     document.advancedContent.keyAnimations !== undefined;
-  if (hasFeedback && !recordingId) pending.push({ kind: 'interaction-source' });
+  if ((hasFeedback || document.advancedContent.cursorFocusPath) && !recordingId)
+    pending.push({ kind: 'interaction-source' });
+  if (
+    document.advancedContent.cursorFocusPath?.segments.some(
+      (segment) =>
+        segment.binding.kind === 'recording-source' && segment.binding.recordingId !== recordingId
+    )
+  )
+    pending.push({ kind: 'interaction-source', field: 'cursorFocusPath' });
   if (document.edits.some((edit) => edit.kind === 'cut' && edit.transition !== undefined))
     pending.push({ kind: 'source-transition' });
   if (pending.length) return blocked(...pending);
@@ -131,6 +142,9 @@ export function planReviewProjectConversion(args: {
   }
   if (timeline.videoClips.some((clip) => !isPlaybackRate(clip.playbackRate)))
     return blocked({ kind: 'native-rate' });
+  const cursor = source.cursorTrack;
+  for (const group of cursor?.sourceObservations ?? [])
+    group.sourceInstanceId = timeline.sourceInstanceId;
   const documents = planReviewProjectDocuments({
     timeline,
     annotations: document.annotations,
@@ -213,23 +227,26 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || original.muted || !application.originalAudioApplied,
   });
-  const minimumVersion = camera.clips.length
-    ? 32
-    : externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
-      ? 31
-      : externalAudio.clips.length
-        ? 30
-        : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-          ? 29
-          : original.ranges?.length || sourceMutes.length
-            ? 28
-            : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-              ? 27
-              : 26;
-  const project: VideoProject = {
+  const minimumVersion = cursor?.sourceObservations
+    ? 33
+    : camera.clips.length
+      ? 32
+      : externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
+        ? 31
+        : externalAudio.clips.length
+          ? 30
+          : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+            ? 29
+            : original.ranges?.length || sourceMutes.length
+              ? 28
+              : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                ? 27
+                : 26;
+  let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,
     name: args.name,
+    cursorTrack: cursor,
     duration: timeline.duration,
     backgroundColor: '#00000000',
     ...scene.scene,
@@ -286,6 +303,11 @@ export function planReviewProjectConversion(args: {
           cameraFollowDefaults: structuredClone(document.advancedContent.cameraFollowDefaults),
         }),
   };
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  if (document.advancedContent.cursorFocusPath && recordingId) {
+    const { actionsEnabled: _enabled, ...content } = document.advancedContent;
+    project = applyRecordingReviewInteractions(project, recordingId, content);
+  }
   if (!isExportReadyVideoProject(project)) return blocked({ kind: 'native-admission' });
   return { status: 'prepared', project, timeline };
 }
@@ -379,10 +401,11 @@ function projectRecordingFeedback(args: {
 function sourceTemplates(seed: VideoProject): {
   video: VideoProjectVideoClip;
   audio?: VideoProjectAudioClip;
+  cursorTrack: VideoProject['cursorTrack'];
 } | null {
   if (
-    !isExportReadyVideoProject(seed) ||
-    seed.cursorTrack !== null ||
+    // Raw recording facts use their own strict admission below, without the legacy 5000-key limit.
+    !isExportReadyVideoProject({ ...seed, cursorTrack: null }) ||
     seed.motionRegions?.length ||
     seed.effectInstances?.length ||
     seed.effectSnapshots?.length ||
@@ -436,7 +459,14 @@ function sourceTemplates(seed: VideoProject): {
     )
   )
     return null;
-  return { video, ...(audio[0] ? { audio: audio[0] } : {}) };
+  const cursor = planReviewProjectCursor({
+    seed,
+    video,
+    recordingId,
+    sourceInstanceId: video.sourceInstanceId ?? video.id,
+  });
+  if (cursor.status !== 'prepared') return null;
+  return { video, cursorTrack: cursor.track, ...(audio[0] ? { audio: audio[0] } : {}) };
 }
 
 function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConversionIssue[] {
@@ -464,7 +494,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
         content.presentation.introControl !== undefined ||
         content.presentation.outroControl !== undefined),
     cameraFollowDefaults: false,
-    cursorFocusPath: content.cursorFocusPath !== undefined,
+    cursorFocusPath: false,
     annotationEffects: content.annotationEffects !== undefined,
     actionAudio: false,
     clickAnimations: false,

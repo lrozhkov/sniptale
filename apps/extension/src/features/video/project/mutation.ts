@@ -99,6 +99,7 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if ((patch.cursorTrack ?? project.cursorTrack)?.sourceObservations !== undefined) return 33;
   if (
     project.sourceVoiceoverDocuments !== undefined ||
     patch.sourceVoiceoverDocuments !== undefined ||

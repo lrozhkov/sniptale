@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from './cursor-source-observations';
 import { reconcileVideoProjectCompositionJoins } from './scene/joins';
 import { removeVideoProjectBookendSources } from './scene/bookend-presets';
 import { getVideoProjectWatermarkAsset } from './scene/watermark';
@@ -179,10 +180,14 @@ export function removeVideoProjectLibrarySources(
       ? { motionRegions: removeSourceMotionRegions(project, removedClipIds, eventIds) }
       : {}),
   };
-  const reconciled = reconcileVideoProjectCompositionJoins({
+  const reconciledProject = reconcileVideoProjectCompositionJoins({
     ...next,
     ...reconcileVideoProjectInteractionSources(project, next),
   });
+  const reconciled = {
+    ...reconciledProject,
+    cursorTrack: materializeVideoProjectCursorSourceObservations(reconciledProject),
+  };
   assertExportReadyVideoProject(reconciled);
   return reconciled;
 }

@@ -36,8 +36,13 @@ function sourceInstances(project: VideoProject) {
 export function reconcileVideoProjectInteractionSources(
   previous: VideoProject,
   project: VideoProject
-): Pick<VideoProject, 'actionFeedback' | 'cursorFocusPath'> {
-  if (!project.actionFeedback && !project.cursorFocusPath) return {};
+): Partial<Pick<VideoProject, 'actionFeedback' | 'cursorFocusPath' | 'cursorTrack'>> {
+  if (
+    !project.actionFeedback &&
+    !project.cursorFocusPath &&
+    !project.cursorTrack?.sourceObservations?.length
+  )
+    return {};
   const before = sourceInstances(previous),
     after = sourceInstances(project);
   const retained = (binding: { recordingId: string; sourceInstanceId: string }) =>
@@ -46,7 +51,22 @@ export function reconcileVideoProjectInteractionSources(
       !after.instances.get(binding.sourceInstanceId)?.has(binding.recordingId)
     ) &&
     !(before.recordingIds.has(binding.recordingId) && !after.recordingIds.has(binding.recordingId));
+  const groups = project.cursorTrack?.sourceObservations;
+  const retainedGroups = groups?.filter(retained);
   return {
+    ...(groups?.length && retainedGroups && project.cursorTrack
+      ? {
+          cursorTrack: {
+            ...project.cursorTrack,
+            sourceObservations: retainedGroups,
+            samples: project.cursorTrack.samples.filter(
+              (sample) =>
+                !sample.sourceAnchor ||
+                project.clips.some((clip) => clip.id === sample.sourceAnchor?.sourceClipId)
+            ),
+          },
+        }
+      : {}),
     ...(project.actionFeedback ? { actionFeedback: project.actionFeedback.filter(retained) } : {}),
     ...(project.cursorFocusPath
       ? {

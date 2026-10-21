@@ -1,3 +1,4 @@
+import { resolveProjectSourceCursorObservation } from '../../../project/cursor-focus-path/projection';
 import {
   hasCameraMediaAt,
   resolveCameraClip,
@@ -343,6 +344,13 @@ export function resolveObservedCursorPosition(
             clip.id === sourceClipId && clip.duration > 0 && time === clip.startTime + clip.duration
         )
       : undefined;
+  const sourceObservation = resolveProjectSourceCursorObservation(
+    project,
+    time,
+    sourceClipId,
+    options
+  );
+  if (sourceObservation !== undefined) return sourceObservation;
   // A closing proof owns the left source at its exact endpoint. Playback keeps its ordinary half-open dispatch.
   const sample = owner
     ? cursorSamplesAtTime(project, time, sourceClipId).previousSample

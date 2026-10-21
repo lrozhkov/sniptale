@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../../../../features/video/project/cursor-source-observations';
 import {
   isSourceVoiceoverSourceClip,
   duplicateProjectSourceVoiceoverDocuments,
@@ -237,6 +238,28 @@ export function duplicateProjectClipsWithResult(
     }),
   ];
   duplicateCursorSamples(project, nextProject, duplicateClipIds, duplicateCursorIds);
+  if (project.cursorTrack?.sourceObservations && nextProject.cursorTrack) {
+    nextProject.cursorTrack = {
+      ...nextProject.cursorTrack,
+      sourceObservations: [
+        ...project.cursorTrack.sourceObservations,
+        ...project.cursorTrack.sourceObservations.flatMap((group) => {
+          const sourceInstanceId = sourceInstances.get(group.sourceInstanceId);
+          return sourceInstanceId ? [{ ...structuredClone(group), sourceInstanceId }] : [];
+        }),
+      ],
+    };
+    const inheritedClips = new Map(
+      project.clips.flatMap((clip) => {
+        const copiedId = duplicateClipIds.get(clip.id);
+        return clip.type === 'VIDEO' && copiedId ? [[copiedId, clip] as const] : [];
+      })
+    );
+    nextProject.cursorTrack = materializeVideoProjectCursorSourceObservations(
+      nextProject,
+      inheritedClips
+    );
+  }
   if (project.cursorFocusPath)
     nextProject.cursorFocusPath = {
       ...project.cursorFocusPath,
@@ -413,6 +436,8 @@ function duplicateCapturedFocusKeyId(
   cursorIds: ReadonlyMap<string, string>,
   actionIds: ReadonlyMap<string, string>
 ): string | null {
+  if (keyId.startsWith(`${originalInstance}:`))
+    return `${newInstance}:${keyId.slice(originalInstance.length + 1)}`;
   const cursorId = cursorIds.get(keyId);
   if (cursorId) return cursorId;
   for (const prefix of ['click:', 'release:']) {
@@ -426,7 +451,10 @@ function duplicateCapturedFocusKeyId(
       return `${prefix}${newInstance}:${keyId.slice(prefix.length + originalInstance.length + 1)}`;
   }
   if (keyId.startsWith('end:segment:')) {
-    const id = cursorIds.get(keyId.slice('end:segment:'.length));
+    const endId = keyId.slice('end:segment:'.length);
+    if (endId.startsWith(`${originalInstance}:`))
+      return `end:segment:${newInstance}:${endId.slice(originalInstance.length + 1)}`;
+    const id = cursorIds.get(endId);
     if (id) return `end:segment:${id}`;
   }
   return null;
@@ -443,6 +471,9 @@ function duplicateSourceInstance(
     isSourceTimedClip(duplicate) &&
     item.type === duplicate.type &&
     (item.sourceInstanceId ||
+      project.cursorTrack?.sourceObservations?.some(
+        (group) => group.sourceInstanceId === item.id
+      ) ||
       isProjectOriginalAudioTarget(project, item) ||
       isSourceVoiceoverSourceClip(project, item) ||
       project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
