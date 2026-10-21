@@ -32,6 +32,7 @@ export interface DesignReviewActions {
   comment: DesignReviewCommentActions;
   copyElement: () => Promise<boolean>;
   copyPath: () => Promise<void>;
+  navigateElement: (target: Element) => void;
   delete: () => void;
   resetValue: (property: PageStyleProperty) => void;
   selectAction: (action: BrowserDesignReviewAction) => void;

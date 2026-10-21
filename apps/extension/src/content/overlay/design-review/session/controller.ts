@@ -170,6 +170,18 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
           await copyDesignReviewText(selection.domPath, 'content.designReview.pathCopied');
         }
       },
+      navigateElement: (target: Element) => {
+        if (!target.isConnected || !closeComment()) return;
+        stopVoiceInput();
+        try {
+          flushPendingPageStyleHistory();
+          if (!openDesignReviewTarget(target)) {
+            showToast(translate('content.designReview.navigateElementFailed'), 'error');
+          }
+        } catch {
+          showToast(translate('content.designReview.navigateElementFailed'), 'error');
+        }
+      },
       delete: () => {
         if (!selection) {
           return;

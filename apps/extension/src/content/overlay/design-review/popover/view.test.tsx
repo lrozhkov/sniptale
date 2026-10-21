@@ -22,6 +22,7 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
   text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
@@ -157,6 +158,14 @@ it('uses native non-layout hints for the element tag and full path', () => {
   expect(
     root.querySelector('[data-ui="content.design-review.element-tag"]')?.getAttribute('title')
   ).toBe('<h1> — заголовок');
+  expect(
+    root.querySelector(
+      '[data-ui="content.design-review.popover-drag-handle"] [data-ui="content.design-review.element-tag"]'
+    )?.textContent
+  ).toBe('H1');
+  expect(
+    root.querySelector('[data-ui="content.design-review.element-text"]')?.previousElementSibling
+  ).toBeNull();
   expect(root.querySelector('[role="tooltip"]')).toBeNull();
 });
 

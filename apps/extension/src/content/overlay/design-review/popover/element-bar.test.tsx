@@ -19,6 +19,7 @@ const base = {
   deleteRequested: false,
   hasFeedback: true,
   onCopyPath: vi.fn(),
+  onNavigateElement: vi.fn(),
   onDeleteRequest: vi.fn(),
   onSettingsOpenChange: vi.fn(),
   onEditText: vi.fn(),

@@ -19,6 +19,7 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
   text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),

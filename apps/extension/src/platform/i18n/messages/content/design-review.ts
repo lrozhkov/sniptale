@@ -291,6 +291,18 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Переместить окно замечания',
     en: 'Move the feedback window',
   },
+  selectParentElement: {
+    ru: 'Выбрать родительский элемент',
+    en: 'Select parent element',
+  },
+  selectChildElement: {
+    ru: 'Выбрать дочерний элемент',
+    en: 'Select child element',
+  },
+  navigateElementFailed: {
+    ru: 'Не удалось выбрать элемент. Текущий выбор сохранён.',
+    en: 'Could not select the element. The current selection is unchanged.',
+  },
   elementHeading: {
     ru: 'заголовок',
     en: 'heading',

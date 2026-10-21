@@ -99,6 +99,22 @@ for (const theme of ['light', 'dark'] as const) {
         const panelBounds = (await popover.boundingBox())!;
         const closeBounds = (await close.boundingBox())!;
         const commentLayer = popover.locator('[data-ui="content.design-review.comment-layer"]');
+        const tag = popover.locator('[data-ui="content.design-review.element-tag"]');
+        await expect(tag).toHaveText('BUTTON');
+        await expect(
+          popover
+            .locator('[data-ui="content.design-review.popover-drag-handle"]')
+            .locator('[data-ui="content.design-review.element-tag"]')
+        ).toBeVisible();
+        const tagBounds = (await tag.boundingBox())!;
+        expect(Math.abs(tagBounds.x - panelBounds.x - 13)).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(tagBounds.y + tagBounds.height / 2 - closeBounds.y - closeBounds.height / 2)
+        ).toBeLessThanOrEqual(1);
+        const footerTextBounds = (await popover
+          .locator('[data-ui="content.design-review.element-text"]')
+          .boundingBox())!;
+        expect(Math.abs(footerTextBounds.x - panelBounds.x - 13)).toBeLessThanOrEqual(1);
         await expect.soft(commentLayer).toHaveCSS('padding-top', '32px', { timeout: 500 });
         expect.soft(closeBounds.width, 'Close retains a compact target').toBe(24);
         expect.soft(closeBounds.height).toBe(24);
@@ -314,6 +330,46 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(popover.getByRole('navigation').getByRole('button')).toHaveCount(5);
         await page.screenshot({
           path: info.outputPath('image-properties.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await close.click();
+        await page.evaluate(() => {
+          const parent = document.createElement('div');
+          parent.id = 'review-tree-parent';
+          parent.style.cssText =
+            'position:fixed;left:400px;top:100px;width:180px;height:100px;padding:20px;background:#ddd';
+          const hidden = document.createElement('span');
+          hidden.hidden = true;
+          const child = document.createElement('span');
+          child.id = 'review-tree-child';
+          child.textContent = 'Tree child';
+          parent.append(hidden, child);
+          document.body.append(parent);
+        });
+        await page.mouse.click(410, 110);
+        await expect(tag).toHaveText('DIV');
+        const treeComment = popover.getByRole('textbox', {
+          name: /Element comment|Комментарий к элементу/u,
+        });
+        await treeComment.fill('Сохранить при переходе по дереву');
+        const down = popover.getByRole('button', {
+          name: /^(Select child element|Выбрать дочерний элемент)$/u,
+        });
+        const up = popover.getByRole('button', {
+          name: /^(Select parent element|Выбрать родительский элемент)$/u,
+        });
+        await down.click();
+        await expect(tag).toHaveText('SPAN');
+        await expect(
+          popover.locator('[data-ui="content.design-review.element-selector"]')
+        ).toContainText('review-tree-child');
+        await expect(down).toBeDisabled();
+        await up.click();
+        await expect(tag).toHaveText('DIV');
+        await expect(treeComment).toHaveValue('Сохранить при переходе по дереву');
+        await page.screenshot({
+          path: info.outputPath('header-tree-navigation.png'),
           fullPage: false,
           animations: 'disabled',
         });

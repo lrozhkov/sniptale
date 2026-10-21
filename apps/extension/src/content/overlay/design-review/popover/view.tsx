@@ -10,6 +10,7 @@ import { DesignReviewActionMenu } from './action-menu';
 import { PageStyleCommentField } from './comment';
 import { useDesignReviewPopoverDrag } from './drag';
 import { DesignReviewElementBar } from './element-bar';
+import { describeDesignReviewElement } from './element-label';
 import {
   DESIGN_REVIEW_POPOVER_VIEWPORT_GAP,
   readDesignReviewPopoverTargetRect,
@@ -180,14 +181,29 @@ export function DesignReviewPopover(props: {
       >
         <div className="relative z-20 p-3 pb-2 pt-8" data-ui="content.design-review.comment-layer">
           <div
-            className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
+            className={[
+              'absolute inset-x-0 top-0 z-10 flex h-8 touch-none items-center pl-3 pr-9',
+              'cursor-grab active:cursor-grabbing',
+            ].join(' ')}
             data-ui="content.design-review.popover-drag-handle"
             title={translate('content.designReview.movePopover')}
             onPointerDown={view.drag.onPointerDown}
             onPointerMove={view.drag.onPointerMove}
             onPointerUp={view.drag.onPointerUp}
             onPointerCancel={view.drag.onPointerUp}
-          />
+          >
+            <span
+              className={[
+                'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
+                'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+              ].join(' ')}
+              data-ui="content.design-review.element-tag"
+              tabIndex={0}
+              title={describeDesignReviewElement(props.state.selection.tagName)}
+            >
+              {props.state.selection.tagName.toUpperCase()}
+            </span>
+          </div>
           <PageStyleCommentField
             actions={{
               ...props.actions.comment,
@@ -211,6 +227,7 @@ export function DesignReviewPopover(props: {
             hasFeedback={props.state.comment.marker !== null}
             onCopyElement={props.actions.copyElement}
             onCopyPath={() => void props.actions.copyPath()}
+            onNavigateElement={props.actions.navigateElement}
             onEditText={props.actions.text.edit}
             onResetText={props.actions.text.reset}
             text={props.state.text}

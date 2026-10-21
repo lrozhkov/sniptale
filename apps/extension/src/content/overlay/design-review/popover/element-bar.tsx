@@ -1,10 +1,19 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Check, ClipboardCopy, Pencil, RotateCcw, TextCursorInput, Trash2 } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  ClipboardCopy,
+  Pencil,
+  RotateCcw,
+  TextCursorInput,
+  Trash2,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
-import { describeDesignReviewElement } from './element-label';
 import type { DesignReviewTextViewState } from '../types';
+import { isSelectablePageElement } from '../../../selection/page-element-target';
 
 function useElementCopyFeedback(element: Element | undefined, copy: () => Promise<boolean>) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'copied'>('idle');
@@ -48,6 +57,7 @@ export function DesignReviewElementBar(props: {
   hasFeedback: boolean;
   onCopyElement: () => Promise<boolean>;
   onCopyPath: () => void;
+  onNavigateElement: (target: Element) => void;
   onDeleteRequest: () => void;
   onSettingsOpenChange: (open: boolean) => void;
   onEditText: () => void;
@@ -61,20 +71,12 @@ export function DesignReviewElementBar(props: {
   if (!selection) {
     return null;
   }
+  const parent = selection.element.parentElement;
+  const parentTarget = parent && isSelectablePageElement(parent) ? parent : null;
+  const childTarget = Array.from(selection.element.children).find(isSelectablePageElement) ?? null;
 
   return (
     <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
-      <span
-        className={[
-          'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
-          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-        ].join(' ')}
-        data-ui="content.design-review.element-tag"
-        tabIndex={0}
-        title={describeDesignReviewElement(selection.tagName)}
-      >
-        {selection.tagName.toUpperCase()}
-      </span>
       <strong
         className="max-w-32 truncate text-xs"
         data-ui="content.design-review.element-text"
@@ -112,6 +114,36 @@ export function DesignReviewElementBar(props: {
           {selection.selectorLabel}
         </span>
       </button>
+      <div className="inline-flex shrink-0 items-center gap-0.5">
+        {[
+          {
+            Icon: ChevronUp,
+            target: parentTarget,
+            label: translate('content.designReview.selectParentElement'),
+          },
+          {
+            Icon: ChevronDown,
+            target: childTarget,
+            label: translate('content.designReview.selectChildElement'),
+          },
+        ].map(({ Icon, target, label }) => (
+          <ContentToolbarButton
+            key={label}
+            tone="utility"
+            type="button"
+            className="!h-6 !min-h-6 !w-5 !min-w-5 shrink-0 !p-0 [&_svg]:!size-3"
+            aria-label={label}
+            title={label}
+            disabled={!target}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              if (target) props.onNavigateElement(target);
+            }}
+          >
+            <Icon size={12} />
+          </ContentToolbarButton>
+        ))}
+      </div>
       <ElementActionButton
         disabled={copy.status === 'pending'}
         label={translate('content.designReview.copyElement')}
