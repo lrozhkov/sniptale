@@ -1,5 +1,5 @@
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
-import { decoratedMediaSourceSize, insetMediaCanvas } from '../window-geometry';
+import { resolveDecoratedMediaFrame, insetMediaCanvas } from '../window-geometry';
 import { fitVideoRect } from '../../review/geometry';
 import { VideoMediaFitMode } from '../types';
 import { resolveMediaClipTransformForFitMode } from './clip';
@@ -10,7 +10,8 @@ export function getMediaFramingPresets(
   sourceHeight: number,
   canvasWidth: number,
   canvasHeight: number,
-  windowHeader?: WindowHeader
+  windowHeader?: WindowHeader,
+  originalSource = { width: sourceWidth, height: sourceHeight }
 ) {
   if (
     ![sourceWidth, sourceHeight, canvasWidth, canvasHeight].every(
@@ -19,15 +20,15 @@ export function getMediaFramingPresets(
   ) {
     return [];
   }
-  const decorated = decoratedMediaSourceSize(sourceWidth, sourceHeight, windowHeader);
-  sourceWidth = decorated.width;
-  sourceHeight = decorated.height;
   const contained = resolveMediaClipTransformForFitMode(
     sourceWidth,
     sourceHeight,
     canvasWidth,
     canvasHeight,
-    VideoMediaFitMode.CONTAIN
+    VideoMediaFitMode.CONTAIN,
+    100,
+    windowHeader,
+    originalSource
   );
   const coverage = (contained.width * contained.height) / (canvasWidth * canvasHeight);
   const margin = Math.min(canvasWidth, canvasHeight) * (0.025 + 0.035 * coverage);
@@ -50,7 +51,9 @@ export function getMediaFramingPresets(
       canvasWidth,
       canvasHeight,
       preset.fitMode,
-      preset.fitScalePercent
+      preset.fitScalePercent,
+      windowHeader,
+      originalSource
     ),
   }));
 }
@@ -67,7 +70,8 @@ export function resolveMediaPaddingLayout(
   canvasWidth: number,
   canvasHeight: number,
   padding: number,
-  windowHeader?: WindowHeader
+  windowHeader?: WindowHeader,
+  originalSource = { width: sourceWidth, height: sourceHeight }
 ) {
   if (
     ![sourceWidth, sourceHeight, canvasWidth, canvasHeight].every(
@@ -78,10 +82,23 @@ export function resolveMediaPaddingLayout(
     padding > maximumMediaPadding(canvasWidth, canvasHeight)
   )
     return null;
-  const source = decoratedMediaSourceSize(sourceWidth, sourceHeight, windowHeader);
+  const source = { width: sourceWidth, height: sourceHeight };
   const content = insetMediaCanvas({ width: canvasWidth, height: canvasHeight }, padding);
-  const fitted = fitVideoRect(content, source);
-  const whole = fitVideoRect({ width: canvasWidth, height: canvasHeight }, source);
+  const fit = (output: typeof source) => {
+    if (!windowHeader) return fitVideoRect(output, source);
+    const { headerHeight: _headerHeight, ...frame } = resolveDecoratedMediaFrame({
+      sourceWidth: originalSource.width,
+      sourceHeight: originalSource.height,
+      contentWidth: sourceWidth,
+      contentHeight: sourceHeight,
+      windowHeader,
+      frame: { x: 0, y: 0, width: output.width, height: output.height },
+      fit: 'contain',
+    });
+    return frame;
+  };
+  const fitted = fit(content);
+  const whole = fit({ width: canvasWidth, height: canvasHeight });
   return {
     fitMode: VideoMediaFitMode.CONTAIN,
     fitScalePercent: Math.max(1, Math.min(100, (100 * fitted.width) / whole.width)),

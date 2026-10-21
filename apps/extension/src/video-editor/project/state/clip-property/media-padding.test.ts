@@ -3,10 +3,7 @@ import { isHydratableVideoProject } from '../../../../features/video/project/val
 import { getFittedMediaWindowFrame } from '../../../../features/video/composition/draw/fitted-media';
 import { mediaWindowPadding } from '../../../../features/video/project/window-geometry';
 import { expect, it } from 'vitest';
-import {
-  DEFAULT_WINDOW_HEADER,
-  windowHeaderGeometry,
-} from '@sniptale/runtime-contracts/window-header';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createProjectWithMediaTrack } from './content.test-support';
 import { createVideoEditorProjectTestStore } from '../test-store.test-support';
 import { resolveMediaClipTransformForFitMode } from '../../../../features/video/project/factories/clip';
@@ -24,14 +21,15 @@ it.each(['clip-video', 'clip-image'])(
     const asset = project.assets.find((asset) => asset.id === clip.assetId)!;
     const width = asset.metadata.width * 0.5,
       height = asset.metadata.height;
-    const header = windowHeaderGeometry(clip.windowHeader, { width, height }).height;
     const expected = resolveMediaClipTransformForFitMode(
       width,
-      height + header,
+      height,
       project.width,
       project.height,
       'CONTAIN',
-      100
+      100,
+      clip.windowHeader,
+      { width: asset.metadata.width, height: asset.metadata.height }
     );
     store.getState().setProject(project);
     store.getState().updateMediaClipFitMode(id, 'CONTAIN', 100);

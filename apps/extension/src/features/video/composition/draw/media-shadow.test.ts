@@ -54,9 +54,9 @@ it('draws backdrop as an outer frame shadow without painting under clip content'
 
   expect(context.fillRect).not.toHaveBeenCalled();
   expect(context.drawImage).toHaveBeenCalledTimes(1);
-  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(50, 50, 120, 80);
+  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(77, 77, 120, 80);
   expect(context.__maskContext.globalCompositeOperation).toBe('destination-out');
-  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.28)');
+  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.5)');
   expect(context.__maskContext.shadowOffsetY).toBe(0);
   expect(context.shadowBlur).toBe(0);
   expect(context.shadowOffsetY).toBe(0);

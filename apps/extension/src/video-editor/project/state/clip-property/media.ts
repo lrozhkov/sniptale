@@ -169,7 +169,8 @@ function resolveMediaClipFitTransform(
     project.height,
     fitMode,
     fitScalePercent,
-    isCamera ? undefined : clip.windowHeader
+    isCamera ? undefined : clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
   );
   return isCamera ? transform : { ...transform, opacity: clip.transform.opacity };
 }
@@ -380,7 +381,8 @@ function updateMediaPadding(project: VideoProject, clip: MediaClip, padding: num
     project.width,
     project.height,
     padding,
-    clip.windowHeader
+    clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
   );
   if (!layout) return project;
   const transform = { ...layout.transform, opacity: clip.transform.opacity };

@@ -3,7 +3,11 @@ import { createEmptyVideoProject } from '../../../../apps/extension/src/features
 import { GALLERY_SAVED_VIEWS_STORAGE_KEY } from '../../../../apps/extension/src/composition/persistence/gallery-saved-views/contract';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
-import { checkInspectorPaintedFont } from '../support/inspector-utilities';
+import { checkInspectorPaintedFont, chooseInspectorValue } from '../support/inspector-utilities';
+import {
+  computeQuickEditSceneSize,
+  computeQuickEditSceneLayout,
+} from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import {
   replayReviewHistory,
@@ -393,6 +397,78 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(async () => (await readNativeReviewWorkspace(page, aggregateId))?.project?.name)
         .toBeTruthy();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+      const sceneGroup = async (key: Parameters<typeof translate>[0]) => {
+        const category = inspector
+          .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+          .getByRole('button', { name: label(key), exact: true });
+        if (await category.count()) await category.click();
+      };
+      await sceneGroup('gallery.videoReview.canvas');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('videoEditor.sidebar.canvasFormatLabel'),
+        '1:1'
+      );
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.sourceCropMode'),
+        label('gallery.videoReview.sourceCropEnable')
+      );
+      await sceneGroup('gallery.videoReview.windowHeader');
+      const headerSettings = inspector.locator('[data-ui="window-header-settings"]');
+      await chooseInspectorValue(
+        page,
+        headerSettings,
+        label('windowHeader.type'),
+        label('windowHeader.browser')
+      );
+      await chooseInspectorValue(
+        page,
+        headerSettings,
+        label('windowHeader.style'),
+        label('windowHeader.windows')
+      );
+      const title = headerSettings.getByRole('textbox', {
+        name: label('windowHeader.tabTitle'),
+        exact: true,
+      });
+      await title.fill('Editable transferred window');
+      await title.press('Tab');
+      await sceneGroup('gallery.videoReview.background');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.backgroundZoom'),
+        label('gallery.videoReview.backgroundZoomWindow')
+      );
+      await chooseInspectorValue(
+        page,
+        inspector.locator('.review-background-kinds'),
+        label('gallery.videoReview.background'),
+        label('gallery.videoReview.backgroundSolid')
+      );
+      for (const [key, value] of [
+        ['gallery.videoReview.backgroundPadding', '8'],
+        ['gallery.videoReview.backgroundCornerRadius', '6'],
+        ['gallery.videoReview.backgroundShadow', '60'],
+      ] as const) {
+        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
+        await field.fill(value);
+        await field.press('Enter');
+      }
+      await page.screenshot({
+        path: info.outputPath('gallery-authored-scene.png'),
+        fullPage: false,
+      });
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       const transfer = dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]');
       await transfer.scrollIntoViewIfNeeded();
@@ -424,6 +500,31 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         reviewDocumentBaseline(gallery)
       );
       expect(document.edits.some((edit) => edit.kind === 'cut')).toBe(true);
+      const scene = {
+        source: gallery.source,
+        canvas: document.advancedContent.canvas,
+        windowHeader: document.advancedContent.windowHeader,
+        background: document.advancedContent.background,
+      };
+      expect(scene.canvas).toMatchObject({ width: 90, height: 90, crop: { width: 0.5625 } });
+      expect(scene.windowHeader).toMatchObject({
+        kind: 'browser',
+        style: 'windows',
+        title: 'Editable transferred window',
+      });
+      expect(scene.background).toMatchObject({
+        enabled: true,
+        type: 'solid',
+        zoomBehavior: 'window',
+        layout: { padding: 8, cornerRadius: 6, shadow: { intensity: 60 } },
+      });
+      expect(document.advancedContent.zoom.regions).toEqual([]);
+      const output = computeQuickEditSceneSize(scene);
+      const layout = computeQuickEditSceneLayout({
+        ...scene,
+        output,
+        camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+      });
       const expectedDuration = buildReviewTimeMap(gallery.source.duration, document.edits).at(
         -1
       )!.resultEnd;
@@ -436,6 +537,89 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(migrated.duration).toBeCloseTo(expectedDuration, 5);
       const originalVideos = migrated.clips.filter((clip) => clip.type === 'VIDEO');
       expect(originalVideos).toHaveLength(2);
+      expect({ width: migrated.width, height: migrated.height }).toEqual({
+        width: output.width,
+        height: output.height,
+      });
+      expect(migrated.sceneBackground).toMatchObject({
+        kind: 'solid',
+        color:
+          scene.background.enabled && scene.background.type === 'solid'
+            ? scene.background.color
+            : '',
+      });
+      for (const clip of originalVideos) {
+        expect(clip).toMatchObject({
+          sourceCrop: layout.sourceCrop,
+          windowHeader: scene.windowHeader,
+          windowCornerRadius: 6,
+          shadowIntensity: 60,
+          shadowMode: 'BACKDROP',
+        });
+        expect(clip.transform).toMatchObject(layout.windowRect);
+      }
+      await page.locator(`[data-project-timeline-clip="${originalVideos[0]!.id}"]`).click();
+      const framing = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupFraming'),
+        exact: true,
+      });
+      await framing.scrollIntoViewIfNeeded();
+      await framing.click();
+      const nativeTitle = page
+        .locator('[data-ui="window-header-settings"]')
+        .getByRole('textbox', { name: label('windowHeader.tabTitle'), exact: true });
+      await expect(nativeTitle).toHaveValue('Editable transferred window');
+      await nativeTitle.fill('Edited in montage');
+      await nativeTitle.press('Tab');
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find(
+            (clip) => clip.id === originalVideos[0]!.id
+          )
+        )
+        .toMatchObject({ windowHeader: { title: 'Edited in montage' } });
+      await checkInspectorPaintedFont(page, nativeTitle, 'input');
+      const scenePlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await scenePlayhead.press('Home');
+      for (let step = 0; step < migrated.fps; step++) await scenePlayhead.press('ArrowRight');
+      await expect
+        .poll(() =>
+          page.locator('[data-preview-stage-canvas]').evaluate(
+            (node: HTMLCanvasElement, scene) => {
+              const context = node.getContext('2d')!;
+              const sample = (x: number, y: number) =>
+                Array.from(
+                  context.getImageData(
+                    Math.round((x * node.width) / scene.output.width),
+                    Math.round((y * node.height) / scene.output.height),
+                    1,
+                    1
+                  ).data
+                ).slice(0, 3);
+              const header = sample(
+                scene.window.x + scene.window.width / 2,
+                scene.window.y + scene.output.headerHeight / 2
+              );
+              const source = sample(
+                scene.window.x + scene.window.width / 2,
+                scene.window.y +
+                  scene.output.headerHeight +
+                  (scene.window.height - scene.output.headerHeight) / 2
+              );
+              return (
+                Math.min(...header) > 100 &&
+                Math.max(...source) > 100 &&
+                Math.max(...source) - Math.min(...source) > 30
+              );
+            },
+            { output, window: layout.windowRect }
+          )
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('migrated-editable-scene.png'),
+        fullPage: false,
+      });
       expect(await readNativeReviewWorkspace(page, aggregateId)).toEqual(gallery);
       await expect.poll(() => new URL(page.url()).searchParams.get('project')).toBe(migrated.id);
       expect(new URL(page.url()).searchParams.has('review')).toBe(false);
@@ -682,6 +866,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         []
       );
       expect(exported.size).toBeGreaterThan(0);
+      expect({ width: exported.width, height: exported.height }).toEqual({
+        width: final.width,
+        height: final.height,
+      });
       expect(Math.abs(exported.duration - final.duration)).toBeLessThanOrEqual(0.1);
     } finally {
       host.server.closeAllConnections();

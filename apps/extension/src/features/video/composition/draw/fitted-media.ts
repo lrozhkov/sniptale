@@ -1,10 +1,10 @@
 import {
-  decoratedMediaSourceSize,
+  resolveDecoratedMediaFrame,
   roundedWindowClearance,
   roundedWindowRadius,
 } from '../../project/window-geometry';
 import { uncropMediaSourceRect, type MediaSourceCrop } from '../../project/media-crop';
-import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
+import { type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import {
   cameraContentFrame,
@@ -77,8 +77,37 @@ function getFittedMediaFrame(params: {
   };
 }
 
+function fittedWindowMediaPlane(
+  params: {
+    sourceCrop?: MediaSourceCrop;
+    windowHeader?: WindowHeader;
+    sourceWidth: number;
+    sourceHeight: number;
+    frame: MediaFrame;
+    fitMode: VideoMediaFitMode;
+    displayScale?: number;
+  },
+  fallbackHeaderHeight = 0
+) {
+  return resolveDecoratedMediaFrame(
+    {
+      ...params,
+      contentWidth: params.sourceWidth * (params.sourceCrop?.width ?? 1),
+      contentHeight: params.sourceHeight * (params.sourceCrop?.height ?? 1),
+      fit:
+        params.fitMode === VideoMediaFitMode.CONTAIN
+          ? 'contain'
+          : params.fitMode === VideoMediaFitMode.COVER
+            ? 'cover'
+            : 'stretch',
+    },
+    fallbackHeaderHeight
+  );
+}
+
 /** Resolve source pixel bounds before clip rotation and transition scaling. */
 export function getFittedMediaContentFrame(params: {
+  displayScale?: number;
   sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
   windowHeader?: WindowHeader;
@@ -87,6 +116,16 @@ export function getFittedMediaContentFrame(params: {
   sourceHeight: number;
   sourceWidth: number;
 }): MediaFrame {
+  if (params.windowHeader) {
+    const plane = fittedWindowMediaPlane(params);
+    const visible = {
+      x: plane.x,
+      y: plane.y + plane.headerHeight,
+      width: plane.width,
+      height: plane.height - plane.headerHeight,
+    };
+    return params.sourceCrop ? uncropMediaSourceRect(visible, params.sourceCrop) : visible;
+  }
   if (params.sourceCrop) {
     const { sourceCrop, ...rest } = params;
     return uncropMediaSourceRect(
@@ -97,20 +136,6 @@ export function getFittedMediaContentFrame(params: {
       }),
       sourceCrop
     );
-  }
-  if (params.windowHeader) {
-    const headerHeight = windowHeaderGeometry(params.windowHeader, {
-      width: params.sourceWidth,
-      height: params.sourceHeight,
-    }).height;
-    const plane = getFittedMediaContentFrame({
-      fitMode: params.fitMode,
-      frame: params.frame,
-      sourceWidth: params.sourceWidth,
-      sourceHeight: params.sourceHeight + headerHeight,
-    });
-    const inset = (plane.height * headerHeight) / (params.sourceHeight + headerHeight);
-    return { ...plane, y: plane.y + inset, height: plane.height - inset };
   }
   if (params.cameraAppearance) {
     const frame = cameraWindowFrame(params.frame, params.cameraAppearance.shape);
@@ -154,6 +179,7 @@ export function getFittedMediaContentFrame(params: {
 
 /** Visible decorated bounds; cropped source pixels and headers are fitted as one plane. */
 export function getFittedMediaWindowFrame(params: {
+  displayScale?: number;
   sourceCrop?: MediaSourceCrop;
   windowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
@@ -162,14 +188,15 @@ export function getFittedMediaWindowFrame(params: {
   sourceHeight: number;
 }): MediaFrame {
   if (params.fitMode === VideoMediaFitMode.COVER) return params.frame;
-  const width = params.sourceWidth * (params.sourceCrop?.width ?? 1);
-  const height = params.sourceHeight * (params.sourceCrop?.height ?? 1);
-  const source = decoratedMediaSourceSize(width, height, params.windowHeader);
+  if (params.windowHeader) {
+    const { headerHeight: _headerHeight, ...window } = fittedWindowMediaPlane(params);
+    return window;
+  }
   return getFittedMediaContentFrame({
     fitMode: params.fitMode,
     frame: params.frame,
-    sourceWidth: source.width,
-    sourceHeight: source.height,
+    sourceWidth: params.sourceWidth * (params.sourceCrop?.width ?? 1),
+    sourceHeight: params.sourceHeight * (params.sourceCrop?.height ?? 1),
   });
 }
 
@@ -245,7 +272,7 @@ export function drawFittedMediaLayer(params: {
   sourceHeight: number;
   sourceWidth: number;
 }): void {
-  if (params.sourceCrop) {
+  if (params.sourceCrop && !params.windowHeaderImage) {
     const { sourceCrop, ...rest } = params;
     drawFittedMediaLayer({
       ...rest,
@@ -300,17 +327,7 @@ export function drawFittedMediaLayer(params: {
       : params.windowHeader &&
           params.windowHeaderImage &&
           params.fitMode !== VideoMediaFitMode.COVER
-        ? getFittedMediaContentFrame({
-            fitMode: params.fitMode,
-            frame: params.frame,
-            sourceWidth: params.sourceWidth,
-            sourceHeight:
-              params.sourceHeight +
-              windowHeaderGeometry(params.windowHeader, {
-                width: params.sourceWidth,
-                height: params.sourceHeight,
-              }).height,
-          })
+        ? roundedFrame
         : params.frame,
     params.displayScale,
     params.cameraAppearance,
@@ -371,45 +388,38 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
     plane.reset?.();
     plane.setTransform(1, 0, 0, 1, 0, 0);
     plane.clearRect(0, 0, width, height);
-    const sourceHeaderHeight = params.windowHeader
-      ? windowHeaderGeometry(params.windowHeader, {
-          width: params.sourceWidth,
-          height: params.sourceHeight,
-        }).height
-      : header.naturalHeight;
-    drawFittedMediaFrame(
-      plane,
-      params.sourceWidth,
-      params.sourceHeight + sourceHeaderHeight,
-      0,
-      0,
-      width,
-      height,
-      params.fitMode,
-      (x, y, w, h) => {
-        const join = Math.round(
-          y + (h * sourceHeaderHeight) / (params.sourceHeight + sourceHeaderHeight)
-        );
-        if (!params.hideWindowHeader) plane.drawImage(header, x, y, w, join - y);
-        plane.save();
-        plane.beginPath();
-        plane.rect(x, join, w, y + h - join);
-        plane.clip();
-        // Raster density must not change the composition coordinates of source actions.
-        const scaleX = width / params.frame.width;
-        const scaleY = height / params.frame.height;
-        plane.scale(scaleX, scaleY);
-        plane.translate(-params.frame.x, -params.frame.y);
-        params.render(
-          params.frame.x + x / scaleX,
-          params.frame.y + join / scaleY,
-          w / scaleX,
-          (y + h - join) / scaleY,
-          plane
-        );
-        plane.restore();
-      }
-    );
+    const window = fittedWindowMediaPlane(params, header.naturalHeight);
+    const scaleX = width / params.frame.width;
+    const scaleY = height / params.frame.height;
+    const x = (window.x - params.frame.x) * scaleX;
+    const y = (window.y - params.frame.y) * scaleY;
+    const w = window.width * scaleX;
+    const join = Math.round((window.y + window.headerHeight - params.frame.y) * scaleY);
+    const bottom = (window.y + window.height - params.frame.y) * scaleY;
+    if (!params.hideWindowHeader) plane.drawImage(header, x, y, w, join - y);
+    plane.save();
+    try {
+      plane.beginPath();
+      plane.rect(x, join, w, bottom - join);
+      plane.clip();
+      // Raster density must not change the composition coordinates of source actions.
+      plane.scale(scaleX, scaleY);
+      plane.translate(-params.frame.x, -params.frame.y);
+      const visible = {
+        x: window.x,
+        y: params.frame.y + join / scaleY,
+        width: window.width,
+        height: (bottom - join) / scaleY,
+      };
+      const source = params.sourceCrop
+        ? uncropMediaSourceRect(visible, params.sourceCrop)
+        : visible;
+      if (params.sourceCrop)
+        params.render(source.x, source.y, source.width, source.height, plane, visible);
+      else params.render(source.x, source.y, source.width, source.height, plane);
+    } finally {
+      plane.restore();
+    }
     params.context.drawImage(
       lease.canvas,
       params.frame.x,

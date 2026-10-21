@@ -189,12 +189,27 @@ it('resolves all shared fit modes into canvas transforms', () => {
   });
 });
 
-it('optional header fitting equals fitting the decorated plane and retains old no-header callers', () => {
+it('optional header fitting retains logical rows and old no-header callers', () => {
   const header = windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 80, height: 90 }).height;
   for (const mode of Object.values(VideoMediaFitMode)) {
-    expect(
-      resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode, 73, DEFAULT_WINDOW_HEADER)
-    ).toEqual(resolveMediaClipTransformForFitMode(80, 90 + header, 320, 180, mode, 73));
+    const fitted = resolveMediaClipTransformForFitMode(
+      80,
+      90,
+      320,
+      180,
+      mode,
+      73,
+      DEFAULT_WINDOW_HEADER
+    );
+    if (mode !== 'STRETCH') {
+      const headerHeight = Math.ceil((header * fitted.width) / 80 / 2) * 2;
+      expect(fitted.height - headerHeight).toBeCloseTo((fitted.width * 90) / 80, 10);
+      expect(fitted.x + fitted.width / 2).toBeCloseTo(160, 10);
+      expect(fitted.y + fitted.height / 2).toBeCloseTo(90, 10);
+    } else
+      expect(fitted).toEqual(
+        resolveMediaClipTransformForFitMode(80, 90 + header, 320, 180, mode, 73)
+      );
     expect(resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode)).toEqual(
       resolveMediaClipTransformForFitMode(80, 90, 320, 180, mode, 100, undefined)
     );
@@ -218,4 +233,29 @@ it('retains integer Native placement after shared odd-aspect contain and cover f
     rotation: 0,
     opacity: 1,
   });
+});
+
+it('keeps cropped SOURCE_100 video pixels at source size below an original-source header', async () => {
+  const { getFittedMediaContentFrame } = await import('../../composition/draw/fitted-media');
+  const frame = resolveMediaClipTransformForFitMode(
+    960,
+    1080,
+    1920,
+    1280,
+    'SOURCE_100',
+    100,
+    DEFAULT_WINDOW_HEADER,
+    { width: 1920, height: 1080 }
+  );
+  const content = getFittedMediaContentFrame({
+    frame,
+    fitMode: 'SOURCE_100',
+    windowHeader: DEFAULT_WINDOW_HEADER,
+    sourceWidth: 1920,
+    sourceHeight: 1080,
+    sourceCrop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+  });
+  expect(content.width).toBe(1920);
+  expect(content.height).toBe(1080);
+  expect(content.y - frame.y).toBe(52);
 });

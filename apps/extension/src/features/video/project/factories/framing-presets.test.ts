@@ -39,7 +39,10 @@ it('uses smaller decorative margins for mismatched aspect ratios and scales with
 });
 
 it('framing previews and resulting decorated window agree after crop and header fitting', () => {
-  for (const preset of getMediaFramingPresets(80, 90, 320, 180, DEFAULT_WINDOW_HEADER)) {
+  for (const preset of getMediaFramingPresets(80, 90, 320, 180, DEFAULT_WINDOW_HEADER, {
+    width: 160,
+    height: 90,
+  })) {
     const frame = getFittedMediaWindowFrame({
       frame: preset.transform,
       fitMode: preset.fitMode,
@@ -54,11 +57,27 @@ it('framing previews and resulting decorated window agree after crop and header 
 });
 
 it.each([0, 12.25, 40, 89.5])(
-  'fits padding %s exactly while preserving a proportional decorated plane',
+  'fits padding %s exactly while preserving video proportions and logical header rows',
   (padding) => {
     const layout = resolveMediaPaddingLayout(80, 90, 320, 180, padding, DEFAULT_WINDOW_HEADER)!;
     const header = windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 80, height: 90 }).height;
-    expect(layout.transform.width / layout.transform.height).toBeCloseTo(80 / (90 + header), 10);
+    const actualHeader = layout.transform.height - (layout.transform.width * 90) / 80;
+    expect(actualHeader).toBeGreaterThan(0);
+    if (layout.transform.height > 2) {
+      expect(actualHeader).toBeCloseTo(
+        Math.ceil((header * layout.transform.width) / 80 / 2) * 2,
+        10
+      );
+    }
+    const visible = getFittedMediaWindowFrame({
+      frame: layout.transform,
+      sourceWidth: 80,
+      sourceHeight: 90,
+      windowHeader: DEFAULT_WINDOW_HEADER,
+      fitMode: layout.fitMode,
+    });
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(visible[key]).toBeCloseTo(layout.transform[key], 10);
     expect(layout.transform.x + layout.transform.width / 2).toBeCloseTo(160, 10);
     expect(layout.transform.y + layout.transform.height / 2).toBeCloseTo(90, 10);
     expect(

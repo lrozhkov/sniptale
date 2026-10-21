@@ -283,7 +283,8 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
     asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     props.project.width,
     props.project.height,
-    clip.windowHeader
+    clip.windowHeader,
+    { width: asset.metadata.width, height: asset.metadata.height }
   );
   const labels = [
     translate('videoEditor.sidebar.framingWhole'),

@@ -106,3 +106,73 @@ export function mediaWindowPadding(
     Math.min(...corners.flatMap(({ x, y }) => [x, y, output.width - x, output.height - y]))
   );
 }
+
+interface DecoratedMediaFrameInput {
+  contentWidth: number;
+  contentHeight: number;
+  windowHeader?: WindowHeader;
+  sourceWidth: number;
+  sourceHeight: number;
+  frame: { x: number; y: number; width: number; height: number };
+  fit: 'contain' | 'cover' | 'stretch';
+  displayScale?: number;
+}
+
+/** Header rows belong to the logical window, and use the uncropped source's typography. */
+export function resolveDecoratedMediaFrame(
+  params: DecoratedMediaFrameInput,
+  fallbackHeaderHeight = 0
+) {
+  const width = params.contentWidth;
+  const height = params.contentHeight;
+  const sourceHeaderHeight = params.windowHeader
+    ? windowHeaderGeometry(params.windowHeader, {
+        width: params.sourceWidth,
+        height: params.sourceHeight,
+      }).height
+    : fallbackHeaderHeight;
+  const headerRatio = sourceHeaderHeight / params.sourceWidth;
+  const nominalRow = 2 * (params.displayScale ?? 1);
+  // A free Native frame can be smaller than one logical header row.
+  const row =
+    params.fit === 'contain' && params.frame.height <= nominalRow
+      ? (params.frame.height * headerRatio) / (height / width + headerRatio)
+      : nominalRow;
+  const headerAt = (windowWidth: number) =>
+    headerRatio > 0 && row > 0 ? Math.ceil((headerRatio * windowWidth) / row - 1e-12) * row : 0;
+  if (
+    width <= 0 ||
+    height <= 0 ||
+    params.frame.width <= 0 ||
+    params.frame.height <= 0 ||
+    params.fit === 'stretch'
+  ) {
+    return {
+      ...params.frame,
+      headerHeight: Math.min(params.frame.height, headerAt(params.frame.width)),
+    };
+  }
+  const contentRatio = height / width;
+  let fittedWidth =
+    params.fit === 'cover'
+      ? Math.max(params.frame.width, params.frame.height / (contentRatio + headerRatio))
+      : Math.min(params.frame.width, params.frame.height / (contentRatio + headerRatio));
+  let headerHeight = headerAt(fittedWidth);
+  if (params.fit !== 'cover' && fittedWidth * contentRatio + headerHeight > params.frame.height) {
+    fittedWidth = Math.max(0, (params.frame.height - headerHeight) / contentRatio);
+    const smallerHeader = headerAt(fittedWidth);
+    if (smallerHeader < headerHeight) {
+      // A discrete row boundary can leave spare height; keep the largest fitting width at that boundary.
+      fittedWidth = Math.min(params.frame.width, smallerHeader / headerRatio);
+      headerHeight = smallerHeader;
+    }
+  }
+  const fittedHeight = fittedWidth * contentRatio + headerHeight;
+  return {
+    width: fittedWidth,
+    height: fittedHeight,
+    x: params.frame.x + (params.frame.width - fittedWidth) / 2,
+    y: params.frame.y + (params.frame.height - fittedHeight) / 2,
+    headerHeight,
+  };
+}

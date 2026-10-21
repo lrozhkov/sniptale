@@ -1,3 +1,4 @@
+import { planReviewProjectScene } from './project-scene';
 import { loadQuickEditAdvancedState } from './advanced/validation';
 import { resolveQuickEditEffectiveFeatures } from './advanced/effective';
 import { buildReviewTimeMap } from './timeline';
@@ -78,6 +79,13 @@ export function planReviewProjectConversion(args: {
   if (!advanced) return blocked({ kind: 'invalid-document', field: 'ui' });
   const application = resolveQuickEditEffectiveFeatures(advanced);
   const pending = pendingContent(document.advancedContent);
+  const scene = planReviewProjectScene({
+    content: document.advancedContent,
+    ui: args.ui,
+    source: args.source,
+  });
+  if (scene.status === 'blocked')
+    pending.push(...scene.fields.map((field) => ({ kind: 'unmapped-content' as const, field })));
   const recordingId = recordingIdForProjectAsset(asset);
   const hasFeedback =
     document.advancedContent.actionAudio !== undefined ||
@@ -87,6 +95,7 @@ export function planReviewProjectConversion(args: {
   if (document.edits.some((edit) => edit.kind === 'cut' && edit.transition !== undefined))
     pending.push({ kind: 'source-transition' });
   if (pending.length) return blocked(...pending);
+  if (scene.status !== 'prepared') return blocked({ kind: 'native-admission' });
   let timeline: ReviewProjectTimelinePlan;
   try {
     timeline = planReviewProjectTimeline({
@@ -142,7 +151,7 @@ export function planReviewProjectConversion(args: {
       ? [{ id: mute.id, start: mute.start, end: mute.end, volume: mute.volume }]
       : []
   );
-  const master = (clip: VideoProjectVideoClip | VideoProjectAudioClip) => ({
+  const master = <T extends VideoProjectVideoClip | VideoProjectAudioClip>(clip: T) => ({
     ...clip,
     volume: original.volume,
     audioGainStart: original.volume,
@@ -167,12 +176,12 @@ export function planReviewProjectConversion(args: {
     name: args.name,
     duration: timeline.duration,
     backgroundColor: '#00000000',
-    sceneBackground: { kind: 'solid', color: '#00000000' },
+    ...scene.scene,
     ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),
     assets: [...structuredClone(args.seed.assets), ...externalAudio.assets],
     tracks: [...structuredClone(args.seed.tracks), ...externalAudio.tracks],
     clips: [
-      ...timeline.videoClips.map(master),
+      ...timeline.videoClips.map((clip) => ({ ...master(clip), ...scene.video })),
       ...timeline.audioClips.map(master),
       ...externalAudio.clips,
     ],
@@ -371,15 +380,11 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     text: false,
     captions: false,
     actionsEnabled: false,
-    zoom: content.zoom.enabled || content.zoom.regions.length > 0,
-    background:
-      content.background.enabled ||
-      Object.keys(content.background).some((key) => key !== 'enabled' && key !== 'zoomBehavior') ||
-      (content.background.zoomBehavior !== undefined &&
-        content.background.zoomBehavior !== 'window'),
+    zoom: content.zoom.regions.length > 0,
+    background: false,
     audio: false,
-    canvas: content.canvas !== undefined,
-    windowHeader: content.windowHeader !== undefined,
+    canvas: false,
+    windowHeader: false,
     webcam: content.webcam !== undefined,
     watermark: content.watermark !== undefined,
     presentation:

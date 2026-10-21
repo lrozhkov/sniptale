@@ -1,3 +1,4 @@
+import { resolveQuickEditShadow } from '../../review/advanced/shadow';
 import { expect, it } from 'vitest';
 import { VideoMediaShadowMode } from '../../project/types/index';
 import {
@@ -11,17 +12,17 @@ it('normalizes media shadow intensity into the persisted slider range', () => {
   expect(normalizeVideoMediaShadowIntensity(undefined)).toBe(0);
   expect(normalizeVideoMediaShadowIntensity(Number.NaN)).toBe(0);
   expect(normalizeVideoMediaShadowIntensity(-20)).toBe(0);
-  expect(normalizeVideoMediaShadowIntensity(42.4)).toBe(42);
+  expect(normalizeVideoMediaShadowIntensity(42.4)).toBe(42.4);
   expect(normalizeVideoMediaShadowIntensity(140)).toBe(100);
   expect(normalizeVideoMediaShadowMode(undefined)).toBe(VideoMediaShadowMode.BACKDROP);
   expect(normalizeVideoMediaShadowMode(VideoMediaShadowMode.GLOW)).toBe(VideoMediaShadowMode.GLOW);
 });
 
 it('resolves deterministic CSS and canvas params for preview and export parity', () => {
-  expect(resolveVideoMediaShadowCss(50)).toBe('0px 0px 24px rgba(0, 0, 0, 0.28)');
+  expect(resolveVideoMediaShadowCss(50)).toBe('0px 0px 37.5px rgba(0, 0, 0, 0.5)');
   expect(resolveVideoMediaShadowParams(50, 2)).toEqual({
-    blur: 48,
-    color: 'rgba(0, 0, 0, 0.28)',
+    blur: 75,
+    color: 'rgba(0, 0, 0, 0.5)',
     offsetX: 0,
     offsetY: 0,
     paint: { color: 'rgba(0, 0, 0, 1)', kind: 'outer-shadow' },
@@ -54,3 +55,25 @@ it('gives camera shadows and glow a strong upper range without changing other me
     expect(scaled.offsetY).toBe(strong.offsetY * 2);
   }
 });
+
+it.each([0.25, 30, 100])(
+  'matches Gallery backdrop spread at intensity %s at every preview scale',
+  (intensity) => {
+    for (const scale of [0.05, 0.5, 1, 2]) {
+      const gallery = resolveQuickEditShadow(
+        {
+          enabled: true,
+          type: 'solid',
+          color: '#000000',
+          layout: { padding: 0, cornerRadius: 0, shadow: { intensity, color: '#123456' } },
+        },
+        scale
+      )!;
+      const native = resolveVideoMediaShadowParams(intensity, scale)!;
+      expect(gallery.blur).toBe(intensity * 0.75 * scale);
+      expect(native.blur).toBe(gallery.blur);
+      expect(native.offsetX).toBe(0);
+      expect(native.offsetY).toBe(0);
+    }
+  }
+);

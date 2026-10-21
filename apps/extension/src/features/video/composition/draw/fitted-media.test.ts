@@ -487,3 +487,112 @@ it('rejects invalid window mapping and maps circular window coordinates independ
     expect(mapVisualLayerPointToWindowNormalized(invalid)).toBeNull();
   }
 });
+
+it.each(['CONTAIN', 'STRETCH'] as const)(
+  'retains Gallery cropped header geometry and draw coordinates through %s',
+  async (fitMode) => {
+    const { computeQuickEditSceneSize, computeQuickEditSceneLayout } =
+      await import('../../review/advanced/scene');
+    const { getFittedMediaContentFrame } = await import('./fitted-media');
+    const source = { width: 1920, height: 1080 };
+    const windowHeader = {
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
+      style: 'windows' as const,
+    };
+    const scene = {
+      source,
+      canvas: { width: 960, height: 1080, crop: { x: 0.25, y: 0, width: 0.5, height: 1 } },
+      windowHeader,
+      background: { enabled: false as const },
+    };
+    const output = computeQuickEditSceneSize(scene);
+    const layout = computeQuickEditSceneLayout({
+      ...scene,
+      output,
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+    expect(output).toEqual({ width: 960, height: 1132, headerHeight: 52 });
+    const params = {
+      sourceWidth: source.width,
+      sourceHeight: source.height,
+      sourceCrop: scene.canvas.crop,
+      windowHeader,
+      fitMode,
+      frame: layout.windowRect,
+    };
+    expect(getFittedMediaWindowFrame(params)).toEqual(layout.windowRect);
+    expect(getFittedMediaContentFrame(params)).toEqual(layout.videoRect);
+    const context = createVisualTestContext(),
+      plane = createVisualTestContext();
+    Object.assign(plane, { setTransform: vi.fn(), clearRect: vi.fn() });
+    const release = vi.fn();
+    const acquire = vi.spyOn(bufferPool, 'acquireVideoCompositionBuffer').mockReturnValue({
+      canvas: Object.assign(plane.canvas, { getContext: () => plane }),
+      release,
+    });
+    const render = vi.fn();
+    try {
+      drawFittedMediaLayer({
+        ...params,
+        context,
+        displayScale: 1,
+        shadowIntensity: 0,
+        shadowMode: undefined,
+        windowHeaderImage: { naturalHeight: 103.2 } as HTMLImageElement,
+        render,
+      });
+      expect(render).toHaveBeenCalledWith(-480, 52, 1920, 1080, plane, layout.visibleVideoRect);
+      expect(plane.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 960, 52);
+      expect(release).toHaveBeenCalledOnce();
+    } finally {
+      acquire.mockRestore();
+    }
+  }
+);
+
+it.each([
+  [1000, 1080, 0, 1],
+  [601, 811, 12.25, 0.53],
+  [640, 360, 24, 0.25],
+  [1920, 1080, 64, 1],
+])(
+  'matches Gallery fractional canvas %sx%s padding%s at display scale%s',
+  async (width, height, padding, displayScale) => {
+    const { computeQuickEditSceneSize, computeQuickEditSceneLayout } =
+      await import('../../review/advanced/scene');
+    const { getFittedMediaContentFrame } = await import('./fitted-media');
+    const scene = {
+      source: { width: 1920, height: 1080 },
+      canvas: { width, height, crop: { x: 0.25, y: 0.1, width: 0.5, height: 0.8 } },
+      windowHeader: DEFAULT_WINDOW_HEADER,
+      background: {
+        enabled: true as const,
+        type: 'solid' as const,
+        color: '#123456',
+        layout: { padding, cornerRadius: 12 },
+      },
+    };
+    const size = computeQuickEditSceneSize(scene);
+    const layout = computeQuickEditSceneLayout({
+      ...scene,
+      output: { width: size.width * displayScale, height: size.height * displayScale },
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+    const params = {
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      displayScale,
+      windowHeader: scene.windowHeader,
+      ...(layout.sourceCrop ? { sourceCrop: layout.sourceCrop } : {}),
+      frame: layout.windowRect,
+      fitMode: 'CONTAIN' as const,
+    };
+    const window = getFittedMediaWindowFrame(params),
+      content = getFittedMediaContentFrame(params);
+    for (const axis of ['x', 'y', 'width', 'height'] as const) {
+      expect(window[axis]).toBeCloseTo(layout.windowRect[axis], 7);
+      expect(content[axis]).toBeCloseTo(layout.videoRect[axis], 7);
+    }
+  }
+);
