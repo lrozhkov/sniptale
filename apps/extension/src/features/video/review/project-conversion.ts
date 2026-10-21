@@ -1,0 +1,405 @@
+import { loadQuickEditAdvancedState } from './advanced/validation';
+import { resolveQuickEditEffectiveFeatures } from './advanced/effective';
+import { buildReviewTimeMap } from './timeline';
+import { resolvePresentationSettings } from './advanced/presentation';
+import type {
+  VideoProject,
+  VideoProjectAudioClip,
+  VideoProjectVideoClip,
+} from '../project/types/model';
+import { isExportReadyVideoProject } from '../project/validation/root';
+import { isPlaybackRate } from '../project/validation/primitives';
+import { getVideoProjectActionPresentation } from '../project/action-presentation';
+import { recordingIdForProjectAsset } from '../project/source-interactions';
+import type { QuickEditAdvancedContent, QuickEditUiState } from './advanced/types';
+import type { ReviewDocument, ReviewSource } from './types';
+import { parseReviewDocumentBaseline } from './validation';
+import {
+  planReviewProjectAudio,
+  type ReviewProjectAudioIssue,
+  type ReviewProjectAudioResources,
+} from './project-audio';
+import {
+  planReviewProjectTimeline,
+  ReviewProjectTimelineError,
+  type ReviewProjectTimelinePlan,
+} from './project-timeline';
+import { planReviewProjectDocuments } from './project-documents';
+
+type ReviewProjectConversionIssue =
+  | ReviewProjectAudioIssue
+  | {
+      kind:
+        | 'invalid-seed'
+        | 'invalid-document'
+        | 'changed-source'
+        | 'unmapped-content'
+        | 'source-transition'
+        | 'interaction-source'
+        | 'native-rate'
+        | 'native-admission';
+      field?: string;
+    };
+
+/** Prepared is a pure domain result; the workflow still owns resource admission and publication. */
+type ReviewProjectConversionPlan =
+  | { status: 'blocked'; issues: ReviewProjectConversionIssue[] }
+  | { status: 'prepared'; project: VideoProject; timeline: ReviewProjectTimelinePlan };
+
+/** Builds a detached core conversion and refuses every currently unmapped authored branch. */
+export function planReviewProjectConversion(args: {
+  seed: VideoProject;
+  name: string;
+  source: ReviewSource;
+  document: ReviewDocument;
+  externalAudio?: ReviewProjectAudioResources;
+  ui: QuickEditUiState;
+}): ReviewProjectConversionPlan {
+  const blocked = (...issues: ReviewProjectConversionIssue[]): ReviewProjectConversionPlan => ({
+    status: 'blocked',
+    issues,
+  });
+  const source = sourceTemplates(args.seed);
+  if (!source) return blocked({ kind: 'invalid-seed' });
+  const asset = args.seed.assets.find((asset) => asset.id === source.video.assetId)!;
+  if (
+    asset.metadata.width !== args.source.width ||
+    asset.metadata.height !== args.source.height ||
+    asset.metadata.duration !== args.source.duration ||
+    asset.metadata.mimeType !== args.source.mimeType ||
+    asset.metadata.size !== args.source.size ||
+    args.seed.width !== args.source.width ||
+    args.seed.height !== args.source.height
+  )
+    return blocked({ kind: 'changed-source' });
+  const document = parseReviewDocumentBaseline(args.document, args.source.duration);
+  if (!document) return blocked({ kind: 'invalid-document' });
+  const advanced = loadQuickEditAdvancedState({ ...document.advancedContent, ui: args.ui });
+  if (!advanced) return blocked({ kind: 'invalid-document', field: 'ui' });
+  const application = resolveQuickEditEffectiveFeatures(advanced);
+  const pending = pendingContent(document.advancedContent);
+  const recordingId = recordingIdForProjectAsset(asset);
+  const hasFeedback =
+    document.advancedContent.actionAudio !== undefined ||
+    document.advancedContent.clickAnimations !== undefined ||
+    document.advancedContent.keyAnimations !== undefined;
+  if (hasFeedback && !recordingId) pending.push({ kind: 'interaction-source' });
+  if (document.edits.some((edit) => edit.kind === 'cut' && edit.transition !== undefined))
+    pending.push({ kind: 'source-transition' });
+  if (pending.length) return blocked(...pending);
+  let timeline: ReviewProjectTimelinePlan;
+  try {
+    timeline = planReviewProjectTimeline({
+      operationId: args.seed.id,
+      source: args.source,
+      edits: document.edits,
+      video: source.video,
+      ...(source.audio ? { audio: source.audio } : {}),
+    });
+  } catch (error) {
+    if (error instanceof ReviewProjectTimelineError)
+      return blocked({
+        kind: error.reason === 'invalid-input' ? 'invalid-seed' : 'native-admission',
+        field: error.reason,
+      });
+    throw error;
+  }
+  if (timeline.videoClips.some((clip) => !isPlaybackRate(clip.playbackRate)))
+    return blocked({ kind: 'native-rate' });
+  const documents = planReviewProjectDocuments({
+    timeline,
+    annotations: document.annotations,
+    canvasComments: document.canvasComments,
+    ...(document.advancedContent.text ? { text: document.advancedContent.text } : {}),
+    ...(document.advancedContent.captions
+      ? { captions: { ...document.advancedContent.captions, enabled: application.captionsApplied } }
+      : {}),
+  });
+  const externalAudio = planReviewProjectAudio({
+    operationId: args.seed.id,
+    audio: document.advancedContent.audio,
+    application,
+    source: {
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: timeline.sourceInstanceId },
+      reference: buildReviewTimeMap(args.source.duration, document.edits),
+    },
+    mainDuration: timeline.duration,
+    originalAudioTarget: {
+      assetId: asset.id,
+      sourceInstanceId: (timeline.audioClips[0] ?? timeline.videoClips[0])!.sourceInstanceId!,
+    },
+    ...(args.externalAudio ? { resources: args.externalAudio } : {}),
+  });
+  if (externalAudio.status === 'blocked') return blocked(...externalAudio.issues);
+  if (
+    externalAudio.assets.some((asset) => args.seed.assets.some((entry) => entry.id === asset.id)) ||
+    externalAudio.tracks.some((track) => args.seed.tracks.some((entry) => entry.id === track.id))
+  )
+    return blocked({ kind: 'audio-resources', field: 'seed-identity' });
+  const original = document.advancedContent.audio.original;
+  const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
+    mute.kind === 'range'
+      ? [{ id: mute.id, start: mute.start, end: mute.end, volume: mute.volume }]
+      : []
+  );
+  const master = (clip: VideoProjectVideoClip | VideoProjectAudioClip) => ({
+    ...clip,
+    volume: original.volume,
+    audioGainStart: original.volume,
+    audioGainEnd: original.volume,
+    muted: clip.muted || original.muted || !application.originalAudioApplied,
+  });
+  const minimumVersion =
+    externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
+      ? 31
+      : externalAudio.clips.length
+        ? 30
+        : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+          ? 29
+          : original.ranges?.length || sourceMutes.length
+            ? 28
+            : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+              ? 27
+              : 26;
+  const project: VideoProject = {
+    ...structuredClone(args.seed),
+    version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,
+    name: args.name,
+    duration: timeline.duration,
+    backgroundColor: '#00000000',
+    sceneBackground: { kind: 'solid', color: '#00000000' },
+    ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),
+    assets: [...structuredClone(args.seed.assets), ...externalAudio.assets],
+    tracks: [...structuredClone(args.seed.tracks), ...externalAudio.tracks],
+    clips: [
+      ...timeline.videoClips.map(master),
+      ...timeline.audioClips.map(master),
+      ...externalAudio.clips,
+    ],
+    ...(original.ranges?.length || sourceMutes.length || externalAudio.originalSpeech !== undefined
+      ? {
+          sourceAudioDocuments: [
+            {
+              id: `${args.seed.id}:source-audio`,
+              binding: {
+                kind: 'source' as const,
+                assetId: asset.id,
+                sourceInstanceId: (timeline.audioClips[0] ?? timeline.videoClips[0])!
+                  .sourceInstanceId!,
+              },
+              ranges: structuredClone(original.ranges ?? []),
+              mutes: sourceMutes,
+              ...(externalAudio.originalSpeech === undefined
+                ? {}
+                : { speech: externalAudio.originalSpeech }),
+            },
+          ],
+        }
+      : {}),
+    ...(externalAudio.sourceVoiceoverDocuments.length
+      ? { sourceVoiceoverDocuments: externalAudio.sourceVoiceoverDocuments }
+      : {}),
+    textDocuments: documents.textDocuments,
+    commentDocuments: documents.commentDocuments,
+    ...projectRecordingFeedback({
+      seed: args.seed,
+      content: document.advancedContent,
+      recordingId,
+      sourceInstanceId: timeline.sourceInstanceId,
+      hasFeedback,
+      actionsApplied: application.actionsApplied,
+    }),
+    ...(document.advancedContent.cameraFollowDefaults === undefined
+      ? {}
+      : {
+          cameraFollowDefaults: structuredClone(document.advancedContent.cameraFollowDefaults),
+        }),
+  };
+  if (!isExportReadyVideoProject(project)) return blocked({ kind: 'native-admission' });
+  return { status: 'prepared', project, timeline };
+}
+
+function projectPresentation(
+  settings: QuickEditAdvancedContent['presentation'],
+  applied: boolean
+): Partial<Pick<VideoProject, 'sceneEdges' | 'bookendPresets'>> {
+  const presentation = settings ? resolvePresentationSettings(settings) : undefined;
+  return presentation
+    ? {
+        sceneEdges: {
+          intro: {
+            ...presentation.fadeIn,
+            enabled: presentation.fadeIn.enabled && applied,
+            color: presentation.fadeIn.color ?? presentation.color,
+            audioFade: presentation.fadeIn.audioFade ?? presentation.audioFade,
+          },
+          outro: {
+            ...presentation.fadeOut,
+            enabled: presentation.fadeOut.enabled && applied,
+            color: presentation.fadeOut.color ?? presentation.color,
+            audioFade: presentation.fadeOut.audioFade ?? presentation.audioFade,
+          },
+        },
+        ...(presentation.introTransition || presentation.outroTransition
+          ? {
+              bookendPresets: {
+                intro: { mode: 'none' as const },
+                outro: { mode: 'none' as const },
+                ...(presentation.introTransition
+                  ? { introTransition: structuredClone(presentation.introTransition) }
+                  : {}),
+                ...(presentation.outroTransition
+                  ? { outroTransition: structuredClone(presentation.outroTransition) }
+                  : {}),
+              },
+            }
+          : {}),
+      }
+    : {};
+}
+
+function projectRecordingFeedback(args: {
+  seed: VideoProject;
+  content: QuickEditAdvancedContent;
+  recordingId: ReturnType<typeof recordingIdForProjectAsset>;
+  sourceInstanceId: string;
+  hasFeedback: boolean;
+  actionsApplied: boolean;
+}): Pick<VideoProject, 'actionEvents' | 'actionPresentation'> &
+  Partial<Pick<VideoProject, 'actionFeedback'>> {
+  return {
+    actionEvents: args.seed.actionEvents.map((event) => ({
+      ...structuredClone(event),
+      anchor:
+        event.anchor.kind === 'recording-source'
+          ? { ...structuredClone(event.anchor), sourceInstanceId: args.sourceInstanceId }
+          : structuredClone(event.anchor),
+    })),
+    ...(args.recordingId &&
+    (args.hasFeedback || args.seed.actionEvents.length || args.seed.actionFeedback?.length)
+      ? {
+          actionFeedback: [
+            {
+              recordingId: args.recordingId,
+              sourceInstanceId: args.sourceInstanceId,
+              signals: structuredClone(args.seed.actionFeedback?.[0]?.signals ?? []),
+              settings: structuredClone(args.content.actionAudio ?? []),
+              ...(args.content.clickAnimations === undefined
+                ? {}
+                : {
+                    gestureStyles: structuredClone(args.content.clickAnimations),
+                  }),
+              ...(args.content.keyAnimations === undefined
+                ? {}
+                : {
+                    keyStyles: structuredClone(args.content.keyAnimations),
+                  }),
+            },
+          ],
+        }
+      : {}),
+    actionPresentation: {
+      ...getVideoProjectActionPresentation(args.seed),
+      enabled: args.actionsApplied,
+    },
+  };
+}
+
+function sourceTemplates(seed: VideoProject): {
+  video: VideoProjectVideoClip;
+  audio?: VideoProjectAudioClip;
+} | null {
+  if (
+    !isExportReadyVideoProject(seed) ||
+    seed.cursorTrack !== null ||
+    seed.motionRegions?.length ||
+    seed.effectInstances?.length ||
+    seed.effectSnapshots?.length ||
+    seed.objectTracks?.length ||
+    seed.transitions?.length ||
+    seed.sourceAudioDocuments?.length ||
+    seed.textDocuments?.length ||
+    seed.commentDocuments?.length ||
+    seed.sourceVoiceoverDocuments?.length ||
+    seed.cursorFocusPath ||
+    seed.watermark ||
+    seed.sceneEdges ||
+    seed.bookendPresets ||
+    seed.compositionJoins?.length
+  )
+    return null;
+  const videos = seed.clips.filter((clip) => clip.type === 'VIDEO');
+  const audio = seed.clips.filter((clip) => clip.type === 'AUDIO');
+  const video = videos[0];
+  if (
+    !video ||
+    videos.length !== 1 ||
+    audio.length > 1 ||
+    seed.clips.length !== videos.length + audio.length ||
+    (audio[0] && audio[0].assetId !== video.assetId)
+  )
+    return null;
+  const asset = seed.assets.find((asset) => asset.id === video.assetId)!;
+  const recordingId = recordingIdForProjectAsset(asset);
+  if (
+    seed.actionEvents.some(
+      (event) =>
+        event.anchor.kind !== 'recording-source' ||
+        !recordingId ||
+        event.anchor.recordingId !== recordingId ||
+        event.anchor.sourceInstanceId !== video.sourceInstanceId
+    ) ||
+    (seed.actionFeedback?.length ?? 0) > 1 ||
+    seed.actionFeedback?.some(
+      (group) =>
+        !recordingId ||
+        group.recordingId !== recordingId ||
+        group.sourceInstanceId !== video.sourceInstanceId ||
+        group.settings.length > 0 ||
+        Boolean(group.gestureStyles?.length) ||
+        Boolean(group.keyStyles?.length)
+    )
+  )
+    return null;
+  return { video, ...(audio[0] ? { audio: audio[0] } : {}) };
+}
+
+function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConversionIssue[] {
+  // Every source field requires a deliberate mapping or a neutral-state check during implementation.
+  const pending: Record<keyof QuickEditAdvancedContent, boolean> = {
+    schemaVersion: false,
+    text: false,
+    captions: false,
+    actionsEnabled: false,
+    zoom: content.zoom.enabled || content.zoom.regions.length > 0,
+    background:
+      content.background.enabled ||
+      Object.keys(content.background).some((key) => key !== 'enabled' && key !== 'zoomBehavior') ||
+      (content.background.zoomBehavior !== undefined &&
+        content.background.zoomBehavior !== 'window'),
+    audio: false,
+    canvas: content.canvas !== undefined,
+    windowHeader: content.windowHeader !== undefined,
+    webcam: content.webcam !== undefined,
+    watermark: content.watermark !== undefined,
+    presentation:
+      content.presentation !== undefined &&
+      (content.presentation.intro.mode !== 'none' ||
+        content.presentation.outro.mode !== 'none' ||
+        content.presentation.intro.image !== undefined ||
+        content.presentation.intro.video !== undefined ||
+        content.presentation.outro.image !== undefined ||
+        content.presentation.outro.video !== undefined ||
+        content.presentation.introControl !== undefined ||
+        content.presentation.outroControl !== undefined),
+    cameraFollowDefaults: false,
+    cursorFocusPath: content.cursorFocusPath !== undefined,
+    annotationEffects: content.annotationEffects !== undefined,
+    actionAudio: false,
+    clickAnimations: false,
+    keyAnimations: false,
+  };
+  return Object.entries(pending).flatMap(([field, unmapped]) =>
+    unmapped ? [{ kind: 'unmapped-content' as const, field }] : []
+  );
+}

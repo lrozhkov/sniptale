@@ -35,6 +35,7 @@ export interface UseVideoEditorRuntimeParams {
       clip: VideoEditorProjectActions['deleteClip'];
       cursorSample: VideoEditorProjectActions['deleteCursorSample'];
       effectInstance: VideoEditorProjectActions['deleteEffectInstance'];
+      sourceVoiceover: VideoEditorProjectActions['deleteSourceVoiceover'];
       motionRegion: VideoEditorProjectActions['deleteMotionRegion'];
       objectTrack: VideoEditorProjectActions['deleteObjectTrack'];
     };
@@ -42,6 +43,7 @@ export interface UseVideoEditorRuntimeParams {
     setCurrentTime: VideoEditorSessionActions['setCurrentTime'];
     setPlaying: VideoEditorSessionActions['setPlaying'];
     duplicateClip: VideoEditorProjectActions['duplicateClip'];
+    duplicateSourceVoiceover: VideoEditorProjectActions['duplicateSourceVoiceover'];
     splitClipAt: VideoEditorProjectActions['splitClipAt'];
     updateActionEventDetails: VideoEditorProjectActions['updateActionEventDetails'];
     updateClipTransform: VideoEditorProjectActions['updateClipTransform'];

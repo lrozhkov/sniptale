@@ -1,5 +1,62 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'native-workspace-preview-selection',
+    productionFile: 'apps/extension/src/video-editor/runtime/controller/workspace/core.ts',
+    reason:
+      'Preview selection opens the inspector and preserves recording destinations across workspace commands.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/controller/workspace-state.test.tsx',
+      'apps/extension/src/video-editor/runtime/controller/workspace/sidebar-placement-actions.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/workspace/sidebar.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/workspace/timeline-actions.test.ts',
+      'apps/extension/src/video-editor/runtime/controller/workspace/timeline-auto-transform.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-audio-take-fields',
+    productionFile: 'apps/extension/src/ui/audio/take-fields.tsx',
+    allowCrossOwner: true,
+    reason:
+      'Shared take fields preserve Gallery numeric editing, tempo, fades and bounds across both editor consumers.',
+    testFiles: ['apps/extension/src/gallery/video-review/audio-editor.test.tsx'],
+  },
+  {
+    owner: 'source-voiceover-playback-consumers',
+    productionFile: 'apps/extension/src/features/video/project/source-voiceover-playback.ts',
+    allowCrossOwner: true,
+    reason:
+      'Source voice projection preserves pure clocks, actual Native splitting and offscreen export collection.',
+    testFiles: [
+      'apps/extension/src/features/video/project/source-voiceover-playback.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/split-source-voiceover.test.ts',
+      'apps/extension/src/offscreen/project-export/offline-audio/clip-audio/source-voiceover.test.ts',
+    ],
+  },
+  {
+    owner: 'review-project-conversion-branches',
+    productionFile: 'apps/extension/src/features/video/review/project-conversion.ts',
+    reason:
+      'Conversion admission preserves core, recorded action and whole voice document branches.',
+    testFiles: [
+      'apps/extension/src/features/video/review/project-conversion.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.actions.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.voiceover.test.ts',
+    ],
+  },
+  {
+    owner: 'native-workspace-review-transfer',
+    productionFile: 'apps/extension/src/video-editor/project/operations/workspace.ts',
+    allowCrossOwner: true,
+    reason:
+      'Saved review transfer preserves raw intake, resource preparation and exact source admission in the actual destination transaction.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/operations/workspace.test.ts',
+      'apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
+    ],
+  },
+
+  {
     owner: 'shared-bookend-preset-consumers',
     productionPrefix: 'apps/extension/src/features/video/project/scene/bookend-',
     allowCrossOwner: true,

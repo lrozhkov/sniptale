@@ -1,4 +1,4 @@
-import { createDefaultEngine } from './use-review-audio-runtime';
+import { createReviewAudioEngine } from '../../workflows/video-review/audio-playback-engine';
 import { afterEach, expect, it, vi } from 'vitest';
 import { openReviewAudioClipSource } from '../../workflows/video-review/audio-clip-source';
 import { createReviewAudioClipRenderer } from '../../workflows/video-review/audio-clip-render';
@@ -106,7 +106,7 @@ it('decodes real44100Hz WAV windows and preserves native-grid tempo parity', asy
         }
       }
     );
-    const engine = createDefaultEngine(null)!;
+    const engine = createReviewAudioEngine(null)!;
     try {
       const live = await engine.prepareClip(await engine.decode(data.slice(0)), clip, signal);
       engine.scheduleClip(

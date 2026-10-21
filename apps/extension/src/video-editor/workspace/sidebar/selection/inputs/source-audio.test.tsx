@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import type { ReviewOriginalSpeech } from '../../../../../features/video/review/original-speech';
+import { reviewSpeechTextSignature } from '../../../../../features/video/review/speech-transcript';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -288,4 +290,108 @@ it('allows another static attenuation range when the existing range covers the s
     { start: 0, end: 10, volume: 0.25 },
   ]);
   expect(current.sourceAudioDocuments?.[0]?.ranges).toEqual([]);
+});
+
+function passiveSourceSpeech(assetId: string): ReviewOriginalSpeech {
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  return {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition-model',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 3,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 3 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'historical',
+          phraseId: 'removed-phrase',
+          start: 1,
+          end: 3,
+          duration: 1,
+          assetId,
+          revision: 1,
+          text: 'Accepted',
+          profile,
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          enabled: true,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+}
+
+it('removes the final envelope through the inspector while retaining passive speech across Undo and Redo', async () => {
+  const { project, clip } = fixture();
+  const source = project.assets.find((asset) => asset.id === clip.assetId)!;
+  const replacement = {
+    ...structuredClone(source),
+    id: 'project-asset:passive-history',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'history-private' },
+    metadata: { ...source.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true },
+  };
+  delete replacement.recordingPart;
+  project.assets.push(replacement);
+  project.version = 31;
+  const binding = {
+    kind: 'source' as const,
+    assetId: clip.assetId,
+    sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+  };
+  const speech = passiveSourceSpeech(replacement.id);
+  project.sourceAudioDocuments = [
+    {
+      id: 'source-speech',
+      binding,
+      ranges: [{ id: 'gain', start: 0, end: 10, volume: 1 }],
+      mutes: [],
+      speech,
+    },
+  ];
+  const { isExportReadyVideoProject } =
+    await import('../../../../../features/video/project/validation/root');
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  mount(project, binding);
+  const before = useVideoEditorStore.getState().project!;
+  const historyLength = useVideoEditorStore.getState().projectHistory.past.length;
+  const remove = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent?.trim() === translate('videoEditor.sidebar.sourceAudioRemove')
+  );
+  if (!remove) throw new Error('Missing remove action');
+  act(() => remove.focus());
+  act(() => remove.click());
+  await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  const cleared = useVideoEditorStore.getState().project!;
+  expect(cleared.sourceAudioDocuments).toEqual([
+    { ...before.sourceAudioDocuments![0]!, ranges: [], mutes: [] },
+  ]);
+  expect(cleared.sourceAudioDocuments![0]!.speech).toEqual(speech);
+  expect(cleared.clips).toEqual(before.clips);
+  expect(cleared.assets).toEqual(before.assets);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(historyLength + 1);
+  expect(document.activeElement).toBe(host.querySelector('[data-source-audio-add]'));
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project!.sourceAudioDocuments).toEqual(
+    before.sourceAudioDocuments
+  );
+  expect(input('videoEditor.sidebar.sourceAudioStart').value).toBe('0');
+  act(() => useVideoEditorStore.getState().redoProject());
+  expect(useVideoEditorStore.getState().project!.sourceAudioDocuments).toEqual(
+    cleared.sourceAudioDocuments
+  );
+  expect(useVideoEditorStore.getState().project!.assets).toEqual(before.assets);
+  expect(host.textContent).not.toContain('Accepted');
+  expect(host.textContent).not.toContain('recognition-model');
 });

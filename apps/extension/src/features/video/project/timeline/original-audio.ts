@@ -1,3 +1,5 @@
+import { isSourceVoiceoverOriginalAudioClip } from '../source-voiceover';
+import { getProjectSourceVoiceoverOriginalAudioRanges } from '../source-voiceover-playback';
 import {
   getProjectSourceAudioDocument,
   getProjectSourceAudioAttenuationRanges,
@@ -11,6 +13,9 @@ export function isProjectOriginalAudioTarget(project: VideoProject, clip: VideoP
   if (clip.type !== 'AUDIO' && clip.type !== 'VIDEO') return false;
   return (
     !!getProjectSourceAudioDocument(project, clip) ||
+    !!project.sourceVoiceoverDocuments?.some((document) =>
+      isSourceVoiceoverOriginalAudioClip(document, clip)
+    ) ||
     project.clips.some(
       (take) =>
         take.type === 'AUDIO' &&
@@ -53,7 +58,11 @@ export function getProjectOriginalAudioRanges(
   });
   return composeSourceAudioRanges(
     [],
-    [...getProjectSourceAudioAttenuationRanges(project, clip), ...ranges]
+    [
+      ...getProjectSourceAudioAttenuationRanges(project, clip),
+      ...ranges,
+      ...getProjectSourceVoiceoverOriginalAudioRanges(project, clip),
+    ]
   );
 }
 

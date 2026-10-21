@@ -90,6 +90,15 @@ export function getSelectionMeta(
       const label = project ? getEffectInstanceLabel(project, selection.effectInstanceId) : 'FX';
       return { icon: renderSidebarIcon(SlidersHorizontal), label, title: label };
     }
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER: {
+      const document = project?.sourceVoiceoverDocuments?.find(
+        (item) => item.id === selection.documentId
+      );
+      const label = translate('gallery.videoReview.audioVoiceover');
+      const title =
+        project?.assets.find((item) => item.id === document?.take.assetId)?.name ?? label;
+      return { icon: renderSidebarIcon(Volume2), label, title };
+    }
     case VideoEditorSelectionKind.COMMENT:
       return createStaticSelectionMeta(MessageSquare, 'videoEditor.sidebar.commentNote');
     case VideoEditorSelectionKind.SCENE:

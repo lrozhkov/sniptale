@@ -22,6 +22,8 @@ it('routes palette editing, playback and panel actions without a diagnostics cap
     currentTime: 120,
     isPlaying: false,
     selectedClipId: 'clip-1',
+    deleteSourceVoiceover: vi.fn(),
+    duplicateSourceVoiceover: vi.fn(),
     deleteClip: vi.fn(),
     duplicateClip: vi.fn(),
     splitClipAt: vi.fn(),

@@ -317,3 +317,44 @@ it('multiplies manual source gain by minimum static and live attenuation with se
   ]);
   expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
 });
+
+it('recognizes the legacy paired target before its first split even when the whole take is inactive', () => {
+  const { project, source, take } = fixture();
+  delete source.sourceInstanceId;
+  delete take.originalAudioMute;
+  project.sourceVoiceoverDocuments = [
+    {
+      id: 'whole-document',
+      trackId: take.trackId,
+      binding: { kind: 'source', assetId: source.assetId, sourceInstanceId: 'separate-video' },
+      originalAudioSourceInstanceId: source.id,
+      enabled: false,
+      reference: [
+        { kind: 'keep', sourceStart: 0, sourceEnd: 8, resultStart: 0, resultEnd: 8, rate: 1 },
+      ],
+      take: {
+        id: 'whole-take',
+        assetId: take.assetId,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 2,
+        volume: 1,
+        muted: true,
+        fadeIn: 0,
+        fadeOut: 0,
+        dormant: true,
+      },
+    },
+  ];
+  expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([]);
+  expect(isProjectOriginalAudioTarget(project, { ...source, sourceInstanceId: 'other' })).toBe(
+    false
+  );
+  expect(isProjectOriginalAudioTarget(project, { ...source, assetId: take.assetId })).toBe(false);
+  const video = createVideoClipFromAsset(project.tracks[0]!.id, project.assets[0]!, 640, 360);
+  if (video.type !== 'VIDEO') throw new Error('Expected video target');
+  expect(isProjectOriginalAudioTarget(project, { ...video, sourceInstanceId: source.id })).toBe(
+    false
+  );
+});

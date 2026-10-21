@@ -6,6 +6,8 @@ function createStore(selectedClipId: string | null) {
   return {
     currentTime: 4,
     selectedClipId,
+    deleteSourceVoiceover: vi.fn(),
+    duplicateSourceVoiceover: vi.fn(),
     deleteClip: vi.fn(),
     duplicateClip: vi.fn(),
     splitClipAt: vi.fn(),
@@ -44,10 +46,28 @@ it('routes the explicit group to one delete operation without choosing a single 
     currentTime: 0,
     selectedClipId: null,
     selection: { kind: 'clip-group', clipIds: ['a', 'b'], anchorClipId: 'a' },
+    deleteSourceVoiceover: vi.fn(),
+    duplicateSourceVoiceover: vi.fn(),
     deleteClip,
     duplicateClip: vi.fn(),
     splitClipAt: vi.fn(),
   });
   actions.deleteSelectedClip();
   expect(deleteClip).toHaveBeenCalledExactlyOnceWith(['a', 'b']);
+});
+
+it('routes a whole take only to document commands even if an obsolete clip ID is supplied', () => {
+  const store = {
+    ...createStore('obsolete-clip'),
+    selection: { kind: 'source-voiceover' as const, documentId: 'document' },
+  };
+  const actions = createSelectedClipActions(store);
+  actions.deleteSelectedClip();
+  actions.duplicateSelectedClip();
+  actions.splitSelectedClip();
+  expect(store.deleteSourceVoiceover).toHaveBeenCalledExactlyOnceWith('document');
+  expect(store.duplicateSourceVoiceover).toHaveBeenCalledExactlyOnceWith('document');
+  expect(store.deleteClip).not.toHaveBeenCalled();
+  expect(store.duplicateClip).not.toHaveBeenCalled();
+  expect(store.splitClipAt).not.toHaveBeenCalled();
 });

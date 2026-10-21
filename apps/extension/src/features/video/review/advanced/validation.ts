@@ -1,23 +1,18 @@
+import { parseReviewAudioClip } from '../audio-clip-validation';
 import {
   parseQuickEditBorder,
   parseQuickEditSpotlight,
 } from '../../project/scene/focus-appearance';
 import { parseMotionBlurPhases } from '../../project/motion/blur';
-import { MAX_AUDIO_FADE_SECONDS } from '../../audio/fades';
 import { parseCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { parseCursorFocusPath } from '../../project/cursor-focus-path/validation';
 import { parseReviewActionAudio } from './action-audio';
 import { parseQuickEditShadow } from './shadow-validation';
 import { parseReviewAnnotationEffects } from '../annotation-effects/validation';
 import { parseReviewOriginalSpeech } from '../original-speech';
-import {
-  parseReviewCaptionSettings,
-  parseReviewTextDocument,
-  parseReviewVoiceTextSnapshot,
-} from '../text-validation';
+import { parseReviewCaptionSettings, parseReviewTextDocument } from '../text-validation';
 import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from '../../project/scene/watermark';
-import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from '../../project/action-feedback/key-animation';
 import {
   parseCameraPerspective as parseQuickEditPerspective,
@@ -28,7 +23,7 @@ import { parseReviewClickAnimations } from './click-animation';
 import { quickEditFocusConflicts } from './focus-layout';
 import { parseSourceAudioGainRanges } from '../../audio/source-envelope';
 import { parseOriginalAudioMutes, validOriginalAudioMuteBindings } from './original-audio-mutes';
-import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
+import { parseVoiceoverSegments } from '../voiceover-validation';
 
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
 import { isBoundedNumber, isUnitInterval } from '../../project/validation/primitives';
@@ -405,54 +400,8 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
   return null;
 }
 
-function parseAudioClip(value: unknown): QuickEditAudioClip | null {
-  if (
-    !isRecord(value) ||
-    !identity(value['id']) ||
-    !identity(value['assetId']) ||
-    (value['tempo'] !== undefined && !isBoundedNumber(value['tempo'], 0.25, 4)) ||
-    !isBoundedNumber(value['timelineStart'], 0, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['sourceOffset'], 0, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
-    !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME) ||
-    typeof value['muted'] !== 'boolean' ||
-    !isBoundedNumber(value['fadeIn'], 0, MAX_AUDIO_FADE_SECONDS) ||
-    !isBoundedNumber(value['fadeOut'], 0, MAX_AUDIO_FADE_SECONDS)
-  )
-    return null;
-  const sourceAnchor =
-    value['sourceAnchor'] === undefined
-      ? undefined
-      : parseVoiceoverAnchors(value['sourceAnchor'], value['timelineStart'], value['duration']);
-  const transcript =
-    value['transcript'] === undefined
-      ? undefined
-      : parseReviewSpeechTranscript(value['transcript']);
-  const textSnapshot =
-    value['textSnapshot'] === undefined
-      ? undefined
-      : parseReviewVoiceTextSnapshot(value['textSnapshot']);
-  if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
-  return {
-    ...(textSnapshot ? { textSnapshot } : {}),
-    ...(sourceAnchor ? { sourceAnchor } : {}),
-    ...(transcript ? { transcript } : {}),
-    ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
-    id: value['id'],
-    assetId: value['assetId'],
-    timelineStart: value['timelineStart'],
-    sourceOffset: value['sourceOffset'],
-    duration: value['duration'],
-    volume: value['volume'],
-    muted: value['muted'],
-    fadeIn: value['fadeIn'],
-    fadeOut: value['fadeOut'],
-    ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
-  };
-}
-
 function parseAudioClips(value: unknown): QuickEditAudioClip[] | null {
-  const clips = parseBoundedArray(value, MAX_QUICK_EDIT_AUDIO_CLIPS, parseAudioClip);
+  const clips = parseBoundedArray(value, MAX_QUICK_EDIT_AUDIO_CLIPS, parseReviewAudioClip);
   if (!clips) return null;
   const ids = new Set<string>();
   for (const clip of clips) {

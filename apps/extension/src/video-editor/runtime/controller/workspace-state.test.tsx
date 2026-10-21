@@ -213,6 +213,7 @@ it.each([true, false])(
         : { kind: 'scene' as const },
       selectClip: vi.fn(),
       selectScene: vi.fn(),
+      selectSourceVoiceover: vi.fn(),
       currentTime: 20,
       isPlaying: false,
     };
@@ -253,6 +254,11 @@ it.each([true, false])(
       preview.preferences.onFrameRateChange('15');
       preview.preferences.onShowFrameRateChange(true);
     });
+    act(() => workspaceState!.toggleSidebarCollapsed());
+    expect(workspaceState!.leftSidebarCollapsed).toBe(true);
+    act(() => preview.selection.onSelectSourceVoiceover('voice-document'));
+    expect(store.selectSourceVoiceover).toHaveBeenCalledWith('voice-document');
+    expect(workspaceState!.leftSidebarCollapsed).toBe(false);
     expect(store.selectClip).toHaveBeenCalledWith('another-clip');
     expect(runtime.seekTo).toHaveBeenCalledWith(20);
     expect(workspaceState!.preview.preferences.preferences.showFrameRate).toBe(true);

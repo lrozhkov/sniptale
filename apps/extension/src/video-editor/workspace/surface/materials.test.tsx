@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
@@ -606,6 +607,76 @@ it('reveals a dormant source audio use and prevents removal of its retained mate
     assetId: asset.id,
     kind: 'source-audio',
     documentId: 'envelope',
+  });
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});
+
+it('reveals the exact disabled dormant voice document from its retained source material', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  const voiceAsset = createVideoProjectAsset(
+    'Voice',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'voice' },
+    { ...asset.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true }
+  );
+  project.tracks.push(track);
+  project.assets.push(voiceAsset);
+  project.version = 31;
+  project.sourceVoiceoverDocuments = [
+    {
+      id: 'whole-voice',
+      enabled: false,
+      trackId: track.id,
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant-source' },
+      reference: [
+        { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 4 },
+      ],
+      take: {
+        id: 'take',
+        assetId: voiceAsset.id,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 1,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+        dormant: true,
+      },
+    },
+  ];
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  const row = container.querySelector(`[data-material-id="${asset.id}"]`)!;
+  await act(async () =>
+    row
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === translate('gallery.videoReview.audioVoiceover')
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: asset.id,
+    kind: 'source-voiceover',
+    documentId: 'whole-voice',
   });
   expect(onRemoveUnused).not.toHaveBeenCalled();
 });

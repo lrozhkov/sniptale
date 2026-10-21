@@ -51,7 +51,8 @@ function buildCameraRecorderPageUrl(params: { launchToken: string; recordingId: 
 
 function buildVideoEditorProjectUrl(
   projectId?: string | null,
-  recordingId?: string | null
+  recordingId?: string | null,
+  review?: { aggregateId: string; revision: number; createdAt: number; sourceAssetId: string }
 ): string {
   const url = new URL(buildVideoEditorPageUrl());
 
@@ -61,6 +62,13 @@ function buildVideoEditorProjectUrl(
 
   if (recordingId) {
     url.searchParams.set('id', recordingId);
+  }
+
+  if (review) {
+    url.searchParams.set('review', review.aggregateId);
+    url.searchParams.set('reviewRevision', String(review.revision));
+    url.searchParams.set('reviewCreatedAt', String(review.createdAt));
+    url.searchParams.set('reviewSourceAssetId', review.sourceAssetId);
   }
 
   return url.toString();
@@ -135,9 +143,10 @@ export async function openLegacySettingsPage(section: LegacySettingsSection): Pr
 
 export async function openVideoEditorPage(
   projectId?: string | null,
-  recordingId?: string | null
+  recordingId?: string | null,
+  review?: Parameters<typeof buildVideoEditorProjectUrl>[2]
 ): Promise<void> {
-  await browserTabs.create({ url: buildVideoEditorProjectUrl(projectId, recordingId) });
+  await browserTabs.create({ url: buildVideoEditorProjectUrl(projectId, recordingId, review) });
 }
 
 export async function openCameraRecorderPage(params: {

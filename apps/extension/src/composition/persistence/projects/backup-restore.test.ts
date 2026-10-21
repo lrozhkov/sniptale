@@ -1,3 +1,5 @@
+import type { ReviewOriginalSpeech } from '../../../features/video/review/original-speech';
+import { reviewSpeechTextSignature } from '../../../features/video/review/speech-transcript';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -876,4 +878,208 @@ it('restores dormant source audio documents with exact source intent through the
   expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
   expect(entry.project).toEqual(before);
   expect(before.version).toBe(28);
+});
+
+it('restores whole source voice takes and accepted replacement references without rewriting their clocks', async () => {
+  const { createVideoProjectTrack } =
+    await import('../../../features/video/project/factories/creation');
+  const { isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'source-voice-restore' });
+  const source = entry.project.assets[0]!;
+  const audio = {
+    ...source,
+    id: 'native-take',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'voice-private' },
+  };
+  const replacement = {
+    ...audio,
+    id: 'project-asset:replacement',
+    source: { kind: 'project-asset' as const, projectAssetId: 'replacement-private' },
+  };
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    assets: [source, audio, replacement],
+    tracks: [...entry.project.tracks, track],
+    clips: [],
+    sourceVoiceoverDocuments: [
+      {
+        id: 'voice',
+        trackId: track.id,
+        enabled: false,
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'dormant-source' },
+        originalAudioSourceInstanceId: 'dormant-original-audio',
+        reference: [
+          { kind: 'speed', rate: 2, sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 2 },
+          { kind: 'cut', rate: 1, sourceStart: 4, sourceEnd: 6, resultStart: 2, resultEnd: 2 },
+          { kind: 'keep', rate: 1, sourceStart: 6, sourceEnd: 10, resultStart: 2, resultEnd: 6 },
+        ],
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0.5,
+          duration: 4,
+          volume: 1,
+          muted: true,
+          dormant: true,
+          fadeIn: 0.25,
+          fadeOut: 0.5,
+          tempo: 0.5,
+          sourceAnchor: [{ start: 0, end: 8, offset: 0, duration: 4 }],
+          transcript: {
+            version: 1,
+            phrases: [],
+            replacements: [
+              {
+                id: 'replacement',
+                assetId: replacement.id,
+                start: 0,
+                end: 1,
+                duration: 1,
+                phraseId: 'phrase',
+                revision: 1,
+                text: 'Accepted',
+                textSignature: reviewSpeechTextSignature('Accepted', profile),
+                profile,
+              },
+            ],
+          },
+        },
+      },
+    ],
+  });
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  const before = structuredClone(entry.project);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  expect(entry.project).toEqual(before);
+  expect(before.version).toBe(31);
+});
+
+function passiveSourceSpeech(assetId: string): ReviewOriginalSpeech {
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  return {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition-model',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 3,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 3 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'historical',
+          phraseId: 'removed-phrase',
+          start: 1,
+          end: 3,
+          duration: 1,
+          assetId,
+          revision: 1,
+          text: 'Accepted',
+          profile,
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          enabled: true,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+}
+
+it('restores passive source speech without scheduling replacement audio', async () => {
+  const { isExportReadyVideoProject, parseHydratableVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { getProjectAssetUses } = await import('../../../features/video/project/media-usage');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'passive-speech-restore' });
+  const source = entry.project.assets[0]!;
+  const replacement = {
+    ...structuredClone(source),
+    id: 'project-asset:passive-history',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'passive-history-private' },
+    metadata: { ...source.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    assets: [source, replacement],
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'source-speech',
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'missing-original' },
+        ranges: [],
+        mutes: [],
+        speech: passiveSourceSpeech(replacement.id),
+      },
+    ],
+  });
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  expect(entry.project.version).toBe(31);
+  expect(getProjectAssetUses(entry.project)).toEqual([
+    { kind: 'source-audio', documentId: 'source-speech', assetId: source.id },
+    { kind: 'source-audio', documentId: 'source-speech', assetId: replacement.id },
+  ]);
+  const before = structuredClone(entry.project);
+  const assets = entry.project.assets.map((asset) => {
+    if (asset.source.kind !== 'project-asset') throw new Error('Expected private asset');
+    return {
+      entry: {
+        id: asset.source.projectAssetId,
+        assetId: `${asset.id}-body`,
+        mimeType: asset.metadata.mimeType,
+        size: asset.metadata.size,
+        createdAt: 1,
+      },
+      filename: asset.name,
+      ref: {
+        ...ref,
+        location: { kind: 'opfs' as const, objectKey: `objects/${asset.id}` },
+        assetId: `${asset.id}-body`,
+        mimeType: asset.metadata.mimeType,
+        size: asset.metadata.size,
+      },
+      publishToLibrary: false,
+    };
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets, entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  for (const asset of assets) {
+    expect(target.refs.put).toHaveBeenCalledWith(asset.ref);
+    expect(target.assets.put).toHaveBeenCalledWith(asset.entry);
+    expect(target.owners.put).toHaveBeenCalledWith(
+      expect.objectContaining({ assetId: asset.ref.assetId, ownerId: asset.entry.id })
+    );
+  }
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(entry.project)))?.sourceAudioDocuments
+  ).toEqual(before.sourceAudioDocuments);
+  expect(entry.project).toEqual(before);
 });

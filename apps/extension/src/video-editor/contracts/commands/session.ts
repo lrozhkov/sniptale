@@ -21,6 +21,7 @@ export interface VideoEditorSessionActions {
   setPixelsPerSecond: (pixelsPerSecond: number) => void;
   clearPlacementMode: () => void;
   selectScene: () => void;
+  selectSourceVoiceover: (documentId: string) => void;
   selectComment: (documentId: string, commentId: string, projectTime?: number) => void;
   selectTrack: (trackId: string | null) => void;
   selectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;

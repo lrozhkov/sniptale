@@ -141,3 +141,91 @@ it('refuses document duplication above the aggregate budget without partial clip
     before
   );
 });
+
+function retainedSpeechFixture() {
+  const value = fixture();
+  value.project.version = 31;
+  value.document.speech = {
+    enabled: false,
+    transcript: {
+      version: 1,
+      replacements: [],
+      transcriptionModelId: 'recognition',
+      profile: { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' },
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 2,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 2 }],
+        },
+      ],
+    },
+  };
+  return value;
+}
+
+it('clears the last envelope while retaining speech and makes a repeated clear a root no-op', () => {
+  const { project, document } = retainedSpeechFixture();
+  const before = structuredClone(project);
+  const result = applyProjectSourceAudioEdit(project, document, null);
+  if (!result.ok || !result.document) throw new Error('Expected retained speech document');
+  expect(result.project.sourceAudioDocuments).toEqual([{ ...document, ranges: [], mutes: [] }]);
+  expect(result.document.speech).toEqual(document.speech);
+  const repeat = applyProjectSourceAudioEdit(result.project, result.document, null);
+  if (!repeat.ok) throw new Error('Expected no-op clear');
+  expect(repeat.project).toBe(result.project);
+  expect(repeat.document).toBe(result.document);
+  expect(project).toEqual(before);
+});
+
+it('does not let envelope patches replace recognition or binding and preserves stale and lock guards', () => {
+  const { project, document, clip } = retainedSpeechFixture();
+  const patch = {
+    ranges: [],
+    mutes: [],
+    speech: { enabled: true, transcript: { version: 1, phrases: [], replacements: [] } },
+    binding: { kind: 'source', assetId: 'foreign', sourceInstanceId: 'foreign' },
+  };
+  const before = structuredClone(project);
+  expect(applyProjectSourceAudioEdit(project, structuredClone(document), patch)).toEqual({
+    ok: false,
+    reason: 'stale',
+  });
+  const sourceTrack = project.tracks.find((track) => track.id === clip.trackId)!;
+  sourceTrack.locked = true;
+  expect(applyProjectSourceAudioEdit(project, document, patch)).toEqual({
+    ok: false,
+    reason: 'locked',
+  });
+  sourceTrack.locked = false;
+  const result = applyProjectSourceAudioEdit(project, document, patch);
+  if (!result.ok || !result.document) throw new Error('Expected envelope clear');
+  expect(result.document.speech).toEqual(document.speech);
+  expect(result.document.binding).toEqual(document.binding);
+  expect(project).toEqual(before);
+});
+
+it('copies retained speech to an independent instance without sharing nested transcript data', () => {
+  const { document } = retainedSpeechFixture();
+  const before = structuredClone(document);
+  const result = duplicateProjectSourceAudioDocuments(
+    [document],
+    new Map([[document.binding.sourceInstanceId, 'new-instance']]),
+    () => 'new-document'
+  );
+  expect(result).toHaveLength(2);
+  expect(result![1]).toEqual({
+    ...document,
+    id: 'new-document',
+    binding: { ...document.binding, sourceInstanceId: 'new-instance' },
+  });
+  result![1]!.speech!.enabled = true;
+  result![1]!.speech!.transcript.phrases[0]!.words![0]!.text = 'Changed';
+  result![1]!.speech!.transcript.profile!.voiceId = 'other';
+  expect(document).toEqual(before);
+});

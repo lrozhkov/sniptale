@@ -1,14 +1,12 @@
+import { translate } from '../../../../../../platform/i18n';
 import { Copy, Scissors, Trash2 } from 'lucide-react';
 
 import type { ProjectTimelineToolbarProps } from '../../types';
 import { ProjectTimelineToolbarActionButton } from './button';
 import { getClipActionLabel, getClipActionTitle, getSplitActionTitle } from './labels';
 
-function getActionDisabled(selectedClip: boolean) {
-  return !selectedClip;
-}
-
 export function ProjectTimelineClipActions({
+  canDuplicateSelection,
   canDeleteSelectedClip,
   canEditSelectedClip,
   canSplitSelectedClip,
@@ -18,6 +16,7 @@ export function ProjectTimelineClipActions({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canDuplicateSelection'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
@@ -26,7 +25,7 @@ export function ProjectTimelineClipActions({
   | 'onDuplicateSelectedClip'
   | 'onSplitSelectedClip'
 >) {
-  const disabled = getActionDisabled(selectedClip) || !canEditSelectedClip;
+  const disabled = !canDuplicateSelection;
 
   return (
     <>
@@ -35,7 +34,11 @@ export function ProjectTimelineClipActions({
         icon={<Scissors size={14} strokeWidth={2} />}
         label={getClipActionLabel('split')}
         onClick={onSplitSelectedClip}
-        title={getSplitActionTitle(canSplitSelectedClip, canEditSelectedClip)}
+        title={
+          selectedClip
+            ? getSplitActionTitle(canSplitSelectedClip, canEditSelectedClip)
+            : translate('videoEditor.timeline.splitUnavailableTitle')
+        }
       />
       <ProjectTimelineToolbarActionButton
         disabled={disabled}

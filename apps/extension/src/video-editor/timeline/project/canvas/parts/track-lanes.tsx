@@ -1,3 +1,4 @@
+import { ProjectTimelineSourceVoiceoverViews } from './source-voiceover';
 import { useTrackMaterialDrop } from './material-drop';
 import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { readVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
@@ -286,6 +287,14 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
           }
         />
       )}
+      <ProjectTimelineSourceVoiceoverViews
+        project={displayProject}
+        trackId={props.track.id}
+        selection={props.selection}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+        height={props.trackLayout?.clipRowHeight ?? 48}
+      />
       <ProjectTimelineTrackClipStack
         hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? true}
         pixelsPerSecond={props.pixelsPerSecond}

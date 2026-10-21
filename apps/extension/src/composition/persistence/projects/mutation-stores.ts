@@ -22,6 +22,7 @@ import {
   SCENARIO_PROJECT_UNITS_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
+  PROJECT_EXPORTS_STORE,
 } from '../infrastructure/indexed-db/core';
 
 type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
@@ -30,6 +31,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
     [
       VIDEO_PROJECTS_STORE,
+      PROJECT_EXPORTS_STORE,
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
       STORE_NAME,

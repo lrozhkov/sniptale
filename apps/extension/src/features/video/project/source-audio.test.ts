@@ -1,3 +1,4 @@
+import { reviewSpeechTextSignature, type ReviewOriginalSpeech } from '../review/speech-transcript';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from './factories/creation';
 import { applyVideoProjectMutationPatch } from './mutation';
@@ -153,3 +154,147 @@ it('enforces the aggregate budget before accepting multiple independent sources'
   documents[0]!.ranges.push({ id: 'overflow', start: 501, end: 502, volume: 1 });
   expect(parseVideoProjectSourceAudioDocuments(documents)).toBeNull();
 });
+
+function speechFixture() {
+  const value = fixture();
+  const { project, document } = value;
+  const profile = {
+    modelId: 'speech',
+    voiceId: 'voice',
+    responseFormat: 'wav' as const,
+    speed: 1.2,
+    instructions: 'Calm',
+  };
+  const speech: ReviewOriginalSpeech = {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 30,
+          end: 32,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 30, end: 31 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'history',
+          start: 30,
+          end: 32,
+          duration: 0.5,
+          assetId: 'project-asset:speech-history',
+          phraseId: 'removed-phrase',
+          revision: 1,
+          text: 'Accepted',
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          profile,
+          enabled: false,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+  const { recordingPart: _recordingPart, ...assetTemplate } = structuredClone(project.assets[0]!);
+  const replacement = {
+    ...assetTemplate,
+    source: { kind: 'project-asset' as const, projectAssetId: 'speech-history-bytes' },
+    id: 'project-asset:speech-history',
+    type: 'AUDIO' as const,
+    metadata: {
+      ...project.assets[0]!.metadata,
+      width: 0,
+      height: 0,
+      duration: 0.5,
+      mimeType: 'audio/wav',
+      hasAudio: true,
+    },
+  };
+  project.assets.push(replacement);
+  document.speech = speech;
+  return { ...value, speech, replacement };
+}
+
+it('fences retained original speech at schema31 while leaving envelope-only schema28 unchanged', () => {
+  const { project, document, speech } = speechFixture();
+  const before = structuredClone(project);
+  for (let version = 2; version <= 30; version++)
+    expect(
+      parseHydratableVideoProject({ ...project, version, sourceAudioDocuments: [document] })
+    ).toBeNull();
+  const admitted = applyVideoProjectMutationPatch(project, { sourceAudioDocuments: [document] });
+  expect(admitted.version).toBe(31);
+  expect(isExportReadyVideoProject(admitted)).toBe(true);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(admitted)))).toEqual(admitted);
+  expect(admitted.sourceAudioDocuments![0]!.speech).toEqual(speech);
+  expect(applyVideoProjectMutationPatch(admitted, { sourceAudioDocuments: [] }).version).toBe(31);
+  expect(project).toEqual(before);
+});
+
+it('retains passive source times beyond the current source and never adds envelope ranges', () => {
+  const { project, document, clip } = speechFixture();
+  const { speech: _speech, ...envelope } = document;
+  const reference = { ...project, sourceAudioDocuments: [envelope] };
+  const admitted = applyVideoProjectMutationPatch(project, { sourceAudioDocuments: [document] });
+  expect(document.speech!.transcript.phrases[0]!.end).toBeGreaterThan(
+    project.assets[0]!.metadata.duration!
+  );
+  expect(isExportReadyVideoProject(admitted)).toBe(true);
+  expect(getProjectSourceAudioRanges(admitted, clip)).toEqual(
+    getProjectSourceAudioRanges(reference, clip)
+  );
+  expect(getProjectSourceAudioAttenuationRanges(admitted, clip)).toEqual(
+    getProjectSourceAudioAttenuationRanges(reference, clip)
+  );
+  document.ranges = [];
+  document.mutes = [];
+  expect(getProjectSourceAudioRanges(admitted, clip)).toEqual([]);
+  expect(getProjectSourceAudioAttenuationRanges(admitted, clip)).toEqual([]);
+});
+
+it.each([
+  'enabled',
+  'replacement-enabled',
+  'original-volume',
+  'signature',
+  'prefix',
+  'word',
+] as const)('refuses malformed retained speech %s without mutating it', (failure) => {
+  const { document } = speechFixture();
+  const speech = document.speech!;
+  const replacement = speech.transcript.replacements[0]!;
+  if (failure === 'enabled') Reflect.set(speech, 'enabled', 'yes');
+  if (failure === 'replacement-enabled') Reflect.set(replacement, 'enabled', 'yes');
+  if (failure === 'original-volume') replacement.originalVolume = 1.01;
+  if (failure === 'signature') replacement.textSignature = 'forged';
+  if (failure === 'prefix') replacement.assetId = 'unprefixed';
+  if (failure === 'word') speech.transcript.phrases[0]!.words![0]!.start = 29;
+  const before = structuredClone(document);
+  expect(parseVideoProjectSourceAudioDocuments([document])).toBeNull();
+  expect(document).toEqual(before);
+});
+
+it.each(['missing', 'wrong-type', 'native-end'] as const)(
+  'retains hydratable speech but refuses a %s replacement resource',
+  (failure) => {
+    const { project, document, replacement } = speechFixture();
+    project.version = 31;
+    project.clips = [];
+    project.sourceAudioDocuments = [document];
+    if (failure === 'missing')
+      project.assets = project.assets.filter((asset) => asset.id !== replacement.id);
+    if (failure === 'wrong-type')
+      project.assets = project.assets.map((asset) =>
+        asset.id === replacement.id ? { ...project.assets[0]!, id: replacement.id } : asset
+      );
+    if (failure === 'native-end') replacement.metadata.duration = 0.5 - 1e-6;
+    expect(parseHydratableVideoProject(project)).not.toBeNull();
+    expect(isExportReadyVideoProject(project)).toBe(false);
+  }
+);

@@ -23,6 +23,7 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'onClearPlaybackRange'
   | 'onStepToNextFrame'
   | 'onStepToPreviousFrame'
+  | 'canDuplicateSelection'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
@@ -93,6 +94,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
             getMotionInsertionRange(props.project, props.currentTime) !== null &&
             (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
           }
+          canDuplicateSelection={props.canDuplicateSelection}
           canDeleteSelectedClip={props.canDeleteSelectedClip}
           canEditSelectedClip={props.canEditSelectedClip}
           canSplitSelectedClip={props.canSplitSelectedClip}

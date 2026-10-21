@@ -1,4 +1,5 @@
-import { useTimelineClipReveal, useTimelineNoteReveal } from './reveal';
+import { resolveSourceVoiceoverNavigation } from '../../../../features/video/project/source-voiceover-views';
+import { useTimelineReveal, useTimelineNoteReveal } from './reveal';
 import { useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
@@ -190,9 +191,16 @@ export function useProjectTimelineState(
     selectedClipId,
     viewportWidth
   );
+  const selectedRange = useMemo(
+    () =>
+      props.selection.kind === 'source-voiceover'
+        ? resolveSourceVoiceoverNavigation(project, props.selection.documentId, 0).range
+        : selectedClip,
+    [project, props.selection, selectedClip]
+  );
   const viewState = useProjectTimelineViewState(
     props,
-    selectedClip,
+    selectedRange,
     viewportWidth,
     scroll.timelineRef
   );
@@ -202,9 +210,9 @@ export function useProjectTimelineState(
     trackHeightByTrackId,
     viewState.readTimelineStartTime
   );
-  useTimelineClipReveal({
-    request: props.revealClipRequest,
-    clips: project.clips,
+  useTimelineReveal({
+    request: props.revealRequest,
+    project,
     pixelsPerSecond,
     viewportWidth,
     navigateTo: viewState.navigateTo,

@@ -96,6 +96,7 @@ const expectedKeys = {
   ],
   selection: [
     'selectActionOccurrence',
+    'selectSourceVoiceover',
     'selectClip',
     'selectCursorSegment',
     'selectHistoryLane',
@@ -129,6 +130,9 @@ const expectedKeys = {
     'clearUtilityLane',
     'closeTrackGap',
     'deleteActionEvent',
+    'editSourceVoiceover',
+    'deleteSourceVoiceover',
+    'duplicateSourceVoiceover',
     'deleteClip',
     'deleteCursorSample',
     'deleteMotionRegion',

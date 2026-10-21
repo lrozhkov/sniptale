@@ -105,3 +105,54 @@ it('retains ordinary track reveal and does not overwrite later manual scrolling'
     fixture.dispose();
   }
 });
+
+it.each(['clip', 'clip-group'] as const)(
+  'keeps a visible selected %s press target in place across history and lane offsets',
+  (kind) => {
+    const fixture = mount();
+    const { params, trackId, timeline, trackList, render } = fixture;
+    const clip = document.createElement('div');
+    clip.dataset['projectTimelineClip'] = 'selected-clip';
+    clip.getBoundingClientRect = () => new DOMRect(20, 60, 400, 44);
+    timeline.append(clip);
+    try {
+      params.selectedTrackId = trackId;
+      params.selection =
+        kind === 'clip'
+          ? { kind, clipId: 'selected-clip' }
+          : { kind, clipIds: ['selected-clip', 'other'], anchorClipId: 'selected-clip' };
+      render();
+      expect(timeline.scrollTop).toBe(143);
+      expect(trackList.scrollTop).toBe(143);
+      timeline.scrollTop = trackList.scrollTop = 100;
+      render();
+      expect(timeline.scrollTop).toBe(100);
+    } finally {
+      fixture.dispose();
+    }
+  }
+);
+
+it('reveals another rendered clip on the same track without returning to the track origin', () => {
+  const fixture = mount();
+  const { params, trackId, timeline, trackList, render } = fixture;
+  const first = document.createElement('div');
+  first.dataset['projectTimelineClip'] = 'first';
+  first.getBoundingClientRect = () => new DOMRect(20, 60, 400, 44);
+  const next = document.createElement('div');
+  next.dataset['projectTimelineClip'] = 'next';
+  next.getBoundingClientRect = () => new DOMRect(20, 220, 400, 44);
+  timeline.append(first, next);
+  try {
+    params.selectedTrackId = trackId;
+    params.selection = { kind: 'clip', clipId: 'first' };
+    render();
+    timeline.scrollTop = trackList.scrollTop = 143;
+    params.selection = { kind: 'clip', clipId: 'next' };
+    render();
+    expect(timeline.scrollTop).toBe(143 + 220 + 44 - 180);
+    expect(trackList.scrollTop).toBe(timeline.scrollTop);
+  } finally {
+    fixture.dispose();
+  }
+});

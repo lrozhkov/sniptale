@@ -162,7 +162,19 @@ export function useVideoEditorCommandPaletteController() {
   }));
   const selection = useVideoEditorClipSelectionPort(({ selectedClipId }) => ({ selectedClipId }));
   const timeline = useVideoEditorTimelineEditingPort(
-    ({ deleteClip, duplicateClip, splitClipAt }) => ({ deleteClip, duplicateClip, splitClipAt })
+    ({
+      deleteClip,
+      duplicateClip,
+      splitClipAt,
+      deleteSourceVoiceover,
+      duplicateSourceVoiceover,
+    }) => ({
+      deleteClip,
+      duplicateClip,
+      splitClipAt,
+      deleteSourceVoiceover,
+      duplicateSourceVoiceover,
+    })
   );
   const annotation = useVideoEditorAnnotationEditingPort(({ addShapeOverlay, addTextOverlay }) => ({
     addShapeOverlay,

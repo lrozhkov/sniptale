@@ -1,3 +1,8 @@
+import {
+  createVideoProjectTrack,
+  createVideoProjectAsset,
+} from '../../../features/video/project/factories/creation';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 // @vitest-environment jsdom
 
 import { act, useState, type ComponentProps } from 'react';
@@ -15,6 +20,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 // The composition boundary supplies unrelated workspace commands; timeline composition stays real.
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorTimelineController: () => null,
   useVideoEditorAutosaveController: () => ({ enabled: true, onChange: vi.fn() }),
   useVideoEditorHistoryController: () => ({
     canUndo: false,
@@ -203,3 +209,79 @@ it('sizes the track rail by names independently of row height', () => {
     }
   }
 });
+
+it.each([false, true])(
+  'fits all current voice occurrences instead of a stale clip selection; dormant=%s',
+  (dormant) => {
+    const props = createProps();
+    const project = props.project;
+    const source = project.clips[0]!;
+    if (source.type !== 'VIDEO') throw new Error('Missing source');
+    source.duration = 2;
+    source.sourceDuration = 2;
+    source.sourceInstanceId = 'instance';
+    project.clips.push({
+      ...source,
+      id: 'second',
+      startTime: source.startTime + 10,
+      sourceStart: 2,
+    });
+    const track = createVideoProjectTrack('Voice', 2, 'AUDIO');
+    const audio = createVideoProjectAsset(
+      'Voice',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'voice' },
+      {
+        width: 0,
+        height: 0,
+        duration: 4,
+        mimeType: 'audio/wav',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    project.tracks.push(track);
+    project.assets.push(audio);
+    project.version = 31;
+    project.sourceVoiceoverDocuments = [
+      {
+        id: 'doc',
+        trackId: track.id,
+        enabled: false,
+        binding: { kind: 'source', assetId: source.assetId, sourceInstanceId: 'instance' },
+        reference: buildReviewTimeMap(4, []),
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0,
+          duration: 4,
+          volume: 1,
+          muted: false,
+          fadeIn: 0,
+          fadeOut: 0,
+          dormant,
+          sourceAnchor: [{ start: 0, end: 4, offset: 0, duration: 4 }],
+        },
+      },
+    ];
+    props.selection = { kind: 'source-voiceover', documentId: 'doc' };
+    const before = structuredClone(project);
+    const selection = props.selection;
+    mountTimeline(props);
+    const fit = container.querySelector<HTMLButtonElement>(
+      '[data-ui="video-editor.timeline.toolbar.fit-selection"]'
+    )!;
+    expect(fit.disabled).toBe(dormant);
+    if (!dormant) {
+      const clip = container.querySelector<HTMLElement>('[data-project-timeline-clip="clip"]')!;
+      expect(clip).not.toBeNull();
+      expect(parseFloat(clip.style.width)).toBeCloseTo(144, 3);
+      expect(container.querySelectorAll('[data-source-voiceover-document="doc"]')).toHaveLength(2);
+    }
+    expect(project).toEqual(before);
+    expect(props.selection).toBe(selection);
+    expect(props.onSeek).not.toHaveBeenCalled();
+  }
+);

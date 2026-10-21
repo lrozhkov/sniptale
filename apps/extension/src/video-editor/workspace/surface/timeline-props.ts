@@ -25,6 +25,7 @@ function getProjectTimelineStateProps(
   controller: VideoEditorTimelineController
 ): Pick<
   ProjectTimelineProps,
+  | 'canDuplicateSelection'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
@@ -42,6 +43,7 @@ function getProjectTimelineStateProps(
   | 'timelinePreviews'
 > {
   return {
+    canDuplicateSelection: controller.state.canDuplicateSelection,
     canDeleteSelectedClip: controller.state.canDeleteSelectedClip,
     canEditSelectedClip: controller.state.canEditSelectedClip,
     canSplitSelectedClip: controller.state.canSplitSelectedClip,

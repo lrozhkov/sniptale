@@ -725,3 +725,57 @@ it('purges dormant source audio documents in the same root as their deleted sour
   });
   expect(harness.complete).toHaveBeenCalledOnce();
 });
+
+it('purges dormant whole source voice documents atomically with their source Library material', async () => {
+  const { createVideoProjectTrack } =
+    await import('../../../features/video/project/factories/creation');
+  const entry = createVideoProjectEntryWithMediaClip({ version: 31 });
+  const source = entry.project.assets[0]!;
+  const audio = {
+    ...source,
+    id: 'retained-native-take',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'voice-private' },
+  };
+  const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+  entry.project.assets.push(audio);
+  entry.project.tracks.push(track);
+  entry.project.clips = [];
+  entry.project.sourceVoiceoverDocuments = [
+    {
+      id: 'voice',
+      trackId: track.id,
+      enabled: false,
+      binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'dormant-source' },
+      reference: [
+        { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 10, resultStart: 0, resultEnd: 10 },
+      ],
+      take: {
+        id: 'take',
+        assetId: audio.id,
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 4,
+        volume: 1,
+        muted: true,
+        dormant: true,
+        fadeIn: 0,
+        fadeOut: 0,
+        sourceAnchor: [{ start: 0, end: 4, offset: 0, duration: 4 }],
+      },
+    },
+  ];
+  expect(isExportReadyVideoProject(entry.project)).toBe(true);
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  expect(rows.get('video_projects')!.get(entry.id)).toMatchObject({
+    workspaceRevision: 1,
+    project: { version: 31, sourceVoiceoverDocuments: [], assets: [audio], clips: [] },
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledOnce();
+});

@@ -1,3 +1,4 @@
+import { resolveSourceVoiceoverNavigation } from '../../../features/video/project/source-voiceover-views';
 import { WorkspacePanelHeader } from '../floating/panel-header';
 import type { ProjectAssetUse } from '../../../features/video/project/media-usage';
 import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
@@ -10,7 +11,7 @@ import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
 import type { VideoProjectAsset } from '../../../features/video/project/types';
 import { ProjectTimeline } from '../../timeline/project';
-import type { TimelineClipRevealRequest } from '../../timeline/project/types';
+import type { TimelineRevealRequest, TimelineRevealTarget } from '../../timeline/project/types';
 import { PreviewStage } from '../../preview/stage';
 import { VideoEditorMaterials } from './materials';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
@@ -51,7 +52,7 @@ import {
 } from '../../runtime/controller/store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
-  const [revealClipRequest, setRevealClipRequest] = useState<TimelineClipRevealRequest>();
+  const [revealRequest, setRevealRequest] = useState<TimelineRevealRequest>();
   const layout = useVideoEditorLayoutController();
   const preview = useVideoEditorPreviewController();
   const viewer = useWorkspacePreviewContext();
@@ -71,8 +72,8 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
           <VideoEditorWorkspaceUpper
             key={preview?.project.id ?? 'empty'}
             {...props}
-            onRevealClip={(clipId) =>
-              setRevealClipRequest((previous) => ({ clipId, serial: (previous?.serial ?? 0) + 1 }))
+            onRevealTarget={(target) =>
+              setRevealRequest((previous) => ({ ...target, serial: (previous?.serial ?? 0) + 1 }))
             }
           />
         </div>
@@ -104,7 +105,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
             gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
           }}
         >
-          <VideoEditorWorkspaceTimeline {...props} revealClipRequest={revealClipRequest} />
+          <VideoEditorWorkspaceTimeline {...props} revealRequest={revealRequest} />
         </div>
       </div>
     </div>
@@ -134,7 +135,9 @@ interface VideoEditorWorkspaceCanvasProps {
 }
 
 function VideoEditorWorkspaceUpper(
-  props: VideoEditorWorkspaceCanvasProps & { onRevealClip: (clipId: string) => void }
+  props: VideoEditorWorkspaceCanvasProps & {
+    onRevealTarget: (target: TimelineRevealTarget) => void;
+  }
 ) {
   const recordingLayout = useVideoEditorLayoutController();
   const recording = useContext(RuntimeProjectContext)?.recordingLeave;
@@ -191,10 +194,10 @@ function VideoEditorWorkspaceUpper(
           <VideoEditorMaterials
             onRecordAudio={recordingLayout.openAudioRecordingDialog}
             onShowUse={(use) => {
-              preview.transport.onPausePlayback();
+              const pausedTime = preview.transport.onPausePlayback();
               setSourceActive(false);
               setSelectedAssetId(null);
-              revealWorkspaceMaterial(use, preview, props.onRevealClip);
+              revealWorkspaceMaterial(use, preview, props.onRevealTarget, pausedTime);
               if (use.kind === 'watermark') props.onRevealWatermark();
               if (use.kind === 'bookend-preset') props.onRevealBookends();
             }}
@@ -391,13 +394,15 @@ function createWorkspacePreviewProps(
   };
 }
 
-function revealWorkspaceMaterial(
+/** Explicit material-use navigation preserves authored data and uses the paused playhead. */
+export function revealWorkspaceMaterial(
   use: ProjectAssetUse,
   preview: Pick<
     NonNullable<ReturnType<typeof useVideoEditorPreviewController>>,
     'project' | 'selection' | 'transport'
   >,
-  onRevealClip: (clipId: string) => void
+  onRevealTarget: (target: TimelineRevealTarget) => void,
+  pausedTime: number
 ) {
   if (
     use.kind === 'scene' ||
@@ -406,12 +411,29 @@ function revealWorkspaceMaterial(
     use.kind === 'source-audio'
   )
     preview.selection.onSelectScene();
+  if (use.kind === 'source-voiceover') {
+    const document = preview.project.sourceVoiceoverDocuments?.find(
+      (item) => item.id === use.documentId
+    );
+    if (!document) return;
+    preview.selection.onSelectSourceVoiceover(document.id);
+    const { nearest } = resolveSourceVoiceoverNavigation(preview.project, document.id, pausedTime);
+    if (nearest) {
+      preview.transport.onSeek(nearest.clip.timelineStart);
+      onRevealTarget({
+        kind: 'source-voiceover',
+        documentId: document.id,
+        viewId: nearest.clip.id,
+      });
+    }
+    return;
+  }
   if (use.kind !== 'clip') return;
   const clip = preview.project.clips.find((clip) => clip.id === use.clipId);
   if (!clip) return;
   preview.selection.onSelectClip(clip.id);
   preview.transport.onSeek(clip.startTime);
-  onRevealClip(clip.id);
+  onRevealTarget({ kind: 'clip', clipId: clip.id });
 }
 
 function createWorkspacePreviewActions(
@@ -457,7 +479,7 @@ function createWorkspacePreviewActions(
 
 function VideoEditorWorkspaceTimeline(
   props: VideoEditorWorkspaceCanvasProps & {
-    revealClipRequest: TimelineClipRevealRequest | undefined;
+    revealRequest: TimelineRevealRequest | undefined;
   }
 ): React.JSX.Element {
   const controller = useVideoEditorTimelineController();
@@ -467,7 +489,7 @@ function VideoEditorWorkspaceTimeline(
   return (
     <div className="min-h-[220px] min-w-0 flex-1">
       <ProjectTimeline
-        revealClipRequest={props.revealClipRequest}
+        revealRequest={props.revealRequest}
         panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,

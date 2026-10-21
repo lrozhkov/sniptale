@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
-import {
-  useReviewAudioRuntime,
-  type ReviewAudioClipBuffer,
-  type ReviewAudioEngine,
-} from './use-review-audio-runtime';
+import { useReviewAudioRuntime } from './use-review-audio-runtime';
+import type {
+  ReviewAudioClipBuffer,
+  ReviewAudioEngine,
+} from '../../workflows/video-review/audio-playback-engine';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 type RuntimeArgs = Parameters<typeof useReviewAudioRuntime>[0];
 
@@ -38,6 +38,7 @@ export class FakeEngine implements ReviewAudioEngine {
   setOriginalGain(volume: number) {
     this.gains.push(volume);
   }
+  setOutputGain() {}
   stopAll() {
     this.stops += 1;
   }

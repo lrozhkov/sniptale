@@ -9,6 +9,8 @@ import { createPersistedLegacyRecordingProject } from './workspace.test-support'
 
 const {
   deleteProjectAsset,
+  getProjectAsset,
+  ensureLibraryMediaAssetsMock,
   getRecording,
   getRecordingTelemetry,
   readVideoWorkspace,
@@ -17,6 +19,8 @@ const {
   saveVideoProject,
 } = vi.hoisted(() => ({
   deleteProjectAsset: vi.fn(),
+  getProjectAsset: vi.fn(),
+  ensureLibraryMediaAssetsMock: vi.fn(),
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
   readVideoWorkspace: vi.fn(),
@@ -28,6 +32,7 @@ const {
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
   deleteProjectAsset,
+  getProjectAsset,
   getVideoProject,
 }));
 
@@ -62,6 +67,7 @@ vi.mock('../media-metadata', async (importOriginal) => {
   return {
     ...actual,
     loadVideoMetadata: vi.fn(),
+    loadAudioMetadata: vi.fn(),
   };
 });
 
@@ -70,6 +76,7 @@ vi.mock('./assets', async (importOriginal) => {
   return {
     ...actual,
     importRecordingProjectAsset: importRecordingProjectAssetMock,
+    ensureLibraryMediaAssets: ensureLibraryMediaAssetsMock,
     ensureRecordingAssets: async (_project: unknown, recordingId: string) => [
       await importRecordingProjectAssetMock(recordingId),
     ],

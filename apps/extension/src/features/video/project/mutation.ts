@@ -98,6 +98,14 @@ function projectSchemaRequirement(
   patch: MutationPatch
 ): VideoProject['version'] {
   if (
+    project.sourceVoiceoverDocuments !== undefined ||
+    patch.sourceVoiceoverDocuments !== undefined ||
+    (patch.sourceAudioDocuments ?? project.sourceAudioDocuments)?.some(
+      (document) => document.speech !== undefined
+    )
+  )
+    return 31;
+  if (
     (patch.textDocuments ?? project.textDocuments)?.some(
       (entry) => entry.durationMode !== undefined
     )

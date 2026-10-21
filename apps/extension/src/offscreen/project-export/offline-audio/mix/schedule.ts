@@ -1,3 +1,7 @@
+import {
+  createReviewAudioClipRenderer,
+  REVIEW_AUDIO_CLIP_PADDING_SECONDS,
+} from '../../../../workflows/video-review/audio-clip-render';
 import { buildAudioFadeEnvelope } from '../../../../features/video/audio/fades';
 import { renderTempoBuffer } from '../../../../features/video/audio/tempo-buffer';
 import { getTransitionProgress } from '../../../../features/video/project/transition/runtime';
@@ -33,18 +37,28 @@ export async function scheduleOfflineAudioClipMix(
   signal?: AbortSignal
 ) {
   const rate = clampClipPlaybackRate(clip.playbackRate ?? 1);
+  const voice = 'sourceKind' in clip && clip.sourceKind === 'source-voiceover' ? clip : null;
+  const localFrom = voice ? (clip.sourceStart - voice.playbackEntry.sourceOffset) / rate : 0;
   const prepared =
     rate === 1
       ? buffer
-      : await renderTempoBuffer(
-          buffer,
-          {
-            start: clip.sourceStart,
-            duration: clip.sourceDuration,
-            rate,
-          },
-          signal
-        );
+      : voice
+        ? await createReviewAudioClipRenderer().render(
+            voice.playbackEntry,
+            buffer,
+            localFrom,
+            localFrom + clip.duration,
+            signal ?? new AbortController().signal
+          )
+        : await renderTempoBuffer(
+            buffer,
+            {
+              start: clip.sourceStart,
+              duration: clip.sourceDuration,
+              rate,
+            },
+            signal
+          );
   signal?.throwIfAborted();
   const source = offlineContext.createBufferSource();
   source.buffer = prepared;
@@ -94,7 +108,13 @@ export async function scheduleOfflineAudioClipMix(
   if (envelopeGainStart > 0 || envelopeGainEnd > 0)
     gain.gain.linearRampToValueAtTime(envelopeGainEnd, clipEnd);
 
-  source.start(clipStart, rate === 1 ? clip.sourceStart : 0, clip.sourceDuration / rate);
+  const offset =
+    rate === 1
+      ? clip.sourceStart
+      : voice
+        ? Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS) / buffer.sampleRate
+        : 0;
+  source.start(clipStart, offset, clip.sourceDuration / rate);
   source.stop(clipEnd);
 }
 

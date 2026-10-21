@@ -42,6 +42,8 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     ru: 'Правка недоступна. Выберите заметку заново.',
     en: 'This edit is unavailable. Select the note again.',
   },
+  sourceVoiceoverFile: { ru: 'Аудиофайл', en: 'Audio file' },
+  sourceVoiceoverPlace: { ru: 'Разместить озвучку', en: 'Place voiceover' },
   sourceAudio: { ru: 'Звук исходника', en: 'Source audio' },
   sourceAudioLevel: { ru: 'Уровень', en: 'Level' },
   sourceAudioGain: { ru: 'Усиление', en: 'Gain' },

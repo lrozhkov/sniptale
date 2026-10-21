@@ -14,19 +14,26 @@ export function useTimelineSelectedTrackAutoScroll(params: {
 }) {
   const effectId =
     params.selection.kind === 'effect-instance' ? params.selection.effectInstanceId : null;
-  const lastSelection = useRef({ trackId: params.selectedTrackId, effectId });
+  const clipId =
+    params.selection.kind === 'clip'
+      ? params.selection.clipId
+      : params.selection.kind === 'clip-group'
+        ? params.selection.anchorClipId
+        : null;
+  const lastSelection = useRef({ trackId: params.selectedTrackId, effectId, clipId });
 
   useLayoutEffect(() => {
     const selectedTrackId = params.selectedTrackId;
 
     if (!selectedTrackId) {
-      lastSelection.current = { trackId: null, effectId: null };
+      lastSelection.current = { trackId: null, effectId: null, clipId: null };
       return;
     }
 
     if (
       lastSelection.current.trackId === selectedTrackId &&
-      lastSelection.current.effectId === effectId
+      lastSelection.current.effectId === effectId &&
+      lastSelection.current.clipId === clipId
     ) {
       return;
     }
@@ -38,14 +45,17 @@ export function useTimelineSelectedTrackAutoScroll(params: {
       return;
     }
 
-    const effect = effectId
+    const selectedObject = effectId
       ? [...timeline.querySelectorAll<HTMLElement>('[data-clip-fx]')].find(
           (node) => node.dataset['clipFx'] === effectId
         )
-      : undefined;
-    const bounds = effect?.getBoundingClientRect();
-    // Reveal the rendered FX interval, including history/lane offsets.
-    // Its visible press target must not move to the track origin.
+      : clipId
+        ? [...timeline.querySelectorAll<HTMLElement>('[data-project-timeline-clip]')].find(
+            (node) => node.dataset['projectTimelineClip'] === clipId
+          )
+        : undefined;
+    const bounds = selectedObject?.getBoundingClientRect();
+    // Rendered press targets include history/lane offsets. Keep visible items in place.
     const target =
       bounds && bounds.height > 0
         ? {
@@ -60,8 +70,9 @@ export function useTimelineSelectedTrackAutoScroll(params: {
       trackList,
       trackTop: target.top,
     });
-    lastSelection.current = { trackId: selectedTrackId, effectId };
+    lastSelection.current = { trackId: selectedTrackId, effectId, clipId };
   }, [
+    clipId,
     effectId,
     params.selectedTrackId,
     params.timelineRef,

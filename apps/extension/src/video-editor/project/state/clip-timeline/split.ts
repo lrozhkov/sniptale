@@ -1,3 +1,7 @@
+import {
+  isSourceVoiceoverSourceClip,
+  duplicateProjectSourceVoiceoverDocuments,
+} from '../../../../features/video/project/source-voiceover';
 import { duplicateProjectSourceAudioDocuments } from '../../../../features/video/project/source-audio-authoring';
 import { duplicateVideoProjectCommentDocuments } from '../../../../features/video/project/comments/duplication';
 import { isCommentSourceClip } from '../../../../features/video/project/comments/projection';
@@ -84,7 +88,8 @@ export function splitProjectClipsAtTimeWithResult(
       !item.sourceInstanceId &&
       (project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
         project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
-        isProjectOriginalAudioTarget(project, item))
+        isProjectOriginalAudioTarget(project, item) ||
+        isSourceVoiceoverSourceClip(project, item))
         ? { ...item, sourceInstanceId: item.id }
         : item;
     const splitClips = splitProjectClip(source, offsets.get(item.id) ?? 0, secondGroupId);
@@ -299,6 +304,15 @@ function duplicateBoundDocuments(
   nextProject: VideoProject,
   sourceInstances: ReadonlyMap<string, string>
 ): boolean {
+  if (project.sourceVoiceoverDocuments) {
+    const documents = duplicateProjectSourceVoiceoverDocuments(
+      project.sourceVoiceoverDocuments,
+      sourceInstances,
+      () => crypto.randomUUID()
+    );
+    if (!documents) return false;
+    nextProject.sourceVoiceoverDocuments = documents;
+  }
   if (project.sourceAudioDocuments) {
     const documents = duplicateProjectSourceAudioDocuments(
       project.sourceAudioDocuments,
@@ -430,6 +444,7 @@ function duplicateSourceInstance(
     item.type === duplicate.type &&
     (item.sourceInstanceId ||
       isProjectOriginalAudioTarget(project, item) ||
+      isSourceVoiceoverSourceClip(project, item) ||
       project.textDocuments?.some((entry) => isTextSourceClip(item, entry.binding)) ||
       project.commentDocuments?.some((entry) => isCommentSourceClip(item, entry.binding)) ||
       project.cursorFocusPath?.segments.some(

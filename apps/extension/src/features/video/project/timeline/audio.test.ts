@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getClipGainRange, getClipWaveformPeaks } from './audio';
+import { getClipGainRange, getClipWaveformPeaks, getProjectAudioWaveformPeaks } from './audio';
 import { VideoClipLinkMode, VideoProjectClipType } from '../types/index';
 
 function createProject() {
@@ -59,4 +59,17 @@ describe('timeline audio helpers', () => {
     ).toEqual([]);
     expect(getClipWaveformPeaks(project as never, clip as never, 0)).toEqual([]);
   });
+});
+
+it('samples a native voice window with the same bounded peaks as an authored clip', () => {
+  const project = createProject();
+  const window = { assetId: 'audio-1', sourceStart: 2, sourceDuration: 4 };
+  expect(getProjectAudioWaveformPeaks(project as never, window, 4)).toEqual([
+    0.8, 0.8, 0.8, 0.8, 0.25, 0.25, 0.25, 0.25,
+  ]);
+  expect(getProjectAudioWaveformPeaks(project as never, window, 1000000)).toHaveLength(4096);
+  expect(getProjectAudioWaveformPeaks(project as never, window, 0)).toEqual([]);
+  expect(
+    getProjectAudioWaveformPeaks(project as never, { ...window, assetId: 'missing' }, 4)
+  ).toEqual([]);
 });

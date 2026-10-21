@@ -1,3 +1,4 @@
+import { createVideoEditorSourceVoiceoverActions } from './source-voiceover';
 import { createCompositionJoinUpdateAction } from './joins';
 import { createBookendPresetUpdateAction } from './bookend-presets';
 import { createVideoEditorProjectCommentActions } from './comments';
@@ -27,6 +28,9 @@ type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 type VideoEditorStoreGet = VideoEditorProjectSliceGet;
 
 type VideoEditorProjectActionKeys =
+  | 'editSourceVoiceover'
+  | 'deleteSourceVoiceover'
+  | 'duplicateSourceVoiceover'
   | 'addCommentDocument'
   | 'editCommentDocument'
   | 'renameProject'
@@ -149,6 +153,7 @@ export function createVideoEditorProjectActions(
     updateBookendPresets: createBookendPresetUpdateAction(set),
     updateCompositionJoins: createCompositionJoinUpdateAction(set),
     ...createVideoEditorProjectCommentActions(set),
+    ...createVideoEditorSourceVoiceoverActions(set),
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),
     upsertAssets,

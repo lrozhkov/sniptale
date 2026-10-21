@@ -161,6 +161,9 @@ function deleteSelectedTimelineObject(
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
+      store.deleteSourceVoiceover(selection.documentId);
+      return;
     case VideoEditorSelectionKind.MOTION_CONNECTION:
       store.updateMotionRegion(selection.motionRegionId, { incomingConnection: null });
       return;
@@ -279,6 +282,7 @@ export function createWorkspaceTimelineSelectionActions(
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onClearPlaybackRange: workspace.clearPlaybackRange,
+    onSelectSourceVoiceover: selectWithInspector(store.selectSourceVoiceover),
     onSelectComment: selectWithInspector(store.selectComment),
     onSelectHistorySpan: selectWithInspector(store.selectHistorySpan),
     onSelectActionOccurrence: selectWithInspector(store.selectActionOccurrence),

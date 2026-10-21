@@ -1,6 +1,8 @@
 import type React from 'react';
 
 export type InspectorSectionSemantic =
+  | 'actions'
+  | 'source-audio'
   | 'comments'
   | 'watermark'
   | 'info'

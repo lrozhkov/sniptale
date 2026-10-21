@@ -13,6 +13,11 @@ import { translate } from '../../platform/i18n';
 
 const sceneProbe = vi.hoisted(() => ({ enabled: false, captionsLocked: false }));
 const backupExport = vi.hoisted(() => vi.fn());
+const openFullEditor = vi.hoisted(() => vi.fn());
+vi.mock('../../platform/navigation/extension-pages', async (original) => ({
+  ...(await original<typeof import('../../platform/navigation/extension-pages')>()),
+  openVideoEditorPage: openFullEditor,
+}));
 vi.mock('../../workflows/media-hub-backup', async (original) => ({
   ...(await original<typeof import('../../workflows/media-hub-backup')>()),
   exportMediaHubBackup: backupExport,
@@ -27,6 +32,7 @@ vi.mock('./advanced-panels', () => ({
 vi.mock('./inspector', () => ({
   ReviewInspector: (props: {
     onBackup(): void;
+    onOpenVideoEditor(): void;
     message: string | null;
     scene: ReactNode;
     speech: ReactNode;
@@ -35,6 +41,7 @@ vi.mock('./inspector', () => ({
   }) => (
     <div>
       <button onClick={props.onBackup}>Backup current work</button>
+      <button onClick={props.onOpenVideoEditor}>Continue in full editor</button>
       <p role="status">{props.message}</p>
       {sceneProbe.enabled ? props.scene : null}
       {props.speech}
@@ -224,6 +231,24 @@ it('joins every editor buffer for either recognition source and guards related-t
     expect(backupExport).toHaveBeenCalledOnce();
     await click('Backup current work');
     expect(backupExport).toHaveBeenCalledTimes(2);
+    openFullEditor.mockImplementationOnce(async () => {
+      order.push('navigate');
+    });
+    await click('Continue in full editor');
+    expect(order.slice(-5)).toEqual(['notes', 'advanced', 'canvas', 'save', 'navigate']);
+    expect(openFullEditor).toHaveBeenCalledWith(null, null, {
+      aggregateId: workspace.aggregateId,
+      revision: workspace.revision,
+      createdAt: workspace.createdAt,
+      sourceAssetId: workspace.sourceAssetId,
+    });
+    save.mockRejectedValueOnce(new Error('Transfer save refused'));
+    await click('Continue in full editor');
+    expect(openFullEditor).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledTimes(2);
+    await click('Continue in full editor');
+    expect(openFullEditor).toHaveBeenCalledTimes(2);
+
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
 
     await click('Open related text');

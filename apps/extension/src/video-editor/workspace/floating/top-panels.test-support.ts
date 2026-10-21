@@ -52,6 +52,7 @@ function createHeaderController(): VideoEditorHeaderController {
 function createTimelineSelectionActions(): Pick<
   TimelineActions,
   | 'onSelectActionOccurrence'
+  | 'onSelectSourceVoiceover'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
   | 'onSelectHistoryLane'
@@ -64,6 +65,7 @@ function createTimelineSelectionActions(): Pick<
 > {
   return {
     onSelectActionOccurrence: noop(),
+    onSelectSourceVoiceover: noop(),
     onSelectClip: noop(),
     onSelectCursorSegment: noop(),
     onSelectHistoryLane: noop(),
@@ -142,6 +144,7 @@ function createTimelineController(
       ...createTimelineSelectionActions(),
     },
     state: {
+      canDuplicateSelection: false,
       canDeleteSelectedClip: false,
       canEditSelectedClip: false,
       canSplitSelectedClip: false,
@@ -222,6 +225,7 @@ function createFloatingPreviewSelection() {
     selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
+    onSelectSourceVoiceover: noop(),
     onSelectClip: noop(),
     onSelectScene: noop(),
   };

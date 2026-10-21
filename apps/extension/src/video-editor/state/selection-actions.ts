@@ -24,6 +24,18 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
     setPixelsPerSecond: (pixelsPerSecond: number) =>
       set({ pixelsPerSecond: clampTimelineScale(pixelsPerSecond) }),
     selectScene: createSelectSceneAction(set),
+    selectSourceVoiceover: ((documentId) =>
+      set((state) => {
+        const document = state.project?.sourceVoiceoverDocuments?.find(
+          (item) => item.id === documentId
+        );
+        if (!document) return state;
+        return {
+          selection: { kind: VideoEditorSelectionKind.SOURCE_VOICEOVER, documentId },
+          selectedTrackId: document.trackId,
+          placementMode: null,
+        };
+      })) satisfies VideoEditorState['selectSourceVoiceover'],
     selectComment: createSelectCommentAction(set),
     selectTrack: createSelectTrackAction(set),
     selectClip: createSelectClipAction(set),

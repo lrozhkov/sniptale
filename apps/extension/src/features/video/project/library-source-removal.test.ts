@@ -1,3 +1,5 @@
+import { createVideoProjectTrack } from './factories/creation';
+import { reviewSpeechTextSignature } from '../review/speech-transcript';
 import { createSceneGradientBackground } from './scene/background-gradient';
 import { expect, it } from 'vitest';
 import { createVideoProjectCursorTrack } from './defaults';
@@ -465,3 +467,186 @@ it('removes only source audio documents owned by the retired source, including d
   expect(isExportReadyVideoProject(result)).toBe(true);
   expect(project).toEqual(before);
 });
+
+it.each(['source', 'take', 'replacement'] as const)(
+  'removes the exact source voice %s dependency and preserves the remaining accepted data',
+  (role) => {
+    const removedSource = { kind: 'project-asset' as const, projectAssetId: 'removed' };
+    const { project, removed, kept, removedClip, keptClip } = fixture(removedSource);
+    const track = createVideoProjectTrack('Voice', 1, 'AUDIO');
+    project.tracks.push(track);
+    const audio = {
+      ...kept,
+      id: 'native-take',
+      type: 'AUDIO' as const,
+      source:
+        role === 'take'
+          ? removedSource
+          : { kind: 'project-asset' as const, projectAssetId: 'take-bytes' },
+      metadata: { ...kept.metadata, mimeType: 'audio/wav', hasAudio: true },
+    };
+    const replacement = {
+      ...audio,
+      id: 'project-asset:replacement',
+      source:
+        role === 'replacement'
+          ? removedSource
+          : { kind: 'project-asset' as const, projectAssetId: 'replacement-bytes' },
+    };
+    project.assets.push(audio, replacement);
+    const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+    project.version = 31;
+    project.sourceVoiceoverDocuments = [
+      {
+        id: 'voice',
+        trackId: track.id,
+        enabled: false,
+        binding: {
+          kind: 'source',
+          assetId: role === 'source' ? removed.id : kept.id,
+          sourceInstanceId: role === 'source' ? removedClip.id : keptClip.id,
+        },
+        reference: [
+          { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 5, resultStart: 0, resultEnd: 5 },
+        ],
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0,
+          duration: 4,
+          volume: 1,
+          muted: true,
+          dormant: true,
+          fadeIn: 0,
+          fadeOut: 0,
+          transcript: {
+            version: 1,
+            phrases: [],
+            replacements: [
+              {
+                id: 'replacement',
+                assetId: replacement.id,
+                start: 0,
+                end: 1,
+                duration: 1,
+                phraseId: 'phrase',
+                revision: 1,
+                text: 'Accepted',
+                textSignature: reviewSpeechTextSignature('Accepted', profile),
+                profile,
+              },
+            ],
+          },
+        },
+      },
+    ];
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const result = removeVideoProjectLibrarySources(project, [removedSource]);
+    expect(result.version).toBe(31);
+    expect(isExportReadyVideoProject(result)).toBe(true);
+    if (role === 'replacement') {
+      const expected = structuredClone(before.sourceVoiceoverDocuments!);
+      expected[0]!.take.transcript!.replacements = [];
+      expect(result.sourceVoiceoverDocuments).toEqual(expected);
+    } else expect(result.sourceVoiceoverDocuments).toEqual([]);
+    expect(project).toEqual(before);
+    expect(
+      removeVideoProjectLibrarySources(project, [{ kind: 'recording', recordingId: 'absent' }])
+    ).toBe(project);
+  }
+);
+
+it.each(['source', 'replacement'] as const)(
+  'retires passive speech %s without deleting unrelated metadata or envelopes',
+  (role) => {
+    const source = { kind: 'project-asset' as const, projectAssetId: 'retired-speech-resource' };
+    const { project, removed, kept } = fixture(source);
+    project.version = 31;
+    project.clips = [];
+    const first = {
+      ...structuredClone(kept),
+      id: 'project-asset:first-history',
+      type: 'AUDIO' as const,
+      metadata: { ...kept.metadata, duration: 1, mimeType: 'audio/wav', hasAudio: true },
+      source:
+        role === 'replacement'
+          ? source
+          : { kind: 'project-asset' as const, projectAssetId: 'first-history' },
+    };
+    const second = {
+      ...structuredClone(first),
+      id: 'project-asset:second-history',
+      source: { kind: 'project-asset' as const, projectAssetId: 'second-history' },
+    };
+    project.assets.push(first, second);
+    const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+    project.sourceAudioDocuments = [
+      {
+        id: 'speech',
+        binding: {
+          kind: 'source',
+          assetId: role === 'source' ? removed.id : kept.id,
+          sourceInstanceId: 'missing-placement',
+        },
+        ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+        mutes: [{ id: 'mute', start: 1, end: 2, volume: 0.5 }],
+        speech: {
+          enabled: false,
+          transcript: {
+            version: 1,
+            phrases: [
+              {
+                id: 'phrase',
+                start: 0,
+                end: 1,
+                originalText: 'Original',
+                text: 'Draft',
+                revision: 1,
+                alignment: 'segment',
+              },
+            ],
+            replacements: [first, second].map((asset, index) => ({
+              id: `history-${index}`,
+              start: index,
+              end: index + 1,
+              duration: 1,
+              assetId: asset.id,
+              enabled: false,
+              originalVolume: 0.25,
+              phraseId: 'removed-phrase',
+              revision: 1,
+              text: 'Accepted',
+              profile,
+              textSignature: reviewSpeechTextSignature('Accepted', profile),
+            })),
+          },
+        },
+      },
+    ];
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const result = removeVideoProjectLibrarySources(project, [source]);
+    if (role === 'source') expect(result.sourceAudioDocuments).toEqual([]);
+    else {
+      const original = before.sourceAudioDocuments![0]!;
+      expect(result.sourceAudioDocuments).toEqual([
+        {
+          ...original,
+          speech: {
+            ...original.speech!,
+            transcript: {
+              ...original.speech!.transcript,
+              replacements: [original.speech!.transcript.replacements[1]!],
+            },
+          },
+        },
+      ]);
+      expect(result.assets.some((asset) => asset.id === second.id)).toBe(true);
+    }
+    expect(isExportReadyVideoProject(result)).toBe(true);
+    expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+    expect(project).toEqual(before);
+  }
+);

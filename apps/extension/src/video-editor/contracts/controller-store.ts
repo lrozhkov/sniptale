@@ -56,6 +56,9 @@ type TimelineClipAction =
   | 'trimClipStart'
   | 'trimClipEnd'
   | 'splitClipAt'
+  | 'editSourceVoiceover'
+  | 'deleteSourceVoiceover'
+  | 'duplicateSourceVoiceover'
   | 'deleteClip'
   | 'duplicateClip'
   | 'detachClipGroup'
@@ -95,6 +98,7 @@ export interface TimelineEditingPort
 }
 
 type SelectionAction =
+  | 'selectSourceVoiceover'
   | 'selectScene'
   | 'selectComment'
   | 'selectTrack'

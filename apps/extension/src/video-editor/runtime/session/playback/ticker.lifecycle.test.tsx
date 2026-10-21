@@ -58,6 +58,8 @@ it('keeps the transport anchor through inspector edits while reading current pro
       deleteActionEvent: vi.fn(),
       deleteCursorSample: vi.fn(),
       editCommentDocument: vi.fn(),
+      deleteSourceVoiceover: vi.fn(),
+      duplicateSourceVoiceover: vi.fn(() => null),
       deleteEffectInstance: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),

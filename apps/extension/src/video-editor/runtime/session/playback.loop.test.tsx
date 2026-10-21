@@ -81,6 +81,8 @@ function PlaybackLoopHarness(props: {
       deleteActionEvent: vi.fn(),
       deleteCursorSample: vi.fn(),
       editCommentDocument: vi.fn(),
+      deleteSourceVoiceover: vi.fn(),
+      duplicateSourceVoiceover: vi.fn(() => null),
       deleteEffectInstance: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),

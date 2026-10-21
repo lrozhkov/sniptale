@@ -1,3 +1,4 @@
+import type { applyProjectSourceVoiceoverEdit } from '../../../features/video/project/source-voiceover';
 import type { VideoProjectBookendPresets } from '../../../features/video/project/scene/bookend-presets-types';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoEditorAnnotationActions } from './annotation';
@@ -39,6 +40,13 @@ export interface VideoEditorProjectActions
     VideoEditorObjectTrackActions,
     VideoEditorTemporalActions,
     VideoEditorEffectInstanceActions {
+  editSourceVoiceover: (
+    expectedProject: VideoProject,
+    documentId: string,
+    patch: Exclude<Parameters<typeof applyProjectSourceVoiceoverEdit>[2], null>
+  ) => boolean;
+  deleteSourceVoiceover: (documentId: string) => void;
+  duplicateSourceVoiceover: (documentId: string) => string | null;
   renameProject: (name: string) => void;
   renameTrack: (trackId: string, name: string) => void;
   addTrackLogicalLane: (trackId: string) => void;

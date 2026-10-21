@@ -45,7 +45,7 @@ export function useProjectTimelineViewState(
     pixelsPerSecond,
     project,
   }: Pick<ProjectTimelineProps, 'onZoomChange' | 'currentTime' | 'pixelsPerSecond' | 'project'>,
-  selectedClip: { startTime: number; duration: number } | null,
+  selectedRange: { startTime: number; duration: number } | null,
   viewportWidth: number,
   timelineRef: React.MutableRefObject<HTMLDivElement | null>
 ) {
@@ -69,8 +69,8 @@ export function useProjectTimelineViewState(
     center: number | null;
     viewportX: number;
   } | null>(null);
-  const fitSelectionDuration = selectedClip?.duration ?? null;
-  const selectedStart = selectedClip?.startTime ?? null;
+  const fitSelectionDuration = selectedRange?.duration ?? null;
+  const selectedStart = selectedRange?.startTime ?? null;
   useLayoutEffect(() => {
     if (!fitRequest || fitRequest.pixelsPerSecond !== pixelsPerSecond) return;
     navigateTo(

@@ -363,7 +363,8 @@ function MaterialRow(props: {
           use.kind === 'scene' ||
           use.kind === 'watermark' ||
           use.kind === 'bookend-preset' ||
-          use.kind === 'source-audio'
+          use.kind === 'source-audio' ||
+          use.kind === 'source-voiceover'
       ) && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
@@ -385,7 +386,8 @@ function MaterialRow(props: {
                   use.kind === 'scene' ||
                   use.kind === 'watermark' ||
                   use.kind === 'bookend-preset' ||
-                  use.kind === 'source-audio')
+                  use.kind === 'source-audio' ||
+                  use.kind === 'source-voiceover')
               )
                 props.onShowUse(use);
             }}
@@ -395,9 +397,14 @@ function MaterialRow(props: {
                 use.kind !== 'scene' &&
                 use.kind !== 'watermark' &&
                 use.kind !== 'bookend-preset' &&
-                use.kind !== 'source-audio'
+                use.kind !== 'source-audio' &&
+                use.kind !== 'source-voiceover'
               )
                 return [];
+              if (use.kind === 'source-voiceover')
+                return [
+                  { value: String(index), label: translate('gallery.videoReview.audioVoiceover') },
+                ];
               if (use.kind === 'source-audio')
                 return [
                   { value: String(index), label: translate('videoEditor.sidebar.sourceAudio') },

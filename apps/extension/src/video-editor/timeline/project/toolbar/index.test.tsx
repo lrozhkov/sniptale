@@ -86,6 +86,7 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
       onStepToPreviousFrame: vi.fn(),
     },
     canAddMotionRegion: true,
+    canDuplicateSelection: true,
     canDeleteSelectedClip: true,
     canEditSelectedClip: true,
     canSplitSelectedClip: true,

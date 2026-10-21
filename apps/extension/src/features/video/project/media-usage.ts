@@ -1,3 +1,4 @@
+import { getSourceVoiceoverAssetReferences } from './source-voiceover';
 import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject } from './types';
 import { VideoProjectClipType, VideoSceneBackgroundKind } from './types';
@@ -12,6 +13,7 @@ export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'text'; documentId: string }
   | { kind: 'comments'; documentId: string }
   | { kind: 'source-audio'; documentId: string }
+  | { kind: 'source-voiceover'; documentId: string }
 );
 
 /** Includes hidden clips, scene media, analysis and dormant source-text dependencies. */
@@ -61,6 +63,12 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   }
   for (const document of project.sourceAudioDocuments ?? []) {
     uses.push({ assetId: document.binding.assetId, kind: 'source-audio', documentId: document.id });
+    for (const replacement of document.speech?.transcript.replacements ?? [])
+      uses.push({ assetId: replacement.assetId, kind: 'source-audio', documentId: document.id });
+  }
+  for (const document of project.sourceVoiceoverDocuments ?? []) {
+    for (const reference of getSourceVoiceoverAssetReferences(document))
+      uses.push({ assetId: reference.assetId, kind: 'source-voiceover', documentId: document.id });
   }
   return uses;
 }

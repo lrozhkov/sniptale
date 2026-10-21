@@ -1,5 +1,11 @@
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
+  createReviewWorkspaceStoreFixture,
+  replaceLegacyWorkspaceFixture,
+} from '../review-workspaces/store.test-support';
+import {
+  createProjectExportEntry,
   createVideoProject,
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
@@ -19,6 +25,11 @@ const projectsDbMocks = vi.hoisted(() => ({
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
   completePhysicalDeleteOperation: vi.fn(async () => undefined),
+}));
+
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: async () => [],
 }));
 
 vi.mock('./asset-publication', async (importOriginal) => ({
@@ -397,3 +408,189 @@ it('refuses a pending save after deletion and recreation of the same identity an
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
 });
+
+it.each([
+  'advanced-edit',
+  'missing-workspace',
+  'recreated-workspace',
+  'restored-content',
+  'missing-media',
+  'changed-physical-source',
+  'missing-export-source',
+] as const)(
+  'refuses Gallery transfer after %s during actual publication preparation and permits a fresh retry',
+  async (change) => {
+    vi.resetModules();
+    const fixture = createReviewWorkspaceStoreFixture(() => false);
+    const writes: { store: string; kind: 'put' | 'delete' }[] = [];
+    const transactions: { stores: string[]; mode: string }[] = [];
+    projectsDbMocks.initDBMock.mockResolvedValue({
+      transaction: (stores: string[], mode: string) => {
+        transactions.push({ stores, mode });
+        const tx = fixture.database.transaction(stores, mode);
+        return {
+          abort: () => tx.abort(),
+          objectStore: (name: string) => {
+            const store = tx.objectStore(name);
+            return {
+              ...store,
+              put: async (value: unknown) => {
+                writes.push({ store: name, kind: 'put' });
+                await store.put(value);
+              },
+              delete: async (key: IDBValidKey) => {
+                writes.push({ store: name, kind: 'delete' });
+                await store.delete(key);
+              },
+            };
+          },
+          get done() {
+            return tx.done;
+          },
+        };
+      },
+    });
+    const { openVideoWorkspace, readVideoWorkspace, saveVideoWorkspaceAdvanced } =
+      await import('../review-workspaces/store');
+    const { commitVideoProjectMutation } = await import('./index-mutations');
+    const id =
+      change === 'missing-export-source'
+        ? 'project-export:gallery-primary-export'
+        : 'recording:beta-v1-recording';
+    const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
+    const primaryExport = createProjectExportEntry({
+      ...source,
+      id: 'gallery-primary-export',
+      projectId: 'export-origin',
+      assetId: 'export-primary-bytes',
+      filename: 'Export.webm',
+      createdAt: 1,
+      fps: 30,
+    });
+    if (change === 'missing-export-source') {
+      const media = fixture.rows.get('media_library')!.get('recording:beta-v1-recording');
+      if (!isRecord(media)) throw new Error('Missing media fixture');
+      fixture.rows.get('media_library')!.set(id, {
+        ...media,
+        id,
+        kind: 'export',
+        source: {
+          kind: 'project-export',
+          exportId: primaryExport.id,
+          projectId: primaryExport.projectId,
+        },
+      });
+      fixture.rows.get('project_exports')!.set(primaryExport.id, primaryExport);
+    }
+    await openVideoWorkspace(id, source);
+    const captured = await readVideoWorkspace(id);
+    if (!captured) throw new Error('Missing Gallery workspace');
+    const expected = structuredClone(captured.workspace);
+    const media = structuredClone(fixture.rows.get('media_library')!.get(id));
+    const recording = structuredClone(fixture.rows.get('recordings')!.get('beta-v1-recording'));
+    let release!: () => void;
+    let entered!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    projectsDbMocks.recoverProjectMediaPublicationsMock.mockImplementationOnce(async () => {
+      entered();
+      await hold;
+    });
+    const destination = createVideoProject({ id: 'gallery-transfer' });
+    const options = { expectedWorkspaceRevision: null, expectedReviewWorkspace: expected };
+    const pending = commitVideoProjectMutation(destination, options);
+    await started;
+    if (change === 'advanced-edit' || change === 'restored-content') {
+      const changed = await saveVideoWorkspaceAdvanced({
+        aggregateId: id,
+        expectedRevision: expected.revision,
+        expectedSourceAssetId: expected.sourceAssetId,
+        advanced: {
+          ...expected.advanced,
+          audio: {
+            ...expected.advanced.audio,
+            original: { ...expected.advanced.audio.original, volume: 0.5 },
+          },
+        },
+      });
+      if (change === 'restored-content') {
+        replaceLegacyWorkspaceFixture(fixture.rows, id, {
+          ...changed.workspace,
+          revision: expected.revision,
+          createdAt: expected.createdAt,
+          updatedAt: expected.updatedAt,
+        });
+        const restored = await readVideoWorkspace(id);
+        expect(restored?.workspace.revision).toBe(expected.revision);
+        expect(restored?.workspace.createdAt).toBe(expected.createdAt);
+        expect(restored?.workspace.advanced.audio.original.volume).toBe(0.5);
+      }
+    }
+    if (change === 'missing-workspace') fixture.rows.get('video_workspaces')!.delete(id);
+    if (change === 'recreated-workspace') {
+      fixture.rows.get('video_workspaces')!.delete(id);
+      replaceLegacyWorkspaceFixture(fixture.rows, id, {
+        ...expected,
+        createdAt: expected.createdAt + 1,
+      });
+    }
+    if (change === 'missing-media') fixture.rows.get('media_library')!.delete(id);
+    if (change === 'missing-export-source')
+      fixture.rows.get('project_exports')!.delete(primaryExport.id);
+    if (change === 'changed-physical-source') {
+      if (!isRecord(recording)) throw new Error('Missing physical source fixture');
+      fixture.rows.get('recordings')!.set('beta-v1-recording', {
+        ...recording,
+        assetId: 'replaced-physical-bytes',
+      });
+    }
+    const sourceRows = structuredClone(fixture.rows);
+    writes.length = 0;
+    transactions.length = 0;
+    projectsDbMocks.publishMediaHubLibraryChangedMock.mockClear();
+    release();
+    await expect(pending).rejects.toMatchObject({ name: 'VideoWorkspaceError' });
+    expect(writes).toEqual([]);
+    expect(fixture.rows).toEqual(sourceRows);
+    expect(fixture.rows.get('video_projects')!.has(destination.id)).toBe(false);
+    expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+    expect(
+      transactions.some(
+        ({ stores, mode }) =>
+          mode === 'readwrite' &&
+          stores.includes('video_workspaces') &&
+          stores.includes('video_projects') &&
+          stores.includes('project_exports')
+      )
+    ).toBe(true);
+    fixture.rows.get('media_library')!.set(id, media);
+    fixture.rows.get('recordings')!.set('beta-v1-recording', recording);
+    if (change === 'missing-export-source')
+      fixture.rows.get('project_exports')!.set(primaryExport.id, primaryExport);
+    if (change !== 'advanced-edit' && change !== 'restored-content')
+      replaceLegacyWorkspaceFixture(fixture.rows, id, expected);
+    const current = await readVideoWorkspace(id);
+    if (!current) throw new Error('Missing accepted retry source');
+    const retrySource = structuredClone(current.workspace);
+    const retryOptions = {
+      expectedWorkspaceRevision: null,
+      expectedReviewWorkspace: retrySource,
+    };
+    await expect(commitVideoProjectMutation(destination, retryOptions)).resolves.toMatchObject({
+      id: destination.id,
+    });
+    expect(await readVideoWorkspace(id)).toEqual(current);
+    expect(fixture.rows.get('video_projects')!.get(destination.id)).toMatchObject({
+      workspaceRevision: 1,
+      project: { id: destination.id },
+    });
+    expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledExactlyOnceWith(
+      'create',
+      ['video-project:gallery-transfer']
+    );
+  }
+);

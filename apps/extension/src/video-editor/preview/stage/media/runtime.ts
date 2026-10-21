@@ -50,7 +50,14 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
     params.currentTime,
     activeAudioClips
   );
+  const prepareSourceVoiceover = usePreviewMediaSynchronization(params, {
+    audioBankClips,
+    audioRefs,
+    videoBankClips,
+    videoRefs,
+  });
   const previewRuntime = usePreviewStagePlaybackPreviewRuntime({
+    ...(params.mutePreviewAudio ? {} : { prepareSourceVoiceover }),
     assetUrls: params.assetUrls,
     audioBankClips,
     audioRefs,
@@ -65,7 +72,7 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
     videoBankClips,
     videoRefs,
   });
-  usePreviewMediaSynchronization(params, { audioBankClips, audioRefs, videoBankClips, videoRefs });
+
   return { audioBankClips, audioRefs, ...previewRuntime, videoBankClips, videoRefs };
 }
 
@@ -77,7 +84,7 @@ function usePreviewMediaSynchronization(
     videoBankClips: ReturnType<typeof usePreviewStageVideoBankClips>;
     videoRefs: MutableRefObject<Record<string, HTMLVideoElement | null>>;
   }
-): void {
+) {
   usePreviewStageVideoSync({
     assetUrls: params.assetUrls,
     activeClips: params.activeClips,
@@ -94,7 +101,8 @@ function usePreviewMediaSynchronization(
     project: params.project,
     syncedClips: media.audioBankClips,
   });
-  usePreviewEffectAudio({
+  return usePreviewEffectAudio({
+    assetUrls: params.assetUrls,
     currentTime: params.currentTime,
     feedback: params.effectRuntimeFeedback,
     isPlaying: params.isPlaying && !params.mutePreviewAudio,

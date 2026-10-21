@@ -88,6 +88,10 @@ function renderLeadingControls(options?: {
             onModalVisibilityChange: vi.fn(),
           }}
           canAddMotionRegion={options?.canAddMotionRegion ?? true}
+          canDuplicateSelection={
+            (options?.canEditSelectedClip ?? options?.selectedClip ?? false) &&
+            (options?.selectedClip ?? false)
+          }
           canDeleteSelectedClip={options?.canDeleteSelectedClip ?? options?.selectedClip ?? false}
           canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
           canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}

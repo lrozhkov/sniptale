@@ -61,6 +61,7 @@ export interface VideoEditorPreviewController {
     selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
     onSelectClip: VideoEditorSessionActions['selectClip'];
     onSelectScene: VideoEditorSessionActions['selectScene'];
+    onSelectSourceVoiceover: VideoEditorSessionActions['selectSourceVoiceover'];
   };
   transport: {
     currentTime: number;

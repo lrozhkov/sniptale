@@ -1,5 +1,6 @@
 export const VideoEditorSelectionKind = {
   SCENE: 'scene',
+  SOURCE_VOICEOVER: 'source-voiceover',
   COMMENT: 'comment',
   EFFECT_INSTANCE: 'effect-instance',
   CLIP: 'clip',
@@ -20,6 +21,7 @@ export type VideoEditorSelectionKind =
   (typeof VideoEditorSelectionKind)[keyof typeof VideoEditorSelectionKind];
 
 export type VideoEditorSelection =
+  | { kind: typeof VideoEditorSelectionKind.SOURCE_VOICEOVER; documentId: string }
   | {
       kind: typeof VideoEditorSelectionKind.COMMENT;
       documentId: string;

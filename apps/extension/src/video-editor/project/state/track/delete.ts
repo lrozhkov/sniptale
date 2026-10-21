@@ -21,6 +21,13 @@ export function deleteProjectTrack(project: VideoProject, trackId: string): Vide
 
   return normalizeTrackOrder(
     applyVideoProjectMutationPatch(project, {
+      ...(project.sourceVoiceoverDocuments
+        ? {
+            sourceVoiceoverDocuments: project.sourceVoiceoverDocuments.filter(
+              (document) => document.trackId !== trackId
+            ),
+          }
+        : {}),
       clips: project.clips.filter((clip) => clip.trackId !== trackId),
       tracks: project.tracks.filter((track) => track.id !== trackId),
     })
@@ -51,6 +58,15 @@ export function resolveSelectionAfterTrackDelete(
       ? { kind: VideoEditorSelectionKind.TRACK, trackId: selectedTrackId }
       : createSceneSelection();
   }
+
+  const selection = state.selection;
+  if (
+    selection.kind === VideoEditorSelectionKind.SOURCE_VOICEOVER &&
+    state.project?.sourceVoiceoverDocuments?.find(
+      (document) => document.id === selection.documentId
+    )?.trackId === trackId
+  )
+    return createSceneSelection();
 
   return resolveRemovedSelectedClip(state, trackId) ? createSceneSelection() : state.selection;
 }

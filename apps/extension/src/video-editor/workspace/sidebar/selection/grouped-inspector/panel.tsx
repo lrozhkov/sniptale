@@ -5,6 +5,8 @@ import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
   MessageSquare,
+  Ellipsis,
+  Volume2,
   Stamp,
   Keyboard,
   Rotate3D,
@@ -37,6 +39,8 @@ import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition, InspectorSectionSemantic } from './types';
 
 const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
+  actions: Ellipsis,
+  'source-audio': Volume2,
   comments: MessageSquare,
   watermark: Stamp,
   perspective: Rotate3D,

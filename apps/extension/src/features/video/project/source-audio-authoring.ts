@@ -24,7 +24,7 @@ export function isProjectSourceAudioEditable(
   );
 }
 
-/** Applies one source document against its accepted identity without publishing a partial root. */
+/** Changes only envelopes; clearing the last range retains independent recognition metadata. */
 export function applyProjectSourceAudioEdit(
   project: VideoProject,
   basis: VideoProjectSourceAudioDocument,
@@ -32,18 +32,19 @@ export function applyProjectSourceAudioEdit(
 ): SourceAudioMutation {
   if (!project.sourceAudioDocuments?.includes(basis)) return { ok: false, reason: 'stale' };
   if (!isProjectSourceAudioEditable(project, basis.binding)) return { ok: false, reason: 'locked' };
+  const envelope = patch ?? (basis.speech ? { ranges: [], mutes: [] } : null);
   if (
-    patch &&
-    JSON.stringify(patch.ranges) === JSON.stringify(basis.ranges) &&
-    JSON.stringify(patch.mutes) === JSON.stringify(basis.mutes)
+    envelope &&
+    JSON.stringify(envelope.ranges) === JSON.stringify(basis.ranges) &&
+    JSON.stringify(envelope.mutes) === JSON.stringify(basis.mutes)
   )
     return { ok: true, project, document: basis };
-  const documents = patch
+  const documents = envelope
     ? project.sourceAudioDocuments.map((document) =>
-        document === basis ? { ...basis, ...patch } : document
+        document === basis ? { ...basis, ranges: envelope.ranges, mutes: envelope.mutes } : document
       )
     : project.sourceAudioDocuments.filter((document) => document !== basis);
-  return admit(project, documents, patch ? basis.id : null);
+  return admit(project, documents, envelope ? basis.id : null);
 }
 
 /** Adds an explicit source binding with caller-supplied identity through the ordinary mutation port. */

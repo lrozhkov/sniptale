@@ -22,3 +22,9 @@ it('keeps history selection separate from editable clip selection', () => {
     })
   ).toBeNull();
 });
+
+it('does not expose a whole voice document as an editable clip', () => {
+  expect(
+    resolveSelectedClipId({ kind: VideoEditorSelectionKind.SOURCE_VOICEOVER, documentId: 'voice' })
+  ).toBeNull();
+});

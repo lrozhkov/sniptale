@@ -264,3 +264,19 @@ it('scopes quick-edit intent to the requested recording route', async () => {
     url: `${EXTENSION_URL_ROOT}/gallery/index.html`,
   });
 });
+
+it('opens the selected saved Gallery review generation in the full editor', async () => {
+  const { openVideoEditorPage } = await import('./index');
+  await openVideoEditorPage(null, null, {
+    aggregateId: 'recording:source-7',
+    revision: 12,
+    createdAt: 100,
+    sourceAssetId: 'source-body-7',
+  });
+  expect(browserTabsCreateMock).toHaveBeenCalledWith({
+    url:
+      'chrome-extension://test/apps/extension/src/video-editor/index.html' +
+      '?review=recording%3Asource-7&reviewRevision=12&reviewCreatedAt=100' +
+      '&reviewSourceAssetId=source-body-7',
+  });
+});

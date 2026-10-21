@@ -1,4 +1,9 @@
-import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
+import type {
+  VideoProject,
+  VideoProjectExportSettings,
+} from '../../../../apps/extension/src/features/video/project/types';
+import { resolveVideoExportDimensions } from '../../../../apps/extension/src/features/video/project/export/output-dimensions';
+import { assertVideoProjectExportSettingsCompatibleWithProject } from '../../../../apps/extension/src/features/video/project/export/settings-validation';
 import { expect, type Page } from '@playwright/test';
 import {
   OFFSCREEN_HARNESS_PATH,
@@ -13,8 +18,23 @@ export async function encodedNativeVideoSamples(
   origin: string,
   project: VideoProject,
   format: 'MP4' | 'WEBM',
-  points: readonly { time: number; x: number; y: number; expected: readonly number[] }[]
+  points: readonly { time: number; x: number; y: number; expected: readonly number[] }[],
+  range?: { start: number; end: number }
 ) {
+  const settings: VideoProjectExportSettings = {
+    burnInSubtitles: false,
+    downloadAfterExport: false,
+    format,
+    fps: 40,
+    ...resolveVideoExportDimensions(project.width, project.height, 'SOURCE'),
+    quality: 'MEDIUM',
+    resolution: 'SOURCE',
+    scope: range ? 'selected-range' : 'project',
+    ...(range ? { rangeStartSeconds: range.start, rangeEndSeconds: range.end } : {}),
+    subtitleSidecarFormats: [],
+    ...(format === 'MP4' ? { mp4VideoCodec: 'VP9' } : { webmVideoCodec: 'VP9' }),
+  };
+  assertVideoProjectExportSettingsCompatibleWithProject(project, settings);
   await page.goto(`${origin}${OFFSCREEN_HARNESS_PATH}`);
   await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
   const jobId = `native-video-${format}-${crypto.randomUUID()}`;
@@ -29,19 +49,7 @@ export async function encodedNativeVideoSamples(
     input,
     jobId,
     type: VideoMessageType.OFFSCREEN_START_PROJECT_EXPORT,
-    settings: {
-      burnInSubtitles: false,
-      downloadAfterExport: false,
-      format,
-      fps: 40,
-      width: 640,
-      height: 360,
-      quality: 'MEDIUM',
-      resolution: 'SOURCE',
-      scope: 'project',
-      subtitleSidecarFormats: [],
-      ...(format === 'MP4' ? { mp4VideoCodec: 'VP9' } : { webmVideoCodec: 'VP9' }),
-    },
+    settings,
   });
   await expect
     .poll(

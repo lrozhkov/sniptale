@@ -1,3 +1,4 @@
+import { reviewSpeechTextSignature } from '../review/speech-transcript';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject, createVideoProjectAsset } from './factories/creation';
 import { createAudioClipFromAsset, createVideoClipFromAsset } from './factories/clip';
@@ -211,4 +212,111 @@ it('retains a dormant source audio document as a material use without a placemen
     { assetId: 'source', kind: 'source-audio', documentId: 'envelope' },
   ]);
   expect(getProjectAssetUseCounts(project).get('source')).toBe(1);
+});
+
+it('retains source, whole take and accepted replacements while source voice is dormant and disabled', () => {
+  const project = createEmptyVideoProject();
+  project.version = 31;
+  project.sourceVoiceoverDocuments = [
+    {
+      id: 'voice',
+      trackId: 'voice-track',
+      enabled: false,
+      binding: { kind: 'source', assetId: 'source', sourceInstanceId: 'instance' },
+      reference: [
+        { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 8, resultStart: 0, resultEnd: 8 },
+      ],
+      take: {
+        id: 'take',
+        assetId: 'native-take',
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 4,
+        volume: 1,
+        muted: true,
+        dormant: true,
+        fadeIn: 0,
+        fadeOut: 0,
+        transcript: {
+          version: 1,
+          phrases: [],
+          replacements: [
+            {
+              id: 'replacement',
+              assetId: 'project-asset:replacement',
+              start: 0,
+              end: 1,
+              duration: 1,
+              phraseId: 'phrase',
+              revision: 1,
+              text: 'Accepted',
+              textSignature: JSON.stringify(['Accepted', 'speech', 'voice', 'wav', 1, '']),
+              profile: { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' },
+            },
+          ],
+        },
+      },
+    },
+  ];
+  expect(getProjectAssetUses(project)).toEqual(
+    ['source', 'native-take', 'project-asset:replacement'].map((assetId) => ({
+      assetId,
+      kind: 'source-voiceover',
+      documentId: 'voice',
+    }))
+  );
+  expect([...getProjectAssetUseCounts(project)]).toEqual([
+    ['source', 1],
+    ['native-take', 1],
+    ['project-asset:replacement', 1],
+  ]);
+});
+
+it('holds every passive original speech replacement even without clips or enabled content', () => {
+  const project = createEmptyVideoProject();
+  project.version = 31;
+  const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+  project.sourceAudioDocuments = [
+    {
+      id: 'speech',
+      binding: { kind: 'source', assetId: 'source', sourceInstanceId: 'removed-placement' },
+      ranges: [],
+      mutes: [],
+      speech: {
+        enabled: false,
+        transcript: {
+          version: 1,
+          phrases: [],
+          replacements: [false, true].map((enabled, index) => ({
+            id: `replacement-${index}`,
+            start: index,
+            end: index + 1,
+            duration: 0.5,
+            enabled,
+            originalVolume: 0.25,
+            assetId: `project-asset:history-${index}`,
+            phraseId: 'removed-phrase',
+            revision: 1,
+            text: 'Accepted',
+            profile,
+            textSignature: reviewSpeechTextSignature('Accepted', profile),
+          })),
+        },
+      },
+    },
+  ];
+  const before = structuredClone(project);
+  expect(getProjectAssetUses(project)).toEqual(
+    ['source', 'project-asset:history-0', 'project-asset:history-1'].map((assetId) => ({
+      assetId,
+      kind: 'source-audio',
+      documentId: 'speech',
+    }))
+  );
+  expect([...getProjectAssetUseCounts(project)]).toEqual([
+    ['source', 1],
+    ['project-asset:history-0', 1],
+    ['project-asset:history-1', 1],
+  ]);
+  expect(project).toEqual(before);
 });

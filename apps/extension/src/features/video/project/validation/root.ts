@@ -1,4 +1,8 @@
 import {
+  parseVideoProjectSourceVoiceoverDocuments,
+  hasValidVideoProjectSourceVoiceoverReferences,
+} from '../source-voiceover';
+import {
   parseVideoProjectSourceAudioDocuments,
   hasValidVideoProjectSourceAudioReferences,
 } from '../source-audio';
@@ -118,8 +122,14 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 30) &&
+    isBoundedNumber(version, 2, 31) &&
     Number.isInteger(version) &&
+    (version >= 31 ||
+      (value['sourceVoiceoverDocuments'] === undefined &&
+        (!Array.isArray(value['sourceAudioDocuments']) ||
+          value['sourceAudioDocuments'].every(
+            (entry: unknown) => !isRecord(entry) || entry['speech'] === undefined
+          )))) &&
     (version >= 29 ||
       !Array.isArray(value['textDocuments']) ||
       value['textDocuments'].every(
@@ -207,6 +217,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
       parseVideoProjectCommentDocuments(value['commentDocuments']) !== null) &&
     (value['sourceAudioDocuments'] === undefined ||
       parseVideoProjectSourceAudioDocuments(value['sourceAudioDocuments']) !== null) &&
+    (value['sourceVoiceoverDocuments'] === undefined ||
+      parseVideoProjectSourceVoiceoverDocuments(value['sourceVoiceoverDocuments']) !== null) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -355,6 +367,7 @@ function hasValidReferences(project: VideoProject): boolean {
     hasValidVideoProjectBaseReferences(project) &&
     hasValidEffectProjectReferences(project) &&
     hasValidVideoProjectSourceAudioReferences(project) &&
+    hasValidVideoProjectSourceVoiceoverReferences(project) &&
     hasValidVideoProjectTextReferences(project) &&
     hasValidVideoProjectCommentReferences(project)
   );

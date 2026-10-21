@@ -62,6 +62,16 @@ export function getClipWaveformPeaks(
     return [];
   }
 
+  return getProjectAudioWaveformPeaks(project, clip, sampleCount);
+}
+
+/** Samples a native asset window without requiring an authored montage clip. */
+export function getProjectAudioWaveformPeaks(
+  project: VideoProject,
+  clip: { assetId: string; sourceStart: number; sourceDuration: number },
+  sampleCount: number
+): number[] {
+  if (sampleCount <= 0) return [];
   const asset = getAssetById(project, clip.assetId);
   const sourcePeaks = asset?.metadata.audioPeaks;
   const assetDuration = asset?.metadata.duration ?? clip.sourceDuration;

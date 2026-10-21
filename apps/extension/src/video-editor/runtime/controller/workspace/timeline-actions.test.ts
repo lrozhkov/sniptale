@@ -19,6 +19,9 @@ import {
   createWorkspaceTimelineSelectionActions,
 } from './timeline-actions';
 import { createWorkspaceTimelineController } from './timeline';
+import { createSelectedClipActions as createSelectedTimelineClipActions } from '../selected-clip-actions';
+import { pairedSourceVoiceoverPlaybackFixture } from '../../../../features/video/project/source-voiceover-playback.test-support';
+import { isExportReadyVideoProject } from '../../../../features/video/project/validation/root';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
   const store: VideoEditorState & Pick<ClipSelectionPort, 'selectedClipId'> = {
@@ -151,6 +154,86 @@ it('projects valid selected-clip split eligibility into the timeline controller'
   store.selectedClipId = null;
   expect(createController().state.canSplitSelectedClip).toBe(false);
 });
+
+it.each([
+  'unlocked',
+  'voice-track-locked',
+  'source-track-locked',
+  'paired-audio-track-locked',
+  'missing-document',
+  'absent-document-list',
+  'source-less-dormant',
+] as const)(
+  'projects whole voice toolbar permissions for %s and keeps clip split unavailable',
+  (scenario) => {
+    const { project, clip, document, track, originalTrack } =
+      pairedSourceVoiceoverPlaybackFixture();
+    if (scenario === 'voice-track-locked') track.locked = true;
+    if (scenario === 'source-track-locked')
+      project.tracks.find((entry) => entry.id === clip.trackId)!.locked = true;
+    if (scenario === 'paired-audio-track-locked') originalTrack.locked = true;
+    if (scenario === 'absent-document-list') delete project.sourceVoiceoverDocuments;
+    if (scenario === 'source-less-dormant') {
+      project.clips = [];
+      document.take.dormant = true;
+      delete document.take.sourceAnchor;
+    }
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const store = createStore(project);
+    store.currentTime = 3;
+    store.selectedClipId = null;
+    store.selectedTrackId = track.id;
+    store.selection = {
+      kind: VideoEditorSelectionKind.SOURCE_VOICEOVER,
+      documentId: scenario === 'missing-document' ? 'missing-document' : document.id,
+    };
+    store.duplicateSourceVoiceover = vi.fn(() => 'copied-document');
+    store.deleteSourceVoiceover = vi.fn();
+    store.duplicateClip = vi.fn();
+    store.deleteClip = vi.fn();
+    store.splitClipAt = vi.fn();
+    type ControllerArgs = Parameters<typeof createWorkspaceTimelineController>;
+    const runtime = {
+      timelinePreviews: {},
+      setTimelinePreviewSuspended: vi.fn(),
+      setTimelinePreviewViewport: vi.fn(),
+    } as unknown as ControllerArgs[1];
+    const workspace = {
+      ...createWorkspace(),
+      grid: { magnetEnabled: true },
+      playbackRange: null,
+    } as unknown as ControllerArgs[4];
+    const controller = createWorkspaceTimelineController(
+      store as unknown as ControllerArgs[0],
+      runtime,
+      project,
+      {} as ControllerArgs[3],
+      workspace,
+      {} as ControllerArgs[5],
+      createSelectedTimelineClipActions(store)
+    );
+    const editable = scenario === 'unlocked' || scenario === 'source-less-dormant';
+    expect(controller.state.canDuplicateSelection).toBe(editable);
+    expect(controller.state.canDeleteSelectedClip).toBe(editable);
+    expect(controller.state.canEditSelectedClip).toBe(false);
+    expect(controller.state.canSplitSelectedClip).toBe(false);
+    controller.actions.onSplitSelectedClip();
+    expect(store.splitClipAt).not.toHaveBeenCalled();
+    if (editable) {
+      controller.actions.onDuplicateSelectedClip();
+      controller.actions.onDeleteSelectedTimelineObject();
+      expect(store.duplicateSourceVoiceover).toHaveBeenCalledExactlyOnceWith(document.id);
+      expect(store.deleteSourceVoiceover).toHaveBeenCalledExactlyOnceWith(document.id);
+    } else {
+      expect(store.duplicateSourceVoiceover).not.toHaveBeenCalled();
+      expect(store.deleteSourceVoiceover).not.toHaveBeenCalled();
+    }
+    expect(store.duplicateClip).not.toHaveBeenCalled();
+    expect(store.deleteClip).not.toHaveBeenCalled();
+    expect(project).toEqual(before);
+  }
+);
 
 it('deletes the selected object track from timeline delete actions', () => {
   const store = createStore();

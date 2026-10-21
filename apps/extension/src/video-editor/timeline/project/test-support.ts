@@ -53,6 +53,7 @@ export function createTimelineTestProps(): ComponentProps<typeof ProjectTimeline
     selectedClipId: 'clip',
     selectedTrackId: null,
     timelinePreviews: {},
+    canDuplicateSelection: true,
     canDeleteSelectedClip: true,
     canEditSelectedClip: true,
     canSplitSelectedClip: false,

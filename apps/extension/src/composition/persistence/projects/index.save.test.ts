@@ -1,3 +1,5 @@
+import type { ReviewOriginalSpeech } from '../../../features/video/review/original-speech';
+import { reviewSpeechTextSignature } from '../../../features/video/review/speech-transcript';
 import { saveVideoProject } from './index';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -821,4 +823,258 @@ it('commits and reopens dormant source audio documents through the canonical roo
       }),
     })
   );
+});
+
+it('commits dormant source voice takes and rejects stale retry without losing resources', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const { parseVideoProjectEntry } = await import('./read-guards');
+  const { createVideoProjectTrack } =
+    await import('../../../features/video/project/factories/creation');
+  const { parseHydratableVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const source = createProjectOwnedVideoAsset('source-voice-source');
+  const audio = {
+    ...createProjectOwnedVideoAsset('source-voice-take'),
+    type: VideoProjectAssetType.AUDIO,
+  };
+  const replacement = {
+    ...createProjectOwnedVideoAsset('project-asset:source-voice-replacement'),
+    type: VideoProjectAssetType.AUDIO,
+  };
+  const track = createVideoProjectTrack('Voice', 0, 'AUDIO');
+  const profile = { modelId: 'speech', voiceId: 'voice', responseFormat: 'wav' as const };
+  const project = createVideoProject({
+    version: 31,
+    assets: [source, audio, replacement],
+    clips: [],
+    tracks: [track],
+    sourceVoiceoverDocuments: [
+      {
+        id: 'voice',
+        enabled: false,
+        trackId: track.id,
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'dormant-instance' },
+        originalAudioSourceInstanceId: 'dormant-original-audio',
+        reference: [
+          { kind: 'keep', rate: 1, sourceStart: 0, sourceEnd: 5, resultStart: 0, resultEnd: 5 },
+        ],
+        take: {
+          id: 'take',
+          assetId: audio.id,
+          timelineStart: 0,
+          sourceOffset: 0.5,
+          duration: 4,
+          volume: 1.5,
+          muted: true,
+          dormant: true,
+          fadeIn: 0.25,
+          fadeOut: 0.5,
+          sourceAnchor: [{ start: 0, end: 4, offset: 0, duration: 4 }],
+          transcript: {
+            version: 1,
+            phrases: [],
+            replacements: [
+              {
+                id: 'replacement',
+                assetId: replacement.id,
+                start: 0,
+                end: 1,
+                duration: 1,
+                phraseId: 'phrase',
+                revision: 1,
+                text: 'Accepted',
+                textSignature: reviewSpeechTextSignature('Accepted', profile),
+                profile,
+              },
+            ],
+          },
+        },
+      },
+    ],
+  });
+  const before = structuredClone(project);
+  let head: ReturnType<typeof parseVideoProjectEntry> = null;
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) => {
+    if (id === project.id) return head ?? undefined;
+    const asset = project.assets.find((asset) => asset.id === id);
+    return asset
+      ? {
+          id,
+          assetId: `${id}-bytes`,
+          mimeType: asset.metadata.mimeType,
+          size: asset.metadata.size,
+          createdAt: 100,
+        }
+      : undefined;
+  });
+  projectsDbMocks.txPutMock.mockImplementation(async (value: unknown) => {
+    const parsed = parseVideoProjectEntry(value);
+    if (parsed) head = parsed;
+  });
+  const invalid = structuredClone(project);
+  invalid.sourceVoiceoverDocuments![0]!.take.volume = NaN;
+  await expect(
+    commitVideoProjectWorkspaceMutation(invalid, {
+      expectedWorkspaceRevision: null,
+      expectedProject: null,
+    })
+  ).rejects.toThrow();
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  const saved = await commitVideoProjectWorkspaceMutation(project, {
+    expectedWorkspaceRevision: null,
+    expectedProject: null,
+  });
+  expect(saved.workspaceRevision).toBe(1);
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(saved.project)))?.sourceVoiceoverDocuments
+  ).toEqual(before.sourceVoiceoverDocuments);
+  for (const asset of project.assets)
+    expect(projectsDbMocks.txGetMock).toHaveBeenCalledWith(asset.id);
+  projectsDbMocks.txPutMock.mockClear();
+  await expect(
+    commitVideoProjectWorkspaceMutation(project, {
+      expectedWorkspaceRevision: null,
+      expectedProject: null,
+    })
+  ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  const retried = await commitVideoProjectWorkspaceMutation(saved.project, {
+    expectedWorkspaceRevision: 1,
+    expectedProject: saved.project,
+  });
+  expect(retried.workspaceRevision).toBe(2);
+  expect(retried.project.sourceVoiceoverDocuments).toEqual(before.sourceVoiceoverDocuments);
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(
+    projectsDbMocks.txPutMock.mock.calls.flat().some((entry) => entry?.kind === 'physical-delete')
+  ).toBe(false);
+  expect(project).toEqual(before);
+});
+
+function passiveSourceSpeech(assetId: string): ReviewOriginalSpeech {
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  return {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition-model',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 3,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 3 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'historical',
+          phraseId: 'removed-phrase',
+          start: 1,
+          end: 3,
+          duration: 1,
+          assetId,
+          revision: 1,
+          text: 'Accepted',
+          profile,
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          enabled: true,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+}
+
+it('retains passive source speech and replacement-only resources through save reopen and retry', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const { parseVideoProjectEntry } = await import('./read-guards');
+  const { parseHydratableVideoProject, isExportReadyVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const { getProjectAssetUses } = await import('../../../features/video/project/media-usage');
+  const source = createProjectOwnedVideoAsset('passive-speech-source');
+  const replacement = {
+    ...createProjectOwnedVideoAsset('project-asset:passive-history'),
+    type: VideoProjectAssetType.AUDIO,
+    metadata: { ...source.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true },
+  };
+  const project = createVideoProject({
+    version: 31,
+    assets: [source, replacement],
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'source-speech',
+        binding: { kind: 'source', assetId: source.id, sourceInstanceId: 'missing-original-audio' },
+        ranges: [],
+        mutes: [],
+        speech: passiveSourceSpeech(replacement.id),
+      },
+    ],
+  });
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(getProjectAssetUses(project)).toEqual([
+    { kind: 'source-audio', documentId: 'source-speech', assetId: source.id },
+    { kind: 'source-audio', documentId: 'source-speech', assetId: replacement.id },
+  ]);
+  const before = structuredClone(project);
+  let head: ReturnType<typeof parseVideoProjectEntry> = null;
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) => {
+    if (id === project.id) return head ?? undefined;
+    const asset = project.assets.find((asset) => asset.id === id);
+    return asset
+      ? {
+          id,
+          assetId: `${id}-bytes`,
+          mimeType: asset.metadata.mimeType,
+          size: asset.metadata.size,
+          createdAt: 100,
+        }
+      : undefined;
+  });
+  projectsDbMocks.txPutMock.mockImplementation(async (value: unknown) => {
+    const parsed = parseVideoProjectEntry(value);
+    if (parsed) head = parsed;
+  });
+  const saved = await commitVideoProjectWorkspaceMutation(project, {
+    expectedWorkspaceRevision: null,
+    expectedProject: null,
+  });
+  expect(saved.workspaceRevision).toBe(1);
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(saved.project)))?.sourceAudioDocuments
+  ).toEqual(before.sourceAudioDocuments);
+  expect(saved.project.assets).toEqual(before.assets);
+  for (const asset of project.assets)
+    expect(projectsDbMocks.txGetMock).toHaveBeenCalledWith(asset.id);
+  projectsDbMocks.txPutMock.mockClear();
+  await expect(
+    commitVideoProjectWorkspaceMutation(project, {
+      expectedWorkspaceRevision: null,
+      expectedProject: null,
+    })
+  ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  expect(parseVideoProjectEntry(head)?.project.sourceAudioDocuments).toEqual(
+    before.sourceAudioDocuments
+  );
+  const retried = await commitVideoProjectWorkspaceMutation(saved.project, {
+    expectedWorkspaceRevision: 1,
+    expectedProject: saved.project,
+  });
+  expect(retried.workspaceRevision).toBe(2);
+  expect(retried.project.sourceAudioDocuments).toEqual(before.sourceAudioDocuments);
+  expect(retried.project.assets).toEqual(before.assets);
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(
+    projectsDbMocks.txPutMock.mock.calls.flat().some((entry) => entry?.kind === 'physical-delete')
+  ).toBe(false);
+  expect(project).toEqual(before);
 });

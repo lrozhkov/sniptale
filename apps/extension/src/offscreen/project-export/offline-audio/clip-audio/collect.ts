@@ -1,3 +1,4 @@
+import { planProjectSourceVoiceoverPlayback } from '../../../../features/video/project/source-voiceover-playback';
 import { composeSourceAudioRanges } from '../../../../features/video/audio/source-attenuation';
 import { getProjectSourceAudioRanges } from '../../../../features/video/project/source-audio';
 import { getClipGainRange } from '../../../../features/video/project/timeline/audio';
@@ -56,6 +57,39 @@ export function collectRenderableAudioClips(
   });
   const clips: OfflineAudioRenderableClip[] = [
     ...preparedMediaClips,
+    ...planProjectSourceVoiceoverPlayback(project).flatMap(
+      ({ entry }): OfflineAudioRenderableClip[] => {
+        if (entry.volume <= 0) return [];
+        if (entry.source.kind !== 'project')
+          throw new Error('Source voiceover requires a declared project material');
+        const rate = entry.playbackRate ?? 1;
+        return [
+          {
+            sourceKind: 'source-voiceover',
+            playbackEntry: entry,
+            id: entry.clipId,
+            assetId: entry.source.assetId,
+            startTime: entry.timelineStart,
+            duration: entry.duration,
+            sourceStart: entry.sourceOffset,
+            sourceDuration: entry.duration * rate,
+            playbackRate: rate,
+            volume: entry.volume,
+            muted: false,
+            fadeInMs: (entry.fadeIn / rate) * 1000,
+            fadeOutMs: (entry.fadeOut / rate) * 1000,
+            audioGainStart: 1,
+            audioGainEnd: 1,
+            volumeEnvelopeStart: 1,
+            volumeEnvelopeEnd: 1,
+            audioFadePhase: {
+              offset: (entry.fadePhase?.offset ?? 0) / rate,
+              duration: (entry.fadePhase?.duration ?? entry.duration * rate) / rate,
+            },
+          },
+        ];
+      }
+    ),
     ...resolveEffectRuntimeAudioPlans(project),
   ];
 

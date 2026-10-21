@@ -8,6 +8,7 @@ import './inspector.css';
 import './inspector-navigation.css';
 import {
   Archive,
+  Clapperboard,
   List,
   PanelLeft,
   ChevronsDownUp,
@@ -107,6 +108,7 @@ export function ReviewInspector(props: {
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
   onBackup?(): void;
+  onOpenVideoEditor?(): void;
   children: ReactNode;
   actions?: ReactNode;
   composer?: ReactNode;
@@ -220,7 +222,7 @@ export function ReviewInspector(props: {
             ) : shown === 'history' ? null : shown === 'export' ? (
               <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
                 {props.actions}
-                <ReviewBackupAction {...props} />
+                <ReviewProjectActions {...props} />
               </section>
             ) : shown === 'text' ? (
               props.textDocument
@@ -334,21 +336,37 @@ function ReviewAnnotationList(props: {
   );
 }
 
-/** Backup is an export action for the current document. */
-function ReviewBackupAction(
-  props: Pick<Parameters<typeof ReviewInspector>[0], 'onBackup' | 'busy'>
+/** Project actions reuse the inspector's compact export controls. */
+function ReviewProjectActions(
+  props: Pick<Parameters<typeof ReviewInspector>[0], 'onBackup' | 'onOpenVideoEditor' | 'busy'>
 ) {
-  return props.onBackup ? (
-    <ReviewButton
-      label={translate('gallery.app.selectionBackup')}
-      disabled={props.busy}
-      className={`${reviewTextButtonClassName} justify-start`}
-      onClick={props.onBackup}
-    >
-      <Archive size={15} aria-hidden="true" />
-      <span>{translate('gallery.app.selectionBackup')}</span>
-    </ReviewButton>
-  ) : null;
+  return (
+    <>
+      {props.onOpenVideoEditor ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.openVideoEditor')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          data-ui="gallery.videoReview.openVideoEditor"
+          onClick={props.onOpenVideoEditor}
+        >
+          <Clapperboard size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.openVideoEditor')}</span>
+        </ReviewButton>
+      ) : null}
+      {props.onBackup ? (
+        <ReviewButton
+          label={translate('gallery.app.selectionBackup')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          onClick={props.onBackup}
+        >
+          <Archive size={15} aria-hidden="true" />
+          <span>{translate('gallery.app.selectionBackup')}</span>
+        </ReviewButton>
+      ) : null}
+    </>
+  );
 }
 
 /** Comment reports retain their own commands; export belongs to the inspector section. */
@@ -359,7 +377,7 @@ function ReviewInspectorFooter(
     <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
       {props.showReports ? (
         <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
-          <ReviewBackupAction {...props} />
+          <ReviewProjectActions {...props} />
           <ReviewButton
             label={translate('gallery.videoReview.copyReport')}
             disabled={props.busy}

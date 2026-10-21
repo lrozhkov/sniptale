@@ -15,6 +15,7 @@ import {
 } from './storage';
 import { usageReferenceKey, USAGE_INDEX_MARKER } from '../media-library/usage-index-keys';
 import {
+  sameReviewWorkspaceValue,
   compactVideoWorkspaceHistory,
   retainedWorkspaceReplacementStart,
 } from './history-retention';
@@ -183,6 +184,16 @@ async function readSnapshot(
   if (workspace.sourceAssetId !== (await readSourceAssetId(tx, aggregateId)))
     throw new VideoWorkspaceError('changed-source');
   return { snapshot: { workspace, draft }, document, storage };
+}
+
+/** Checks the selected source inside the consuming project's publication transaction. */
+export async function assertVideoWorkspaceUnchanged(
+  tx: Transaction,
+  expected: VideoWorkspace
+): Promise<void> {
+  const current = await readSnapshot(tx, expected.aggregateId);
+  if (!current || !sameReviewWorkspaceValue(current.snapshot.workspace, expected))
+    throw new VideoWorkspaceError('conflict');
 }
 
 /** Read-only recovery: missing is distinct from invalid and never repairs durable content. */

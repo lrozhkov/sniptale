@@ -374,3 +374,117 @@ it('schedules source amplification from the actual collector with each master ap
     );
   }
 });
+
+it.each([0.25, 1, 4])(
+  'preserves shared waveform and padding after selected-range seek at tempo %s',
+  async (rate) => {
+    const { scheduleOfflineAudioClipMix } = await import('./schedule');
+    const { createReviewAudioClipRenderer, REVIEW_AUDIO_CLIP_PADDING_SECONDS } =
+      await import('../../../../workflows/video-review/audio-clip-render');
+    const { clipAudioClipToExportRange } = await import('../clip-audio/collect');
+    const buffer = createAudioBuffer(1, 8_000, 64_000);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < data.length; index++)
+      data[index] = Math.sin(index * 0.037) * Math.sin(index * 0.0011);
+    const entry = {
+      lane: 'voiceover' as const,
+      clipId: 'take',
+      source: { kind: 'project' as const, assetId: 'voice' },
+      timelineStart: 0,
+      duration: 1.5,
+      sourceOffset: 0.37,
+      volume: 0.8,
+      fadeIn: 0.3,
+      fadeOut: 0.4,
+      playbackRate: rate,
+      fadePhase: { offset: 0.2, duration: 7 },
+    };
+    const clip: import('../clip-audio/types').OfflineAudioRenderableClip = {
+      sourceKind: 'source-voiceover',
+      playbackEntry: entry,
+      id: 'take',
+      assetId: 'voice',
+      startTime: 0,
+      duration: entry.duration,
+      sourceStart: entry.sourceOffset,
+      sourceDuration: entry.duration * rate,
+      playbackRate: rate,
+      volume: entry.volume,
+      muted: false,
+      fadeInMs: (entry.fadeIn / rate) * 1000,
+      fadeOutMs: (entry.fadeOut / rate) * 1000,
+      audioFadePhase: { offset: 0.2 / rate, duration: 7 / rate },
+    };
+    const range = clipAudioClipToExportRange(clip, { start: 0.5, end: 1.25 });
+    if (!range) throw new Error('Missing range');
+    const context = new FakeOfflineAudioContext() as FakeOfflineAudioContext & OfflineAudioContext;
+    await scheduleOfflineAudioClipMix(context, range, buffer);
+    const source = context.lastSource;
+    if (!source?.buffer) throw new Error('Missing scheduled buffer');
+    const padding = Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS);
+    expect(source.start).toHaveBeenCalledWith(
+      0,
+      rate === 1 ? entry.sourceOffset + 0.5 : padding / buffer.sampleRate,
+      0.75
+    );
+    expect(source.stop).toHaveBeenCalledWith(0.75);
+    if (rate === 1) expect(source.buffer).toBe(buffer);
+    else {
+      const whole = await createReviewAudioClipRenderer().render(
+        entry,
+        buffer,
+        0,
+        entry.duration,
+        new AbortController().signal
+      );
+      const expected = whole.getChannelData(0).subarray(padding + 4_000, padding + 10_000);
+      const actual = source.buffer.getChannelData(0).subarray(padding, padding + 6_000);
+      let maximum = 0;
+      for (let index = 0; index < expected.length; index++)
+        maximum = Math.max(maximum, Math.abs(expected[index]! - actual[index]!));
+      expect(maximum).toBeLessThanOrEqual(1e-6);
+    }
+    expect(context.gains[1]?.gain.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
+  }
+);
+
+it('does not schedule a source voiceover after abort', async () => {
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const controller = new AbortController();
+  controller.abort();
+  const context = new FakeOfflineAudioContext() as FakeOfflineAudioContext & OfflineAudioContext;
+  await expect(
+    scheduleOfflineAudioClipMix(
+      context,
+      {
+        sourceKind: 'source-voiceover',
+        id: 'take',
+        assetId: 'voice',
+        startTime: 0,
+        duration: 1,
+        sourceStart: 0,
+        sourceDuration: 2,
+        playbackRate: 2,
+        volume: 1,
+        muted: false,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        playbackEntry: {
+          lane: 'voiceover',
+          clipId: 'take',
+          source: { kind: 'project', assetId: 'voice' },
+          timelineStart: 0,
+          duration: 1,
+          sourceOffset: 0,
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          playbackRate: 2,
+        },
+      },
+      createAudioBuffer(1, 8000, 8000),
+      controller.signal
+    )
+  ).rejects.toThrow();
+  expect(context.lastSource).toBeNull();
+});

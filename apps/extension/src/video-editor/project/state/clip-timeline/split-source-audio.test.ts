@@ -1,3 +1,5 @@
+import type { ReviewOriginalSpeech } from '../../../../features/video/review/original-speech';
+import { reviewSpeechTextSignature } from '../../../../features/video/review/speech-transcript';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
 import { getProjectSourceAudioRanges } from '../../../../features/video/project/source-audio';
@@ -88,5 +90,86 @@ it('refuses document duplication above the aggregate budget without partial clip
   }));
   const before = structuredClone(project);
   expect(duplicateProjectClipsWithResult(project, clip.id)).toBeNull();
+  expect(project).toEqual(before);
+});
+
+function passiveSourceSpeech(assetId: string): ReviewOriginalSpeech {
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  return {
+    enabled: false,
+    transcript: {
+      version: 1,
+      profile,
+      transcriptionModelId: 'recognition-model',
+      phrases: [
+        {
+          id: 'phrase',
+          start: 1,
+          end: 3,
+          originalText: 'Original',
+          text: 'Draft',
+          revision: 2,
+          alignment: 'word',
+          words: [{ text: 'Original', start: 1, end: 3 }],
+        },
+      ],
+      replacements: [
+        {
+          id: 'historical',
+          phraseId: 'removed-phrase',
+          start: 1,
+          end: 3,
+          duration: 1,
+          assetId,
+          revision: 1,
+          text: 'Accepted',
+          profile,
+          textSignature: reviewSpeechTextSignature('Accepted', profile),
+          enabled: true,
+          originalVolume: 0.25,
+        },
+      ],
+    },
+  };
+}
+
+it('retains passive speech through real legacy split and independent source copy commands', () => {
+  const { project, clip } = fixture();
+  const source = project.assets.find((asset) => asset.id === clip.assetId)!;
+  const replacement = {
+    ...structuredClone(source),
+    id: 'project-asset:passive-history',
+    type: 'AUDIO' as const,
+    source: { kind: 'project-asset' as const, projectAssetId: 'history-private' },
+    metadata: { ...source.metadata, width: 0, height: 0, mimeType: 'audio/wav', hasAudio: true },
+  };
+  delete replacement.recordingPart;
+  project.assets.push(replacement);
+  project.version = 31;
+  const document = project.sourceAudioDocuments![0]!;
+  document.speech = passiveSourceSpeech(replacement.id);
+  delete clip.sourceInstanceId;
+  document.binding.sourceInstanceId = clip.id;
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const before = structuredClone(project);
+  const split = splitProjectClipsAtTimeWithResult(project, clip.id, 5);
+  if (!split) throw new Error('Expected split');
+  expect(split.project.sourceAudioDocuments).toEqual([document]);
+  expect(
+    split.project.clips.filter((item) => item.type === 'VIDEO').map((item) => item.sourceInstanceId)
+  ).toEqual([clip.id, clip.id]);
+  expect(isExportReadyVideoProject(split.project)).toBe(true);
+  const copied = duplicateProjectClipsWithResult(project, clip.id);
+  if (!copied) throw new Error('Expected source copy');
+  expect(copied.project.sourceAudioDocuments).toHaveLength(2);
+  const copy = copied.project.sourceAudioDocuments![1]!;
+  expect(copy.binding.sourceInstanceId).not.toBe(document.binding.sourceInstanceId);
+  expect(copy.speech).toEqual(document.speech);
+  expect(copy.speech).not.toBe(document.speech);
+  expect(copy.speech!.transcript.replacements).not.toBe(document.speech.transcript.replacements);
+  expect(copied.project.assets).toEqual(project.assets);
+  expect(isExportReadyVideoProject(copied.project)).toBe(true);
+  copy.speech!.transcript.phrases[0]!.text = 'Independent draft';
+  copy.speech!.transcript.replacements[0]!.originalVolume = 1;
   expect(project).toEqual(before);
 });

@@ -429,6 +429,8 @@ it('isolates Delete, Space and Undo during setup/review and restores shortcuts a
       deleteClip: remove,
       deleteCursorSample: noop,
       editCommentDocument: vi.fn(),
+      deleteSourceVoiceover: vi.fn(),
+      duplicateSourceVoiceover: vi.fn(() => null),
       deleteEffectInstance: noop,
       deleteMotionRegion: noop,
       deleteObjectTrack: noop,

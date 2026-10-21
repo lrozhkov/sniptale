@@ -15,7 +15,7 @@ import {
   auditionRecordedActionAudio,
 } from './action-presentation';
 import { ReviewActionHistory } from './action-history';
-import { openGalleryPage } from '../../platform/navigation/extension-pages';
+import { openVideoEditorPage, openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import {
@@ -251,6 +251,18 @@ export function ReviewInspectorBinding({
         onSelect={state.selectComment}
         onHover={state.setHovered}
         onBackup={() => void run(() => backupReview(state, canvasComments))}
+        onOpenVideoEditor={() =>
+          void run(async () => {
+            await flushReviewTextVoiceBuffers(state, canvasComments);
+            const saved = await state.session.saveBuffered();
+            await openVideoEditorPage(null, null, {
+              aggregateId: saved.workspace.aggregateId,
+              revision: saved.workspace.revision,
+              createdAt: saved.workspace.createdAt,
+              sourceAssetId: saved.workspace.sourceAssetId,
+            });
+          })
+        }
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewSelectionBinding

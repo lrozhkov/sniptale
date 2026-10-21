@@ -127,10 +127,10 @@
       "file": "apps/extension/src/gallery/video-review/review.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing mounted editor fixture now asserts the inspector recording tab instead of the old modal strip. The same source/save mocks, real editor binding, fixture lifecycle, cleanup, and state receivers remain. File score4 delta0 and cohesion1 do not establish a new independent lifecycle. Main inspected the complete fixture and exact changed test. A line-only split would distribute this same integration receiver. Fresh complete-candidate architecture review must validate this classification.",
+      "reason": "tool-noise: This existing integration fixture tests one mounted review editor. The candidate changes one assertion from the last operation target to the exact note text in the canonical document. It adds no fixture, state receiver, writer, or effect. Owner and state counts remain unchanged. The file exceeds the existing line budget. Splitting the same mounted fixture would add test navigation without isolating an authority. Independent architecture review must assess this exact body.",
       "removalCondition": "Remove when this exact AST or signature changes; reassess a new fixture lifecycle, independent authority or mixed recovery. Remove when the analyzer recognizes cohesive tests sharing one integration fixture. Independent architecture review must inspect the classification.",
-      "reviewDate": "2026-10-17",
-      "astHash": "847d8be189dd58d9a06fa15aa7e81d530d675bb6d72f34e771d985b66e59bff6",
+      "reviewDate": "2026-10-21",
+      "astHash": "ef2a4af1399a7ce1801c67f4df5fe49cf9b555aa08ce2bc4e47ae2e5050ae19b",
       "signatureHash": "a411df1f8a4dd05950d634461348210539321a3a0a91a54138e7774cc24654d9"
     },
     {
@@ -512,11 +512,11 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence:review-workspaces",
-      "reason": "tool-noise: The cursor-only candidate is replaced by a shared pure cursor/master candidate. Source identity, CAS admission, strict transaction, validation, commit/abort and cleanup remain in the existing store protocol. The helper creates no writer or independent transaction authority. Independent track_controls_structural_diagnosis inspected this correction. Fresh corrected-candidate architecture review remains required.",
+      "reason": "tool-noise: This existing store owns one workspace transaction protocol. The candidate adds a read assertion in the consuming transaction. It reuses canonical snapshot and physical source admission. It creates no writer, transaction, state authority, or recovery path. Before and after metrics retain two owner groups, one effect family, two state signals, and zero effect clusters. The added export is the caller transaction assertion. Independent architecture review must assess this exact body.",
       "removalCondition": "Remove when the exact body or signature changes. Reassess a new state authority, runtime, independent transaction or recovery policy. Remove when structural analysis models this cohesive transaction owner.",
-      "reviewDate": "2026-10-15",
-      "astHash": "9092965c52cbb284922de199d4968d193c7eda9b2f652c7bcffe54ceda0d09d6",
-      "signatureHash": "0d394a6f4302cc17c058195d5d41f56c7919e652c64a8628c0e7a5c267fbb155"
+      "reviewDate": "2026-10-21",
+      "astHash": "466c6e6e47f8f7965fb8a675f36c4b0c1677ff0e38d36e7c4277bde633d9440b",
+      "signatureHash": "f94b148614a83a2e7581a3bb44111aba8600dc78c5eabec39ecd663f1a740528"
     },
     {
       "rule": "structural-file-risk",
@@ -820,11 +820,11 @@
       "file": "apps/extension/src/gallery/video-review/inspector.tsx",
       "symbol": "ReviewInspector",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The existing inspector owns header, navigation, and scroll placement. The temporary recording slot adds one local tab-selection boolean and preserves the mounted recorder across tab changes. It adds no capture, save, permission, or media authority. The function score decreased from10 to7; its extra JSX keeps the same inspector receiver. Extracting the slot into another forwarding component would spread navigation and hidden/inert decisions. Main inspected the exact body and actual tab-switch/save proof. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, resource, persistence, capture, or recovery authority. Remove when the analyzer models this cohesive UI receiver. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-17",
-      "astHash": "4301fe6bf937cede35489f4a4140760de4c8b7b0411f43e2c9e5a2db53a87492",
-      "signatureHash": "d171ef57ffabab7d865f684f6c8f8fb5f5e3d190c74bc824a91102ac24c0e2a2"
+      "reason": "tool-noise: This existing inspector owns one header, navigation rail, and content scroll receiver. The candidate forwards one project action to its existing footer. It adds no capture, resource, persistence, or recovery authority. Its state and complexity do not increase. Extra forwarding components would distribute the same placement and visibility decisions. Existing interaction and primary viewport proof cover this body.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "1520020310b8d7d670c39ce21a63af1fea5fb90e0dbd84ed0dd03f28c61accdf",
+      "signatureHash": "cfb7a2b0618132a9bb3b4b580dcc722d2854f5e745f9abee642a7c15d5099b97"
     },
     {
       "rule": "structural-file-risk",
@@ -1722,22 +1722,132 @@
       "file": "apps/extension/src/composition/persistence/projects/backup-restore.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: The schema28 case extends the existing root restore proof with dormant source audio documents. It uses the same writer, caller-owned stores, and transaction fixture. It adds no independent fixture, operation, or recovery lifetime. File length alone triggers this finding. Independent final architecture review must assess this exact classification.",
-      "removalCondition": "Remove this allowance when its exact AST or signature changes. Reassess any new fixture, writer, operation, or recovery lifetime. Remove it when the analyzer recognizes this cohesive root proof. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves the existing atomic project restore and resource graph. The candidate adds passive speech metadata to that same root contract. Existing store constructors and restore operations own all fixtures. It adds no runtime import, writer, or recovery lifetime. File length alone exceeds the budget. Independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact file AST or signature changes. Reassess any new fixture authority, writer, operation, or recovery lifetime. Remove when the analyzer models this cohesive root proof. Independent architecture review must assess this exact classification.",
       "reviewDate": "2026-10-21",
-      "astHash": "f4a2508c78f7ccc691b8618acd4b43d6b2ed7b52c2fb1a04d4b69e86ffe9e709",
-      "signatureHash": "bb320308abea3398e61c1591d52f4b41ad78f75b08b509266e7fde60caa0dc37"
+      "astHash": "f6217724c1c0a374a32d893bd3d0e038deb3bb7008e642b0e0c79e6f239e449f",
+      "signatureHash": "921e5efc231b3d0eca846f5008c75cd2bc9fb2f8c73af38380f9c092797cb29f"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/projects/index.save.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: This suite tests the canonical Native workspace root writer. The candidate adds source audio roundtrip proof under existing transaction mocks. It adds no writer, runtime, or state authority. File length alone triggers this finding. Independent final architecture review must assess this exact classification.",
-      "removalCondition": "Remove this allowance when its exact AST or signature changes. Reassess any new fixture, writer, operation, or recovery lifetime. Remove it when the analyzer recognizes this cohesive root proof. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves the canonical project root writer and its existing transaction mocks. The candidate adds whole takes and passive speech resource retention. It preserves save, reopen, and retry under the same revision authority. It adds no runtime import or writer. File length alone exceeds the budget. Independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact file AST or signature changes. Reassess any new fixture authority, writer, operation, or recovery lifetime. Remove when the analyzer models this cohesive root proof. Independent architecture review must assess this exact classification.",
       "reviewDate": "2026-10-21",
-      "astHash": "7fc7f88b6059a553106d551ac41774a3a4e3bfce61166e10edb78aaab24ec2c4",
-      "signatureHash": "517e837d0135138f7e3538d9f36986a0ebdab5b3b65c91d55c405fe9cc042f8b"
+      "astHash": "94397d764356b8d438c6268eb234630948a14fd40ac2218b71c2375ebc04fec0",
+      "signatureHash": "217ad7a800b6b93ec678032c58b25c6c2cf97007f01b1ef317cecb383d2cd960"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-audio.ts",
+      "symbol": "planReviewProjectAudio",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure audio conversion owns one normalized result and one refusal path. Private operations separate result clips, whole takes, and replacement references. Asset maps and cloned records are local. It owns no resource, writer, runtime, or session state. The remaining branches enforce bounded input and identity contracts. Splitting those guards would obscure their first-refusal order.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "381cae4b05d9f4ea7616c27cf0ac47419db7c0b8e95ce1277b12714e6d05d0bf",
+      "signatureHash": "e891bd80fd94729a08e144f94bb93a710f433304dedad107d0eebdda24badbcc"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-conversion.ts",
+      "symbol": "planReviewProjectConversion",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure converter coordinates source admission and one complete project result. Private operations project presentation and recording feedback. The analyzer classifies call arguments containing the domain name document as DOM effects. This function does not access the DOM. It acquires no resources and publishes no state. Additional forwarding helpers would distribute the same admission decision.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "e5f1355442d417045935ea40c175aa96b4339f950b55c5eff716a85438504b94",
+      "signatureHash": "e2e3b56ab90caf823537a5e2676d9deaded169c1214ee983dac642e38581c9c0"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-documents.ts",
+      "symbol": "planReviewProjectDocuments",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure projection converts source and result text through one timeline. Its bounds checks preserve raw fragments and passive comments. It owns no state, resources, effects, or recovery. The analyzer reports one owner and full cohesion. Branch counts reflect the existing document variants. A separate owner would not isolate another contract.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "efe03954ac8b709a9f26e7f0282a66d531ffab67a606288c7edc5ae00c59df97",
+      "signatureHash": "fbf565e6ad0c7653a03b5b2ea3476e9fa1503d70721e8f50fe9ae219f4586904"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-timeline.ts",
+      "symbol": "planReviewProjectTimeline",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure projection converts one retained source clock into linked video and audio clips. It retains cut adjacency and separate source instances. It owns no state, resources, effects, or recovery. The analyzer reports one owner and full cohesion. Its branches preserve source clock and first-refusal invariants. Further forwarding helpers would distribute the same projection.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "df923fbfd5bb9fd29a8be850682821eedbb6de74fd7c44e32c78c47a079ad8ce",
+      "signatureHash": "970d7763f036d204a4df54240e44b9556fbcffe3353aca3bc7d34655431b9c5b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/project/library-source-removal.ts",
+      "symbol": "removeVideoProjectLibrarySources",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This existing pure removal transaction filters one project and admits one reconciled result. Its callbacks use the domain name document. The analyzer incorrectly counts those call arguments as DOM effects. There is no DOM access or durable writer. The candidate retains passive replacement references under the same removal contract. Its score and authority count do not increase.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "afdc6d191f69839a3f4182bb6ef8b2c5df2fe63b824a87206cc598dfdb4f9c60",
+      "signatureHash": "58c03c15049ca1538b319a2ae8e3d3b8e3b4631a64a5e8980feff8d6b566a8d3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/inspector-binding.test.tsx",
+      "symbol": "it callback",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This ordered integration test uses one mounted inspector and one session fixture. Its sceneProbe is disposable test data, not another runtime authority. The candidate checks buffer flush, selected source identity, refusal, and retry through that same fixture. The function has one branch and no nested control flow. Only the test line budget triggers this finding. Splitting it would obscure the ordered interaction proof.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "0d1b2810b86c59da857ff32f8159b8e69ddea09a7b4621c9402a60241e6be2fe",
+      "signatureHash": "4bd833e688236b8c036afdb49f63adf0e750f7446aac250c82600d04b76483fb"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/surface/canvas.tsx",
+      "symbol": "VideoEditorWorkspaceUpper",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: This existing view coordinates one source viewer and material selection. The candidate delegates source voice navigation to an existing pure resolver. It adds no state receiver, resource lifetime, writer, or recovery. Its unchanged score reflects existing UI wiring. One additional signature line exceeds the view line budget. A forwarding component would not isolate another authority.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "c2b08d01c13e5f791964aa8c6a8fe963e8f62c3e5267d47e5bf9418492e786df",
+      "signatureHash": "fef3b232c7fdd60cfe6a04bd98e9a1cb6af50c7c9b3d38387f5668b79ec744c9"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-audio.ts",
+      "symbol": "convertSourceTake",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This private pure codec converts one complete take and its replacement references. The analyzer counts its local structuredClone named take as state authority. That clone does not own session or persisted state. All maps belong to the enclosing conversion result. Its remaining branches enforce source binding and complete document admission. Another owner would divide the same result contract.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new authority or fallback behavior. Remove when the analyzer models this data or pure codec. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "6fcad766dcb46a56c81b6871ca826dab4378294ffb059b75800dbc7ee224a1ea",
+      "signatureHash": "43b860748696be9a6d5e7688f39a89d8c125cab654031faf4e9ca11d611b7c63"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "symbol": "<file>",
+      "owner": "qa:focused-coverage",
+      "reason": "tool-noise: This existing file contains one declarative owner mapping list. The candidate adds five exact mappings for moved consumer proof. It adds no executable state, effects, runtime authority, or fallback selection. The analyzer reports zero owner and state receivers. File length alone exceeds the budget. The same resolver checks every entry and its referenced test files.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new authority or fallback behavior. Remove when the analyzer models this data or pure codec. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "b3f0f5c63d442a31253d37081259aec76cf564346060235808f7e10c36c97138",
+      "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/projects/index.stale-save.test.ts",
+      "symbol": "it.each([\n  'advanced-edit',\n  'missing-workspace',\n  'recreated-workspace',\n  'restored-content',\n  'missing-media',\n  'changed-physical-source',\n  'missing-export-source',\n] as const) callback",
+      "owner": "extension:composition:persistence:projects",
+      "reason": "tool-noise: This test checks one publication transaction with seven source states. The two counted state receivers record writes and transaction scopes in the same fixture. They do not own product state. The three counted owner groups are composition, Vitest, and value validation. Setup, controlled recovery, source change, refusal, and retry prove one ordering invariant. Splitting these steps would separate the assertion from the controlled transaction. Independent architecture review must assess this exact body.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent product state, transaction authority, recovery, or fixture ownership. Remove when the analyzer models test observations and the cohesive transaction proof.",
+      "reviewDate": "2026-10-21",
+      "astHash": "b676d9fb22655437cbfd010c4067fe567a1a0bed9f4cd5482dbd4dd45c6acbb2",
+      "signatureHash": "e31ce2b52bd3c06db72a5b1668106b743d8e54cc12f37c6b462c0f47ccebced7"
     }
   ]
 }

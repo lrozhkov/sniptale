@@ -72,11 +72,61 @@ export function removeVideoProjectLibrarySources(
     ...project,
     assets: project.assets.filter(({ id }) => !removedAssetIds.has(id)),
     clips,
+    ...(project.sourceVoiceoverDocuments
+      ? {
+          sourceVoiceoverDocuments: project.sourceVoiceoverDocuments
+            .filter(
+              ({ binding, take }) =>
+                !removedAssetIds.has(binding.assetId) && !removedAssetIds.has(take.assetId)
+            )
+            .map((document) => {
+              const transcript = document.take.transcript;
+              if (
+                !transcript?.replacements.some((replacement) =>
+                  removedAssetIds.has(replacement.assetId)
+                )
+              )
+                return document;
+              return {
+                ...document,
+                take: {
+                  ...document.take,
+                  transcript: {
+                    ...transcript,
+                    replacements: transcript.replacements.filter(
+                      (replacement) => !removedAssetIds.has(replacement.assetId)
+                    ),
+                  },
+                },
+              };
+            }),
+        }
+      : {}),
     ...(project.sourceAudioDocuments
       ? {
-          sourceAudioDocuments: project.sourceAudioDocuments.filter(
-            ({ binding }) => !removedAssetIds.has(binding.assetId)
-          ),
+          sourceAudioDocuments: project.sourceAudioDocuments
+            .filter(({ binding }) => !removedAssetIds.has(binding.assetId))
+            .map((document) => {
+              const speech = document.speech;
+              if (
+                !speech?.transcript.replacements.some((replacement) =>
+                  removedAssetIds.has(replacement.assetId)
+                )
+              )
+                return document;
+              return {
+                ...document,
+                speech: {
+                  ...speech,
+                  transcript: {
+                    ...speech.transcript,
+                    replacements: speech.transcript.replacements.filter(
+                      (replacement) => !removedAssetIds.has(replacement.assetId)
+                    ),
+                  },
+                },
+              };
+            }),
         }
       : {}),
     ...(project.textDocuments

@@ -1,3 +1,4 @@
+import type { VideoWorkspace } from '../review-workspaces/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
@@ -7,6 +8,8 @@ export interface SaveVideoProjectOptions {
   expectedWorkspaceRevision?: number | null;
   /** Exact canonical predecessor closes restore/recreation races that can retain an old revision. */
   expectedProject?: VideoProject | null;
+  /** Exact selected Gallery predecessor; checked in the destination transaction. */
+  expectedReviewWorkspace?: VideoWorkspace;
   storageClass?: LibraryStorageClass;
 }
 

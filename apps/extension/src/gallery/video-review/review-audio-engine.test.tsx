@@ -3,7 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { readFile } from 'node:fs/promises';
-import { createDefaultEngine, useReviewAudioRuntime } from './use-review-audio-runtime';
+import { useReviewAudioRuntime } from './use-review-audio-runtime';
+import { createReviewAudioEngine } from '../../workflows/video-review/audio-playback-engine';
 import type { QuickEditClipSchedule } from '../../features/video/review/advanced/audio-plan';
 const decoding = vi.hoisted(() => ({
   decode:
@@ -106,7 +107,7 @@ it('builds the default Web Audio engine graph', async () => {
     captureFakeContext((made) => (context = made))
   );
   const element = document.createElement('video');
-  const engine = createDefaultEngine(element);
+  const engine = createReviewAudioEngine(element);
   expect(context.captured).toBe(element);
   engine!.setOriginalGain(2);
   expect(context.gains[0]!.gain.value).toBe(2);
@@ -130,8 +131,8 @@ it('builds the default Web Audio engine graph', async () => {
   expect(context.sources).toHaveLength(1);
   expect(context.sources[0]!.started).toEqual([60, 1, 3]);
   expect(context.sources[0]!.playbackRate.value).toBe(1);
-  expect(context.sources[0]!.destinations[0]).toBe(context.gains[1]);
-  const gain = context.gains[1]!;
+  expect(context.sources[0]!.destinations[0]).toBe(context.gains[2]);
+  const gain = context.gains[2]!;
   expect(gain.gain.points).toEqual([
     ['set', 1, 60],
     ['ramp', 0, 63],
@@ -152,10 +153,10 @@ it('creates a default engine without a captured element', async () => {
     'AudioContext',
     captureFakeContext((made) => (context = made))
   );
-  const engine = createDefaultEngine(null);
+  const engine = createReviewAudioEngine(null);
   expect(context.captured).toBeNull();
   engine!.setOriginalGain(2);
-  expect(context.gains).toHaveLength(0);
+  expect(context.gains).toHaveLength(1);
   const handle = engine!.scheduleClip(
     {
       when: 60,
@@ -175,7 +176,7 @@ it('ignores stop failures from finished clip sources', async () => {
     'AudioContext',
     captureFakeContext((made) => (context = made))
   );
-  const engine = createDefaultEngine(null);
+  const engine = createReviewAudioEngine(null);
   const handle = engine!.scheduleClip(
     {
       when: 60,
@@ -301,7 +302,7 @@ it.each([0.5, 1.25, 2, 4, 16])(
         decoding.decode.mockResolvedValue(voice);
       })
     );
-    const engine = createDefaultEngine(null)!;
+    const engine = createReviewAudioEngine(null)!;
     try {
       const entry = {
         lane: 'voiceover' as const,
@@ -360,7 +361,7 @@ it('cancels native asset decoding when the browser graph is disposed', async () 
         signal.addEventListener('abort', () => reject(signal.reason), { once: true });
       })
   );
-  const engine = createDefaultEngine(null)!;
+  const engine = createReviewAudioEngine(null)!;
   const pending = engine.decode(new ArrayBuffer(0));
   const signal = decoding.decode.mock.calls[0]![1];
   engine.dispose();

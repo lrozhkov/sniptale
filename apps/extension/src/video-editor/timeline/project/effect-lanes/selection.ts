@@ -48,6 +48,7 @@ function getTimelineEffectSelection(
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.MOTION_CONNECTION:
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.CLIP:
     case VideoEditorSelectionKind.TRACK:

@@ -1,3 +1,4 @@
+import { parseReviewOriginalSpeech, type ReviewOriginalSpeech } from '../review/original-speech';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   parseSourceAudioGainRanges,
@@ -14,6 +15,8 @@ export interface VideoProjectSourceAudioDocument {
   binding: { kind: 'source'; assetId: string; sourceInstanceId: string };
   ranges: SourceAudioGainRange[];
   mutes: SourceAudioGainRange[];
+  /** Retained recognition metadata never schedules replacement audio or implicit gain. */
+  speech?: ReviewOriginalSpeech;
 }
 
 function identity(value: unknown): value is string {
@@ -34,7 +37,7 @@ export function parseVideoProjectSourceAudioDocuments(
       !isRecord(raw) ||
       !identity(raw['id']) ||
       ids.has(raw['id']) ||
-      Object.keys(raw).some((key) => !['id', 'binding', 'ranges', 'mutes'].includes(key))
+      Object.keys(raw).some((key) => !['id', 'binding', 'ranges', 'mutes', 'speech'].includes(key))
     )
       return null;
     const binding = raw['binding'];
@@ -51,11 +54,14 @@ export function parseVideoProjectSourceAudioDocuments(
       return null;
     entries += raw['ranges'].length + raw['mutes'].length;
     if (entries > 5_000) return null;
+    const speech =
+      raw['speech'] === undefined ? undefined : parseReviewOriginalSpeech(raw['speech']);
     const ranges = parseSourceAudioGainRanges(raw['ranges']);
     const mutes = parseSourceAudioAttenuationRanges(raw['mutes']);
     if (
       !ranges ||
       !mutes ||
+      speech === null ||
       new Set([...ranges, ...mutes].map((range) => range.id)).size !== ranges.length + mutes.length
     )
       return null;
@@ -70,6 +76,7 @@ export function parseVideoProjectSourceAudioDocuments(
       },
       ranges,
       mutes,
+      ...(speech === undefined ? {} : { speech }),
     });
   }
   return documents;
@@ -90,6 +97,15 @@ export function hasValidVideoProjectSourceAudioReferences(project: VideoProject)
       )
     )
       return false;
+    for (const replacement of document.speech?.transcript.replacements ?? []) {
+      const resource = project.assets.find((item) => item.id === replacement.assetId);
+      if (
+        resource?.type !== 'AUDIO' ||
+        (resource.metadata.duration !== null &&
+          replacement.duration > resource.metadata.duration + 1e-7)
+      )
+        return false;
+    }
     const duration = asset.metadata.duration;
     return (
       duration == null ||

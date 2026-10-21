@@ -111,6 +111,8 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       deleteActionEvent: props.deleteActionEvent,
       deleteCursorSample: props.deleteCursorSample,
       editCommentDocument: vi.fn(),
+      deleteSourceVoiceover: vi.fn(),
+      duplicateSourceVoiceover: vi.fn(() => null),
       deleteEffectInstance: props.deleteEffectInstance ?? vi.fn(),
       deleteMotionRegion: props.deleteMotionRegion,
       deleteObjectTrack: props.deleteObjectTrack,

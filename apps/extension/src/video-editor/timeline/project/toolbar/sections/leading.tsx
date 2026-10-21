@@ -16,6 +16,7 @@ export function ProjectTimelineToolbarLeadingControls({
   historyVisible,
   hasHistory,
   canAddMotionRegion,
+  canDuplicateSelection,
   canDeleteSelectedClip,
   canEditSelectedClip,
   canSplitSelectedClip,
@@ -31,6 +32,7 @@ export function ProjectTimelineToolbarLeadingControls({
   | 'historyVisible'
   | 'hasHistory'
   | 'canAddMotionRegion'
+  | 'canDuplicateSelection'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
@@ -78,6 +80,7 @@ export function ProjectTimelineToolbarLeadingControls({
       <ToolbarSeparator />
       <div className="flex shrink-0 items-center gap-[var(--timeline-control-gap)]">
         <ProjectTimelineClipActions
+          canDuplicateSelection={canDuplicateSelection}
           canDeleteSelectedClip={canDeleteSelectedClip}
           canEditSelectedClip={canEditSelectedClip}
           canSplitSelectedClip={canSplitSelectedClip}

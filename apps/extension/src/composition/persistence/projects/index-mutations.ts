@@ -1,9 +1,11 @@
+import type { SaveVideoProjectOptions } from './index.save-guard';
 import type { VideoProject } from '../../../features/video/project/types';
 import { saveVideoProject } from './index';
 
 export interface CommitVideoProjectMutationOptions {
   baseRevision?: number | null;
   expectedWorkspaceRevision?: number | null;
+  expectedReviewWorkspace?: SaveVideoProjectOptions['expectedReviewWorkspace'];
 }
 
 export interface VideoProjectWorkspaceCommit {
@@ -20,6 +22,9 @@ export async function commitVideoProjectMutation(
     ...(options.expectedWorkspaceRevision === undefined
       ? {}
       : { expectedWorkspaceRevision: options.expectedWorkspaceRevision }),
+    ...(options.expectedReviewWorkspace === undefined
+      ? {}
+      : { expectedReviewWorkspace: options.expectedReviewWorkspace }),
     storageClass: 'library',
   });
   return entry.project;

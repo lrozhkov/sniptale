@@ -1,3 +1,4 @@
+import { InspectSourceVoiceoverPanel } from './inspection/source-voiceover';
 import { EffectPresetEditingProvider } from './effect-instance/editing';
 import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
 import { InspectCommentPanel } from './inspection/comment';
@@ -56,6 +57,13 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.SOURCE_VOICEOVER:
+      return (
+        <InspectSourceVoiceoverPanel
+          project={props.project}
+          documentId={props.selection.documentId}
+        />
+      );
     case VideoEditorSelectionKind.COMMENT:
       return (
         <InspectCommentPanel

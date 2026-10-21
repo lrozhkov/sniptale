@@ -141,6 +141,8 @@ function createPlaybackShortcutHandlers(state: VideoEditorState): PlaybackHandle
     duplicateClip: state.duplicateClip,
     deleteCursorSample: state.deleteCursorSample,
     editCommentDocument: state.editCommentDocument,
+    deleteSourceVoiceover: state.deleteSourceVoiceover,
+    duplicateSourceVoiceover: state.duplicateSourceVoiceover,
     deleteEffectInstance: state.deleteEffectInstance,
     deleteMotionRegion: state.deleteMotionRegion,
     deleteObjectTrack: state.deleteObjectTrack,
