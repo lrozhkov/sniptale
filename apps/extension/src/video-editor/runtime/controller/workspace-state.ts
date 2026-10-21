@@ -441,9 +441,15 @@ export function presentWorkspaceSceneEdgesPreview(
 ): VideoProject {
   if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
     return project;
-  return {
-    ...project,
-    version: project.version >= 24 ? project.version : 24,
-    sceneEdges: preview.settings,
-  };
+  return preview.compositionJoins !== undefined
+    ? {
+        ...project,
+        version: project.version >= 26 ? project.version : 26,
+        compositionJoins: preview.compositionJoins,
+      }
+    : {
+        ...project,
+        version: project.version >= 24 ? project.version : 24,
+        sceneEdges: preview.settings,
+      };
 }

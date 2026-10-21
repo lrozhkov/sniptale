@@ -141,3 +141,43 @@ it('refuses a foreign history lease and preserves the accepted recipe for retry'
   expect(useVideoEditorStore.getState().project!.bookendPresets!.intro.mode).toBe('none');
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
+
+it('authors a future join recipe without changing existing instances or timeline clips', () => {
+  render();
+  click('gallery.videoReview.presentationImage');
+  click('videoEditor.sidebar.bookendChooseImage');
+  click('Card');
+  const project = useVideoEditorStore.getState().project!;
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  act(() =>
+    useVideoEditorStore.getState().setProject({
+      ...project,
+      version: 26,
+      compositionJoins: [
+        {
+          id: 'existing',
+          clipId: clip.id,
+          edge: 'start',
+          transition: { type: 'dissolve', before: 0.1, after: 0.3 },
+        },
+      ],
+    })
+  );
+  const before = useVideoEditorStore.getState();
+  click('gallery.videoReview.cutFadeColor');
+  const after = useVideoEditorStore.getState();
+  expect(after.project!.bookendPresets!.introTransition).toEqual({
+    type: 'fade-black',
+    before: 0.2,
+    after: 0.2,
+  });
+  expect(after.project!.version).toBe(26);
+  expect(after.project!.compositionJoins).toEqual(before.project!.compositionJoins);
+  expect(after.project!.clips).toEqual(before.project!.clips);
+  expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
+  click('gallery.videoReview.transitionNone');
+  expect(useVideoEditorStore.getState().project!.bookendPresets!.introTransition).toBeUndefined();
+  expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
+    before.project!.compositionJoins
+  );
+});

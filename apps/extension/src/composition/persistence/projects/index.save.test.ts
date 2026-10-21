@@ -742,3 +742,42 @@ it.each(['none', 'video'] as const)(
     expect(held).toEqual(before);
   }
 );
+
+it('saves schema26 joins and recipes without changing source data', async () => {
+  const { createVideoProjectEntryWithMediaClip } = await import('./index.test-support');
+  const { createVideoProjectBookendPresets } =
+    await import('../../../features/video/project/scene/bookend-presets');
+  const entry = createVideoProjectEntryWithMediaClip();
+  const project = structuredClone(entry.project);
+  project.version = 26;
+  project.bookendPresets = {
+    ...createVideoProjectBookendPresets(),
+    introTransition: { type: 'dissolve', before: 0.2, after: 0.3 },
+  };
+  project.compositionJoins = [
+    {
+      id: 'saved',
+      clipId: project.clips[0]!.id,
+      edge: 'end',
+      transition: { type: 'fade-black', before: 0.1, after: 0.3, color: '#123456' },
+    },
+  ];
+  const before = structuredClone(project);
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === entry.id ? entry : undefined
+  );
+  await saveVideoProject(project);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({
+        version: 26,
+        compositionJoins: before.compositionJoins,
+        bookendPresets: before.bookendPresets,
+        clips: before.clips,
+        assets: before.assets,
+      }),
+    })
+  );
+  expect(project).toEqual(before);
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+});

@@ -81,8 +81,22 @@ export function createBookendPlacementAction(
                 : { objectTracks: [...project.objectTracks] }),
             };
       if (!composition) return reject('invalid-project');
+      const transition = preset
+        ? side === 'intro'
+          ? project.bookendPresets?.introTransition
+          : project.bookendPresets?.outroTransition
+        : undefined;
       const proposed = retainOwnerEffectCoverage(project, {
         ...composition,
+        compositionJoins: [
+          ...(composition.compositionJoins ?? []),
+          {
+            id: crypto.randomUUID(),
+            clipId: placement.selectedClipId,
+            edge: side === 'intro' ? 'end' : 'start',
+            ...(transition ? { transition } : {}),
+          },
+        ],
         tracks: placement.project.tracks,
         clips: [...composition.clips, ...added],
       });

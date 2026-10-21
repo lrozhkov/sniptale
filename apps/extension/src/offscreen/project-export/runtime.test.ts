@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { getProjectExportWatermarkRenderer } from './runtime';
 // @vitest-environment jsdom
 
@@ -343,4 +344,48 @@ it('keeps one watermark renderer per export job and releases it on cleanup', () 
     'PROJECT_EXPORT_CANCELLED'
   );
   expect(job.watermarkRenderer).toBeUndefined();
+});
+
+it('disposes the composition sampler before revoking its borrowed media URLs and clears ownership', () => {
+  const order: string[] = [];
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {
+    order.push('url');
+  });
+  const project = createEmptyVideoProject();
+  const dispose = vi.fn(() => {
+    order.push('sampler');
+  });
+  const job: ProjectExportRuntimeState = {
+    mediaRecorder: null,
+    clipMediaElements: new Map(),
+    clipAudioNodes: new Map(),
+    audioContext: null,
+    audioDestination: null,
+    exportAudioSettings: null,
+    assetUrls: ['blob:borrowed'],
+    cleanupNode: null,
+    exportAbortController: null,
+    exportStream: null,
+    compositionJoinRenderer: {
+      project,
+      settings: {
+        format: 'MP4',
+        mp4VideoCodec: 'AVC',
+        fps: 30,
+        width: 8,
+        height: 4,
+        quality: 'MEDIUM',
+        resolution: 'SOURCE',
+        downloadAfterExport: false,
+      },
+      clear() {},
+      dispose,
+      async draw() {},
+    },
+  };
+  cleanupJob(job);
+  expect(order).toEqual(['sampler', 'url']);
+  expect(job.compositionJoinRenderer).toBeUndefined();
+  cleanupJob(job);
+  expect(dispose).toHaveBeenCalledOnce();
 });

@@ -341,3 +341,20 @@ it('shares the job spatial renderer between decoded effect capture and final out
   expect(spatialOwner.get).toHaveBeenNthCalledWith(1, args.job, args.signal);
   expect(spatialOwner.get).toHaveBeenNthCalledWith(2, args.job, args.signal);
 });
+
+it('refuses direct decoded acceleration inside an active composition join before decoder acquisition', async () => {
+  const args = createArgs();
+  args.project.duration = 2;
+  args.project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'clip-1',
+      edge: 'end',
+      transition: { type: 'dissolve', before: 0.2, after: 0.2 },
+    },
+  ];
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(false);
+  expect(loadBlobForAssetMock).not.toHaveBeenCalled();
+  expect(getPrimaryVideoTrackMock).not.toHaveBeenCalled();
+  expect(args.videoEncoder.encode).not.toHaveBeenCalled();
+});

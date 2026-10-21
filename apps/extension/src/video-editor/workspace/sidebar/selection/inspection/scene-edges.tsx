@@ -16,6 +16,7 @@ import {
   useVideoEditorHistoryPort,
   useVideoEditorTimelineEditingPort,
 } from '../../../../runtime/controller/store';
+import { SceneJoinFields } from './scene-joins';
 import { SceneBookendFields } from './scene-bookends';
 import { InspectorDetails } from '../shared/details';
 
@@ -76,6 +77,7 @@ export function SceneEdgesFields(props: {
           </InspectorDetails>
         );
       })}
+      <SceneJoinFields project={props.project} runtime={props.runtime} />
       {refused && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('common.errors.actionFailed')}

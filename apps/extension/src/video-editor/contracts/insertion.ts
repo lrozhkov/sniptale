@@ -88,3 +88,8 @@ export type VideoEditorBookendPlacementResult =
 export type VideoEditorBookendPresetUpdateResult =
   | { status: 'updated' | 'unchanged' }
   | Extract<VideoEditorBookendPlacementResult, { status: 'rejected' }>;
+
+/** Whole-composition boundaries use the existing accepted-root/history refusal contract. */
+export type VideoEditorCompositionJoinUpdateResult =
+  | { status: 'updated' | 'unchanged' }
+  | Extract<VideoEditorBookendPlacementResult, { status: 'rejected' }>;

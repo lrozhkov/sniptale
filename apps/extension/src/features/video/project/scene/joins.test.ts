@@ -1,0 +1,225 @@
+import { expect, it } from 'vitest';
+import {
+  createImageClip,
+  createProject,
+  createVideoClip,
+} from '../timeline/project-meta.test.helpers';
+import { applyVideoProjectMutationPatch } from '../mutation';
+import { hydrateVideoProject } from '../hydration';
+import { isExportReadyVideoProject, isHydratableVideoProject } from '../validation/root';
+import { syncProjectDuration } from '../timeline/basics';
+import { removeVideoProjectLibrarySources } from '../library-source-removal';
+import {
+  parseVideoProjectCompositionJoins,
+  reconcileVideoProjectCompositionJoins,
+  resolveVideoProjectCompositionJoinPlans,
+  resolveVideoProjectCompositionJoinEndpoints,
+} from './joins';
+import type { VideoProjectCompositionJoin } from './joins-types';
+
+const transition = { type: 'dissolve' as const, before: 0.4, after: 0.4 };
+function fixture() {
+  const project = createProject([
+    createImageClip({ id: 'intro', startTime: 0, duration: 1 }),
+    createVideoClip({ id: 'main', startTime: 1, duration: 0.2, sourceDuration: 0.2 }),
+    createImageClip({ id: 'outro', startTime: 1.2, duration: 1 }),
+  ]);
+  project.duration = 2.2;
+  const compositionJoins: VideoProjectCompositionJoin[] = [
+    { id: 'intro-join', clipId: 'intro', edge: 'end', transition: { ...transition } },
+    { id: 'outro-join', clipId: 'outro', edge: 'start', transition: { ...transition } },
+  ];
+  return applyVideoProjectMutationPatch(project, { compositionJoins });
+}
+
+it('admits exact bounded anchors and remembered None without rewriting reads or older roots', () => {
+  const project = fixture();
+  expect(project.version).toBe(26);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(parseVideoProjectCompositionJoins(project.compositionJoins)).toEqual(
+    project.compositionJoins
+  );
+  expect(hydrateVideoProject(project).compositionJoins).toEqual(project.compositionJoins);
+  const none = {
+    ...project,
+    compositionJoins: project.compositionJoins!.map(({ transition: _settings, ...entry }) => entry),
+  };
+  expect(isExportReadyVideoProject(none)).toBe(true);
+  expect(resolveVideoProjectCompositionJoinPlans(none)).toEqual([]);
+  expect(isHydratableVideoProject({ ...project, version: 25 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject(createProject([]))).toBe(true);
+  const cleared = { ...project };
+  delete cleared.compositionJoins;
+  expect(applyVideoProjectMutationPatch(cleared, {}).version).toBe(26);
+});
+
+it('refuses malformed or duplicate anchors while retaining shape-only recovery for missing references', () => {
+  const project = fixture();
+  const entry = project.compositionJoins![0]!;
+  for (const value of [
+    null,
+    {},
+    [null],
+    [{ ...entry, extra: true }],
+    [{ ...entry, edge: 'middle' }],
+    [{ ...entry, clipId: '' }],
+    [{ ...entry, transition: { ...transition, extra: true } }],
+    [entry, entry],
+    [entry, { ...entry, id: 'duplicate-edge' }],
+    Array.from({ length: 129 }, (_, n) => ({ ...entry, id: String(n), clipId: String(n) })),
+  ]) {
+    expect(parseVideoProjectCompositionJoins(value)).toBeNull();
+  }
+  const missing = { ...project, compositionJoins: [{ ...entry, clipId: 'missing' }] };
+  expect(isHydratableVideoProject(missing)).toBe(true);
+  expect(isExportReadyVideoProject(missing)).toBe(false);
+  expect(() => resolveVideoProjectCompositionJoinPlans(missing)).toThrow(
+    'Missing composition join anchor'
+  );
+  expect(
+    parseVideoProjectCompositionJoins([
+      { ...entry, transition: { type: 'fade-black', before: 0, after: 0.2, color: '#abcdef' } },
+    ])
+  ).not.toBeNull();
+});
+
+it('fits both joins proportionally without changing montage duration, sources or authored settings', () => {
+  const project = fixture();
+  const before = structuredClone(project);
+  const plans = resolveVideoProjectCompositionJoinPlans(project);
+  expect(plans).toHaveLength(2);
+  expect(plans[0]).toMatchObject({ seam: 1, before: 0.4, outgoingStart: 0, incomingEnd: 1.2 });
+  expect(resolveVideoProjectCompositionJoinEndpoints(plans[0]!, 30)).toEqual({
+    outgoingTime: 29 / 30,
+    incomingTime: 1,
+  });
+  expect(plans[0]!.after).toBeCloseTo(0.1, 12);
+  expect(plans[1]!.before).toBeCloseTo(0.1, 12);
+  expect(project).toEqual(before);
+  const { transition: _disabled, ...boundary } = project.compositionJoins![1]!;
+  project.compositionJoins![1] = boundary;
+  expect(resolveVideoProjectCompositionJoinPlans(project)[0]!.after).toBeCloseTo(0.2, 12);
+});
+
+it('keeps blank main heads and project-text tails instead of selecting a neighbouring video track', () => {
+  const project = fixture();
+  project.clips = project.clips
+    .filter(({ id }) => id !== 'outro')
+    .map((clip) => (clip.id === 'main' ? { ...clip, startTime: 5 } : clip));
+  project.compositionJoins = [project.compositionJoins![0]!];
+  project.textDocuments = [
+    {
+      id: 'script',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'text-tail',
+            text: 'Tail',
+            originalText: 'Tail',
+            start: 6,
+            end: 8,
+            revision: 0,
+            timingRevision: 0,
+            alignment: 'manual',
+            timeDomain: 'result',
+            showInVideo: true,
+            words: [],
+          },
+        ],
+      },
+    },
+  ];
+  const next = syncProjectDuration(project);
+  expect(next.duration).toBe(8);
+  expect(resolveVideoProjectCompositionJoinPlans(next)[0]).toMatchObject({
+    seam: 1,
+    incomingEnd: 8,
+    after: 0.4,
+  });
+  expect(next.clips.find(({ id }) => id === 'main')!.startTime).toBe(5);
+});
+
+it('follows split, trim, rate and free movement and never redirects a removed endpoint', () => {
+  const project = fixture();
+  const original = project.clips[0]!;
+  const split = {
+    ...project,
+    clips: [
+      { ...original, duration: 0.5 },
+      { ...original, id: 'intro-tail', startTime: 0.5, duration: 0.5 },
+      ...project.clips.slice(1),
+    ],
+  };
+  const next = reconcileVideoProjectCompositionJoins(split, new Map([['intro', 'intro-tail']]));
+  expect(next.compositionJoins![0]!.clipId).toBe('intro-tail');
+  expect(resolveVideoProjectCompositionJoinPlans(next)[0]!.seam).toBe(1);
+  const moved = {
+    ...next,
+    clips: next.clips.map((clip) =>
+      clip.id === 'intro-tail' ? { ...clip, startTime: 0.6, duration: 0.25 } : clip
+    ),
+  };
+  expect(resolveVideoProjectCompositionJoinPlans(moved)[0]!.seam).toBe(0.85);
+  const deleted = reconcileVideoProjectCompositionJoins({
+    ...moved,
+    clips: moved.clips.filter(({ id }) => id !== 'intro-tail'),
+  });
+  expect(deleted.compositionJoins!.map(({ id }) => id)).toEqual(['outro-join']);
+  expect(reconcileVideoProjectCompositionJoins(project)).toBe(project);
+  const copied = { ...project, id: 'independent-project-copy' };
+  expect(copied.compositionJoins).toBe(project.compositionJoins);
+});
+
+it.each([0.5, 1, 24, 30_000 / 1001, 60_000 / 1001, 240])(
+  'selects actual output cadence endpoints at %s fps, including sparse access',
+  (fps) => {
+    const project = fixture();
+    project.clips = project.clips.filter(({ id }) => id !== 'outro');
+    project.compositionJoins = [project.compositionJoins![0]!];
+    project.duration = 8;
+    const timing = resolveVideoProjectCompositionJoinPlans(project)[0]!;
+    const plan = { ...timing, ...resolveVideoProjectCompositionJoinEndpoints(timing, fps) };
+    expect(plan.outgoingTime).toBeLessThan(plan.seam);
+    expect(plan.incomingTime).toBeGreaterThanOrEqual(plan.seam);
+    expect((plan.outgoingTime * Math.max(1, fps)) % 1).toBeCloseTo(0, 10);
+    expect(plan.incomingTime - plan.outgoingTime).toBeCloseTo(1 / Math.max(1, fps), 12);
+  }
+);
+
+it('refuses nonrepresentable dissolve or collapsed active regions without a hard-cut substitute', () => {
+  const project = fixture();
+  const sparse = {
+    ...project,
+    clips: project.clips.map((clip) => (clip.id === 'intro' ? { ...clip, duration: 1.1 } : clip)),
+  };
+  const timing = resolveVideoProjectCompositionJoinPlans(sparse)[0]!;
+  expect(() => resolveVideoProjectCompositionJoinEndpoints(timing, 1)).toThrow('no output frame');
+  expect(() => resolveVideoProjectCompositionJoinEndpoints(timing, NaN)).toThrow('frame rate');
+  const outro = project.clips.find(({ id }) => id === 'outro')!;
+  const collapsed = {
+    ...project,
+    clips: project.clips.map((clip) => (clip.id === 'outro' ? { ...outro, startTime: 1 } : clip)),
+  };
+  expect(() => resolveVideoProjectCompositionJoinPlans(collapsed)).toThrow('collapsed');
+  const edgeOnly = { ...project, duration: 1, compositionJoins: [project.compositionJoins![0]!] };
+  expect(resolveVideoProjectCompositionJoinPlans(edgeOnly)).toEqual([]);
+});
+
+it('confirmed source purge removes only exact clip anchors and keeps remembered transition recipes', () => {
+  const project = fixture();
+  const presets = {
+    intro: { mode: 'none' as const },
+    outro: { mode: 'none' as const },
+    introTransition: { ...transition },
+  };
+  project.bookendPresets = presets;
+  const next = removeVideoProjectLibrarySources(project, [
+    project.assets.find(({ id }) => id === 'asset-video')!.source,
+  ]);
+  expect(next.compositionJoins).toEqual([]);
+  expect(next.bookendPresets?.introTransition).toEqual(transition);
+  expect(project.compositionJoins).toHaveLength(2);
+});

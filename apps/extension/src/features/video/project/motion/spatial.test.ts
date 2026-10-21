@@ -41,7 +41,7 @@ it('fences authored spatial settings at schema nineteen and retains them through
           ],
         })
       ).toBe(false);
-  expect(isHydratableVideoProject({ ...candidate, version: 26 })).toBe(false);
+  expect(isHydratableVideoProject({ ...candidate, version: 27 })).toBe(false);
   expect(applyVideoProjectMutationPatch(candidate, { motionRegions: [] }).version).toBe(19);
   const legacy = hydrateVideoProject(project);
   expect(legacy.version).toBe(project.version);

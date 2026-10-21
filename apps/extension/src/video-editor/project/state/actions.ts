@@ -1,3 +1,4 @@
+import { createCompositionJoinUpdateAction } from './joins';
 import { createBookendPresetUpdateAction } from './bookend-presets';
 import { createVideoEditorProjectCommentActions } from './comments';
 import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
@@ -48,6 +49,7 @@ type VideoEditorProjectActionKeys =
   | 'appendMaterial'
   | 'placeBookendMaterial'
   | 'updateBookendPresets'
+  | 'updateCompositionJoins'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'addAnnotationOverlay'
@@ -145,6 +147,7 @@ export function createVideoEditorProjectActions(
 
   return {
     updateBookendPresets: createBookendPresetUpdateAction(set),
+    updateCompositionJoins: createCompositionJoinUpdateAction(set),
     ...createVideoEditorProjectCommentActions(set),
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),

@@ -4,12 +4,13 @@ const mocks = vi.hoisted(() => ({
   dispose: vi.fn(),
   renderFrame: vi.fn(async (_time: number, _signal: AbortSignal) => ({})),
   measure: vi.fn(),
+  create: vi.fn(),
 }));
 vi.mock('../preview/cache/materializer', () => ({
-  createVideoPreviewFrameMaterializer: () => ({
-    dispose: mocks.dispose,
-    renderFrame: mocks.renderFrame,
-  }),
+  createVideoPreviewFrameMaterializer: (args: unknown) => {
+    mocks.create(args);
+    return { dispose: mocks.dispose, renderFrame: mocks.renderFrame };
+  },
 }));
 vi.mock('../../workflows/video/export-size', () => ({ measureVideoExportSize: mocks.measure }));
 import { estimateProjectExportSize } from './estimate-size';
@@ -32,7 +33,13 @@ it('samples the selected output range at final dimensions and disposes its isola
     await args.render(async () => undefined);
     return { bytes: 100, lowerBytes: 75, upperBytes: 135, sampledSeconds: 2 };
   });
-  const project = { ...createEmptyVideoProject(), duration: 10, width: 1904, height: 1064 };
+  const project = {
+    ...createEmptyVideoProject(),
+    fps: 24,
+    duration: 10,
+    width: 1904,
+    height: 1064,
+  };
   await estimateProjectExportSize({
     project,
     assetUrls: {},
@@ -51,6 +58,8 @@ it('samples the selected output range at final dimensions and disposes its isola
     },
     signal: new AbortController().signal,
   });
+  expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ sampleFps: 30 }));
+  expect(project.fps).toBe(24);
   expect(mocks.renderFrame).toHaveBeenCalledTimes(45);
   expect(mocks.renderFrame.mock.calls[0]?.[0]).toBe(3);
   expect(mocks.dispose).toHaveBeenCalledOnce();

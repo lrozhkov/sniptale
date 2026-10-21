@@ -60,6 +60,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     appendMaterial: state.appendMaterial,
     placeBookendMaterial: state.placeBookendMaterial,
     updateBookendPresets: state.updateBookendPresets,
+    updateCompositionJoins: state.updateCompositionJoins,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,
     addAssetClip: state.addAssetClip,

@@ -1,3 +1,4 @@
+import type { ProjectExportCompositionJoinRenderer } from './composition-joins';
 import type { VideoProjectWatermarkRenderer } from '../../features/video/composition/canvas/project-watermark';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../features/video/project/export/time-estimate';
@@ -6,6 +7,7 @@ import { type ClipAudioNode } from './media';
 import type { VideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
 
 export interface ProjectExportRuntimeState {
+  compositionJoinRenderer?: ProjectExportCompositionJoinRenderer;
   cameraSpatialRenderer?: ReviewSpatialRenderer;
   captionRenderer?: VideoProjectCaptionRenderer;
   watermarkRenderer?: VideoProjectWatermarkRenderer;

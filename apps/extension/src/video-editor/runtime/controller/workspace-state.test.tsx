@@ -730,3 +730,28 @@ it('presents scene edges only for the accepted scene snapshot without mutating h
   expect(project.sceneEdges).toBeUndefined();
   expect(project.version).toBe(2);
 });
+
+it('presents a composition join draft through the existing accepted-scene preview owner without persistence', () => {
+  const project = createEmptyVideoProject('Join gesture');
+  const compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'intro',
+      edge: 'end' as const,
+      transition: { type: 'dissolve' as const, before: 0.2, after: 0.2 },
+    },
+  ];
+  const preview = { project, compositionJoins };
+  const presented = presentWorkspaceSceneEdgesPreview(project, { kind: 'scene' }, preview);
+  expect(presented.compositionJoins).toBe(compositionJoins);
+  expect(presented.version).toBe(26);
+  expect(presented.sceneEdges).toBeUndefined();
+  expect(project.compositionJoins).toBeUndefined();
+  expect(project.version).toBe(2);
+  expect(presentWorkspaceSceneEdgesPreview(project, { kind: 'scene' }, null)).toBe(project);
+  expect(
+    presentWorkspaceSceneEdgesPreview(project, { kind: 'clip', clipId: 'intro' }, preview)
+  ).toBe(project);
+  const restored = structuredClone(project);
+  expect(presentWorkspaceSceneEdgesPreview(restored, { kind: 'scene' }, preview)).toBe(restored);
+});

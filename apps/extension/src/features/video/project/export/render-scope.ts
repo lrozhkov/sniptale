@@ -28,6 +28,7 @@ export function resolveProjectRenderScope(
   return {
     ...project,
     clips: scope.clips,
+    ...(project.compositionJoins ? { compositionJoins: [] } : {}),
     ...(project.transitions ? { transitions: scope.transitions } : {}),
     ...(project.effectInstances ? { effectInstances: scope.effectInstances } : {}),
     ...(project.effectSnapshots ? { effectSnapshots: scope.effectSnapshots } : {}),

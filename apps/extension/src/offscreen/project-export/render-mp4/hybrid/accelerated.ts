@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { isMimeTypeCompatibleWithFormat } from '../../persistence';
 import {
   getAssetById,
@@ -69,6 +70,12 @@ export function createAcceleratedCompositeSpan(
   start: number,
   end: number
 ): Mp4VideoRenderSpan | null {
+  if (
+    resolveVideoProjectCompositionJoinPlans(project).some(
+      (plan) => start < plan.seam + plan.after && end > plan.seam - plan.before
+    )
+  )
+    return null;
   let hasVideoClip = false;
   for (const time of getSampleTimes(start, end)) {
     const clips = getVisibleVideoClipsAtTime(project, time);

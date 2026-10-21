@@ -1,3 +1,4 @@
+import { reconcileVideoProjectCompositionJoins } from '../scene/joins';
 import {
   VideoClipLinkMode,
   type VideoProject,
@@ -56,7 +57,9 @@ export function calculateProjectDuration(project: VideoProject): number {
 }
 
 export function syncProjectDuration(project: VideoProject): VideoProject {
-  const nextProject = reconcileVideoProjectEffectInstances(syncProjectTransitions(project));
+  const nextProject = reconcileVideoProjectEffectInstances(
+    syncProjectTransitions(reconcileVideoProjectCompositionJoins(project))
+  );
 
   return applyVideoProjectMutationPatch(nextProject, {
     duration: calculateProjectDuration(nextProject),

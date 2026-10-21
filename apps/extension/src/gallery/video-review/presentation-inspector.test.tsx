@@ -407,8 +407,8 @@ it('configures and removes a join independently of the opposite edge and media',
   props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.3 };
   await render();
   async function choose(option: string) {
-    act(() => button('Transition to video', section()).click());
-    const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    const group = section().querySelector('[role="group"][aria-label="Transition to video"]')!;
+    const node = [...group.querySelectorAll<HTMLButtonElement>('button')].find(
       (item) => item.textContent === option
     )!;
     await act(async () => node.click());

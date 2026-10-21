@@ -2,17 +2,17 @@ import { PresentationMediaFields } from '../../ui/presentation-media-fields';
 import { PresentationFadeFields } from '../../ui/presentation-fade-fields';
 import { FolderOpen, Library, LogIn, LogOut, Play, RotateCcw } from 'lucide-react';
 import { backgroundActionClassName } from '../../composition/background-resources/picker';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   parseQuickEditPresentationSettings,
   presentationEdgeControl,
   type PresentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
-import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
-import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
+import { PresentationJoinFields } from '../../ui/presentation-join-fields';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
 type Settings = QuickEditPresentationSettings;
@@ -62,59 +62,6 @@ export function ReviewPresentationInspector(props: ReviewPresentationInspectorPr
       </div>
     </fieldset>
   );
-}
-
-function NumberField(
-  props: Pick<ReviewPresentationInspectorProps, 'onChange' | 'onPreview'> & {
-    label: string;
-    value: number;
-    min: number;
-    max: number;
-    scrubMax?: number;
-    scrubMin?: number;
-    step: number;
-    unit?: 's' | '%';
-    patch(value: number): Settings;
-  }
-) {
-  const [invalid, setInvalid] = useState(false);
-  useEffect(() => setInvalid(false), [props.value]);
-  const proposal = (value: number) => parseQuickEditPresentationSettings(props.patch(value));
-  return (
-    <div>
-      <ReviewPreviewNumberRow
-        label={props.label}
-        value={props.value}
-        min={props.min}
-        max={props.max}
-        {...(props.scrubMax === undefined ? {} : { scrubMax: props.scrubMax })}
-        {...(props.scrubMin === undefined ? {} : { scrubMin: props.scrubMin })}
-        step={props.step}
-        {...(props.unit === undefined ? {} : { unit: props.unit })}
-        precision={props.step === 0.001 ? Math.max(3, decimalPrecision(props.value)) : 2}
-        onChange={(value) => {
-          const next = proposal(value);
-          setInvalid(next === null);
-          if (next) props.onChange(next);
-        }}
-        onPreview={(value) => {
-          const next = value === null ? null : proposal(value);
-          setInvalid(value !== null && next === null);
-          props.onPreview(next);
-        }}
-      />
-      {invalid && (
-        <p role="alert" className="text-xs">
-          {label('presentationTrimInvalid')}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function decimalPrecision(value: number) {
-  const [mantissa = '', exponent = '0'] = value.toString().split('e');
-  return Math.min(100, Math.max(0, (mantissa.split('.')[1]?.length ?? 0) - Number(exponent)));
 }
 
 function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
@@ -336,103 +283,37 @@ function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }
     else delete next[key];
     return next;
   };
+  const accept = (value: NonNullable<Settings[typeof key]> | null, preview: boolean) => {
+    const next =
+      value === null && preview ? null : parseQuickEditPresentationSettings(patch(value));
+    if (preview) props.onPreview(next);
+    else if (next) props.onChange(next);
+  };
   return (
-    <div className="min-w-0 space-y-1">
-      <SelectField<'none' | 'dissolve' | 'fade-black'>
-        className={reviewSelectFieldClassName}
-        label={label(props.slot === 'intro' ? 'presentationJoinIntro' : 'presentationJoinOutro')}
-        value={transition?.type ?? 'none'}
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.transitionNone') },
-          { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-          { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
-        ]}
-        onChange={(type) =>
-          props.onChange(
-            patch(
-              type === 'none'
-                ? null
-                : {
-                    before: 0.2,
-                    after: 0.2,
-                    ...transition,
-                    type,
-                  }
-            )
-          )
-        }
-      />
-      {transition && (
-        <>
-          {transition.type === 'fade-black' && (
-            <ColorField
-              className={reviewSelectFieldClassName}
-              label={translate('gallery.videoReview.cutTransitionColor')}
-              title={translate('gallery.videoReview.cutTransitionColor')}
-              value={transition.color ?? '#000000'}
-              allowAlpha={false}
-              allowTransparent={false}
-              onChange={(color) => props.onChange(patch({ ...transition, color }))}
-              onPreviewChange={(color) =>
-                props.onPreview(color ? patch({ ...transition, color }) : null)
-              }
-            />
+    <PresentationJoinFields
+      label={label(props.slot === 'intro' ? 'presentationJoinIntro' : 'presentationJoinOutro')}
+      value={transition}
+      timing={timing}
+      colorClassName={reviewSelectFieldClassName}
+      Details={ReviewDetails}
+      preferenceId={`presentation.${props.slot}`}
+      onChange={(value) => accept(value, false)}
+      onPreview={(value) => accept(value, true)}
+    >
+      <ReviewButton
+        label={label(
+          props.slot === 'intro' ? 'presentationPreviewJoinIntro' : 'presentationPreviewJoinOutro'
+        )}
+        disabled={props.previewDisabled || !props.onJoinPreview}
+        onClick={() => props.onJoinPreview?.(props.slot, 'join')}
+      >
+        <Play size={14} aria-hidden="true" />
+        <span>
+          {label(
+            props.slot === 'intro' ? 'presentationPreviewJoinIntro' : 'presentationPreviewJoinOutro'
           )}
-          <NumberField
-            {...props}
-            label={label('presentationDuration')}
-            value={timing!.before + timing!.after}
-            min={0.05}
-            max={60}
-            scrubMax={3}
-            step={0.05}
-            unit="s"
-            patch={(total) => {
-              const ratio = timing!.before / (timing!.before + timing!.after);
-              return patch({ ...transition, before: total * ratio, after: total * (1 - ratio) });
-            }}
-          />
-          <ReviewButton
-            label={label(
-              props.slot === 'intro'
-                ? 'presentationPreviewJoinIntro'
-                : 'presentationPreviewJoinOutro'
-            )}
-            disabled={props.previewDisabled || !props.onJoinPreview}
-            onClick={() => props.onJoinPreview?.(props.slot, 'join')}
-          >
-            <Play size={14} aria-hidden="true" />
-            <span>
-              {label(
-                props.slot === 'intro'
-                  ? 'presentationPreviewJoinIntro'
-                  : 'presentationPreviewJoinOutro'
-              )}
-            </span>
-          </ReviewButton>
-          <ReviewDetails
-            label={label('presentationJoinTiming')}
-            preferenceId={`presentation.${props.slot}.joinTiming`}
-          >
-            {(['before', 'after'] as const).map((edge) => (
-              <NumberField
-                {...props}
-                key={edge}
-                label={label(
-                  edge === 'before' ? 'presentationJoinBefore' : 'presentationJoinAfter'
-                )}
-                value={timing![edge]}
-                min={transition[edge === 'before' ? 'after' : 'before'] === 0 ? 0.05 : 0}
-                max={60 - transition[edge === 'before' ? 'after' : 'before']}
-                scrubMax={Math.min(3, 60 - transition[edge === 'before' ? 'after' : 'before'])}
-                step={0.05}
-                unit="s"
-                patch={(value) => patch({ ...transition, [edge]: value })}
-              />
-            ))}
-          </ReviewDetails>
-        </>
-      )}
-    </div>
+        </span>
+      </ReviewButton>
+    </PresentationJoinFields>
   );
 }

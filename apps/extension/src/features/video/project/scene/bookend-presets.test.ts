@@ -66,7 +66,7 @@ describe('retained Native bookend recipes', () => {
     delete cleared.bookendPresets;
     expect(applyVideoProjectMutationPatch(cleared, {}).version).toBe(25);
     expect(isHydratableVideoProject({ ...changed, version: 24 })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 26 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
   });
 
   it('protects all four remembered references even in None mode and with no visible clips', () => {
@@ -141,4 +141,26 @@ describe('retained Native bookend recipes', () => {
     expect(isHydratableVideoProject(removed)).toBe(true);
     expect(changed.bookendPresets).toEqual(presets);
   });
+});
+
+it('admits shared transition recipes only in schema26 and keeps independent inactive settings on read', () => {
+  const { project, presets } = fixture();
+  const configured = {
+    ...presets,
+    introTransition: { type: 'dissolve' as const, before: 0.2, after: 0.3 },
+    outroTransition: { type: 'fade-black' as const, before: 0.3, after: 0, color: '#abcdef' },
+  };
+  const next = applyVideoProjectMutationPatch(project, { bookendPresets: configured });
+  expect(next.version).toBe(26);
+  expect(isHydratableVideoProject(next)).toBe(true);
+  expect(isHydratableVideoProject({ ...next, version: 25 })).toBe(false);
+  expect(parseVideoProjectBookendPresets(next.bookendPresets)).toEqual(configured);
+  expect(hydrateVideoProject(next).bookendPresets).toEqual(configured);
+  expect(
+    parseVideoProjectBookendPresets({
+      ...configured,
+      introTransition: { ...configured.introTransition, extra: true },
+    })
+  ).toBeNull();
+  expect(project.bookendPresets).toBeUndefined();
 });

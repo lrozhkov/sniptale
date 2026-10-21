@@ -1,9 +1,6 @@
+import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 import { useRef, useState } from 'react';
-import type {
-  ReviewAnchor,
-  ReviewEdit,
-  ReviewCutTransition,
-} from '../../features/video/review/types';
+import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
   createReviewCut,
   createReviewSpeed,
@@ -127,7 +124,7 @@ export function useReviewEdits(props: {
         ? props.commit(selected, { ...selected, audio: value })
         : undefined,
     selected,
-    changeSelectedTransition: (transition: ReviewCutTransition | null) => {
+    changeSelectedTransition: (transition: CompositionJoinSettings | null) => {
       if (selected?.kind !== 'cut') return undefined;
       props.pause();
       const cut = { ...selected };

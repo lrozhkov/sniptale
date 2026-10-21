@@ -1,3 +1,4 @@
+import { reconcileVideoProjectCompositionJoins } from './scene/joins';
 import { removeVideoProjectBookendSources } from './scene/bookend-presets';
 import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject, VideoProjectAssetSource } from './types';
@@ -121,7 +122,10 @@ export function removeVideoProjectLibrarySources(
       ? { motionRegions: removeSourceMotionRegions(project, removedClipIds, eventIds) }
       : {}),
   };
-  const reconciled = { ...next, ...reconcileVideoProjectInteractionSources(project, next) };
+  const reconciled = reconcileVideoProjectCompositionJoins({
+    ...next,
+    ...reconcileVideoProjectInteractionSources(project, next),
+  });
   assertExportReadyVideoProject(reconciled);
   return reconciled;
 }

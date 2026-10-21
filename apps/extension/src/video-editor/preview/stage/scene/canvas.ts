@@ -35,6 +35,7 @@ function syncCanvasResolution(
   return dpr;
 }
 
+/** Measures the existing preview viewport without changing the presented canvas. */
 function resolvePreviewSceneMetrics(
   canvas: HTMLCanvasElement,
   project: VideoProject,
@@ -217,4 +218,100 @@ export function beginPreviewCameraPass(
     -camera.viewportX * prepared.viewport.scale,
     -camera.viewportY * prepared.viewport.scale
   );
+}
+
+/** Publishes a finished transaction canvas after asynchronous preparation succeeds. */
+export function publishCompletedPreviewFrame(
+  presented: HTMLCanvasElement,
+  staging: HTMLCanvasElement
+): void {
+  const context = presented.getContext('2d');
+  if (!context) throw new Error('Preview frame context is unavailable.');
+  if (presented.width !== staging.width) presented.width = staging.width;
+  if (presented.height !== staging.height) presented.height = staging.height;
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'copy';
+    context.filter = 'none';
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetX = 0;
+    context.shadowOffsetY = 0;
+    context.drawImage(staging, 0, 0);
+  } finally {
+    context.restore();
+  }
+}
+
+type CompletedCompositionPresentation = Pick<
+  Parameters<typeof resolvePreparedPreviewSceneCanvas>[0],
+  'imageBank' | 'project' | 'stage' | 'previewRasterSize'
+> & {
+  canvas: HTMLCanvasElement;
+  currentTime: number;
+  stagingCanvas?: () => HTMLCanvasElement;
+  signal?: AbortSignal;
+};
+
+/** Uses the canonical contained viewport to select the completed-composition sample size. */
+export function resolvePreviewCompositionFrameSize(
+  input: Pick<
+    CompletedCompositionPresentation,
+    'canvas' | 'project' | 'stage' | 'previewRasterSize'
+  >
+) {
+  const { viewport } = resolvePreviewSceneMetrics(input.canvas, input.project, input.stage);
+  const dpr = input.canvas.ownerDocument.defaultView?.devicePixelRatio || 1;
+  const size = input.previewRasterSize ?? {
+    width: Math.round(viewport.width * dpr),
+    height: Math.round(viewport.height * dpr),
+  };
+  return size.width > 0 && size.height > 0 && viewport.width > 0 && viewport.height > 0
+    ? size
+    : null;
+}
+
+/** Publishes one completed composition through the existing viewport and transaction canvas. */
+export function publishPreviewCompositionFrame(
+  input: CompletedCompositionPresentation,
+  frame: CanvasImageSource
+) {
+  const owned = !input.stagingCanvas;
+  const staging = input.stagingCanvas?.() ?? input.canvas.ownerDocument.createElement('canvas');
+  if (staging === input.canvas || staging.ownerDocument !== input.canvas.ownerDocument)
+    throw new Error('Preview frame canvas is unavailable.');
+  try {
+    const prepared = resolvePreparedPreviewSceneCanvas({
+      canvas: staging,
+      viewportCanvas: input.canvas,
+      imageBank: input.imageBank,
+      project: input.project,
+      ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
+      shouldClearCanvas: true,
+      stage: input.stage,
+      currentTime: input.currentTime,
+    });
+    if (!prepared) return false;
+    beginPreviewViewportClip(prepared);
+    try {
+      const context = prepared.context;
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = 'copy';
+      context.filter = 'none';
+      context.shadowColor = 'transparent';
+      context.shadowBlur = context.shadowOffsetX = context.shadowOffsetY = 0;
+      context.drawImage(frame, 0, 0, prepared.viewport.width, prepared.viewport.height);
+    } finally {
+      prepared.context.restore();
+    }
+    input.signal?.throwIfAborted();
+    publishCompletedPreviewFrame(input.canvas, staging);
+  } finally {
+    if (owned) {
+      staging.width = 0;
+      staging.height = 0;
+    }
+  }
 }

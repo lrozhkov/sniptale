@@ -1,3 +1,5 @@
+import { isExportReadyVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
+import { createQuickEditWatermark } from '../../../../apps/extension/src/features/video/project/scene/watermark';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
@@ -43,132 +45,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
-      const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
-      const project = createVideoProjectFromRecording({
-        recordingId: 'beta-v1-recording',
-        filename: 'beta-v1.webm',
-        width: 640,
-        height: 360,
-        duration: 12,
-        mimeType: 'video/webm',
-        size: bytes.length,
-        hasAudio: true,
-      });
-      project.version = 24;
-      project.sceneBackground = { kind: 'solid', color: '#0000ffff' };
-      project.duration = 1.2;
-      project.clips.forEach((clip) => {
-        clip.duration = 1.2;
-        if (clip.type === 'VIDEO' || clip.type === 'AUDIO') clip.sourceDuration = 1.2;
-      });
-      const leading = project.clips.find((clip) => clip.type === 'VIDEO')!;
-      if (leading.type !== 'VIDEO') throw new Error('Expected video');
-      leading.duration = leading.sourceDuration = 0.8;
-      const trailing = { ...leading, id: 'trailing', startTime: 0.4, sourceStart: 0.4 };
-      project.clips.push(trailing);
-      project.transitions = [
-        {
-          id: 'join',
-          leadingClipId: leading.id,
-          trailingClipId: trailing.id,
-          kind: 'CROSSFADE',
-          duration: 0.4,
-          easing: 'LINEAR',
-        },
-      ];
-      const track = createVideoProjectTrack('Upper composition', -1, 'PRIMARY');
-      const shape = createShapeClip(track.id, 640, 360, 0, 'RECTANGLE');
-      shape.duration = 1.2;
-      shape.transform = { x: 0, y: 0, width: 640, height: 360, opacity: 1, rotation: 0 };
-      shape.style = {
-        fillColor: '#00ff00ff',
-        strokeColor: '#00ff00ff',
-        strokeWidth: 0,
-        borderRadius: 0,
-      };
-      project.tracks.push(track);
-      project.clips.push(shape);
-      project.motionRegions = [{ ...createVideoProjectMotionRegion(project, 0.2), duration: 0.4 }];
-      project.textDocuments = [
-        {
-          id: 'script',
-          binding: { kind: 'project' },
-          document: {
-            version: 1,
-            fragments: [
-              {
-                id: 'phrase',
-                originalText: 'Main',
-                text: 'Main',
-                start: 0.2,
-                end: 0.6,
-                revision: 0,
-                timingRevision: 0,
-                alignment: 'range',
-                timeDomain: 'result',
-                showInVideo: false,
-              },
-            ],
-          },
-        },
-      ];
-      project.commentDocuments = [
-        {
-          id: 'notes',
-          binding: { kind: 'project' },
-          annotations: [{ id: 'note', text: 'Main note', anchor: { kind: 'point', time: 0.4 } }],
-          canvasComments: [],
-        },
-      ];
-      const sourceMaterial = project.assets[0]!;
-      for (let materialIndex = 0; materialIndex < 12; materialIndex++) {
-        project.assets.push({
-          ...sourceMaterial,
-          id: `unused-material-${materialIndex}`,
-          name: `Source ${materialIndex + 1} — retained project material`,
-        });
-      }
-      const source = await readFile(
-        new URL(
-          '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
-          import.meta.url
-        ),
-        'utf8'
-      );
-      const effect = parseEffectV1Source(source).document;
-      if (!effect) throw new Error('Invalid effect fixture');
-      const sha256 = createHash('sha256').update(source).digest('hex');
-      project.effectSnapshots = [
-        {
-          id: `effect:${sha256}`,
-          sha256,
-          source,
-          documentId: effect.id,
-          kind: effect.kind,
-          schemaVersion: 'sniptale.effect.v1',
-          assets: [],
-          retainedByteLength: Buffer.byteLength(source),
-        },
-      ];
-      project.effectInstances = [
-        {
-          id: 'fx',
-          kind: 'targetEffect',
-          target: { kind: 'clip', clipId: leading.id },
-          snapshotId: `effect:${sha256}`,
-          enabled: true,
-          startTime: 0,
-          duration: 0.8,
-          playbackRate: effect.duration / 0.8,
-          rangeMode: 'owner',
-          controls: Object.fromEntries(
-            effect.controls.map((control) => [
-              control.id,
-              resolveEffectV1ControlDefault(control, locale),
-            ])
-          ),
-        },
-      ];
+      const project = await createBookendCompositionFixture(locale);
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         videoProjects: [project],
@@ -452,16 +329,144 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect((await readNativeVideoProject(page))!.clips).toEqual(accepted.clips);
       expect((await readNativeVideoProject(page))!.bookendPresets).toEqual(accepted.bookendPresets);
       await select();
+      expect((await readNativeVideoProject(page))!.compositionJoins).toEqual(
+        accepted.compositionJoins
+      );
+      await page.locator('[data-ui="video-editor.materials.close"]').click();
+      const joins = owner.locator('[data-ui="shared.ui.presentation-join-fields"]');
+      const firstJoin = joins.first();
+      await chooseInspectorValue(
+        page,
+        firstJoin,
+        label('videoEditor.sidebar.compositionJoin'),
+        label('gallery.videoReview.cutDissolve')
+      );
+      await owner
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.compositionJoinSeek'),
+          exact: true,
+        })
+        .first()
+        .click();
+      await expect
+        .poll(async () =>
+          page.locator('[data-preview-stage-canvas]').evaluate((node) => {
+            if (!(node instanceof HTMLCanvasElement)) throw new Error('Missing preview canvas');
+            const pixel = node
+              .getContext('2d')!
+              .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data;
+            return Math.max(Math.abs(pixel[0]! - 128), Math.abs(pixel[1]! - 128), pixel[2]!);
+          })
+        )
+        .toBeLessThanOrEqual(1);
+      await chooseInspectorValue(
+        page,
+        firstJoin,
+        label('videoEditor.sidebar.compositionJoin'),
+        label('gallery.videoReview.cutFadeColor')
+      );
+      await expect
+        .poll(
+          async () => (await readNativeVideoProject(page))?.compositionJoins?.[0]?.transition?.type
+        )
+        .toBe('fade-black');
+      await owner
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.compositionJoinSeek'),
+          exact: true,
+        })
+        .first()
+        .click();
+      await expect
+        .poll(async () =>
+          page.locator('[data-preview-stage-canvas]').evaluate((node) => {
+            if (!(node instanceof HTMLCanvasElement)) throw new Error('Missing preview canvas');
+            const pixel = node
+              .getContext('2d')!
+              .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data;
+            return Array.from(pixel);
+          })
+        )
+        .toEqual([0, 0, 0, 255]);
+      for (const width of [359, 360, 361, 520]) {
+        const current = (await inspector.boundingBox())!.width;
+        const box = (await handle.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + current - width, box.y + 12);
+        await page.mouse.up();
+        await expect
+          .poll(async () => Math.round((await inspector.boundingBox())!.width))
+          .toBe(width);
+        await firstJoin.scrollIntoViewIfNeeded();
+        await checkInspectorLabels(firstJoin);
+        await checkInspectorPaintedFont(page, firstJoin, `join-font-${width}`);
+        expect(
+          await firstJoin.evaluate((node) => {
+            const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+            return body instanceof HTMLElement && body.scrollWidth <= body.clientWidth + 1;
+          })
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath(`composition-join-${width}.png`),
+          fullPage: false,
+        });
+      }
+      await chooseInspectorValue(
+        page,
+        firstJoin,
+        label('videoEditor.sidebar.compositionJoin'),
+        label('gallery.videoReview.transitionNone')
+      );
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.compositionJoins?.[0]?.transition)
+        .toBeUndefined();
       await page.setViewportSize({ width: 1100, height: 560 });
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
       ).toBe(true);
-      const encoded = await encodedNativeVideoSamples(page, host.origin, accepted, format, [
-        { time: 0.2, x: 320, y: 180, expected: [255, 0, 0] },
+      const output = structuredClone(accepted);
+      const card = output.assets.find((asset) => asset.type === 'IMAGE')!;
+      output.sceneEdges = {
+        intro: { enabled: true, duration: 5.2, color: '#000000ff', audioFade: false },
+        outro: { enabled: false, duration: 0.2 },
+      };
+      output.watermark = {
+        ...createQuickEditWatermark('Mark'),
+        mode: 'image',
+        image: {
+          assetId: `project-asset:${card.id}`,
+          width: 641,
+          height: 201,
+          size: 0.1,
+          opacity: 1,
+        },
+        placement: { anchor: 'top-left', margin: 0.02 },
+      };
+      output.compositionJoins = output.compositionJoins!.map((boundary) => ({
+        ...boundary,
+        transition:
+          boundary.edge === 'end'
+            ? { type: 'dissolve', before: 0.2, after: 0.2 }
+            : { type: 'fade-black', before: 0.1, after: 0.1, color: '#ffffff' },
+      }));
+      expect(isExportReadyVideoProject(output)).toBe(true);
+      const encoded = await encodedNativeVideoSamples(page, host.origin, output, format, [
+        { time: 0.2, x: 320, y: 180, expected: [10, 0, 0] },
         { time: 0.2, x: 320, y: 10, expected: [0, 0, 0] },
+        { time: 4.9, x: 320, y: 180, expected: [180, 60, 0] },
+        { time: 5, x: 320, y: 180, expected: [123, 123, 0] },
+        { time: 5.1, x: 320, y: 180, expected: [63, 188, 0] },
+        { time: 5, x: 320, y: 10, expected: [0, 123, 0] },
+        { time: 5, x: 20, y: 12, expected: [245, 0, 0] },
         { time: 5.2, x: 320, y: 180, expected: [0, 255, 0] },
         { time: 5.8, x: 320, y: 180, expected: [0, 255, 0] },
+        { time: 6.2, x: 320, y: 180, expected: [255, 255, 255] },
+        { time: 6.2, x: 20, y: 12, expected: [255, 255, 255] },
       ]);
+      expect(
+        accepted.compositionJoins!.every((boundary) => boundary.transition === undefined)
+      ).toBe(true);
       expect(encoded.duration).toBeCloseTo(18.2, 1);
       expect(encoded.samples.every((sample) => sample.error < 12)).toBe(true);
       expect(errors).toEqual([]);
@@ -472,4 +477,134 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       );
     }
   });
+}
+
+async function createBookendCompositionFixture(locale: 'ru' | 'en') {
+  const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
+  const project = createVideoProjectFromRecording({
+    recordingId: 'beta-v1-recording',
+    filename: 'beta-v1.webm',
+    width: 640,
+    height: 360,
+    duration: 12,
+    mimeType: 'video/webm',
+    size: bytes.length,
+    hasAudio: true,
+  });
+  project.version = 24;
+  project.sceneBackground = { kind: 'solid', color: '#0000ffff' };
+  project.duration = 1.2;
+  project.clips.forEach((clip) => {
+    clip.duration = 1.2;
+    if (clip.type === 'VIDEO' || clip.type === 'AUDIO') clip.sourceDuration = 1.2;
+  });
+  const leading = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (leading.type !== 'VIDEO') throw new Error('Expected video');
+  leading.duration = leading.sourceDuration = 0.8;
+  const trailing = { ...leading, id: 'trailing', startTime: 0.4, sourceStart: 0.4 };
+  project.clips.push(trailing);
+  project.transitions = [
+    {
+      id: 'join',
+      leadingClipId: leading.id,
+      trailingClipId: trailing.id,
+      kind: 'CROSSFADE',
+      duration: 0.4,
+      easing: 'LINEAR',
+    },
+  ];
+  const track = createVideoProjectTrack('Upper composition', -1, 'PRIMARY');
+  const shape = createShapeClip(track.id, 640, 360, 0, 'RECTANGLE');
+  shape.duration = 1.2;
+  shape.transform = { x: 0, y: 0, width: 640, height: 360, opacity: 1, rotation: 0 };
+  shape.style = {
+    fillColor: '#00ff00ff',
+    strokeColor: '#00ff00ff',
+    strokeWidth: 0,
+    borderRadius: 0,
+  };
+  project.tracks.push(track);
+  project.clips.push(shape);
+  project.motionRegions = [{ ...createVideoProjectMotionRegion(project, 0.2), duration: 0.4 }];
+  project.textDocuments = [
+    {
+      id: 'script',
+      binding: { kind: 'project' },
+      document: {
+        version: 1,
+        fragments: [
+          {
+            id: 'phrase',
+            originalText: 'Main',
+            text: 'Main',
+            start: 0.2,
+            end: 0.6,
+            revision: 0,
+            timingRevision: 0,
+            alignment: 'range',
+            timeDomain: 'result',
+            showInVideo: false,
+          },
+        ],
+      },
+    },
+  ];
+  project.commentDocuments = [
+    {
+      id: 'notes',
+      binding: { kind: 'project' },
+      annotations: [{ id: 'note', text: 'Main note', anchor: { kind: 'point', time: 0.4 } }],
+      canvasComments: [],
+    },
+  ];
+  const sourceMaterial = project.assets[0]!;
+  for (let materialIndex = 0; materialIndex < 12; materialIndex++) {
+    project.assets.push({
+      ...sourceMaterial,
+      id: `unused-material-${materialIndex}`,
+      name: `Source ${materialIndex + 1} — retained project material`,
+    });
+  }
+  const source = await readFile(
+    new URL(
+      '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  const effect = parseEffectV1Source(source).document;
+  if (!effect) throw new Error('Invalid effect fixture');
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  project.effectSnapshots = [
+    {
+      id: `effect:${sha256}`,
+      sha256,
+      source,
+      documentId: effect.id,
+      kind: effect.kind,
+      schemaVersion: 'sniptale.effect.v1',
+      assets: [],
+      retainedByteLength: Buffer.byteLength(source),
+    },
+  ];
+  project.effectInstances = [
+    {
+      id: 'fx',
+      kind: 'targetEffect',
+      target: { kind: 'clip', clipId: leading.id },
+      snapshotId: `effect:${sha256}`,
+      enabled: true,
+      startTime: 0,
+      duration: 0.8,
+      playbackRate: effect.duration / 0.8,
+      rangeMode: 'owner',
+      controls: Object.fromEntries(
+        effect.controls.map((control) => [
+          control.id,
+          resolveEffectV1ControlDefault(control, locale),
+        ])
+      ),
+    },
+  ];
+  return project;
 }

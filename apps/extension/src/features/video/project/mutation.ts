@@ -90,6 +90,14 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  const presets = patch.bookendPresets ?? project.bookendPresets;
+  if (
+    project.compositionJoins !== undefined ||
+    patch.compositionJoins !== undefined ||
+    presets?.introTransition !== undefined ||
+    presets?.outroTransition !== undefined
+  )
+    return 26;
   if (project.bookendPresets !== undefined || patch.bookendPresets !== undefined) return 25;
   if (project.sceneEdges !== undefined || patch.sceneEdges !== undefined) return 24;
   if (project.commentDocuments !== undefined || patch.commentDocuments !== undefined) return 23;

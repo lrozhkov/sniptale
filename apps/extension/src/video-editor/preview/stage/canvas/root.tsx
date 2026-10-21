@@ -185,6 +185,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
 
   usePreviewStageCanvasScene({
     activeClips: params.activeClips,
+    assetUrls: params.assetUrls,
     canvasRef,
     currentTime: params.currentTime,
     effectRuntimeFeedback: params.effectRuntimeFeedback,

@@ -102,6 +102,9 @@ export function getProjectExportWatermarkRenderer(
 }
 
 export function cleanupJob(job: ProjectExportRuntimeState): void {
+  const joins = job.compositionJoinRenderer;
+  delete job.compositionJoinRenderer;
+  joins?.dispose();
   const spatialRenderer = job.cameraSpatialRenderer;
   delete job.cameraSpatialRenderer;
   spatialRenderer?.dispose();

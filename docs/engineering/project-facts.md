@@ -168,6 +168,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/popup-shell`
 - `apps/extension/src/ui/presentation-fade-fields.test.tsx`
 - `apps/extension/src/ui/presentation-fade-fields.tsx`
+- `apps/extension/src/ui/presentation-join-fields.test.tsx`
+- `apps/extension/src/ui/presentation-join-fields.tsx`
 - `apps/extension/src/ui/presentation-media-fields.test.tsx`
 - `apps/extension/src/ui/presentation-media-fields.tsx`
 - `apps/extension/src/ui/surface-style-selector`

@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
 import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
@@ -5,25 +6,18 @@ import { translate } from '../../../../platform/i18n';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
 import { waitForEncoderQueueCapacity } from '../../codecs';
-import { drawProjectFrame } from '../../renderer';
+import { renderProjectCompositionScene } from '../../composition-scene';
 import {
   createOffscreenProjectEffectRuntime,
   type OffscreenProjectEffectRuntime,
 } from '../../effect-runtime';
-import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
 import type { ExportSceneBackgroundCache } from '../../renderer/background';
-import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
-import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { pauseRenderLoopMediaElements } from '../../render-loop/shared/media';
 import {
   getFrameDrivenRenderCurrentTime,
   getFrameDrivenRenderTiming,
 } from '../../render-loop/frame-driven/timing';
-import {
-  sendProgress,
-  getProjectExportWatermarkRenderer,
-  getProjectExportSpatialRenderer,
-} from '../../runtime';
+import { sendProgress } from '../../runtime';
 import type { Mp4AcceleratedCompositeRenderSpan, Mp4HybridVideoPipelineArgs } from './types';
 import {
   createWebmFrameProviders,
@@ -199,47 +193,18 @@ async function drawDecodedCompositeFrame(
   frames: Awaited<ReturnType<typeof prepareWebmProviderFrames>>
 ): Promise<void> {
   const clipMediaElements = new Map(frames.map((frame) => [frame.clipId, frame.source]));
-  const { job, project, settings, signal } = args.request;
-  job.captionRenderer ??= createVideoProjectCaptionRenderer();
-  const captions = await job.captionRenderer.prepare(project, settings, signal);
-  captions.assertExportable(resolveProjectExportRange(project, settings));
-  const watermark =
-    project.watermark && project.watermark.mode !== 'none'
-      ? await getProjectExportWatermarkRenderer(job, signal).prepare(project, settings, signal)
-      : undefined;
-  if (!watermark) job.watermarkRenderer?.clear();
+  const { project } = args.request;
   const ownerDocument = getDecodedCompositeOwnerDocument(args);
-  const effectRuntimeFrames = await args.effectRuntime.renderProjectFrames({
+  await renderProjectCompositionScene({
+    ...args.request,
+    currentTime: args.projectTime,
     clipMediaElements,
     compositionIndex: args.compositionIndex,
-    currentTime: args.projectTime,
-    spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
-    loadedImages: args.request.loadedImages,
+    effectRuntime: args.effectRuntime,
+    backgroundCache: args.backgroundCache,
     ...(ownerDocument ? { ownerDocument } : {}),
-    project: args.request.project,
   });
-  try {
-    throwIfAborted(args.request.signal);
-    drawProjectFrame(
-      args.request.context,
-      args.request.project,
-      args.request.settings,
-      args.projectTime,
-      args.request.loadedImages,
-      clipMediaElements,
-      {
-        backgroundCache: args.backgroundCache,
-        spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
-        compositionIndex: args.compositionIndex,
-        ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
-      }
-    );
-    captions.draw(args.request.context, args.projectTime);
-    watermark?.draw(args.request.context);
-    drawVideoProjectSceneEdges(args.request.context, project, args.projectTime);
-  } finally {
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
-  }
+  drawVideoProjectSceneEdges(args.request.context, project, args.projectTime);
 }
 
 function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Document | undefined {
@@ -252,6 +217,12 @@ function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Docu
 export async function renderAcceleratedCompositeWebmSpan(
   args: AcceleratedCompositeWebmRenderArgs
 ): Promise<boolean> {
+  if (
+    resolveVideoProjectCompositionJoinPlans(args.project).some(
+      (plan) => args.span.start < plan.seam + plan.after && args.span.end > plan.seam - plan.before
+    )
+  )
+    return false;
   if (typeof VideoFrame === 'undefined') {
     return false;
   }

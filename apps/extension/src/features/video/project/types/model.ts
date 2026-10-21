@@ -328,7 +328,8 @@ export interface VideoProject {
     | 22
     | 23
     | 24
-    | 25;
+    | 25
+    | 26;
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
@@ -347,6 +348,8 @@ export interface VideoProject {
   sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
   /** Authored insertion recipes; existing timeline instances remain independent. */
   bookendPresets?: import('../scene/bookend-presets-types').VideoProjectBookendPresets;
+  /** Whole-frame joins retain explicit ordinary media clip-edge anchors. */
+  compositionJoins?: import('../scene/joins-types').VideoProjectCompositionJoin[];
   timelinePlacementMode: VideoTimelinePlacementMode;
   duration: number;
   createdAt: number;

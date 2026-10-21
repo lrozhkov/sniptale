@@ -19,6 +19,9 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     ru: 'Проект изменился. Выберите материал ещё раз.',
     en: 'The project changed. Choose the material again.',
   },
+  compositionJoins: { ru: 'Стыки композиции', en: 'Composition joins' },
+  compositionJoin: { ru: 'Переход', en: 'Transition' },
+  compositionJoinSeek: { ru: 'Перейти к стыку', en: 'Go to join' },
   sceneEdges: { ru: 'Начало и конец', en: 'Start and end' },
   comments: { ru: 'Заметки', en: 'Notes' },
   commentDeleteDocument: {

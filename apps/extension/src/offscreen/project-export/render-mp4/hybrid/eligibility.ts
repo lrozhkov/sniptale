@@ -1,3 +1,4 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { resolveVideoProjectSceneEdgePlan } from '../../../../features/video/project/scene/edge-fades';
 import { isMimeTypeCompatibleWithFormat } from '../../persistence';
 import { getAssetById } from '../../../../features/video/project/timeline/basics';
@@ -152,6 +153,12 @@ export function createCleanSourceSpan(
   end: number,
   timelineIndex: VideoCompositionTimelineIndex
 ): Mp4VideoRenderSpan {
+  if (
+    resolveVideoProjectCompositionJoinPlans(project).some(
+      (plan) => start < plan.seam + plan.after && end > plan.seam - plan.before
+    )
+  )
+    return createCompositeSpan(start, end, 'transition');
   const edges = resolveVideoProjectSceneEdgePlan(project).visualEnvelope;
   if (edges.fadeIn > 0 || edges.fadeOut > 0) {
     return createCompositeSpan(start, end, 'visual-layer');

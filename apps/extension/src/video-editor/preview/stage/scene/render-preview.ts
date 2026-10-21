@@ -1,3 +1,4 @@
+import { publishCompletedPreviewFrame } from './canvas';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
@@ -119,6 +120,8 @@ function drawPreviewSceneOverlays(params: {
 }
 
 type PreviewSceneParams = {
+  /** Held composition samples exclude outer fades; their caller applies presentation once. */
+  sceneEdges?: 'omit';
   watermarkRenderer?: VideoProjectWatermarkRenderer;
   cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
@@ -127,6 +130,8 @@ type PreviewSceneParams = {
   stagingCanvas?: () => HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
   currentTime: number;
+  /** Complete borrowed source map for composition endpoint sampling. */
+  assetUrls?: Record<string, string>;
   imageBank: Record<string, HTMLImageElement>;
   effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
   isPlaybackFrame?: boolean;
@@ -276,29 +281,6 @@ function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): boolean {
   }
 }
 
-function publishCompletedPreviewFrame(
-  presented: HTMLCanvasElement,
-  staging: HTMLCanvasElement
-): void {
-  const context = presented.getContext('2d');
-  if (!context) throw new Error('Preview frame context is unavailable.');
-  if (presented.width !== staging.width) presented.width = staging.width;
-  if (presented.height !== staging.height) presented.height = staging.height;
-  context.save();
-  try {
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = 'copy';
-    context.filter = 'none';
-    context.shadowBlur = 0;
-    context.shadowOffsetX = 0;
-    context.shadowOffsetY = 0;
-    context.drawImage(staging, 0, 0);
-  } finally {
-    context.restore();
-  }
-}
-
 function drawResolvedPreviewSceneContent(
   args: ResolvedPreviewSceneArgs,
   viewportCanvas?: HTMLCanvasElement
@@ -370,12 +352,13 @@ function drawResolvedPreviewSceneContent(
       context.restore();
     }
   }
-  drawVideoProjectSceneEdges(context, args.params.project, args.params.currentTime, {
-    x: viewport.offsetX * overlayPrepared.dpr,
-    y: viewport.offsetY * overlayPrepared.dpr,
-    width: viewport.width * overlayPrepared.dpr,
-    height: viewport.height * overlayPrepared.dpr,
-  });
+  if (args.params.sceneEdges !== 'omit')
+    drawVideoProjectSceneEdges(context, args.params.project, args.params.currentTime, {
+      x: viewport.offsetX * overlayPrepared.dpr,
+      y: viewport.offsetY * overlayPrepared.dpr,
+      width: viewport.width * overlayPrepared.dpr,
+      height: viewport.height * overlayPrepared.dpr,
+    });
   return true;
 }
 

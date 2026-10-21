@@ -42,6 +42,7 @@ type TimelineClipAction =
   | 'appendMaterial'
   | 'placeBookendMaterial'
   | 'updateBookendPresets'
+  | 'updateCompositionJoins'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'renameAsset'

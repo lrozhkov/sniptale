@@ -1711,9 +1711,9 @@
       "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: These cases use one publisher, database fixture and staged-object helper family. Watermark and bookend cases distinguish logical material IDs from private-resource IDs. Dormant bookend references use the same remapping operation. Each invocation creates its own database capture. The 800-line cap identifies no additional authority. Independent read-only diagnosis checked this exact scope. Final architecture review must check this classification.",
-      "removalCondition": "Remove when the file body or signature changes. Reassess unrelated proof or an independent fixture or lifecycle. Remove when the analyzer recognizes this reference-remap proof boundary.",
-      "astHash": "3f59de6db8b178ac4daef665795ddf93e722dcaa7af9fd175fec407ba092343b",
+      "reason": "tool-noise: Optional schema26 joins extend the existing portable bookend duplicate matrix. All cases use the same publisher, database capture, portable encoder and staged-object helpers. Preset transitions and clip-edge joins add root data, with no independent fixture, operation or lifecycle. Each invocation creates its own database capture. Independent read-only diagnosis inspected the exact baseline and candidate bodies. Complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when the file body or signature changes. Reassess unrelated proof or an independent fixture, operation or lifecycle. Remove when the analyzer recognizes this reference-remap proof boundary.",
+      "astHash": "8ceb4e171ad471c039309023d0355e55e6c9a5e006ed9a2543812e0c04952ae0",
       "signatureHash": "88547062d221fa4397cc7320aa5aab74e7ef56c25a512cc8d0d1e566286ce526",
       "reviewDate": "2026-10-21"
     },
@@ -1722,9 +1722,9 @@
       "file": "apps/extension/src/composition/persistence/projects/backup-restore.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: These restore cases use the same writer, caller-owned stores and transaction fixture. The schema25 case checks retained bookend settings. Each case creates isolated stores. The file exceeds 800 lines without an additional product authority. Independent read-only diagnosis checked this exact scope. Final architecture review must check this classification.",
-      "removalCondition": "Remove when the body or signature changes. Reassess an independent fixture, unrelated operation or restore lifecycle. Remove when the analyzer recognizes this cohesive restore proof.",
-      "astHash": "0df1efe4ab026b2d9154e7abfa2320717a5b34b2091ba40364493b028d144476",
+      "reason": "tool-noise: The schema25/schema26 cases extend the existing remembered-bookend restore proof with optional preset transitions and clip-edge joins. Both cases use the same root writer, caller-owned stores and transaction fixture. Each invocation creates isolated stores. The change adds no independent operation, fixture or restore lifecycle. Independent read-only diagnosis inspected the exact baseline and candidate bodies. Complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when the file body or signature changes. Reassess an independent fixture, unrelated operation or restore lifecycle. Remove when the analyzer recognizes this cohesive restore proof.",
+      "astHash": "d179b1a20865a64842a1994e6b7d9cf37a16d29fad8db812ab0822f6e6fa0542",
       "signatureHash": "bb320308abea3398e61c1591d52f4b41ad78f75b08b509266e7fde60caa0dc37",
       "reviewDate": "2026-10-21"
     }

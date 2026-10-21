@@ -1,86 +1,25 @@
-import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
-import { getProjectExportSpatialRenderer, getProjectExportWatermarkRenderer } from '../../runtime';
-import { type LoadedImagesMap, drawProjectFrame } from '../../renderer';
-import type { VideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
+import { renderProjectCompositionFrame } from '../../composition-joins';
+import type { ProjectCompositionSceneInput } from '../../composition-scene';
 import { syncClipPlayback } from '../../media';
-import { type VideoProjectExportSettings } from '../../../../features/video/project/types/export';
-import { type VideoProject } from '../../../../features/video/project/types/model';
 import type { RenderLoopJobState } from '../shared/index';
-import {
-  renderOffscreenProjectEffectFrames,
-  type OffscreenProjectEffectRuntime,
-} from '../../effect-runtime';
-import { disposeEffectRuntimeComposition } from '../../../../features/video/composition/effect-runtime';
 import { sendCompositeRenderProgress } from '../progress/index';
-import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
-import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 
-type RenderCompositeFrameArgs = {
-  context: CanvasRenderingContext2D;
-  currentTime: number;
+type RenderCompositeFrameArgs = Omit<ProjectCompositionSceneInput, 'job' | 'clipMediaElements'> & {
   frameIndex: number;
   job: RenderLoopJobState;
-  loadedImages: LoadedImagesMap;
-  effectRuntime?: OffscreenProjectEffectRuntime;
-  compositionIndex?: VideoCompositionTimelineIndex;
-  project: VideoProject;
-  settings: VideoProjectExportSettings;
-  signal?: AbortSignal;
   lastProgressSent: number;
   totalFrames: number;
 };
 
 export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Promise<number | null> {
-  const {
-    compositionIndex,
-    context,
-    currentTime,
-    frameIndex,
-    job,
-    loadedImages,
-    project,
-    settings,
-    signal,
-  } = args;
+  const { currentTime, frameIndex, job, project, settings, signal } = args;
 
   if (job.cancelled || signal?.aborted) {
     throw new Error('PROJECT_EXPORT_CANCELLED');
   }
 
   syncClipPlayback(job, project, currentTime);
-  job.captionRenderer ??= createVideoProjectCaptionRenderer();
-  const captions = await job.captionRenderer.prepare(project, settings, signal);
-  captions.assertExportable(resolveProjectExportRange(project, settings));
-  const watermark =
-    project.watermark && project.watermark.mode !== 'none'
-      ? await getProjectExportWatermarkRenderer(job, signal).prepare(project, settings, signal)
-      : undefined;
-  if (!watermark) job.watermarkRenderer?.clear();
-  const effectRuntimeFrames = await renderCompositeEffectFrames(args);
-  try {
-    if (job.cancelled || signal?.aborted) {
-      throw new Error('PROJECT_EXPORT_CANCELLED');
-    }
-    const frameOptions = {
-      spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
-      ...(compositionIndex ? { compositionIndex } : {}),
-      ...(effectRuntimeFrames ? { effectRuntimeFrames } : {}),
-    };
-    drawProjectFrame(
-      context,
-      project,
-      settings,
-      currentTime,
-      loadedImages,
-      job.clipMediaElements,
-      frameOptions
-    );
-    captions.draw(context, currentTime);
-    watermark?.draw(context);
-    drawVideoProjectSceneEdges(context, project, currentTime);
-  } finally {
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
-  }
+  await renderProjectCompositionFrame({ ...args, clipMediaElements: job.clipMediaElements });
 
   return sendCompositeRenderProgress({
     currentFrame: frameIndex + 1,
@@ -89,23 +28,4 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
     jobId: job.jobId,
     lastProgressSent: args.lastProgressSent,
   });
-}
-
-function renderCompositeEffectFrames(args: RenderCompositeFrameArgs) {
-  const ownerDocument =
-    typeof HTMLCanvasElement !== 'undefined' && args.context.canvas instanceof HTMLCanvasElement
-      ? args.context.canvas.ownerDocument
-      : undefined;
-  const frameArgs = {
-    ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
-    clipMediaElements: args.job.clipMediaElements,
-    currentTime: args.currentTime,
-    loadedImages: args.loadedImages,
-    ...(ownerDocument ? { ownerDocument } : {}),
-    project: args.project,
-    spatialRenderer: () => getProjectExportSpatialRenderer(args.job, args.signal),
-  };
-  return args.effectRuntime
-    ? args.effectRuntime.renderProjectFrames(frameArgs)
-    : renderOffscreenProjectEffectFrames(frameArgs);
 }

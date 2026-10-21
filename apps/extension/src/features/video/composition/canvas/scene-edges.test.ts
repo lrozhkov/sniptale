@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { createVideoProjectSceneEdges } from '../../project/scene/edge-fades';
-import { drawVideoProjectSceneEdges } from './scene-edges';
+import { drawVideoProjectSceneEdges, drawCompositionColorOverlay } from './scene-edges';
 
 afterEach(() => vi.restoreAllMocks());
 function fixture() {
@@ -77,4 +77,25 @@ it('restores the owning context when final painting fails', () => {
   });
   expect(() => drawVideoProjectSceneEdges(context, project, 0)).toThrow('Context lost');
   expect(restore).toHaveBeenCalledOnce();
+});
+
+it('uses the same final-canvas color paint for joins without inheriting caller camera or effect state', () => {
+  const { context } = fixture();
+  context.globalAlpha = 0.2;
+  context.globalCompositeOperation = 'multiply';
+  context.filter = 'blur(2px)';
+  context.shadowBlur = 12;
+  const savedAlpha = context.globalAlpha;
+  const fill = vi.spyOn(context, 'fillRect').mockImplementation(() => {
+    expect(context.globalAlpha).toBe(0.75);
+    expect(context.globalCompositeOperation).toBe('source-over');
+    expect(context.filter).toBe('none');
+    expect(context.shadowBlur).toBe(0);
+    expect(context.fillStyle).toBe('#ffffff');
+  });
+  drawCompositionColorOverlay(context, 0.75, '#ffffff');
+  expect(fill).toHaveBeenCalledWith(0, 0, 640, 360);
+  expect(context.globalAlpha).toBe(savedAlpha);
+  expect(context.globalCompositeOperation).toBe('multiply');
+  expect(context.shadowBlur).toBe(12);
 });

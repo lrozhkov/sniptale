@@ -28,10 +28,10 @@ export interface VideoEditorWatermarkInspectorRuntime {
 }
 
 /** A final-scene gesture belongs to one accepted project snapshot. */
-export interface VideoEditorSceneEdgesPreview {
-  project: VideoProject;
-  settings: NonNullable<VideoProject['sceneEdges']>;
-}
+export type VideoEditorSceneEdgesPreview = { project: VideoProject } & (
+  | { settings: NonNullable<VideoProject['sceneEdges']>; compositionJoins?: never }
+  | { compositionJoins: NonNullable<VideoProject['compositionJoins']>; settings?: never }
+);
 
 /** Scene authoring uses the workspace's existing disposable preview owner. */
 export interface VideoEditorSceneEdgesInspectorRuntime {

@@ -99,3 +99,25 @@ it('rejects accelerated composite when source decode assumptions are not met', (
     )
   ).toBeNull();
 });
+
+it('refuses decoded acceleration only where a whole-composition join is active', () => {
+  const project = createProject();
+  project.clips[0]!.startTime = 1;
+  project.clips[0]!.duration = 3;
+  project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'clip-1',
+      edge: 'start',
+      transition: { type: 'fade-black', before: 0.2, after: 0.2 },
+    },
+  ];
+  expect(createAcceleratedCompositeSpan(project, settings, 0.8, 1.2)).toBeNull();
+  expect(createAcceleratedCompositeSpan(project, settings, 1.2, 4)?.kind).toBe(
+    'accelerated-composite'
+  );
+  project.compositionJoins = [{ id: 'join', clipId: 'clip-1', edge: 'start' }];
+  expect(createAcceleratedCompositeSpan(project, settings, 1, 4)?.kind).toBe(
+    'accelerated-composite'
+  );
+});

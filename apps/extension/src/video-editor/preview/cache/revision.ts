@@ -183,6 +183,7 @@ function projectVideoPreviewSegmentRenderState(
   const rangeStart = range.startFrame / Math.max(1, project.fps);
   const rangeEnd = range.endFrame / Math.max(1, project.fps);
   const fullState = projectVideoPreviewRenderState(project) as Record<string, unknown>;
+  if (project.compositionJoins?.some(({ transition }) => transition)) return fullState;
   const motionRegions = (project.motionRegions ?? []).filter((region) =>
     overlapsRange(region.startTime, region.duration, rangeStart, rangeEnd)
   );

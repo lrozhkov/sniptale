@@ -86,9 +86,14 @@ export async function prepareReviewCaptions(args: {
     args.signal.throwIfAborted();
     return {
       plan,
-      assertExportable(range?: { start: number; end: number }) {
+      /** Held samples use their exact time, including a conflict that starts on the sampled frame. */
+      assertExportable(range?: { start: number; end: number } | { time: number }) {
         const conflicts = range
-          ? plan.conflicts.filter((entry) => entry.start < range.end && range.start < entry.end)
+          ? plan.conflicts.filter((entry) =>
+              'time' in range
+                ? entry.start <= range.time && range.time < entry.end
+                : entry.start < range.end && range.start < entry.end
+            )
           : plan.conflicts;
         if (conflicts.length) throw new QuickEditExportUnavailable(['caption-layout'], conflicts);
       },

@@ -744,9 +744,14 @@ it.each(['none', 'text', 'image'] as const)(
   }
 );
 
-it.each(['none', 'image', 'video'] as const)(
-  'duplicates portable %s bookend recipes with all dormant references and exact private bytes',
-  async (mode) => {
+it.each(
+  (['none', 'image', 'video'] as const).flatMap((mode) => [
+    { mode, joins: false },
+    { mode, joins: true },
+  ])
+)(
+  'duplicates portable $mode bookend recipes with optional joins ($joins), dormant references and exact private bytes',
+  async ({ mode, joins }) => {
     const { createVideoProjectAsset } =
       await import('../../../../features/video/project/factories/creation');
     const { createBookendImagePresentation, createBookendVideoPresentation } =
@@ -756,7 +761,7 @@ it.each(['none', 'image', 'video'] as const)(
     const base = createVideoProjectEntryWithMediaClip();
     base.id = 'p';
     base.project.id = 'p';
-    base.project.version = 25;
+    base.project.version = joins ? 26 : 25;
     const movie = base.project.assets[0]!;
     const image = createVideoProjectAsset(
       'Card',
@@ -782,7 +787,25 @@ it.each(['none', 'image', 'video'] as const)(
         audio: { muted: true, gain: 0.37 },
       },
     };
-    base.project.bookendPresets = { intro: slot, outro: structuredClone(slot) };
+    base.project.bookendPresets = {
+      intro: slot,
+      outro: structuredClone(slot),
+      ...(joins
+        ? {
+            introTransition: { type: 'dissolve', before: 0.2, after: 0.3 },
+            outroTransition: { type: 'fade-black', before: 0.1, after: 0.2, color: '#123456' },
+          }
+        : {}),
+    };
+    if (joins)
+      base.project.compositionJoins = [
+        {
+          id: 'instance',
+          clipId: base.project.clips[0]!.id,
+          edge: 'end',
+          transition: { type: 'fade-black', before: 0.4, after: 0.2, color: '#abcdef' },
+        },
+      ];
     const before = structuredClone(base);
     const values = new Map<string, unknown[]>();
     const db = publisherDatabase(values);
@@ -815,8 +838,9 @@ it.each(['none', 'image', 'video'] as const)(
       .find((entry) => entry !== null)?.project;
     expect(restored).toBeDefined();
     expect(restored!.id).not.toBe(base.id);
-    expect(restored!.version).toBe(25);
+    expect(restored!.version).toBe(joins ? 26 : 25);
     expect(restored!.bookendPresets).toEqual(base.project.bookendPresets);
+    expect(restored!.compositionJoins).toEqual(base.project.compositionJoins);
     const material = restored!.assets.find(({ id }) => id === image.id);
     if (material?.source.kind !== 'project-asset')
       throw new Error('Missing restored private source');

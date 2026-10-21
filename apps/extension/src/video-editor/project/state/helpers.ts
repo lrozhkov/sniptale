@@ -1,3 +1,4 @@
+import { reconcileVideoProjectCompositionJoins } from '../../../features/video/project/scene/joins';
 import { reconcileMotionSourceBindings } from '../../../features/video/project/motion/source-binding';
 import {
   createVideoProjectTrack,
@@ -110,7 +111,11 @@ export function reconcileProjectMutation(
   return syncProjectDuration(
     reconcileMotionSourceBindings(
       previousProject,
-      reconcileRecordingInteractionAnchors(previousProject, updatedProject, splitLineage),
+      reconcileRecordingInteractionAnchors(
+        previousProject,
+        reconcileVideoProjectCompositionJoins(updatedProject, splitLineage),
+        splitLineage
+      ),
       splitLineage
     )
   );

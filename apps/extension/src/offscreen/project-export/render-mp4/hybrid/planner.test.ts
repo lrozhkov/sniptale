@@ -374,3 +374,30 @@ it('composites scene edge fades while retaining clean-source eligibility for dor
     planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
   ).toBe(true);
 });
+
+it('routes only the active join window through faithful composition and retains fast paths outside', () => {
+  const project = createProject();
+  const video = project.clips[0]!;
+  if (video.type !== 'VIDEO') throw new Error('Expected video');
+  const first = { ...video, duration: 2, sourceDuration: 2 };
+  project.clips = [first, { ...first, id: 'second', startTime: 2, sourceStart: 2 }];
+  project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: first.id,
+      edge: 'end',
+      transition: { type: 'dissolve', before: 0.2, after: 0.3 },
+    },
+  ];
+  const spans = planMp4VideoRenderSpans(project, createSettings());
+  expect(spans.map(({ start, end, kind }) => ({ start, end, kind }))).toEqual([
+    { start: 0, end: 1.8, kind: 'clean-source' },
+    { start: 1.8, end: 2.3, kind: 'composite' },
+    { start: 2.3, end: 4, kind: 'accelerated-composite' },
+  ]);
+  expect(spans[1]).toMatchObject({ reason: 'transition' });
+  project.compositionJoins = [{ id: 'join', clipId: first.id, edge: 'end' }];
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every(({ kind }) => kind !== 'composite')
+  ).toBe(true);
+});

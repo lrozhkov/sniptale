@@ -1,3 +1,4 @@
+import type { CompositionJoinSettings } from './composition-join';
 import type { BookendImagePresentation, BookendVideoPresentation } from './bookend-media';
 
 /** References name project materials, independently of their backing byte identities. */
@@ -16,6 +17,8 @@ export type VideoProjectBookendPreset =
 
 /** Recipes author future insertions; accepted timeline instances remain independent. */
 export interface VideoProjectBookendPresets {
+  introTransition?: CompositionJoinSettings;
+  outroTransition?: CompositionJoinSettings;
   intro: VideoProjectBookendPreset;
   outro: VideoProjectBookendPreset;
 }

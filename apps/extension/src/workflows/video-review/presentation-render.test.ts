@@ -94,6 +94,15 @@ class RasterContext {
   setTransform(x: number, _b: number, _c: number, y: number) {
     this.scale = [x, y];
   }
+  clearRect(x: number, y: number, width: number, height: number) {
+    for (let row = Math.max(0, y); row < Math.min(this.raster.height, y + height); row++)
+      for (let col = Math.max(0, x); col < Math.min(this.raster.width, x + width); col++)
+        this.raster.pixels.fill(
+          0,
+          (row * this.raster.width + col) * 3,
+          (row * this.raster.width + col + 1) * 3
+        );
+  }
   drawImage(source: Raster, _x: number, _y: number) {
     for (let index = 0; index < this.raster.pixels.length; index++)
       this.raster.pixels[index] =

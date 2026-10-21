@@ -40,6 +40,8 @@ Inspected source paths use `apps/extension/src/`:
 - `gallery/video-review/{inspector,inspector-sections,scene-inspector,background-inspector,presentation-inspector}.tsx`
 - `ui/watermark/inspector.tsx`
 - `ui/action-audio/fields.tsx`
+- `ui/presentation-join-fields.tsx`: Both editors share measured transition choices, duration, color and exact timing fields. Local adapters retain clocks, preview and history.
+- `video-editor/workspace/sidebar/selection/inspection/scene-joins.tsx`: Exact clip-edge instances remain separate from future presets. Browser proof checks both primary viewports and inspector widths 359, 360, 361 and 520. It checks fonts, complete-frame preview and encoded output.
 - `ui/presentation-media-fields.tsx`: Both editor bookends share fit, crop, duration, trim and sound controls. Local adapters retain acquisition, paused preview, history and disclosure preferences.
 - `video-editor/workspace/sidebar/selection/inspection/scene-bookend-*.tsx`: Native recipes create ordinary linked media and fill clips. `extension-critical-video-editor-bookends.spec.ts` checks inspector widths, fonts, keyboard selection, reopen and encoded output.
 - `workflows/browser-frame/settings.tsx`

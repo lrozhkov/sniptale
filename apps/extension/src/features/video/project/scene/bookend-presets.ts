@@ -1,3 +1,4 @@
+import { parseCompositionJoinSettings } from './composition-join';
 import { isRecord, isString } from '../validation/primitives';
 import type { VideoProject, VideoProjectAsset } from '../types/model';
 import {
@@ -59,10 +60,38 @@ function parseSlot(value: unknown): VideoProjectBookendPreset | null {
 
 /** Refuses malformed remembered settings as well as malformed active settings. */
 export function parseVideoProjectBookendPresets(value: unknown): VideoProjectBookendPresets | null {
-  if (!isRecord(value) || !hasFields(value, ['intro', 'outro'])) return null;
+  if (
+    !isRecord(value) ||
+    !hasFields(value, ['intro', 'outro', 'introTransition', 'outroTransition'])
+  )
+    return null;
+  for (const key of ['introTransition', 'outroTransition']) {
+    const setting = value[key];
+    if (
+      setting !== undefined &&
+      (!isRecord(setting) || !hasFields(setting, ['type', 'before', 'after', 'color']))
+    )
+      return null;
+  }
   const intro = parseSlot(value['intro']);
   const outro = parseSlot(value['outro']);
-  return intro && outro ? { intro, outro } : null;
+  const introTransition =
+    value['introTransition'] === undefined
+      ? undefined
+      : parseCompositionJoinSettings(value['introTransition']);
+  const outroTransition =
+    value['outroTransition'] === undefined
+      ? undefined
+      : parseCompositionJoinSettings(value['outroTransition']);
+  if (introTransition === null || outroTransition === null) return null;
+  return intro && outro
+    ? {
+        intro,
+        outro,
+        ...(introTransition ? { introTransition } : {}),
+        ...(outroTransition ? { outroTransition } : {}),
+      }
+    : null;
 }
 
 /** All retained recipes refer to declared compatible materials, even in None mode. */
@@ -124,5 +153,5 @@ export function removeVideoProjectBookendSources(
     if (slot.mode === 'video' && video) return { ...variants, mode: 'video', video };
     return { ...variants, mode: 'none' };
   };
-  return { intro: clear(presets.intro), outro: clear(presets.outro) };
+  return { ...presets, intro: clear(presets.intro), outro: clear(presets.outro) };
 }

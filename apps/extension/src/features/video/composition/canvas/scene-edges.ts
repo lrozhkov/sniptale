@@ -13,6 +13,21 @@ export function drawVideoProjectSceneEdges(
 ): void {
   const plan = resolveVideoProjectSceneEdgePlan(project);
   const alpha = presentationEnvelopeOpacity(plan.visualEnvelope, time);
+  drawCompositionColorOverlay(
+    context,
+    alpha,
+    time >= plan.visualEnvelope.fadeIn ? plan.endColor : plan.color,
+    bounds
+  );
+}
+
+/** Final-canvas paint resets camera and effect state and always restores the caller's context. */
+export function drawCompositionColorOverlay(
+  context: CanvasRenderingContext2D,
+  alpha: number,
+  color: string,
+  bounds?: { x: number; y: number; width: number; height: number }
+): void {
   if (alpha <= 0) return;
   const frame = bounds ?? {
     x: 0,
@@ -30,7 +45,7 @@ export function drawVideoProjectSceneEdges(
     context.shadowBlur = 0;
     context.shadowOffsetX = 0;
     context.shadowOffsetY = 0;
-    context.fillStyle = time >= plan.visualEnvelope.fadeIn ? plan.endColor : plan.color;
+    context.fillStyle = color;
     context.fillRect(frame.x, frame.y, frame.width, frame.height);
   } finally {
     context.restore();

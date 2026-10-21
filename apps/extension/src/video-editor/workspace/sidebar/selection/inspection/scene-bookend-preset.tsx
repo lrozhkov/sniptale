@@ -12,6 +12,8 @@ import type {
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import { translate } from '../../../../../platform/i18n';
 import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
+import { PresentationJoinFields } from '../../../../../ui/presentation-join-fields';
+import type { CompositionJoinSettings } from '../../../../../features/video/project/scene/composition-join';
 import { PresentationMediaFields } from '../../../../../ui/presentation-media-fields';
 import { useVideoEditorTimelineEditingPort } from '../../../../runtime/controller/store';
 import { InspectorDetails } from '../shared/details';
@@ -73,6 +75,20 @@ export function SceneBookendPreset(props: { project: VideoProject; side: 'intro'
           onPreview={(value) => patch(value, true)}
         />
       )}
+      {mode !== 'none' && (
+        <PresentationJoinFields
+          label={translate(
+            props.side === 'intro'
+              ? 'gallery.videoReview.presentationJoinIntro'
+              : 'gallery.videoReview.presentationJoinOutro'
+          )}
+          value={editor.transition}
+          Details={InspectorDetails}
+          preferenceId={`scene-bookend-preset.${props.side}`}
+          onChange={editor.changeTransition}
+          onPreview={editor.previewTransition}
+        />
+      )}
       {refused && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('common.errors.actionFailed')}
@@ -93,16 +109,33 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     value: BookendImagePresentation | BookendVideoPresentation;
   } | null>(null);
   const [refused, setRefused] = useState(false);
+  const [joinDraft, setJoinDraft] = useState<{
+    project: VideoProject;
+    value: CompositionJoinSettings;
+  } | null>(null);
+  const transitionKey = props.side === 'intro' ? 'introTransition' : 'outroTransition';
+  const transition =
+    joinDraft?.project === props.project ? joinDraft.value : settings[transitionKey];
   const mode = pending?.project === props.project ? pending.mode : slot.mode;
   const media = mode === 'image' ? slot.image : mode === 'video' ? slot.video : null;
   const asset = media ? props.project.assets.find(({ id }) => id === media.assetId) : null;
-  const commit = (proposal: unknown) => {
-    const parsed = parseVideoProjectBookendPresets({ ...settings, [props.side]: proposal });
+  const commitSettings = (proposal: unknown) => {
+    const parsed = parseVideoProjectBookendPresets(proposal);
     const result = parsed ? update(parsed, props.project) : null;
     setRefused(!result || result.status === 'rejected');
     setPreview(null);
+    setJoinDraft(null);
     if (result && result.status !== 'rejected') setPending(null);
   };
+  const commit = (proposal: unknown) => commitSettings({ ...settings, [props.side]: proposal });
+  const changeTransition = (value: CompositionJoinSettings | null) => {
+    const next = { ...settings };
+    if (value) next[transitionKey] = value;
+    else delete next[transitionKey];
+    commitSettings(next);
+  };
+  const previewTransition = (value: CompositionJoinSettings | null) =>
+    setJoinDraft(value ? { project: props.project, value } : null);
   const patch = (
     value: BookendImagePresentation | BookendVideoPresentation | null,
     transient: boolean
@@ -122,5 +155,17 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     if (next) commit(next);
     else setRefused(true);
   };
-  return { mode, slot, asset, current, refused, patch, changeMode, choose };
+  return {
+    mode,
+    slot,
+    asset,
+    current,
+    refused,
+    patch,
+    changeMode,
+    choose,
+    transition,
+    changeTransition,
+    previewTransition,
+  };
 }

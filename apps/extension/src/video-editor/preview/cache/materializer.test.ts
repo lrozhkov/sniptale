@@ -1,3 +1,5 @@
+import { drawVideoProjectSceneEdges } from '../../../features/video/composition/canvas/scene-edges';
+import { createImageClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -378,4 +380,145 @@ it('retains one watermark preparation owner across frames and clears it when the
   owner.dispose();
   owner.dispose();
   expect(clear).toHaveBeenCalledTimes(1);
+});
+
+function compositionFixture(type: 'dissolve' | 'fade-black' = 'dissolve') {
+  const project = createEmptyVideoProject('Whole composition');
+  project.fps = 4;
+  project.duration = 2;
+  project.clips = [createImageClip({ id: 'intro', trackId: project.tracks[0]!.id, duration: 1 })];
+  project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'intro',
+      edge: 'end',
+      transition: { type, before: 0.5, after: 0.5, color: '#ffffff' },
+    },
+  ];
+  const completedScene = async (input: PreviewSceneInput) => {
+    const context = input.canvas.getContext('2d')!;
+    context.fillStyle = input.currentTime < 1 ? '#ff0000' : '#0000ff';
+    context.fillRect(0, 0, 8, 4);
+    context.fillStyle = '#00ff00';
+    context.fillRect(6, 0, 2, 2);
+    if (input.sceneEdges !== 'omit')
+      drawVideoProjectSceneEdges(context, input.project, input.currentTime);
+  };
+  renderPreviewScene.mockImplementation(completedScene);
+  const owner = createVideoPreviewFrameMaterializer({
+    assetUrls: {},
+    ownerDocument: document,
+    project,
+    rasterSize: { width: 8, height: 4 },
+  });
+  return {
+    project,
+    owner,
+    completedScene,
+    pixel: (x = 0, y = 0) =>
+      Array.from(owner.canvas.getContext('2d')!.getImageData(x, y, 1, 1).data),
+  };
+}
+
+it('materializes complete held compositions and applies outer fades exactly once after the mix', async () => {
+  const f = compositionFixture();
+  f.project.sceneEdges = {
+    intro: { enabled: true, duration: 2 },
+    outro: { enabled: false, duration: 0.4 },
+  };
+  await f.owner.renderFrame(1, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.75, 1]);
+  expect(renderPreviewScene.mock.calls.every(([input]) => input.sceneEdges === 'omit')).toBe(true);
+  const color = f.pixel();
+  expect(Math.abs(color[0]! - 64)).toBeLessThanOrEqual(1);
+  expect(color[1]).toBe(0);
+  expect(Math.abs(color[2]! - 64)).toBeLessThanOrEqual(1);
+  expect(Math.abs(f.pixel(7, 0)[1]! - 128)).toBeLessThanOrEqual(1);
+  await f.owner.renderFrame(1.1, new AbortController().signal);
+  expect(renderPreviewScene).toHaveBeenCalledTimes(2);
+  f.owner.dispose();
+});
+
+it('materializes a color join from the current whole scene rather than held endpoint frames', async () => {
+  const f = compositionFixture('fade-black');
+  await f.owner.renderFrame(1.25, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([1.25]);
+  expect(renderPreviewScene.mock.calls[0]![0].sceneEdges).toBe('omit');
+  expect(f.pixel()).toEqual([128, 128, 255, 255]);
+  await f.owner.renderFrame(1.5, new AbortController().signal);
+  expect(renderPreviewScene.mock.lastCall![0].sceneEdges).toBeUndefined();
+  f.owner.dispose();
+});
+
+it('retries failed endpoint preparation and cancels publication when the materializer closes', async () => {
+  const f = compositionFixture();
+  renderPreviewScene
+    .mockImplementationOnce(f.completedScene)
+    .mockRejectedValueOnce(new Error('endpoint failed'));
+  await expect(f.owner.renderFrame(1, new AbortController().signal)).rejects.toThrow(
+    'endpoint failed'
+  );
+  await f.owner.renderFrame(1, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([
+    0.75, 1, 0.75, 1,
+  ]);
+  const controller = new AbortController();
+  controller.abort();
+  await expect(f.owner.renderFrame(1.1, controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  f.owner.dispose();
+  expect(document.body.children).toHaveLength(0);
+  await expect(f.owner.renderFrame(1.1, new AbortController().signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+});
+
+it('keeps unrelated frames available when a join has no sample', async () => {
+  const project = createEmptyVideoProject('Sparse cadence');
+  project.fps = 1;
+  project.duration = 2.2;
+  project.clips = [
+    createImageClip({ id: 'intro', duration: 1.1 }),
+    createImageClip({ id: 'outro', startTime: 1.2, duration: 1 }),
+  ];
+  project.compositionJoins = [
+    {
+      id: 'join',
+      clipId: 'intro',
+      edge: 'end',
+      transition: { type: 'dissolve', before: 0.4, after: 0.4 },
+    },
+    { id: 'limit', clipId: 'outro', edge: 'start' },
+  ];
+  renderPreviewScene.mockImplementation(async () => {});
+  const owner = createVideoPreviewFrameMaterializer({
+    assetUrls: {},
+    ownerDocument: document,
+    project,
+    rasterSize: { width: 8, height: 4 },
+  });
+  await owner.renderFrame(0.2, new AbortController().signal);
+  await expect(owner.renderFrame(1.1, new AbortController().signal)).rejects.toThrow(
+    'no output frame'
+  );
+  await owner.renderFrame(0.2, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.2, 0.2]);
+  owner.dispose();
+});
+
+it('uses the explicitly selected sample fps without changing the accepted project cadence', async () => {
+  const f = compositionFixture();
+  f.owner.dispose();
+  const owner = createVideoPreviewFrameMaterializer({
+    assetUrls: {},
+    ownerDocument: document,
+    project: f.project,
+    rasterSize: { width: 8, height: 4 },
+    sampleFps: 8,
+  });
+  await owner.renderFrame(1, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.875, 1]);
+  expect(f.project.fps).toBe(4);
+  owner.dispose();
 });

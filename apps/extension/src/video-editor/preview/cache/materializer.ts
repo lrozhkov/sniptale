@@ -1,3 +1,14 @@
+import { createCompositionJoinEndpoints } from '../../../features/video/composition/canvas/join-endpoints';
+import {
+  drawCompositionColorOverlay,
+  drawVideoProjectSceneEdges,
+} from '../../../features/video/composition/canvas/scene-edges';
+import { evaluateCompositionJoin } from '../../../features/video/project/scene/composition-join';
+import {
+  resolveVideoProjectCompositionJoinPlans,
+  resolveVideoProjectCompositionJoinEndpoints,
+} from '../../../features/video/project/scene/joins';
+import { createPreviewRenderResources } from '../../../workflows/video-review/preview-render-resources';
 import { createVideoProjectWatermarkRenderer } from '../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../runtime/session/asset-urls';
 import {
@@ -186,18 +197,137 @@ function createMaterializerSurface(
 
 export function createVideoPreviewFrameMaterializer(params: {
   assetUrls: Record<string, string>;
+  sampleFps?: number;
   ownerDocument: Document;
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
 }): VideoPreviewFrameMaterializer {
+  const joinPlans = resolveVideoProjectCompositionJoinPlans(params.project);
   const { canvas, stage } = createMaterializerSurface(params.ownerDocument, params.rasterSize);
   const state = createMaterializerMediaState(params, stage);
+  const presentation = joinPlans.length
+    ? createMaterializedJoinPresentation(params, state, canvas, stage, joinPlans)
+    : null;
 
   return {
     canvas,
-    dispose: () => disposeMaterializer(state, stage),
+    dispose: () => {
+      presentation?.dispose();
+      disposeMaterializer(state, stage);
+    },
     renderFrame: (time, signal, cameraOverride) =>
-      renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride),
+      presentation
+        ? presentation.renderFrame(time, signal, cameraOverride)
+        : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride),
+  };
+}
+
+function createMaterializedJoinPresentation(
+  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
+  state: VideoPreviewMaterializerState,
+  canvas: HTMLCanvasElement,
+  stage: HTMLDivElement,
+  plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>
+) {
+  const resources = createPreviewRenderResources({
+    maximumCanvases: 2,
+    maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 8,
+    createCanvas: () => params.ownerDocument.createElement('canvas'),
+  });
+  let cameraOverride: VideoCompositionCameraState | undefined;
+  let busy = false;
+  const endpoints = createCompositionJoinEndpoints({
+    resources,
+    size: params.rasterSize,
+    renderSample: async (time, signal) => ({
+      canvas: await renderMaterializedFrame(
+        params,
+        state,
+        canvas,
+        stage,
+        time,
+        signal,
+        cameraOverride,
+        'omit'
+      ),
+      release() {},
+    }),
+  });
+  return {
+    dispose() {
+      endpoints.dispose();
+      resources.dispose();
+    },
+    async renderFrame(time: number, signal: AbortSignal, nextCamera?: VideoCompositionCameraState) {
+      throwIfAborted(signal);
+      if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+      if (busy) throw new Error('Composition frame is already being materialized.');
+      if (cameraOverride !== nextCamera) endpoints.clear();
+      cameraOverride = nextCamera;
+      busy = true;
+      try {
+        const plan = plans.find((item) =>
+          evaluateCompositionJoin(time, item.seam, item.before, item.after)
+        );
+        if (!plan) {
+          endpoints.clear();
+          return await renderMaterializedFrame(
+            params,
+            state,
+            canvas,
+            stage,
+            time,
+            signal,
+            cameraOverride
+          );
+        }
+        const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Preview frame context is unavailable.');
+        if (plan.boundary.transition?.type === 'dissolve') {
+          const samples = resolveVideoProjectCompositionJoinEndpoints(
+            plan,
+            params.sampleFps ?? params.project.fps
+          );
+          await endpoints.draw(
+            context,
+            {
+              key: plan,
+              ...samples,
+              incomingWeight: blend.incoming,
+            },
+            signal
+          );
+        } else {
+          endpoints.clear();
+          await renderMaterializedFrame(
+            params,
+            state,
+            canvas,
+            stage,
+            time,
+            signal,
+            cameraOverride,
+            'omit'
+          );
+          drawCompositionColorOverlay(
+            context,
+            blend.black,
+            plan.boundary.transition?.color ?? '#000000'
+          );
+        }
+        throwIfAborted(signal);
+        if (state.disposed)
+          throw new DOMException('Preview preparation was cancelled', 'AbortError');
+        drawVideoProjectSceneEdges(context, params.project, time);
+        return canvas;
+      } catch (error) {
+        endpoints.clear();
+        throw error;
+      } finally {
+        busy = false;
+      }
+    },
   };
 }
 
@@ -276,7 +406,8 @@ async function renderMaterializedFrame(
   stage: HTMLDivElement,
   time: number,
   signal: AbortSignal,
-  cameraOverride?: VideoCompositionCameraState
+  cameraOverride?: VideoCompositionCameraState,
+  sceneEdges: 'apply' | 'omit' = 'apply'
 ): Promise<HTMLCanvasElement> {
   const assertActive = () => {
     throwIfAborted(signal);
@@ -288,6 +419,7 @@ async function renderMaterializedFrame(
   await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
   assertActive();
   const drawn = await renderPreviewScene({
+    ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
     captionRenderer: state.captionRenderer,
     watermarkRenderer: state.watermarkRenderer,
     stagingCanvas: () => {

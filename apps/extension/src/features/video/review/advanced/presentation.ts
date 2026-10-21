@@ -1,4 +1,8 @@
 import {
+  parseCompositionJoinSettings,
+  type CompositionJoinSettings,
+} from '../../project/scene/composition-join';
+import {
   parseBookendImagePresentation,
   parseBookendVideoPresentation,
   type BookendImagePresentation,
@@ -9,7 +13,6 @@ import {
   parsePresentationFade as fade,
   type PresentationFade as Fade,
 } from '../../project/scene/edge-fades';
-import { parseCutTransition, type ReviewCutTransition } from '../cut-transition';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';
@@ -47,8 +50,8 @@ export interface QuickEditPresentationSettings {
   audioFade: boolean;
   intro: Slot;
   outro: Slot;
-  introTransition?: ReviewCutTransition;
-  outroTransition?: ReviewCutTransition;
+  introTransition?: CompositionJoinSettings;
+  outroTransition?: CompositionJoinSettings;
 }
 
 /** Legacy omission is processing-neutral, including when advanced mode is selected. */
@@ -238,11 +241,11 @@ export function parseQuickEditPresentationSettings(
   const introTransition =
     value['introTransition'] === undefined
       ? undefined
-      : parseCutTransition(value['introTransition']);
+      : parseCompositionJoinSettings(value['introTransition']);
   const outroTransition =
     value['outroTransition'] === undefined
       ? undefined
-      : parseCutTransition(value['outroTransition']);
+      : parseCompositionJoinSettings(value['outroTransition']);
   if (introTransition === null || outroTransition === null) return null;
   return {
     ...(introControl ? { introControl } : {}),

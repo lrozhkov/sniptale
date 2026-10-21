@@ -27,6 +27,7 @@ import type {
 import type {
   VideoEditorBookendPlacementResult,
   VideoEditorBookendPresetUpdateResult,
+  VideoEditorCompositionJoinUpdateResult,
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
   VideoEditorMaterialTarget,
@@ -66,6 +67,11 @@ export interface VideoEditorProjectActions
     value: VideoProjectBookendPresets | undefined,
     expectedProject: VideoProject
   ) => VideoEditorBookendPresetUpdateResult;
+  /** Accepts exact clip-edge descriptors without changing the referenced timeline clips. */
+  updateCompositionJoins: (
+    value: VideoProject['compositionJoins'],
+    expectedProject: VideoProject
+  ) => VideoEditorCompositionJoinUpdateResult;
   /** Inserts an editable edge material against the exact accepted inspector snapshot. */
   placeBookendMaterial: (
     assetId: string,

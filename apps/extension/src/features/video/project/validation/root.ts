@@ -1,4 +1,8 @@
 import {
+  parseVideoProjectCompositionJoins,
+  hasValidVideoProjectCompositionJoinReferences,
+} from '../scene/joins';
+import {
   parseVideoProjectBookendPresets,
   hasValidVideoProjectBookendReferences,
 } from '../scene/bookend-presets';
@@ -103,8 +107,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 25) &&
+    isBoundedNumber(version, 2, 26) &&
     Number.isInteger(version) &&
+    (version >= 26 ||
+      (value['compositionJoins'] === undefined &&
+        (!isRecord(value['bookendPresets']) ||
+          (value['bookendPresets']['introTransition'] === undefined &&
+            value['bookendPresets']['outroTransition'] === undefined)))) &&
     (version >= 25 || value['bookendPresets'] === undefined) &&
     (version >= 24 || value['sceneEdges'] === undefined) &&
     (version >= 23 || value['commentDocuments'] === undefined) &&
@@ -209,6 +218,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
     (value['bookendPresets'] === undefined ||
       parseVideoProjectBookendPresets(value['bookendPresets']) !== null) &&
+    (value['compositionJoins'] === undefined ||
+      parseVideoProjectCompositionJoins(value['compositionJoins']) !== null) &&
     (value['sceneEdges'] === undefined ||
       parseVideoProjectSceneEdges(value['sceneEdges']) !== null) &&
     (value['sceneBackground'] === undefined ||
@@ -233,6 +244,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     hasValidSceneBackgroundReferences(project, assetIds) &&
     (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
     hasValidVideoProjectBookendReferences(project) &&
+    hasValidVideoProjectCompositionJoinReferences(project) &&
     (project.transitions ?? []).every(
       (transition) =>
         clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)

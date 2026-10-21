@@ -1,4 +1,4 @@
-import { parseCutTransition } from './cuts';
+import { parseCompositionJoinSettings } from '../project/scene/composition-join';
 import { parsePaint } from '@sniptale/foundation/paint';
 import { isReviewSpeedRate } from './speed';
 import { CANVAS_COMMENT_LIMITS } from './comments';
@@ -205,7 +205,7 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   };
   if (value['kind'] === 'cut') {
     if (value['transition'] === undefined) return { ...range, kind: 'cut' };
-    const transition = parseCutTransition(value['transition']);
+    const transition = parseCompositionJoinSettings(value['transition']);
     return transition ? { ...range, kind: 'cut', transition } : null;
   }
   const rate = value['rate'];

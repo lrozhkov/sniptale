@@ -1,3 +1,4 @@
+import type { CompositionJoinSettings } from '../project/scene/composition-join';
 /** Commands move the existing history cursor without appending an operation. */
 export type ReviewHistoryDirection = 'undo' | 'redo' | 'start';
 
@@ -41,12 +42,9 @@ interface ReviewEditRange {
   end: number;
 }
 
-import type { ReviewCutTransition } from './cut-transition';
-export type { ReviewCutTransition } from './cut-transition';
-
 export type ReviewEdit = ReviewEditRange &
   (
-    | { kind: 'cut'; transition?: ReviewCutTransition }
+    | { kind: 'cut'; transition?: CompositionJoinSettings }
     | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' }
   );
 

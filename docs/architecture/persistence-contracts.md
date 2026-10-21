@@ -581,7 +581,7 @@ Evaluated poses and GPU resources do not enter these fields. The change adds no 
 
 ## Montage bookend presets
 
-Project schema 25 admits optional `bookendPresets`. Each intro and outro slot retains image and video variants independently of its active mode. Earlier schemas refuse this field. Readers refuse future schemas. Reading adds no defaults. Mutation and removal retain schema 25.
+Project schema 25 admits optional `bookendPresets`. Each intro and outro slot retains image and video variants independently of its active mode. Earlier schemas refuse this field. Readers refuse future schemas. Reading adds no defaults. Mutation and removal retain schema 25 or a later version.
 
 Each variant references a project material by its exact `assetId`. The reference does not contain a private resource identity. Inactive variants retain their references. Material use counts protect all retained variants from unused cleanup. Confirmed source removal clears only matching variants. Copy and portable restore preserve settings and material identities. The existing restore owner remaps private source identities separately.
 
@@ -590,3 +590,25 @@ Both editors share media framing, image duration, video trim and audio settings.
 A preset edit changes the recipe for future insertions. It never rebuilds existing clips. Insertion creates ordinary media clips and an editable opaque shape behind them. The linked shape follows splitting, trimming and movement. A speed edit from a source clip also retimes linked shapes with identical bounds. All affected tracks retain their lock and neighbor constraints.
 
 Recipe edits require the exact accepted project snapshot and an idle history owner. Invalid references, stale snapshots and history failures preserve the project and history. The existing mutation, history, save and revision owners retain authority. This field adds no writer, queue, store or physical database migration.
+
+## Montage composition joins
+
+Project schema 26 admits optional `compositionJoins` and transition settings in `bookendPresets`. Earlier schemas refuse these fields. Reading adds no defaults. Mutation never reduces the schema version.
+
+A join descriptor references the start or end of one ordinary image or video clip. The project accepts at most 128 descriptors. Descriptor identities and clip-edge pairs must be unique. Hydration retains valid descriptor shapes with missing clips. Export admission refuses missing anchors.
+
+Insertion records a boundary even when its transition is None. These boundaries limit adjacent composition regions. An intro boundary follows the trailing descendant after a split. An outro boundary follows the original leading clip. Movement, trim and rate changes follow the referenced edge. Deletion removes the exact anchor descriptor. Clip duplication does not copy its boundary. Project duplication preserves clip and descriptor identities.
+
+A preset transition configures future insertions. Editing a preset never changes existing instances. Instance edits require the exact accepted project and an idle history owner. Invalid proposals, stale projects and history failures preserve the project and history. Accepted edits create one history step.
+
+Dissolve samples two complete compositions around the boundary. Samples include all tracks, camera settings, effects, captions and watermark. Samples exclude recursive joins and outer fades. The renderer applies outer fades once after the mix. Color transitions cover the current complete frame. Joins never change montage duration or crossfade audio.
+
+Native preview uses the project frame rate. Export and size estimation use the selected output frame rate. Fractional rates remain fractional. The Native cadence normalizes rates below one to one. Gallery retains its rational microsecond clock. An unavailable dissolve endpoint fails the affected render request without partial publication. Other timestamps remain available.
+
+The shared canvas owner retains at most two immutable endpoint copies. Native adapters use independent paused media with borrowed source URLs. The existing job or preview scheduler owns cancellation and disposal. Cleanup releases samplers before it revokes borrowed URLs. No new source reader, writer, store or physical database migration exists.
+
+Caption admission checks each held sample at its exact time, including samples outside the selected export range.
+
+Selected-clip export removes whole-composition joins from a temporary subset. A complete selection retains the original project. Project and selected-range exports retain joins. None of these projections changes the accepted root. Hybrid MP4 uses complete composition rendering inside active join windows. Existing fast paths remain available outside those windows.
+
+Both editors share controlled fields and transition settings. Each editor retains timing, resource admission, preview and history ownership. The removed on-video notes interface remains absent.

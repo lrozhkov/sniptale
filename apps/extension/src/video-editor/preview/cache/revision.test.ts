@@ -384,3 +384,62 @@ it('invalidates exact frames and every segment for authored final-canvas waterma
     await createVideoPreviewSegmentRevision(project, { startFrame: 0, endFrame: 20 })
   ).not.toBe(segment);
 });
+
+it('invalidates an active join segment when a held complete endpoint changes outside that segment', async () => {
+  const project = { ...createEmptyVideoProject('Join'), duration: 4, fps: 10 };
+  const trackId = project.tracks[0]!.id;
+  const asset = createVideoProjectAsset(
+    'Intro',
+    'IMAGE',
+    { kind: 'project-asset', projectAssetId: 'intro-bytes' },
+    {
+      duration: null,
+      width: 100,
+      height: 100,
+      mimeType: 'image/png',
+      hasAudio: false,
+      audioPeaks: null,
+      size: 100,
+    }
+  );
+  project.assets = [asset];
+  const first = {
+    ...createVideoClipFromAsset(trackId, asset, project.width, project.height, 0),
+    duration: 1,
+  };
+  const second = { ...createTextClip(trackId, project.width, project.height, 3), duration: 1 };
+  project.clips = [first, second];
+  const joined = {
+    ...project,
+    compositionJoins: [
+      {
+        id: 'join',
+        clipId: first.id,
+        edge: 'end' as const,
+        transition: { type: 'dissolve' as const, before: 0.2, after: 0.2 },
+      },
+    ],
+  };
+  const range = { startFrame: 9, endFrame: 11 };
+  const revision = await createVideoPreviewSegmentRevision(joined, range);
+  await expect(
+    createVideoPreviewSegmentRevision(
+      { ...joined, clips: [first, { ...second, text: 'Changed endpoint overlay' }] },
+      range
+    )
+  ).resolves.not.toBe(revision);
+  await expect(
+    createVideoPreviewSegmentRevision(
+      {
+        ...joined,
+        compositionJoins: [
+          {
+            ...joined.compositionJoins[0]!,
+            transition: { type: 'fade-black', before: 0.2, after: 0.2 },
+          },
+        ],
+      },
+      range
+    )
+  ).resolves.not.toBe(revision);
+});

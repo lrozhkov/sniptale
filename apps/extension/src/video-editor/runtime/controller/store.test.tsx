@@ -116,6 +116,7 @@ const expectedKeys = {
     'appendMaterial',
     'placeBookendMaterial',
     'updateBookendPresets',
+    'updateCompositionJoins',
     'insertMaterial',
     'overlayMaterial',
     'addAssetClip',
