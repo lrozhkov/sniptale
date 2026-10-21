@@ -218,7 +218,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
           ? { fullCodecString: input.encoding.videoCodecString }
           : {}),
         onEncodedPacket: observeEncodedPacket,
-        sizeChangeBehavior: 'deny',
+        sizeChangeBehavior: 'contain',
         onEncoderConfig: (config) => this.assertEncoderConfig(config),
       });
     }
