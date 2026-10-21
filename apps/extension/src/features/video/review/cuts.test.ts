@@ -201,3 +201,31 @@ it('clips transition frame authority to a fragment and leaves old cuts unmodifie
   ]);
   expect(configured.transition).toEqual({ type: 'dissolve', before: 2, after: 2 });
 });
+
+it('retains the exact selected seam and its frame bounds when windows share an endpoint', () => {
+  const plans = planReviewCutTransitions(10, [
+    {
+      id: 'a',
+      kind: 'cut',
+      start: 2,
+      end: 4,
+      requestedStart: 2,
+      requestedEnd: 4,
+      transition: { type: 'dissolve', before: 1, after: 2 },
+    },
+    {
+      id: 'b',
+      kind: 'cut',
+      start: 6,
+      end: 8,
+      requestedStart: 6,
+      requestedEnd: 8,
+      transition: { type: 'fade-black', before: 2, after: 1 },
+    },
+  ]);
+  const sharedBoundary = plans[0]!.seam + plans[0]!.after;
+  expect(sharedBoundary).toBe(plans[1]!.seam - plans[1]!.before);
+  expect(reviewCutTransitionAt(sharedBoundary, plans)?.plan).toBe(plans[1]);
+  expect(reviewCutTransitionAt(sharedBoundary, plans)?.plan.left).toBe(plans[1]!.left);
+  expect(reviewCutTransitionAt(NaN, plans)).toBeNull();
+});

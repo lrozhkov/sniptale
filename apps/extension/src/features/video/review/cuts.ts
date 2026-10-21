@@ -1,3 +1,4 @@
+import { evaluateCompositionJoin } from '../project/scene/composition-join';
 export { parseCutTransition } from './cut-transition';
 import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
@@ -181,20 +182,11 @@ export function planReviewCutTransitions(
 
 /** Shared blend evaluation; outside a transition the native frame remains unchanged. */
 export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTransitionPlan[]) {
-  const plan = plans.find(
-    (item) => time >= item.seam - item.before && time < item.seam + item.after
-  );
-  if (!plan || plan.before + plan.after <= 0) return null;
-  const incoming = (time - plan.seam + plan.before) / (plan.before + plan.after);
-  const black =
-    time < plan.seam
-      ? plan.before > 0
-        ? 1 - (plan.seam - time) / plan.before
-        : 1
-      : plan.after > 0
-        ? 1 - (time - plan.seam) / plan.after
-        : 0;
-  return { plan, incoming, beforeSeam: time < plan.seam, black: Math.max(0, Math.min(1, black)) };
+  for (const plan of plans) {
+    const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after);
+    if (blend) return { plan, ...blend };
+  }
+  return null;
 }
 
 /** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */

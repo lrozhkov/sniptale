@@ -1,3 +1,4 @@
+import { evaluateCompositionJoin } from '../../features/video/project/scene/composition-join';
 import { reviewWatermarkAssets } from './asset-bytes';
 import type { InputAudioTrack } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
@@ -186,20 +187,14 @@ class PresentationRenderer {
     this.busy = true;
     let output: RenderCanvasLease | undefined;
     try {
-      const join = this.plan.joins?.find(
-        (entry) =>
-          candidate.timestampUs >= entry.seamUs - entry.beforeUs &&
-          candidate.timestampUs < entry.seamUs + entry.afterUs
-      );
+      const selected = this.joinAt(candidate.timestampUs);
+      const join = selected?.join;
       if (this.endpoints?.join !== join) this.releaseEndpoints();
-      if (join?.type === 'dissolve') output = await this.dissolve(join, candidate.timestampUs);
+      if (selected?.join.type === 'dissolve')
+        output = await this.dissolve(selected.join, selected.blend.incoming);
       else {
         output = await this.renderContent(candidate);
-        if (join) {
-          const distance = candidate.timestampUs - join.seamUs;
-          const alpha = distance < 0 ? 1 + distance / join.beforeUs : 1 - distance / join.afterUs;
-          this.drawColor(output.context, Math.max(0, Math.min(1, alpha)), join.color);
-        }
+        if (selected) this.drawColor(output.context, selected.blend.black, selected.join.color);
       }
       this.assertLive();
       this.drawFade(output.context, candidate.timestampUs);
@@ -224,6 +219,14 @@ class PresentationRenderer {
     } finally {
       this.busy = false;
     }
+  }
+
+  private joinAt(timeUs: number) {
+    for (const join of this.plan.joins ?? []) {
+      const blend = evaluateCompositionJoin(timeUs, join.seamUs, join.beforeUs, join.afterUs);
+      if (blend) return { join, blend };
+    }
+    return null;
   }
 
   private async renderContent(candidate: PresentationCandidate): Promise<RenderCanvasLease> {
@@ -269,7 +272,7 @@ class PresentationRenderer {
     }
   }
 
-  private async dissolve(join: PresentationJoin, timeUs: number): Promise<RenderCanvasLease> {
+  private async dissolve(join: PresentationJoin, incoming: number): Promise<RenderCanvasLease> {
     if (!this.endpoints) {
       const outgoing = await this.endpoint(join.outgoingTick, 'presentation-join-outgoing');
       try {
@@ -286,7 +289,6 @@ class PresentationRenderer {
       const context = output.context;
       context.save();
       try {
-        const incoming = (timeUs - join.seamUs + join.beforeUs) / (join.beforeUs + join.afterUs);
         context.globalAlpha = 1 - incoming;
         context.drawImage(this.endpoints.outgoing.canvas, 0, 0);
         // Add premultiplied contributions so transparent corners also dissolve away.
