@@ -1,5 +1,5 @@
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
-import { decoratedMediaSourceSize } from '../window-geometry';
+import { decoratedMediaSourceSize, resolveMediaFitFrame } from '../window-geometry';
 import {
   DEFAULT_CLIP_FADE_MS,
   DEFAULT_CLIP_VOLUME,
@@ -108,9 +108,6 @@ function resolveMediaClipBaseScale(
   projectHeight: number,
   fitMode: VideoMediaFitMode
 ) {
-  const widthRatio = projectWidth / sourceWidth;
-  const heightRatio = projectHeight / sourceHeight;
-
   switch (fitMode) {
     case VideoMediaFitMode.SOURCE_100:
       return 1;
@@ -118,9 +115,17 @@ function resolveMediaClipBaseScale(
       return Math.max(projectWidth, projectHeight) / Math.max(sourceWidth, sourceHeight);
     case VideoMediaFitMode.FIT_SHORT_SIDE:
     case VideoMediaFitMode.COVER:
-      return Math.max(widthRatio, heightRatio);
+      return resolveMediaFitFrame({
+        source: { width: sourceWidth, height: sourceHeight },
+        output: { width: projectWidth, height: projectHeight },
+        fit: 'cover',
+      }).scale;
     case VideoMediaFitMode.CONTAIN:
-      return Math.min(widthRatio, heightRatio);
+      return resolveMediaFitFrame({
+        source: { width: sourceWidth, height: sourceHeight },
+        output: { width: projectWidth, height: projectHeight },
+        fit: 'contain',
+      }).scale;
     case VideoMediaFitMode.STRETCH:
       return 1;
   }

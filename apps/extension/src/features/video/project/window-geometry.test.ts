@@ -9,6 +9,7 @@ import {
   mediaWindowPadding,
   roundedWindowClearance,
   roundedWindowRadius,
+  resolveMediaFitFrame,
 } from './window-geometry';
 
 it('clamps window radius without changing its visible bounds', () => {
@@ -79,4 +80,33 @@ it('decorates already-cropped source dimensions with the canonical header exactl
     width: 80,
     height: 90 + windowHeaderGeometry(DEFAULT_WINDOW_HEADER, source).height,
   });
+});
+
+it('keeps odd-aspect contain geometry fractional and ignores dormant cover crop', () => {
+  const frame = resolveMediaFitFrame({
+    source: { width: 641, height: 359 },
+    output: { width: 321, height: 181 },
+    fit: 'contain',
+    crop: { panX: 0.75, panY: -0.6 },
+  });
+  expect(frame.width).toBe(321);
+  expect(frame.height).toBeCloseTo(179.78003120124805, 9);
+  expect(frame.x).toBe(0);
+  expect(frame.y).toBeCloseTo(0.609984399375975, 9);
+});
+
+it.each([
+  [641, 359, 323.1782729805014, 181, -1.9059888579387188, 0],
+  [359, 641, 321, 573.150417827298, 0, -78.43008356545961],
+])('positions odd cover source %sx%s on the fractional output plane', (sw, sh, w, h, x, y) => {
+  const frame = resolveMediaFitFrame({
+    source: { width: sw, height: sh },
+    output: { width: 321, height: 181 },
+    fit: 'cover',
+    crop: { panX: 0.75, panY: -0.6 },
+  });
+  expect(frame.width).toBeCloseTo(w, 9);
+  expect(frame.height).toBeCloseTo(h, 9);
+  expect(frame.x).toBeCloseTo(x, 9);
+  expect(frame.y).toBeCloseTo(y, 9);
 });

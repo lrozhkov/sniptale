@@ -200,3 +200,22 @@ it('optional header fitting equals fitting the decorated plane and retains old n
     );
   }
 });
+
+it('retains integer Native placement after shared odd-aspect contain and cover fitting', () => {
+  expect(createFittedTransform(641, 359, 321, 181)).toEqual({
+    width: 321,
+    height: 180,
+    x: 0,
+    y: 1,
+    rotation: 0,
+    opacity: 1,
+  });
+  expect(resolveMediaClipTransformForFitMode(641, 359, 321, 181, VideoMediaFitMode.COVER)).toEqual({
+    width: 323,
+    height: 181,
+    x: -1,
+    y: 0,
+    rotation: 0,
+    opacity: 1,
+  });
+});

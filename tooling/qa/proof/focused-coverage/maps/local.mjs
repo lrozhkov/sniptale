@@ -167,6 +167,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Window geometry serves both editors, framing, crop/header rendering, source interactions and admission.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-frame.test.ts',
       'apps/extension/src/features/video/project/factories/clip.test.ts',
       'apps/extension/src/features/video/project/factories/framing-presets.test.ts',
       'apps/extension/src/features/video/review/advanced/scene.test.ts',

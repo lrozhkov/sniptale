@@ -1,3 +1,4 @@
+import { resolveMediaFitFrame } from '../../features/video/project/window-geometry';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 
 type Size = { width: number; height: number };
@@ -26,14 +27,7 @@ export function drawReviewPresentationFrame(
     )
   )
     throw new Error('Invalid presentation dimensions');
-  const scale =
-    framing.fit === 'cover'
-      ? Math.max(output.width / source.width, output.height / source.height)
-      : Math.min(output.width / source.width, output.height / source.height);
-  const width = source.width * scale;
-  const height = source.height * scale;
-  const panX = framing.fit === 'cover' ? framing.crop.panX : 0;
-  const panY = framing.fit === 'cover' ? framing.crop.panY : 0;
+  const frame = resolveMediaFitFrame({ source, output, fit: framing.fit, crop: framing.crop });
   context.save();
   try {
     context.setTransform(1, 0, 0, 1, 0, 0);
@@ -49,13 +43,7 @@ export function drawReviewPresentationFrame(
     context.clip();
     context.fillStyle = framing.fillColor;
     context.fillRect(0, 0, output.width, output.height);
-    draw(
-      context,
-      ((output.width - width) * (panX + 1)) / 2,
-      ((output.height - height) * (panY + 1)) / 2,
-      width,
-      height
-    );
+    draw(context, frame.x, frame.y, frame.width, frame.height);
   } finally {
     context.restore();
   }

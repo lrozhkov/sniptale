@@ -1,6 +1,36 @@
 import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 type Range = readonly [number, number];
 
+/** Fits admitted media dimensions without raster rounding; contain ignores remembered cover pan. */
+export function resolveMediaFitFrame(params: {
+  source: { width: number; height: number };
+  output: { width: number; height: number };
+  fit: 'contain' | 'cover';
+  crop?: { panX: number; panY: number };
+}) {
+  const scale =
+    params.fit === 'cover'
+      ? Math.max(
+          params.output.width / params.source.width,
+          params.output.height / params.source.height
+        )
+      : Math.min(
+          params.output.width / params.source.width,
+          params.output.height / params.source.height
+        );
+  const width = params.source.width * scale;
+  const height = params.source.height * scale;
+  const panX = params.fit === 'cover' ? (params.crop?.panX ?? 0) : 0;
+  const panY = params.fit === 'cover' ? (params.crop?.panY ?? 0) : 0;
+  return {
+    scale,
+    width,
+    height,
+    x: ((params.output.width - width) * (panX + 1)) / 2,
+    y: ((params.output.height - height) * (panY + 1)) / 2,
+  };
+}
+
 /** Clamp a logical radius to the visible decorated window. */
 export function roundedWindowRadius(width: number, height: number, radius: number): number {
   return Math.max(0, Math.min(radius, width / 2, height / 2));
