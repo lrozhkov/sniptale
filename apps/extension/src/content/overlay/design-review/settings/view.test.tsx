@@ -294,6 +294,15 @@ it('preserves text-property toggles, accepted-value reset, and disabled admissio
     expect(localActions.updateValue).toHaveBeenLastCalledWith(property, value);
   }
   for (const key of ['textStyleGroup', 'textAlign'] as const) {
+    const reset = button(
+      `${translate(`content.designReview.${key}`)}: ${translate('content.designReview.resetProperty')}`
+    );
+    expect(reset.closest('.sniptale-parameter-name')).not.toBeNull();
+    expect(reset.closest('.sniptale-parameter-value')).toBeNull();
+    expect(reset.className).not.toContain('opacity-0');
+    expect(reset.closest('.sniptale-parameter-name')?.className).toContain(
+      '!text-[var(--sniptale-color-accent)]'
+    );
     act(() =>
       button(
         `${translate(`content.designReview.${key}`)}: ${translate('content.designReview.resetProperty')}`

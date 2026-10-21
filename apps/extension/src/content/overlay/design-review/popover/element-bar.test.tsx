@@ -47,6 +47,18 @@ function copyButton() {
   )!;
 }
 
+it('uses the neighboring utility shell for delete without losing its danger cue or action', () => {
+  act(() => root.render(<DesignReviewElementBar {...base} onCopyElement={async () => true} />));
+  const remove = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Удалить замечание"]'
+  )!;
+  expect(remove.className).toContain('sniptale-btn-utility');
+  expect(remove.className).not.toContain('sniptale-btn-danger');
+  expect(remove.className).toContain('text-[var(--sniptale-color-danger)]');
+  act(() => remove.click());
+  expect(base.onDeleteRequest).toHaveBeenCalledOnce();
+});
+
 it('offers targeted text editing and a compact reset only for modified text', () => {
   const copy = vi.fn(async () => true);
   act(() => root.render(<DesignReviewElementBar {...base} onCopyElement={copy} />));

@@ -86,7 +86,7 @@ export function DesignReviewElementBar(props: {
         <ContentToolbarButton
           tone="utility"
           type="button"
-          className="!h-6 !w-6 shrink-0 !p-0"
+          className="!h-6 !w-6 shrink-0 !p-0 [&_svg]:!size-3"
           dataUi="content.design-review.reset-text"
           disabled={!props.text.resettable}
           aria-label={translate('content.designReview.resetText')}
@@ -144,7 +144,7 @@ export function DesignReviewElementBar(props: {
           label={translate('content.designReview.deleteFeedback')}
           onClick={props.onDeleteRequest}
         >
-          <Trash2 size={16} />
+          <Trash2 size={16} className="text-[var(--sniptale-color-danger)]" />
         </ElementActionButton>
       ) : null}
     </div>
@@ -162,7 +162,7 @@ function ElementActionButton(props: {
 }) {
   return (
     <ContentToolbarButton
-      tone={props.danger ? 'danger' : props.active ? 'property' : 'utility'}
+      tone={props.active ? 'property' : 'utility'}
       active={props.active ?? false}
       type="button"
       className={[

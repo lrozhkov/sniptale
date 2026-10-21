@@ -2,7 +2,8 @@ import { Link2, Unlink2 } from 'lucide-react';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
-import { propertyValue } from '../value-editing/values';
+import { propertyModified, propertyValue } from '../value-editing/values';
+import { FieldResetButton } from './field-shell';
 import { AXIS_SIDE_INDEXES, type SideAxis, useSideFieldLinking } from './side-fields-state';
 import { resolveSideValueKind, SideValueInput } from './side-value-input';
 
@@ -221,7 +222,20 @@ export function LinkedSideFields(props: {
     >
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
         <div className={expanded ? 'col-span-2 min-w-0' : 'min-w-0'}>
-          <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
+          <div className="flex min-w-0 items-center gap-1">
+            <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
+            {linking.model.modifiedCount > 0 && !props.disabled ? (
+              <FieldResetButton
+                label={props.label}
+                onReset={() => {
+                  for (const property of props.properties) {
+                    if (propertyModified(props.state, property))
+                      props.onChange(property, props.state.defaultValues[property] ?? '');
+                  }
+                }}
+              />
+            ) : null}
+          </div>
         </div>
         {!expanded ? (
           <div className="min-w-0">

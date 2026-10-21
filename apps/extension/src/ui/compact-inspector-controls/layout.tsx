@@ -16,6 +16,8 @@ export function useInspectorLayout() {
 /** One geometry owner fits ordinary name/value rows before stacking the value. */
 export function InspectorParameterRow(props: {
   label: string;
+  labelAccessory?: React.ReactNode;
+  labelModified?: boolean | undefined;
   children: React.ReactNode;
   valueMinimum?: number;
   valueText?: string | undefined;
@@ -28,6 +30,7 @@ export function InspectorParameterRow(props: {
 }) {
   const row = React.useRef<HTMLDivElement>(null);
   const name = React.useRef<HTMLSpanElement>(null);
+  const hasLabelAccessory = Boolean(props.labelAccessory);
   const [stacked, setStacked] = React.useState(props.stacked ?? false);
   const fit = React.useCallback(() => {
     const element = row.current;
@@ -38,7 +41,12 @@ export function InspectorParameterRow(props: {
     if (!context) return;
     context.font = getComputedStyle(label).font;
     const available = element.clientWidth - 16;
-    const labelWidth = context.measureText(props.label).width;
+    const accessoryWidth = hasLabelAccessory
+      ? (label.querySelector('[data-parameter-label-accessory]')?.getBoundingClientRect().width ??
+        0)
+      : 0;
+    const labelWidth =
+      context.measureText(props.label).width + (accessoryWidth ? accessoryWidth + 4 : 0);
     const valueWidth = Math.max(
       props.valueMinimum ?? 100,
       props.valueText ? context.measureText(props.valueText).width + 40 : 0,
@@ -54,6 +62,7 @@ export function InspectorParameterRow(props: {
     setStacked(labelWidth > (available - 8) * 0.45 || valueWidth > (available - 8) * 0.55);
   }, [
     props.label,
+    hasLabelAccessory,
     props.stacked,
     props.keepInline,
     props.valueMinimum,
@@ -97,8 +106,20 @@ export function InspectorParameterRow(props: {
         }
       }}
     >
-      <span ref={name} className="sniptale-parameter-name" title={props.label}>
-        {props.label}
+      <span
+        ref={name}
+        title={props.label}
+        className={cx(
+          'sniptale-parameter-name',
+          props.labelModified && '!text-[var(--sniptale-color-accent)]'
+        )}
+      >
+        <span>{props.label}</span>
+        {props.labelAccessory ? (
+          <span data-parameter-label-accessory className="ml-1 inline-flex shrink-0">
+            {props.labelAccessory}
+          </span>
+        ) : null}
       </span>
       <div className="sniptale-parameter-value">{props.children}</div>
     </div>

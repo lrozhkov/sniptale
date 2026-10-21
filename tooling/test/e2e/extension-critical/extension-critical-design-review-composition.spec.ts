@@ -190,6 +190,27 @@ for (const theme of ['light', 'dark'] as const) {
         await comment.fill('Проверка композиции и сохранения комментария');
         await comment.press('Enter');
         await expect(popover).toHaveCount(0);
+        await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+        const remove = popover.getByRole('button', {
+          name: /^(Delete feedback|Удалить замечание)$/u,
+        });
+        await expect(remove).toBeVisible();
+        await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await remove.hover();
+        await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await page.screenshot({
+          path: info.outputPath('delete-hover-no-border.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await remove.click();
+        const confirmation = popover.locator(
+          '[data-ui="content.design-review.delete-confirmation"]'
+        );
+        await expect(confirmation).toBeVisible();
+        await confirmation.getByRole('button', { name: /^(Cancel|Отмена)$/u }).click();
+        await expect(confirmation).toHaveCount(0);
+        await close.click();
         await toolbar.locator('[data-ui="content.toolbar.design-review-panel-button"]').click();
         await expect(
           page.locator('[data-ui="content.design-review.feedback-panel"]')

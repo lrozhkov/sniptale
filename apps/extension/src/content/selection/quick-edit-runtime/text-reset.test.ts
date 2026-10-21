@@ -10,6 +10,11 @@ import {
 import { createQuickEditHistoryTracker } from './history';
 import { canResetQuickEditText, resetQuickEditText } from './text-reset';
 import * as historyModule from '../../parser/page-preparation/history';
+import { teardownDesignReviewSessionAfterUiTransition } from '../../overlay/design-review/runtime/session-teardown';
+import {
+  applyPageStylePatchWithHistory,
+  flushPendingPageStyleHistory,
+} from '../../overlay/design-review/runtime/actions';
 
 const bridge = {
   applySnapshot: (snapshot: PagePreparationSessionSnapshot) => {
@@ -54,6 +59,73 @@ function edit(value: string, id: string): void {
   target.textContent = value;
   expect(tracker.commit(target, id)).toBe(true);
 }
+
+it('restores canonical text and style together before clearing and closing', async () => {
+  Object.defineProperty(target, 'getClientRects', {
+    value: () => [DOMRect.fromRect({ width: 200, height: 40 })],
+  });
+  edit('Changed text', 'before-close');
+  await applyPageStylePatchWithHistory({
+    element: target,
+    patch: { declarations: [{ property: 'font-style', value: 'italic' }] },
+  });
+  const transition = vi.fn();
+  await teardownDesignReviewSessionAfterUiTransition(transition);
+  expect(target.textContent).toBe('Original text');
+  expect(target.querySelector('strong')?.textContent).toBe('Original');
+  expect(target.style.fontStyle).toBe('');
+  expect(browserAnnotationSession.captureSnapshot().domRecords).toEqual([]);
+  expect(pagePreparationHistory.getState().canUndo).toBe(false);
+  expect(transition).toHaveBeenCalledOnce();
+});
+
+it('keeps the UI and factual text history when restoration cannot make progress', async () => {
+  edit('Keep this work', 'blocked-close');
+  const before = browserAnnotationSession.captureSnapshot();
+  vi.spyOn(pagePreparationHistory, 'undo').mockImplementation(() => {});
+  const transition = vi.fn();
+  await expect(teardownDesignReviewSessionAfterUiTransition(transition)).rejects.toThrow(
+    'could not be restored'
+  );
+  expect(transition).not.toHaveBeenCalled();
+  expect(target.textContent).toBe('Keep this work');
+  expect(browserAnnotationSession.captureSnapshot()).toEqual(before);
+  expect(pagePreparationHistory.getState().canUndo).toBe(true);
+});
+
+it('resets text without removing canonical style evidence or its reversible history', async () => {
+  Object.defineProperty(target, 'getClientRects', {
+    value: () => [DOMRect.fromRect({ width: 200, height: 40 })],
+  });
+  edit('Changed', 'initial-text');
+  await applyPageStylePatchWithHistory({
+    element: target,
+    patch: {
+      declarations: [
+        { property: 'font-weight', value: '700' },
+        { property: 'font-style', value: 'italic' },
+      ],
+    },
+  });
+  flushPendingPageStyleHistory();
+  const before = browserAnnotationSession.captureSnapshot().domRecords[0]!;
+  expect(before.propertyChanges).toHaveLength(2);
+  expect(resetQuickEditText(target)).toBe(true);
+  const after = browserAnnotationSession.captureSnapshot().domRecords[0]!;
+  expect(after.propertyChanges).toEqual(before.propertyChanges);
+  expect(after.textChange).toBeUndefined();
+  expect(target.style.fontWeight).toBe('700');
+  expect(target.style.fontStyle).toBe('italic');
+  pagePreparationHistory.undo();
+  expect(target.textContent).toBe('Changed');
+  expect(browserAnnotationSession.captureSnapshot().domRecords[0]?.propertyChanges).toEqual(
+    before.propertyChanges
+  );
+  pagePreparationHistory.redo();
+  expect(browserAnnotationSession.captureSnapshot().domRecords[0]?.propertyChanges).toEqual(
+    before.propertyChanges
+  );
+});
 
 it('restores earliest rich text after repeated canonical edits while retaining live CSS', () => {
   edit('Review edit', 'review');

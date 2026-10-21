@@ -20,6 +20,8 @@ async function readElementStyles(target: Locator) {
       background: style.backgroundColor,
       color: style.color,
       textAlign: style.textAlign,
+      fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle,
     };
   });
 }
@@ -198,6 +200,7 @@ for (const { theme, locale } of [
         });
         const target = page.locator('#review-inline-text');
         const originalMarkup = await target.evaluate((node) => node.innerHTML);
+        const originalStyles = await readElementStyles(target);
         const popover = page.locator('[data-ui="content.design-review.popover"]');
         const preview = popover.locator('[data-ui="content.design-review.element-text"]');
         const reset = popover.locator('[data-ui="content.design-review.reset-text"]');
@@ -212,6 +215,10 @@ for (const { theme, locale } of [
         await popover.getByRole('button', { name: propertiesLabel }).click();
         await popover.getByRole('button', { name: /^(Center|По центру)$/u }).click();
         await expect(target).toHaveCSS('text-align', 'center');
+        await popover.getByRole('button', { name: /^(Weight|Насыщенность)$/u }).click();
+        await popover.getByRole('button', { name: /^(Style|Наклон)$/u, exact: true }).click();
+        await expect(target).toHaveCSS('font-weight', '700');
+        await expect(target).toHaveCSS('font-style', 'italic');
         await popover.getByRole('button', { name: propertiesLabel }).click();
         await beginTextEdit(page, target);
         for (const direction of ['right', 'below', 'left'] as const) {
@@ -230,6 +237,7 @@ for (const { theme, locale } of [
         await expect(popover).toBeVisible();
         await expect(preview).toHaveText('Edited with Enter');
         await expect(reset).toBeEnabled();
+        await expect(reset.locator('svg')).toHaveCSS('width', '12px');
         await expect(preview).toHaveAttribute(
           'title',
           locale === 'ru' ? 'Текст изменён' : 'Text edited'
@@ -258,6 +266,26 @@ for (const { theme, locale } of [
         await expect.poll(() => target.evaluate((node) => node.innerHTML)).toBe(originalMarkup);
         await expect(target).toHaveCSS('text-align', 'center');
         await expect(reset).toHaveCount(0);
+        await popover.getByRole('button', { name: propertiesLabel }).click();
+        const alignReset = popover.getByRole('button', {
+          name: /^(Align: reset|Выравнивание: сбросить)$/u,
+        });
+        await expect(alignReset).toBeVisible();
+        await expect(alignReset).toHaveCSS('opacity', '1');
+        const styleReset = popover.getByRole('button', {
+          name: /^(Style: reset|Начертание: сбросить)$/u,
+        });
+        await expect(styleReset).toBeVisible();
+        await expect(styleReset).toHaveCSS('opacity', '1');
+        await expect(alignReset.locator('svg')).toHaveCSS('width', '12px');
+        expect(
+          await alignReset.evaluate((node) => Boolean(node.closest('.sniptale-parameter-name')))
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath('text-reset-preserves-property-history.png'),
+          fullPage: false,
+        });
+        await popover.getByRole('button', { name: propertiesLabel }).click();
         await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
         await expect
           .poll(
@@ -313,6 +341,15 @@ for (const { theme, locale } of [
         await reset.click();
         await expect(frameText).toHaveText('Frame original text');
         await page.screenshot({ path: info.outputPath('frame-text-reset.png'), fullPage: false });
+        await popover.getByRole('button', { name: /^(Close|Закрыть)$/u }).click();
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await page.getByRole('button', { name: /^(Clear and close|Очистить и закрыть)$/u }).click();
+        await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveCount(0);
+        await page.screenshot({ path: info.outputPath('after-clear.png'), fullPage: false });
+        await expect(target).toHaveCSS('text-align', originalStyles.textAlign);
+        await expect(target).toHaveCSS('font-weight', originalStyles.fontWeight);
+        await expect(target).toHaveCSS('font-style', originalStyles.fontStyle);
+        await expect(target).toHaveText('Original rich text');
       } finally {
         await popup.close();
         await page.close();
