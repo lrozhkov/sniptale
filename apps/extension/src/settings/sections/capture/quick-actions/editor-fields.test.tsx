@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSectionState } from './state.test-helpers.ts';
+import { translate } from '../../../../platform/i18n';
 
 const { productSelectPropsSpy, hotkeyInputPropsSpy } = vi.hoisted(() => ({
   productSelectPropsSpy: vi.fn(),
@@ -147,6 +148,21 @@ it('bounds the icon picker and retains selection after collapsing it', () => {
   expect(state.updateFormField).toHaveBeenCalledWith('icon', 'Star');
   act(() => more.click());
   expect(picker.querySelectorAll('button')).toHaveLength(24);
+});
+
+it('provides an explicit label for an inherited capture delay', () => {
+  renderFields();
+  const delay = productSelectPropsSpy.mock.calls
+    .map(([props]) => props)
+    .find((props) => props.options.some((option: { value: string }) => option.value === '5'));
+  expect(delay?.options).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        value: '',
+        label: translate('settings.quickActions.followSettingsPlaceholder'),
+      }),
+    ])
+  );
 });
 
 function verifyQuickActionEditorFieldInteractions() {

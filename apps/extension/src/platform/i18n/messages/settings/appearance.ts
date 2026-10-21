@@ -281,6 +281,10 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Добавьте команду из каталога',
     en: 'Add a command from the catalog',
   },
+  contextMenuEmptySection: {
+    ru: 'В этом разделе нет команд. Выберите команду из каталога, чтобы добавить её.',
+    en: 'No commands in this section. Select a command from the catalog to add it.',
+  },
   contextMenuCatalogLoading: { ru: 'Загрузка команд…', en: 'Loading commands…' },
   contextMenuCatalogFailed: {
     ru: 'Не удалось загрузить быстрые действия',

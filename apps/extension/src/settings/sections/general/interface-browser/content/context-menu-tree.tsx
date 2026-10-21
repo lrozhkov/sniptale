@@ -1,4 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { Plus } from 'lucide-react';
 import { settingsAddButtonClassName } from '../../../../section-surface';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
@@ -342,30 +350,41 @@ export function ContextMenuTreeView(props: TreeViewProps) {
             node.type === 'command' &&
             !catalog.find((item) => item.command === node.command)?.available;
           return (
-            <ContextMenuTreeRow
-              key={key}
-              row={row}
-              label={label}
-              selected={selectedKey === key}
-              first={!selectedKey && rows[0]?.key === key}
-              expanded={node.type === 'section' && expanded.has(node.id)}
-              dropEdge={
-                drop?.edge === 'after'
-                  ? afterKey === key
-                    ? 'after'
-                    : undefined
-                  : drop?.rowKey === key
-                    ? drop.edge
-                    : undefined
-              }
-              dropIndent={dropRow ? (row.level - dropRow.level) * 18 : 0}
-              {...(drop ? { dropTargetKey: drop.rowKey } : {})}
-              unavailable={unavailable}
-              editingValue={editing?.key === key ? editing.value : undefined}
-              inputRef={inputRef}
-              locale={locale}
-              actions={rowActions}
-            />
+            <Fragment key={key}>
+              <ContextMenuTreeRow
+                row={row}
+                label={label}
+                selected={selectedKey === key}
+                first={!selectedKey && rows[0]?.key === key}
+                expanded={node.type === 'section' && expanded.has(node.id)}
+                dropEdge={
+                  drop?.edge === 'after'
+                    ? afterKey === key
+                      ? 'after'
+                      : undefined
+                    : drop?.rowKey === key
+                      ? drop.edge
+                      : undefined
+                }
+                dropIndent={dropRow ? (row.level - dropRow.level) * 18 : 0}
+                {...(drop ? { dropTargetKey: drop.rowKey } : {})}
+                unavailable={unavailable}
+                editingValue={editing?.key === key ? editing.value : undefined}
+                inputRef={inputRef}
+                locale={locale}
+                actions={rowActions}
+              />
+              {node.type === 'section' &&
+              expanded.has(node.id) &&
+              !node.children.some((child) => child.enabled) ? (
+                <p
+                  className="px-3 py-2 text-[13px] text-[var(--sniptale-color-text-muted)]"
+                  style={{ paddingInlineStart: row.level * 18 + 12 }}
+                >
+                  {t('settings.appearance.contextMenuEmptySection')}
+                </p>
+              ) : null}
+            </Fragment>
           );
         })}
       </div>

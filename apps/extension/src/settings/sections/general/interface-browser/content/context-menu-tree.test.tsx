@@ -222,3 +222,19 @@ it('offers one-time recovery when an imported section is disabled and empty', as
   expect(row('section:hidden')).toBeTruthy();
   expect(container.textContent).not.toContain('Restore hidden sections');
 });
+
+it('explains an expanded empty user section without changing its contents', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [{ type: 'section', id: 'custom', title: 'Custom', enabled: true, children: [] }],
+  };
+  await act(async () => root.render(<Harness key="empty-custom" start={start} />));
+  expect(container.textContent).not.toContain('No commands in this section.');
+  await key(row('section:custom'), 'ArrowRight');
+  expect(container.textContent).toContain(
+    'No commands in this section. Select a command from the catalog to add it.'
+  );
+  expect(latest).toEqual(start);
+  await key(row('section:custom'), 'ArrowLeft');
+  expect(container.textContent).not.toContain('No commands in this section.');
+});

@@ -58,6 +58,7 @@ it('marks bundled entries and offers custom editing without exposing built-in ed
   const root = createRoot(host);
   try {
     await act(async () => root.render(<BackgroundPresetsSettings />));
+    expect(host.textContent).not.toContain(translate('settings.editor.backgrounds.libraryNote'));
     expect(io.props!.items[0]).toMatchObject({
       isBuiltIn: true,
       capabilities: { edit: false, delete: false, toggle: true, reorder: true },

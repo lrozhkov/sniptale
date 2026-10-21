@@ -1,4 +1,3 @@
-import { InformationDisclosure } from '../../../../ui/compact-inspector-controls/disclosure';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -100,10 +99,9 @@ function NewItemsSection(
           />
         </SettingsControlRow>
       ))}
-      <InformationDisclosure label={translate('common.actions.details')}>
-        <p>{translate('settings.storageDrafts.newItemsDescription')}</p>
-        <p>{translate('settings.storageDrafts.destinationDescription')}</p>
-      </InformationDisclosure>
+      <p className="pb-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        {translate('settings.storageDrafts.destinationDescription')}
+      </p>
     </section>
   );
 }

@@ -81,8 +81,12 @@
   letter-spacing: normal;
   text-transform: none;
 }
-.sniptale-settings-workspace .sniptale-parameter-check {
-  border-radius: 50%;
+.sniptale-settings-workspace
+  :is([data-ui='settings.subpage-tabs'] button, button[data-command-tone='toggle'])
+  > .sniptale-command-content {
+  transform: none !important;
+  opacity: 1 !important;
+  transition: none;
 }
 .sniptale-settings-workspace
   [data-settings-collection-layout='tiles']
@@ -118,8 +122,32 @@
 }
 
 /* Settings forms share one quiet surface; other modal consumers retain their own material. */
+.sniptale-modal.sniptale-settings-workspace,
 .sniptale-settings-workspace .sniptale-modal {
   background: var(--sniptale-color-surface-panel);
+}
+.sniptale-modal.sniptale-settings-workspace {
+  overflow: hidden;
+}
+.sniptale-modal.sniptale-settings-workspace
+  :is(.sniptale-modal-header-sm, .sniptale-modal-footer-sm) {
+  flex-shrink: 0;
+}
+.sniptale-modal.sniptale-settings-workspace .sniptale-modal-body-sm {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.sniptale-modal.sniptale-settings-workspace .sniptale-modal-body-sm:not(.overflow-hidden) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sniptale-settings-workspace
+  .sniptale-paint-value
+  [data-ui='shared.ui.color-selector.value-editor']:focus-within {
+  border-color: var(--sniptale-color-border-strong);
+}
+.sniptale-settings-workspace .settings-profile-choice > .sniptale-parameter-row {
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 .sniptale-settings-workspace
   .sniptale-modal

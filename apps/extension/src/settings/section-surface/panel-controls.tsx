@@ -72,7 +72,7 @@ export function SettingsControlRow(props: {
   return (
     <div
       data-ui="settings.control-row"
-      className={['w-full max-w-[720px]', props.className ?? ''].join(' ')}
+      className={['w-full max-w-[560px]', props.className ?? ''].join(' ')}
     >
       {typeof props.label === 'string' ? (
         <InspectorParameterRow

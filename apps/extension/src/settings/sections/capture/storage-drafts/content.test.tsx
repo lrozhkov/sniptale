@@ -96,6 +96,23 @@ it('routes destination, cleanup, and numeric retention selections to their polic
   expect(props.updatePolicy).toHaveBeenLastCalledWith({ trashCleanupEnabled: false });
 });
 
+it('shows retention and deletion consequences without the repeated Details explanation', () => {
+  render();
+  expect(container.querySelector('details')).toBeNull();
+  expect(container.textContent).not.toContain(
+    translate('settings.storageDrafts.newItemsDescription')
+  );
+  for (const message of [
+    'destinationDescription',
+    'cleanupEnabledDescription',
+    'retentionConsequence',
+    'trashCleanupDescription',
+    'trashRetentionConsequence',
+  ] as const) {
+    expect(container.textContent).toContain(translate(`settings.storageDrafts.${message}`));
+  }
+});
+
 it('reports trash save progress and retries only when the failed policy is editable', () => {
   props.trashPolicyFeedback = 'error';
   props.busy = true;
@@ -137,6 +154,8 @@ it('keeps management in Library and preserves cleanup warnings and privacy navig
     translate('settings.storageDrafts.draftActionsTitle')
   );
   expect(button(translate('settings.storageDrafts.ordinaryRetention')).disabled).toBe(true);
+  expect(button(translate('settings.storageDrafts.trashRetention')).disabled).toBe(true);
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashCleanupDisabled'));
   expect(container.textContent).toContain(
     translate('settings.storageDrafts.cleanupDisabledWarning')
   );

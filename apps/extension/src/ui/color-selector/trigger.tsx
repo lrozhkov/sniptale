@@ -87,6 +87,7 @@ export function ColorValue(props: {
     return (
       <span className="flex min-w-0 flex-1 flex-col">
         <span
+          data-ui="shared.ui.color-selector.value-editor"
           className={cx(
             'flex min-w-0 flex-col justify-center',
             COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,

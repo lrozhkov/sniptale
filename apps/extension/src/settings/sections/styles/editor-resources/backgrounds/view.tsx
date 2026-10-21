@@ -52,9 +52,6 @@ export function BackgroundPresetsSettings() {
   }));
   return (
     <section>
-      <p className="mb-3 text-xs text-[var(--sniptale-color-text-secondary)]">
-        {translate('settings.editor.backgrounds.libraryNote')}
-      </p>
       {(failed || catalog.status === 'failed') && (
         <p role="alert">{translate('settings.editor.backgrounds.failed')}</p>
       )}

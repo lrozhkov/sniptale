@@ -13,6 +13,7 @@ export function useSettingsCollectionLayoutAnimation(
   useLayoutEffect(() => {
     const rows = rootRef.current?.querySelectorAll<HTMLElement>('[data-settings-collection-item]');
     if (!rows) return;
+    const animations: Animation[] = [];
     const nextPositions = new Map<string, RowPosition>();
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
     const rootBounds = rootRef.current?.getBoundingClientRect();
@@ -30,12 +31,16 @@ export function useSettingsCollectionLayoutAnimation(
       const deltaX = previous.left - position.left;
       const deltaY = previous.top - position.top;
       if (deltaX === 0 && deltaY === 0) return;
-      row.animate?.(
+      const animation = row.animate?.(
         [{ transform: `translate(${deltaX}px, ${deltaY}px)` }, { transform: 'translate(0, 0)' }],
         { duration: 160, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
       );
+      if (animation) animations.push(animation);
     });
     previousPositionsRef.current = nextPositions;
+    return () => {
+      for (const animation of animations) animation.cancel();
+    };
   }, [groups]);
 
   return rootRef;

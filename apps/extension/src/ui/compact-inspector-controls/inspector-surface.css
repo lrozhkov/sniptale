@@ -1040,8 +1040,9 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   opacity: 0;
 }
 
-/* Accepted circular selection drawing is limited to the automatic blur flow. */
-.sniptale-auto-blur-modal.sniptale-compact-workspace .sniptale-parameter-check {
+/* Accepted circular selection drawing is shared by automatic blur and Settings. */
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace).sniptale-compact-workspace
+  .sniptale-parameter-check {
   appearance: none;
   position: relative;
   flex: 0 0 28px;
@@ -1053,7 +1054,7 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   border-radius: 50%;
   background: transparent;
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check::before {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::before {
   content: '';
   position: absolute;
   inset: 5px;
@@ -1065,7 +1066,7 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   background: rgb(from var(--sniptale-color-surface-hover) r g b);
   pointer-events: none;
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check::after {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::after {
   content: '';
   position: absolute;
   inset: 8px;
@@ -1080,10 +1081,12 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   opacity: 0;
   pointer-events: none;
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check:checked::after {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+  .sniptale-parameter-check:checked::after {
   opacity: 1;
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check:indeterminate::after {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+  .sniptale-parameter-check:indeterminate::after {
   inset: 13px 10px;
   width: 8px;
   height: 2px;
@@ -1091,19 +1094,21 @@ input.sniptale-range[data-out-of-scale='true']::-moz-range-thumb {
   mask: none;
   opacity: 1;
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check:hover:not(:disabled)::before {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+  .sniptale-parameter-check:hover:not(:disabled)::before {
   box-shadow: 0 0 6px 1px color-mix(in srgb, var(--sniptale-color-text-primary) 18%, transparent);
 }
-.sniptale-auto-blur-modal .sniptale-parameter-check:focus-visible {
+:is(.sniptale-auto-blur-modal, .sniptale-settings-workspace)
+  .sniptale-parameter-check:focus-visible {
   outline-color: var(--sniptale-color-text-secondary);
   outline-offset: 0;
 }
 @media (forced-colors: active) {
-  .sniptale-auto-blur-modal .sniptale-parameter-check::before {
+  :is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::before {
     border-color: ButtonText;
     background: Canvas;
   }
-  .sniptale-auto-blur-modal .sniptale-parameter-check::after {
+  :is(.sniptale-auto-blur-modal, .sniptale-settings-workspace) .sniptale-parameter-check::after {
     background: Highlight;
   }
 }

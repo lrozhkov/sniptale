@@ -48,7 +48,8 @@ export const settingsToggleRowClassName = 'flex min-h-8 items-center justify-bet
 
 export const settingsAddButtonClassName = [
   'inline-flex w-fit',
-  getControlSecondaryButtonClassName({ density: 'default' }),
+  getControlSecondaryButtonClassName({ density: 'compact' }),
+  '!min-h-8 !h-8 !rounded-[4px] !px-2 !py-0 gap-1.5',
 ].join(' ');
 
 export const settingsNeutralBadgeClassName = [
@@ -66,6 +67,7 @@ export const settingsSuccessBadgeClassName = [
 export const settingsModalFieldSurfaceClassName = '';
 
 export const settingsModalClassName = [
+  'sniptale-settings-workspace sniptale-compact-workspace',
   '!rounded-[8px]',
   '[&_.sniptale-modal-header-sm]:px-4 [&_.sniptale-modal-header-sm]:py-3',
   '[&_.sniptale-modal-body-sm]:px-4 [&_.sniptale-modal-body-sm]:py-3',

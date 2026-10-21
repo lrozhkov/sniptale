@@ -206,10 +206,13 @@ export function QuickActionsEditorSecondaryCaptureFields(props: {
               value === '' ? null : (parseInt(value, 10) as QuickActionDelay)
             )
           }
-          options={delayOptions.map((option) => ({
-            value: String(option.value),
-            label: option.label,
-          }))}
+          options={[
+            { value: '', label: translate('settings.quickActions.followSettingsPlaceholder') },
+            ...delayOptions.map((option) => ({
+              value: String(option.value),
+              label: option.label,
+            })),
+          ]}
         />
       </SettingsControlRow>
     </div>

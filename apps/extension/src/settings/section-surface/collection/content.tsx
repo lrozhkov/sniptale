@@ -1,6 +1,7 @@
 import { translate } from '../../../platform/i18n';
 import { settingsEmptyStateClassName } from '../classes';
 import { useSettingsCollectionLayoutAnimation } from './layout-animation';
+import { useSettingsCollectionScrollLayout } from './scroll-layout';
 import { SettingsCollectionRow } from './row';
 import type { SettingsCollectionReorderInteraction } from './reorder-interaction';
 import type { SettingsCollectionProps, SettingsCollectionResolvedGroup } from './types';
@@ -14,6 +15,10 @@ export function SettingsCollectionContent(props: {
 }) {
   const { collection, groups, reorder } = props;
   const collectionRootRef = useSettingsCollectionLayoutAnimation(groups);
+  useSettingsCollectionScrollLayout(
+    collectionRootRef,
+    collection.state !== 'loading' && collection.state !== 'error' && collection.items.length > 0
+  );
   const pointerDragging = reorder.draggingItemId !== null;
   if (collection.state === 'loading') {
     return (
@@ -42,13 +47,13 @@ export function SettingsCollectionContent(props: {
       data-settings-collection-root
       data-settings-collection-layout={collection.layout ?? 'rows'}
       data-settings-collection-pointer-dragging={pointerDragging || undefined}
+      data-ui="settings.collection.list-scroll"
       className={[
+        'overflow-y-auto overscroll-contain [scrollbar-gutter:stable]',
         pointerDragging
-          ? 'overflow-visible cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
-          : 'overflow-hidden',
-        collection.layout === 'tiles'
-          ? '!overflow-visible !border-0 !bg-transparent'
-          : 'rounded-[4px] border',
+          ? 'cursor-grabbing select-none [&_*]:!cursor-grabbing [&_button]:pointer-events-none'
+          : '',
+        collection.layout === 'tiles' ? '!border-0 !bg-transparent' : 'rounded-[4px] border',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface)]',
       ].join(' ')}

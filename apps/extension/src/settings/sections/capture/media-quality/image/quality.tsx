@@ -11,7 +11,12 @@ export function ImageSettingsSectionQuality({
   const qualityValue = state.isQualityDisabled ? 100 : state.imageQuality;
 
   return (
-    <SettingsControlRow label={translate('imageSettings.section.qualityLabel')}>
+    <SettingsControlRow
+      label={translate('imageSettings.section.qualityLabel')}
+      className="!max-w-[480px]"
+      keepInline
+      valueMinimum={100}
+    >
       <NumericRow
         appearance="plain"
         className="w-full"

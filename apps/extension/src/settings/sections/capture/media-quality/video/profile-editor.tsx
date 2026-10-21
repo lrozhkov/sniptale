@@ -72,10 +72,6 @@ function VideoProfileFormatFields(props: {
           }))}
           onChange={(quality) => props.onChange({ ...props.configuration, quality })}
         />
-        <div className="flex justify-between text-xs text-[var(--sniptale-color-text-muted)]">
-          <span>{translate('settings.videoQuality.smallerFile')}</span>
-          <span>{translate('settings.videoQuality.moreDetail')}</span>
-        </div>
       </fieldset>
       <fieldset className="mt-4 min-w-0">
         <legend className="mb-2 text-sm font-medium">
@@ -115,13 +111,6 @@ function VideoProfileFormatFields(props: {
                 <span className="block text-[13px] font-medium">
                   {container === VideoOutputContainer.MP4 ? 'MP4' : 'WebM'}
                 </span>
-                <span className="mt-1 block text-xs text-[var(--sniptale-color-text-muted)]">
-                  {translate(
-                    container === VideoOutputContainer.MP4
-                      ? 'settings.videoQuality.mp4Purpose'
-                      : 'settings.videoQuality.webmPurpose'
-                  )}
-                </span>
               </span>
             </label>
           ))}
@@ -146,12 +135,6 @@ function VideoProfileFormatFields(props: {
               onChange={(codec) => props.onChange({ ...props.configuration, codec })}
             />
           </SettingsControlRow>
-          <p className="mt-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {translate('settings.videoQuality.geometryHelp')}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {translate('settings.videoQuality.compressionHelp')}
-          </p>
         </div>
       </InspectorDisclosureView>
     </>

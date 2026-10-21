@@ -437,8 +437,8 @@ function projectLegacyTree(
           type: 'section' as const,
           id: `${mode}-${group.id}`,
           title: titles[group.titleKey] ?? group.title,
-          enabled: commands.some((node) => node.enabled),
-          children: commands,
+          enabled: settings[key],
+          children: commands.map((command) => ({ ...command, enabled: true })),
         },
       ];
     });
