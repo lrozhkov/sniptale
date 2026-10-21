@@ -6,6 +6,7 @@ import { InspectorParameterRow, useInspectorLayout } from './layout';
 import { InspectorFieldClear } from './text-field';
 
 const TEXTAREA_FIELD_LABEL_CLASS_NAME = [
+  'sniptale-interface-label',
   'select-none break-words text-[12px] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');

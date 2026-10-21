@@ -71,6 +71,7 @@ export function CheckboxField(props: {
 }
 
 const FIELD_LABEL_CLASS_NAME = [
+  'sniptale-interface-label',
   'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
   'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',

@@ -24,6 +24,7 @@ for (const appearance of [
     extensionId,
     hostOrigin,
   }, info) => {
+    const windowsRendering = appearance.locale === 'ru';
     const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
     await worker.evaluate(async ({ theme, locale }) => {
       await chrome.storage.local.set({
@@ -33,6 +34,12 @@ for (const appearance of [
     }, appearance);
     opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
     const { page } = opened;
+    if (windowsRendering) {
+      await page.locator('.sniptale-toolbar').evaluate((element) => {
+        const root = element.getRootNode();
+        if (root instanceof ShadowRoot) root.host.setAttribute('data-ui-platform', 'windows');
+      });
+    }
     await page.addStyleTag({
       content: `body { background: ${appearance.theme === 'dark' ? '#222' : '#fff'}; } * { -webkit-text-stroke: 0.35px !important; }`,
     });
@@ -67,6 +74,7 @@ for (const appearance of [
               weight: style.fontWeight,
               stroke: style.webkitTextStrokeWidth,
               family: style.fontFamily,
+              fill: style.getPropertyValue('-webkit-text-fill-color'),
             };
           })
         );
@@ -74,6 +82,11 @@ for (const appearance of [
           expect(style.weight).toBe('400');
           expect(style.stroke).toBe('0px');
           expect(style.family).toContain('Sniptale Interface');
+          if (appearance.theme === 'dark' && windowsRendering) {
+            expect(style.fill).toContain('/ 0.82)');
+          } else {
+            expect(style.fill).not.toContain('/ 0.82)');
+          }
         }
         const option = menu.getByRole('button').first();
         await option.hover();

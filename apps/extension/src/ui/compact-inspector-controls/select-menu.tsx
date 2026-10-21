@@ -155,7 +155,7 @@ function CompactSelectMenuOptionContent<T extends string>({
         </span>
       ) : null}
       <span className="min-w-0 flex-1">
-        <span className="block truncate">{option.label}</span>
+        <span className="sniptale-interface-label block truncate">{option.label}</span>
         {option.description ? <CompactSelectMenuOptionDescription option={option} /> : null}
       </span>
       <span

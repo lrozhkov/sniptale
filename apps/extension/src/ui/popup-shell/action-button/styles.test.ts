@@ -33,6 +33,7 @@ describe('popup-action-button.styles', () => {
   it('uses destructive emphasis only when a danger action is hovered or focused', () => {
     const dangerClassName = getPopupActionButtonRootClassName('danger', false);
 
+    expect(dangerClassName).toContain('[--sniptale-interface-label-ink-strength:100%]');
     expect(dangerClassName).toContain('bg-transparent');
     expect(dangerClassName).toContain('hover:text-[var(--sniptale-color-danger)]');
     expect(dangerClassName).toContain('focus-visible:text-[var(--sniptale-color-danger)]');

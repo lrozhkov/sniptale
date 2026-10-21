@@ -23,6 +23,7 @@ const POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME = [
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_DANGER_CLASS_NAME = [
+  '[--sniptale-interface-label-ink-strength:100%]',
   'border-none bg-transparent text-[var(--sniptale-color-text-primary)] shadow-none',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_14%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-danger)_18%,transparent)]',

@@ -68,7 +68,9 @@ export function PopupActionButtonDefaultContent({
   return (
     <>
       <span className={['min-w-0 text-left'].join(' ')}>
-        <span className="block whitespace-normal leading-[1.05]">{label}</span>
+        <span className="sniptale-interface-label block whitespace-normal leading-[1.05]">
+          {label}
+        </span>
         {subtitle ? (
           <span className={POPUP_ACTION_BUTTON_SUBTITLE_CLASS_NAME}>{subtitle}</span>
         ) : null}

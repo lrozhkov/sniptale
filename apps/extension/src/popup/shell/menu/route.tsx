@@ -376,7 +376,9 @@ function MenuQuickScenarios(props: {
           onClick={scenario.onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span className="min-h-6 text-[10px] font-medium leading-3">{label}</span>
+          <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+            {label}
+          </span>
         </button>
       ))}
     </div>
@@ -420,7 +422,9 @@ function MenuWorkspace() {
             onClick={onClick}
           >
             <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-            <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
+            <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+              {translate(labelKey)}
+            </span>
           </button>
         ))}
       </div>
@@ -453,7 +457,9 @@ function MenuToolbarButton({
       onClick={() => void onOpen(mode)}
     >
       <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-      <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
+      <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+        {translate(labelKey)}
+      </span>
     </button>
   );
 }
