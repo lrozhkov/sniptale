@@ -103,12 +103,15 @@ function createSelectionModePointerLifecycleHandlers(args: SelectionModeEventHan
         tagName: getSelectionModeResolvedTagName(event, iframe),
       });
       handleSelectionModeMouseDown(event, args.state, args.selectionModeEvents, iframe);
+      if (args.state.isResizing) args.selectionModeEvents.updateFinalFrame();
     },
     handleMouseUp(event: MouseEvent) {
+      const wasResizing = args.state.isResizing;
       logSelectionModeEvent('MouseUp received', {
         currentState: args.state.currentState,
       });
       handleSelectionModeMouseUp(event, args.state, args.selectionModeEvents);
+      if (wasResizing) args.selectionModeEvents.updateFinalFrame();
     },
   };
 }

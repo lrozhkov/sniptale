@@ -3,8 +3,15 @@ import {
   syncContentSizeTooltipAspectRatioButtonState,
   type ContentSizeTooltipDom,
 } from '@sniptale/ui/content-size-tooltip/dom';
-import { MIN_REGION_SELECTOR_SIZE, resizeRegionDimension, type RegionBounds } from './helpers';
+import {
+  MIN_REGION_SELECTOR_SIZE,
+  resizeRegionDimension,
+  resizeRegionWithAspectRatio,
+  type RegionBounds,
+} from './helpers';
 import { getOverlayControlsRegionConfirmTooltipCopy } from '../controls/tooltip-copy';
+import { translate } from '../../../platform/i18n';
+import { createSelectionCaptureMenuChevron } from '../selection-mode/ui/final-elements/icons';
 
 const REGION_SELECTOR_STEP = 10;
 
@@ -115,21 +122,14 @@ function resizeRegionDimensionWithAspectRatio(
     return resizeRegionDimension(region, dimension, nextValue);
   }
 
-  if (dimension === 'width') {
-    const nextHeight = Math.round(nextValue / aspectRatio);
-    const widthResizedRegion = resizeRegionDimension(region, 'width', nextValue);
-    return resizeRegionDimension(widthResizedRegion, 'height', nextHeight);
-  }
-
-  const nextWidth = Math.round(nextValue * aspectRatio);
-  const heightResizedRegion = resizeRegionDimension(region, 'height', nextValue);
-  return resizeRegionDimension(heightResizedRegion, 'width', nextWidth);
+  return resizeRegionWithAspectRatio(region, dimension, nextValue, aspectRatio);
 }
 
 function bindRegionSelectorAspectRatioButton(args: {
   tooltip: ContentSizeTooltipDom;
   aspectRatioState: RegionSelectorAspectRatioState;
   getCurrentRegion: () => RegionBounds;
+  ratioSelect: HTMLSelectElement;
 }) {
   args.tooltip.aspectRatioButton.addEventListener('click', (event) => {
     event.preventDefault();
@@ -141,6 +141,7 @@ function bindRegionSelectorAspectRatioButton(args: {
     args.aspectRatioState.aspectRatio = nextMaintainAspectRatio
       ? currentRegion.width / currentRegion.height
       : null;
+    args.ratioSelect.value = nextMaintainAspectRatio ? 'current' : 'free';
     syncContentSizeTooltipAspectRatioButtonState(args.tooltip.aspectRatioButton, {
       maintainAspectRatio: nextMaintainAspectRatio,
       canToggleAspectRatio: true,
@@ -167,13 +168,14 @@ function bindRegionSelectorActions(args: {
 }
 
 export function createRegionSelectorTooltip(args: {
+  aspectRatioState?: RegionSelectorAspectRatioState;
   getCurrentRegion: () => RegionBounds;
   mountInto: HTMLElement;
   onCancel: () => void;
   onConfirm: () => void;
   onRegionChange: (nextRegion: RegionBounds) => void;
 }): ContentSizeTooltipDom {
-  const aspectRatioState: RegionSelectorAspectRatioState = {
+  const aspectRatioState: RegionSelectorAspectRatioState = args.aspectRatioState ?? {
     maintainAspectRatio: false,
     aspectRatio: null,
   };
@@ -184,9 +186,27 @@ export function createRegionSelectorTooltip(args: {
     widthMax: window.innerWidth,
     heightMin: MIN_REGION_SELECTOR_SIZE,
     heightMax: window.innerHeight,
-    maintainAspectRatio: false,
+    maintainAspectRatio: aspectRatioState.maintainAspectRatio,
     canToggleAspectRatio: true,
+    variant: 'frame-edit',
   });
+  tooltip.root.style.minHeight = 'var(--sniptale-toolbar-shell-height, 50px)';
+  tooltip.root.style.maxWidth = 'calc(100vw - 16px)';
+  tooltip.root.style.flexWrap = 'wrap';
+  tooltip.root.style.width = 'max-content';
+  tooltip.root.style.minWidth = '0';
+  tooltip.widthInput.step = '2';
+  tooltip.heightInput.step = '2';
+  const confirmText = document.createElement('span');
+  confirmText.textContent = translate('content.overlayControls.regionConfirm');
+  tooltip.confirmButton.append(confirmText);
+  tooltip.confirmButton.style.width = 'auto';
+  tooltip.confirmButton.style.flex = '0 0 auto';
+  tooltip.confirmButton.style.padding = '0 8px';
+  tooltip.confirmButton.style.lineHeight = '18px';
+  tooltip.confirmButton.style.gap = '6px';
+  tooltip.actions.replaceChildren(tooltip.confirmButton, tooltip.cancelButton);
+  const ratioSelect = createRegionAspectRatioSelect({ ...args, tooltip, aspectRatioState });
 
   bindRegionSelectorDimensionButtons({
     tooltip,
@@ -204,6 +224,7 @@ export function createRegionSelectorTooltip(args: {
     tooltip,
     aspectRatioState,
     getCurrentRegion: args.getCurrentRegion,
+    ratioSelect,
   });
   bindRegionSelectorActions({
     tooltip,
@@ -212,4 +233,67 @@ export function createRegionSelectorTooltip(args: {
   });
 
   return tooltip;
+}
+
+function createRegionAspectRatioSelect(args: {
+  tooltip: ContentSizeTooltipDom;
+  aspectRatioState: RegionSelectorAspectRatioState;
+  getCurrentRegion: () => RegionBounds;
+  onRegionChange: (nextRegion: RegionBounds) => void;
+}): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', translate('content.overlayControls.regionAspectRatio'));
+  select.dataset['ui'] = 'content.region-aspect-ratio';
+  select.style.cssText = [
+    'height: 32px; max-width: 140px; border: 0; border-radius: 4px; padding: 0 40px 0 8px; appearance: none;',
+    'background: var(--sniptale-color-surface-input); color: var(--sniptale-color-text-primary);',
+    'font: inherit; font-weight: 400; cursor: pointer;',
+  ].join(' ');
+  const presets = [
+    ['free', translate('content.overlayControls.regionAspectFree')],
+    ['current', translate('content.overlayControls.regionAspectCurrent')],
+    ['16:9', '16:9'],
+    ['4:3', '4:3'],
+    ['1:1', '1:1'],
+    ['9:16', '9:16'],
+  ] as const;
+  for (const [value, label] of presets) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.append(option);
+  }
+  select.value = args.aspectRatioState.maintainAspectRatio ? 'current' : 'free';
+  select.addEventListener('change', () => {
+    const current = args.getCurrentRegion();
+    const ratios: Record<string, number> = {
+      '16:9': 16 / 9,
+      '4:3': 4 / 3,
+      '1:1': 1,
+      '9:16': 9 / 16,
+    };
+    const ratio =
+      select.value === 'current' ? current.width / current.height : (ratios[select.value] ?? null);
+    args.aspectRatioState.aspectRatio = ratio;
+    args.aspectRatioState.maintainAspectRatio = ratio !== null;
+    syncContentSizeTooltipAspectRatioButtonState(args.tooltip.aspectRatioButton, {
+      maintainAspectRatio: ratio !== null,
+      canToggleAspectRatio: true,
+    });
+    if (ratio)
+      args.onRegionChange(resizeRegionWithAspectRatio(current, 'width', current.width, ratio));
+  });
+  const wrapper = document.createElement('span');
+  wrapper.style.cssText = 'position: relative; display: inline-flex; flex: 0 0 auto;';
+  const chevron = createSelectionCaptureMenuChevron();
+  chevron.setAttribute('width', '16');
+  chevron.setAttribute('height', '16');
+  chevron.setAttribute('class', 'sniptale-select-chevron sniptale-select-chevron-edge');
+  chevron.style.cssText = [
+    'position: absolute; right: 13px; top: 50%; transform: translateY(-50%);',
+    'pointer-events: none; color: var(--sniptale-color-text-dim);',
+  ].join(' ');
+  wrapper.append(select, chevron);
+  args.tooltip.root.prepend(wrapper);
+  return select;
 }

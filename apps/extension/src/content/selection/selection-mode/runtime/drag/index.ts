@@ -83,6 +83,12 @@ export function constrainSelectionModeSelection(args: SelectionModeRuntimeAction
 
 export function updateSelectionModeFinalFrame(args: SelectionModeRuntimeActionsArgs): void {
   getDragSelectionRuntime(args).updateFinalFrame();
+  if (args.state.dom.finalFrame) {
+    args.state.dom.finalFrame.style.opacity = args.state.isResizing ? '0' : '1';
+  }
+  if (args.state.dom.sizePanel) {
+    args.state.dom.sizePanel.style.visibility = args.state.isResizing ? 'hidden' : 'visible';
+  }
 }
 
 export function handleSelectionModeDragMove(

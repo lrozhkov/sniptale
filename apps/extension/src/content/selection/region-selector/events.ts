@@ -112,17 +112,22 @@ function createRegionSelectorPointerMoveHandler(args: {
           args.state.currentRegion,
           args.state.dragStart,
           args.state.resizeCorner,
-          event
+          event,
+          args.state.aspectRatioState.maintainAspectRatio
+            ? args.state.aspectRatioState.aspectRatio
+            : null
         );
 
     args.updateUi();
   };
 }
 
-function createRegionSelectorPointerUpHandler(state: RegionSelectorState) {
+function createRegionSelectorPointerUpHandler(state: RegionSelectorState, updateUi: () => void) {
   return (): void => {
+    if (!state.isDragging && !state.isResizing) return;
     state.isDragging = false;
     state.isResizing = false;
+    updateUi();
   };
 }
 
@@ -140,7 +145,7 @@ export function createRegionSelectorDocumentHandlers(args: {
   updateUi: () => void;
 }): RegionSelectorDocumentHandlers {
   const handlePointerMove = createRegionSelectorPointerMoveHandler(args);
-  const handlePointerUp = createRegionSelectorPointerUpHandler(args.state);
+  const handlePointerUp = createRegionSelectorPointerUpHandler(args.state, args.updateUi);
   const handleKeyDown = createRegionSelectorKeyDownHandler(args.handleRegionCancelled);
 
   return {

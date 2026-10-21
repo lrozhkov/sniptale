@@ -1,6 +1,33 @@
 export type RegionBounds = { x: number; y: number; width: number; height: number };
 export const MIN_REGION_SELECTOR_SIZE = 100;
 
+function evenSize(value: number, maximum: number): number {
+  const max = Math.max(2, Math.floor(maximum / 2) * 2);
+  return Math.min(
+    max,
+    Math.max(Math.min(MIN_REGION_SELECTOR_SIZE, max), Math.round(value / 2) * 2)
+  );
+}
+
+export function resizeRegionWithAspectRatio(
+  region: RegionBounds,
+  dimension: 'width' | 'height',
+  nextValue: number,
+  ratio: number
+): RegionBounds {
+  const maxWidth = Math.min(window.innerWidth, window.innerHeight * ratio);
+  const minWidth = Math.min(
+    maxWidth,
+    Math.max(MIN_REGION_SELECTOR_SIZE, MIN_REGION_SELECTOR_SIZE * ratio)
+  );
+  const width = evenSize(
+    Math.max(minWidth, dimension === 'width' ? nextValue : nextValue * ratio),
+    maxWidth
+  );
+  const height = evenSize(width / ratio, window.innerHeight);
+  return resizeRegionDimension(resizeRegionDimension(region, 'width', width), 'height', height);
+}
+
 export function resizeRegionDimension(
   region: RegionBounds,
   dimension: 'width' | 'height',
@@ -8,8 +35,8 @@ export function resizeRegionDimension(
 ): RegionBounds {
   const width = dimension === 'width' ? nextValue : region.width;
   const height = dimension === 'height' ? nextValue : region.height;
-  const clampedWidth = Math.min(window.innerWidth, Math.max(MIN_REGION_SELECTOR_SIZE, width));
-  const clampedHeight = Math.min(window.innerHeight, Math.max(MIN_REGION_SELECTOR_SIZE, height));
+  const clampedWidth = evenSize(width, window.innerWidth);
+  const clampedHeight = evenSize(height, window.innerHeight);
   const centerX = region.x + region.width / 2;
   const centerY = region.y + region.height / 2;
 
@@ -41,7 +68,8 @@ export function updateResizingRegion(
   currentRegion: RegionBounds,
   dragStart: { x: number; y: number },
   resizeCorner: string,
-  event: MouseEvent
+  event: MouseEvent,
+  aspectRatio: number | null = null
 ): RegionBounds {
   const deltaX = event.clientX - dragStart.x;
   const deltaY = event.clientY - dragStart.y;
@@ -55,7 +83,43 @@ export function updateResizingRegion(
     resizeCorner,
   });
 
-  return clampResizedRegion(nextRegion, minSize);
+  if (aspectRatio) {
+    const anchorX = resizeCorner.includes('w')
+      ? initialRegion.x + initialRegion.width
+      : initialRegion.x;
+    const anchorY = resizeCorner.includes('n')
+      ? initialRegion.y + initialRegion.height
+      : initialRegion.y;
+    const maxWidth = Math.min(
+      resizeCorner.includes('w') ? anchorX : window.innerWidth - anchorX,
+      (resizeCorner.includes('n') ? anchorY : window.innerHeight - anchorY) * aspectRatio
+    );
+    const minWidth = Math.min(maxWidth, Math.max(minSize, minSize * aspectRatio));
+    const requestedWidth =
+      Math.abs(deltaX) >= Math.abs(deltaY * aspectRatio)
+        ? nextRegion.width
+        : nextRegion.height * aspectRatio;
+    const width = evenSize(Math.max(minWidth, requestedWidth), maxWidth);
+    const height = evenSize(
+      width / aspectRatio,
+      resizeCorner.includes('n') ? anchorY : window.innerHeight - anchorY
+    );
+    return {
+      x: resizeCorner.includes('w') ? anchorX - width : anchorX,
+      y: resizeCorner.includes('n') ? anchorY - height : anchorY,
+      width,
+      height,
+    };
+  }
+  const clamped = clampResizedRegion(nextRegion, minSize);
+  const width = evenSize(clamped.width, clamped.width);
+  const height = evenSize(clamped.height, clamped.height);
+  return {
+    x: resizeCorner.includes('w') ? clamped.x + clamped.width - width : clamped.x,
+    y: resizeCorner.includes('n') ? clamped.y + clamped.height - height : clamped.y,
+    width,
+    height,
+  };
 }
 
 function updateResizeEdges(args: {

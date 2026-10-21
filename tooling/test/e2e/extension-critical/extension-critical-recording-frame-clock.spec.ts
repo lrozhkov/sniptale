@@ -359,6 +359,11 @@ for (const { resolution, fault, crop } of [
           throw new Error('Clock fixture server has no port');
         const origin = `http://127.0.0.1:${address.port}`;
         const target = await context.newPage();
+        const regionResponseErrors: string[] = [];
+        target.on('console', (message) => {
+          if (message.text().includes('Failed to notify selected region'))
+            regionResponseErrors.push(message.text());
+        });
         await target.goto(origin + '/initial');
         await target.bringToFront();
         const actionTarget = await triggerExtensionAction(context, extensionId, target);
@@ -401,16 +406,19 @@ for (const { resolution, fault, crop } of [
         if (crop) {
           await target.locator('#sniptale-region-selector-root').waitFor();
           await target.bringToFront();
-          await target.locator('#sniptale-width-input').fill('1280');
+          await target.locator('#sniptale-width-input').fill('1281');
           await target.locator('#sniptale-width-input').press('Enter');
-          await target.locator('#sniptale-height-input').fill('560');
+          await target.locator('#sniptale-height-input').fill('561');
           await target.locator('#sniptale-height-input').press('Enter');
+          await expect(target.locator('#sniptale-width-input')).toHaveValue('1280');
+          await expect(target.locator('#sniptale-height-input')).toHaveValue('560');
           await target.locator('.sniptale-selection-size-confirm-button').click({ timeout: 5000 });
         }
         const state = () => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
         await expect
           .poll(state, { timeout: 20000 })
           .toMatchObject({ success: true, state: { status: VideoRecordingStatus.RECORDING } });
+        expect(regionResponseErrors).toEqual([]);
         if (faultWorldId !== null) {
           const session = await context.newCDPSession(target);
           try {

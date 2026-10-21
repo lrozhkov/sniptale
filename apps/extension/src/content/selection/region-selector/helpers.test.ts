@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MIN_REGION_SELECTOR_SIZE,
   resizeRegionDimension,
+  resizeRegionWithAspectRatio,
   updateDraggingRegion,
   updateResizingRegion,
   type RegionBounds,
@@ -16,6 +17,52 @@ beforeEach(() => {
 });
 
 describe('region-selector geometry helpers', () => {
+  it.each([16 / 9, 4 / 3, 1, 9 / 16])(
+    'keeps even dimensions and the ratio %s at every corner',
+    (ratio) => {
+      vi.stubGlobal('innerWidth', 1001);
+      vi.stubGlobal('innerHeight', 799);
+      const initial = resizeRegionWithAspectRatio(
+        { x: 100, y: 100, width: 320, height: 200 },
+        'width',
+        319,
+        ratio
+      );
+      for (const corner of ['nw', 'ne', 'sw', 'se']) {
+        for (const delta of [-2000, -37, 41, 2000]) {
+          const result = updateResizingRegion(
+            initial,
+            initial,
+            { x: 0, y: 0 },
+            corner,
+            new MouseEvent('mousemove', { clientX: delta, clientY: delta }),
+            ratio
+          );
+          expect(result.width % 2).toBe(0);
+          expect(result.height % 2).toBe(0);
+          expect(Math.abs(result.width - result.height * ratio)).toBeLessThanOrEqual(2);
+          expect(result.x).toBeGreaterThanOrEqual(0);
+          expect(result.y).toBeGreaterThanOrEqual(0);
+          expect(result.x + result.width).toBeLessThanOrEqual(innerWidth);
+          expect(result.y + result.height).toBeLessThanOrEqual(innerHeight);
+        }
+      }
+    }
+  );
+  it('keeps the locked ratio while resizing a corner at the viewport edge', () => {
+    const initial = { x: 100, y: 100, width: 320, height: 180 };
+    const result = updateResizingRegion(
+      initial,
+      initial,
+      { x: 420, y: 280 },
+      'se',
+      new MouseEvent('mousemove', { clientX: 1600, clientY: 1200 }),
+      16 / 9
+    );
+    expect(Math.abs(result.width - (result.height * 16) / 9)).toBeLessThanOrEqual(1);
+    expect(result.x + result.width).toBeLessThanOrEqual(innerWidth);
+    expect(result.y + result.height).toBeLessThanOrEqual(innerHeight);
+  });
   it('resizes around the region center while clamping to viewport bounds', () => {
     const region = { x: 900, y: 760, width: 120, height: 120 };
 
@@ -71,7 +118,7 @@ describe('region-selector resize helpers', () => {
       x: 100,
       y: 100,
       width: 340,
-      height: 225,
+      height: 224,
     });
   });
 

@@ -3,7 +3,11 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { DesktopMediaSourceChooserResult } from './desktop-source';
 import type { requestDesktopMediaSource } from './desktop-media';
 
-type RuntimeListener = (message: unknown, sender: chrome.runtime.MessageSender) => void;
+type RuntimeListener = (
+  message: unknown,
+  sender: chrome.runtime.MessageSender,
+  sendResponse?: (response: unknown) => void
+) => void;
 type DesktopMediaRequestDeps = NonNullable<Parameters<typeof requestDesktopMediaSource>[2]>;
 type SendRuntimeMessage = (message: unknown) => Promise<unknown>;
 type DesktopMediaRequestBinding = {
@@ -28,9 +32,10 @@ export function createRuntimeSubscriptionHarness() {
   return {
     emit(
       message: unknown,
-      sender: chrome.runtime.MessageSender = {} as chrome.runtime.MessageSender
+      sender: chrome.runtime.MessageSender = {} as chrome.runtime.MessageSender,
+      sendResponse?: (response: unknown) => void
     ) {
-      listener?.(message, sender);
+      listener?.(message, sender, sendResponse);
     },
     subscribeToMessages: vi.fn((nextListener: RuntimeListener) => {
       listener = nextListener;

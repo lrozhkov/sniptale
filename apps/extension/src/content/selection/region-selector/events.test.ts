@@ -25,6 +25,21 @@ beforeEach(() => {
 });
 
 describe('region-selector root events', () => {
+  it('repaints controls on pointer release and ignores an unrelated release', () => {
+    const state = createDefaultRegionSelectorState();
+    const updateUi = vi.fn();
+    const handlers = createRegionSelectorDocumentHandlers({
+      state,
+      updateUi,
+      handleRegionCancelled: vi.fn(),
+    });
+    handlers.handlePointerUp();
+    expect(updateUi).not.toHaveBeenCalled();
+    state.isResizing = true;
+    handlers.handlePointerUp();
+    expect(state.isResizing).toBe(false);
+    expect(updateUi).toHaveBeenCalledOnce();
+  });
   function createCancelFixture() {
     const overlay = document.createElement('div');
     const region = document.createElement('div');
@@ -211,7 +226,8 @@ describe('region-selector document events', () => {
       expect.any(Object),
       state.dragStart,
       'se',
-      expect.any(MouseEvent)
+      expect.any(MouseEvent),
+      null
     );
     expect(state.currentRegion).toBe(nextRegion);
     expect(updateUi).toHaveBeenCalledOnce();

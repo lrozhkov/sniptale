@@ -16,6 +16,7 @@ export type RegionSelectorBounds = {
 };
 
 type RegionSelectorState = {
+  aspectRatioState: { maintainAspectRatio: boolean; aspectRatio: number | null };
   activeRequestBinding: RegionSelectorRequestBinding | null;
   currentRegion: RegionSelectorBounds;
   dragStart: { x: number; y: number };
@@ -49,6 +50,7 @@ export type RegionSelectorController = {
 
 export function createDefaultRegionSelectorState(): RegionSelectorState {
   return {
+    aspectRatioState: { maintainAspectRatio: false, aspectRatio: null },
     activeRequestBinding: null,
     currentRegion: { x: 100, y: 100, width: 640, height: 480 },
     dragStart: { x: 0, y: 0 },

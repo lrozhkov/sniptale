@@ -50,6 +50,120 @@ async function selectCrop(
   await expect(page.locator('.sniptale-selection-toolbar')).toBeVisible();
 }
 
+for (const theme of ['light', 'dark']) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`region and crop resize chrome ${theme} ${viewport.name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openCropWorkspace(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport.size,
+        theme
+      );
+      const overlayMessage = async (show: boolean) =>
+        popup.evaluate(
+          async ({ url, show }) => {
+            const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+            if (tab?.id === undefined) throw new Error('Region test tab unavailable');
+            return chrome.tabs.sendMessage(
+              tab.id,
+              show
+                ? {
+                    type: 'SHOW_REGION_SELECTOR',
+                    regionSelectionCapabilityToken: crypto.randomUUID(),
+                    regionSelectionRequestGeneration: crypto.randomUUID(),
+                    regionSelectionRequestId: crypto.randomUUID(),
+                  }
+                : { type: 'HIDE_REGION_SELECTOR' }
+            );
+          },
+          { url: page.url(), show }
+        );
+      try {
+        await overlayMessage(true);
+        const region = page.locator('#sniptale-region');
+        const panel = page.locator('#sniptale-region-selector-root .sniptale-content-size-tooltip');
+        await expect(region).toHaveCSS('border-top-style', 'dashed');
+        await expect(region).toHaveCSS('cursor', 'move');
+        await expect(panel).toHaveAttribute('data-variant', 'frame-edit');
+        const ratio = page.locator('[data-ui="content.region-aspect-ratio"]');
+        const chevron = ratio.locator('..').locator('.sniptale-select-chevron');
+        await expect(chevron).toHaveCSS('right', '13px');
+        const selectBounds = (await ratio.boundingBox())!;
+        const chevronBounds = (await chevron.boundingBox())!;
+        expect(
+          Math.abs(selectBounds.x + selectBounds.width - chevronBounds.x - chevronBounds.width - 13)
+        ).toBeLessThanOrEqual(1);
+        for (const value of ['16:9', '4:3', '1:1', '9:16']) {
+          await ratio.selectOption(value);
+          const [width, height] = value.split(':').map(Number);
+          const bounds = (await region.boundingBox())!;
+          expect(bounds.width % 2).toBe(0);
+          expect(bounds.height % 2).toBe(0);
+          expect(Math.abs(bounds.width - (bounds.height * width!) / height!)).toBeLessThanOrEqual(
+            2
+          );
+        }
+        await ratio.selectOption('16:9');
+        const handle = region.locator('[data-corner="se"]');
+        const start = (await handle.boundingBox())!;
+        await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+        await page.mouse.down();
+        await expect(region).toHaveCSS('opacity', '0');
+        await expect(panel).toHaveCSS('visibility', 'hidden');
+        await page.mouse.move(start.x + 41, start.y + 29);
+        await page.screenshot({ path: info.outputPath('region-resizing.png'), fullPage: false });
+        await page.mouse.up();
+        await expect(region).toHaveCSS('opacity', '1');
+        await expect(panel).toHaveCSS('visibility', 'visible');
+        const resized = (await region.boundingBox())!;
+        expect(Math.abs(resized.width - (resized.height * 16) / 9)).toBeLessThanOrEqual(2);
+        expect(resized.width % 2).toBe(0);
+        expect(resized.height % 2).toBe(0);
+        await page.mouse.move(resized.x + 40, resized.y + 40);
+        await page.mouse.down();
+        await page.mouse.move(resized.x + 60, resized.y + 55);
+        await expect(region).toHaveCSS('cursor', 'move');
+        await page.mouse.up();
+        await page.screenshot({ path: info.outputPath('region-controls.png'), fullPage: false });
+        const panelBounds = (await panel.boundingBox())!;
+        expect(panelBounds.height).toBeLessThanOrEqual(52);
+        expect(panelBounds.x).toBeGreaterThanOrEqual(0);
+        expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(viewport.size.width);
+        await overlayMessage(false);
+        await selectCrop(page, { x: 300, y: 100, width: 321, height: 181 });
+        await page.locator('[data-ui="content.crop.mode.resize"]').click();
+        const frame = page.locator('.sniptale-selection-final-frame');
+        const cropPanel = page.locator('.sniptale-selection-toolbar');
+        expect((await frame.boundingBox())!.width).toBe(321);
+        const corner = (await frame.locator('[data-direction="se"]').boundingBox())!;
+        await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
+        await page.mouse.down();
+        await expect(frame).toHaveCSS('opacity', '0');
+        await expect(cropPanel).toHaveCSS('visibility', 'hidden');
+        await page.mouse.move(corner.x + 33, corner.y + 23);
+        await page.screenshot({ path: info.outputPath('crop-resizing.png'), fullPage: false });
+        await page.mouse.up();
+        await expect(frame).toHaveCSS('opacity', '1');
+        await expect(cropPanel).toHaveCSS('visibility', 'visible');
+        await page.keyboard.press('Escape');
+        await expect(cropPanel).toHaveCount(0);
+        await page.setViewportSize({ width: 960, height: viewport.size.height });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        );
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}
+
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`crop drawing keeps compact height after selecting a layer ${name}`, async ({
     context,

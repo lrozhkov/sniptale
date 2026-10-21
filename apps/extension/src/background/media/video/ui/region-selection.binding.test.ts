@@ -96,6 +96,17 @@ function cancelledMessage(binding: RegionSelectionRequestBinding) {
   };
 }
 
+it('acknowledges only an admitted selection through the runtime response contract', async () => {
+  const request = createRequest();
+  await Promise.resolve();
+  const sendResponse = vi.fn();
+  request.runtime.emit(selectedMessage(request.binding), sender({ frameId: 2 }), sendResponse);
+  expect(sendResponse).not.toHaveBeenCalled();
+  request.runtime.emit(selectedMessage(request.binding), sender(), sendResponse);
+  expect(sendResponse).toHaveBeenCalledExactlyOnceWith({ success: true });
+  await expect(request.resultPromise).resolves.toEqual(selection);
+});
+
 it('rejects stale request bindings before accepting the current selection', async () => {
   const request = createRequest();
   await Promise.resolve();

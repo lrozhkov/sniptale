@@ -246,6 +246,20 @@ function registerSuppressedOutputTest() {
 }
 
 describe('selection-mode runtime drag lifecycle', () => {
+  it('hides only resize chrome and restores it after release', () => {
+    const args = createArgs();
+    applySelectionModeDragSelectionMock.mockReturnValue(createDragRuntime());
+    args.state.dom.finalFrame = document.createElement('div');
+    args.state.dom.sizePanel = document.createElement('div');
+    args.state.isResizing = true;
+    updateSelectionModeFinalFrame(args);
+    expect(args.state.dom.finalFrame.style.opacity).toBe('0');
+    expect(args.state.dom.sizePanel.style.visibility).toBe('hidden');
+    args.state.isResizing = false;
+    updateSelectionModeFinalFrame(args);
+    expect(args.state.dom.finalFrame.style.opacity).toBe('1');
+    expect(args.state.dom.sizePanel.style.visibility).toBe('visible');
+  });
   registerHoverLifecycleTest();
   registerElementSelectionTest();
   registerDragResultTest();

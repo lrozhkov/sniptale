@@ -23,8 +23,45 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
 
 import { createRegionSelectorTooltip } from './tooltip';
 
+it('shares preset and lock state with pointer resizing and keeps numeric dimensions even', () => {
+  vi.stubGlobal('innerWidth', 1001);
+  vi.stubGlobal('innerHeight', 799);
+  const tooltip = createTooltipDom();
+  createContentSizeTooltipDomMock.mockReturnValue(tooltip);
+  let current = { x: 100, y: 100, width: 320, height: 180 };
+  const aspectRatioState = { maintainAspectRatio: false, aspectRatio: null as number | null };
+  createRegionSelectorTooltip({
+    aspectRatioState,
+    getCurrentRegion: () => current,
+    mountInto: document.body,
+    onCancel: vi.fn(),
+    onConfirm: vi.fn(),
+    onRegionChange: (next) => {
+      current = next;
+    },
+  });
+  const select = tooltip.root.querySelector<HTMLSelectElement>('select')!;
+  const chevron = select.parentElement!.querySelector<SVGSVGElement>('.sniptale-select-chevron')!;
+  expect(chevron.getAttribute('width')).toBe('16');
+  expect(chevron.style.right).toBe('13px');
+  expect(select.style.appearance).toBe('none');
+  expect(select.style.paddingRight).toBe('40px');
+  select.value = '16:9';
+  select.dispatchEvent(new Event('change'));
+  expect(aspectRatioState).toEqual({ maintainAspectRatio: true, aspectRatio: 16 / 9 });
+  tooltip.widthInput.value = '517';
+  tooltip.widthInput.dispatchEvent(new Event('change'));
+  expect(current.width % 2).toBe(0);
+  expect(current.height % 2).toBe(0);
+  expect(Math.abs(current.width - (current.height * 16) / 9)).toBeLessThanOrEqual(2);
+  tooltip.aspectRatioButton.click();
+  expect(aspectRatioState.maintainAspectRatio).toBe(false);
+  expect(select.value).toBe('free');
+});
+
 function createTooltipDom() {
   const root = document.createElement('div');
+  const actions = document.createElement('div');
   const minusWidth = document.createElement('button');
   minusWidth.className = 'sniptale-size-btn-minus';
   minusWidth.dataset['target'] = 'width';
@@ -40,6 +77,7 @@ function createTooltipDom() {
   const confirmButton = document.createElement('button');
 
   return {
+    actions,
     aspectRatioButton,
     cancelButton,
     confirmButton,

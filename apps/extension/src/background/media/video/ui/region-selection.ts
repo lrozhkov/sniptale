@@ -167,7 +167,11 @@ function createRegionSelectionListener(props: {
     owner: props.owner,
   });
 
-  return (message: unknown, sender: chrome.runtime.MessageSender) => {
+  return (
+    message: unknown,
+    sender: chrome.runtime.MessageSender,
+    sendResponse?: (response: { success: true }) => void
+  ) => {
     const parsedMessage = parseRegionSelectionMessage(message);
     if (
       !parsedMessage ||
@@ -182,6 +186,7 @@ function createRegionSelectionListener(props: {
     }
     consumed = true;
     clearActiveRegionSelectionRequest(props.tabId, props.owner);
+    sendResponse?.({ success: true });
 
     handleAcceptedRegionSelectionMessage({
       finish: props.finish,

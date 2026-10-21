@@ -21,7 +21,6 @@ it('builds the complete styled region selector surface', () => {
   const masks = root.querySelectorAll<HTMLElement>('[data-ui="content.region-mask"]');
   const region = root.querySelector<HTMLElement>('#sniptale-region');
   const firstHandle = root.querySelector<HTMLElement>('.sniptale-resize');
-  const instruction = root.lastElementChild as HTMLElement;
 
   expect(root.id).toBe('sniptale-overlay');
   expect(getComputedStyle(root).backgroundColor).toBe('rgba(0, 0, 0, 0)');
@@ -31,18 +30,13 @@ it('builds the complete styled region selector surface', () => {
       'color-mix(in srgb, var(--sniptale-color-overlay) 72%, transparent)'
     );
   }
-  expect(region?.style.border).toContain(
-    'color-mix(in srgb, var(--sniptale-color-accent) 56%, var(--sniptale-color-border-soft) 44%)'
-  );
-  expect(firstHandle?.style.background).toContain(
-    'color-mix(in srgb, var(--sniptale-color-accent-soft) 18%, var(--sniptale-color-surface-panel) 82%)'
-  );
+  expect(region?.style.border).toBe('1px dashed rgb(37, 99, 235)');
+  expect(region?.style.cursor).toBe('move');
+  expect(firstHandle?.style.background).toBe('var(--sniptale-color-surface-panel)');
   expect(firstHandle?.style.boxShadow).toContain('0 8px 18px');
-  expect(instruction.style.background).toContain(
-    'color-mix(in srgb, var(--sniptale-color-surface-panel) 92%, var(--sniptale-color-surface-canvas) 8%)'
+  expect(region?.getAttribute('aria-description')).toBe(
+    'content.overlayControls.regionInstruction'
   );
-  expect(instruction.style.borderRadius).toBe('12px');
-  expect(root.textContent).toContain('content.overlayControls.regionInstruction');
 });
 
 it('updates overlay mask positions for the current region', () => {
