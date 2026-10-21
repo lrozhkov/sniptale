@@ -1,3 +1,4 @@
+import { ProjectSourceAudioEditor } from './source-audio';
 import { ProjectOriginalAudioEditor } from './original-audio';
 import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
@@ -70,6 +71,19 @@ export function renderAudioFields(
         onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
         onUpdateClipVolume: props.onUpdateClipVolume,
       })}
+      <InspectorDetails
+        preferenceId="audio-fields:source-audio"
+        label={translate('videoEditor.sidebar.sourceAudio')}
+      >
+        <ProjectSourceAudioEditor
+          project={props.project}
+          source={{
+            kind: 'source',
+            assetId: clip.assetId,
+            sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+          }}
+        />
+      </InspectorDetails>
       {clip.originalAudioMute ? (
         <ProjectOriginalAudioEditor
           key={clip.id}

@@ -456,3 +456,21 @@ it('retains admitted object observations beyond the bounded composition clock', 
     analysis: { projectStartTime: 90_002.75, projectEndTime: 90_003.75 },
   });
 });
+
+it('moves placements for a prefix while retaining the exact authored source audio clock', () => {
+  const project = fixture();
+  project.version = 28;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: 'asset-video', sourceInstanceId: 'instance' },
+      ranges: [{ id: 'gain', start: 2.123456789, end: 8, volume: 2 }],
+      mutes: [{ id: 'mute', start: 4, end: 6, volume: 0.25 }],
+    },
+  ];
+  const before = structuredClone(project);
+  const next = prefix(project);
+  expect(next.sourceAudioDocuments).toEqual(before.sourceAudioDocuments);
+  expect(next.clips[0]?.startTime).toBe(project.clips[0]!.startTime + delta);
+  expect(project).toEqual(before);
+});

@@ -72,6 +72,13 @@ export function removeVideoProjectLibrarySources(
     ...project,
     assets: project.assets.filter(({ id }) => !removedAssetIds.has(id)),
     clips,
+    ...(project.sourceAudioDocuments
+      ? {
+          sourceAudioDocuments: project.sourceAudioDocuments.filter(
+            ({ binding }) => !removedAssetIds.has(binding.assetId)
+          ),
+        }
+      : {}),
     ...(project.textDocuments
       ? {
           textDocuments: project.textDocuments.filter(

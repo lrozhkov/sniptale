@@ -1,40 +1,6 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { sourceAudioGainAtTime } from '../../audio/source-attenuation';
 import type { ReviewEdit } from '../types';
 import type { QuickEditOriginalAudio, QuickEditOriginalAudioRange } from './types';
-
-/** Source-time gain intervals never move when cuts or speed edits change output time. */
-export function parseOriginalAudioRanges(value: unknown): QuickEditOriginalAudioRange[] | null {
-  if (!Array.isArray(value) || value.length > 512) return null;
-  const ranges: QuickEditOriginalAudioRange[] = [];
-  const ids = new Set<string>();
-  for (const item of value) {
-    if (!isRecord(item)) return null;
-    const { id, start, end, volume } = item;
-    if (
-      typeof id !== 'string' ||
-      !id.trim() ||
-      id.trim() !== id ||
-      id.length > 256 ||
-      ids.has(id) ||
-      typeof start !== 'number' ||
-      !Number.isFinite(start) ||
-      start < 0 ||
-      typeof end !== 'number' ||
-      !Number.isFinite(end) ||
-      end > 86_400 ||
-      end - start < 0.001 ||
-      typeof volume !== 'number' ||
-      !Number.isFinite(volume) ||
-      volume < 0 ||
-      volume > 2
-    )
-      return null;
-    ids.add(id);
-    ranges.push({ id, start, end, volume });
-  }
-  ranges.sort((a, b) => a.start - b.start);
-  return ranges.some((range, i) => i > 0 && range.start < ranges[i - 1]!.end) ? null : ranges;
-}
 
 /** Master gain multiplies the selected range; explicit speed/cut muting always wins. */
 export function originalAudioGainAt(
@@ -50,8 +16,7 @@ export function originalAudioGainAt(
     )
   )
     return 0;
-  const range = original.ranges?.find((item) => time >= item.start && time < item.end);
-  return original.volume * (range?.volume ?? 1);
+  return original.volume * sourceAudioGainAtTime(original.ranges ?? [], time);
 }
 
 /** A range must retain audible video and must not overlap another manually controlled range. */

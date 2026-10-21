@@ -702,3 +702,26 @@ it('purges deleted comment sources through the cascade and preserves independent
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   expect(harness.complete).toHaveBeenCalledTimes(1);
 });
+
+it('purges dormant source audio documents in the same root as their deleted source', async () => {
+  const entry = createVideoProjectEntryWithMediaClip({ version: 28 });
+  const asset = entry.project.assets[0]!;
+  entry.project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  entry.project.clips = [];
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, entry);
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: entry.id, kind: 'video', name: entry.project.name, primary: false },
+  ]);
+  expect(rows.get('video_projects')!.get(entry.id)).toMatchObject({
+    project: { version: 28, sourceAudioDocuments: [], assets: [], clips: [] },
+  });
+  expect(harness.complete).toHaveBeenCalledOnce();
+});

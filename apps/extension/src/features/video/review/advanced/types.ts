@@ -1,3 +1,4 @@
+import type { SourceAudioGainRange } from '../../audio/source-envelope';
 import type {
   CameraPerspective as QuickEditPerspective,
   CameraDepthOfField as QuickEditDepthOfField,
@@ -212,12 +213,7 @@ export interface QuickEditAudioClip {
   fadeOut: number;
 }
 
-export interface QuickEditOriginalAudioRange {
-  id: string;
-  start: number;
-  end: number;
-  volume: number;
-}
+export type QuickEditOriginalAudioRange = SourceAudioGainRange;
 
 /** Source attenuation follows an ordinary take until its first manual range edit. */
 export type QuickEditOriginalAudioMute =

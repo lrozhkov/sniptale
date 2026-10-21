@@ -1722,11 +1722,22 @@
       "file": "apps/extension/src/composition/persistence/projects/backup-restore.test.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence",
-      "reason": "tool-noise: The schema25/schema26 cases extend the existing remembered-bookend restore proof with optional preset transitions and clip-edge joins. Both cases use the same root writer, caller-owned stores and transaction fixture. Each invocation creates isolated stores. The change adds no independent operation, fixture or restore lifecycle. Independent read-only diagnosis inspected the exact baseline and candidate bodies. Complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when the file body or signature changes. Reassess an independent fixture, unrelated operation or restore lifecycle. Remove when the analyzer recognizes this cohesive restore proof.",
-      "astHash": "d179b1a20865a64842a1994e6b7d9cf37a16d29fad8db812ab0822f6e6fa0542",
-      "signatureHash": "bb320308abea3398e61c1591d52f4b41ad78f75b08b509266e7fde60caa0dc37",
-      "reviewDate": "2026-10-21"
+      "reason": "tool-noise: The schema28 case extends the existing root restore proof with dormant source audio documents. It uses the same writer, caller-owned stores, and transaction fixture. It adds no independent fixture, operation, or recovery lifetime. File length alone triggers this finding. Independent final architecture review must assess this exact classification.",
+      "removalCondition": "Remove this allowance when its exact AST or signature changes. Reassess any new fixture, writer, operation, or recovery lifetime. Remove it when the analyzer recognizes this cohesive root proof. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "f4a2508c78f7ccc691b8618acd4b43d6b2ed7b52c2fb1a04d4b69e86ffe9e709",
+      "signatureHash": "bb320308abea3398e61c1591d52f4b41ad78f75b08b509266e7fde60caa0dc37"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/projects/index.save.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence",
+      "reason": "tool-noise: This suite tests the canonical Native workspace root writer. The candidate adds source audio roundtrip proof under existing transaction mocks. It adds no writer, runtime, or state authority. File length alone triggers this finding. Independent final architecture review must assess this exact classification.",
+      "removalCondition": "Remove this allowance when its exact AST or signature changes. Reassess any new fixture, writer, operation, or recovery lifetime. Remove it when the analyzer recognizes this cohesive root proof. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-21",
+      "astHash": "7fc7f88b6059a553106d551ac41774a3a4e3bfce61166e10edb78aaab24ec2c4",
+      "signatureHash": "517e837d0135138f7e3538d9f36986a0ebdab5b3b65c91d55c405fe9cc042f8b"
     }
   ]
 }

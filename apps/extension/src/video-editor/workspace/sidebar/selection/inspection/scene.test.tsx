@@ -309,3 +309,36 @@ it('opens notes as a scene category without nesting a selected inspector', () =>
   expect(container!.querySelector('[data-ui="video-editor.comments.panel"]')).not.toBeNull();
   expect(container!.querySelector('[data-ui="video-editor.comment.inspector"]')).toBeNull();
 });
+
+it('hides source audio for an unplaced material and exposes retained dormant documents', () => {
+  const props = createProps();
+  const asset = createVideoProjectAsset(
+    'Sound',
+    VideoProjectAssetType.AUDIO,
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      audioPeaks: null,
+      duration: 10,
+      hasAudio: true,
+      height: 0,
+      width: 0,
+      mimeType: 'audio/wav',
+      size: 100,
+    }
+  );
+  props.project.assets = [asset];
+  renderInspectPanel(props);
+  const category = 'nav button[title="videoEditor.sidebar.sourceAudio"]';
+  expect(container?.querySelector(category)).toBeNull();
+  props.project.version = 28;
+  props.project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  renderInspectPanel(props);
+  expect(container?.querySelector(category)).not.toBeNull();
+});

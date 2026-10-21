@@ -300,3 +300,38 @@ it('retains targeted legacy source identity on both overwrite tails without text
   expect(getProjectOriginalAudioRanges(result, anchor)).toEqual([]);
   expect(project).toEqual(before);
 });
+
+it('retains legacy source audio identity across both overwrite tails and keeps hidden intent', async () => {
+  const { getProjectSourceAudioRanges } = await import('../source-audio');
+  const source = createVideoClip({ id: 'original' });
+  const anchor = createVideoClip({
+    id: 'anchor',
+    assetId: 'replacement',
+    startTime: 4,
+    duration: 2,
+    sourceDuration: 2,
+  });
+  const project = {
+    ...createProject([source, anchor]),
+    version: 28 as const,
+    sourceAudioDocuments: [
+      {
+        id: 'envelope',
+        binding: { kind: 'source' as const, assetId: source.assetId, sourceInstanceId: source.id },
+        ranges: [{ id: 'all', start: 0, end: 10, volume: 2 }],
+        mutes: [{ id: 'hidden', start: 4, end: 6, volume: 0.25 }],
+      },
+    ],
+  };
+  const before = structuredClone(project);
+  const result = applyOverwritePlacement(project, [anchor.id]);
+  const tails = result.clips.filter(
+    (clip) => clip.type === 'VIDEO' && clip.assetId === source.assetId
+  );
+  expect(tails.map((clip) => getProjectSourceAudioRanges(result, clip))).toEqual([
+    [{ start: 0, end: 4, volume: 2 }],
+    [{ start: 6, end: 10, volume: 2 }],
+  ]);
+  expect(result.sourceAudioDocuments).toEqual(before.sourceAudioDocuments);
+  expect(project).toEqual(before);
+});

@@ -439,3 +439,29 @@ it('removes only comment documents bound to explicitly deleted source assets', (
   expect(isExportReadyVideoProject(result)).toBe(true);
   expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
 });
+
+it('removes only source audio documents owned by the retired source, including dormant documents', () => {
+  const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+  const { project, removed, kept, removedClip, keptClip } = fixture(source);
+  project.version = 28;
+  project.sourceAudioDocuments = [removedClip, keptClip].map((clip, index) => ({
+    id: String(index),
+    binding: {
+      kind: 'source',
+      assetId: clip.assetId,
+      sourceInstanceId: ('sourceInstanceId' in clip ? clip.sourceInstanceId : undefined) ?? clip.id,
+    },
+    ranges: [{ id: 'range', start: 0, end: 1, volume: 2 }],
+    mutes: [],
+  }));
+  project.clips = [];
+  const before = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.assets).toEqual([kept]);
+  expect(result.sourceAudioDocuments).toEqual([project.sourceAudioDocuments[1]]);
+  expect(
+    result.sourceAudioDocuments?.some((document) => document.binding.assetId === removed.id)
+  ).toBe(false);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+});

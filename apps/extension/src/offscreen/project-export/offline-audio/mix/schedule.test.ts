@@ -302,3 +302,75 @@ it.each([0.0625, 0.125, 0.5, 8, 16])(
     expect(context.lastSource?.stop).toHaveBeenCalledWith(1 + 0.04 / rate);
   }
 );
+
+it('schedules source amplification from the actual collector with each master applied once', async () => {
+  const { collectRenderableAudioClips } = await import('../clip-audio/collect');
+  const { createVideoProjectTrack } =
+    await import('../../../../features/video/project/factories/creation');
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const project = createEmptyVideoProject('Source gain');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 4,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.audioGainStart = clip.audioGainEnd = 2;
+  project.tracks = [track];
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 4;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: {
+        kind: 'source',
+        assetId: asset.id,
+        sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      },
+      ranges: [{ id: 'boost', start: 0, end: 4, volume: 2 }],
+      mutes: [{ id: 'static', start: 1, end: 2, volume: 0.25 }],
+    },
+  ];
+  for (const settings of [undefined, { rangeStartSeconds: 0.5, rangeEndSeconds: 2.5 }]) {
+    const prepared = collectRenderableAudioClips(project, settings)[0]!;
+    const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+      OfflineAudioContext;
+    await scheduleOfflineAudioClipMix(context, prepared, createAudioBuffer(1, 48000, 192000));
+    expect(context.gains).toHaveLength(2);
+    const [masters, source] = context.gains;
+    expect(masters?.gain.setValueAtTime).toHaveBeenCalledWith(4, 0);
+    expect(source?.gain.setValueAtTime.mock.calls).toEqual(
+      settings
+        ? [
+            [1, 0],
+            [2, 0],
+            [1, 0.5],
+            [0.5, 0.5],
+            [1, 1.5],
+            [2, 1.5],
+            [1, 2],
+          ]
+        : [
+            [1, 0],
+            [2, 0],
+            [1, 1],
+            [0.5, 1],
+            [1, 2],
+            [2, 2],
+            [1, 4],
+          ]
+    );
+  }
+});

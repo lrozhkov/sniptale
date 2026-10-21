@@ -55,3 +55,8 @@ export function sourceAudioAttenuationAtTime(ranges: readonly AudioGainRange[], 
     if (time >= range.start && time < range.end) volume = Math.min(volume, range.volume);
   return volume;
 }
+
+/** Resolves a disjoint manual envelope, including authored amplification. */
+export function sourceAudioGainAtTime(ranges: readonly AudioGainRange[], time: number): number {
+  return ranges.find((range) => time >= range.start && time < range.end)?.volume ?? 1;
+}

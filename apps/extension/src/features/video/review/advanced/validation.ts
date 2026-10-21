@@ -26,7 +26,7 @@ import {
 import { parseReviewClickAnimations } from './click-animation';
 
 import { quickEditFocusConflicts } from './focus-layout';
-import { parseOriginalAudioRanges } from './original-audio';
+import { parseSourceAudioGainRanges } from '../../audio/source-envelope';
 import { parseOriginalAudioMutes, validOriginalAudioMuteBindings } from './original-audio-mutes';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
 
@@ -470,7 +470,7 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
   )
     return null;
   const ranges =
-    value['ranges'] === undefined ? undefined : parseOriginalAudioRanges(value['ranges']);
+    value['ranges'] === undefined ? undefined : parseSourceAudioGainRanges(value['ranges']);
   const mutes = value['mutes'] === undefined ? undefined : parseOriginalAudioMutes(value['mutes']);
   if (ranges === null || mutes === null) return null;
   return {

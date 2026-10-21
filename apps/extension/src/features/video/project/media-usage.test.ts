@@ -196,3 +196,19 @@ it('retains comment sources even when every placement and bubble is hidden or re
   ]);
   expect([...getProjectAssetUseCounts(project)]).toEqual([['retained', 1]]);
 });
+
+it('retains a dormant source audio document as a material use without a placement', () => {
+  const project = createEmptyVideoProject();
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: 'source', sourceInstanceId: 'instance' },
+      ranges: [{ id: 'gain', start: 1, end: 2, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  expect(getProjectAssetUses(project)).toEqual([
+    { assetId: 'source', kind: 'source-audio', documentId: 'envelope' },
+  ]);
+  expect(getProjectAssetUseCounts(project).get('source')).toBe(1);
+});

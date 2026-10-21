@@ -1,8 +1,12 @@
+import { getProjectSourceAudioRanges } from '../source-audio';
 import { getClipGainRange } from './audio';
 import { getAudioFadeFactor } from '../../audio/fades';
 import { getProjectTrackAudioVolume } from './track-audio';
 import { getProjectOriginalAudioRanges } from './original-audio';
-import { sourceAudioAttenuationAtTime } from '../../audio/source-attenuation';
+import {
+  sourceAudioAttenuationAtTime,
+  sourceAudioGainAtTime,
+} from '../../audio/source-attenuation';
 import { clampNumber } from './basics';
 import type { VideoProject, VideoProjectClip } from '../types/index';
 import {
@@ -70,9 +74,10 @@ export function getClipCompositeAudioGain(
   return clampNumber(
     getClipAudioGain(clip, currentTime) *
       getProjectTrackAudioVolume(project, clip.trackId) *
+      sourceAudioGainAtTime(getProjectSourceAudioRanges(project, clip), currentTime) *
       sourceAudioAttenuationAtTime(getProjectOriginalAudioRanges(project, clip), currentTime) *
       resolveClipTransitionAudioMultiplier(project, clip, currentTime),
     0,
-    4
+    8
   );
 }

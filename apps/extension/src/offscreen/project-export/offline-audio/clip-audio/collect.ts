@@ -1,3 +1,5 @@
+import { composeSourceAudioRanges } from '../../../../features/video/audio/source-attenuation';
+import { getProjectSourceAudioRanges } from '../../../../features/video/project/source-audio';
 import { getClipGainRange } from '../../../../features/video/project/timeline/audio';
 import { getProjectTrackAudioVolume } from '../../../../features/video/project/timeline/track-audio';
 import { getProjectOriginalAudioRanges } from '../../../../features/video/project/timeline/original-audio';
@@ -36,7 +38,10 @@ export function collectRenderableAudioClips(
         easing: segment.transition.easing,
         incoming: segment.trailingClipId === clip.id,
       }));
-    const originalAudioRanges = getProjectOriginalAudioRanges(project, clip);
+    const originalAudioRanges = composeSourceAudioRanges(
+      getProjectSourceAudioRanges(project, clip),
+      getProjectOriginalAudioRanges(project, clip)
+    );
     return {
       ...clip,
       volume: getProjectTrackAudioVolume(project, clip.trackId),

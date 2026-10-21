@@ -399,7 +399,12 @@ function revealWorkspaceMaterial(
   >,
   onRevealClip: (clipId: string) => void
 ) {
-  if (use.kind === 'scene' || use.kind === 'watermark' || use.kind === 'bookend-preset')
+  if (
+    use.kind === 'scene' ||
+    use.kind === 'watermark' ||
+    use.kind === 'bookend-preset' ||
+    use.kind === 'source-audio'
+  )
     preview.selection.onSelectScene();
   if (use.kind !== 'clip') return;
   const clip = preview.project.clips.find((clip) => clip.id === use.clipId);

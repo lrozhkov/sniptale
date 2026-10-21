@@ -482,3 +482,71 @@ it.each([
   }
   expect(JSON.stringify(imported)).toBe(before);
 });
+
+it('prepares amplified source cells once and clips their clock for selected export', () => {
+  const project = createEmptyVideoProject('Source audio export');
+  const track = createVideoProjectTrack('Audio', 1, 'AUDIO');
+  track.audioVolume = 2;
+  const asset = createVideoProjectAsset(
+    'Source',
+    'AUDIO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 0,
+      height: 0,
+      duration: 8,
+      mimeType: 'audio/wav',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createAudioClipFromAsset(track.id, asset);
+  clip.audioGainStart = clip.audioGainEnd = 2;
+  project.tracks = [track];
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 8;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: {
+        kind: 'source',
+        assetId: asset.id,
+        sourceInstanceId: clip.sourceInstanceId ?? clip.id,
+      },
+      ranges: [{ id: 'boost', start: 0, end: 8, volume: 2 }],
+      mutes: [
+        { id: 'static', start: 2, end: 4, volume: 0.5 },
+        { id: 'overlap', start: 3, end: 5, volume: 0.25 },
+      ],
+    },
+  ];
+  getAssetByIdMock.mockReturnValue(asset);
+  const before = structuredClone(project);
+  expect(collectRenderableAudioClips(project)[0]).toMatchObject({
+    volume: 2,
+    audioGainStart: 2,
+    audioGainEnd: 2,
+    originalAudioRanges: [
+      { start: 0, end: 2, volume: 2 },
+      { start: 3, end: 5, volume: 0.5 },
+      { start: 5, end: 8, volume: 2 },
+    ],
+  });
+  expect(
+    collectRenderableAudioClips(project, { rangeStartSeconds: 1, rangeEndSeconds: 6 })[0]
+  ).toMatchObject({
+    volume: 2,
+    audioGainStart: 2,
+    audioGainEnd: 2,
+    sourceStart: 1,
+    duration: 5,
+    originalAudioRanges: [
+      { start: 0, end: 1, volume: 2 },
+      { start: 2, end: 4, volume: 0.5 },
+      { start: 4, end: 5, volume: 2 },
+    ],
+  });
+  expect(project).toEqual(before);
+});

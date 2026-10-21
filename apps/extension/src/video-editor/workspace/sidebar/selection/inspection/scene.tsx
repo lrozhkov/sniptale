@@ -1,3 +1,5 @@
+import { listProjectOriginalAudioTargets } from '../../../../../features/video/project/timeline/original-audio';
+import { ProjectSourceAudioEditor } from '../inputs/source-audio';
 import { SceneEdgesFields } from './scene-edges';
 import { InspectProjectCommentsPanel } from './comments';
 import { SceneWatermarkFields } from './watermark';
@@ -108,6 +110,15 @@ function createSceneGroups(
           {...(props.textVoice ? { voice: props.textVoice } : {})}
         />
       ),
+    },
+    {
+      id: 'audio',
+      semantic: 'audio' as const,
+      label: translate('videoEditor.sidebar.sourceAudio'),
+      visible:
+        listProjectOriginalAudioTargets(props.project).length > 0 ||
+        Boolean(props.project.sourceAudioDocuments?.length),
+      content: <ProjectSourceAudioEditor project={props.project} />,
     },
     {
       id: 'comments',

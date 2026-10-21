@@ -1,4 +1,8 @@
 import {
+  parseVideoProjectSourceAudioDocuments,
+  hasValidVideoProjectSourceAudioReferences,
+} from '../source-audio';
+import {
   parseVideoProjectCompositionJoins,
   hasValidVideoProjectCompositionJoinReferences,
 } from '../scene/joins';
@@ -113,8 +117,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 27) &&
+    isBoundedNumber(version, 2, 28) &&
     Number.isInteger(version) &&
+    (version >= 28 || value['sourceAudioDocuments'] === undefined) &&
     (version >= 26 ||
       (value['compositionJoins'] === undefined &&
         (!isRecord(value['bookendPresets']) ||
@@ -194,6 +199,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
       parseVideoProjectTextDocuments(value['textDocuments']) !== null) &&
     (value['commentDocuments'] === undefined ||
       parseVideoProjectCommentDocuments(value['commentDocuments']) !== null) &&
+    (value['sourceAudioDocuments'] === undefined ||
+      parseVideoProjectSourceAudioDocuments(value['sourceAudioDocuments']) !== null) &&
     isString(value['name']) &&
     isProjectSource(value['source']) &&
     isNullable(value['baseRecordingId'], isString) &&
@@ -341,6 +348,7 @@ function hasValidReferences(project: VideoProject): boolean {
   return (
     hasValidVideoProjectBaseReferences(project) &&
     hasValidEffectProjectReferences(project) &&
+    hasValidVideoProjectSourceAudioReferences(project) &&
     hasValidVideoProjectTextReferences(project) &&
     hasValidVideoProjectCommentReferences(project)
   );

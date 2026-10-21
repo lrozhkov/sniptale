@@ -1,3 +1,4 @@
+import { duplicateProjectSourceAudioDocuments } from '../../../../features/video/project/source-audio-authoring';
 import { duplicateVideoProjectCommentDocuments } from '../../../../features/video/project/comments/duplication';
 import { isCommentSourceClip } from '../../../../features/video/project/comments/projection';
 import { projectMotionSourceBinding } from '../../../../features/video/project/motion/source-binding';
@@ -298,6 +299,15 @@ function duplicateBoundDocuments(
   nextProject: VideoProject,
   sourceInstances: ReadonlyMap<string, string>
 ): boolean {
+  if (project.sourceAudioDocuments) {
+    const documents = duplicateProjectSourceAudioDocuments(
+      project.sourceAudioDocuments,
+      sourceInstances,
+      () => crypto.randomUUID()
+    );
+    if (!documents) return false;
+    nextProject.sourceAudioDocuments = documents;
+  }
   if (project.textDocuments) {
     const documents = duplicateVideoProjectTextDocuments(project.textDocuments, sourceInstances);
     if (!documents) return false;

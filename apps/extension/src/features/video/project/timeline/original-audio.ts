@@ -1,3 +1,7 @@
+import {
+  getProjectSourceAudioDocument,
+  getProjectSourceAudioAttenuationRanges,
+} from '../source-audio';
 import { applyVideoProjectMutationPatch } from '../mutation';
 import { composeSourceAudioRanges, type AudioGainRange } from '../../audio/source-attenuation';
 import type { VideoProject, VideoProjectClip } from '../types';
@@ -5,15 +9,18 @@ import type { VideoProject, VideoProjectClip } from '../types';
 /** Finds exact authored targets, including legacy source identity before its first split. */
 export function isProjectOriginalAudioTarget(project: VideoProject, clip: VideoProjectClip) {
   if (clip.type !== 'AUDIO' && clip.type !== 'VIDEO') return false;
-  return project.clips.some(
-    (take) =>
-      take.type === 'AUDIO' &&
-      take.id !== clip.id &&
-      take.originalAudioMute?.targets.some(
-        (target) =>
-          target.assetId === clip.assetId &&
-          target.sourceInstanceId === (clip.sourceInstanceId ?? clip.id)
-      )
+  return (
+    !!getProjectSourceAudioDocument(project, clip) ||
+    project.clips.some(
+      (take) =>
+        take.type === 'AUDIO' &&
+        take.id !== clip.id &&
+        take.originalAudioMute?.targets.some(
+          (target) =>
+            target.assetId === clip.assetId &&
+            target.sourceInstanceId === (clip.sourceInstanceId ?? clip.id)
+        )
+    )
   );
 }
 
@@ -44,7 +51,10 @@ export function getProjectOriginalAudioRanges(
     const end = Math.min(clip.startTime + clip.duration, take.startTime + take.duration);
     return end > start ? [{ start, end, volume: mute.volume }] : [];
   });
-  return composeSourceAudioRanges([], ranges);
+  return composeSourceAudioRanges(
+    [],
+    [...getProjectSourceAudioAttenuationRanges(project, clip), ...ranges]
+  );
 }
 
 /** Copies explicit bindings only after the montage command has its complete instance map. */

@@ -559,3 +559,53 @@ it('reveals a dormant watermark as a watermark and protects its material from re
   expect(onSelect).not.toHaveBeenCalled();
   expect(onRemoveUnused).not.toHaveBeenCalled();
 });
+
+it('reveals a dormant source audio use and prevents removal of its retained material', async () => {
+  const { asset, project, onImport, onSelect, onRename, onRemoveUnused } = renderMaterials();
+  project.version = 28;
+  project.sourceAudioDocuments = [
+    {
+      id: 'envelope',
+      binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+      ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+      mutes: [],
+    },
+  ];
+  const onShowUse = vi.fn();
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRename={onRename}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === translate('videoEditor.sidebar.sourceAudio')
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: asset.id,
+    kind: 'source-audio',
+    documentId: 'envelope',
+  });
+  expect(onRemoveUnused).not.toHaveBeenCalled();
+});

@@ -330,7 +330,9 @@ export interface VideoProject {
     | 24
     | 25
     | 26
-    | 27;
+    | 27
+    | 28;
+  sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;

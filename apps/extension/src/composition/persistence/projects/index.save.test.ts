@@ -781,3 +781,44 @@ it('saves schema26 joins and recipes without changing source data', async () => 
   expect(project).toEqual(before);
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
 });
+
+it('commits and reopens dormant source audio documents through the canonical root writer', async () => {
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const { parseHydratableVideoProject } =
+    await import('../../../features/video/project/validation/root');
+  const asset = createProjectOwnedVideoAsset('source-envelope');
+  const project = createVideoProject({
+    version: 28,
+    assets: [asset],
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'envelope',
+        binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+        ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+        mutes: [{ id: 'mute', start: 0.25, end: 0.75, volume: 0.125 }],
+      },
+    ],
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === asset.id
+      ? { id: asset.id, assetId: 'source-bytes', mimeType: 'video/mp4', size: 20, createdAt: 100 }
+      : undefined
+  );
+  const saved = await commitVideoProjectWorkspaceMutation(project, {
+    expectedWorkspaceRevision: null,
+    expectedProject: null,
+  });
+  expect(saved.workspaceRevision).toBe(1);
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(saved.project)))?.sourceAudioDocuments
+  ).toEqual(project.sourceAudioDocuments);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({
+        version: 28,
+        sourceAudioDocuments: project.sourceAudioDocuments,
+      }),
+    })
+  );
+});

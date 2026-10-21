@@ -1,3 +1,4 @@
+import { parseSourceAudioAttenuationRanges } from '../../audio/source-envelope';
 import { composeSourceAudioRanges } from '../../audio/source-attenuation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { projectReviewVoiceover } from '../voiceover-edits';
@@ -16,9 +17,6 @@ type ReviewOriginalAudioRangeView = QuickEditOriginalAudioRange & {
 
 const identity = (value: unknown, limit = 256): value is string =>
   typeof value === 'string' && !!value && value.trim() === value && value.length <= limit;
-const finite = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
 /** Parses only bounded attenuation metadata; take identities are admitted by the audio owner. */
 export function parseOriginalAudioMutes(value: unknown): QuickEditOriginalAudioMute[] | null {
   if (!Array.isArray(value) || value.length > 512) return null;
@@ -34,19 +32,9 @@ export function parseOriginalAudioMutes(value: unknown): QuickEditOriginalAudioM
       clips.add(item['clipId']);
       entries.push({ id, kind: 'take', clipId: item['clipId'] });
     } else if (item['kind'] === 'range') {
-      const { start, end, volume } = item;
-      if (
-        !finite(start) ||
-        start < 0 ||
-        !finite(end) ||
-        end > 86_400 ||
-        end <= start ||
-        !finite(volume) ||
-        volume < 0 ||
-        volume > 1
-      )
-        return null;
-      entries.push({ id, kind: 'range', start, end, volume });
+      const range = parseSourceAudioAttenuationRanges([item])?.[0];
+      if (!range) return null;
+      entries.push({ ...range, kind: 'range' });
     } else return null;
   }
   return entries;

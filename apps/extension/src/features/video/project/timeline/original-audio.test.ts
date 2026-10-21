@@ -285,3 +285,35 @@ it('offers the sound track rather than the muted video half of a demuxed source 
     listProjectOriginalAudioTargets(project).filter((target) => target.assetId === asset.id)
   ).toEqual([{ assetId: source.assetId, sourceInstanceId: source.sourceInstanceId }]);
 });
+
+it('multiplies manual source gain by minimum static and live attenuation with separate masters', () => {
+  const { project, source } = fixture();
+  const track = project.tracks.find((item) => item.id === source.trackId);
+  if (!track) throw new Error('Missing audio track');
+  track.audioVolume = 2;
+  source.audioGainStart = source.audioGainEnd = 2;
+  project.sourceAudioDocuments = [
+    {
+      id: 'source-envelope',
+      binding: {
+        kind: 'source',
+        assetId: source.assetId,
+        sourceInstanceId: source.sourceInstanceId!,
+      },
+      ranges: [{ id: 'manual', start: 0, end: 8, volume: 2 }],
+      mutes: [
+        { id: 'static', start: 1, end: 5, volume: 0.5 },
+        { id: 'overlap', start: 3, end: 6, volume: 0.125 },
+      ],
+    },
+  ];
+  expect(
+    [0, 1, 2, 3, 4, 5, 6].map((time) => getClipCompositeAudioGain(project, source, time))
+  ).toEqual([8, 4, 2, 1, 1, 1, 8]);
+  expect(getProjectOriginalAudioRanges(project, source)).toEqual([
+    { start: 1, end: 2, volume: 0.5 },
+    { start: 2, end: 3, volume: 0.25 },
+    { start: 3, end: 6, volume: 0.125 },
+  ]);
+  expect(isProjectOriginalAudioTarget(project, source)).toBe(true);
+});

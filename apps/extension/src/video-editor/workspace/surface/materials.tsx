@@ -362,7 +362,8 @@ function MaterialRow(props: {
           use.kind === 'clip' ||
           use.kind === 'scene' ||
           use.kind === 'watermark' ||
-          use.kind === 'bookend-preset'
+          use.kind === 'bookend-preset' ||
+          use.kind === 'source-audio'
       ) && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
@@ -383,7 +384,8 @@ function MaterialRow(props: {
                 (use.kind === 'clip' ||
                   use.kind === 'scene' ||
                   use.kind === 'watermark' ||
-                  use.kind === 'bookend-preset')
+                  use.kind === 'bookend-preset' ||
+                  use.kind === 'source-audio')
               )
                 props.onShowUse(use);
             }}
@@ -392,9 +394,14 @@ function MaterialRow(props: {
                 use.kind !== 'clip' &&
                 use.kind !== 'scene' &&
                 use.kind !== 'watermark' &&
-                use.kind !== 'bookend-preset'
+                use.kind !== 'bookend-preset' &&
+                use.kind !== 'source-audio'
               )
                 return [];
+              if (use.kind === 'source-audio')
+                return [
+                  { value: String(index), label: translate('videoEditor.sidebar.sourceAudio') },
+                ];
               if (use.kind === 'bookend-preset')
                 return [
                   {

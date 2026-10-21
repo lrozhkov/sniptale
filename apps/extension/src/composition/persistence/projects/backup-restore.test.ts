@@ -849,3 +849,31 @@ it.each([false, true])(
     expect(entry).toEqual(original);
   }
 );
+
+it('restores dormant source audio documents with exact source intent through the existing root writer', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'source-audio-restore' });
+  const asset = entry.project.assets[0]!;
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    clips: [],
+    sourceAudioDocuments: [
+      {
+        id: 'envelope',
+        binding: { kind: 'source', assetId: asset.id, sourceInstanceId: 'dormant' },
+        ranges: [{ id: 'gain', start: 0, end: 1, volume: 2 }],
+        mutes: [],
+      },
+    ],
+  });
+  const before = structuredClone(entry.project);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(expect.objectContaining({ project: before }));
+  expect(entry.project).toEqual(before);
+  expect(before.version).toBe(28);
+});
