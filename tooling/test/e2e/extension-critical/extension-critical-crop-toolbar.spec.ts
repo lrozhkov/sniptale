@@ -50,6 +50,52 @@ async function selectCrop(
   await expect(page.locator('.sniptale-selection-toolbar')).toBeVisible();
 }
 
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`crop drawing keeps compact height after selecting a layer ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openCropWorkspace(
+      context,
+      extensionId,
+      hostOrigin,
+      size,
+      size.width === 1920 ? 'dark' : 'light'
+    );
+    try {
+      await selectCrop(page, { x: 300, y: 100, width: 480, height: 200 });
+      await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+      const arrow = page.locator(
+        '[data-ui="content.crop.drawing-slot"] [data-ui="content.toolbar.drawing.arrow"]'
+      );
+      await arrow.click();
+      const panel = page
+        .locator('.sniptale-drawing-options-popover')
+        .filter({ has: page.locator('[data-ui="content.toolbar.drawing-options.arrow"]') });
+      await expect(panel).toBeVisible();
+      const before = (await panel.boundingBox())!.height;
+      expect(before).toBeLessThanOrEqual(42);
+      await page.screenshot({
+        path: info.outputPath('crop-unselected-height.png'),
+        fullPage: false,
+      });
+      await page.mouse.move(380, 150);
+      await page.mouse.down();
+      await page.mouse.move(540, 200, { steps: 4 });
+      await page.mouse.up();
+      const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
+      await expect(pair).toBeVisible();
+      for (const surface of await pair.locator('.sniptale-drawing-options-popover').all())
+        expect((await surface.boundingBox())!.height).toBeCloseTo(before, 0);
+      await page.screenshot({ path: info.outputPath('crop-selected-height.png'), fullPage: false });
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
 async function noPointerRing(button: Locator) {
   await expect(button).not.toBeFocused();
   await expect(button).toHaveCSS('outline-style', 'none');

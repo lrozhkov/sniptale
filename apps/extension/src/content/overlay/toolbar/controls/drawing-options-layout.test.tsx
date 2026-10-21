@@ -34,7 +34,7 @@ function DrawingLayoutHarness(props: {
   });
   const side =
     layout.placement === 'side' ? (layout.style.right ? 'left' : 'right') : layout.placement;
-  return <output data-side={side} />;
+  return <output data-side={side} data-padding={layout.style.padding ?? ''} />;
 }
 
 function renderLayout(props: ComponentProps<typeof DrawingLayoutHarness>) {
@@ -81,6 +81,25 @@ afterEach(() => {
 });
 
 describe('drawing options measured placement', () => {
+  it.each(['horizontal', 'vertical'] as const)(
+    'keeps %s standalone tool padding with the shared compact shell',
+    (displayMode) => {
+      for (const tool of [
+        'arrow',
+        'blur',
+        'marker',
+        'pencil',
+        'shape',
+        'selection',
+        'text',
+      ] as const) {
+        renderLayout({ open: false, displayMode, tool, hasSelection: false });
+        expect(container.querySelector('output')?.dataset['padding']).toBe('');
+        renderLayout({ open: false, displayMode, tool, hasSelection: true });
+        expect(container.querySelector('output')?.dataset['padding']).toBe('8px');
+      }
+    }
+  );
   it('refreshes when the toolbar positioner moves without a size change', async () => {
     const positioner = document.createElement('div');
     positioner.className = 'sniptale-toolbar-positioner';

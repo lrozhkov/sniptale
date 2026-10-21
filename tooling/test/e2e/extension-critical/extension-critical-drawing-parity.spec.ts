@@ -98,6 +98,7 @@ async function checkDrawingPlacement(page: Page, editor: boolean) {
     const box = (await surface.boundingBox())!;
     expect(vertical ? box.x : box.y).toBeCloseTo(vertical ? bounds.x : bounds.y, 0);
   }
+  return bounds;
 }
 
 for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -141,7 +142,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           const arrow = page.locator('[data-ui="content.toolbar.drawing.arrow"]');
           await arrow.click();
           if ((await arrow.getAttribute('aria-expanded')) !== 'true') await arrow.click();
-          await checkDrawingPlacement(page, false);
+          const unselected = await checkDrawingPlacement(page, false);
           await page.mouse.move(300, 160);
           await page.mouse.down();
           await page.mouse.move(420, 210, { steps: 4 });
@@ -149,7 +150,15 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
           await expect(
             page.locator('[data-ui="content.toolbar.drawing-options.pair"]')
           ).toBeVisible();
-          await checkDrawingPlacement(page, false);
+          const selected = await checkDrawingPlacement(page, false);
+          expect(selected.height).toBeCloseTo(unselected.height, 0);
+          if (edge === 'top' || edge === 'bottom') {
+            expect(selected.height).toBeLessThanOrEqual(42);
+            for (const panel of await page
+              .locator('.sniptale-drawing-options-popover:visible')
+              .all())
+              expect((await panel.boundingBox())!.height).toBeCloseTo(unselected.height, 0);
+          }
           await page.screenshot({
             path: info.outputPath(`${mode}-${edge}-pair.png`),
             fullPage: false,
@@ -162,7 +171,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await applyHarnessBootstrap(editor, { storage: { 'sniptale-theme-preference': theme } });
         await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
         await editor.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
-        await checkDrawingPlacement(editor, true);
+        const unselected = await checkDrawingPlacement(editor, true);
         const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas');
         const box = (await canvas.boundingBox())!;
         await editor.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
@@ -170,7 +179,13 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         await editor.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.65, { steps: 4 });
         await editor.mouse.up();
         await expect(editor.locator('[data-ui="editor.floating.selection-actions"]')).toBeVisible();
-        await checkDrawingPlacement(editor, true);
+        const selected = await checkDrawingPlacement(editor, true);
+        expect(selected.height).toBeCloseTo(unselected.height, 0);
+        expect(selected.height).toBeLessThanOrEqual(42);
+        expect(
+          (await editor.locator('[data-ui="editor.floating.selection-actions"]').boundingBox())!
+            .height
+        ).toBeCloseTo(unselected.height, 0);
         for (const width of [viewport.width, 960, 719, 720, 721]) {
           await editor.setViewportSize({ width, height: viewport.height });
           await checkDrawingPlacement(editor, true);

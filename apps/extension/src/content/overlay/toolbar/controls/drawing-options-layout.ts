@@ -180,7 +180,7 @@ export function useDrawingOptionsLayout(args: {
         minWidth: 0,
         overflowX: 'auto',
         overflowY: 'auto',
-        padding: `${TOOLBAR_DRAWING_MENU_PADDING_PX}px`,
+        padding: args.hasSelection ? `${TOOLBAR_DRAWING_MENU_PADDING_PX}px` : undefined,
         zIndex: TOOLBAR_SECONDARY_MENU_Z_INDEX,
       } satisfies CSSProperties,
     };
