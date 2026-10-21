@@ -54,6 +54,7 @@ function hideRegionSelector(args: {
   args.state.isDragging = false;
   args.state.isResizing = false;
   args.state.resizeCorner = '';
+  args.state.regionSelectorTooltip?.dispose();
   args.state.regionSelectorContainer?.remove();
   args.state.regionSelectorContainer = null;
   args.state.regionSelectorTooltip = null;

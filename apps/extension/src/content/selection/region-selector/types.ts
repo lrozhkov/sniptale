@@ -3,6 +3,11 @@ import type { RuntimeMessagingTransport } from '../../../platform/runtime-messag
 import type { ShowRegionSelectorMessage } from '../../../contracts/video/types/messages';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 
+export type RegionSelectorTooltipDom = ContentSizeTooltipDom & {
+  dispose(): void;
+  dismissMenu(): void;
+};
+
 type RegionSelectorRequestBinding = Pick<
   ShowRegionSelectorMessage,
   'regionSelectionCapabilityToken' | 'regionSelectionRequestGeneration' | 'regionSelectionRequestId'
@@ -26,7 +31,7 @@ type RegionSelectorState = {
   keyDownHandler: ((event: KeyboardEvent) => void) | null;
   recordingOverlayContainer: HTMLDivElement | null;
   regionSelectorContainer: HTMLDivElement | null;
-  regionSelectorTooltip: ContentSizeTooltipDom | null;
+  regionSelectorTooltip: RegionSelectorTooltipDom | null;
   resizeCorner: string;
   selectedRegion: RegionSelectorBounds | null;
 };

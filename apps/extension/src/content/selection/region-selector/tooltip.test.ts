@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 
 const { createContentSizeTooltipDomMock, syncContentSizeTooltipAspectRatioButtonStateMock } =
   vi.hoisted(() => ({
@@ -21,16 +22,32 @@ vi.mock('@sniptale/ui/content-size-tooltip/dom', () => ({
   syncContentSizeTooltipValues: vi.fn(),
 }));
 
-import { createRegionSelectorTooltip } from './tooltip';
+import { createRegionSelectorTooltip as createTooltip } from './tooltip';
 
-it('shares preset and lock state with pointer resizing and keeps numeric dimensions even', () => {
+const mounted: ReturnType<typeof createTooltip>[] = [];
+function createRegionSelectorTooltip(args: Parameters<typeof createTooltip>[0]) {
+  let tooltip: ReturnType<typeof createTooltip>;
+  act(() => {
+    tooltip = createTooltip(args);
+  });
+  mounted.push(tooltip!);
+  return tooltip!;
+}
+afterEach(() => {
+  for (const tooltip of mounted.splice(0)) {
+    act(() => tooltip.dispose());
+    tooltip.root.remove();
+  }
+});
+
+it('shares preset and lock state with pointer resizing and keeps numeric dimensions even', async () => {
   vi.stubGlobal('innerWidth', 1001);
   vi.stubGlobal('innerHeight', 799);
   const tooltip = createTooltipDom();
   createContentSizeTooltipDomMock.mockReturnValue(tooltip);
   let current = { x: 100, y: 100, width: 320, height: 180 };
   const aspectRatioState = { maintainAspectRatio: false, aspectRatio: null as number | null };
-  createRegionSelectorTooltip({
+  const mountedTooltip = createRegionSelectorTooltip({
     aspectRatioState,
     getCurrentRegion: () => current,
     mountInto: document.body,
@@ -40,15 +57,20 @@ it('shares preset and lock state with pointer resizing and keeps numeric dimensi
       current = next;
     },
   });
-  const select = tooltip.root.querySelector<HTMLSelectElement>('select')!;
-  const chevron = select.parentElement!.querySelector<SVGSVGElement>('.sniptale-select-chevron')!;
-  expect(chevron.getAttribute('width')).toBe('16');
-  expect(chevron.style.right).toBe('13px');
-  expect(select.style.appearance).toBe('none');
-  expect(select.style.paddingRight).toBe('40px');
-  select.value = '16:9';
-  select.dispatchEvent(new Event('change'));
+  expect(tooltip.root.querySelector('select')).toBeNull();
+  const select = tooltip.root.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+  await act(async () => select.click());
+  const option = document.querySelector<HTMLButtonElement>('[role="option"]:nth-child(3)')!;
+  await act(async () => option.click());
+  expect(aspectRatioState.maintainAspectRatio).toBe(true);
   expect(aspectRatioState).toEqual({ maintainAspectRatio: true, aspectRatio: 16 / 9 });
+  await act(async () => select.click());
+  expect(document.querySelector('[role="listbox"]')).not.toBeNull();
+  act(() => mountedTooltip.dismissMenu());
+  expect(document.querySelector('[role="listbox"]')).toBeNull();
+  expect(tooltip.root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe('16:9');
+  expect(aspectRatioState).toEqual({ maintainAspectRatio: true, aspectRatio: 16 / 9 });
+  act(() => mountedTooltip.dismissMenu());
   tooltip.widthInput.value = '517';
   tooltip.widthInput.dispatchEvent(new Event('change'));
   expect(current.width % 2).toBe(0);
@@ -56,11 +78,14 @@ it('shares preset and lock state with pointer resizing and keeps numeric dimensi
   expect(Math.abs(current.width - (current.height * 16) / 9)).toBeLessThanOrEqual(2);
   tooltip.aspectRatioButton.click();
   expect(aspectRatioState.maintainAspectRatio).toBe(false);
-  expect(select.value).toBe('free');
+  expect(tooltip.root.querySelector('[aria-haspopup="listbox"]')?.textContent).toBe(
+    'content.overlayControls.regionAspectFree'
+  );
 });
 
 function createTooltipDom() {
   const root = document.createElement('div');
+  document.body.append(root);
   const actions = document.createElement('div');
   const minusWidth = document.createElement('button');
   minusWidth.className = 'sniptale-size-btn-minus';
@@ -86,6 +111,50 @@ function createTooltipDom() {
     widthInput,
   };
 }
+
+it('preserves input commits and keyboard focus while preventing pointer button focus', () => {
+  const tooltip = createTooltipDom();
+  createContentSizeTooltipDomMock.mockReturnValue(tooltip);
+  const onRegionChange = vi.fn();
+  createRegionSelectorTooltip({
+    getCurrentRegion: () => ({ x: 100, y: 100, width: 320, height: 180 }),
+    mountInto: document.body,
+    onCancel: vi.fn(),
+    onConfirm: vi.fn(),
+    onRegionChange,
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.append(tooltip.root);
+  tooltip.root.append(tooltip.widthInput, tooltip.aspectRatioButton);
+  const press = (target: Node, button = 0) => {
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  tooltip.widthInput.value = '400';
+  tooltip.widthInput.focus();
+  expect(press(tooltip.aspectRatioButton)).toBe(true);
+  expect(shadow.activeElement).not.toBe(tooltip.widthInput);
+  expect(onRegionChange).toHaveBeenCalled();
+  tooltip.aspectRatioButton.focus();
+  expect(shadow.activeElement).toBe(tooltip.aspectRatioButton);
+  expect(press(tooltip.aspectRatioButton, 2)).toBe(false);
+  expect(shadow.activeElement).toBe(tooltip.aspectRatioButton);
+  expect(press(tooltip.root)).toBe(false);
+  tooltip.aspectRatioButton.disabled = true;
+  expect(press(tooltip.aspectRatioButton)).toBe(false);
+  tooltip.aspectRatioButton.disabled = false;
+  const text = document.createTextNode('text');
+  tooltip.root.append(text);
+  expect(press(text)).toBe(false);
+  expect(press(tooltip.aspectRatioButton)).toBe(true);
+  document.body.append(tooltip.root);
+  tooltip.widthInput.focus();
+  expect(press(tooltip.aspectRatioButton)).toBe(true);
+  host.remove();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -284,6 +353,7 @@ describe('region-selector tooltip actions', () => {
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(result).toBe(tooltip);
+    expect(result).toMatchObject(tooltip);
+    expect(result.dispose).toEqual(expect.any(Function));
   });
 });

@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   }),
   calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 24 })),
   createRegionSelectorTooltipMock: vi.fn(() => ({
+    dismissMenu: vi.fn(),
+    dispose: vi.fn(),
     aspectRatioButton: document.createElement('button'),
     root: document.createElement('div'),
   })),
@@ -175,6 +177,7 @@ it('shows region selectors once and renders the surface with tooltip wiring', ()
   expect(state.isDragging).toBe(false);
   expect(state.isResizing).toBe(true);
   expect(state.resizeCorner).toBe('se');
+  expect(state.regionSelectorTooltip?.dismissMenu).toHaveBeenCalledTimes(2);
   expect(mocks.applyRegionSelectorThemeMock).toHaveBeenCalledOnce();
   expect(mocks.createRegionSelectorTooltipMock).toHaveBeenCalledOnce();
   expect(mocks.bindRegionSelectorRootEventsMock).toHaveBeenCalledOnce();

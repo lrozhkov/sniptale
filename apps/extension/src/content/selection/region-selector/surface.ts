@@ -69,7 +69,7 @@ export function updateRegionSelectorUi(state: RegionSelectorState): void {
   const region = state.regionSelectorContainer.querySelector<HTMLElement>('#sniptale-region');
   if (region) {
     updateRegionSurface(region, state.currentRegion);
-    region.style.opacity = state.isResizing ? '0' : '1';
+    region.style.opacity = state.isResizing || state.isDragging ? '0' : '1';
     region.style.cursor = 'move';
   }
 
@@ -122,6 +122,7 @@ function renderRegionSelector(args: {
     handleRegionCancelled: args.handleRegionCancelled,
     onDragStart: (event) => {
       if (args.state.isDragging || args.state.isResizing) return;
+      args.state.regionSelectorTooltip?.dismissMenu();
       args.state.isDragging = true;
       args.state.dragStart = { x: event.clientX, y: event.clientY };
       args.state.initialRegion = { ...args.state.currentRegion };
@@ -130,6 +131,7 @@ function renderRegionSelector(args: {
     },
     onResizeStart: (event, corner) => {
       if (args.state.isDragging || args.state.isResizing) return;
+      args.state.regionSelectorTooltip?.dismissMenu();
       args.state.isResizing = true;
       args.state.resizeCorner = corner;
       args.state.dragStart = { x: event.clientX, y: event.clientY };

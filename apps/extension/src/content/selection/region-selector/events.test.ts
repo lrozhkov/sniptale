@@ -24,6 +24,24 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+it('leaves Escape from a nested floating menu to its keyboard owner', () => {
+  const state = createDefaultRegionSelectorState();
+  const menu = document.createElement('div');
+  menu.dataset['floatingUiRoot'] = 'true';
+  const handleRegionCancelled = vi.fn();
+  const handlers = createRegionSelectorDocumentHandlers({
+    state,
+    handleRegionCancelled,
+    updateUi: vi.fn(),
+  });
+  const event = new KeyboardEvent('keydown', { key: 'Escape' });
+  vi.spyOn(event, 'composedPath').mockReturnValue([menu]);
+  handlers.handleKeyDown(event);
+  expect(handleRegionCancelled).not.toHaveBeenCalled();
+  handlers.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+  expect(handleRegionCancelled).toHaveBeenCalledOnce();
+});
+
 describe('region-selector root events', () => {
   it('repaints controls on pointer release and ignores an unrelated release', () => {
     const state = createDefaultRegionSelectorState();

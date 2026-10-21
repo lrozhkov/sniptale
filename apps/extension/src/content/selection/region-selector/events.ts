@@ -134,6 +134,17 @@ function createRegionSelectorPointerUpHandler(state: RegionSelectorState, update
 function createRegionSelectorKeyDownHandler(handleRegionCancelled: () => void) {
   return (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
+      if (
+        event
+          .composedPath()
+          .some(
+            (target) =>
+              target instanceof Element &&
+              (target.closest('[data-floating-ui-root="true"]') ||
+                target.matches('[aria-haspopup="listbox"][aria-expanded="true"]'))
+          )
+      )
+        return;
       handleRegionCancelled();
     }
   };

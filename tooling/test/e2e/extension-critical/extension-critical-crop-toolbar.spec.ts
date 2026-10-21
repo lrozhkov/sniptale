@@ -90,16 +90,28 @@ for (const theme of ['light', 'dark']) {
         await expect(region).toHaveCSS('border-top-style', 'dashed');
         await expect(region).toHaveCSS('cursor', 'move');
         await expect(panel).toHaveAttribute('data-variant', 'frame-edit');
-        const ratio = page.locator('[data-ui="content.region-aspect-ratio"]');
-        const chevron = ratio.locator('..').locator('.sniptale-select-chevron');
-        await expect(chevron).toHaveCSS('right', '13px');
-        const selectBounds = (await ratio.boundingBox())!;
-        const chevronBounds = (await chevron.boundingBox())!;
-        expect(
-          Math.abs(selectBounds.x + selectBounds.width - chevronBounds.x - chevronBounds.width - 13)
-        ).toBeLessThanOrEqual(1);
+        const ratio = page.locator('[data-ui="content.region-aspect-ratio"] button');
+        await expect(panel.locator('select')).toHaveCount(0);
+        await expect(panel.locator('.sniptale-selection-size-confirm-button')).toHaveAccessibleName(
+          /Start recording|Начать запись/
+        );
+        const chooseRatio = async (value: string) => {
+          await ratio.click();
+          await expect(ratio).toHaveAttribute('aria-expanded', 'true');
+          await expect(ratio.locator('svg')).toHaveClass(/rotate-180/);
+          const menu = page.getByRole('listbox');
+          await expect(menu).toBeVisible();
+          await expect(menu.getByRole('option').first()).toHaveCSS('font-weight', '400');
+          expect(await menu.evaluate((element) => getComputedStyle(element).fontFamily)).toContain(
+            'Sniptale Interface'
+          );
+          await expect(menu.getByRole('option', { selected: true })).toHaveCount(1);
+          await menu.getByRole('option', { name: value, exact: true }).click();
+          await expect(ratio).toHaveText(value);
+          expect(await ratio.evaluate((element) => element.matches(':focus-visible'))).toBe(false);
+        };
         for (const value of ['16:9', '4:3', '1:1', '9:16']) {
-          await ratio.selectOption(value);
+          await chooseRatio(value);
           const [width, height] = value.split(':').map(Number);
           const bounds = (await region.boundingBox())!;
           expect(bounds.width % 2).toBe(0);
@@ -108,12 +120,36 @@ for (const theme of ['light', 'dark']) {
             2
           );
         }
-        await ratio.selectOption('16:9');
+        await chooseRatio('16:9');
+        await ratio.click();
+        await ratio.locator('svg').evaluate(async (element) => {
+          await Promise.all(element.getAnimations().map((animation) => animation.finished));
+        });
+        await page.screenshot({ path: info.outputPath('region-ratio-menu.png'), fullPage: false });
+        await ratio.click();
+        const lock = panel.locator('.sniptale-selection-size-ratio-button');
+        await lock.click();
+        expect(await lock.evaluate((element) => element.matches(':focus-visible'))).toBe(false);
+        await chooseRatio('16:9');
+        await ratio.focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('option', { name: '16:9', exact: true })).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(ratio).toBeFocused();
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        await ratio.press('ArrowDown');
+        await expect(page.getByRole('listbox')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        await expect(panel).toBeVisible();
         const handle = region.locator('[data-corner="se"]');
+        await ratio.click();
+        await expect(page.getByRole('listbox')).toBeVisible();
         const start = (await handle.boundingBox())!;
         await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
         await page.mouse.down();
         await expect(region).toHaveCSS('opacity', '0');
+        await expect(page.getByRole('listbox')).toHaveCount(0);
         await expect(panel).toHaveCSS('visibility', 'hidden');
         await page.mouse.move(start.x + 41, start.y + 29);
         await page.screenshot({ path: info.outputPath('region-resizing.png'), fullPage: false });
@@ -124,17 +160,27 @@ for (const theme of ['light', 'dark']) {
         expect(Math.abs(resized.width - (resized.height * 16) / 9)).toBeLessThanOrEqual(2);
         expect(resized.width % 2).toBe(0);
         expect(resized.height % 2).toBe(0);
-        await page.mouse.move(resized.x + 40, resized.y + 40);
+        const moveX = resized.x + resized.width - 40;
+        await ratio.click();
+        await expect(page.getByRole('listbox')).toBeVisible();
+        await page.mouse.move(moveX, resized.y + 40);
         await page.mouse.down();
-        await page.mouse.move(resized.x + 60, resized.y + 55);
+        await page.mouse.move(moveX + 20, resized.y + 55);
         await expect(region).toHaveCSS('cursor', 'move');
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        await expect(region).toHaveCSS('opacity', '0');
+        await expect(panel).toHaveCSS('visibility', 'hidden');
         await page.mouse.up();
+        await expect(region).toHaveCSS('opacity', '1');
+        await expect(panel).toHaveCSS('visibility', 'visible');
         await page.screenshot({ path: info.outputPath('region-controls.png'), fullPage: false });
         const panelBounds = (await panel.boundingBox())!;
         expect(panelBounds.height).toBeLessThanOrEqual(52);
         expect(panelBounds.x).toBeGreaterThanOrEqual(0);
         expect(panelBounds.x + panelBounds.width).toBeLessThanOrEqual(viewport.size.width);
+        await ratio.click();
         await overlayMessage(false);
+        await expect(page.getByRole('listbox')).toHaveCount(0);
         await selectCrop(page, { x: 300, y: 100, width: 321, height: 181 });
         await page.locator('[data-ui="content.crop.mode.resize"]').click();
         const frame = page.locator('.sniptale-selection-final-frame');
@@ -147,6 +193,15 @@ for (const theme of ['light', 'dark']) {
         await expect(cropPanel).toHaveCSS('visibility', 'hidden');
         await page.mouse.move(corner.x + 33, corner.y + 23);
         await page.screenshot({ path: info.outputPath('crop-resizing.png'), fullPage: false });
+        await page.mouse.up();
+        await expect(frame).toHaveCSS('opacity', '1');
+        await expect(cropPanel).toHaveCSS('visibility', 'visible');
+        const moved = (await frame.boundingBox())!;
+        await page.mouse.move(moved.x + 40, moved.y + 40);
+        await page.mouse.down();
+        await expect(frame).toHaveCSS('opacity', '0');
+        await expect(cropPanel).toHaveCSS('visibility', 'hidden');
+        await page.mouse.move(moved.x + 65, moved.y + 55);
         await page.mouse.up();
         await expect(frame).toHaveCSS('opacity', '1');
         await expect(cropPanel).toHaveCSS('visibility', 'visible');
