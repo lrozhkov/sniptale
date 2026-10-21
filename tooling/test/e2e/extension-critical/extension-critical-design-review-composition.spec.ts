@@ -99,15 +99,13 @@ for (const theme of ['light', 'dark'] as const) {
         const panelBounds = (await popover.boundingBox())!;
         const closeBounds = (await close.boundingBox())!;
         const commentLayer = popover.locator('[data-ui="content.design-review.comment-layer"]');
-        await expect.soft(commentLayer).toHaveCSS('padding-top', '16px', { timeout: 500 });
+        await expect.soft(commentLayer).toHaveCSS('padding-top', '32px', { timeout: 500 });
         expect.soft(closeBounds.width, 'Close retains a compact target').toBe(24);
         expect.soft(closeBounds.height).toBe(24);
         expect
-          .soft(Math.abs(closeBounds.x + closeBounds.width / 2 - panelBounds.x - panelBounds.width))
-          .toBeLessThanOrEqual(2);
-        expect
-          .soft(Math.abs(closeBounds.y + closeBounds.height / 2 - panelBounds.y))
-          .toBeLessThanOrEqual(2);
+          .soft(Math.abs(panelBounds.x + panelBounds.width - closeBounds.x - closeBounds.width - 5))
+          .toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(closeBounds.y - panelBounds.y - 5)).toBeLessThanOrEqual(1);
         const backing = await close.evaluate((node) => {
           const surface = node.parentElement?.matches(
             '[data-ui="content.design-review.close-backing"]'
@@ -122,8 +120,11 @@ for (const theme of ['light', 'dark'] as const) {
           context.fillRect(0, 0, 1, 1);
           return { radius: css.borderRadius, alpha: context.getImageData(0, 0, 1, 1).data[3] };
         });
-        expect.soft(backing.radius, 'Close has a circular backing over page imagery').toBe('50%');
-        expect.soft(backing.alpha).toBe(255);
+        expect.soft(backing.radius, 'Close has no separate circular backing').toBe('4px');
+        expect.soft(backing.alpha).toBe(0);
+        await expect(
+          popover.locator('[data-ui="content.design-review.close-backing"]')
+        ).toHaveCount(0);
         expect.soft(closeBounds.x).toBeGreaterThanOrEqual(0);
         expect.soft(closeBounds.y).toBeGreaterThanOrEqual(0);
         expect.soft(closeBounds.x + closeBounds.width).toBeLessThanOrEqual(viewport.size.width);
@@ -141,6 +142,16 @@ for (const theme of ['light', 'dark'] as const) {
           .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
           .click();
         const categories = popover.getByRole('navigation').getByRole('button');
+        const navigation = popover.getByRole('navigation');
+        const navigationBounds = (await navigation.boundingBox())!;
+        for (const category of await categories.all()) {
+          const bounds = (await category.boundingBox())!;
+          expect(
+            Math.abs(
+              bounds.x + bounds.width / 2 - navigationBounds.x - (navigationBounds.width - 1) / 2
+            )
+          ).toBeLessThanOrEqual(1);
+        }
         const names = await categories.evaluateAll((buttons) =>
           buttons.map(
             (button) =>
@@ -195,6 +206,30 @@ for (const theme of ['light', 'dark'] as const) {
           name: /^(Delete feedback|Удалить замечание)$/u,
         });
         await expect(remove).toBeVisible();
+        const actionCenters = await popover
+          .locator('button')
+          .filter({
+            has: page.locator(
+              '.lucide-clipboard-copy, .lucide-text-cursor-input, .lucide-pencil, .lucide-trash-2'
+            ),
+          })
+          .evaluateAll((buttons) =>
+            buttons.map((button) => {
+              const bounds = button.getBoundingClientRect();
+              return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+            })
+          );
+        expect(actionCenters).toHaveLength(4);
+        const actionStep = actionCenters[1]!.x - actionCenters[0]!.x;
+        for (let index = 1; index < actionCenters.length; index++) {
+          expect(
+            Math.abs(actionCenters[index]!.x - actionCenters[index - 1]!.x - actionStep)
+          ).toBeLessThanOrEqual(1);
+          expect(Math.abs(actionCenters[index]!.y - actionCenters[0]!.y)).toBeLessThanOrEqual(1);
+        }
+        await expect(
+          toolbar.locator('[data-ui="content.toolbar.reset-all-button"] .lucide-brush-cleaning')
+        ).toBeVisible();
         await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
         await remove.hover();
         await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');

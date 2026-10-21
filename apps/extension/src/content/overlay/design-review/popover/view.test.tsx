@@ -121,7 +121,7 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(copyButton?.className).toContain('active:bg-');
   const deleteButton = root.querySelector('button[aria-label="Удалить замечание"]');
   expect(deleteButton?.className).toContain('text-[var(--sniptale-color-danger)]');
-  expect(deleteButton?.className).toContain('ml-1');
+  expect(deleteButton?.className).not.toContain('ml-1');
   const closeButton = root.querySelector('button[aria-label="Закрыть"]');
   expect(closeButton?.className).toContain('pointer-events-auto');
   expect(closeButton?.className).toContain('cursor-pointer');
@@ -130,13 +130,12 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(closeButton?.className).not.toContain('-right-3');
   expect(closeButton?.className).not.toContain('-top-3');
   expect(closeButton?.className).not.toContain('hover:bg-[var(--sniptale-color-surface-input)]');
-  const closeBacking = closeButton?.parentElement;
-  expect(closeBacking?.getAttribute('data-ui')).toBe('content.design-review.close-backing');
-  expect(closeBacking?.className).toContain('-right-3 -top-3');
-  expect(closeBacking?.style.borderRadius).toBe('50%');
+  expect(closeButton?.className).toContain('absolute right-1 top-1');
+  expect(root.querySelector('[data-ui="content.design-review.close-backing"]')).toBeNull();
+  expect(closeButton?.querySelector('svg')?.getAttribute('width')).toBe('14');
   expect(closeButton?.className).toContain('!h-6 !min-h-6 !w-6 !min-w-6');
   const commentLayer = root.querySelector('[data-ui="content.design-review.comment-layer"]');
-  expect(commentLayer?.className).toContain('pt-4');
+  expect(commentLayer?.className).toContain('pt-8');
   expect(commentLayer?.className).not.toContain('pt-10');
 });
 

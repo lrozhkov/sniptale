@@ -189,6 +189,8 @@ it.each([
 ] as const)('confirms only the advertised %s scope', (resetScope, message) => {
   render();
   act(() => root?.render(<Harness resetScope={resetScope} />));
+  expect(trigger().querySelector('svg.lucide-brush-cleaning')).not.toBeNull();
+  expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('18');
   click(trigger());
   expect(scope.querySelector('[role="alertdialog"]')?.textContent).toContain(
     `content.toolbar.${message}`

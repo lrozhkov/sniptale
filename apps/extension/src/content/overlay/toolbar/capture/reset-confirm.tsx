@@ -1,6 +1,6 @@
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { BrushCleaning } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -94,7 +94,7 @@ export function ToolbarResetConfirmControl(props: {
           toggleMenu('reset-confirm');
         }}
       >
-        <RotateCcw size={18} strokeWidth={2} />
+        <BrushCleaning size={18} strokeWidth={2} />
       </ContentToolbarButton>
       {open ? (
         <ProductToolbarMenu

@@ -158,38 +158,27 @@ export function DesignReviewPopover(props: {
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <span
-        data-ui="content.design-review.close-backing"
-        className="pointer-events-none absolute -right-3 -top-3 z-50 inline-flex h-6 w-6 items-center justify-center"
-        style={{
-          backgroundColor: 'rgb(from var(--sniptale-color-surface-panel) r g b / 1)',
-          border: '1px solid var(--sniptale-color-border-strong)',
-          borderRadius: '50%',
-          boxSizing: 'border-box',
-        }}
+      <ContentToolbarButton
+        tone="close"
+        type="button"
+        className={[
+          'sniptale-dismiss-button',
+          'pointer-events-auto absolute right-1 top-1 z-50 inline-flex !h-6 !min-h-6 !w-6 !min-w-6 !p-0',
+          'cursor-pointer items-center justify-center !rounded-[4px] [&_svg]:!size-3.5',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
+        ].join(' ')}
+        aria-label={translate('content.designReview.close')}
+        title={translate('content.designReview.close')}
+        onClick={props.actions.close}
       >
-        <ContentToolbarButton
-          tone="close"
-          type="button"
-          className={[
-            'sniptale-dismiss-button',
-            'pointer-events-auto relative z-50 inline-flex !h-6 !min-h-6 !w-6 !min-w-6 !p-0',
-            'cursor-pointer items-center justify-center !rounded-full',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
-          ].join(' ')}
-          aria-label={translate('content.designReview.close')}
-          title={translate('content.designReview.close')}
-          onClick={props.actions.close}
-        >
-          <X size={16} />
-        </ContentToolbarButton>
-      </span>
+        <X size={14} />
+      </ContentToolbarButton>
       <div
         className="grid grid-rows-[auto_minmax(0,1fr)] overflow-visible"
         data-ui="content.design-review.popover-layout"
         style={{ maxHeight: view.basePosition.maxHeight }}
       >
-        <div className="relative z-20 p-3 pb-2 pt-4" data-ui="content.design-review.comment-layer">
+        <div className="relative z-20 p-3 pb-2 pt-8" data-ui="content.design-review.comment-layer">
           <div
             className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
             data-ui="content.design-review.popover-drag-handle"

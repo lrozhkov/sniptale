@@ -171,7 +171,7 @@ function ElementActionButton(props: {
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         'disabled:cursor-default disabled:opacity-50',
         props.danger
-          ? 'ml-1 text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
+          ? 'text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
           : props.active
             ? 'text-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-input)]'
             : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',

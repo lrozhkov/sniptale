@@ -54,6 +54,7 @@ it('uses the neighboring utility shell for delete without losing its danger cue 
   )!;
   expect(remove.className).toContain('sniptale-btn-utility');
   expect(remove.className).not.toContain('sniptale-btn-danger');
+  expect(remove.classList.contains('ml-1')).toBe(false);
   expect(remove.className).toContain('text-[var(--sniptale-color-danger)]');
   act(() => remove.click());
   expect(base.onDeleteRequest).toHaveBeenCalledOnce();
