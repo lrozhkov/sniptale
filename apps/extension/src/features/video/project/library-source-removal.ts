@@ -1,3 +1,4 @@
+import { removeVideoProjectBookendSources } from './scene/bookend-presets';
 import { getVideoProjectWatermarkAsset } from './scene/watermark';
 import type { VideoProject, VideoProjectAssetSource } from './types';
 import { VideoClipTransitionKind } from './types';
@@ -90,6 +91,11 @@ export function removeVideoProjectLibrarySources(
       : {}),
     ...removeSourceBackground(project, removedAssetIds),
     ...removeSourceWatermark(project, removedAssetIds),
+    ...(project.bookendPresets
+      ? {
+          bookendPresets: removeVideoProjectBookendSources(project.bookendPresets, removedAssetIds),
+        }
+      : {}),
     ...(project.cursorTrack
       ? {
           cursorTrack: {

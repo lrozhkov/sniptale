@@ -1,3 +1,7 @@
+import {
+  parseVideoProjectBookendPresets,
+  hasValidVideoProjectBookendReferences,
+} from '../scene/bookend-presets';
 import { parseVideoProjectSceneEdges } from '../scene/edge-fades';
 import {
   parseVideoProjectCommentDocuments,
@@ -99,8 +103,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 24) &&
+    isBoundedNumber(version, 2, 25) &&
     Number.isInteger(version) &&
+    (version >= 25 || value['bookendPresets'] === undefined) &&
     (version >= 24 || value['sceneEdges'] === undefined) &&
     (version >= 23 || value['commentDocuments'] === undefined) &&
     (version >= 20 || value['watermark'] === undefined) &&
@@ -202,6 +207,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
+    (value['bookendPresets'] === undefined ||
+      parseVideoProjectBookendPresets(value['bookendPresets']) !== null) &&
     (value['sceneEdges'] === undefined ||
       parseVideoProjectSceneEdges(value['sceneEdges']) !== null) &&
     (value['sceneBackground'] === undefined ||
@@ -225,6 +232,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     project.clips.every((clip) => hasValidClipReferences(clip, assetIds, trackIds)) &&
     hasValidSceneBackgroundReferences(project, assetIds) &&
     (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
+    hasValidVideoProjectBookendReferences(project) &&
     (project.transitions ?? []).every(
       (transition) =>
         clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)

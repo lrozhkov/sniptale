@@ -7,6 +7,7 @@ export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'clip'; clipId: string }
   | { kind: 'scene' }
   | { kind: 'watermark' }
+  | { kind: 'bookend-preset'; side: 'intro' | 'outro'; variant: 'image' | 'video' }
   | { kind: 'analysis'; objectTrackId: string }
   | { kind: 'text'; documentId: string }
   | { kind: 'comments'; documentId: string }
@@ -23,6 +24,13 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
   }
   if (project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE) {
     uses.push({ assetId: project.sceneBackground.assetId, kind: 'scene' });
+  }
+  for (const side of ['intro', 'outro'] as const) {
+    const slot = project.bookendPresets?.[side];
+    for (const variant of ['image', 'video'] as const) {
+      const recipe = slot?.[variant];
+      if (recipe) uses.push({ assetId: recipe.assetId, kind: 'bookend-preset', side, variant });
+    }
   }
   const watermarkAsset = getVideoProjectWatermarkAsset(project);
   if (watermarkAsset) uses.push({ assetId: watermarkAsset.id, kind: 'watermark' });

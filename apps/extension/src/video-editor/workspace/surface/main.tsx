@@ -88,6 +88,9 @@ export function VideoEditorWorkspaceMain({
                 <VideoProjectStorageStatus />
                 <VideoEditorWorkspaceCanvas
                   inspectorPanel={inspector}
+                  onRevealBookends={() =>
+                    setInspectorGroupFocus({ groupId: 'scene-edges', token: crypto.randomUUID() })
+                  }
                   onRevealWatermark={() =>
                     setInspectorGroupFocus({ groupId: 'watermark', token: crypto.randomUUID() })
                   }

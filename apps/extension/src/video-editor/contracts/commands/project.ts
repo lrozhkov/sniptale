@@ -1,3 +1,4 @@
+import type { VideoProjectBookendPresets } from '../../../features/video/project/scene/bookend-presets-types';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
@@ -25,6 +26,7 @@ import type {
 } from './patches';
 import type {
   VideoEditorBookendPlacementResult,
+  VideoEditorBookendPresetUpdateResult,
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
   VideoEditorMaterialTarget,
@@ -59,6 +61,11 @@ export interface VideoEditorProjectActions
     range?: VideoEditorMaterialSourceRange,
     telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
+  /** Accepts a recipe independently of any existing timeline instances. */
+  updateBookendPresets: (
+    value: VideoProjectBookendPresets | undefined,
+    expectedProject: VideoProject
+  ) => VideoEditorBookendPresetUpdateResult;
   /** Inserts an editable edge material against the exact accepted inspector snapshot. */
   placeBookendMaterial: (
     assetId: string,

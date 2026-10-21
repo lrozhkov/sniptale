@@ -577,3 +577,16 @@ The reference rectangle uses normalized project-canvas coordinates. Omission mea
 The existing project updater merges spatial scalar commands into the current settings. Invalid, equal, missing-target and locked commands preserve project identity and history. Reset removes only the reference rectangle. Undo, redo, save, hydration and portable restore retain authored settings. Source split, rate changes and duplication retain the settings. Duplicate regions have independent identities.
 
 Evaluated poses and GPU resources do not enter these fields. The change adds no store, writer or physical database migration.
+
+
+## Montage bookend presets
+
+Project schema 25 admits optional `bookendPresets`. Each intro and outro slot retains image and video variants independently of its active mode. Earlier schemas refuse this field. Readers refuse future schemas. Reading adds no defaults. Mutation and removal retain schema 25.
+
+Each variant references a project material by its exact `assetId`. The reference does not contain a private resource identity. Inactive variants retain their references. Material use counts protect all retained variants from unused cleanup. Confirmed source removal clears only matching variants. Copy and portable restore preserve settings and material identities. The existing restore owner remaps private source identities separately.
+
+Both editors share media framing, image duration, video trim and audio settings. Each editor retains its source admission limits. Native trim uses source seconds and cannot exceed the accepted material duration. Explicit insertion refuses a range shorter than one project frame.
+
+A preset edit changes the recipe for future insertions. It never rebuilds existing clips. Insertion creates ordinary media clips and an editable opaque shape behind them. The linked shape follows splitting, trimming and movement. A speed edit from a source clip also retimes linked shapes with identical bounds. All affected tracks retain their lock and neighbor constraints.
+
+Recipe edits require the exact accepted project snapshot and an idle history owner. Invalid references, stale snapshots and history failures preserve the project and history. The existing mutation, history, save and revision owners retain authority. This field adds no writer, queue, store or physical database migration.

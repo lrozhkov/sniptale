@@ -16,7 +16,11 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
-import { checkInspectorLabels, checkInspectorPaintedFont } from '../support/inspector-utilities';
+import {
+  checkInspectorLabels,
+  checkInspectorPaintedFont,
+  chooseInspectorValue,
+} from '../support/inspector-utilities';
 import { startHostServer } from '../support/host-server';
 import {
   applyHarnessBootstrap,
@@ -51,6 +55,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         hasAudio: true,
       });
       project.version = 24;
+      project.sceneBackground = { kind: 'solid', color: '#0000ffff' };
       project.duration = 1.2;
       project.clips.forEach((clip) => {
         clip.duration = 1.2;
@@ -188,11 +193,11 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       const png = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 360;
+        canvas.width = 641;
+        canvas.height = 201;
         const context = canvas.getContext('2d')!;
         context.fillStyle = '#ff0000';
-        context.fillRect(0, 0, 640, 360);
+        context.fillRect(0, 0, 641, 201);
         return canvas.toDataURL('image/png').split(',')[1]!;
       });
       const imageName = 'Opening — a deliberately long material name for the command menu.png';
@@ -284,8 +289,90 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(menu.getByRole('menuitem').first()).toBeFocused();
       await page.keyboard.press('End');
       await expect(menu.getByRole('menuitem').last()).toBeFocused();
+      await page.keyboard.press('Escape');
+      const beforeRecipes = (await readNativeVideoProject(page))!;
+      const introFields = page.locator('[data-ui="video-editor.scene-bookends.intro"]');
+      await introFields
+        .getByRole('button', { name: label('videoEditor.sidebar.bookendPreset'), exact: true })
+        .click();
+      const preset = introFields.locator('[data-ui="video-editor.scene-bookends.preset"]');
+      await chooseInspectorValue(
+        page,
+        preset,
+        label('videoEditor.sidebar.bookendPreset'),
+        label('gallery.videoReview.presentationImage')
+      );
+      await preset
+        .getByRole('button', { name: label('videoEditor.sidebar.bookendChooseImage'), exact: true })
+        .click();
+      await page
+        .getByRole('menu', { name: label('videoEditor.sidebar.bookendChooseImage'), exact: true })
+        .getByRole('menuitem', { name: imageName, exact: true })
+        .click();
+      await expect
+        .poll(
+          async () => (await readNativeVideoProject(page))?.bookendPresets?.intro.image?.duration
+        )
+        .toBe(3);
+      const duration = preset.getByRole('textbox', {
+        name: label('gallery.videoReview.presentationDuration'),
+        exact: true,
+      });
+      await duration.fill('5');
+      await duration.press('Enter');
+      const framing = preset
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationFraming') });
+      await framing.click();
+      await chooseInspectorValue(
+        page,
+        preset,
+        label('gallery.videoReview.presentationFit'),
+        label('gallery.videoReview.presentationCover')
+      );
+      const pan = preset.getByRole('textbox', {
+        name: label('gallery.videoReview.presentationPanX'),
+        exact: true,
+      });
+      await pan.fill('37');
+      await pan.press('Enter');
+      for (const width of [359, 360, 361, 520]) {
+        const current = (await inspector.boundingBox())!.width;
+        const box = (await handle.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + current - width, box.y + 12);
+        await page.mouse.up();
+        await expect
+          .poll(async () => Math.round((await inspector.boundingBox())!.width))
+          .toBe(width);
+        await pan.scrollIntoViewIfNeeded();
+        await checkInspectorLabels(preset);
+        await checkInspectorPaintedFont(page, framing, `preset-framing-font-${width}`);
+        expect(
+          await preset.evaluate((node) => {
+            const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+            return body instanceof HTMLElement && body.scrollWidth <= body.clientWidth + 1;
+          })
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath(`bookend-preset-${width}.png`),
+          fullPage: false,
+        });
+      }
+      await chooseInspectorValue(
+        page,
+        preset,
+        label('gallery.videoReview.presentationFit'),
+        label('gallery.videoReview.presentationContain')
+      );
       const before = (await readNativeVideoProject(page))!;
-      await menu.getByRole('menuitem', { name: imageName, exact: true }).click();
+      expect(before.clips).toEqual(beforeRecipes.clips);
+      expect(before.bookendPresets?.intro.image).toMatchObject({
+        duration: 5,
+        crop: { panX: 0.37, panY: 0 },
+      });
+      await intro.click();
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.duration)
         .toBeCloseTo(6.2, 6);
@@ -363,6 +450,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.reload();
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       expect((await readNativeVideoProject(page))!.clips).toEqual(accepted.clips);
+      expect((await readNativeVideoProject(page))!.bookendPresets).toEqual(accepted.bookendPresets);
       await select();
       await page.setViewportSize({ width: 1100, height: 560 });
       expect(
@@ -370,6 +458,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ).toBe(true);
       const encoded = await encodedNativeVideoSamples(page, host.origin, accepted, format, [
         { time: 0.2, x: 320, y: 180, expected: [255, 0, 0] },
+        { time: 0.2, x: 320, y: 10, expected: [0, 0, 0] },
         { time: 5.2, x: 320, y: 180, expected: [0, 255, 0] },
         { time: 5.8, x: 320, y: 180, expected: [0, 255, 0] },
       ]);

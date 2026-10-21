@@ -90,6 +90,7 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (project.bookendPresets !== undefined || patch.bookendPresets !== undefined) return 25;
   if (project.sceneEdges !== undefined || patch.sceneEdges !== undefined) return 24;
   if (project.commentDocuments !== undefined || patch.commentDocuments !== undefined) return 23;
   if (project.watermark !== undefined || patch.watermark !== undefined) return 20;

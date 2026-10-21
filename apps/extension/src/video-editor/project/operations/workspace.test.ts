@@ -482,3 +482,66 @@ it.each(['none', 'text', 'image'] as const)(
     expect(original).toEqual(before);
   }
 );
+
+it.each(['none', 'image', 'video'] as const)(
+  'copies %s bookend recipes independently with remembered material identities',
+  async (mode) => {
+    const { createVideoProjectAsset } =
+      await import('../../../features/video/project/factories/creation');
+    const { createBookendImagePresentation, createBookendVideoPresentation } =
+      await import('../../../features/video/project/scene/bookend-media');
+    const { parseHydratableVideoProject } =
+      await import('../../../features/video/project/validation/root');
+    const original = createEmptyVideoProject('Original');
+    const image = createVideoProjectAsset(
+      'Card',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-card' },
+      {
+        width: 641,
+        height: 359,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    const video = createVideoProjectAsset(
+      'Movie',
+      'VIDEO',
+      { kind: 'project-asset', projectAssetId: 'private-movie' },
+      {
+        width: 641,
+        height: 359,
+        duration: 6,
+        mimeType: 'video/webm',
+        size: 6,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    original.version = 25;
+    original.assets = [image, video];
+    const slot = {
+      mode,
+      image: { ...createBookendImagePresentation(), assetId: image.id },
+      video: { ...createBookendVideoPresentation(6), assetId: video.id },
+    };
+    original.bookendPresets = { intro: slot, outro: structuredClone(slot) };
+    const before = structuredClone(original);
+    saveVideoProject.mockImplementation(async (project) => project);
+    const copy = await copyProject(original, 'Copy');
+    expect(parseHydratableVideoProject(copy)).not.toBeNull();
+    expect(copy.id).not.toBe(original.id);
+    expect(copy.bookendPresets).toEqual(original.bookendPresets);
+    expect(copy.bookendPresets).not.toBe(original.bookendPresets);
+    expect(copy.bookendPresets!.intro.image).not.toBe(original.bookendPresets.intro.image);
+    expect(copy.assets.map(({ source }) => source)).toEqual(
+      original.assets.map(({ source }) => source)
+    );
+    expect(saveVideoProject).toHaveBeenLastCalledWith(copy, { baseRevision: null });
+    copy.bookendPresets!.intro.image!.crop.panX = 0.5;
+    expect(original).toEqual(before);
+  }
+);

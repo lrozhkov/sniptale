@@ -1,3 +1,7 @@
+import {
+  applyBookendMaterialPresentation,
+  resolveBookendMaterialPresentation,
+} from './bookend-presentation';
 import { resolveEffectOwner } from '../../../../features/video/project/effect-instance/owner';
 import { isEffectInstanceTimingEqual } from '../../../../features/video/project/effect-instance/timing';
 import { prefixVideoProjectComposition } from '../../../../features/video/project/timeline/composition-prefix';
@@ -7,7 +11,11 @@ import type { VideoProject } from '../../../../features/video/project/types/mode
 import type { VideoEditorBookendPlacementResult } from '../../../contracts/insertion';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate } from '../helpers';
-import { buildMaterialPlacement, getMaterialDuration } from './material-plan';
+import {
+  buildMaterialPlacement,
+  getMaterialDuration,
+  isMaterialSourceRangeValid,
+} from './material-plan';
 import { areMaterialInsertActionsLocked } from './material-actions';
 
 /** Publishes an ordinary edge material and the complete composition move in one history step. */
@@ -38,12 +46,19 @@ export function createBookendPlacementAction(
       )
         return reject('invalid-range');
       if (side === 'intro' && isCompositionLocked(project)) return reject('locked-track');
-      const placement = buildMaterialPlacement(
+      const preset = resolveBookendMaterialPresentation(project, side, assetId);
+      const range = preset?.mode === 'video' ? preset.video.trim : undefined;
+      if (range && !isMaterialSourceRangeValid(asset, range, project.fps))
+        return reject('invalid-range');
+      const raw = buildMaterialPlacement(
         project,
         asset,
         side === 'intro' ? 0 : project.duration,
-        'append'
+        'append',
+        range
       );
+      const placement = preset ? applyBookendMaterialPresentation(project, raw, preset) : raw;
+      if (!placement) return reject('invalid-project');
       const existingIds = new Set(project.clips.map((clip) => clip.id));
       const added = placement.project.clips.filter((clip) => !existingIds.has(clip.id));
       if (!placement.selectedClipId || added.length === 0) return reject('invalid-range');

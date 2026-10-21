@@ -83,3 +83,8 @@ export type VideoEditorBookendPlacementResult =
         | 'history-unavailable'
         | 'invalid-project';
     };
+
+/** A recipe edit never edits an already inserted timeline instance. */
+export type VideoEditorBookendPresetUpdateResult =
+  | { status: 'updated' | 'unchanged' }
+  | Extract<VideoEditorBookendPlacementResult, { status: 'rejected' }>;

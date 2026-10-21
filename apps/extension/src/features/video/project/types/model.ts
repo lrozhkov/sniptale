@@ -327,7 +327,8 @@ export interface VideoProject {
     | 21
     | 22
     | 23
-    | 24;
+    | 24
+    | 25;
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
@@ -344,6 +345,8 @@ export interface VideoProject {
   watermark?: import('../scene/watermark-types').QuickEditWatermarkSettings;
   /** Project-clock presentation after the complete visual and audio composition. */
   sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
+  /** Authored insertion recipes; existing timeline instances remain independent. */
+  bookendPresets?: import('../scene/bookend-presets-types').VideoProjectBookendPresets;
   timelinePlacementMode: VideoTimelinePlacementMode;
   duration: number;
   createdAt: number;

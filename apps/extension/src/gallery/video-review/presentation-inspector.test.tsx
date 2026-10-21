@@ -95,19 +95,6 @@ function accept(node: HTMLInputElement) {
     node.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
   });
 }
-async function select(index: number, option: string, parent: ParentNode = host) {
-  act(() =>
-    parent.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')[index]!.click()
-  );
-  const choice = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (node) => node.textContent === option
-  )!;
-  expect(choice).toBeDefined();
-  await act(async () => {
-    choice.click();
-    await Promise.resolve();
-  });
-}
 function retained(mode: 'image' | 'video' = 'image') {
   props.settings.intro = {
     mode,
@@ -223,7 +210,7 @@ it('preserves both variants when requesting None and changes only cover framing'
   const disabled = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   expect(disabled.introControl?.mode).toBe('none');
   expect(disabled.intro).toEqual(props.settings.intro);
-  await select(0, 'Fill', section());
+  act(() => button('Fill', section()).click());
   expect(props.onChange).toHaveBeenCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({

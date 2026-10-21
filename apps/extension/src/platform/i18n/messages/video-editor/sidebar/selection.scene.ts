@@ -206,4 +206,12 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     ru: 'Сетка помогает выравнивать объекты в превью и не меняет экспорт.',
     en: 'The grid helps align objects in preview and does not change export output.',
   },
+  bookendPreset: { ru: 'Заготовка заставки', en: 'Bookend preset' },
+  bookendChooseImage: { ru: 'Выбрать изображение', en: 'Choose image' },
+  bookendChooseVideo: { ru: 'Выбрать видео', en: 'Choose video' },
+  bookendPreviewFailed: { ru: 'Не удалось открыть превью', en: 'Preview could not open' },
+  bookendIntroImageUse: { ru: 'Заставка · Изображение', en: 'Intro · Image' },
+  bookendIntroVideoUse: { ru: 'Заставка · Видео', en: 'Intro · Video' },
+  bookendOutroImageUse: { ru: 'Концовка · Изображение', en: 'Outro · Image' },
+  bookendOutroVideoUse: { ru: 'Концовка · Видео', en: 'Outro · Video' },
 });

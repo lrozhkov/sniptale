@@ -797,3 +797,36 @@ it.each([23, 24])(
     expect(entry.project).toEqual(original);
   }
 );
+
+it('restores schema25 remembered bookend settings through the existing root writer', async () => {
+  const { createBookendVideoPresentation } =
+    await import('../../../features/video/project/scene/bookend-media');
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'bookend-restore' });
+  const asset = entry.project.assets[0]!;
+  const slot = {
+    mode: 'none' as const,
+    video: {
+      ...createBookendVideoPresentation(asset.metadata.duration!),
+      assetId: asset.id,
+      trim: { start: 0.123456, end: asset.metadata.duration! },
+      audio: { muted: true, gain: 0.37 },
+    },
+  };
+  entry.project = applyVideoProjectMutationPatch(entry.project, {
+    bookendPresets: { intro: slot, outro: structuredClone(slot) },
+  });
+  const original = structuredClone(entry);
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    root: { assets: [], entry, exports: [] },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({ project: original.project })
+  );
+  expect(original.project.version).toBe(25);
+  expect(entry).toEqual(original);
+});

@@ -709,3 +709,36 @@ it.each(['none', 'text', 'image'] as const)(
     expect(held).toEqual(heldBefore);
   }
 );
+
+it.each(['none', 'video'] as const)(
+  'retains private bytes held by a %s bookend recipe in another project',
+  async (mode) => {
+    const { createBookendVideoPresentation } =
+      await import('../../../features/video/project/scene/bookend-media');
+    const shared = {
+      ...createProjectOwnedVideoAsset('logical-movie'),
+      source: { kind: 'project-asset' as const, projectAssetId: 'private-movie' },
+    };
+    const slot = { mode, video: { ...createBookendVideoPresentation(5), assetId: shared.id } };
+    const presets = { intro: slot, outro: structuredClone(slot) };
+    const original = createVideoProject({ assets: [shared], version: 25, bookendPresets: presets });
+    const held = createVideoProject({
+      assets: [structuredClone(shared)],
+      version: 25,
+      id: 'held',
+      bookendPresets: structuredClone(presets),
+    });
+    const before = structuredClone(held);
+    const detached = { ...original, assets: [] };
+    delete detached.bookendPresets;
+    projectsDbMocks.txGetMock.mockResolvedValue(createVideoProjectEntry(original));
+    projectsDbMocks.txGetAllMock.mockResolvedValue([
+      createVideoProjectEntry(original),
+      createVideoProjectEntry(held, { id: held.id }),
+    ]);
+    await saveVideoProject(detached);
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('private-movie');
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:private-movie');
+    expect(held).toEqual(before);
+  }
+);

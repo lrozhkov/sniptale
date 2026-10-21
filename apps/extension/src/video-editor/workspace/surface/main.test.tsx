@@ -78,6 +78,12 @@ vi.mock('../floating/inspector-stack', () => ({
               content: 'Canvas controls',
             },
             {
+              id: 'scene-edges',
+              semantic: 'transition',
+              label: 'Bookends',
+              content: 'Bookend controls',
+            },
+            {
               id: 'watermark',
               semantic: 'watermark',
               label: 'Watermark',
@@ -693,6 +699,51 @@ it('reveals the watermark group through the workspace intent and repeats after m
       container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-watermark"]')!.click()
     );
     expect(container.textContent).toContain('Watermark controls');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    canvas.mockRestore();
+    hookMocks.watermarkFocusProbe = false;
+  }
+});
+
+it('reveals the bookend group through the workspace intent and repeats after manual navigation', async () => {
+  hookMocks.controller = createWorkspaceController();
+  hookMocks.watermarkFocusProbe = true;
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const canvas = vi.spyOn(canvasSurface, 'VideoEditorWorkspaceCanvas').mockImplementation(
+    (
+      props: ComponentProps<typeof canvasSurface.VideoEditorWorkspaceCanvas> & {
+        onRevealBookends?: () => void;
+      }
+    ) => (
+      <>
+        <button data-ui="test.reveal-bookends" onClick={props.onRevealBookends}>
+          Reveal bookends
+        </button>
+        {props.inspector}
+      </>
+    )
+  );
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />));
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-bookends"]')!.click()
+    );
+    expect(container.textContent).toContain('Bookend controls');
+    expect(container.textContent).not.toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('nav button[aria-label="Canvas"]')!.click()
+    );
+    expect(container.textContent).toContain('Canvas controls');
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>('[data-ui="test.reveal-bookends"]')!.click()
+    );
+    expect(container.textContent).toContain('Bookend controls');
   } finally {
     await act(async () => root.unmount());
     container.remove();

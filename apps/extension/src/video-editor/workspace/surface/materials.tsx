@@ -358,7 +358,11 @@ function MaterialRow(props: {
       </div>
       <MaterialName {...props} />
       {props.uses.some(
-        (use) => use.kind === 'clip' || use.kind === 'scene' || use.kind === 'watermark'
+        (use) =>
+          use.kind === 'clip' ||
+          use.kind === 'scene' ||
+          use.kind === 'watermark' ||
+          use.kind === 'bookend-preset'
       ) && (
         <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
@@ -374,12 +378,38 @@ function MaterialRow(props: {
             placeholder={translate('videoEditor.sidebar.materialsShowUses')}
             onChange={(value) => {
               const use = props.uses[Number(value)];
-              if (use && (use.kind === 'clip' || use.kind === 'scene' || use.kind === 'watermark'))
+              if (
+                use &&
+                (use.kind === 'clip' ||
+                  use.kind === 'scene' ||
+                  use.kind === 'watermark' ||
+                  use.kind === 'bookend-preset')
+              )
                 props.onShowUse(use);
             }}
             options={props.uses.flatMap((use, index) => {
-              if (use.kind !== 'clip' && use.kind !== 'scene' && use.kind !== 'watermark')
+              if (
+                use.kind !== 'clip' &&
+                use.kind !== 'scene' &&
+                use.kind !== 'watermark' &&
+                use.kind !== 'bookend-preset'
+              )
                 return [];
+              if (use.kind === 'bookend-preset')
+                return [
+                  {
+                    value: String(index),
+                    label: translate(
+                      use.side === 'intro'
+                        ? use.variant === 'image'
+                          ? 'videoEditor.sidebar.bookendIntroImageUse'
+                          : 'videoEditor.sidebar.bookendIntroVideoUse'
+                        : use.variant === 'image'
+                          ? 'videoEditor.sidebar.bookendOutroImageUse'
+                          : 'videoEditor.sidebar.bookendOutroVideoUse'
+                    ),
+                  },
+                ];
               if (use.kind === 'scene' || use.kind === 'watermark')
                 return [
                   {

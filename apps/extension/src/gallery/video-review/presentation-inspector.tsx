@@ -1,19 +1,15 @@
+import { PresentationMediaFields } from '../../ui/presentation-media-fields';
 import { PresentationFadeFields } from '../../ui/presentation-fade-fields';
 import { FolderOpen, Library, LogIn, LogOut, Play, RotateCcw } from 'lucide-react';
 import { backgroundActionClassName } from '../../composition/background-resources/picker';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   parseQuickEditPresentationSettings,
   presentationEdgeControl,
   type PresentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
-import {
-  ColorField,
-  SegmentedRow,
-  SelectField,
-  ToggleField,
-} from '../../ui/compact-inspector-controls';
+import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { PreviewNumericRow as ReviewPreviewNumberRow } from '../../ui/compact-inspector-controls/numeric-preview';
@@ -279,180 +275,55 @@ function FadeFields(
   );
 }
 
-/** Placement, crop and timing share the selected asset; acquisition stays with Bookend. */
+/** Each Gallery adapter retains the selected asset metadata and whole-scene validation. */
 function BookendFields(
   props: ReviewPresentationInspectorProps & { slot: SlotName; hasAudio: boolean }
 ) {
   const slot = props.settings[props.slot];
-  const mode = props.slotModes[props.slot];
-  const image = mode === 'image' ? slot.image : undefined;
-  const video = mode === 'video' ? slot.video : undefined;
-  const media = image ?? video;
-  if (!media) return null;
-  const patchMedia = (patch: Partial<NonNullable<Slot['image']>>) => {
-    if (mode === 'none' || !media) return props.settings;
-    return { ...props.settings, [props.slot]: { ...slot, [mode]: { ...media, ...patch } } };
+  const shared = {
+    Details: ReviewDetails,
+    preferenceId: `presentation.${props.slot}`,
+    colorClassName: reviewSelectFieldClassName,
   };
-  const number = (
-    name: Message,
-    value: number,
-    min: number,
-    max: number,
-    step: number,
-    patch: (value: number) => Settings,
-    unit?: 's' | '%',
-    scrubMax?: number,
-    scrubMin?: number
-  ): ReactNode => (
-    <NumberField
-      {...props}
-      label={label(name)}
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      patch={patch}
-      {...(unit === undefined ? {} : { unit })}
-      {...(scrubMax === undefined ? {} : { scrubMax })}
-      {...(scrubMin === undefined ? {} : { scrubMin })}
-    />
-  );
-  return (
-    <div className="review-inspector-columns">
-      {image &&
-        number(
-          'presentationDuration',
-          image.duration,
-          0.1,
-          60,
-          0.1,
-          (duration) => patchMedia({ duration }),
-          's',
-          10,
-          1
-        )}
-      {video && <VideoFields {...props} video={video} hasAudio={props.hasAudio} />}
-      <ReviewDetails
-        label={label('presentationFraming')}
-        preferenceId={`presentation.${props.slot}.framing`}
-      >
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={label('presentationFit')}
-          value={media.fit}
-          options={[
-            { value: 'contain', label: label('presentationContain') },
-            { value: 'cover', label: label('presentationCover') },
-          ]}
-          onChange={(fit: 'contain' | 'cover') => props.onChange(patchMedia({ fit }))}
-        />
-        {media.fit === 'contain' && (
-          <ColorField
-            className={reviewSelectFieldClassName}
-            label={label('presentationFill')}
-            title={label('presentationFill')}
-            value={media.fillColor}
-            allowAlpha={false}
-            allowTransparent={false}
-            onChange={(fillColor) => props.onChange(patchMedia({ fillColor }))}
-            onPreviewChange={(fillColor) =>
-              props.onPreview(fillColor ? patchMedia({ fillColor }) : null)
-            }
-          />
-        )}
-        {media.fit === 'cover' && (
-          <>
-            {number(
-              'presentationPanX',
-              media.crop.panX * 100,
-              -100,
-              100,
-              0.1,
-              (value) => patchMedia({ crop: { ...media.crop, panX: value / 100 } }),
-              '%'
-            )}
-            {number(
-              'presentationPanY',
-              media.crop.panY * 100,
-              -100,
-              100,
-              0.1,
-              (value) => patchMedia({ crop: { ...media.crop, panY: value / 100 } }),
-              '%'
-            )}
-            <ReviewButton
-              label={label('presentationCenter')}
-              onClick={() => props.onChange(patchMedia({ crop: { panX: 0, panY: 0 } }))}
-            />
-          </>
-        )}
-      </ReviewDetails>
-    </div>
-  );
-}
-
-function VideoFields(
-  props: ReviewPresentationInspectorProps & {
-    slot: SlotName;
-    video: NonNullable<Slot['video']>;
-    hasAudio: boolean;
-  }
-) {
-  const video = props.video;
-  const patch = (value: Partial<typeof video>) => ({
-    ...props.settings,
-    [props.slot]: { ...props.settings[props.slot], video: { ...video, ...value } },
-  });
-  return (
-    <>
-      <ReviewDetails
-        label={label('presentationTrim')}
-        preferenceId={`presentation.${props.slot}.trim`}
-      >
-        <NumberField
-          {...props}
-          label={label('presentationTrimStart')}
-          value={video.trim.start}
-          min={0}
-          max={video.trim.end}
-          step={0.001}
-          unit="s"
-          patch={(start) => patch({ trim: { ...video.trim, start } })}
-        />
-        <NumberField
-          {...props}
-          label={label('presentationTrimEnd')}
-          value={video.trim.end}
-          min={video.trim.start}
-          max={video.source.duration}
-          step={0.001}
-          unit="s"
-          patch={(end) => patch({ trim: { ...video.trim, end } })}
-        />
-      </ReviewDetails>
-      {props.hasAudio && (
-        <ToggleField
-          label={label('presentationSound')}
-          value={!video.audio.muted}
-          onChange={(enabled) =>
-            props.onChange(patch({ audio: { ...video.audio, muted: !enabled } }))
-          }
-        />
-      )}
-      {props.hasAudio && !video.audio.muted && (
-        <NumberField
-          {...props}
-          label={label('presentationVolume')}
-          value={video.audio.gain * 100}
-          min={0}
-          max={200}
-          step={1}
-          unit="%"
-          patch={(value) => patch({ audio: { ...video.audio, gain: value / 100 } })}
-        />
-      )}
-    </>
-  );
+  const publish = (
+    media: Partial<NonNullable<Slot['image']> & NonNullable<Slot['video']>> | null,
+    preview: boolean
+  ) => {
+    const kind = props.slotModes[props.slot];
+    const previous = kind === 'image' ? slot.image : kind === 'video' ? slot.video : null;
+    const next =
+      media && previous
+        ? parseQuickEditPresentationSettings({
+            ...props.settings,
+            [props.slot]: { ...slot, [kind]: { ...previous, ...media } },
+          })
+        : null;
+    if (preview) props.onPreview(next);
+    else if (next) props.onChange(next);
+  };
+  if (props.slotModes[props.slot] === 'image' && slot.image)
+    return (
+      <PresentationMediaFields
+        {...shared}
+        kind="image"
+        value={slot.image}
+        onChange={(value) => publish(value, false)}
+        onPreview={(value) => publish(value, true)}
+      />
+    );
+  if (props.slotModes[props.slot] === 'video' && slot.video)
+    return (
+      <PresentationMediaFields
+        {...shared}
+        kind="video"
+        value={slot.video}
+        sourceDuration={slot.video.source.duration}
+        hasAudio={props.hasAudio}
+        onChange={(value) => publish(value, false)}
+        onPreview={(value) => publish(value, true)}
+      />
+    );
+  return null;
 }
 
 function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }) {

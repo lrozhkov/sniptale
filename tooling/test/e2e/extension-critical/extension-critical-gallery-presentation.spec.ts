@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
@@ -123,8 +124,7 @@ for (const variant of variants) {
       const mode = (key: Message) => intro.getByRole('button', { name: label(key), exact: true });
       const settled = () => expect(fields).toHaveAttribute('aria-busy', 'false');
       const select = async (owner: Locator, field: Message, option: Message) => {
-        await owner.getByRole('button', { name: label(field), exact: true }).click();
-        await page.getByRole('option', { name: label(option), exact: true }).click();
+        await chooseInspectorValue(page, owner, label(field), label(option));
         await settled();
       };
       await fields.scrollIntoViewIfNeeded();

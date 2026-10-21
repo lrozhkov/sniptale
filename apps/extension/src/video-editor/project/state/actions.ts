@@ -1,3 +1,4 @@
+import { createBookendPresetUpdateAction } from './bookend-presets';
 import { createVideoEditorProjectCommentActions } from './comments';
 import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
@@ -46,6 +47,7 @@ type VideoEditorProjectActionKeys =
   | 'placeMaterial'
   | 'appendMaterial'
   | 'placeBookendMaterial'
+  | 'updateBookendPresets'
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'addAnnotationOverlay'
@@ -142,6 +144,7 @@ export function createVideoEditorProjectActions(
   };
 
   return {
+    updateBookendPresets: createBookendPresetUpdateAction(set),
     ...createVideoEditorProjectCommentActions(set),
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),

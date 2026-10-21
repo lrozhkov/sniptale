@@ -92,19 +92,33 @@ function createClipTransitionActions(
       set((state) =>
         applyProjectUpdate(state, (project) => {
           const operation = resolveEditableClipOperation(project, clipId);
-          if (!operation || operation.affectedClips.some((clip) => !isSourceTimedClip(clip))) {
+          if (!operation || !isSourceTimedClip(operation.clip)) return project;
+          const anchor = operation.clip;
+          const previousRate = anchor.playbackRate ?? 1;
+          // A static fill with identical bounds follows its linked source through a speed edit.
+          if (
+            operation.affectedClips.some(
+              (clip) =>
+                !isSourceTimedClip(clip) &&
+                (clip.type !== 'SHAPE' ||
+                  Math.abs(clip.startTime - anchor.startTime) > 1e-7 ||
+                  Math.abs(clip.duration - anchor.duration) > 1e-7)
+            )
+          ) {
             return project;
           }
 
           let minimumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.min;
           let maximumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.max;
           for (const clip of operation.affectedClips) {
-            if (!isSourceTimedClip(clip)) continue;
-            const bounds = getReachableClipTimingBounds(project, clip);
+            const sourceDuration = isSourceTimedClip(clip)
+              ? clip.sourceDuration
+              : clip.duration * previousRate;
+            const bounds = getReachableClipTimingBounds(project, clip, operation.clipIdSet);
             const maximumDuration = bounds.maximumEnd - clip.startTime;
             const minimumDuration = Math.max(1 / project.fps, bounds.minimumEnd - clip.startTime);
-            minimumRate = Math.max(minimumRate, clip.sourceDuration / maximumDuration);
-            maximumRate = Math.min(maximumRate, clip.sourceDuration / minimumDuration);
+            minimumRate = Math.max(minimumRate, sourceDuration / maximumDuration);
+            maximumRate = Math.min(maximumRate, sourceDuration / minimumDuration);
           }
           if (minimumRate > maximumRate) return project;
           const nextPlaybackRate = clampVideoPropertyNumber(playbackRate, {
@@ -113,14 +127,14 @@ function createClipTransitionActions(
           });
           if (
             operation.affectedClips.every(
-              (clip) => isSourceTimedClip(clip) && (clip.playbackRate ?? 1) === nextPlaybackRate
+              (clip) => !isSourceTimedClip(clip) || (clip.playbackRate ?? 1) === nextPlaybackRate
             )
           )
             return project;
           return applyEditableClipPatch(project, operation.clipIdSet, (item) =>
             isSourceTimedClip(item)
               ? updateSourceTimedClipTiming(item, { playbackRate: nextPlaybackRate })
-              : item
+              : { ...item, duration: anchor.sourceDuration / nextPlaybackRate }
           );
         })
       ),

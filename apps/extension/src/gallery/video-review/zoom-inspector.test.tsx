@@ -107,15 +107,17 @@ function renderInspector(
   };
 }
 
-it('keeps intermediate typed drafts local and clamps a blank commit to the row minimum', async () => {
+it('keeps invalid and blank drafts local and clamps a numeric zero to the row minimum', async () => {
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
   const scale = inspector.field('gallery.videoReview.zoomScale');
   await inspector.type(scale, 'not-a-number');
   await inspector.commit(scale);
   expect(change).not.toHaveBeenCalled();
-  // The shared field treats a blank draft as zero and clamps into the row range.
   await inspector.type(scale, '');
+  await inspector.commit(scale);
+  expect(change).not.toHaveBeenCalled();
+  await inspector.type(scale, '0');
   await inspector.commit(scale);
   expect(change).toHaveBeenLastCalledWith({ scale: 1 });
   await inspector.type(scale, '2');

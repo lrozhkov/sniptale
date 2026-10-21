@@ -743,3 +743,91 @@ it.each(['none', 'text', 'image'] as const)(
     expect(base).toEqual(before);
   }
 );
+
+it.each(['none', 'image', 'video'] as const)(
+  'duplicates portable %s bookend recipes with all dormant references and exact private bytes',
+  async (mode) => {
+    const { createVideoProjectAsset } =
+      await import('../../../../features/video/project/factories/creation');
+    const { createBookendImagePresentation, createBookendVideoPresentation } =
+      await import('../../../../features/video/project/scene/bookend-media');
+    const { parseVideoProjectEntry, parseProjectAssetEntry } =
+      await import('../../../../composition/persistence/projects/read-guards');
+    const base = createVideoProjectEntryWithMediaClip();
+    base.id = 'p';
+    base.project.id = 'p';
+    base.project.version = 25;
+    const movie = base.project.assets[0]!;
+    const image = createVideoProjectAsset(
+      'Card',
+      'IMAGE',
+      { kind: 'project-asset', projectAssetId: 'private-card' },
+      {
+        width: 641,
+        height: 359,
+        duration: null,
+        mimeType: 'image/png',
+        size: 6,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    base.project.assets.push(image);
+    const slot = {
+      mode,
+      image: { ...createBookendImagePresentation(), assetId: image.id, duration: 7.3 },
+      video: {
+        ...createBookendVideoPresentation(movie.metadata.duration!),
+        assetId: movie.id,
+        audio: { muted: true, gain: 0.37 },
+      },
+    };
+    base.project.bookendPresets = { intro: slot, outro: structuredClone(slot) };
+    const before = structuredClone(base);
+    const values = new Map<string, unknown[]>();
+    const db = publisherDatabase(values);
+    db.get = async (name, key) => (name === 'video_projects' && key === 'p' ? base : undefined);
+    mocks.database.mockReturnValue(db);
+    mocks.mutate.mockImplementation(async (callback) => callback(db));
+    const metadata = portableMetadata({
+      entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+      projectAssets: [
+        portableProjectAsset('project-asset-1'),
+        {
+          ...portableProjectAsset('private-card'),
+          entry: { id: 'private-card', mimeType: 'image/png', createdAt: 1, size: 6 },
+          filename: 'card.png',
+        },
+      ],
+      projectExports: [],
+    });
+    const metadataBefore = structuredClone(metadata);
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(metadata, [
+          stagedObject('o-project-asset-1', 'restored-video-bytes', 'video/webm', 6),
+          stagedObject('o-private-card', 'restored-card-bytes', 'image/png', 6),
+        ])
+      )
+    ).resolves.toMatchObject({ imported: true });
+    const restored = (values.get('video_projects') ?? [])
+      .map(parseVideoProjectEntry)
+      .find((entry) => entry !== null)?.project;
+    expect(restored).toBeDefined();
+    expect(restored!.id).not.toBe(base.id);
+    expect(restored!.version).toBe(25);
+    expect(restored!.bookendPresets).toEqual(base.project.bookendPresets);
+    const material = restored!.assets.find(({ id }) => id === image.id);
+    if (material?.source.kind !== 'project-asset')
+      throw new Error('Missing restored private source');
+    const restoredPrivateId = material.source.projectAssetId;
+    expect(restoredPrivateId).not.toBe('private-card');
+    expect(
+      (values.get('project_assets') ?? [])
+        .map(parseProjectAssetEntry)
+        .find((entry) => entry?.id === restoredPrivateId)
+    ).toMatchObject({ assetId: 'restored-card-bytes', mimeType: 'image/png', size: 6 });
+    expect(metadata).toEqual(metadataBefore);
+    expect(base).toEqual(before);
+  }
+);

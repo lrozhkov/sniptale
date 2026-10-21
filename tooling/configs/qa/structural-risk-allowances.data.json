@@ -1700,22 +1700,33 @@
       "file": "apps/extension/src/video-editor/workspace/surface/main.tsx",
       "symbol": "VideoEditorWorkspaceMain",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: This component composes existing workspace surfaces. Its callback updates the existing local inspector focus intent. It adds no runtime, resource or persistence authority. Independent read-only diagnosis checked this exact diff. Final architecture review must check the complete candidate.",
+      "reason": "tool-noise: This component composes existing workspace surfaces. The bookend and watermark callbacks update the same local inspector focus intent. They add no runtime, resource or persistence authority. Score6 has delta0. Independent read-only diagnosis checked this exact scope. Final architecture review must check this classification.",
       "removalCondition": "Remove when the body or signature changes. Reassess independent runtime, resource or persistence authority, or a forbidden dependency. Remove when the analyzer recognizes this workspace composition.",
-      "astHash": "ad628eedbe6c68294d2737bdec444d153ce1ec76df656a0f7b1a9601936af6c5",
+      "astHash": "4d7b21a4969995cab9adc4e96f1beb7ff177962f7ff07b5232d9d6f603f60bb7",
       "signatureHash": "297761bc2d02931ed4e6d8ee529f9c71c03f92a2346c4ab962e388ae47a8c779",
-      "reviewDate": "2026-10-20"
+      "reviewDate": "2026-10-21"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: These cases use one publisher, database fixture and staged-object helper family to test video-project reference remapping. The watermark cases distinguish logical material IDs from private-resource IDs. The line limit causes this finding. Independent read-only diagnosis checked the shared fixture and operation. Final architecture review must check the complete candidate.",
+      "reason": "tool-noise: These cases use one publisher, database fixture and staged-object helper family. Watermark and bookend cases distinguish logical material IDs from private-resource IDs. Dormant bookend references use the same remapping operation. Each invocation creates its own database capture. The 800-line cap identifies no additional authority. Independent read-only diagnosis checked this exact scope. Final architecture review must check this classification.",
       "removalCondition": "Remove when the file body or signature changes. Reassess unrelated proof or an independent fixture or lifecycle. Remove when the analyzer recognizes this reference-remap proof boundary.",
-      "astHash": "5a70beb1cb6c23ae873ecbdaf10c64846172b46d595e06ec4e6729a5428e93a6",
-      "signatureHash": "f728932e0c9ff177b308ecb6f29eddccd20e4460b7686cb4d0e827a3b85637a5",
-      "reviewDate": "2026-10-20"
+      "astHash": "3f59de6db8b178ac4daef665795ddf93e722dcaa7af9fd175fec407ba092343b",
+      "signatureHash": "88547062d221fa4397cc7320aa5aab74e7ef56c25a512cc8d0d1e566286ce526",
+      "reviewDate": "2026-10-21"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/projects/backup-restore.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence",
+      "reason": "tool-noise: These restore cases use the same writer, caller-owned stores and transaction fixture. The schema25 case checks retained bookend settings. Each case creates isolated stores. The file exceeds 800 lines without an additional product authority. Independent read-only diagnosis checked this exact scope. Final architecture review must check this classification.",
+      "removalCondition": "Remove when the body or signature changes. Reassess an independent fixture, unrelated operation or restore lifecycle. Remove when the analyzer recognizes this cohesive restore proof.",
+      "astHash": "0df1efe4ab026b2d9154e7abfa2320717a5b34b2091ba40364493b028d144476",
+      "signatureHash": "bb320308abea3398e61c1591d52f4b41ad78f75b08b509266e7fde60caa0dc37",
+      "reviewDate": "2026-10-21"
     }
   ]
 }
