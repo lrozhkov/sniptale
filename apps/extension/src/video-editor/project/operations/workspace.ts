@@ -4,9 +4,12 @@ import {
   reviewDocumentBaseline,
 } from '../../../features/video/review/document';
 import { planReviewProjectConversion } from '../../../features/video/review/project-conversion';
+import type { ReviewProjectCameraResource } from '../../../features/video/review/project-camera';
+import { assertImportableProjectAssetFile } from './import-validation';
+import { PROJECT_ASSET_VIDEO_MIME_TYPES } from '../../../features/media-hub/project-assets';
 import type { ReviewProjectAudioResources } from '../../../features/video/review/project-audio';
 import type { ReviewDocument } from '../../../features/video/review/types';
-import { loadAudioMetadata, loadImageMetadata } from '../media-metadata';
+import { loadAudioMetadata, loadImageMetadata, loadVideoMetadata } from '../media-metadata';
 import {
   reviewProjectSceneImageReferences,
   type ReviewProjectSceneImageResource,
@@ -170,6 +173,7 @@ async function prepareReviewResources(
 ): Promise<{
   audio?: ReviewProjectAudioResources;
   images: readonly ReviewProjectSceneImageResource[];
+  camera?: ReviewProjectCameraResource;
 }> {
   const audio = document.advancedContent.audio;
   const audioIds = new Set([
@@ -182,21 +186,61 @@ async function prepareReviewResources(
     ),
   ]);
   const imageIds = new Set(reviewProjectSceneImageReferences(document.advancedContent));
+  const cameraId = document.advancedContent.webcam?.assetId;
+  let camera: ReviewProjectCameraResource | undefined;
   const audioAssets: ReviewProjectAudioResources['assets'][number][] = [];
   const images: ReviewProjectSceneImageResource[] = [];
-  for (const id of new Set([...audioIds, ...imageIds])) {
+  for (const id of new Set([...audioIds, ...imageIds, ...(cameraId ? [cameraId] : [])])) {
     const image = imageIds.has(id);
+    const video = id === cameraId;
     const unavailable = () =>
       new Error(
-        image ? 'Review image resource is unavailable.' : 'Review audio resource is unavailable.'
+        video
+          ? 'Review camera resource is unavailable.'
+          : image
+            ? 'Review image resource is unavailable.'
+            : 'Review audio resource is unavailable.'
       );
-    if (image && audioIds.has(id)) throw new Error('Review resource roles conflict.');
+    if (Number(image) + Number(video) + Number(audioIds.has(id)) > 1)
+      throw new Error('Review resource roles conflict.');
     if (!id.startsWith('project-asset:') || id.length <= 'project-asset:'.length)
       throw unavailable();
     const projectAssetId = id.slice('project-asset:'.length);
     const result = await getProjectAsset(projectAssetId);
-    if (result.status !== 'ready' || result.entry.id !== projectAssetId) throw unavailable();
-    if (image) {
+    if (!result || result.status !== 'ready' || result.entry.id !== projectAssetId)
+      throw unavailable();
+    if (video) {
+      const file = result.entry.file;
+      const mimeType = file.type.toLowerCase().split(';', 1)[0]?.trim();
+      if (!PROJECT_ASSET_VIDEO_MIME_TYPES.some((type) => type === mimeType)) throw unavailable();
+      await assertImportableProjectAssetFile(file, 'VIDEO');
+      const metadata = await loadVideoMetadata(file);
+      if (
+        metadata.mimeType.toLowerCase().split(';', 1)[0]?.trim() !== mimeType ||
+        result.entry.mimeType.toLowerCase().split(';', 1)[0]?.trim() !== mimeType ||
+        metadata.size !== result.entry.size
+      )
+        throw unavailable();
+      camera = {
+        reviewAssetId: id,
+        asset: createVideoProjectAsset(
+          file.name && file.name !== projectAssetId
+            ? file.name
+            : translate('gallery.videoReview.webcam'),
+          'VIDEO',
+          { kind: 'project-asset', projectAssetId },
+          metadata
+        ),
+        track: {
+          ...createVideoProjectTrack(
+            translate('gallery.videoReview.webcam'),
+            Math.min(0, ...project.tracks.map((track) => track.order)) - 1,
+            'PRIMARY'
+          ),
+          role: 'CAMERA',
+        },
+      };
+    } else if (image) {
       const file = result.entry.file;
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw unavailable();
       const admitted =
@@ -246,6 +290,7 @@ async function prepareReviewResources(
   }
   return {
     images,
+    ...(camera ? { camera } : {}),
     ...(audioIds.size || audio.laneVolumes !== undefined
       ? {
           audio: {
@@ -336,6 +381,7 @@ async function createProjectFromReview(
     ui: snapshot.workspace.advanced.ui,
     ...(resources.audio ? { externalAudio: resources.audio } : {}),
     imageAssets: resources.images,
+    ...(resources.camera ? { camera: resources.camera } : {}),
   });
   if (result.status !== 'prepared')
     throw new Error('Review project settings cannot be transferred.');

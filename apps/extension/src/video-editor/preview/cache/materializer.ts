@@ -1,3 +1,4 @@
+import { hasCameraMediaAt } from '../../../features/video/project/camera/animation';
 import { createCompositionJoinEndpoints } from '../../../features/video/composition/canvas/join-endpoints';
 import {
   drawCompositionColorOverlay,
@@ -468,7 +469,7 @@ async function prepareMaterializedVideos(
 ): Promise<void> {
   const activeVideos = project.clips
     .filter(isVideoClip)
-    .filter((clip) => isClipActiveAtTime(clip, time));
+    .filter((clip) => isClipActiveAtTime(clip, time) && hasCameraMediaAt(project, clip, time));
   for (const clip of activeVideos) {
     const video = videoRefs[clip.id];
     if (!video) throw new Error(`Preview video source is unavailable for clip ${clip.id}`);

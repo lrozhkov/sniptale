@@ -1,3 +1,4 @@
+import { hasCameraMediaAt } from '../../../features/video/project/camera/animation';
 import {
   getMediaClipSourceTime,
   isClipActiveAtTime,
@@ -14,7 +15,11 @@ export async function syncVideoClipFrame(
 ): Promise<void> {
   const activeVideoClips: VideoProjectVideoClip[] = [];
   for (const clip of project.clips) {
-    if (isVideoClip(clip) && isClipActiveAtTime(clip, currentTime)) {
+    if (
+      isVideoClip(clip) &&
+      isClipActiveAtTime(clip, currentTime) &&
+      hasCameraMediaAt(project, clip, currentTime)
+    ) {
       activeVideoClips.push(clip);
     }
   }

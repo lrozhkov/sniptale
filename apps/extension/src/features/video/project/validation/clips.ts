@@ -201,6 +201,17 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
     return false;
   }
 
+  const timing = value['cameraTiming'];
+  if (
+    timing !== undefined &&
+    (value['type'] !== VideoProjectClipType.VIDEO ||
+      !isRecord(timing) ||
+      Object.keys(timing).some((key) => key !== 'offsetSeconds' && key !== 'transitions') ||
+      !isBoundedNumber(timing['offsetSeconds'], -86400, 86400) ||
+      timing['transitions'] !== 'bounded')
+  )
+    return false;
+
   if (
     isRecord(value['cameraAppearance']) &&
     value['cameraAppearance']['shape'] === 'circle' &&

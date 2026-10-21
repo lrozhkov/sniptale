@@ -8,6 +8,7 @@ import {
 import { applyVideoProjectClipsPatch } from '../mutation';
 import type { VideoProject, VideoProjectVideoClip } from '../types';
 import {
+  effectiveCameraTransitionDuration,
   activeCameraPosition,
   cameraSourceTime,
   canAddCameraPosition,
@@ -31,6 +32,24 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'offset') {
+    const timing = clip.cameraTiming;
+    if (
+      !timing ||
+      !Number.isFinite(edit.offsetSeconds) ||
+      Math.abs(edit.offsetSeconds) > 86400 ||
+      timing.offsetSeconds === edit.offsetSeconds
+    )
+      return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId
+          ? { ...clip, cameraTiming: { ...timing, offsetSeconds: edit.offsetSeconds } }
+          : item
+      )
+    );
+  }
   if (edit.kind === 'mirror') {
     if (typeof edit.mirrored !== 'boolean' || (clip.cameraMirrored ?? false) === edit.mirrored)
       return project;
@@ -117,8 +136,7 @@ export function cameraPositionSeekTime(
   if (!position) return clip.startTime;
   const next = clip.cameraPositions?.find((item) => item.sourceTime > position.sourceTime);
   const end = Math.min(
-    position.sourceTime +
-      (position.transition.kind === 'instant' ? 0 : position.transition.duration),
+    position.sourceTime + effectiveCameraTransitionDuration(clip, position),
     (next?.sourceTime ?? Infinity) - (clip.playbackRate ?? 1) / project.fps
   );
   return Math.max(
@@ -163,7 +181,10 @@ function updatePositionTiming(
             ? {
                 transition: {
                   ...edit.transition,
-                  duration: Math.min(clip.sourceDuration, edit.transition.duration),
+                  duration: Math.min(
+                    clip.cameraTiming ? 86400 : clip.sourceDuration,
+                    edit.transition.duration
+                  ),
                 },
               }
             : {}),
@@ -233,6 +254,7 @@ function editCameraVisibility(
     const duration = Math.max(
       project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
         clip.sourceStart + clip.sourceDuration,
+      clip.cameraTiming ? clip.sourceStart + clip.sourceDuration : 0,
       ranges.at(-1)?.end ?? 0
     );
     if (

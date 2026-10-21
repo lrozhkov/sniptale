@@ -55,6 +55,19 @@ export function useTimelineSelectedTrackAutoScroll(params: {
           )
         : undefined;
     const bounds = selectedObject?.getBoundingClientRect();
+    const viewport = timeline.getBoundingClientRect();
+    // A browser can reveal a pressed clip before its scroll event mirrors the rail.
+    // Do not move that visible target using the rail's older scroll position.
+    if (
+      bounds &&
+      bounds.height > 0 &&
+      bounds.top >= viewport.top + RULER_HEIGHT &&
+      bounds.bottom <= viewport.top + timeline.clientHeight
+    ) {
+      lastSelection.current = { trackId: selectedTrackId, effectId, clipId };
+      return;
+    }
+
     // Rendered press targets include history/lane offsets. Keep visible items in place.
     const target =
       bounds && bounds.height > 0

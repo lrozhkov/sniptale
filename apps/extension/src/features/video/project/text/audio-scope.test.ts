@@ -104,3 +104,17 @@ it('admits retained recording assets used by supported video and audio clips', (
     expect(createVideoProjectAudioScope(project, 2, clip.id, 1, 3)).toBeNull();
   }
 });
+
+it('authorizes camera selections in covered authored seconds for signed offsets', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: 4, transitions: 'bounded' };
+  expect(createVideoProjectAudioScope(project, 1, clip.id, 4, 10)).not.toBeNull();
+  expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 5)).toBeNull();
+  clip.cameraTiming.offsetSeconds = -15;
+  expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 5)).not.toBeNull();
+  expect(createVideoProjectAudioScope(project, 1, clip.id, 4, 6)).toBeNull();
+  for (const offsetSeconds of [-100, 100]) {
+    clip.cameraTiming.offsetSeconds = offsetSeconds;
+    expect(createVideoProjectAudioScope(project, 1, clip.id, 2, 3)).toBeNull();
+  }
+});

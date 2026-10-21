@@ -39,3 +39,38 @@ it('seeks active video clips while syncing frame-accurate previews', async () =>
 
   expect(seekMediaElementMock).toHaveBeenCalledWith(video, 4, undefined);
 });
+
+it('does not seek retained camera clips outside actual media coverage', async () => {
+  const { createEmptyVideoProject, createVideoProjectAsset } =
+    await import('../../../features/video/project/factories/creation');
+  const { createVideoClipFromAsset } =
+    await import('../../../features/video/project/factories/clip');
+  const project = createEmptyVideoProject();
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'camera' },
+    {
+      duration: 4,
+      width: 100,
+      height: 100,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 100, 100, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera video');
+  clip.duration = 12;
+  clip.sourceDuration = 12;
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  project.clips = [clip];
+  project.assets = [asset];
+  const video = document.createElement('video');
+  const job = { clipMediaElements: new Map([[clip.id, video]]) };
+  for (const time of [0, 2.9, 7, 11]) await syncVideoClipFrame(job, project, time);
+  expect(seekMediaElementMock).not.toHaveBeenCalled();
+  await syncVideoClipFrame(job, project, 3);
+  expect(seekMediaElementMock).toHaveBeenCalledOnce();
+});

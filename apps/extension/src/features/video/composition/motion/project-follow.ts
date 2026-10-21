@@ -193,7 +193,7 @@ function collectProjectCameraFrames(project: VideoProject, region: VideoProjectM
       clip.startTime + clip.duration,
       ...(clip.type === 'VIDEO' &&
       project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
-        ? cameraSourceGeometryBreaks(clip)
+        ? cameraSourceGeometryBreaks(clip, project)
         : []),
     ]),
   ])

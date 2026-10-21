@@ -351,3 +351,23 @@ it('does not recreate a disposed raster when cancellation follows normalization'
     getContext.mockRestore();
   }
 });
+
+it('enumerates only covered camera timestamps in the actual media clock', async () => {
+  const base = createProject();
+  const clip = base.clips[0]!;
+  const project = {
+    ...base,
+    clips: [
+      {
+        ...clip,
+        duration: 12,
+        sourceDuration: 12,
+        cameraTiming: { offsetSeconds: 3, transitions: 'bounded' as const },
+      },
+    ],
+  };
+  samplesAtTimestampsMock.mockReturnValue(createSamples([]));
+  const providers = await createWebmFrameProviders(project, [0, 2, 3, 4, 7.9, 8, 11]);
+  expect(samplesAtTimestampsMock).toHaveBeenCalledWith([0, 1, 4.9]);
+  providers?.forEach((provider) => provider.dispose());
+});

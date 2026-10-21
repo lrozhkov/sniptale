@@ -29,7 +29,11 @@ export function getMediaClipSourceTime(
   currentTime: number
 ): number {
   const projectOffset = clampValue(currentTime - clip.startTime, 0, clip.duration);
-  return clip.sourceStart + projectOffset * normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+  return (
+    clip.sourceStart +
+    projectOffset * normalizeClipPlaybackRate(clip.playbackRate ?? 1) -
+    (clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0)
+  );
 }
 
 export function getVideoClipSourceTime(clip: VideoProjectVideoClip, currentTime: number): number {

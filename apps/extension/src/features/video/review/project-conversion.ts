@@ -26,6 +26,11 @@ import {
   type ReviewProjectTimelinePlan,
 } from './project-timeline';
 import { planReviewProjectDocuments } from './project-documents';
+import {
+  planReviewProjectCamera,
+  isNeutralReviewSeedCamera,
+  type ReviewProjectCameraResource,
+} from './project-camera';
 
 type ReviewProjectConversionIssue =
   | ReviewProjectAudioIssue
@@ -35,6 +40,7 @@ type ReviewProjectConversionIssue =
         | 'invalid-document'
         | 'changed-source'
         | 'scene-resources'
+        | 'camera-resources'
         | 'unmapped-content'
         | 'source-transition'
         | 'interaction-source'
@@ -55,6 +61,7 @@ export function planReviewProjectConversion(args: {
   source: ReviewSource;
   document: ReviewDocument;
   externalAudio?: ReviewProjectAudioResources;
+  camera?: ReviewProjectCameraResource;
   imageAssets?: readonly ReviewProjectSceneImageResource[];
   ui: QuickEditUiState;
 }): ReviewProjectConversionPlan {
@@ -160,6 +167,39 @@ export function planReviewProjectConversion(args: {
     )
   )
     return blocked({ kind: 'scene-resources', field: 'identity' });
+  const camera = planReviewProjectCamera({
+    operationId: args.seed.id,
+    webcam: document.advancedContent.webcam,
+    resource: args.camera,
+    applied: application.webcamApplied,
+    scene: scene.scene,
+    timeline,
+  });
+  if (!camera) return blocked({ kind: 'camera-resources' });
+  const seedTracks = args.seed.tracks.filter((track) => track.role !== 'CAMERA');
+  if (
+    camera.assets.some((entry) =>
+      [...args.seed.assets, ...externalAudio.assets, ...scene.assets].some(
+        (asset) => asset.id === entry.id
+      )
+    ) ||
+    camera.tracks.some((entry) =>
+      [...args.seed.tracks, ...externalAudio.tracks].some((track) => track.id === entry.id)
+    ) ||
+    camera.clips.some((entry) =>
+      [...timeline.videoClips, ...timeline.audioClips, ...externalAudio.clips].some(
+        (clip) => clip.id === entry.id
+      )
+    )
+  )
+    return blocked({ kind: 'camera-resources', field: 'identity' });
+  if (camera.clips.length) {
+    timeline.videoClips = timeline.videoClips.map((clip, index) => ({
+      ...clip,
+      groupId: camera.clips[index]!.groupId,
+      linkMode: 'LINKED',
+    }));
+  }
   const original = document.advancedContent.audio.original;
   const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
     mute.kind === 'range'
@@ -173,8 +213,9 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || original.muted || !application.originalAudioApplied,
   });
-  const minimumVersion =
-    externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
+  const minimumVersion = camera.clips.length
+    ? 32
+    : externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
       ? 31
       : externalAudio.clips.length
         ? 30
@@ -193,12 +234,18 @@ export function planReviewProjectConversion(args: {
     backgroundColor: '#00000000',
     ...scene.scene,
     ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),
-    assets: [...structuredClone(args.seed.assets), ...externalAudio.assets, ...scene.assets],
-    tracks: [...structuredClone(args.seed.tracks), ...externalAudio.tracks],
+    assets: [
+      ...structuredClone(args.seed.assets),
+      ...externalAudio.assets,
+      ...scene.assets,
+      ...camera.assets,
+    ],
+    tracks: [...structuredClone(seedTracks), ...externalAudio.tracks, ...camera.tracks],
     clips: [
       ...timeline.videoClips.map((clip) => ({ ...master(clip), ...scene.video })),
       ...timeline.audioClips.map(master),
       ...externalAudio.clips,
+      ...camera.clips,
     ],
     ...(original.ranges?.length || sourceMutes.length || externalAudio.originalSpeech !== undefined
       ? {
@@ -354,10 +401,14 @@ function sourceTemplates(seed: VideoProject): {
     return null;
   const videos = seed.clips.filter((clip) => clip.type === 'VIDEO');
   const audio = seed.clips.filter((clip) => clip.type === 'AUDIO');
-  const video = videos[0];
+  const mainVideos = videos.filter(
+    (clip) => !seed.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  );
+  const video = mainVideos[0];
   if (
     !video ||
-    videos.length !== 1 ||
+    mainVideos.length !== 1 ||
+    videos.some((clip) => clip !== video && !isNeutralReviewSeedCamera(seed, clip, video)) ||
     audio.length > 1 ||
     seed.clips.length !== videos.length + audio.length ||
     (audio[0] && audio[0].assetId !== video.assetId)
@@ -400,7 +451,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     audio: false,
     canvas: false,
     windowHeader: false,
-    webcam: content.webcam !== undefined,
+    webcam: false,
     watermark: false,
     presentation:
       content.presentation !== undefined &&

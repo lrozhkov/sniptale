@@ -1,9 +1,9 @@
+import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
 import { useContext } from 'react';
 import { Scan, RotateCcw } from 'lucide-react';
 import { InspectorActionButton } from '../shared/actions';
 import {
   activeCameraPosition,
-  cameraSourceTime,
   type CameraPositionEdit,
 } from '../../../../../features/video/project/camera/animation';
 import {
@@ -162,7 +162,7 @@ function renderCameraCropControls(props: {
       <CameraCropPreview
         key={`${props.clip.id}:${position?.id ?? 'initial'}`}
         url={props.url}
-        sourceTime={cameraSourceTime(props.clip, props.currentTime)}
+        sourceTime={Math.max(0, getMediaClipSourceTime(props.clip, props.currentTime))}
         width={transform.width}
         height={transform.height}
         appearance={value}

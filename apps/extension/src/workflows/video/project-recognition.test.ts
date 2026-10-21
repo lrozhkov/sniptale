@@ -354,3 +354,120 @@ it('admits boundary-sized audio-chat selections at a large source offset', async
     expect.anything()
   );
 });
+
+it.each([4, -15])(
+  'maps camera decoder seconds and phrase origins to authored seconds for offset %s',
+  async (offsetSeconds) => {
+    const f = fixture();
+    f.change((project) => ({
+      ...project,
+      clips: project.clips.map((clip) =>
+        clip.type === 'VIDEO'
+          ? { ...clip, cameraTiming: { offsetSeconds, transitions: 'bounded' as const } }
+          : clip
+      ),
+    }));
+    const start = offsetSeconds > 0 ? 4 : 2;
+    const end = offsetSeconds > 0 ? 10 : 5;
+    vi.mocked(planReviewSpeechChunks).mockImplementation(async (_source, ranges) => [
+      { start: ranges[0]!.start + 0.25, end: ranges[0]!.end },
+    ]);
+    const job = await prepareProjectRecognition(f.access, { ...f.options, start, end }, signal());
+    expect(planReviewSpeechChunks).toHaveBeenCalledWith(
+      job.source,
+      [{ start: start - offsetSeconds, end: end - offsetSeconds }],
+      expect.anything()
+    );
+    expect(job.chunks).toEqual([{ start: start + 0.25, end, range: 0 }]);
+    expect(job.options).toMatchObject({ start, end });
+    expect(readVideoProjectAudioSource).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeStart: start, nativeEnd: end })
+    );
+    vi.mocked(runReviewSpeechJob).mockImplementationOnce(async (_request, options) => {
+      await options.prepareInput?.(signal());
+      return {
+        type: 'transcript',
+        result: { text: 'Camera.', words: [{ text: 'Camera.', start: 0, end: 1 }] },
+      };
+    });
+    const proposal = await runProjectRecognition(f.access, job, signal());
+    expect(extractReviewSpeechWav).toHaveBeenCalledWith(
+      job.source,
+      start + 0.25 - offsetSeconds,
+      end - offsetSeconds,
+      expect.anything()
+    );
+    expect(proposal.entry.document.fragments[0]).toMatchObject({
+      start: start + 0.25,
+      end: start + 1.25,
+      timeDomain: 'source',
+      origin: { start: start + 0.25, end: start + 1.25 },
+    });
+  }
+);
+
+it('refuses camera noncoverage and offset changes during pending work without relying on timestamps', async () => {
+  const f = fixture();
+  const changeOffset = (offsetSeconds: number) =>
+    f.change((project) => ({
+      ...project,
+      clips: project.clips.map((clip) =>
+        clip.type === 'VIDEO'
+          ? { ...clip, cameraTiming: { offsetSeconds, transitions: 'bounded' as const } }
+          : clip
+      ),
+    }));
+  for (const offset of [-100, 100]) {
+    changeOffset(offset);
+    await expect(prepareProjectRecognition(f.access, f.options, signal())).rejects.toThrow(
+      'selection'
+    );
+  }
+  changeOffset(0);
+  const job = await prepareProjectRecognition(f.access, f.options, signal());
+  vi.mocked(runReviewSpeechJob).mockImplementationOnce(async () => {
+    changeOffset(1);
+    return { type: 'transcript', result: { text: 'Late.' } };
+  });
+  await expect(runProjectRecognition(f.access, job, signal())).rejects.toThrow('stale');
+  expect(f.update).not.toHaveBeenCalled();
+});
+
+it('keeps explicit audio-chat camera metadata authored while extracting actual media seconds', async () => {
+  const f = fixture();
+  f.change((project) => ({
+    ...project,
+    clips: project.clips.map((clip) =>
+      clip.type === 'VIDEO'
+        ? { ...clip, cameraTiming: { offsetSeconds: 4, transitions: 'bounded' as const } }
+        : clip
+    ),
+  }));
+  const options = {
+    ...f.options,
+    start: 4,
+    end: 10,
+    recognition: { mode: 'transcribe' as const, granularity: 'sentence' as const, prompt: '' },
+  };
+  const job = await prepareProjectRecognition(f.access, options, signal());
+  expect(planReviewSpeechChunks).not.toHaveBeenCalled();
+  expect(job.chunks).toEqual([{ start: 4, end: 10, range: 0 }]);
+  vi.mocked(runReviewSpeechJob).mockImplementationOnce(async (_request, requestOptions) => {
+    await requestOptions.prepareInput?.(signal());
+    return { type: 'transcript', result: { text: 'Camera.' } };
+  });
+  const proposal = await runProjectRecognition(f.access, job, signal());
+  expect(extractReviewSpeechWav).toHaveBeenCalledWith(job.source, 0, 6, expect.anything());
+  expect(runReviewSpeechJob).toHaveBeenCalledWith(
+    expect.objectContaining({
+      scope: expect.objectContaining({ nativeStart: 4, nativeEnd: 10 }),
+      recognition: options.recognition,
+    }),
+    expect.anything()
+  );
+  expect(proposal.entry.document.fragments[0]).toMatchObject({
+    start: 4,
+    end: 10,
+    origin: { start: 4, end: 10 },
+  });
+});

@@ -1,3 +1,4 @@
+import { getMediaClipSourceTime } from '../timeline/rate';
 import { isCameraHiddenAt } from './visibility';
 import {
   DEFAULT_CAMERA_APPEARANCE,
@@ -12,6 +13,7 @@ import type { VideoMediaFitMode } from '../types/media';
 type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
 export type CameraPositionEdit =
+  | { kind: 'offset'; offsetSeconds: number }
   | { kind: 'mirror'; mirrored: boolean }
   | { kind: 'appearance'; appearance: CameraAppearance }
   | { kind: 'crop'; crop: CameraCrop | null }
@@ -45,6 +47,29 @@ export function resolveCameraClip(
   const positions = clip.cameraPositions ?? [];
   const appearance = clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
   const hasCrop = positions.some((position) => position.crop !== undefined);
+  if (clip.cameraTiming?.transitions === 'bounded') {
+    const index = positions.findLastIndex((position) => position.sourceTime <= sourceTime);
+    const position = positions[index];
+    if (!position) return clip;
+    const previous = positions[index - 1];
+    const from = previous
+      ? {
+          ...clip,
+          transform: previous.transform,
+          fitMode: previous.fitMode,
+          ...(hasCrop
+            ? { cameraAppearance: { ...appearance, ...(previous.crop ?? appearance) } }
+            : {}),
+        }
+      : clip;
+    return interpolateCameraPosition(
+      from,
+      position,
+      sourceTime,
+      hasCrop ? appearance : undefined,
+      effectiveCameraTransitionDuration(clip, position)
+    );
+  }
   let visual = clip;
   for (let index = 0; index < positions.length; index += 1) {
     const position = positions[index];
@@ -64,10 +89,13 @@ function interpolateCameraPosition(
   clip: VideoProjectVideoClip,
   position: CameraPosition,
   sourceTime: number,
-  baseAppearance?: CameraAppearance
+  baseAppearance?: CameraAppearance,
+  effectiveDuration?: number
 ): VideoProjectVideoClip {
   const from = clip.transform;
-  const duration = position.transition.kind === 'instant' ? 0 : position.transition.duration;
+  const duration =
+    effectiveDuration ??
+    (position.transition.kind === 'instant' ? 0 : position.transition.duration);
   const progress =
     duration > 0 ? Math.min(1, Math.max(0, (sourceTime - position.sourceTime) / duration)) : 1;
   if (progress === 0) return clip;
@@ -122,7 +150,8 @@ export function resolveCameraVisualClip(
   )
     return clip;
   const visual = resolveCameraClip(clip, time);
-  return isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, time))
+  return !hasCameraMediaAt(project, clip, time) ||
+    isCameraHiddenAt(clip.cameraHiddenRanges ?? [], cameraSourceTime(clip, time))
     ? { ...visual, transform: { ...visual.transform, opacity: 0 } }
     : visual;
 }
@@ -186,7 +215,7 @@ export function resolveCameraDestinationTransform(
   const visual = resolveCameraClip(clip, time).transform;
   const desired = { ...visual, ...transform };
   if (!position) return desired;
-  const duration = position.transition.kind === 'instant' ? 0 : position.transition.duration;
+  const duration = effectiveCameraTransitionDuration(clip, position);
   const progress =
     duration > 0
       ? Math.min(1, Math.max(0, (cameraSourceTime(clip, time) - position.sourceTime) / duration))
@@ -216,4 +245,36 @@ export function resolveCameraDestinationTransform(
     rotation: target.rotation + (desired.rotation - visual.rotation) / weight,
     opacity: target.opacity + (desired.opacity - visual.opacity) / weight,
   };
+}
+
+/** Effective render duration; authored transition durations remain unchanged. */
+export function effectiveCameraTransitionDuration(
+  clip: VideoProjectVideoClip,
+  position: CameraPosition
+): number {
+  if (position.transition.kind === 'instant') return 0;
+  if (clip.cameraTiming?.transitions !== 'bounded') return position.transition.duration;
+  const next = clip.cameraPositions?.find((item) => item.sourceTime > position.sourceTime);
+  return Math.min(
+    position.transition.duration,
+    (next?.sourceTime ?? Infinity) - position.sourceTime
+  );
+}
+
+/** Coverage uses actual camera media seconds and never freezes an out-of-range frame. */
+export function hasCameraMediaAt(
+  project: VideoProject,
+  clip: VideoProjectClip,
+  time: number
+): boolean {
+  if (clip.type !== 'VIDEO' || !clip.cameraTiming) return true;
+  const mediaTime = getMediaClipSourceTime(clip, time);
+  const duration = project.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration;
+  return (
+    Number.isFinite(mediaTime) &&
+    mediaTime >= 0 &&
+    typeof duration === 'number' &&
+    Number.isFinite(duration) &&
+    mediaTime < duration
+  );
 }

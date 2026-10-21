@@ -256,7 +256,14 @@ function clampClipTrimDelta(
       const assetDuration =
         getAssetById(project, clip.assetId)?.metadata.duration ??
         clip.sourceStart + clip.sourceDuration;
-      maximum = Math.min(maximum, (assetDuration - clip.sourceStart - clip.sourceDuration) / rate);
+      const authoredEnd =
+        clip.type === 'VIDEO' && clip.cameraTiming
+          ? Math.max(
+              assetDuration + clip.cameraTiming.offsetSeconds,
+              clip.sourceStart + clip.sourceDuration
+            )
+          : assetDuration;
+      maximum = Math.min(maximum, (authoredEnd - clip.sourceStart - clip.sourceDuration) / rate);
     }
   }
   if (minimum > maximum) return 0;

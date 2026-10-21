@@ -176,3 +176,84 @@ it('keys durable frames by source identity, not material names or object URLs', 
   expect(replaced.sourceKey).not.toBe(first.sourceKey);
   expect(replaced.slots[0]?.cacheKey).not.toBe(first.slots[0]?.cacheKey);
 });
+
+it('samples bounded camera media in its actual clock with and without a viewport', () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 4 });
+  const clip = project.clips[0] as VideoProjectVideoClip;
+  project.clips = [
+    {
+      ...clip,
+      startTime: 0,
+      duration: 12,
+      sourceStart: 0,
+      sourceDuration: 12,
+      cameraTiming: { offsetSeconds: 3, transitions: 'bounded' },
+    },
+  ];
+  for (const viewport of [null, { startTime: 0, endTime: 12, pixelsPerSecond: 64 }]) {
+    const plan = buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, viewport)[0]!;
+    expect(plan.slots.length).toBeGreaterThan(0);
+    expect(
+      plan.slots.every(
+        (slot) => slot.sourceStart >= 0 && slot.sourceStart < 4 && slot.sourceEnd <= 4
+      )
+    ).toBe(true);
+    expect(plan.slots[0]!.sourceStart).toBe(0);
+  }
+  project.clips = [
+    {
+      ...(project.clips[0] as VideoProjectVideoClip),
+      cameraTiming: { offsetSeconds: 20, transitions: 'bounded' },
+    },
+  ];
+  expect(
+    buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, null)[0]!.slots
+  ).toEqual([]);
+});
+
+it('uses negative camera offsets and includes timing in storyboard cache keys', () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 8 });
+  const clip = project.clips[0] as VideoProjectVideoClip;
+  project.clips = [
+    {
+      ...clip,
+      startTime: 0,
+      duration: 4,
+      sourceStart: 0,
+      sourceDuration: 4,
+      cameraTiming: { offsetSeconds: -2, transitions: 'bounded' },
+    },
+  ];
+  const first = buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, null)[0]!;
+  expect(first.slots[0]).toMatchObject({ sourceStart: 2, sourceEnd: 6 });
+  project.clips = [
+    {
+      ...(project.clips[0] as VideoProjectVideoClip),
+      sourceStart: 1,
+      cameraTiming: { offsetSeconds: -1, transitions: 'bounded' },
+    },
+  ];
+  const second = buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, null)[0]!;
+  expect(second.slots[0]!.sourceStart).toBe(2);
+  expect(second.slots[0]!.cacheKey).not.toBe(first.slots[0]!.cacheKey);
+});
+
+it('requests no camera frames while its media URL is pending or its clip is outside the viewport buffer', () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 8 });
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera');
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  expect(buildTimelinePreviewPlans(project, {}, null)).toEqual([]);
+  const plans = buildTimelinePreviewPlans(
+    project,
+    { 'asset-video': 'blob:camera' },
+    {
+      startTime: 40,
+      endTime: 44,
+      pixelsPerSecond: 64,
+    }
+  );
+  expect(plans).toHaveLength(1);
+  expect(plans[0]!.slots).toEqual([]);
+  expect(getNextTimelinePreviewFrameBatch(plans, new Map())).toBeNull();
+});

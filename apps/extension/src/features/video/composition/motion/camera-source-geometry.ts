@@ -1,6 +1,10 @@
-import { resolveCameraClip, cameraSourceTime } from '../../project/camera/animation';
+import {
+  resolveCameraClip,
+  cameraSourceTime,
+  effectiveCameraTransitionDuration,
+} from '../../project/camera/animation';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../project/camera/appearance';
-import type { VideoProjectVideoClip } from '../../project/types';
+import type { VideoProject, VideoProjectVideoClip } from '../../project/types';
 import {
   getFittedMediaContentFrame,
   type VisualLayerSourcePointMapping,
@@ -16,14 +20,24 @@ const times = (a: Range, b: Range): Range =>
 const scale = (a: Range, factor: number): Range => times(a, [factor, factor]);
 
 /** Exact source-clock seams partition camera position and visibility proof intervals. */
-export function cameraSourceGeometryBreaks(clip: VideoProjectVideoClip): number[] {
+export function cameraSourceGeometryBreaks(
+  clip: VideoProjectVideoClip,
+  project?: VideoProject
+): number[] {
   const toProject = (time: number) =>
     clip.startTime + (time - clip.sourceStart) / (clip.playbackRate ?? 1);
   return [
+    ...(clip.cameraTiming
+      ? [
+          clip.cameraTiming.offsetSeconds,
+          clip.cameraTiming.offsetSeconds +
+            (project?.assets.find((asset) => asset.id === clip.assetId)?.metadata.duration ??
+              Infinity),
+        ]
+      : []),
     ...(clip.cameraPositions ?? []).flatMap((position) => [
       position.sourceTime,
-      position.sourceTime +
-        (position.transition.kind === 'instant' ? 0 : position.transition.duration),
+      position.sourceTime + effectiveCameraTransitionDuration(clip, position),
     ]),
     ...(clip.cameraHiddenRanges ?? []).flatMap((interval) => [interval.start, interval.end]),
   ]
@@ -51,21 +65,25 @@ function poseBounds(clip: VideoProjectVideoClip, start: number, end: number) {
   const positions = (clip.cameraPositions ?? []).filter(
     (position) => position.sourceTime <= cameraSourceTime(clip, middle)
   );
-  const local = { ...clip, cameraPositions: positions };
+  const local = {
+    ...clip,
+    cameraPositions: positions.map((position) => ({
+      ...position,
+      transition: {
+        ...position.transition,
+        duration: effectiveCameraTransitionDuration(clip, position),
+      },
+    })),
+  };
   const first = resolveCameraClip(local, start),
     last = resolveCameraClip(local, end);
   const poses = [first, resolveCameraClip(local, middle), last];
   const active = positions.at(-1);
+  const duration = active ? effectiveCameraTransitionDuration(clip, active) : 0;
   const progress = (time: number) =>
-    !active || active.transition.duration <= 0
+    !active || duration <= 0
       ? 1
-      : Math.min(
-          1,
-          Math.max(
-            0,
-            (cameraSourceTime(clip, time) - active.sourceTime) / active.transition.duration
-          )
-        );
+      : Math.min(1, Math.max(0, (cameraSourceTime(clip, time) - active.sourceTime) / duration));
   const shrink = active?.transition.kind === 'shrink';
   const factorAt = (time: number) =>
     shrink ? 1 - 0.55 * Math.sin(Math.PI * progress(time)) ** 2 : 1;
@@ -150,6 +168,7 @@ function fittedBounds(
 
 function boundCameraPart(input: {
   clip: VideoProjectVideoClip;
+  project?: VideoProject;
   mapping: Mapping;
   nativeX: Range;
   nativeY: Range;
@@ -204,7 +223,7 @@ function boundCameraPart(input: {
 export function boundCameraSourceGeometry(input: Parameters<typeof boundCameraPart>[0]) {
   const breaks = [
     input.start,
-    ...cameraSourceGeometryBreaks(input.clip).filter(
+    ...cameraSourceGeometryBreaks(input.clip, input.project).filter(
       (time) => time > input.start && time < input.end
     ),
     input.end,

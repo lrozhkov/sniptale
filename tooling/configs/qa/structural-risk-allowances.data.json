@@ -1755,11 +1755,11 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure converter prepares one detached project or one refusal. Existing planners own scene, timeline, documents and audio projections. Image additions pass admitted resources and reject identity collisions without adding a writer or resource lifetime. The analyzer matches the domain identifier document as a DOM effect, but this body accesses no DOM. Independent read-only image_structural_diagnosis confirmed this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: The converter returns one detached project or one refusal. Clip identities, linked groups, schema admission, and final validation share that result. The document variable is domain data. It is not a DOM authority. The mapper owns camera projection. Splitting the conversion by property group would fragment the admission. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "24a416f8130fb338ccbac61167dc2907a27865941be8e8df0052d0d21a0bc821",
-      "signatureHash": "99eea4daa04004c7bbc577627d0f58a947c07182d35656836598aba46a058dc1"
+      "astHash": "414521be3c2625ff7d22c4d98dbbfd65630267af39cec1966c2c92bf0a7ae6f0",
+      "signatureHash": "4723efd60b994dfbbad28fa1cfb6e50a6a8faeb21d3ab9bd0c06f17c43462415"
     },
     {
       "rule": "structural-function-risk",
@@ -1854,32 +1854,32 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
       "symbol": "prepareReviewResources",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This single read-only acquisition resolves immutable references for one document before publication. Existing intake and metadata owners validate media and release decoding objects. The caller rechecks the Gallery snapshot and owns the final guarded commit. The dependency groups describe orchestration rather than competing writers. No resource publication, durable mutation or independent recovery occurs here. Independent read-only image_structural_diagnosis confirmed this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: This read-only acquisition resolves immutable audio, image, and camera references for one Gallery document. Existing intake and metadata owners validate media and release decoders. The caller validates the selected snapshot and owns the final guarded commit. The document variable is domain data. It is not a DOM authority. No publication, durable writer, or independent recovery occurs here. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "5e75dc03e30c620c2c56e7a8499f6fb5039efa3a5686a5d34ec7f55d78a1b5fd",
-      "signatureHash": "bb32035eb94ed96cceac25177cb3a48564ed47bd587d731c459e8e2b81b5df04"
+      "astHash": "4cc0fad9db23b3a07f439a0e4c27fc27d1cbb0abfba840743534e576cc982c6c",
+      "signatureHash": "435cf81f6cb4c84b70a60e9abcd478813caf48082a69c86a92e68648e4c5a8bd"
     },
     {
       "rule": "structural-file-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: The test-profile score is file scale only. These cases prove material identity and retention through montage using existing harness adapters. Reported receivers are per-test pages, fixture transactions, storage bootstrap and disposable canvas objects. No shared production state or product authority is introduced. Independent read-only image_structural_diagnosis confirmed this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: These tests prove material identity and retention through montage with existing harness adapters. The pages, storage fixtures, and disposable canvases are local test receivers. The tests add no shared production state or product authority. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "22b7cf2308b5718f4780d857efe2b16b029443aa984b6e8f7102f8b33d24da9c",
-      "signatureHash": "d58f987978650d80817d3b82274ee8d4a0c4f894e0418d9e705517d0b22c9c44"
+      "astHash": "424d923ba3c0eb94048de65052408e91611f6e482cdb7e62b1eea7deb937da13",
+      "signatureHash": "0ab65f1c6d0605a59b6b3aee07bda86be69005d9503c6399f5a8bb3a2d788aa9"
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "test callback#2",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One continuous user chain carries an authored Gallery snapshot into one Native root, edits images, adds footage and effects, reopens, removes only the Gallery project and exports that surviving root. Continuity establishes acceptance. Branches select active and remembered image variants across two viewports. One host lifecycle ends in finally. Existing export helpers own encoding and decoding; there is no independent recovery domain. Independent read-only image_structural_diagnosis confirmed this classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent result, writer, publication, resource lifetime, cleanup or recovery authority, unrelated workflow or shared test authority. Remove when analyzer handling changes. Final independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: One continuous chain carries an authored Gallery snapshot into one Native root. It edits the transferred camera and images, adds footage and effects, reopens, removes the Gallery project, and exports the surviving root. Continuity proves acceptance. One host lifetime ends in finally. Existing export helpers own encoding and decoding. There is no independent recovery domain. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-10-21",
-      "astHash": "caea6fe0458e24218e2cb41822d02bb192f3a225f7be1a1ed88f121f998a0f58",
+      "astHash": "49a0bfd17afe876176de4f391a80549de2b3f090e9116d458ba1030f76357578",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -1892,6 +1892,39 @@
       "reviewDate": "2026-10-21",
       "astHash": "089fb48763a3137ac83c6b0e5919c70c4d372c891c0d78cae55cebfd89773454",
       "signatureHash": "f91dd62b8698efdfcb53b623335e3d48703425104c758d2849540c341c4732ba"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-camera.ts",
+      "symbol": "planReviewProjectCamera",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The pure mapper has one admission and projection result. Its eight statements map one retained camera placement. It has no effect, writer, state, or recovery authority. Property groups share the same camera clock and identity. Splitting those groups would fragment one conversion. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-10-21",
+      "astHash": "bf0ce22f21b11b92faa61bc649c2aa15a5c19d531a570d71faac97a9b5087d38",
+      "signatureHash": "d8933e663cedd577da78e0d9019f94b8726a8c9985fb50414b78dc4648fc3336"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-camera.ts",
+      "symbol": "isNeutralReviewSeedCamera",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This predicate admits only the exact neutral camera sidecar from the existing recording factory. The boolean conditions form one admission rule. They prevent loss of authored settings. There is no state, effect, writer, or recovery authority. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-10-21",
+      "astHash": "e232cebc024c8dd5b3a19fc3c615c58fb323c46913aaf329e2b2d81e02ecfa54",
+      "signatureHash": "6784f2a70ded7f1e66e85431266e950d7d72be5e3ecaa31722cc863679435ea4"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:project",
+      "reason": "tool-noise: This fixture tests one resource acquisition and publication protocol. Codec admission, render order, controlled pending reads, refusal, and retry use the same receiver. Local observations do not own product state. Each case resets the fixture. Independent read-only camera_structural_diagnosis classified the operation as Keep. Final independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, publication, resource lifetime, cleanup, recovery, unrelated workflow, or shared test authority. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-10-21",
+      "astHash": "1163f1a28fb8581a34f5fed3c21e155a97be2ebc8e4a20d9b0f058997dd4e27a",
+      "signatureHash": "edd3a82a1855a71d86918c661ffc42be5d76cb51af17de2539b8302a3a7b74c1"
     }
   ]
 }

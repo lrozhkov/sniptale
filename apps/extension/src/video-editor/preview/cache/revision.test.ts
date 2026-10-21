@@ -443,3 +443,30 @@ it('invalidates an active join segment when a held complete endpoint changes out
     )
   ).resolves.not.toBe(revision);
 });
+
+it('invalidates rendered camera frames when actual media timing changes', async () => {
+  const project = createEmptyVideoProject('Camera');
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'camera' },
+    {
+      duration: 4,
+      width: 100,
+      height: 100,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 100, 100, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera video');
+  clip.cameraTiming = { offsetSeconds: 1, transitions: 'bounded' };
+  project.clips = [clip];
+  project.assets = [asset];
+  const range = { startFrame: 0, endFrame: project.fps * 2 };
+  const before = await createVideoPreviewSegmentRevision(project, range);
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
+});

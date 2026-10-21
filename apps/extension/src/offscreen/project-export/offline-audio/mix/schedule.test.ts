@@ -2,7 +2,10 @@ import {
   createEmptyVideoProject,
   createVideoProjectAsset,
 } from '../../../../features/video/project/factories/creation';
-import { createAudioClipFromAsset } from '../../../../features/video/project/factories/clip';
+import {
+  createAudioClipFromAsset,
+  createVideoClipFromAsset,
+} from '../../../../features/video/project/factories/clip';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 
 const { clampClipPlaybackRateMock } = vi.hoisted(() => ({
@@ -487,4 +490,43 @@ it('does not schedule a source voiceover after abort', async () => {
     )
   ).rejects.toThrow();
   expect(context.lastSource).toBeNull();
+});
+
+it.each([
+  { offset: 2, start: 2, media: 0, duration: 2 },
+  { offset: -1, start: 0, media: 1, duration: 1 },
+  { offset: 10, start: null, media: 0, duration: 0 },
+])('schedules unmuted camera audio only inside media coverage ($offset)', async (expected) => {
+  const { scheduleOfflineAudioClipMix } = await import('./schedule');
+  const context = new FakeOfflineAudioContext() as FakeOfflineAudioContext & OfflineAudioContext;
+  const asset = createVideoProjectAsset(
+    'Camera',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'camera' },
+    {
+      width: 16,
+      height: 9,
+      duration: 2,
+      mimeType: 'video/webm',
+      size: 10,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset('camera-track', asset, 16, 9, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera');
+  clip.duration = 4;
+  clip.sourceDuration = 4;
+  clip.cameraTiming = { offsetSeconds: expected.offset, transitions: 'bounded' };
+  clip.muted = false;
+  await scheduleOfflineAudioClipMix(context, clip, createAudioBuffer(1, 48000, 96000));
+  if (expected.start === null) expect(context.lastSource).toBeNull();
+  else {
+    expect(context.lastSource!.start).toHaveBeenCalledWith(
+      expected.start,
+      expected.media,
+      expected.duration
+    );
+    expect(context.lastSource!.stop).toHaveBeenCalledWith(expected.start + expected.duration);
+  }
 });

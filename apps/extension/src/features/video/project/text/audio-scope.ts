@@ -29,12 +29,14 @@ export function resolveVideoProjectAudioTarget(
     !asset.metadata.hasAudio
   )
     return null;
+  const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
+  const start = Math.max(clip.sourceStart, offset);
   const end = Math.min(
     clip.sourceStart + clip.sourceDuration,
-    getMediaClipSourceTime(clip, clip.startTime + clip.duration),
-    asset.metadata.duration ?? Infinity
+    getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,
+    (asset.metadata.duration ?? Infinity) + offset
   );
-  if (scope.nativeStart < clip.sourceStart || scope.nativeEnd > end) return null;
+  if (scope.nativeStart < start || scope.nativeEnd > end) return null;
   return { clip, asset };
 }
 

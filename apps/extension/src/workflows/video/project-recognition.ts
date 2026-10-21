@@ -59,18 +59,25 @@ export interface ProjectRecognitionProposal {
   receipt?: VideoProjectTextDocument;
 }
 
-/** All intervals here are native source seconds, independent of montage start and rate. */
+/** Intervals use authored source seconds, independent of montage start and rate. */
 export function projectRecognitionRange(project: VideoProject, clipId: string) {
   const clip = project.clips.find((entry) => entry.id === clipId);
   if (!clip || (clip.type !== 'VIDEO' && clip.type !== 'AUDIO')) return null;
   const asset = project.assets.find((entry) => entry.id === clip.assetId);
   if (!asset?.metadata.hasAudio) return null;
+  const offset = clip.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
+  const start = Math.max(clip.sourceStart, offset);
   const end = Math.min(
     clip.sourceStart + clip.sourceDuration,
-    getMediaClipSourceTime(clip, clip.startTime + clip.duration),
-    asset.metadata.duration ?? Infinity
+    getMediaClipSourceTime(clip, clip.startTime + clip.duration) + offset,
+    (asset.metadata.duration ?? Infinity) + offset
   );
-  return end > clip.sourceStart ? { start: clip.sourceStart, end } : null;
+  return end > start ? { start, end } : null;
+}
+
+function cameraOffset(project: VideoProject, clipId: string): number {
+  const clip = project.clips.find((entry) => entry.id === clipId);
+  return clip?.type === 'VIDEO' ? (clip.cameraTiming?.offsetSeconds ?? 0) : 0;
 }
 
 function basis(project: VideoProject, clipId: string) {
@@ -88,6 +95,7 @@ function basis(project: VideoProject, clipId: string) {
     clip.sourceStart,
     clip.sourceDuration,
     clip.playbackRate ?? 1,
+    clip.type === 'VIDEO' ? clip.cameraTiming : undefined,
     asset?.source,
     asset
       ? [
@@ -165,9 +173,16 @@ export async function prepareProjectRecognition(
   if (previous?.identity === identity) return previous;
   const source = await readVideoProjectAudioSource(scope);
   signal.throwIfAborted();
+  const offset = cameraOffset(saved.project, options.clipId);
   const ranges = options.recognition
     ? [{ start: options.start, end: options.end }]
-    : await planReviewSpeechChunks(source, [{ start: options.start, end: options.end }], signal);
+    : (
+        await planReviewSpeechChunks(
+          source,
+          [{ start: options.start - offset, end: options.end - offset }],
+          signal
+        )
+      ).map((chunk) => ({ ...chunk, start: chunk.start + offset, end: chunk.end + offset }));
   const job: ProjectRecognitionJob = {
     id: crypto.randomUUID(),
     project: saved.project,
@@ -191,6 +206,7 @@ export async function runProjectRecognition(
   signal: AbortSignal,
   onProgress?: (completed: number, total: number) => void
 ): Promise<ProjectRecognitionProposal> {
+  const offset = cameraOffset(job.project, job.options.clipId);
   for (const chunk of job.chunks) {
     signal.throwIfAborted();
     assertCurrent(access, job);
@@ -220,7 +236,12 @@ export async function runProjectRecognition(
         {
           signal,
           prepareInput: async (active) => {
-            const wav = await extractReviewSpeechWav(job.source, chunk.start, chunk.end, active);
+            const wav = await extractReviewSpeechWav(
+              job.source,
+              chunk.start - offset,
+              chunk.end - offset,
+              active
+            );
             return (await reviewSpeechWavIsSilent(wav, active)) ? null : wav;
           },
         }

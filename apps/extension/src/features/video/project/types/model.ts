@@ -221,6 +221,8 @@ export interface VideoProjectUtilityLanes {
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
   /** Camera-native source seconds survive cuts, rates and project moves. */
   cameraHiddenRanges?: CameraHiddenRange[];
+  /** Authored camera anchors use main-source seconds; media seconds subtract the offset. */
+  cameraTiming?: { offsetSeconds: number; transitions: 'bounded' };
   cameraPositions?: CameraPosition[];
   cameraAppearance?: CameraAppearance;
   /** Reflect camera pixels within their window; the source clock and placement stay unchanged. */
@@ -337,7 +339,8 @@ export interface VideoProject {
     | 28
     | 29
     | 30
-    | 31;
+    | 31
+    | 32;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

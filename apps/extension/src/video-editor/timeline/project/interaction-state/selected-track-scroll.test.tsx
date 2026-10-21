@@ -16,6 +16,7 @@ function mount() {
   document.body.append(host);
   timeline.getBoundingClientRect = () => new DOMRect(0, 0, 600, 180);
   Object.defineProperty(trackList, 'clientHeight', { value: 150 });
+  Object.defineProperty(timeline, 'clientHeight', { value: 180 });
   timeline.scrollTop = trackList.scrollTop = 143;
   const project = createEmptyVideoProject('Selected FX');
   const trackId = project.tracks[0]!.id;
@@ -152,6 +153,27 @@ it('reveals another rendered clip on the same track without returning to the tra
     render();
     expect(timeline.scrollTop).toBe(143 + 220 + 44 - 180);
     expect(trackList.scrollTop).toBe(timeline.scrollTop);
+  } finally {
+    fixture.dispose();
+  }
+});
+
+it('keeps a visible pressed clip stable before the canvas scroll reaches the track rail', () => {
+  const fixture = mount();
+  const { params, trackId, timeline, trackList, render } = fixture;
+  const clip = document.createElement('div');
+  clip.dataset['projectTimelineClip'] = 'pressed';
+  clip.getBoundingClientRect = () => new DOMRect(20, 58, 400, 44);
+  timeline.append(clip);
+  try {
+    // Browser scroll-into-view occurs before its asynchronous scroll event mirrors the rail.
+    timeline.scrollTop = 123;
+    trackList.scrollTop = 2;
+    params.selectedTrackId = trackId;
+    params.selection = { kind: 'clip', clipId: 'pressed' };
+    render();
+    expect(timeline.scrollTop).toBe(123);
+    expect(trackList.scrollTop).toBe(2);
   } finally {
     fixture.dispose();
   }

@@ -401,3 +401,13 @@ it('routes only the active join window through faithful composition and retains 
     planMp4VideoRenderSpans(project, createSettings()).every(({ kind }) => kind !== 'composite')
   ).toBe(true);
 });
+
+it('routes a timed camera through decoded composition instead of copying uncovered source pixels', () => {
+  const project = createProject();
+  const clip = project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  expect(planMp4VideoRenderSpans(project, createSettings())).toEqual([
+    { kind: 'accelerated-composite', reason: 'decoded-frame-provider', start: 0, end: 4 },
+  ]);
+});

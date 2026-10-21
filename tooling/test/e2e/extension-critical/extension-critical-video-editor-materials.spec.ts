@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { GALLERY_SAVED_VIEWS_STORAGE_KEY } from '../../../../apps/extension/src/composition/persistence/gallery-saved-views/contract';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -8,7 +9,8 @@ import {
   computeQuickEditSceneSize,
   computeQuickEditSceneLayout,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { webcamVideoPixels } from '../support/quick-editor-webcam-proof';
+import { seedReviewWebcamBundle, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
@@ -356,7 +358,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await seedReviewWebcamBundle(page);
       await page.evaluate(async () => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
           const request = indexedDB.open('sniptale-db');
@@ -397,7 +399,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         db.close();
       });
       await page.reload();
-      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page
+        .getByRole('button', { name: /: Screen$/ })
+        .first()
+        .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       await dialog
@@ -422,6 +427,87 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
+        .click();
+      const webcamSwitch = dialog
+        .locator('[data-review-header-track="webcam"]')
+        .getByRole('switch');
+      await webcamSwitch.click();
+      await expect(webcamSwitch).toHaveAttribute('aria-checked', 'true');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.trackSettings'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.webcamSettings'), exact: true })
+        .click();
+      const galleryCamera = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
+      await expect(galleryCamera).toBeVisible();
+      const cameraSection = async (key: Parameters<typeof translate>[0]) => {
+        const category = galleryCamera
+          .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+          .getByRole('button', { name: label(key), exact: true });
+        if (await category.count()) await category.click();
+      };
+      await cameraSection('gallery.videoReview.webcamLayout');
+      await chooseInspectorValue(
+        page,
+        galleryCamera,
+        label('gallery.videoReview.webcamPlacement'),
+        label('gallery.videoReview.webcamPlacement_top-left')
+      );
+      const galleryZoom = galleryCamera.getByRole('textbox', {
+        name: label('videoEditor.sidebar.cameraCropZoom'),
+        exact: true,
+      });
+      await galleryZoom.fill('1.5');
+      await galleryZoom.press('Enter');
+      await cameraSection('gallery.videoReview.webcamAppearance');
+      const galleryMirror = galleryCamera.getByRole('switch', {
+        name: label('gallery.videoReview.webcamMirror'),
+        exact: true,
+      });
+      await galleryMirror.click();
+      await expect(galleryMirror).toHaveAttribute('aria-checked', 'true');
+      await cameraSection('gallery.videoReview.webcamTiming');
+      const galleryOffset = galleryCamera.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamOffset'),
+        exact: true,
+      });
+      const authoredOffset = index === 0 ? 0.5 : -0.5;
+      await galleryOffset.fill(String(authoredOffset));
+      await galleryOffset.press('Enter');
+      await dialog
+        .locator('video')
+        .first()
+        .evaluate((video) => {
+          video.currentTime = 5;
+        });
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.webcamAddPosition'), exact: true })
+        .click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.webcamPosition"]')).toHaveCount(1);
+      const cameraLane = dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]');
+      await cameraLane.scrollIntoViewIfNeeded();
+      const cameraLaneBox = (await cameraLane.boundingBox())!;
+      await page.mouse.move(
+        cameraLaneBox.x + (cameraLaneBox.width * 8) / duration,
+        cameraLaneBox.y + cameraLaneBox.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        cameraLaneBox.x + (cameraLaneBox.width * 9) / duration,
+        cameraLaneBox.y + cameraLaneBox.height / 2,
+        { steps: 6 }
+      );
+      await page.mouse.up();
+      await expect(
+        cameraLane.getByRole('button', { name: label('gallery.videoReview.webcamHidden') })
+      ).toHaveCount(1);
+      await page.screenshot({
+        path: info.outputPath('gallery-authored-camera.png'),
+        fullPage: false,
+      });
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
@@ -637,7 +723,181 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(migrated.id).not.toBe(gallery.aggregateId);
       expect(migrated.name).toBe(gallery.project!.name);
       expect(migrated.duration).toBeCloseTo(expectedDuration, 5);
-      const originalVideos = migrated.clips.filter((clip) => clip.type === 'VIDEO');
+      const primaryTrack = migrated.tracks.find((track) => track.isRoot)!;
+      const originalVideos = migrated.clips.filter(
+        (clip) => clip.type === 'VIDEO' && clip.trackId === primaryTrack.id
+      );
+      const cameraTrack = migrated.tracks.find((track) => track.role === 'CAMERA')!;
+      expect(cameraTrack).toMatchObject({ visible: true, isRoot: false });
+      const cameraClips = migrated.clips.filter(
+        (clip) => clip.type === 'VIDEO' && clip.trackId === cameraTrack.id
+      );
+      expect(cameraClips).toHaveLength(originalVideos.length);
+      const authoredCamera = document.advancedContent.webcam!;
+      expect(authoredCamera).toMatchObject({
+        enabled: true,
+        offsetSeconds: authoredOffset,
+        mirrored: true,
+        appearance: { zoom: 1.5 },
+      });
+      expect(authoredCamera.positions).toHaveLength(1);
+      expect(authoredCamera.hiddenRanges).toHaveLength(1);
+      const cameraAsset = migrated.assets.find((asset) => asset.id === cameraClips[0]!.assetId)!;
+      expect(cameraAsset).toMatchObject({
+        type: 'VIDEO',
+        source: {
+          kind: 'project-asset',
+          projectAssetId: authoredCamera.assetId.slice('project-asset:'.length),
+        },
+      });
+      for (const [slice, clip] of cameraClips.entries()) {
+        const primary = originalVideos[slice]!;
+        expect(clip).toMatchObject({
+          startTime: primary.startTime,
+          duration: primary.duration,
+          sourceStart: primary.sourceStart,
+          sourceDuration: primary.sourceDuration,
+          playbackRate: primary.playbackRate ?? 1,
+          groupId: primary.groupId,
+          assetId: cameraAsset.id,
+          muted: true,
+          cameraTiming: { offsetSeconds: authoredOffset, transitions: 'bounded' },
+          cameraMirrored: authoredCamera.mirrored,
+          cameraAppearance: authoredCamera.appearance,
+          cameraHiddenRanges: authoredCamera.hiddenRanges,
+          transform: {
+            x: authoredCamera.placement.x * migrated.width,
+            y: authoredCamera.placement.y * migrated.height,
+            width: authoredCamera.placement.width * migrated.width,
+            height: authoredCamera.placement.height * migrated.height,
+          },
+        });
+        expect(
+          clip.cameraPositions?.map((position) => ({
+            id: position.id,
+            sourceTime: position.sourceTime,
+            crop: position.crop,
+            transition: position.transition,
+          }))
+        ).toEqual(
+          authoredCamera.positions.map((position) => ({
+            id: position.id,
+            sourceTime: position.time,
+            crop: position.crop,
+            transition: {
+              kind:
+                position.transition.type === 'none'
+                  ? 'instant'
+                  : position.transition.type === 'ease-in-out'
+                    ? 'smooth'
+                    : 'shrink',
+              duration: position.transition.duration,
+            },
+          }))
+        );
+      }
+      const cameraCenter = {
+        x: (authoredCamera.placement.x + authoredCamera.placement.width / 2) * migrated.width,
+        y: (authoredCamera.placement.y + authoredCamera.placement.height / 2) * migrated.height,
+      };
+      const cameraBytes = (
+        await readFile(new URL('../fixtures/review-webcam-clock.webm', import.meta.url))
+      ).toString('base64');
+      const cameraReference = await webcamVideoPixels(page, cameraBytes, [
+        { time: 1 - authoredOffset, x: 0.5, y: 0.5 },
+        { time: 5 - authoredOffset, x: 0.5, y: 0.5 },
+      ]);
+      const cameraPixel = () =>
+        page
+          .locator('[data-preview-stage-canvas]')
+          .evaluate(
+            (canvas: HTMLCanvasElement, point) =>
+              Array.from(
+                canvas
+                  .getContext('2d')!
+                  .getImageData(
+                    Math.round((point.x * canvas.width) / point.width),
+                    Math.round((point.y * canvas.height) / point.height),
+                    1,
+                    1
+                  ).data
+              ).slice(0, 3),
+            { ...cameraCenter, width: migrated.width, height: migrated.height }
+          );
+      const cameraPlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await cameraPlayhead.press('Home');
+      for (let step = 0; step < migrated.fps; step++) await cameraPlayhead.press('ArrowRight');
+      await expect
+        .poll(async () =>
+          Math.max(
+            ...(await cameraPixel()).map((value, channel) =>
+              Math.abs(value - cameraReference.pixels[0]![channel]!)
+            )
+          )
+        )
+        .toBeLessThanOrEqual(10);
+      // The second retained slice maps project second 3 to main-source second 5.
+      for (let step = 0; step < migrated.fps * 2; step++) await cameraPlayhead.press('ArrowRight');
+      await expect
+        .poll(async () =>
+          Math.max(
+            ...(await cameraPixel()).map((value, channel) =>
+              Math.abs(value - cameraReference.pixels[1]![channel]!)
+            )
+          )
+        )
+        .toBeLessThanOrEqual(10);
+      await cameraPlayhead.press('Home');
+      for (let step = 0; step < migrated.fps; step++) await cameraPlayhead.press('ArrowRight');
+      await page.locator(`[data-project-timeline-clip="${cameraClips[0]!.id}"]`).click();
+      const cameraGroup = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupCamera'),
+        exact: true,
+      });
+      await cameraGroup.scrollIntoViewIfNeeded();
+      await cameraGroup.click();
+      const nativeOffset = page
+        .locator('[data-ui="video-editor.camera-placement-controls"]')
+        .getByRole('textbox', { name: label('gallery.videoReview.webcamOffset'), exact: true });
+      await expect(nativeOffset).toHaveValue(String(authoredOffset));
+      const editedOffset = authoredOffset / 2;
+      await nativeOffset.fill(String(editedOffset));
+      await nativeOffset.press('Enter');
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === cameraClips[0]!.id)
+        )
+        .toMatchObject({ cameraTiming: { offsetSeconds: editedOffset } });
+      const cameraStyle = page.getByRole('button', {
+        name: label('videoEditor.sidebar.inspectorGroupStyle'),
+        exact: true,
+      });
+      await cameraStyle.scrollIntoViewIfNeeded();
+      await cameraStyle.click();
+      await chooseInspectorValue(
+        page,
+        page.locator('[data-ui="video-editor.camera-appearance"]'),
+        label('gallery.videoReview.webcamMirror'),
+        label('gallery.videoReview.webcamMirrorOff')
+      );
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === cameraClips[0]!.id)
+        )
+        .toMatchObject({ cameraMirrored: false });
+      const editedCameraReference = await webcamVideoPixels(page, cameraBytes, [
+        { time: 1 - editedOffset, x: 0.5, y: 0.5 },
+      ]);
+      await expect
+        .poll(async () =>
+          Math.max(
+            ...(await cameraPixel()).map((value, channel) =>
+              Math.abs(value - editedCameraReference.pixels[0]![channel]!)
+            )
+          )
+        )
+        .toBeLessThanOrEqual(10);
+      await page.screenshot({ path: info.outputPath('native-edited-camera.png'), fullPage: false });
       expect(originalVideos).toHaveLength(2);
       expect({ width: migrated.width, height: migrated.height }).toEqual({
         width: output.width,
@@ -861,8 +1121,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(
           async () =>
-            (await readNativeVideoProject(page))?.clips.filter((clip) => clip.type === 'VIDEO')
-              .length
+            (await readNativeVideoProject(page))?.clips.filter(
+              (clip) => clip.type === 'VIDEO' && clip.trackId === primaryTrack.id
+            ).length
         )
         .toBe(originalVideos.length + 1);
       const appended = (await readNativeVideoProject(page))!.clips.find(
@@ -885,8 +1146,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(
           async () =>
-            (await readNativeVideoProject(page))?.clips.filter((clip) => clip.type === 'VIDEO')
-              .length
+            (await readNativeVideoProject(page))?.clips.filter(
+              (clip) => clip.type === 'VIDEO' && clip.trackId === primaryTrack.id
+            ).length
         )
         .toBe(originalVideos.length + 2);
       await page
@@ -1107,6 +1369,12 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         [
           {
             time: 1,
+            x: Math.round(cameraCenter.x),
+            y: Math.round(cameraCenter.y),
+            expected: editedCameraReference.pixels[0]!.slice(0, 3) as [number, number, number],
+          },
+          {
+            time: 1,
             x: Math.round(
               final.width -
                 Math.min(final.width, final.height) * final.watermark!.placement.margin -
@@ -1122,7 +1390,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         ]
       );
       expect(exported.size).toBeGreaterThan(0);
-      expect(exported.samples[0]!.error).toBeLessThanOrEqual(10);
+      for (const sample of exported.samples) expect(sample.error).toBeLessThanOrEqual(10);
       expect({ width: exported.width, height: exported.height }).toEqual({
         width: final.width,
         height: final.height,

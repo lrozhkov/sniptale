@@ -37,6 +37,16 @@ export async function scheduleOfflineAudioClipMix(
   signal?: AbortSignal
 ) {
   const rate = clampClipPlaybackRate(clip.playbackRate ?? 1);
+  const timing = 'cameraTiming' in clip ? clip.cameraTiming : undefined;
+  const requestedStart = clip.sourceStart - (timing?.offsetSeconds ?? 0);
+  const mediaStart = timing ? Math.max(0, requestedStart) : requestedStart;
+  const mediaEnd = timing
+    ? Math.min(buffer.length / buffer.sampleRate, requestedStart + clip.sourceDuration)
+    : requestedStart + clip.sourceDuration;
+  if (timing && mediaEnd <= mediaStart) return;
+  const mediaDuration = timing ? mediaEnd - mediaStart : clip.sourceDuration;
+  const coveredStart = clip.startTime + (mediaStart - requestedStart) / rate;
+  const coveredEnd = coveredStart + mediaDuration / rate;
   const voice = 'sourceKind' in clip && clip.sourceKind === 'source-voiceover' ? clip : null;
   const localFrom = voice ? (clip.sourceStart - voice.playbackEntry.sourceOffset) / rate : 0;
   const prepared =
@@ -53,8 +63,8 @@ export async function scheduleOfflineAudioClipMix(
         : await renderTempoBuffer(
             buffer,
             {
-              start: clip.sourceStart,
-              duration: clip.sourceDuration,
+              start: mediaStart,
+              duration: mediaDuration,
               rate,
             },
             signal
@@ -100,8 +110,11 @@ export async function scheduleOfflineAudioClipMix(
     output.connect(offlineContext.destination);
   }
 
-  const clipStart = Math.max(0, clip.startTime);
-  const clipEnd = Math.max(clipStart, clip.startTime + clip.duration);
+  const clipStart = Math.max(0, timing ? coveredStart : clip.startTime);
+  const clipEnd = Math.max(
+    clipStart,
+    timing ? Math.min(coveredEnd, clip.startTime + clip.duration) : clip.startTime + clip.duration
+  );
   const envelopeGainStart = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipStart);
   const envelopeGainEnd = clip.muted ? 0 : resolveEnvelopeGainAtTime(clip, clipEnd);
   gain.gain.setValueAtTime(envelopeGainStart, clipStart);
@@ -110,11 +123,11 @@ export async function scheduleOfflineAudioClipMix(
 
   const offset =
     rate === 1
-      ? clip.sourceStart
+      ? mediaStart
       : voice
         ? Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS) / buffer.sampleRate
         : 0;
-  source.start(clipStart, offset, clip.sourceDuration / rate);
+  source.start(clipStart, offset, mediaDuration / rate);
   source.stop(clipEnd);
 }
 

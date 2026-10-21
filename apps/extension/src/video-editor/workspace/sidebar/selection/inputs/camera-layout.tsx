@@ -2,7 +2,7 @@ import { resolveMediaClipTransformForFitMode } from '../../../../../features/vid
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { MediaFitModeSelect, MediaFitScaleControls } from './media-frame';
 import { useState, type ReactNode } from 'react';
-import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
+import { CompactSelect, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { formatPreciseTime } from '../../../../../composition/library-preview/time-format';
 import { Plus, Trash2, Maximize, EyeOff, Scan } from 'lucide-react';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
@@ -67,6 +67,11 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
     ? { ...props.clip, transform: position.transform, fitMode: position.fitMode }
     : props.clip;
   const layout = resolveVideoProjectCameraLayout(props.project, clip);
+  const setOffset = (offsetSeconds: number) =>
+    props.onEditCameraPosition?.(props.clip.id, {
+      kind: 'offset',
+      offsetSeconds: Math.round(offsetSeconds * 1000) / 1000,
+    });
   const disabled = props.disabled || !props.onApplyCameraLayout;
   const [showCustom, setShowCustom] = useState(false);
   const custom =
@@ -81,6 +86,20 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
       data-ui="video-editor.camera-placement-controls"
     >
       <CameraPositionNavigation {...props} />
+      {props.clip.cameraTiming ? (
+        <NumericRow
+          label={translate('gallery.videoReview.webcamOffset')}
+          value={props.clip.cameraTiming.offsetSeconds}
+          min={-86400}
+          max={86400}
+          step={0.01}
+          precision={3}
+          unit="s"
+          disabled={props.disabled || !props.onEditCameraPosition}
+          onCommitValue={setOffset}
+          onPreviewValue={setOffset}
+        />
+      ) : null}
       <div
         className="video-inspector-camera-layout"
         role="group"

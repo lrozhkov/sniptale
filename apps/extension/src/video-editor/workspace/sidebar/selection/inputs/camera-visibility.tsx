@@ -30,7 +30,11 @@ export function CameraVisibilityControls(props: {
     ranges.find((range) => range.id === selectedId) ??
     ranges.find((range) => isCameraHiddenAt([range], time)) ??
     ranges.at(-1);
-  const duration = Math.max(props.sourceDuration, ranges.at(-1)?.end ?? 0);
+  const duration = Math.max(
+    props.sourceDuration + (props.clip.cameraTiming?.offsetSeconds ?? 0),
+    props.clip.sourceStart + props.clip.sourceDuration,
+    ranges.at(-1)?.end ?? 0
+  );
   const nextStart = ranges.find((range) => range.start > time)?.start ?? duration;
   const end = Math.min(
     props.clip.sourceStart + props.clip.sourceDuration,

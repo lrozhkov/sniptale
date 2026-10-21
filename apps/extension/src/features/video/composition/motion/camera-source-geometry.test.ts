@@ -170,3 +170,46 @@ it('retains camera geometry while hidden and restores the source cursor after th
   expect(resolveVideoCompositionCursor(project, 0.75, [])).not.toBeNull();
   expect(cameraSourceGeometryBreaks(clip)).toEqual([0, expect.closeTo(0.5, 9)]);
 });
+
+it('partitions actual media coverage and retains the next key cap in bounded pose intervals', () => {
+  const { project, clip } = fixture();
+  clip.sourceStart = 0;
+  clip.playbackRate = 1;
+  clip.duration = 12;
+  clip.sourceDuration = 12;
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  clip.cameraPositions = [
+    {
+      id: 'first',
+      sourceTime: 0,
+      transform: { ...clip.transform, x: 500 },
+      fitMode: clip.fitMode,
+      transition: { kind: 'smooth', duration: 10 },
+    },
+    {
+      id: 'second',
+      sourceTime: 4,
+      transform: { ...clip.transform, x: 600 },
+      fitMode: clip.fitMode,
+      transition: { kind: 'instant', duration: 0 },
+    },
+  ];
+  const breaks = cameraSourceGeometryBreaks(clip, project);
+  expect(breaks).toContain(2);
+  expect(breaks).toContain(8);
+  expect(breaks).not.toContain(10);
+  const mapping = resolveCursorSourcePointMapping(project, clip.id, 2)!;
+  const bounds = boundCameraSourceGeometry({
+    project,
+    clip,
+    mapping,
+    nativeX: [0.5, 0.5],
+    nativeY: [0.5, 0.5],
+    start: 2,
+    end: 3,
+  });
+  for (const [index, time] of [2, 3].entries()) {
+    const actual = resolveCursorSourcePointMapping(project, clip.id, time)!;
+    expect(bounds.center.x[index]).toBeCloseTo(actual.frame.x + actual.frame.width / 2, 9);
+  }
+});

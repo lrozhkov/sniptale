@@ -50,6 +50,7 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraTiming !== undefined)) return 32;
   if (clips.some((clip) => clip.type === 'AUDIO' && clip.durationMode !== undefined)) return 30;
   if (
     clips.some(
@@ -89,6 +90,7 @@ function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['vers
   )
     return 9;
   if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraMirrored !== undefined)) return 8;
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraTiming !== undefined)) return 32;
   if (clips.some((clip) => clip.type === 'AUDIO' && clip.originalAudioMute !== undefined)) return 6;
   return 2;
 }

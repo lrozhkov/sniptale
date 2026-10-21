@@ -76,6 +76,8 @@ vi.mock('../../../workflows/background-images/static-logo', () => ({
   prepareStaticLogo: vi.fn(async (file: File) => file),
 }));
 
+vi.mock('./import-validation', () => ({ assertImportableProjectAssetFile: vi.fn() }));
+
 vi.mock('./assets', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./assets')>();
   return {
@@ -723,4 +725,175 @@ it('refuses a Gallery snapshot changed while image metadata is pending', async (
   await expect(pending).rejects.toThrow('Review project changed before transfer.');
   expect(saveVideoProject).not.toHaveBeenCalled();
   expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+
+async function cameraTransferFixture() {
+  const snapshot = await transferFixture();
+  const { createQuickEditWebcam } = await import('../../../features/video/review/advanced/webcam');
+  snapshot.workspace.advanced.webcam = {
+    ...createQuickEditWebcam(
+      'project-asset:camera-body',
+      { width: 160, height: 90 },
+      { width: 1280, height: 720 }
+    ),
+    offsetSeconds: 0.75,
+    mirrored: true,
+  };
+  const { loadVideoMetadata } = await import('../media-metadata');
+  vi.mocked(loadVideoMetadata).mockResolvedValue({
+    width: 160,
+    height: 90,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 4,
+    hasAudio: false,
+    audioPeaks: null,
+  });
+  getProjectAsset.mockResolvedValue({
+    status: 'ready',
+    entry: {
+      id: 'camera-body',
+      assetId: 'camera-immutable',
+      mimeType: 'video/webm',
+      size: 4,
+      createdAt: 1,
+      updatedAt: 1,
+      file: new File(['webm'], 'camera-body', { type: 'video/webm' }),
+    },
+  });
+  return snapshot;
+}
+
+it('transfers immutable camera media with main-clock slices and retries missing bytes', async () => {
+  const snapshot = await cameraTransferFixture();
+  const primary = await importRecordingProjectAssetMock('recording-1');
+  primary.metadata.hasAudio = true;
+  const before = structuredClone(snapshot);
+  getProjectAsset.mockResolvedValueOnce({ status: 'missing' });
+  await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+    'Review camera resource is unavailable.'
+  );
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  const result = await loadInitialProjectFromLocation();
+  const cameraTrack = result.project!.tracks.find((track) => track.role === 'CAMERA')!;
+  expect(cameraTrack).toMatchObject({ visible: true });
+  const cameras = result.project!.clips.filter((clip) => clip.trackId === cameraTrack.id);
+  expect(cameras).toHaveLength(2);
+  const { resolveVideoCompositionVisualLayers } =
+    await import('../../../features/video/composition/timeline/frame/layers');
+  expect(resolveVideoCompositionVisualLayers(result.project!, 1).at(-1)?.clipId).toBe(
+    cameras[1]!.id
+  );
+  for (const camera of cameras)
+    expect(camera).toMatchObject({
+      muted: true,
+      cameraMirrored: true,
+      cameraTiming: { offsetSeconds: 0.75, transitions: 'bounded' },
+    });
+  const firstCamera = cameras[0]!;
+  if (firstCamera.type !== 'VIDEO') throw new Error('Expected camera video');
+  const asset = result.project!.assets.find((asset) => asset.id === firstCamera.assetId)!;
+  expect(asset).toMatchObject({
+    type: 'VIDEO',
+    source: {
+      kind: 'project-asset',
+      projectAssetId: 'camera-body',
+    },
+  });
+  const { translate } = await import('../../../platform/i18n');
+  expect(asset.name).toBe(translate('gallery.videoReview.webcam'));
+  const { assertImportableProjectAssetFile } = await import('./import-validation');
+  expect(assertImportableProjectAssetFile).toHaveBeenCalledWith(expect.any(File), 'VIDEO');
+  expect(saveVideoProject).toHaveBeenCalledTimes(1);
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+  expect(snapshot).toEqual(before);
+});
+
+it.each(['mime', 'metadata', 'intake'] as const)(
+  'refuses invalid camera %s before destination publication',
+  async (failure) => {
+    await cameraTransferFixture();
+    if (failure === 'mime') {
+      const resource = await getProjectAsset('camera-body');
+      resource.entry.file = new File(['webm'], 'Camera.svg', { type: 'image/svg+xml' });
+    }
+    if (failure === 'metadata') {
+      const { loadVideoMetadata } = await import('../media-metadata');
+      vi.mocked(loadVideoMetadata).mockResolvedValue({
+        width: 160,
+        height: 90,
+        duration: 3,
+        mimeType: 'video/mp4',
+        size: 99,
+        hasAudio: false,
+        audioPeaks: null,
+      });
+    }
+    if (failure === 'intake') {
+      const { assertImportableProjectAssetFile } = await import('./import-validation');
+      vi.mocked(assertImportableProjectAssetFile).mockRejectedValue(
+        new Error('Invalid video signature')
+      );
+    }
+    await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+      failure === 'intake' ? 'Invalid video signature' : 'Review camera resource is unavailable.'
+    );
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses a Gallery snapshot changed while camera metadata is pending', async () => {
+  const snapshot = await cameraTransferFixture();
+  const { loadVideoMetadata } = await import('../media-metadata');
+  const metadata = Promise.withResolvers<Awaited<ReturnType<typeof loadVideoMetadata>>>();
+  const started = Promise.withResolvers<void>();
+  vi.mocked(loadVideoMetadata).mockImplementation(() => {
+    started.resolve();
+    return metadata.promise;
+  });
+  const pending = loadInitialProjectFromLocation();
+  await started.promise;
+  readVideoWorkspace.mockResolvedValue({
+    ...snapshot,
+    workspace: { ...snapshot.workspace, revision: 4 },
+  });
+  metadata.resolve({
+    width: 160,
+    height: 90,
+    duration: 3,
+    mimeType: 'video/webm',
+    size: 4,
+    hasAudio: false,
+    audioPeaks: null,
+  });
+  await expect(pending).rejects.toThrow('Review project changed before transfer.');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+
+it('admits canonical webcam codec MIME metadata without changing immutable bytes', async () => {
+  await cameraTransferFixture();
+  const resource = await getProjectAsset('camera-body');
+  resource.entry.file = new File(['webm'], 'camera-body', { type: 'video/webm; codecs="vp8"' });
+  resource.entry.mimeType = 'video/webm';
+  const { loadVideoMetadata } = await import('../media-metadata');
+  vi.mocked(loadVideoMetadata).mockResolvedValue({
+    width: 160,
+    height: 90,
+    duration: 3,
+    mimeType: 'video/webm; codecs="vp8"',
+    size: 4,
+    hasAudio: false,
+    audioPeaks: null,
+  });
+  const result = await loadInitialProjectFromLocation();
+  expect(result.project!.assets).toContainEqual(
+    expect.objectContaining({
+      type: 'VIDEO',
+      source: { kind: 'project-asset', projectAssetId: 'camera-body' },
+      metadata: expect.objectContaining({ mimeType: 'video/webm; codecs="vp8"' }),
+    })
+  );
+  expect(saveVideoProject).toHaveBeenCalledOnce();
 });

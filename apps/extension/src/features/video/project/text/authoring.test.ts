@@ -105,6 +105,10 @@ it('does not guess native time in gaps or conflicting placements and respects so
   };
   project.clips = [{ ...clip, sourceStart: 3, sourceDuration: 4, duration: 2, playbackRate: 2 }];
   expect(videoProjectTextPlayhead(project, source, 2.5)).toBe(4);
+  if (project.clips[0]!.type !== 'VIDEO') throw new Error('Expected source video');
+  project.clips[0]!.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  expect(videoProjectTextPlayhead(project, source, 2.5)).toBe(4);
+  delete project.clips[0]!.cameraTiming;
   expect(videoProjectTextPlayhead(project, source, 4)).toBeNull();
   project.clips.push({
     ...clip,

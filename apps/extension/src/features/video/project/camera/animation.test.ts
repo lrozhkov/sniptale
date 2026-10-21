@@ -8,7 +8,17 @@ import { createVideoClipFromAsset } from '../factories/clip';
 import { VideoProjectAssetType, VideoTrackKind, VideoProjectTrackRole } from '../types';
 import { isVideoProjectClip } from '../validation/clips';
 import { resolveVideoCompositionVisualLayers } from '../../composition/timeline/frame/layers';
-import { resolveCameraClip, canAddCameraPosition } from './animation';
+import {
+  resolveCameraClip,
+  canAddCameraPosition,
+  cameraSourceTime,
+  hasCameraMediaAt,
+  resolveCameraVisualClip,
+  resolveCameraDestinationTransform,
+} from './animation';
+import { getMediaClipSourceTime } from '../timeline/rate';
+import { cameraPositionSeekTime } from './editing';
+import { isHydratableVideoProject } from '../validation/root';
 import { editCameraPosition } from './editing';
 
 function fixture() {
@@ -276,4 +286,140 @@ it('edits only active destination crop and supports inherited reset, refusal and
   expect(
     editCameraPosition(project, clip.id, 0, { kind: 'crop', crop: { zoom: 1.2, panX: 0, panY: 0 } })
   ).toBe(project);
+});
+
+it('retains authored camera time while offset media coverage stays half-open', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  expect(cameraSourceTime(clip, 1)).toBe(1);
+  expect(getMediaClipSourceTime(clip, 1)).toBe(-1);
+  expect(hasCameraMediaAt(project, clip, 1)).toBe(false);
+  expect(resolveCameraVisualClip(project, clip, 1).transform.opacity).toBe(0);
+  expect(hasCameraMediaAt(project, clip, 2)).toBe(true);
+  clip.cameraTiming.offsetSeconds = -2;
+  expect(getMediaClipSourceTime(clip, 1)).toBe(3);
+  expect(hasCameraMediaAt(project, clip, 5.999)).toBe(true);
+  expect(hasCameraMediaAt(project, clip, 6)).toBe(false);
+  const partial = {
+    ...clip,
+    sourceStart: 3,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 2,
+    playbackRate: 2,
+  };
+  expect(getMediaClipSourceTime(partial, 10.5)).toBe(6);
+  expect(hasCameraMediaAt(project, partial, 11)).toBe(true);
+  expect(hasCameraMediaAt(project, partial, 11.5)).toBe(false);
+  for (const offsetSeconds of [-100, 100]) {
+    clip.cameraTiming.offsetSeconds = offsetSeconds;
+    expect(hasCameraMediaAt(project, clip, 4)).toBe(false);
+  }
+  delete clip.cameraTiming;
+  expect(hasCameraMediaAt({ ...project, assets: [] }, clip, 4)).toBe(true);
+});
+
+it('fences timing at schema 32 and admits video timing on compatible ordinary tracks', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  for (let version = 2; version < 32; version++)
+    expect(isHydratableVideoProject({ ...project, version })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 32 })).toBe(true);
+  expect(isHydratableVideoProject({ ...project, version: 33 })).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      version: 32,
+      tracks: project.tracks.map(({ role: _role, ...track }) => track),
+    })
+  ).toBe(true);
+  for (const cameraTiming of [
+    null,
+    {},
+    { offsetSeconds: NaN, transitions: 'bounded' },
+    { offsetSeconds: 86401, transitions: 'bounded' },
+    { offsetSeconds: -86401, transitions: 'bounded' },
+    { offsetSeconds: 0, transitions: 'continuous' },
+    { offsetSeconds: 0, transitions: 'bounded', extra: true },
+  ])
+    expect(isVideoProjectClip({ ...clip, cameraTiming })).toBe(false);
+  expect(isVideoProjectClip({ ...clip, type: 'AUDIO' })).toBe(false);
+  for (const offsetSeconds of [-86400, 86400])
+    expect(
+      isVideoProjectClip({ ...clip, cameraTiming: { offsetSeconds, transitions: 'bounded' } })
+    ).toBe(true);
+});
+
+it('caps overlapping transitions at the next authored key and uses authored crop destinations', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: 0, transitions: 'bounded' };
+  clip.cameraAppearance = { shape: 'rounded', roundness: 0, zoom: 1, panX: 0, panY: 0 };
+  const first = clip.cameraPositions![0]!;
+  first.transition.duration = 6;
+  first.crop = { zoom: 3, panX: 1, panY: -1 };
+  clip.cameraPositions!.push({
+    ...first,
+    id: 'second',
+    sourceTime: 3,
+    transform: { ...first.transform, x: 0 },
+    crop: { zoom: 1, panX: 0, panY: 0 },
+    transition: { kind: 'smooth', duration: 2 },
+  });
+  expect(resolveCameraClip(clip, 2.5).transform.x).toBe(200);
+  expect(resolveCameraClip(clip, 3).transform).toEqual(first.transform);
+  expect(resolveCameraClip(clip, 3).cameraAppearance?.zoom).toBe(3);
+  expect(resolveCameraClip(clip, 4).transform.x).toBe(200);
+  expect(resolveCameraClip(clip, 4).cameraAppearance?.zoom).toBe(2);
+  const desired = resolveCameraDestinationTransform(clip, 2.5, { x: 220 });
+  expect(desired?.x).toBe(440);
+  expect(cameraPositionSeekTime(project, clip.id, 0, first.id)).toBeCloseTo(3 - 1 / project.fps);
+  expect(first.transition.duration).toBe(6);
+  const partial = {
+    ...clip,
+    sourceStart: 2,
+    sourceDuration: 4,
+    startTime: 10,
+    duration: 2,
+    playbackRate: 2,
+  };
+  expect(resolveCameraClip(partial, 10.25).transform).toEqual(
+    resolveCameraClip(clip, 2.5).transform
+  );
+  delete clip.cameraPositions![1]!.crop;
+  expect(resolveCameraClip(clip, 4).cameraAppearance?.zoom).toBe(2);
+  expect(resolveCameraClip(clip, 5).cameraAppearance?.zoom).toBe(1);
+});
+
+it('edits bounded camera offsets through the mutation owner and refuses invalid or locked edits', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
+  const changed = editCameraPosition(project, clip.id, 0, { kind: 'offset', offsetSeconds: -3 });
+  expect(changed.version).toBe(32);
+  expect(changed.clips[0]).toEqual({
+    ...clip,
+    cameraTiming: { offsetSeconds: -3, transitions: 'bounded' },
+  });
+  expect(clip.cameraTiming.offsetSeconds).toBe(2);
+  for (const offsetSeconds of [NaN, Infinity, 86401, -86401, 2])
+    expect(editCameraPosition(project, clip.id, 0, { kind: 'offset', offsetSeconds })).toBe(
+      project
+    );
+  project.tracks[0]!.locked = true;
+  expect(editCameraPosition(project, clip.id, 0, { kind: 'offset', offsetSeconds: 0 })).toBe(
+    project
+  );
+});
+
+it('edits dormant timing-camera visibility in retained main-source bounds and preserves long authored moves', () => {
+  const { project, clip } = fixture();
+  clip.cameraTiming = { offsetSeconds: -2, transitions: 'bounded' };
+  project.assets[0]!.metadata.duration = 1;
+  const hidden = editCameraPosition(project, clip.id, 0, { kind: 'hide', start: 6, end: 7 });
+  expect(hidden.clips[0]).toMatchObject({ cameraHiddenRanges: [{ start: 6, end: 7 }] });
+  const changed = editCameraPosition(project, clip.id, 0, {
+    kind: 'update',
+    id: 'corner',
+    transition: { kind: 'smooth', duration: 20 },
+  });
+  expect(changed.clips[0]).toMatchObject({ cameraPositions: [{ transition: { duration: 20 } }] });
 });

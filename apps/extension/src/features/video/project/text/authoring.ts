@@ -7,7 +7,6 @@ import {
   createReviewCaptionSettings,
   createReviewTextDocument,
 } from '../../review/text-document';
-import { getMediaClipSourceTime } from '../timeline/rate';
 import { isTextSourceClip } from './projection';
 import type { VideoProjectTextDocument } from './types';
 import { parseVideoProjectTextDocuments } from './validation';
@@ -173,7 +172,7 @@ export function videoProjectTextPlayhead(
     isTextSourceClip(clip, entry.binding) &&
     clip.startTime <= projectTime &&
     projectTime < clip.startTime + clip.duration
-      ? [getMediaClipSourceTime(clip, projectTime)]
+      ? [clip.sourceStart + (projectTime - clip.startTime) * (clip.playbackRate ?? 1)]
       : []
   );
   const first = values[0];

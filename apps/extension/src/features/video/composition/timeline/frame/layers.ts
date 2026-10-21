@@ -1,7 +1,7 @@
 import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionBorders } from './borders';
 import type { VideoCompositionBorderState, VideoCompositionSpotlightState } from '../../types';
-import { resolveCameraVisualClip } from '../../../project/camera/animation';
+import { hasCameraMediaAt, resolveCameraVisualClip } from '../../../project/camera/animation';
 import { resolveVideoCompositionActions } from './actions';
 import {
   getClipCompositeVisualOpacity,
@@ -66,6 +66,7 @@ function createVisualLayer(
     windowSpotlights: ReadonlyMap<string, readonly VideoCompositionSpotlightState[]>;
   }
 ): VideoCompositionVisualLayer | null {
+  if (!hasCameraMediaAt(project, clip, currentTime)) return null;
   clip = resolveCameraVisualClip(project, clip, currentTime);
   if (!isVisualClip(clip)) {
     return null;

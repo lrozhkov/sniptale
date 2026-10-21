@@ -510,7 +510,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       clip.type === 'VIDEO' &&
       project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
     const cameraBounds = camera
-      ? boundCameraSourceGeometry({ clip, mapping, nativeX, nativeY, start, end })
+      ? boundCameraSourceGeometry({ project, clip, mapping, nativeX, nativeY, start, end })
       : null;
     const { center, rotatedX, rotatedY, raster } =
       cameraBounds ?? nativeSourceRasterBounds(mapping, nativeX, nativeY);
@@ -549,7 +549,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       ...project.clips.flatMap((clip) =>
         clip.type === 'VIDEO' &&
         project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
-          ? cameraSourceGeometryBreaks(clip)
+          ? cameraSourceGeometryBreaks(clip, project)
           : []
       ),
       ...(project.cursorTrack?.samples ?? []).map((sample) => sample.time),

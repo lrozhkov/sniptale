@@ -176,6 +176,10 @@ export function createCleanSourceSpan(
     return createCompositeSpan(start, end, 'visible-clips');
   }
 
+  if (project.clips.some((item) => item.type === 'VIDEO' && item.cameraTiming)) {
+    return createCompositeSpan(start, end, 'camera-motion');
+  }
+
   const asset = getAssetById(project, clip.assetId);
   if (!asset) {
     return createCompositeSpan(start, end, 'asset-missing');

@@ -614,3 +614,18 @@ Caption admission checks each held sample at its exact time, including samples o
 Selected-clip export removes whole-composition joins from a temporary subset. A complete selection retains the original project. Project and selected-range exports retain joins. None of these projections changes the accepted root. Hybrid MP4 uses complete composition rendering inside active join windows. Existing fast paths remain available outside those windows.
 
 Both editors share controlled fields and transition settings. Each editor retains timing, resource admission, preview and history ownership. The removed on-video notes interface remains absent.
+
+
+## Montage camera media clocks
+
+Montage schema 32 admits optional `cameraTiming` on VIDEO clips. A camera placement retains this field after a move to another compatible video track. Earlier schemas refuse this field. Readers retain legacy camera behavior when the field is absent.
+
+`offsetSeconds` ranges from -86400 through 86400. The clip source clock owns positions, hidden intervals, and edits. Media decoders subtract `offsetSeconds` from that clock. They skip timestamps outside `[0, mediaDuration)`. Missing coverage does not repeat an endpoint frame.
+
+The `bounded` transition policy caps effective position transitions at the next position. Interpolation starts at the previous authored destination and crop. Stored transition durations remain unchanged. Legacy cameras retain continuous interruption.
+
+Gallery conversion creates a linked camera placement for each retained source slice. It retains camera settings when no camera pixels overlap that slice. Disabled tracks retain their placements and immutable media references. Camera offsets do not change montage duration.
+
+Preview, export, thumbnails, and crop previews use the media clock. Source text and camera controls use the authored clock. Unmuted camera audio uses only the covered media interval. Project audio scopes retain authored intervals. Recognition maps those intervals to media time for decoding. Recognized text retains authored time. Existing gain and fade phases retain their authored times.
+
+The existing project mutation owner promotes edits that contain `cameraTiming` to schema 32. Existing history, resource admission, retention, and guarded publication owners retain authority. This field adds no writer, store, or physical database migration.

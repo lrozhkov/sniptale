@@ -391,3 +391,35 @@ it('multiplies the final scene envelope with clip and track gain once', async ()
   expect(clip.volume).toBe(1.5);
   expect(audio.volume).toBe(1);
 });
+
+it('pauses unmuted transferred camera audio without seeking outside actual coverage', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const base = createEmptyVideoProject('Camera');
+  const clip = createVideoClip(base.tracks[0]!.id, {
+    startTime: 0,
+    sourceStart: 0,
+    duration: 12,
+    sourceDuration: 12,
+    cameraTiming: { offsetSeconds: 3, transitions: 'bounded' },
+  });
+  const project = createProject([clip], [clip.assetId]);
+  const audio = createAudioElement({ currentTime: 17 });
+  const props = {
+    audioRefs: { current: { [clip.id]: audio } },
+    isPlaying: true,
+    project,
+    syncedClips: [clip],
+  };
+  await renderHarness({ ...props, currentTime: 0 });
+  expect(audio.currentTime).toBe(17);
+  expect(audio.play).not.toHaveBeenCalled();
+  await renderHarness({ ...props, currentTime: 4 });
+  expect(audio.currentTime).toBe(1);
+  expect(audio.play).toHaveBeenCalledOnce();
+  Object.defineProperty(audio, 'paused', { value: false, configurable: true });
+  await renderHarness({ ...props, currentTime: 9 });
+  expect(audio.currentTime).toBe(1);
+  expect(audio.play).toHaveBeenCalledOnce();
+  expect(audio.pause).toHaveBeenCalled();
+  expect(graph.latestContext.gains.every((node) => node.gain.value === 0)).toBe(true);
+});

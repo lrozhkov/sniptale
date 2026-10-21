@@ -1,4 +1,8 @@
-import { resolveCameraClip, cameraSourceTime } from '../../../project/camera/animation';
+import {
+  hasCameraMediaAt,
+  resolveCameraClip,
+  cameraSourceTime,
+} from '../../../project/camera/animation';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
 import {
@@ -222,7 +226,7 @@ export function resolveCursorSourcePointMapping(
 ): Omit<VisualLayerSourcePointMapping, 'point'> | null {
   if (!sourceClipId) return null;
   const clip = project.clips.find((item) => item.id === sourceClipId);
-  if (clip?.type !== 'VIDEO') return null;
+  if (clip?.type !== 'VIDEO' || !hasCameraMediaAt(project, clip, time)) return null;
   const asset = project.assets.find((item) => item.id === clip.assetId);
   if (!asset) return null;
   const camera = project.tracks.some(

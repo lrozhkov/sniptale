@@ -1,3 +1,4 @@
+import { hasCameraMediaAt } from '../../../../features/video/project/camera/animation';
 import { getVideoProjectSceneEdgeAudioGain } from '../../../../features/video/project/scene/edge-fades';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
@@ -50,6 +51,10 @@ function stopPreviewAudioClip(
 
 function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
   const { audio, audioGraphState, clip, currentTime, isPlaying, mediaSyncState, project } = params;
+  if (!hasCameraMediaAt(project, clip, currentTime)) {
+    stopPreviewAudioClip(audioGraphState, clip.id, audio);
+    return;
+  }
   const nextTime = getMediaClipSourceTime(clip, currentTime);
   const playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
   const isClipActive = isClipActiveAtTime(clip, currentTime);

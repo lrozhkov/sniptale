@@ -4,7 +4,11 @@ import {
   getVideoProjectKeyStyle,
 } from '../../../project/action-feedback/projection';
 import { isCameraHiddenAt } from '../../../project/camera/visibility';
-import { resolveCameraClip, cameraSourceTime } from '../../../project/camera/animation';
+import {
+  hasCameraMediaAt,
+  resolveCameraClip,
+  cameraSourceTime,
+} from '../../../project/camera/animation';
 import { evaluateProjectGestureFeedback } from '../../../review/project-action-audio';
 import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
 import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
@@ -138,6 +142,7 @@ export function resolveVideoCompositionActionSourceMapping(
   const clip = project.clips.find((item) => item.id === occurrence.clipId);
   if (
     clip?.type !== 'VIDEO' ||
+    !hasCameraMediaAt(project, clip, currentTime) ||
     clip.sourceInstanceId !== anchor.sourceInstanceId ||
     anchor.sourceTime < clip.sourceStart ||
     anchor.sourceTime >= clip.sourceStart + clip.sourceDuration

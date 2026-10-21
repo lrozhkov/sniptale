@@ -454,3 +454,29 @@ it('keeps exact actions on visible and isolated input layers across repeated sou
   upper.visible = false;
   expect(resolveVideoCompositionEffectInputLayers(project, 1.2, [plan])).toEqual([]);
 });
+
+it('omits uncovered camera pixels from normal and transparent effect input layers', () => {
+  const project = createEmptyVideoProject();
+  const asset = createMediaAsset('camera', 'Camera', VideoProjectAssetType.VIDEO, 4, false);
+  const track = project.tracks[0]!;
+  track.role = VideoProjectTrackRole.CAMERA;
+  const clip = createVideoClipFromAsset(track.id, asset, 1280, 720, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected camera video');
+  clip.duration = 12;
+  clip.sourceDuration = 12;
+  clip.cameraTiming = { offsetSeconds: 3, transitions: 'bounded' };
+  project.assets = [asset];
+  project.clips = [clip];
+  const plan = createInputPlan({
+    kind: 'clip',
+    clipId: clip.id,
+    chainIndex: 0,
+    placement: { width: 1280, height: 720, x: 0, y: 0, opacity: 1, rotation: 0 },
+  });
+  for (const time of [0, 2.9, 7, 11]) {
+    expect(resolveVideoCompositionFrame(project, time).visualLayers).toEqual([]);
+    expect(resolveVideoCompositionEffectInputLayers(project, time, [plan])).toEqual([]);
+  }
+  expect(resolveVideoCompositionFrame(project, 3).visualLayers).toHaveLength(1);
+  expect(resolveVideoCompositionEffectInputLayers(project, 3, [plan])).toHaveLength(1);
+});
