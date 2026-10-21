@@ -112,6 +112,48 @@ it('claims outside completion without activating the page or starting another te
   expect(element.classList.contains('sniptale-editing')).toBe(false);
 });
 
+it('keeps editing after a selection starts in a text child and its click lands outside', () => {
+  const { element, onFinish } = start();
+  element.tabIndex = 0;
+  element.focus();
+  const child = document.createElement('strong');
+  child.textContent = 'Selected text';
+  element.replaceChildren(child);
+  const outside = document.createElement('button');
+  document.body.append(outside);
+  const hostClick = vi.fn();
+  outside.addEventListener('click', hostClick);
+  child.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  outside.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }));
+  const selectionClick = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 });
+  outside.dispatchEvent(selectionClick);
+  expect(selectionClick.defaultPrevented).toBe(true);
+  expect(hostClick).not.toHaveBeenCalled();
+  expect(onFinish).not.toHaveBeenCalled();
+  expect(pagePreparationHistory.commitTransaction).not.toHaveBeenCalled();
+  expect(element.contentEditable).toBe('true');
+  expect(document.activeElement).toBe(element);
+  outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(onFinish).toHaveBeenCalledOnce();
+});
+
+it('does not suppress a keyboard click after an unfinished pointer interaction', () => {
+  const { element, onFinish } = start();
+  element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+  expect(onFinish).toHaveBeenCalledOnce();
+});
+
+it('does not let an untrusted pointer start suppress a trusted outside click', () => {
+  const { element, onFinish } = start();
+  policy.trusted = false;
+  element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  policy.trusted = true;
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(onFinish).toHaveBeenCalledOnce();
+});
+
 it('ignores untrusted completion and retains multiline and composing input', () => {
   const { element, onFinish } = start();
   policy.trusted = false;
@@ -150,6 +192,10 @@ it('commits an actual same-origin iframe target on Enter', () => {
   innerDocument.body.append(paragraph);
   const { element, onFinish } = start(paragraph);
   element.textContent = 'Frame edit';
+  element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  document.body.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+  expect(onFinish).not.toHaveBeenCalled();
+  expect(element.contentEditable).toBe('true');
   element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   expect(onFinish).toHaveBeenCalledOnce();
   expect(element.textContent).toBe('Frame edit');

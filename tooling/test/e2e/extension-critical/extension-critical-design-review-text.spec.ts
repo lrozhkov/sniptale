@@ -66,6 +66,86 @@ async function beginTextEdit(page: Page, target: Locator): Promise<void> {
     .toBe(true);
 }
 
+async function selectTextOutside(
+  page: Page,
+  target: Locator,
+  direction: 'right' | 'below' | 'left'
+) {
+  const bounds = (await target.boundingBox())!;
+  const startY = bounds.y + (direction === 'left' ? 2 : 16);
+  await page.mouse.move(bounds.x + (direction === 'left' ? 2 : 14), startY);
+  await page.mouse.down();
+  await page.mouse.move(
+    direction === 'left'
+      ? bounds.x - 40
+      : direction === 'right'
+        ? bounds.x + bounds.width + 40
+        : bounds.x + bounds.width / 2,
+    direction === 'below' ? bounds.y + bounds.height + 40 : startY,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+  if (direction !== 'left')
+    await expect
+      .poll(() =>
+        target.evaluate((node) => node.ownerDocument.getSelection()?.toString().length ?? 0)
+      )
+      .toBeGreaterThan(0);
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const mode of ['block-selection', 'direct-text'] as const) {
+    test(`Content Editing retains ${mode} during outside selection ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        await page.evaluate(() => {
+          const target = document.createElement('p');
+          target.id = 'content-edit-selection';
+          target.textContent = 'First second third fourth';
+          target.style.cssText =
+            'position:absolute;left:620px;top:170px;width:260px;height:56px;margin:0;padding:8px;background:#dbeafe;color:#172554';
+          document.body.append(target);
+        });
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.quick-edit"]').click();
+        const modeButton = page.locator(`[data-ui="content.toolbar.page-editing-mode.${mode}"]`);
+        await modeButton.click();
+        const target = page.locator('#content-edit-selection');
+        const targetBounds = (await target.boundingBox())!;
+        await page.mouse.click(targetBounds.x + 14, targetBounds.y + 16);
+        if (mode === 'block-selection')
+          await expect(target).toHaveAttribute('contenteditable', 'true');
+        else await expect.poll(() => page.evaluate(() => document.designMode)).toBe('on');
+        for (const direction of ['right', 'below'] as const) {
+          await selectTextOutside(page, target, direction);
+          await expect(modeButton).toHaveAttribute('aria-pressed', 'true');
+          if (mode === 'block-selection') {
+            await expect(target).toHaveAttribute('contenteditable', 'true');
+            await expect(target).toBeFocused();
+          } else await expect.poll(() => page.evaluate(() => document.designMode)).toBe('on');
+        }
+        await page.screenshot({
+          path: info.outputPath(`${mode}-selection-retained.png`),
+          fullPage: false,
+        });
+        if (mode === 'block-selection') {
+          await page.keyboard.type('Replacement');
+          await target.press('Enter');
+          await expect(target).not.toHaveAttribute('contenteditable', 'true');
+          await expect(target).toContainText('Replacement');
+        }
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}
+
 for (const { theme, locale } of [
   { theme: 'light', locale: 'en' },
   { theme: 'dark', locale: 'ru' },
@@ -134,6 +214,16 @@ for (const { theme, locale } of [
         await expect(target).toHaveCSS('text-align', 'center');
         await popover.getByRole('button', { name: propertiesLabel }).click();
         await beginTextEdit(page, target);
+        for (const direction of ['right', 'below', 'left'] as const) {
+          await selectTextOutside(page, target, direction);
+          await expect(target).toHaveAttribute('contenteditable', 'true');
+          await expect(target).toBeFocused();
+          await expect(popover).toHaveCount(0);
+        }
+        await page.screenshot({
+          path: info.outputPath('selection-outside-editing.png'),
+          fullPage: false,
+        });
         await target.fill('Edited with Enter');
         await page.screenshot({ path: info.outputPath('text-editing.png'), fullPage: false });
         await target.press('Enter');
@@ -211,6 +301,10 @@ for (const { theme, locale } of [
         await selectTarget(page, frameText);
         await expect(popover.getByRole('button', { name: editTextLabel })).toBeEnabled();
         await beginTextEdit(page, frameText);
+        await selectTextOutside(page, frameText, 'below');
+        await expect(frameText).toHaveAttribute('contenteditable', 'true');
+        await expect(frameText).toBeFocused();
+        await expect(popover).toHaveCount(0);
         await frameText.fill('Frame edited text');
         await frameText.press('Enter');
         await expect(popover).toBeVisible();

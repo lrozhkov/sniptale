@@ -43,6 +43,7 @@ export function createQuickEditTargetSession(args: {
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
   let settled = false;
+  let pointerStartedInTarget = false;
   const cleanups: Array<() => void> = [];
   function cleanup(): void {
     cleanups.splice(0).forEach((dispose) => dispose());
@@ -108,8 +109,9 @@ export function createQuickEditTargetSession(args: {
       addWindowEventListenerToAllWindowsDynamic<PointerEvent>(
         'pointerdown',
         (event) => {
-          if (settled || !isTrustedPointerEvent(event) || event.composedPath().includes(target))
-            return;
+          if (settled || !isTrustedPointerEvent(event)) return;
+          pointerStartedInTarget = event.button === 0 && event.composedPath().includes(target);
+          if (event.composedPath().includes(target)) return;
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
@@ -121,12 +123,14 @@ export function createQuickEditTargetSession(args: {
       addWindowEventListenerToAllWindowsDynamic<MouseEvent>(
         'click',
         (event) => {
-          if (settled || !isTrustedMouseEvent(event) || event.composedPath().includes(target))
-            return;
+          if (settled || !isTrustedMouseEvent(event)) return;
+          const startedInTarget = pointerStartedInTarget;
+          pointerStartedInTarget = false;
+          if (event.composedPath().includes(target)) return;
           event.preventDefault();
           event.stopPropagation();
           event.stopImmediatePropagation();
-          finish();
+          if (!startedInTarget || event.detail === 0) finish();
         },
         { capture: true }
       )
