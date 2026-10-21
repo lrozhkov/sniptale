@@ -4,10 +4,44 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   bindFloatingInteractionPositionListeners,
   mergeFloatingInteractionLayerStyle,
+  resolveToolbarSurfacePlacement,
 } from './placement';
 
 afterEach(() => {
   document.body.replaceChildren();
+});
+
+it.each(['up', 'down', 'side'] as const)(
+  'uses one visible gap for %s single and paired surfaces',
+  (placement) => {
+    for (const surfaceInset of [0, 8]) {
+      const result = resolveToolbarSurfacePlacement({
+        anchor: { x: 109, y: 309, width: 32, height: 32 },
+        toolbar: { x: 100, y: 300, width: 50, height: 50 },
+        viewport: { width: 1000, height: 600 },
+        width: 200 + surfaceInset * 2,
+        height: 100 + surfaceInset * 2,
+        placement,
+        surfaceInset,
+      });
+      expect(result.left + surfaceInset).toBe(placement === 'side' ? 151 : 109);
+      expect(result.top + surfaceInset).toBe(
+        placement === 'up' ? 199 : placement === 'down' ? 351 : 309
+      );
+    }
+  }
+);
+
+it('limits an oversized surface without moving its near edge across the toolbar', () => {
+  const result = resolveToolbarSurfacePlacement({
+    anchor: { x: 900, y: 200, width: 32, height: 32 },
+    toolbar: { x: 800, y: 190, width: 192, height: 50 },
+    viewport: { width: 1000, height: 360 },
+    width: 600,
+    height: 500,
+    placement: 'down',
+  });
+  expect(result).toEqual({ left: 392, top: 241, maxWidth: 984, maxHeight: 111 });
 });
 
 it('adds pointer ownership and a maximum layer z-index without replacing caller geometry', () => {

@@ -203,22 +203,6 @@ describe('selection-mode confirmed toolbar', () => {
     expect(disabledMouseDown.defaultPrevented).toBe(false);
   });
 
-  it.each([100, 600])('keeps a ten pixel gap from the outer toolbar at y=%s', (top) => {
-    const { tooltip, overlayContainer } = createToolbar();
-    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
-      '.sniptale-selection-capture-menu-trigger'
-    );
-    if (!trigger) throw new Error('Expected capture-menu trigger');
-    vi.spyOn(tooltip.root, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, top, 400, 46));
-    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(450, top + 7, 18, 32));
-    trigger.click();
-    const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
-    const below = top === 100;
-    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 10 : top - 10 - 284);
-    expect(trigger.dataset['menuSide']).toBe(below ? 'down' : 'up');
-    expect(trigger.style.width).toBe('18px');
-  });
-
   it('uses the compact frame toolbar and groups symmetric padding controls between dividers', () => {
     const { onAdjustPadding, tooltip } = createToolbar();
 
@@ -350,6 +334,59 @@ describe('selection-mode confirmed toolbar', () => {
       })
     ).not.toThrow();
   });
+});
+
+describe('selection-mode capture menu placement and density', () => {
+  it.each([100, 600])('matches the main mode-menu shell gap at y=%s', (top) => {
+    const { tooltip, overlayContainer } = createToolbar();
+    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+      '.sniptale-selection-capture-menu-trigger'
+    );
+    if (!trigger) throw new Error('Expected capture-menu trigger');
+    vi.spyOn(tooltip.root, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, top, 400, 46));
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(450, top + 7, 18, 32));
+    trigger.click();
+    const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
+    const below = top === 100;
+    expect(menu?.classList).toContain('sniptale-content-menu-adopted');
+    expect(Number.parseFloat(menu?.style.top ?? '')).toBe(below ? top + 46 + 1 : top - 1 - 284);
+    expect(trigger.dataset['menuSide']).toBe(below ? 'down' : 'up');
+    expect(trigger.style.width).toBe('18px');
+  });
+
+  it.each([220, 300])(
+    'compacts before limiting the capture list height (%s px)',
+    (compactHeight) => {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 560 });
+      const { tooltip, overlayContainer } = createToolbar();
+      const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+        '.sniptale-selection-capture-menu-trigger'
+      )!;
+      const measure = vi
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockImplementation(function (this: HTMLElement) {
+          if (this === tooltip.root) return new DOMRect(100, 220, 400, 46);
+          if (this === trigger) return new DOMRect(450, 227, 18, 32);
+          const height = this.classList.contains('sniptale-toolbar-menu--compact')
+            ? compactHeight
+            : 400;
+          return new DOMRect(0, 0, 280, height);
+        });
+      try {
+        trigger.click();
+        const menu = overlayContainer.querySelector<HTMLElement>(
+          '.sniptale-selection-capture-menu'
+        )!;
+        expect(trigger.dataset['menuSide']).toBe('down');
+        expect(menu.classList).toContain('sniptale-toolbar-menu--compact');
+        expect(menu.style.top).toBe('267px');
+        expect(menu.style.maxHeight).toBe('285px');
+        expect(menu.style.overflowY).toBe('auto');
+      } finally {
+        measure.mockRestore();
+      }
+    }
+  );
 });
 
 describe('selection-mode capture action menu', () => {

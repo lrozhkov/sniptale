@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { resolveToolbarSurfacePlacement } from '@sniptale/ui/floating-interactions/placement';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { type CompactCommand } from '../../inspector/compact';
@@ -21,33 +22,47 @@ import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { ToolPropertiesButton } from './tool-properties-button';
 
 const TOOL_PROPERTIES_PAIR_CLASS_NAME = [
-  'absolute left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-start gap-2',
-  'max-[720px]:left-3 max-[720px]:right-3 max-[720px]:translate-x-0',
+  'absolute z-40 flex w-max max-w-[calc(100vw-16px)] items-start gap-2 overflow-auto',
 ].join(' ');
 
-function useToolRailPlacement(enabled: boolean) {
+function useToolRailPlacement(enabled: boolean, activeTool: EditorTool) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [top, setTop] = useState<number>();
+  const [style, setStyle] = useState<CSSProperties>();
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
     const toolbar = panel?.ownerDocument.querySelector('[data-ui="editor.floating.tool-rail"]');
     if (!enabled || !panel || !toolbar) return;
     const update = () => {
-      const parentTop = panel.offsetParent?.getBoundingClientRect().top ?? 0;
-      setTop(toolbar.getBoundingClientRect().bottom - parentTop + 6);
+      const parent = panel.offsetParent?.getBoundingClientRect();
+      const anchor =
+        toolbar.querySelector(`[data-ui="editor.floating.tool-rail.${activeTool}"]`) ?? toolbar;
+      const position = resolveToolbarSurfacePlacement({
+        anchor: anchor.getBoundingClientRect(),
+        toolbar: toolbar.getBoundingClientRect(),
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        width: panel.offsetWidth,
+        height: panel.offsetHeight,
+        placement: 'down',
+      });
+      setStyle({
+        ...position,
+        left: position.left - (parent?.left ?? 0),
+        top: position.top - (parent?.top ?? 0),
+      });
     };
     update();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
     observer?.observe(toolbar);
+    observer?.observe(panel);
     window.addEventListener('resize', update);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [enabled]);
+  }, [enabled, activeTool]);
 
-  return { panelRef, top };
+  return { panelRef, style };
 }
 
 const TOOLS_WITH_PROPERTIES = new Set<EditorTool>(['step']);
@@ -199,7 +214,7 @@ export function EditorFloatingToolPropertiesRail({
   const showSelectionActions = drawingPropertiesEnabled && selection.hasSelection;
   const selectedLayerCount = layers.filter((layer) => layer.selected).length;
   const canUngroup = canUngroupLayerSelection(layers);
-  const placement = useToolRailPlacement(enabled);
+  const placement = useToolRailPlacement(enabled, activeTool);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
 
   useEffect(() => {
@@ -217,11 +232,7 @@ export function EditorFloatingToolPropertiesRail({
       <div
         ref={placement.panelRef}
         className={TOOL_PROPERTIES_PAIR_CLASS_NAME}
-        style={{
-          top: placement.top,
-          maxHeight:
-            placement.top === undefined ? undefined : `calc(100% - ${placement.top}px - 12px)`,
-        }}
+        style={placement.style}
       >
         <FloatingChromeToolbar
           dataUi="editor.floating.tool-properties"

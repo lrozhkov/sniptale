@@ -20,10 +20,15 @@ import {
   ToolbarDrawingControls,
   type ToolbarDrawingControlsOwner,
 } from '../../../overlay/toolbar/controls/drawing';
+import {
+  resolveToolbarDrawingMenuStyle,
+  TOOLBAR_MENU_SHELL_GAP_PX,
+  TOOLBAR_MENU_VIEWPORT_MARGIN_PX,
+} from '../../../overlay/toolbar/menu/floating.helpers';
 
 const resolveCropDrawingMenuLayout: NonNullable<
   ToolbarDrawingControlsOwner['resolveMenuLayout']
-> = ({ anchor, menuWidth, menuHeight }) => {
+> = ({ anchor, menuWidth, menuHeight, surfaceInset = 0 }) => {
   const toolbar = anchor.closest<HTMLElement>('.sniptale-selection-toolbar');
   if (!toolbar) return null;
   const scale = readContentUiScaleCompensation(anchor);
@@ -34,65 +39,53 @@ const resolveCropDrawingMenuLayout: NonNullable<
     clientHeight: window.innerHeight,
     scale,
   });
-  const pair = anchor.parentElement?.querySelector<HTMLElement>(
-    '[data-ui="content.toolbar.drawing-options.pair"]'
-  );
-  const pairStyle = pair ? getComputedStyle(pair) : null;
-  const upperGap = 10 - (Number.parseFloat(pairStyle?.paddingBottom ?? '0') || 0);
-  const lowerGap = 10 - (Number.parseFloat(pairStyle?.paddingTop ?? '0') || 0);
-  const above = toolbarRect.y - upperGap - 8;
-  const below = viewport.height - toolbarRect.y - toolbarRect.height - lowerGap - 8;
+  const visibleHeight = Math.max(0, menuHeight - surfaceInset * 2);
+  const visibleWidth = Math.max(0, menuWidth - surfaceInset * 2);
+  const margin = TOOLBAR_MENU_VIEWPORT_MARGIN_PX;
+  const gap = TOOLBAR_MENU_SHELL_GAP_PX;
+  const above = toolbarRect.y - gap - margin;
+  const below = viewport.height - toolbarRect.y - toolbarRect.height - gap - margin;
   const frame = toolbar
     .closest('.sniptale-selection-container')
     ?.querySelector<HTMLElement>('.sniptale-selection-final-frame');
   const cropRect = frame
     ? projectClientRectToContentUi(frame.getBoundingClientRect(), scale)
     : null;
-  const left = Math.min(Math.max(8, anchorRect.x), Math.max(8, viewport.width - menuWidth - 8));
+  const left = Math.min(
+    Math.max(margin, anchorRect.x),
+    Math.max(margin, viewport.width - visibleWidth - margin)
+  );
   const adjacentPositions = [
-    { placement: 'up', top: toolbarRect.y - menuHeight - upperGap, fits: above >= menuHeight },
+    { placement: 'up', top: toolbarRect.y - visibleHeight - gap, fits: above >= visibleHeight },
     {
       placement: 'down',
-      top: toolbarRect.y + toolbarRect.height + lowerGap,
-      fits: below >= menuHeight,
+      top: toolbarRect.y + toolbarRect.height + gap,
+      fits: below >= visibleHeight,
     },
   ] as const;
   const clearPosition = cropRect
     ? adjacentPositions.find(
         (candidate) =>
           candidate.fits &&
-          (left + menuWidth <= cropRect.x ||
+          (left + visibleWidth <= cropRect.x ||
             left >= cropRect.x + cropRect.width ||
-            candidate.top + menuHeight <= cropRect.y ||
+            candidate.top + visibleHeight <= cropRect.y ||
             candidate.top >= cropRect.y + cropRect.height)
       )
     : undefined;
   const placement =
     clearPosition?.placement ??
-    (above >= menuHeight || (below < menuHeight && above >= below) ? 'up' : 'down');
-  const position = {
-    x: left,
-    y: Math.min(
-      Math.max(
-        8,
-        placement === 'up'
-          ? toolbarRect.y - menuHeight - upperGap
-          : toolbarRect.y + toolbarRect.height + lowerGap
-      ),
-      Math.max(8, viewport.height - menuHeight - 8)
-    ),
-  };
+    (above >= visibleHeight || (below < visibleHeight && above >= below) ? 'up' : 'down');
   return {
     placement,
-    style: {
-      left: position.x - anchorRect.x,
-      right: 'auto',
-      top: placement === 'up' ? 'auto' : position.y - anchorRect.y,
-      bottom:
-        placement === 'up' ? anchorRect.y + anchorRect.height - position.y - menuHeight : 'auto',
-      maxHeight: 'calc(100vh - 16px)',
-      overflowY: 'auto',
-    },
+    style:
+      resolveToolbarDrawingMenuStyle({
+        anchorEl: anchor,
+        menuWidth,
+        menuHeight,
+        placement,
+        surfaceInset,
+      }) ?? {},
   };
 };
 

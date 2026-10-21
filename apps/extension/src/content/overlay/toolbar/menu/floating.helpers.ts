@@ -8,12 +8,18 @@ import {
   resolveContentUiViewport,
 } from '@sniptale/ui/floating-interactions/scale';
 import { registerToolbarMenuEscapeOwner } from '../state/menu';
+import {
+  resolveToolbarSurfacePlacement,
+  TOOLBAR_SURFACE_GAP_PX,
+} from '@sniptale/ui/floating-interactions/placement';
 
 const TOOLBAR_MENU_GAP_PX = 10;
+export const TOOLBAR_MENU_SHELL_GAP_PX = TOOLBAR_SURFACE_GAP_PX;
+export const TOOLBAR_DRAWING_MENU_PADDING_PX = 8;
 export const TOOLBAR_PRIMARY_MENU_Z_INDEX = 2147483647;
 export const TOOLBAR_SECONDARY_MENU_Z_INDEX = 2147483646;
 export const TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX = 250;
-const TOOLBAR_MENU_VIEWPORT_MARGIN_PX = 8;
+export const TOOLBAR_MENU_VIEWPORT_MARGIN_PX = 8;
 
 function clampValue(value: number, min: number, max: number) {
   if (max < min) {
@@ -105,6 +111,56 @@ export function resolveToolbarFloatingMenuStyle(params: {
     viewportRightInset,
     viewport,
   });
+}
+
+export function resolveToolbarDrawingMenuStyle(params: {
+  anchorEl: HTMLElement | null;
+  displayMode?: ContentToolbarDisplayMode;
+  menuWidth: number;
+  menuHeight: number;
+  placement: 'up' | 'down';
+  surfaceInset?: number;
+}): CSSProperties | null {
+  const anchor = params.anchorEl;
+  const toolbar = anchor?.closest<HTMLElement>('.sniptale-toolbar, .sniptale-selection-toolbar');
+  if (!anchor || !toolbar) return resolveToolbarFloatingMenuStyle(params);
+  const scale = readContentUiScaleCompensation(anchor);
+  const anchorRect = projectClientRectToContentUi(anchor.getBoundingClientRect(), scale);
+  const toolbarRect = projectClientRectToContentUi(toolbar.getBoundingClientRect(), scale);
+  const viewport = resolveContentUiViewport({
+    clientWidth: window.innerWidth,
+    clientHeight: window.innerHeight,
+    scale,
+  });
+  const position = resolveToolbarSurfacePlacement({
+    anchor: anchorRect,
+    toolbar: toolbarRect,
+    viewport,
+    width: params.menuWidth,
+    height: params.menuHeight,
+    placement: params.displayMode === 'vertical' ? 'side' : params.placement,
+    surfaceInset: params.surfaceInset ?? 0,
+  });
+  const above = params.displayMode !== 'vertical' && params.placement === 'up';
+  const toLeft = params.displayMode === 'vertical' && position.left < toolbarRect.x;
+  return {
+    ...position,
+    left: toLeft ? 'auto' : position.left - anchorRect.x,
+    right: toLeft
+      ? anchorRect.x +
+        anchorRect.width -
+        position.left -
+        Math.min(params.menuWidth, position.maxWidth)
+      : 'auto',
+    top: above ? 'auto' : position.top - anchorRect.y,
+    bottom: above
+      ? anchorRect.y +
+        anchorRect.height -
+        position.top -
+        Math.min(params.menuHeight, position.maxHeight)
+      : 'auto',
+    overflowY: 'auto',
+  };
 }
 
 function resolveHorizontalToolbarFloatingMenuStyle(args: {

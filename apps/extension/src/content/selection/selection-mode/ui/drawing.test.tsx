@@ -147,7 +147,6 @@ const menuPlacementCases = [
     anchorOffset: 140,
     height: 40,
     width: 100,
-    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'up',
@@ -156,7 +155,6 @@ const menuPlacementCases = [
     anchorOffset: 0,
     height: 40,
     width: 100,
-    style: { left: 8, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'up',
@@ -165,7 +163,6 @@ const menuPlacementCases = [
     anchorOffset: 160,
     height: 40,
     width: 100,
-    style: { left: -68, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'down',
@@ -173,7 +170,6 @@ const menuPlacementCases = [
     crop: [300, 200, 200, 90],
     height: 40,
     width: 100,
-    style: { left: 0, right: 'auto', top: 51, bottom: 'auto' },
   },
   {
     placement: 'up',
@@ -181,7 +177,6 @@ const menuPlacementCases = [
     crop: [300, 420, 200, 90],
     height: 40,
     width: 100,
-    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'up',
@@ -189,7 +184,6 @@ const menuPlacementCases = [
     crop: [300, 360, 200, 200],
     height: 40,
     width: 100,
-    style: { left: 0, right: 'auto', top: 'auto', bottom: 51 },
   },
   {
     placement: 'down',
@@ -197,7 +191,6 @@ const menuPlacementCases = [
     crop: [300, 8, 200, 100],
     height: 40,
     width: 100,
-    style: { left: 0, right: 'auto', top: 51, bottom: 'auto' },
   },
   {
     placement: 'up',
@@ -206,7 +199,6 @@ const menuPlacementCases = [
     height: 58,
     width: 100,
     pairPadding: 8,
-    style: { left: 0, right: 'auto', top: 'auto', bottom: 43 },
   },
   {
     placement: 'down',
@@ -215,7 +207,6 @@ const menuPlacementCases = [
     height: 58,
     width: 100,
     pairPadding: 8,
-    style: { left: 0, right: 'auto', top: 43, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -223,7 +214,6 @@ const menuPlacementCases = [
     crop: [8, 8, 400, 584],
     height: 580,
     width: 200,
-    style: { left: 0, right: 'auto', top: -197, bottom: 'auto' },
   },
   {
     placement: 'down',
@@ -231,7 +221,6 @@ const menuPlacementCases = [
     crop: [592, 8, 400, 584],
     height: 580,
     width: 200,
-    style: { left: 0, right: 'auto', top: -197, bottom: 'auto' },
   },
 ];
 
@@ -248,7 +237,6 @@ function checkMenuPlacement(
     crop,
     height,
     width,
-    style,
     pairPadding,
     anchorOffset = 20,
   }: (typeof menuPlacementCases)[number]
@@ -277,11 +265,16 @@ function checkMenuPlacement(
   vi.spyOn(harness.frame, 'getBoundingClientRect').mockReturnValue(
     new DOMRect(cropX, cropY, cropWidth, cropHeight)
   );
-  const layout = state.resolveMenuLayout!({ anchor, menuWidth: width, menuHeight: height });
-  expect(layout).toEqual({
-    placement,
-    style: { ...style, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' },
+  const padding = pairPadding ?? 0;
+  const layout = state.resolveMenuLayout!({
+    anchor,
+    menuWidth: width,
+    menuHeight: height,
+    surfaceInset: padding,
   });
+  expect(layout?.placement).toBe(placement);
+  expect(layout?.style.overflowY).toBe('auto');
+  const renderedHeight = Math.min(height, Number(layout?.style.maxHeight));
   const position = {
     x:
       typeof layout?.style.left === 'number'
@@ -290,7 +283,7 @@ function checkMenuPlacement(
     y:
       typeof layout?.style.top === 'number'
         ? toolbarY + 9 + layout.style.top
-        : toolbarY + 41 - Number(layout?.style.bottom) - height,
+        : toolbarY + 41 - Number(layout?.style.bottom) - renderedHeight,
   };
   if (height === 40) {
     const [x = 0, y = 0, rectWidth = 0, rectHeight = 0] = toolbar;
@@ -301,10 +294,18 @@ function checkMenuPlacement(
         position.y >= y + rectHeight
     ).toBe(true);
   }
-  expect(position.x).toBeGreaterThanOrEqual(8);
-  expect(position.x + width).toBeLessThanOrEqual(992);
-  expect(position.y).toBeGreaterThanOrEqual(8);
-  expect(position.y + height).toBeLessThanOrEqual(592);
+  expect(position.x + padding).toBe(
+    Math.min(Math.max(8, toolbarX + anchorOffset), 992 - width + padding * 2)
+  );
+  expect(
+    placement === 'up'
+      ? toolbarY - position.y - renderedHeight + padding
+      : position.y + padding - toolbarY - toolbarHeight
+  ).toBe(1);
+  expect(position.x + padding).toBeGreaterThanOrEqual(8);
+  expect(position.x + width - padding).toBeLessThanOrEqual(992);
+  expect(position.y + padding).toBeGreaterThanOrEqual(8);
+  expect(position.y + renderedHeight - padding).toBeLessThanOrEqual(592);
 }
 
 const runtimes: Array<ReturnType<typeof createSelectionDrawingRuntime>> = [];

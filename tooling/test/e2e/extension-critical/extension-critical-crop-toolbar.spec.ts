@@ -16,6 +16,15 @@ async function openCropWorkspace(
   }, theme);
   const page = opened.page;
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  const modeMenu = page.locator('.sniptale-mode-wrapper .sniptale-toolbar-menu');
+  await modeMenu.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const menuGap = await modeMenu.evaluate((element) => {
+    const shell = element.closest('.sniptale-toolbar')!.getBoundingClientRect();
+    const menu = element.getBoundingClientRect();
+    return Math.max(shell.top - menu.bottom, menu.top - shell.bottom);
+  });
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
   await page.locator('[data-ui="content.toolbar.timer-button"]').click();
   await page.locator('[data-ui="content.toolbar.timer-menu"]').getByRole('button').first().click();
@@ -25,7 +34,7 @@ async function openCropWorkspace(
     icon: button.querySelector('svg')!.getBoundingClientRect().width,
     shell: button.closest('.sniptale-toolbar-root')!.getBoundingClientRect().height,
   }));
-  return { ...opened, mainGeometry };
+  return { ...opened, mainGeometry: { ...mainGeometry, menuGap } };
 }
 
 async function selectCrop(
@@ -196,7 +205,7 @@ async function checkCaptureChrome(page: Page, checkMenu = true) {
       const bounds = (await menu.boundingBox())!;
       return Math.max(shell.y - bounds.y - bounds.height, bounds.y - shell.y - shell.height);
     })
-    .toBeGreaterThanOrEqual(9);
+    .toBeGreaterThanOrEqual(0);
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(trigger).toBeFocused();
@@ -245,7 +254,7 @@ async function checkToolFocus(
     icon: button.querySelector('svg')!.getBoundingClientRect().width,
     shell: button.closest('.sniptale-toolbar-root')!.getBoundingClientRect().height,
   }));
-  expect(geometry).toEqual(mainGeometry);
+  expect(mainGeometry).toMatchObject(geometry);
   await pencil.focus();
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
@@ -300,17 +309,176 @@ async function checkSelectedPair(
   expect(Math.abs(propertyPanel.height - actionsPanel.height)).toBeLessThanOrEqual(0.5);
   expect(Math.abs(propertyPanel.y - actionsPanel.y)).toBeLessThanOrEqual(0.5);
   const toolbar = (await page.locator('.sniptale-selection-toolbar').boundingBox())!;
-  expect(overlap((await pair.boundingBox())!, toolbar)).toBeLessThanOrEqual(1);
+  expect(overlap(propertyPanel, toolbar)).toBeLessThanOrEqual(1);
+  expect(overlap(actionsPanel, toolbar)).toBeLessThanOrEqual(1);
   const bounds = {
     y: Math.min(propertyPanel.y, actionsPanel.y),
     bottom: Math.max(propertyPanel.y + propertyPanel.height, actionsPanel.y + actionsPanel.height),
   };
   expect(
     Math.min(Math.abs(bounds.bottom - toolbar.y), Math.abs(bounds.y - toolbar.y - toolbar.height))
-  ).toBeCloseTo(10, 0);
+  ).toBeCloseTo(1, 0);
 }
 
+test('Crop compacts before scrolling and restores descriptions when space returns', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}, info) => {
+  const { page, popup, mainGeometry } = await openCropWorkspace(
+    context,
+    extensionId,
+    hostOrigin,
+    { width: 1280, height: 360 },
+    'dark'
+  );
+  try {
+    await selectCrop(page, { x: 300, y: 8, width: 480, height: 135 });
+    await page.locator('[data-ui="content.crop.mode.resize"]').click();
+    const toolbar = page.locator('.sniptale-selection-toolbar');
+    const trigger = toolbar.locator('.sniptale-selection-capture-menu-trigger');
+    await trigger.click();
+    const menu = page.locator('.sniptale-selection-capture-menu');
+    await expect(menu).toHaveClass(/sniptale-toolbar-menu--compact/);
+    await expect(menu.locator('.sniptale-toolbar-menu-item-hint').first()).toBeHidden();
+    expect(await menu.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+      true
+    );
+    const shell = (await toolbar.boundingBox())!;
+    const bounds = (await menu.boundingBox())!;
+    expect(
+      Math.max(shell.y - bounds.y - bounds.height, bounds.y - shell.y - shell.height)
+    ).toBeCloseTo(mainGeometry.menuGap, 0);
+    expect(bounds.y).toBeGreaterThanOrEqual(7);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(353);
+    await page.screenshot({ path: info.outputPath('compact-scroll.png'), fullPage: false });
+    await menu.getByRole('menuitem').first().focus();
+    await page.keyboard.press('End');
+    await expect(menu.getByRole('menuitem').last()).toBeFocused();
+    expect(await menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(menu).not.toHaveClass(/sniptale-toolbar-menu--compact/);
+    await expect(menu.locator('.sniptale-toolbar-menu-item-hint').first()).toBeVisible();
+    expect(await menu.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(
+      true
+    );
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+  } finally {
+    await popup.close();
+    await page.close();
+  }
+});
+
 for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const theme of ['light', 'dark']) {
+    test(`Crop capture menu shares toolbar material and animated gap ${name} ${theme}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup, mainGeometry } = await openCropWorkspace(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport,
+        theme
+      );
+      await popup.evaluate(
+        async (locale) => {
+          await chrome.storage.local.set({ 'sniptale-locale-preference': locale });
+        },
+        theme === 'dark' ? 'ru' : 'en'
+      );
+      try {
+        for (const side of ['down', 'up', 'middle']) {
+          const expectedSide = side === 'up' ? 'up' : 'down';
+          await selectCrop(page, {
+            x: 300,
+            y: 8,
+            width: 480,
+            height:
+              side === 'down'
+                ? 60
+                : side === 'up'
+                  ? viewport.height - 82
+                  : Math.floor(viewport.height / 2) - 45,
+          });
+          const toolbar = page.locator('.sniptale-selection-toolbar');
+          for (const mode of ['resize', 'drawing']) {
+            await page.locator(`[data-ui="content.crop.mode.${mode}"]`).click();
+            const trigger = toolbar.locator('.sniptale-selection-capture-menu-trigger');
+            await trigger.click();
+            const menu = page.locator('.sniptale-selection-capture-menu');
+            await expect(menu).toBeVisible();
+            for (const progress of [0, 0.25, 1]) {
+              await menu.evaluate(async (element, progress) => {
+                element.style.animationFillMode = 'both';
+                for (const animation of element.getAnimations()) {
+                  const duration = animation.effect?.getComputedTiming().duration;
+                  if (typeof duration !== 'number') continue;
+                  animation.pause();
+                  animation.currentTime = duration * progress;
+                }
+                await new Promise(requestAnimationFrame);
+              }, progress);
+              const shell = (await toolbar.boundingBox())!;
+              const bounds = (await menu.boundingBox())!;
+              const gap =
+                expectedSide === 'up'
+                  ? shell.y - bounds.y - bounds.height
+                  : bounds.y - shell.y - shell.height;
+              expect(
+                Math.abs(gap - mainGeometry.menuGap),
+                `${side}/${mode} phase ${progress}`
+              ).toBeLessThanOrEqual(1);
+              expect(bounds.x).toBeGreaterThanOrEqual(7);
+              expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width - 7);
+            }
+            await expect(trigger).toHaveAttribute('data-menu-side', expectedSide);
+            if (side === 'middle') {
+              if (viewport.height === 560) {
+                await expect(menu).toHaveClass(/sniptale-toolbar-menu--compact/);
+                await expect(menu.locator('.sniptale-toolbar-menu-item-hint').first()).toBeHidden();
+                expect(
+                  await menu.evaluate((element) => element.scrollHeight <= element.clientHeight)
+                ).toBe(true);
+              }
+              await menu.getByRole('menuitem').first().focus();
+              await page.keyboard.press('End');
+              await expect(menu.getByRole('menuitem').last()).toBeFocused();
+              expect(
+                await menu.evaluate(
+                  (element) => element.scrollHeight <= element.clientHeight || element.scrollTop > 0
+                )
+              ).toBe(true);
+            }
+            const alpha = await menu.evaluate((element) => {
+              const canvas = document.createElement('canvas');
+              canvas.width = canvas.height = 1;
+              const context = canvas.getContext('2d')!;
+              context.fillStyle = getComputedStyle(element).backgroundColor;
+              context.fillRect(0, 0, 1, 1);
+              return context.getImageData(0, 0, 1, 1).data[3];
+            });
+            expect(alpha).toBe(255);
+            await page.screenshot({
+              path: info.outputPath(`${side}-${mode}-capture-menu.png`),
+              fullPage: false,
+            });
+            await page.keyboard.press('Escape');
+            await expect(menu).toHaveCount(0);
+            await expect(trigger).toBeFocused();
+          }
+          await toolbar.locator('.sniptale-selection-size-cancel-button').click();
+          await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+        }
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
   for (const theme of ['light', 'dark']) {
     test(`Crop keeps shell spacing across modes ${name} ${theme}`, async ({
       context,
@@ -380,7 +548,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
                     Math.max(
                       current.y - bounds.y - bounds.height,
                       bounds.y - current.y - current.height
-                    ) - 10
+                    ) - 1
                   );
                 })
                 .toBeLessThanOrEqual(1);
@@ -435,7 +603,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(cropSemantics.tools).toEqual(mainSemantics.tools);
         expect(cropSemantics.property).toEqual(mainSemantics.property);
         expect(cropSemantics.actions).toEqual(mainSemantics.actions);
-        expect(Math.abs(cropSemantics.gap - 10)).toBeLessThanOrEqual(1);
+        expect(Math.abs(cropSemantics.gap - 1)).toBeLessThanOrEqual(1);
         for (const action of ['undo', 'redo'])
           await expect(page.locator(`[data-ui="content.crop.${action}"]`)).toHaveAttribute(
             'data-command-chrome',
@@ -521,7 +689,7 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
             Math.abs(bounds.y + bounds.height - shell.y),
             Math.abs(bounds.y - shell.y - shell.height)
           )
-        ).toBeCloseTo(10, 0);
+        ).toBeCloseTo(1, 0);
         expect(
           Math.abs(
             bounds.x -

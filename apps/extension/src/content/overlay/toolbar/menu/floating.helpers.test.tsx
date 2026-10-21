@@ -9,6 +9,7 @@ import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import {
   getPointerDistanceFromRect,
   resolveToolbarFloatingMenuStyle,
+  resolveToolbarDrawingMenuStyle,
   TOOLBAR_MENU_POINTER_DISMISS_DISTANCE_PX,
   useToolbarFloatingMenuDismissal,
 } from './floating.helpers';
@@ -104,6 +105,77 @@ it('keeps floating menu placement in the same physical viewport under page zoom'
       placement: 'down',
     })
   ).toMatchObject({ left: 0, top: 'calc(100% + 10px)' });
+});
+
+it.each(['sniptale-toolbar', 'sniptale-selection-toolbar'])(
+  'anchors drawing ribbons to the visible shell and button for %s',
+  (className) => {
+    vi.stubGlobal('innerWidth', 1000);
+    vi.stubGlobal('innerHeight', 600);
+    const toolbar = document.createElement('div');
+    toolbar.className = className;
+    const anchor = document.createElement('button');
+    toolbar.append(anchor);
+    document.body.append(toolbar);
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 300, 500, 50));
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 309, 32, 32));
+    expect(
+      resolveToolbarDrawingMenuStyle({
+        anchorEl: anchor,
+        menuWidth: 400,
+        menuHeight: 60,
+        placement: 'up',
+        surfaceInset: 8,
+      })
+    ).toMatchObject({ left: -8, top: 'auto', bottom: 34, maxHeight: 307 });
+    expect(
+      resolveToolbarDrawingMenuStyle({
+        anchorEl: anchor,
+        menuWidth: 400,
+        menuHeight: 60,
+        placement: 'up',
+      })
+    ).toMatchObject({ left: 0, top: 'auto', bottom: 42, maxHeight: 291 });
+    expect(
+      resolveToolbarDrawingMenuStyle({
+        anchorEl: anchor,
+        menuWidth: 400,
+        menuHeight: 600,
+        placement: 'down',
+        surfaceInset: 8,
+      })
+    ).toMatchObject({ left: -8, top: 34, bottom: 'auto', maxHeight: 257, overflowY: 'auto' });
+  }
+);
+
+it.each([0, 8])('keeps vertical drawing surfaces aligned with inset %s', (surfaceInset) => {
+  vi.stubGlobal('innerWidth', 1000);
+  vi.stubGlobal('innerHeight', 600);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar';
+  const anchor = document.createElement('button');
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  const shell = vi.spyOn(toolbar, 'getBoundingClientRect');
+  const trigger = vi.spyOn(anchor, 'getBoundingClientRect');
+  for (const x of [8, 942]) {
+    shell.mockReturnValue(new DOMRect(x, 100, 50, 300));
+    trigger.mockReturnValue(new DOMRect(x + 9, 200, 32, 32));
+    const style = resolveToolbarDrawingMenuStyle({
+      anchorEl: anchor,
+      displayMode: 'vertical',
+      menuWidth: 190 + 2 * surfaceInset,
+      menuHeight: 200 + 2 * surfaceInset,
+      placement: 'down',
+      surfaceInset,
+    })!;
+    const left =
+      (style.left === 'auto'
+        ? x + 41 - Number(style.right) - 190 - surfaceInset * 2
+        : Number(style.left) + x + 9) + surfaceInset;
+    expect(x === 8 ? left - x - 50 : x - left - 190).toBe(1);
+    expect(Number(style.top) + 200 + surfaceInset).toBe(200);
+  }
 });
 
 it('keeps a floating menu open nearby and uses the non-focus close path far away', () => {

@@ -3,6 +3,199 @@ import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/ty
 import { expect, test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+
+async function checkDrawingPlacement(page: Page, editor: boolean) {
+  const toolbar = page.locator(
+    `[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.root'}"]`
+  );
+  const surfaces = page.locator(
+    editor
+      ? '[data-ui="editor.floating.tool-properties"], [data-ui="editor.floating.selection-actions"]'
+      : '.sniptale-drawing-options-popover:visible'
+  );
+  await expect(surfaces.first()).toBeVisible();
+  await toolbar.evaluate(async (node) => {
+    const positioner = node.closest('.sniptale-toolbar-positioner') ?? node;
+    const active = () =>
+      [...node.getAnimations(), ...positioner.getAnimations()].filter(
+        (animation) =>
+          animation.playState === 'running' &&
+          animation.effect?.getComputedTiming().iterations !== Infinity
+      );
+    await new Promise(requestAnimationFrame);
+    let animations = active();
+    while (animations.length) {
+      await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+      await new Promise(requestAnimationFrame);
+      animations = active();
+    }
+  });
+  await surfaces.first().evaluate(async (node) => {
+    await Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+  const geometry = await surfaces.evaluateAll((nodes, editor) => {
+    const first = nodes[0]!;
+    const toolbar = editor
+      ? first.ownerDocument.querySelector('[data-ui="editor.floating.tool-rail"]')!
+      : first.closest('[data-ui="content.toolbar.root"]')!;
+    const rect = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    };
+    const boxes = nodes.map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right };
+    });
+    const active = toolbar.querySelector(
+      editor
+        ? 'button[aria-pressed="true"]'
+        : '[data-ui^="content.toolbar.drawing."][aria-pressed="true"]'
+    )!;
+    const pair = first.closest('[data-ui="content.toolbar.drawing-options.pair"]');
+    return {
+      shell: rect(toolbar),
+      bounds: rect(first),
+      anchor: rect(active),
+      vertical: !editor && toolbar.getAttribute('data-display-mode') === 'vertical',
+      visibleWidth:
+        Math.max(...boxes.map((box) => box.right)) - Math.min(...boxes.map((box) => box.left)),
+      wrapper: pair
+        ? {
+            rect: rect(pair),
+            style: pair.getAttribute('style'),
+            width: (pair as HTMLElement).offsetWidth,
+          }
+        : null,
+    };
+  }, editor);
+  const { shell, bounds, vertical, anchor, visibleWidth } = geometry;
+  if (!vertical) {
+    expect(bounds.x, JSON.stringify(geometry)).toBeCloseTo(
+      Math.min(Math.max(anchor.x, 8), page.viewportSize()!.width - visibleWidth - 8),
+      0
+    );
+  }
+  if (!editor) {
+    const disclosure = toolbar
+      .locator('[data-ui^="content.toolbar.drawing."][aria-expanded="true"]')
+      .first();
+    const trigger = (await disclosure.count())
+      ? disclosure
+      : toolbar.locator('[data-ui^="content.toolbar.drawing."][aria-pressed="true"]').first();
+    await expect(trigger).toHaveAttribute(
+      'data-menu-side',
+      vertical ? (bounds.x < shell.x ? 'left' : 'right') : bounds.y < shell.y ? 'up' : 'down'
+    );
+  }
+  expect(
+    Math.max(
+      vertical ? shell.x - bounds.x - bounds.width : shell.y - bounds.y - bounds.height,
+      vertical ? bounds.x - shell.x - shell.width : bounds.y - shell.y - shell.height
+    )
+  ).toBeCloseTo(1, 0);
+  for (const surface of await surfaces.all()) {
+    const box = (await surface.boundingBox())!;
+    expect(vertical ? box.x : box.y).toBeCloseTo(vertical ? bounds.x : bounds.y, 0);
+  }
+}
+
+for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`shared drawing surface placement ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    page.setDefaultTimeout(10_000);
+    const theme = viewport.width === 1920 ? 'dark' : 'light';
+    await popup.evaluate(
+      async (theme) => chrome.storage.local.set({ 'sniptale-theme-preference': theme }),
+      theme
+    );
+    try {
+      for (const mode of ['drawing', 'video-recording']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        if (mode === 'video-recording') {
+          await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+            'data-video-recording',
+            'true'
+          );
+        }
+        for (const [edge, x, y] of [
+          ['top', viewport.width / 2, 20],
+          ['bottom', viewport.width / 2, viewport.height - 20],
+          ['left', 20, viewport.height / 2],
+          ['right', viewport.width - 20, viewport.height / 2],
+        ] as const) {
+          await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+          await page.mouse.click(viewport.width * 0.6, viewport.height * 0.6);
+          const handle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+          const grip = (await handle.boundingBox())!;
+          await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(x, y, { steps: 5 });
+          await page.mouse.up();
+          const arrow = page.locator('[data-ui="content.toolbar.drawing.arrow"]');
+          await arrow.click();
+          if ((await arrow.getAttribute('aria-expanded')) !== 'true') await arrow.click();
+          await checkDrawingPlacement(page, false);
+          await page.mouse.move(300, 160);
+          await page.mouse.down();
+          await page.mouse.move(420, 210, { steps: 4 });
+          await page.mouse.up();
+          await expect(
+            page.locator('[data-ui="content.toolbar.drawing-options.pair"]')
+          ).toBeVisible();
+          await checkDrawingPlacement(page, false);
+          await page.screenshot({
+            path: info.outputPath(`${mode}-${edge}-pair.png`),
+            fullPage: false,
+          });
+        }
+      }
+      const editor = await context.newPage();
+      try {
+        await editor.setViewportSize(viewport);
+        await applyHarnessBootstrap(editor, { storage: { 'sniptale-theme-preference': theme } });
+        await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+        await editor.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+        await checkDrawingPlacement(editor, true);
+        const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas');
+        const box = (await canvas.boundingBox())!;
+        await editor.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+        await editor.mouse.down();
+        await editor.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.65, { steps: 4 });
+        await editor.mouse.up();
+        await expect(editor.locator('[data-ui="editor.floating.selection-actions"]')).toBeVisible();
+        await checkDrawingPlacement(editor, true);
+        for (const width of [viewport.width, 960, 719, 720, 721]) {
+          await editor.setViewportSize({ width, height: viewport.height });
+          await checkDrawingPlacement(editor, true);
+          await editor.screenshot({
+            path: info.outputPath(`editor-pair-${width}.png`),
+            fullPage: false,
+          });
+          const overflow = await editor.evaluate(() => ({
+            width: innerWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            minimumWidth: Number.parseFloat(
+              getComputedStyle(document.querySelector('[data-ui="editor.page.root"]')!).minWidth
+            ),
+          }));
+          expect(overflow.scrollWidth).toBeLessThanOrEqual(Math.max(width, overflow.minimumWidth));
+        }
+      } finally {
+        await editor.close();
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
 
 async function pixels(canvas: Locator): Promise<string> {
   return canvas.evaluate(async (element) => {
@@ -65,6 +258,10 @@ for (const locale of ['en', 'ru'] as const) {
         }
         await page.bringToFront();
         await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+        await page
+          .getByRole('alertdialog')
+          .getByRole('button', { name: /^(Continue|Продолжить)$/u })
+          .click();
         await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeVisible(
           { timeout: 30_000 }
         );
@@ -378,12 +575,14 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await expect(freePlacement).toHaveClass(/sniptale-popover-item-selected/u);
     await page.getByRole('button', { name: /Vertical view|Вертикальный вид/ }).click();
     await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
-    await page.mouse.move(450, 280);
+    const toolbarBox = (await page.locator('[data-ui="content.toolbar.root"]').boundingBox())!;
+    const drawingX = toolbarBox.x + toolbarBox.width / 2 < 640 ? 900 : 100;
+    await page.mouse.move(drawingX, 280);
     await page.mouse.down();
-    await page.mouse.move(620, 400, { steps: 8 });
+    await page.mouse.move(drawingX + 170, 400, { steps: 8 });
     await page.mouse.up();
     await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
-    await page.mouse.click(500, 300);
+    await page.mouse.click(drawingX + 50, 300);
     const actions = page.locator('[data-ui="drawing.selection.actions"]');
     await expect(actions).toBeVisible();
     const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
@@ -458,10 +657,23 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     await page.locator('[data-ui="content.toolbar.settings-button"]').click();
     await page.getByRole('button', { name: /Horizontal view|Горизонтальный вид/ }).click();
     await expect(actions).toBeVisible();
-    const horizontalFirst = (await first.boundingBox())!;
-    const horizontalSecond = (await second.boundingBox())!;
-    expect(Math.abs(horizontalFirst.y - horizontalSecond.y)).toBeLessThanOrEqual(1);
-    expect(horizontalSecond.x).toBeGreaterThan(horizontalFirst.x + horizontalFirst.width);
+    await expect(actions).toHaveCSS('flex-direction', 'row');
+    await checkDrawingPlacement(page, false);
+    const horizontal = await actions.evaluate((node) => {
+      const first = node
+        .querySelector('[data-ui="drawing.selection.actions.front"]')!
+        .getBoundingClientRect();
+      const second = node
+        .querySelector('[data-ui="drawing.selection.actions.forward"]')!
+        .getBoundingClientRect();
+      return { yOffset: second.y - first.y, gap: second.x - first.right };
+    });
+    expect(Math.abs(horizontal.yOffset)).toBeLessThanOrEqual(1);
+    expect(horizontal.gap).toBeGreaterThan(0);
+    await page.screenshot({
+      path: info.outputPath('horizontal-layer-actions.png'),
+      fullPage: false,
+    });
     await popup.close();
     await page.close();
   });

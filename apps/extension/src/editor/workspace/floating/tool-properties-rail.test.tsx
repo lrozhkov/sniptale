@@ -110,8 +110,8 @@ it('anchors current drawing tools and renders their shared options directly', ()
   const properties = container.querySelector<HTMLElement>(
     '[data-ui="editor.floating.tool-properties"]'
   );
-  expect(properties?.parentElement?.className).toContain('left-1/2');
-  expect(properties?.parentElement?.className).toContain('-translate-x-1/2');
+  expect(properties?.parentElement?.className).not.toContain('left-1/2');
+  expect(properties?.parentElement?.className).not.toContain('-translate-x-1/2');
   expect(properties?.className).not.toContain('!rounded-none');
   expect(properties?.className).toContain('overflow-y-hidden');
 
@@ -297,7 +297,7 @@ it('uses layer selection guards and offers ungroup for a selected group', () => 
   expect(controller.ungroupSelectedLayers).toHaveBeenCalledOnce();
 });
 
-it('keeps drawing options six pixels below the outer tool rail after viewport changes', () => {
+it('keeps the shared shell gap after viewport changes', () => {
   const toolbar = document.createElement('div');
   toolbar.dataset['ui'] = 'editor.floating.tool-rail';
   document.body.append(toolbar);
@@ -305,9 +305,9 @@ it('keeps drawing options six pixels below the outer tool rail after viewport ch
   bounds.mockReturnValue(new DOMRect(20, 12, 400, 52));
   renderRail();
   const panel = container.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]');
-  expect(panel?.parentElement?.style.top).toBe('70px');
+  expect(panel?.parentElement?.style.top).toBe('65px');
   bounds.mockReturnValue(new DOMRect(12, 136, 400, 94));
   act(() => window.dispatchEvent(new Event('resize')));
-  expect(panel?.parentElement?.style.top).toBe('236px');
+  expect(panel?.parentElement?.style.top).toBe('231px');
   toolbar.remove();
 });

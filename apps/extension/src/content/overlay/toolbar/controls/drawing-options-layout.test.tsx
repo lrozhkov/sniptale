@@ -81,6 +81,44 @@ afterEach(() => {
 });
 
 describe('drawing options measured placement', () => {
+  it('refreshes when the toolbar positioner moves without a size change', async () => {
+    const positioner = document.createElement('div');
+    positioner.className = 'sniptale-toolbar-positioner';
+    positioner.style.left = '100px';
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    positioner.append(toolbar);
+    toolbar.append(triggerRef.current!);
+    document.body.append(positioner);
+    const resolveMenuLayout = vi.fn(() => ({
+      placement: 'down' as const,
+      style: { left: Number.parseFloat(positioner.style.left) },
+    }));
+    renderLayout({ open: true, displayMode: 'horizontal', resolveMenuLayout });
+    expect(resolveMenuLayout).toHaveLastReturnedWith({ placement: 'down', style: { left: 100 } });
+    await act(async () => {
+      positioner.style.left = '200px';
+      await Promise.resolve();
+    });
+    expect(resolveMenuLayout).toHaveLastReturnedWith({ placement: 'down', style: { left: 200 } });
+  });
+  it('includes the invisible pair inset in the viewport width budget', () => {
+    vi.stubGlobal('innerWidth', 960);
+    const resolveMenuLayout = vi.fn(() => ({ placement: 'down' as const, style: {} }));
+    renderLayout({
+      open: false,
+      displayMode: 'horizontal',
+      tool: 'text',
+      hasSelection: true,
+      resolveMenuLayout,
+    });
+    expect(resolveMenuLayout).toHaveBeenLastCalledWith({
+      anchor: triggerRef.current,
+      menuWidth: 960,
+      menuHeight: 48,
+      surfaceInset: 8,
+    });
+  });
   it('uses the crop owner resolver with measured whole-surface dimensions and its direction', () => {
     const resolveMenuLayout = vi.fn(() => ({
       placement: 'side' as const,
@@ -91,6 +129,7 @@ describe('drawing options measured placement', () => {
       anchor: triggerRef.current,
       menuWidth: 400,
       menuHeight: 400,
+      surfaceInset: 0,
     });
     expect(renderLayout({ open: false, displayMode: 'horizontal', resolveMenuLayout })).toBe(
       'left'

@@ -1,8 +1,9 @@
 import { useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
 import type { ConfigurableDrawingQuickOptionsTool } from './drawing-options-updates';
 import {
-  resolveToolbarFloatingMenuStyle,
+  resolveToolbarDrawingMenuStyle,
   resolveToolbarMenuPlacement,
+  TOOLBAR_DRAWING_MENU_PADDING_PX,
   TOOLBAR_SECONDARY_MENU_Z_INDEX,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
@@ -13,6 +14,7 @@ export type DrawingMenuLayoutResolver = (args: {
   anchor: HTMLElement;
   menuWidth: number;
   menuHeight: number;
+  surfaceInset?: number;
 }) => { placement: ProductToolbarMenuPlacement; style: CSSProperties } | null;
 
 export type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
@@ -80,17 +82,45 @@ export function useDrawingOptionsLayout(args: {
       measure();
       setViewportRevision((value) => value + 1);
     };
-    measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    refresh();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
     if (root) observer?.observe(root);
+    const toolbar = args.triggerRef.current?.closest(
+      '.sniptale-toolbar, .sniptale-selection-toolbar'
+    );
+    if (toolbar) observer?.observe(toolbar);
+    const positioner = toolbar?.closest('.sniptale-toolbar-positioner') ?? toolbar;
+    let positionFrame: number | null = null;
+    const positionAnimating = () =>
+      positioner?.getAnimations?.().some((animation) => animation.playState === 'running') ?? false;
+    const followPosition = () => {
+      positionFrame = null;
+      refresh();
+      if (positionAnimating()) positionFrame = requestAnimationFrame(followPosition);
+    };
+    const updatePosition = () => {
+      refresh();
+      if (positionFrame === null && positionAnimating())
+        positionFrame = requestAnimationFrame(followPosition);
+    };
+    const positionObserver =
+      typeof MutationObserver === 'undefined' ? null : new MutationObserver(updatePosition);
+    if (positioner)
+      positionObserver?.observe(positioner, { attributes: true, attributeFilter: ['style'] });
+    positioner?.addEventListener('transitionrun', updatePosition);
+    positioner?.addEventListener('transitionend', refresh);
     window.addEventListener('resize', refresh);
     window.addEventListener('scroll', refresh, true);
     return () => {
       observer?.disconnect();
+      positionObserver?.disconnect();
+      if (positionFrame !== null) cancelAnimationFrame(positionFrame);
+      positioner?.removeEventListener('transitionrun', updatePosition);
+      positioner?.removeEventListener('transitionend', refresh);
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, [args.panelRef, args.open, measurementKey]);
+  }, [args.panelRef, args.triggerRef, args.open, measurementKey]);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
   const currentMeasurement = measured?.key === measurementKey ? measured : null;
   const menuHeight =
@@ -99,12 +129,20 @@ export function useDrawingOptionsLayout(args: {
   const menuWidth = Math.min(
     currentMeasurement?.width ??
       dimensions.width + (args.hasSelection && args.displayMode === 'horizontal' ? 294 : 0),
-    Math.max(0, window.innerWidth - 16)
+    Math.max(
+      0,
+      window.innerWidth - 16 + (args.hasSelection ? TOOLBAR_DRAWING_MENU_PADDING_PX * 2 : 0)
+    )
   );
   const resolveLayout = () => {
     const anchor = args.triggerRef.current;
     const customLayout = anchor
-      ? args.resolveMenuLayout?.({ anchor, menuWidth, menuHeight })
+      ? args.resolveMenuLayout?.({
+          anchor,
+          menuWidth,
+          menuHeight,
+          surfaceInset: args.hasSelection ? TOOLBAR_DRAWING_MENU_PADDING_PX : 0,
+        })
       : null;
     const scale = readContentUiScaleCompensation(anchor);
     const above = (anchor?.getBoundingClientRect().top ?? 0) / scale;
@@ -118,31 +156,32 @@ export function useDrawingOptionsLayout(args: {
         : getToolbarMenuPosition(anchor, menuHeight);
     const positioned =
       customLayout?.style ??
-      resolveToolbarFloatingMenuStyle({
+      resolveToolbarDrawingMenuStyle({
         anchorEl: args.triggerRef.current,
         displayMode: args.displayMode,
         menuHeight,
         menuWidth,
         placement,
-        preferredTop: args.hasSelection ? -16 : 0,
+        surfaceInset: args.hasSelection ? TOOLBAR_DRAWING_MENU_PADDING_PX : 0,
       });
     const fallback: CSSProperties =
       args.displayMode === 'vertical'
         ? { left: 'calc(100% + 10px)', top: 0 }
         : { left: 0, top: 'calc(100% + 10px)' };
-    const verticalOverflow: CSSProperties =
-      args.displayMode === 'vertical' ? { maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' } : {};
     return {
       placement:
         customLayout?.placement ?? resolveToolbarMenuPlacement(args.displayMode, placement),
       style: {
         ...(positioned ?? fallback),
-        maxWidth: 'calc(100vw - 16px)',
+        maxWidth: positioned?.maxWidth ?? 'calc(100vw - 16px)',
+        maxHeight:
+          positioned?.maxHeight ??
+          (args.displayMode === 'vertical' ? 'calc(100vh - 16px)' : undefined),
         minWidth: 0,
         overflowX: 'auto',
-        padding: '8px',
+        overflowY: 'auto',
+        padding: `${TOOLBAR_DRAWING_MENU_PADDING_PX}px`,
         zIndex: TOOLBAR_SECONDARY_MENU_Z_INDEX,
-        ...verticalOverflow,
       } satisfies CSSProperties,
     };
   };
