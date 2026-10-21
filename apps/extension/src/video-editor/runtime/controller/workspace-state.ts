@@ -5,6 +5,7 @@ import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project
 import type { VideoProject } from '../../../features/video/project/types';
 import type {
   VideoEditorWatermarkPreview,
+  VideoEditorSceneEdgesPreview,
   VideoEditorMotionPreview,
 } from '../../contracts/workspace';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
@@ -41,6 +42,8 @@ interface VideoEditorWorkspaceConfirmState {
 }
 
 interface VideoEditorWorkspaceInspectorState {
+  sceneEdgesPreview: VideoEditorSceneEdgesPreview | null;
+  previewSceneEdges: (preview: VideoEditorSceneEdgesPreview | null) => void;
   watermarkPreview: VideoEditorWatermarkPreview | null;
   previewWatermark: (preview: VideoEditorWatermarkPreview | null) => void;
   registerWatermarkAbort: (abort: () => void) => () => void;
@@ -209,6 +212,9 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
 function useVideoEditorInspectorState(
   setCollapsed: (collapsed: boolean) => void
 ): VideoEditorWorkspaceInspectorState {
+  const [sceneEdgesPreview, previewSceneEdges] = useState<VideoEditorSceneEdgesPreview | null>(
+    null
+  );
   const [watermarkPreview, previewWatermark] = useState<VideoEditorWatermarkPreview | null>(null);
   const watermarkAbort = useRef<(() => void) | null>(null);
   const registerWatermarkAbort = useCallback((abort: () => void) => {
@@ -237,6 +243,8 @@ function useVideoEditorInspectorState(
       openSelection,
       motionPreview,
       previewMotion,
+      sceneEdgesPreview,
+      previewSceneEdges,
       watermarkPreview,
       previewWatermark,
       registerWatermarkAbort,
@@ -246,6 +254,7 @@ function useVideoEditorInspectorState(
       mode,
       openSelection,
       motionPreview,
+      sceneEdgesPreview,
       watermarkPreview,
       registerWatermarkAbort,
       cancelWatermarkAcquisition,
@@ -421,5 +430,20 @@ export function presentWorkspaceWatermarkPreview(
     ...project,
     version: project.version >= 20 ? project.version : 20,
     watermark: preview.settings,
+  };
+}
+
+/** Only the current accepted scene can present a disposable final-output gesture. */
+export function presentWorkspaceSceneEdgesPreview(
+  project: VideoProject,
+  selection: VideoEditorSelection,
+  preview: VideoEditorSceneEdgesPreview | null
+): VideoProject {
+  if (!preview || preview.project !== project || selection.kind !== VideoEditorSelectionKind.SCENE)
+    return project;
+  return {
+    ...project,
+    version: project.version >= 24 ? project.version : 24,
+    sceneEdges: preview.settings,
   };
 }

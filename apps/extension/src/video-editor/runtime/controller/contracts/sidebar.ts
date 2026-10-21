@@ -22,6 +22,7 @@ import type { VideoEditorLibrariesState } from '../../app-model/types';
 interface VideoEditorSidebarCommands extends VideoEditorProjectActions, VideoEditorSessionActions {}
 
 interface VideoEditorSidebarState {
+  sceneEdges?: import('../../../contracts/workspace').VideoEditorSceneEdgesInspectorRuntime;
   watermark?: import('../../../contracts/workspace').VideoEditorWatermarkInspectorRuntime;
   typingProject?: VideoProject;
   recordingTelemetry?: readonly RecordingTelemetryEntry[];

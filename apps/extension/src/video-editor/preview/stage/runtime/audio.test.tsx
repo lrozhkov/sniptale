@@ -368,3 +368,26 @@ it('applies a live AUDIO track master without changing the media element or clip
   expect(clip.volume).toBe(1.5);
   expect(audio.volume).toBe(1);
 });
+
+it('multiplies the final scene envelope with clip and track gain once', async () => {
+  const graph = installPreviewAudioContextHarness();
+  const seed = createEmptyVideoProject('Scene edge');
+  const clip = createAudioClip(seed.tracks[0]!.id, { volume: 1.5 });
+  const project = createProject([clip]);
+  project.duration = 10;
+  project.sceneEdges = {
+    intro: { enabled: true, duration: 8, audioFade: true },
+    outro: { enabled: false, duration: 1 },
+  };
+  const audio = createAudioElement();
+  await renderHarness({
+    audioRefs: { current: { [clip.id]: audio } },
+    currentTime: 6,
+    isPlaying: true,
+    project,
+    syncedClips: [clip],
+  });
+  expect(graph.latestContext.gains[0]!.gain.value).toBe(1.125);
+  expect(clip.volume).toBe(1.5);
+  expect(audio.volume).toBe(1);
+});

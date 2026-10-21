@@ -27,6 +27,7 @@ class ProjectActionAudioRuntime {
   private planSignature = '';
   private controller = new AbortController();
   private context: AudioContext | null = null;
+  private output: GainNode | null = null;
   private source: ReturnType<typeof createReviewActionAudioSource<AudioBuffer>> | null = null;
   private ready: ReturnType<typeof admitReviewActionAudioPlan> | null = null;
   private playing = false;
@@ -66,6 +67,8 @@ class ProjectActionAudioRuntime {
     this.ready = null;
     const previous = this.context;
     this.context = null;
+    this.output?.disconnect();
+    this.output = null;
     if (previous && previous.state !== 'closed') await previous.close();
   };
   private revisePlan = (plan: ReviewActionAudioPlan) => {
@@ -86,6 +89,8 @@ class ProjectActionAudioRuntime {
     if (!this.context) {
       this.context = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
       const graph = this.context;
+      this.output = graph.createGain();
+      this.output.connect(graph.destination);
       this.source = createReviewActionAudioSource({
         signal: this.controller.signal,
         getURL: (path) => browserRuntime.getURL(path),
@@ -147,7 +152,7 @@ class ProjectActionAudioRuntime {
     node.buffer = buffer;
     node.playbackRate.value = 1;
     node.connect(gain);
-    gain.connect(graph.destination);
+    gain.connect(this.output!);
     const when = Math.max(graph.currentTime, this.anchorClock + from - this.anchorTime);
     const volume = cue.volume * busGain;
     gain.gain.setValueAtTime(cue.fadeIn > 0 ? 0 : volume, when);
@@ -168,7 +173,12 @@ class ProjectActionAudioRuntime {
     this.scheduled.set(cue.id, cue.end);
     return true;
   };
-  async sync(args: { plan: ReviewActionAudioPlan; currentTime: number; isPlaying: boolean }) {
+  async sync(args: {
+    plan: ReviewActionAudioPlan;
+    currentTime: number;
+    isPlaying: boolean;
+    outputGain?: number;
+  }) {
     if (this.disposed) return;
     this.revisePlan(args.plan);
     const plan = this.currentPlan!;
@@ -180,6 +190,7 @@ class ProjectActionAudioRuntime {
       return;
     }
     this.ensureGraph(plan);
+    this.output!.gain.value = args.outputGain ?? 1;
     const graph = this.context!,
       reader = this.source!;
     const expected = this.anchorTime + graph.currentTime - this.anchorClock;

@@ -1,3 +1,4 @@
+import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
 import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
@@ -235,6 +236,7 @@ async function drawDecodedCompositeFrame(
     );
     captions.draw(args.request.context, args.projectTime);
     watermark?.draw(args.request.context);
+    drawVideoProjectSceneEdges(args.request.context, project, args.projectTime);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

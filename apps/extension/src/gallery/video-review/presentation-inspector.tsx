@@ -1,3 +1,4 @@
+import { PresentationFadeFields } from '../../ui/presentation-fade-fields';
 import { FolderOpen, Library, LogIn, LogOut, Play, RotateCcw } from 'lucide-react';
 import { backgroundActionClassName } from '../../composition/background-resources/picker';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -238,60 +239,43 @@ function FadeFields(
   const patch = (value: Partial<typeof fade>) =>
     props.patch({ ...props.control, [field]: { ...fade, ...value } });
   return (
-    <div className="min-w-0 space-y-1">
-      {props.media && (
-        <ToggleField
-          label={label(props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut')}
-          value={fade.enabled}
-          onChange={(enabled) => props.onChange(patch({ enabled }))}
-        />
-      )}
-      {(!props.media || fade.enabled) && (
-        <>
-          <NumberField
-            {...props}
-            label={label('presentationDuration')}
-            value={duration}
-            min={0}
-            max={60}
-            scrubMax={3}
-            step={0.1}
-            unit="s"
-            patch={(duration) => patch({ duration })}
-          />
-          <ColorField
-            className={reviewSelectFieldClassName}
-            label={label('presentationFadeColor')}
-            title={label('presentationFadeColor')}
-            value={fade.color ?? props.settings.color}
-            allowAlpha={false}
-            allowTransparent={false}
-            onChange={(color) => props.onChange(patch({ color }))}
-            onPreviewChange={(color) => props.onPreview(color ? patch({ color }) : null)}
-          />
-          <ToggleField
-            label={label('presentationAudioFade')}
-            value={fade.audioFade ?? props.settings.audioFade}
-            onChange={(audioFade) => props.onChange(patch({ audioFade }))}
-          />
-          <ReviewButton
-            label={label(
-              props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
-            )}
-            disabled={props.previewDisabled || !props.onJoinPreview}
-            className="review-inspector-parameter-command"
-            onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
-          >
-            <Play size={14} aria-hidden="true" />
-            <span>
-              {label(
-                props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
-              )}
-            </span>
-          </ReviewButton>
-        </>
-      )}
-    </div>
+    <PresentationFadeFields
+      value={fade}
+      duration={duration}
+      fallbackColor={props.settings.color}
+      fallbackAudioFade={props.settings.audioFade}
+      colorClassName={reviewSelectFieldClassName}
+      {...(props.media
+        ? {
+            enabledLabel: label(
+              props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut'
+            ),
+          }
+        : {})}
+      onChange={(change) => {
+        const next = parseQuickEditPresentationSettings(patch(change));
+        if (next) props.onChange(next);
+      }}
+      onPreview={(change) =>
+        props.onPreview(change === null ? null : parseQuickEditPresentationSettings(patch(change)))
+      }
+    >
+      <ReviewButton
+        label={label(
+          props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
+        )}
+        disabled={props.previewDisabled || !props.onJoinPreview}
+        className="review-inspector-parameter-command"
+        onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
+      >
+        <Play size={14} aria-hidden="true" />
+        <span>
+          {label(
+            props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
+          )}
+        </span>
+      </ReviewButton>
+    </PresentationFadeFields>
   );
 }
 

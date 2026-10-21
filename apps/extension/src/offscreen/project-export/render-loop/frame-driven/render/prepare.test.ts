@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { createVideoProjectSceneEdges } from '../../../../../features/video/project/scene/edge-fades';
 import { createQuickEditWatermark } from '../../../../../features/video/project/scene/watermark';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -268,4 +270,30 @@ it('refuses caption preparation before painting and permits a fresh frame retry'
   expect(captionOwner.assertExportable).toHaveBeenCalledOnce();
   expect(drawProjectFrameMock).toHaveBeenCalledOnce();
   expect(captionOwner.draw).toHaveBeenCalledWith(fixture.context, fixture.args.currentTime);
+});
+
+it('paints scene edge presentation after the complete frame and watermark', async () => {
+  const fixture = createIndexedEffectRuntimeFrameFixture();
+  fixture.project.duration = 10;
+  fixture.args.currentTime = 0.5;
+  fixture.args.canvas = document.createElement('canvas');
+  fixture.args.context = fixture.args.canvas.getContext('2d')!;
+  fixture.project.sceneEdges = createVideoProjectSceneEdges();
+  fixture.project.sceneEdges.intro = { enabled: true, duration: 1, color: '#ff0000ff' };
+  fixture.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  const order: string[] = [];
+  fixture.job.watermarkRenderer = {
+    prepare: vi.fn(async () => ({
+      bounds: { x: 0, y: 0, width: 20, height: 10 },
+      draw: () => order.push('watermark'),
+    })),
+    clear: vi.fn(),
+  };
+  drawProjectFrameMock.mockImplementation(() => order.push('scene'));
+  captionOwner.draw.mockImplementation(() => order.push('captions'));
+  vi.spyOn(fixture.args.context, 'fillRect').mockImplementation(() => {
+    order.push('scene edge');
+  });
+  await prepareFrameDrivenCompositeFrame(fixture.args);
+  expect(order).toEqual(['scene', 'captions', 'watermark', 'scene edge']);
 });

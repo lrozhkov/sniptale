@@ -136,3 +136,15 @@ describe('workspace-sidebar/selection/body', () => {
     }
   });
 });
+
+it('forwards scene edge preview through the selection body to the scene inspector', () => {
+  const sceneEdges = { onPreview: vi.fn() };
+  inspectPanelMock.mockClear();
+  renderToStaticMarkup(
+    <WorkspaceSidebarSelectionBody {...createProps()} sceneEdges={sceneEdges} />
+  );
+  expect(inspectPanelMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ sceneEdges }),
+    undefined
+  );
+});

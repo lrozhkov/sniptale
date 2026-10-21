@@ -13,6 +13,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'textRewrite'
     | 'textVoice'
     | 'watermark'
+    | 'sceneEdges'
     | 'onImportImage'
     | 'gridSettings'
     | 'typingProject'
@@ -152,6 +153,7 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
     ...(props.textVoice ? { textVoice: props.textVoice } : {}),
     ...(props.watermark ? { watermark: props.watermark } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,

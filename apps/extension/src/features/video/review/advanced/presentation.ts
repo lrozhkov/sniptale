@@ -1,3 +1,8 @@
+import {
+  createPresentationFade,
+  parsePresentationFade as fade,
+  type PresentationFade as Fade,
+} from '../../project/scene/edge-fades';
 import { parseCutTransition, type ReviewCutTransition } from '../cut-transition';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -27,7 +32,6 @@ type Slot =
   | { mode: 'none'; image?: Image; video?: Video }
   | { mode: 'image'; image: Image; video?: Video }
   | { mode: 'video'; image?: Image; video: Video };
-type Fade = { enabled: boolean; duration: number; color?: string; audioFade?: boolean };
 /** Independent authored edge; legacy scalar fields are fallback only when this is absent. */
 export interface PresentationEdgeControl {
   mode: 'none' | 'fade' | 'media';
@@ -53,8 +57,8 @@ export interface QuickEditPresentationSettings {
 /** Legacy omission is processing-neutral, including when advanced mode is selected. */
 export function createNeutralPresentationSettings(): QuickEditPresentationSettings {
   return {
-    fadeIn: { enabled: false, duration: 0.4 },
-    fadeOut: { enabled: false, duration: 0.4 },
+    fadeIn: createPresentationFade(),
+    fadeOut: createPresentationFade(),
     color: '#000000ff',
     audioFade: false,
     intro: { mode: 'none' },
@@ -233,24 +237,6 @@ function slot(value: unknown): Slot | null {
     return { ...variants, mode: 'video', video: rememberedVideo };
   return null;
 }
-function fade(value: unknown): Fade | null {
-  if (
-    !isRecord(value) ||
-    !fields(value, ['enabled', 'duration', 'color', 'audioFade']) ||
-    typeof value['enabled'] !== 'boolean' ||
-    !isBoundedNumber(value['duration'], 0, 60) ||
-    (value['color'] !== undefined && !opaqueColor(value['color'])) ||
-    (value['audioFade'] !== undefined && typeof value['audioFade'] !== 'boolean')
-  )
-    return null;
-  return {
-    enabled: value['enabled'],
-    duration: value['duration'],
-    ...(value['color'] === undefined ? {} : { color: opaqueColor(value['color'])! }),
-    ...(typeof value['audioFade'] === 'boolean' ? { audioFade: value['audioFade'] } : {}),
-  };
-}
-
 /** Rejects malformed active or remembered fields; absence alone receives neutral defaults. */
 export function parseQuickEditPresentationSettings(
   value: unknown

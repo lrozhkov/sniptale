@@ -259,6 +259,7 @@ function getWorkspaceSidebarSelectionProps(
 ): Pick<
   WorkspaceSidebarProps,
   | 'watermark'
+  | 'sceneEdges'
   | 'typingProject'
   | 'recordingTelemetry'
   | 'currentTime'
@@ -276,6 +277,7 @@ function getWorkspaceSidebarSelectionProps(
       ? {}
       : { currentTime: controller.state.currentTime }),
     ...(controller.state.watermark ? { watermark: controller.state.watermark } : {}),
+    ...(controller.state.sceneEdges ? { sceneEdges: controller.state.sceneEdges } : {}),
     ...(controller.state.typingProject ? { typingProject: controller.state.typingProject } : {}),
     ...(controller.state.recordingTelemetry
       ? { recordingTelemetry: controller.state.recordingTelemetry }

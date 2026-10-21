@@ -79,6 +79,7 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
     ...(props.recognition ? { recognition: props.recognition } : {}),
     ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
     ...(props.textVoice ? { textVoice: props.textVoice } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
     ...(props.watermark ? { watermark: props.watermark } : {}),
     project: props.project,
     selection: props.selection,
@@ -180,6 +181,7 @@ function createSelectionPanelStateProps(
   | 'textRewrite'
   | 'textVoice'
   | 'watermark'
+  | 'sceneEdges'
   | 'gridSettings'
   | 'placementMode'
   | 'project'
@@ -204,6 +206,7 @@ function createSelectionPanelStateProps(
     ...(props.recognition ? { recognition: props.recognition } : {}),
     ...(props.textRewrite ? { textRewrite: props.textRewrite } : {}),
     ...(props.textVoice ? { textVoice: props.textVoice } : {}),
+    ...(props.sceneEdges ? { sceneEdges: props.sceneEdges } : {}),
     ...(props.watermark ? { watermark: props.watermark } : {}),
     project: props.project,
     recentColors: props.recentColors ?? [],

@@ -1,3 +1,4 @@
+import { drawVideoProjectSceneEdges } from '../../../../../features/video/composition/canvas/scene-edges';
 import { createVideoProjectCaptionRenderer } from '../../../../../workflows/video-review/project-captions';
 import { resolveProjectExportRange } from '../../../../../features/video/project/export/range';
 import {
@@ -65,6 +66,7 @@ export async function prepareFrameDrivenCompositeFrame(
     drawFrameDrivenProjectFrame(args, effectRuntimeFrames);
     captions.draw(args.context, currentTime);
     watermark?.draw(args.context);
+    drawVideoProjectSceneEdges(args.context, project, currentTime);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

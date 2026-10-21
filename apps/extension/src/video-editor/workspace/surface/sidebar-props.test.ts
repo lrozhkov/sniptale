@@ -85,3 +85,10 @@ it('preserves the Native watermark runtime binding through the workspace project
   controller.state.watermark = watermark;
   expect(getWorkspaceSidebarProps(controller).watermark).toBe(watermark);
 });
+
+it('preserves the Native scene edges binding through the complete workspace projection', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const sceneEdges = { onPreview: vi.fn() };
+  controller.state.sceneEdges = sceneEdges;
+  expect(getWorkspaceSidebarProps(controller).sceneEdges).toBe(sceneEdges);
+});

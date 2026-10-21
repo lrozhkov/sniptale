@@ -242,6 +242,7 @@ function createWorkspaceSidebarState(args: {
   workspace: SidebarWorkspace;
 }) {
   return {
+    sceneEdges: { onPreview: args.workspace.inspector.previewSceneEdges },
     watermark: {
       onPreview: args.workspace.inspector.previewWatermark,
       registerAbort: args.workspace.inspector.registerWatermarkAbort,

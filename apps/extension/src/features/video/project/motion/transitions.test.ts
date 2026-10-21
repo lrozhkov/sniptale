@@ -89,7 +89,7 @@ it('fences schema18 and retains settings through hydration JSON and clearing', (
   ).toEqual(region.phaseTransitions);
   for (let version = 2; version < 18; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 24 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 25 })).toBe(false);
   const cleared = applyVideoProjectMutationPatch(changed, { motionRegions: [] });
   expect(cleared.version).toBe(18);
   const legacy = createVideoProjectMotionRegion(project, 0);

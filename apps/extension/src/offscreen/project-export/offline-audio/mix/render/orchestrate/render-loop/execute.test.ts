@@ -1,3 +1,4 @@
+import { executeOfflineAudioMixRender } from './execute';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createEffectAudioBufferCache } from '../../../../../../../features/video/composition/effect-runtime';
 import { createVideoProjectFromRecording } from '../../../../../../../features/video/project/factories/creation';
@@ -108,7 +109,6 @@ function createExecuteOfflineAudioMixRenderArgs() {
 }
 
 it('renders the mix loop and closes the decode context in the caller', async () => {
-  const { executeOfflineAudioMixRender } = await import('./execute');
   const {
     args,
     audioContext,
@@ -134,7 +134,6 @@ it('renders the mix loop and closes the decode context in the caller', async () 
 });
 
 it('waits for tempo preparation before rendering and propagates preparation failure', async () => {
-  const { executeOfflineAudioMixRender } = await import('./execute');
   const { args, scheduleOfflineAudioClipMix, offlineContext } =
     createExecuteOfflineAudioMixRenderArgs();
   let reject!: (error: Error) => void;
@@ -152,7 +151,6 @@ it('waits for tempo preparation before rendering and propagates preparation fail
   expect(offlineContext.startRendering).not.toHaveBeenCalled();
 });
 it('awaits physical action PCM before publishing and refuses a failed action mix', async () => {
-  const { executeOfflineAudioMixRender } = await import('./execute');
   const { args, renderedBuffer, buildOfflineAudioMixResult } =
     createExecuteOfflineAudioMixRenderArgs();
   const project = createVideoProjectFromRecording({
@@ -196,4 +194,36 @@ it('awaits physical action PCM before publishing and refuses a failed action mix
     executeOfflineAudioMixRender({ ...args, project, clipsWithAudio: [] })
   ).rejects.toThrow('physical action decode refused');
   expect(buildOfflineAudioMixResult).not.toHaveBeenCalled();
+});
+
+it('fades action and clip audio together after mixing on an absolute export range', async () => {
+  const fixture = createExecuteOfflineAudioMixRenderArgs();
+  const project = createVideoProjectFromRecording({
+    recordingId: 'tone',
+    filename: 'tone.webm',
+    width: 160,
+    height: 90,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  project.sceneEdges = {
+    intro: { enabled: true, duration: 2, audioFade: true },
+    outro: { enabled: false, duration: 1 },
+  };
+  project.actionFeedback = [{} as never];
+  mixActionAudio.mockImplementationOnce(async (output: AudioBuffer) => {
+    output.getChannelData(0).fill(0.8);
+  });
+  const result = await executeOfflineAudioMixRender({
+    ...fixture.args,
+    project,
+    actionRange: { start: 1, end: 2 },
+  });
+  expect(result.buffer.getChannelData(0)[0]).toBeCloseTo(0.4, 6);
+  expect(result.buffer.getChannelData(1)[0]).toBeCloseTo(0.25, 6);
+  expect(mixActionAudio).toHaveBeenLastCalledWith(result.buffer, project, undefined, {
+    start: 1,
+    end: 2,
+  });
 });

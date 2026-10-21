@@ -98,7 +98,11 @@ for (const variant of variants) {
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
       const open = async () => {
-        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page
+          .locator(`[data-gallery-keyboard-id="${betaV1Fixture.records.media_library[0].id}"]`)
+          .getByRole('button', { name: 'beta-v1.webm', exact: true })
+          .first()
+          .click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       };
       await open();
@@ -404,7 +408,7 @@ for (const variant of variants) {
         await expect(outroModal).toHaveCount(0);
 
         await expect(
-          outro.getByRole('button', {
+          outro.getByRole('switch', {
             name: label('gallery.videoReview.presentationSound'),
             exact: true,
           })
@@ -417,7 +421,7 @@ for (const variant of variants) {
         ).toBeVisible();
         await uploadVideo('review-webcam-clock.webm');
         await expect(
-          outro.getByRole('button', {
+          outro.getByRole('switch', {
             name: label('gallery.videoReview.presentationSound'),
             exact: true,
           })

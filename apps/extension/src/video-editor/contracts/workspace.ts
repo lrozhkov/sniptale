@@ -26,3 +26,14 @@ export interface VideoEditorWatermarkInspectorRuntime {
   registerAbort(abort: () => void): () => void;
   imagePreviewUrl?: string;
 }
+
+/** A final-scene gesture belongs to one accepted project snapshot. */
+export interface VideoEditorSceneEdgesPreview {
+  project: VideoProject;
+  settings: NonNullable<VideoProject['sceneEdges']>;
+}
+
+/** Scene authoring uses the workspace's existing disposable preview owner. */
+export interface VideoEditorSceneEdgesInspectorRuntime {
+  onPreview(preview: VideoEditorSceneEdgesPreview | null): void;
+}

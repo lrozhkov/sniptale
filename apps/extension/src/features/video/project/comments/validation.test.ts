@@ -145,7 +145,7 @@ it('admits schema23 through real root parsing and preserves the version after re
   expect(project.commentDocuments).toBeUndefined();
   for (let version = 2; version < 23; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 24 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 25 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...changed,

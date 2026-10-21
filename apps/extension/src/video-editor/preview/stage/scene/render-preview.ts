@@ -1,3 +1,4 @@
+import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
 import {
@@ -358,16 +359,23 @@ function drawResolvedPreviewSceneContent(
     spatialRenderer: args.params.spatialRenderer,
   });
   const { context, viewport } = overlayPrepared;
-  if (!args.captions.plan.cues.length && !args.watermark) return true;
-  context.save();
-  try {
-    context.translate(viewport.offsetX, viewport.offsetY);
-    context.scale(viewport.scale, viewport.scale);
-    if (args.captions.plan.cues.length) args.captions.draw(context, args.params.currentTime);
-    args.watermark?.draw(context);
-  } finally {
-    context.restore();
+  if (args.captions.plan.cues.length || args.watermark) {
+    context.save();
+    try {
+      context.translate(viewport.offsetX, viewport.offsetY);
+      context.scale(viewport.scale, viewport.scale);
+      if (args.captions.plan.cues.length) args.captions.draw(context, args.params.currentTime);
+      args.watermark?.draw(context);
+    } finally {
+      context.restore();
+    }
   }
+  drawVideoProjectSceneEdges(context, args.params.project, args.params.currentTime, {
+    x: viewport.offsetX * overlayPrepared.dpr,
+    y: viewport.offsetY * overlayPrepared.dpr,
+    width: viewport.width * overlayPrepared.dpr,
+    height: viewport.height * overlayPrepared.dpr,
+  });
   return true;
 }
 

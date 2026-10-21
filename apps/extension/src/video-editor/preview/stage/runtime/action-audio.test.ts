@@ -25,6 +25,15 @@ function installAudioGraph(onStart?: () => void) {
     currentTime = 0;
     state = 'running';
     destination = {};
+    gains: {
+      gain: {
+        value: number;
+        setValueAtTime: ReturnType<typeof vi.fn>;
+        linearRampToValueAtTime: ReturnType<typeof vi.fn>;
+      };
+      connect: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+    }[] = [];
     constructor() {
       graphs.push(this);
     }
@@ -36,11 +45,13 @@ function installAudioGraph(onStart?: () => void) {
       return { sampleRate: 44100, length: (bytes.byteLength - 44) / 2, numberOfChannels: 1 };
     }
     createGain() {
-      return {
-        gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+      const gain = {
+        gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
         connect: vi.fn(),
         disconnect: vi.fn(),
       };
+      this.gains.push(gain);
+      return gain;
     }
     createBufferSource() {
       const node = {
@@ -230,7 +241,9 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
     applied: true,
   });
   const { sync, close } = createProjectActionAudioRuntime();
-  await sync({ plan, currentTime: 0.9, isPlaying: true });
+  await sync({ plan, currentTime: 0.9, isPlaying: true, outputGain: 0.25 });
+  expect(graphs[0]!.gains[0]!.gain.value).toBe(0.25);
+  expect(graphs[0]!.gains[1]!.connect).toHaveBeenCalledWith(graphs[0]!.gains[0]);
   expect(nodes).toHaveLength(1);
   expect(nodes[0]!.playbackRate.value).toBe(1);
   expect(nodes[0]!.start.mock.calls[0]![0]).toBeCloseTo(0.1, 12);
@@ -239,6 +252,7 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   graphs.at(-1)!.currentTime = 0.11;
   await sync({ plan: structuredClone(plan), currentTime: 1.01, isPlaying: true });
   expect(graphs.at(-1)!.close).not.toHaveBeenCalled();
+  expect(graphs[0]!.gains[0]!.gain.value).toBe(1);
   expect(nodes).toHaveLength(1);
   graphs.at(-1)!.currentTime = 0.2;
   await sync({ plan, currentTime: 3.9, isPlaying: true });
@@ -250,6 +264,7 @@ it('schedules actual attacks once, resets seek/pause, keeps native pitch and rel
   await close();
   expect(graphs.at(-1)!.close).toHaveBeenCalledOnce();
   expect(nodes.every((node) => node.disconnect.mock.calls.length > 0)).toBe(true);
+  expect(graphs[0]!.gains[0]!.disconnect).toHaveBeenCalledOnce();
 });
 
 function auditionPlan() {

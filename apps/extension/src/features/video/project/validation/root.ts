@@ -1,3 +1,4 @@
+import { parseVideoProjectSceneEdges } from '../scene/edge-fades';
 import {
   parseVideoProjectCommentDocuments,
   hasValidVideoProjectCommentReferences,
@@ -98,8 +99,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 23) &&
+    isBoundedNumber(version, 2, 24) &&
     Number.isInteger(version) &&
+    (version >= 24 || value['sceneEdges'] === undefined) &&
     (version >= 23 || value['commentDocuments'] === undefined) &&
     (version >= 20 || value['watermark'] === undefined) &&
     (version >= 22 ||
@@ -200,6 +202,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
+    (value['sceneEdges'] === undefined ||
+      parseVideoProjectSceneEdges(value['sceneEdges']) !== null) &&
     (value['sceneBackground'] === undefined ||
       parseSceneBackgroundSettings(value['sceneBackground']) !== null) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&

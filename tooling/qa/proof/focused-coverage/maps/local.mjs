@@ -1124,6 +1124,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/features/video/project/validation/root.ts',
     reason: 'Video project boundary validation is covered by parser and transitive boundary tests.',
     testFiles: [
+      'apps/extension/src/features/video/project/comments/validation.test.ts',
       'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/offscreen/project-export/service/root.test.ts',

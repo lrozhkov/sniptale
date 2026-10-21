@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  sceneEdges: { ru: 'Начало и конец', en: 'Start and end' },
   comments: { ru: 'Заметки', en: 'Notes' },
   commentDeleteDocument: {
     ru: 'Удалить заметки этой привязки',

@@ -1,3 +1,4 @@
+import { getVideoProjectSceneEdgeAudioGain } from '../../../../features/video/project/scene/edge-fades';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
 import {
@@ -76,7 +77,8 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
 
   const gain =
     !params.mutePreviewAudio && isClipActive
-      ? getClipCompositeAudioGain(project, clip, currentTime)
+      ? getClipCompositeAudioGain(project, clip, currentTime) *
+        getVideoProjectSceneEdgeAudioGain(project, currentTime)
       : 0;
   setPreviewAudioNodeGain(node, gain);
 

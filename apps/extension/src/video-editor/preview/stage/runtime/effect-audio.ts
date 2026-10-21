@@ -1,3 +1,4 @@
+import { getVideoProjectSceneEdgeAudioGain } from '../../../../features/video/project/scene/edge-fades';
 import { buildProjectActionAudioPlan } from '../../../../features/video/review/project-action-audio';
 import { createProjectActionAudioRuntime } from './action-audio';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
@@ -21,6 +22,7 @@ export function usePreviewEffectAudio(args: {
   isPlaying: boolean;
   project: VideoProject;
 }): void {
+  const outputGain = getVideoProjectSceneEdgeAudioGain(args.project, args.currentTime);
   const plans = useMemo(() => resolveEffectRuntimeAudioPlans(args.project), [args.project]);
   const stateRef = useRef(createPreviewEffectAudioState());
   const actionStateRef = useRef(createProjectActionAudioRuntime());
@@ -39,6 +41,7 @@ export function usePreviewEffectAudio(args: {
       syncPreviewEffectAudio({
         currentTime: args.currentTime,
         isPlaying: args.isPlaying,
+        outputGain,
         plans,
         state: stateRef.current,
       }),
@@ -46,6 +49,7 @@ export function usePreviewEffectAudio(args: {
         plan: actionPlan,
         currentTime: args.currentTime,
         isPlaying: args.isPlaying,
+        outputGain,
       }),
     ]).then(
       () => {
@@ -58,7 +62,16 @@ export function usePreviewEffectAudio(args: {
     return () => {
       active = false;
     };
-  }, [args.currentTime, args.isPlaying, onFailure, onRecovery, plans, actionPlan, retryVersion]);
+  }, [
+    args.currentTime,
+    args.isPlaying,
+    onFailure,
+    onRecovery,
+    plans,
+    actionPlan,
+    retryVersion,
+    outputGain,
+  ]);
 
   useEffect(() => {
     const state = stateRef.current;

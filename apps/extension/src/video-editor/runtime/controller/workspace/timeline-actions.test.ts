@@ -55,6 +55,8 @@ function createWorkspace(): Pick<
     inspector: {
       mode: 'selection',
       openSelection: vi.fn(),
+      sceneEdgesPreview: null,
+      previewSceneEdges: vi.fn(),
       watermarkPreview: null,
       previewWatermark: () => undefined,
       registerWatermarkAbort: () => () => undefined,

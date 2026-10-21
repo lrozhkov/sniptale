@@ -354,3 +354,23 @@ it('retains clean-source eligibility with dormant watermark settings', () => {
     'clean-source'
   );
 });
+
+it('composites scene edge fades while retaining clean-source eligibility for dormant settings', () => {
+  const sceneEdges = {
+    intro: { enabled: true, duration: 1, color: '#ff0000ff' },
+    outro: { enabled: false, duration: 2, color: '#0000ffff' },
+  };
+  const project = createProject({ sceneEdges });
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind !== 'clean-source')
+  ).toBe(true);
+  sceneEdges.intro.enabled = false;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+  sceneEdges.intro.enabled = true;
+  sceneEdges.intro.duration = 0;
+  expect(
+    planMp4VideoRenderSpans(project, createSettings()).every((span) => span.kind === 'clean-source')
+  ).toBe(true);
+});

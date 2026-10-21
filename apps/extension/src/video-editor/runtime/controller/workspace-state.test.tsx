@@ -1,3 +1,5 @@
+import { presentWorkspaceSceneEdgesPreview } from './workspace-state';
+import { createVideoProjectSceneEdges } from '../../../features/video/project/scene/edge-fades';
 import { createQuickEditBorder } from '../../../features/video/project/scene/focus-appearance';
 import { createQuickEditWatermark } from '../../../features/video/project/scene/watermark';
 import { presentWorkspaceWatermarkPreview } from './workspace-state';
@@ -708,4 +710,23 @@ it('presents disposable spotlight drafts only for their accepted selection and r
   });
   expect(enabled.motionRegions![0]!.spotlight).toEqual(createQuickEditSpotlight());
   expect(enabled.version).toBe(22);
+});
+
+it('presents scene edges only for the accepted scene snapshot without mutating history data', () => {
+  const project = createEmptyVideoProject('Edges');
+  const settings = createVideoProjectSceneEdges();
+  settings.intro.enabled = true;
+  const preview = { project, settings };
+  expect(presentWorkspaceSceneEdgesPreview(project, { kind: 'scene' }, null)).toBe(project);
+  expect(
+    presentWorkspaceSceneEdgesPreview(project, { kind: 'clip', clipId: 'other' }, preview)
+  ).toBe(project);
+  const recreated = structuredClone(project);
+  expect(presentWorkspaceSceneEdgesPreview(recreated, { kind: 'scene' }, preview)).toBe(recreated);
+  const presented = presentWorkspaceSceneEdgesPreview(project, { kind: 'scene' }, preview);
+  expect(presented).not.toBe(project);
+  expect(presented.version).toBe(24);
+  expect(presented.sceneEdges).toBe(settings);
+  expect(project.sceneEdges).toBeUndefined();
+  expect(project.version).toBe(2);
 });

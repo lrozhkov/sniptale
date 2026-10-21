@@ -326,7 +326,8 @@ export interface VideoProject {
     | 20
     | 21
     | 22
-    | 23;
+    | 23
+    | 24;
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;
@@ -341,6 +342,8 @@ export interface VideoProject {
   sceneBackground?: VideoProjectSceneBackground;
   /** Final-canvas watermark; image references name a declared project material. */
   watermark?: import('../scene/watermark').QuickEditWatermarkSettings;
+  /** Project-clock presentation after the complete visual and audio composition. */
+  sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
   timelinePlacementMode: VideoTimelinePlacementMode;
   duration: number;
   createdAt: number;

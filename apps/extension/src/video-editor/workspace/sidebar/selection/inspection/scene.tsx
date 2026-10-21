@@ -1,3 +1,4 @@
+import { SceneEdgesFields } from './scene-edges';
 import { InspectProjectCommentsPanel } from './comments';
 import { SceneWatermarkFields } from './watermark';
 import { InspectProjectTextPanel } from './text';
@@ -82,6 +83,18 @@ function createSceneGroups(
             onImportImage={props.onImportImage}
           />
         ) : null,
+    },
+    {
+      id: 'scene-edges',
+      semantic: 'transition' as const,
+      label: translate('videoEditor.sidebar.sceneEdges'),
+      visible: Boolean(props.sceneEdges),
+      content: props.sceneEdges ? (
+        <SceneEdgesFields
+          project={props.typingProject ?? props.project}
+          runtime={props.sceneEdges}
+        />
+      ) : null,
     },
     {
       id: 'text',

@@ -1,3 +1,4 @@
+import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import { getProjectExportSpatialRenderer, getProjectExportWatermarkRenderer } from '../../runtime';
 import { type LoadedImagesMap, drawProjectFrame } from '../../renderer';
 import type { VideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
@@ -76,6 +77,7 @@ export async function renderCompositeFrame(args: RenderCompositeFrameArgs): Prom
     );
     captions.draw(context, currentTime);
     watermark?.draw(context);
+    drawVideoProjectSceneEdges(context, project, currentTime);
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }

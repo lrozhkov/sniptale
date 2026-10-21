@@ -94,6 +94,8 @@ const mocks = vi.hoisted(() => {
     inspector: {
       mode: 'selection',
       openSelection: action,
+      sceneEdgesPreview: null,
+      previewSceneEdges: vi.fn(),
       watermarkPreview: null,
       previewWatermark: () => undefined,
       registerWatermarkAbort: () => () => undefined,

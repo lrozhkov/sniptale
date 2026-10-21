@@ -1,3 +1,4 @@
+import { resolveVideoProjectSceneEdgePlan } from '../../../../features/video/project/scene/edge-fades';
 import { isMimeTypeCompatibleWithFormat } from '../../persistence';
 import { getAssetById } from '../../../../features/video/project/timeline/basics';
 import { getMediaClipSourceTime } from '../../../../features/video/project/timeline/rate';
@@ -151,6 +152,10 @@ export function createCleanSourceSpan(
   end: number,
   timelineIndex: VideoCompositionTimelineIndex
 ): Mp4VideoRenderSpan {
+  const edges = resolveVideoProjectSceneEdgePlan(project).visualEnvelope;
+  if (edges.fadeIn > 0 || edges.fadeOut > 0) {
+    return createCompositeSpan(start, end, 'visual-layer');
+  }
   if (project.watermark && project.watermark.mode !== 'none') {
     return createCompositeSpan(start, end, 'visual-layer');
   }
