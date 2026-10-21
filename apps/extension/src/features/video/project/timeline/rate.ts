@@ -1,3 +1,7 @@
+import {
+  MIN_VIDEO_PROJECT_PLAYBACK_RATE,
+  MAX_VIDEO_PROJECT_PLAYBACK_RATE,
+} from '../validation/primitives';
 import type { VideoProjectAudioClip, VideoProjectVideoClip } from '../types/index';
 
 function clampValue(value: number, min: number, max: number): number {
@@ -9,7 +13,7 @@ export function clampClipPlaybackRate(value: number): number {
     return 1;
   }
 
-  return clampValue(value, 1, 4);
+  return clampValue(value, MIN_VIDEO_PROJECT_PLAYBACK_RATE, MAX_VIDEO_PROJECT_PLAYBACK_RATE);
 }
 
 export function normalizeClipPlaybackRate(value: number): number {

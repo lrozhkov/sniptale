@@ -329,7 +329,8 @@ export interface VideoProject {
     | 23
     | 24
     | 25
-    | 26;
+    | 26
+    | 27;
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;

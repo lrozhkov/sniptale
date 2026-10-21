@@ -66,7 +66,7 @@ describe('retained Native bookend recipes', () => {
     delete cleared.bookendPresets;
     expect(applyVideoProjectMutationPatch(cleared, {}).version).toBe(25);
     expect(isHydratableVideoProject({ ...changed, version: 24 })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 28 })).toBe(false);
   });
 
   it('protects all four remembered references even in None mode and with no visible clips', () => {

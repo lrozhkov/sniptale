@@ -1,2 +1,4 @@
-export const VIDEO_EDITOR_PLAYBACK_RATE_MIN = 0.1;
-export const VIDEO_EDITOR_PLAYBACK_RATE_MAX = 16;
+export {
+  MIN_VIDEO_PROJECT_PLAYBACK_RATE as VIDEO_EDITOR_PLAYBACK_RATE_MIN,
+  MAX_VIDEO_PROJECT_PLAYBACK_RATE as VIDEO_EDITOR_PLAYBACK_RATE_MAX,
+} from '../../../../features/video/project/validation/primitives';

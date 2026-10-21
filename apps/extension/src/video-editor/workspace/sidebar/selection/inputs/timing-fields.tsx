@@ -75,6 +75,7 @@ function renderClipPlaybackRateField(
       label={translate('videoEditor.sidebar.playbackRateLabel')}
       disabled={selectedTrackLocked}
       value={playbackRate}
+      precision={4}
       min={VIDEO_EDITOR_PLAYBACK_RATE_MIN}
       max={VIDEO_EDITOR_PLAYBACK_RATE_MAX}
       step={0.01}

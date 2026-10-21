@@ -85,6 +85,12 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (
+    (value['type'] === 'VIDEO' || value['type'] === 'AUDIO') &&
+    typeof value['playbackRate'] === 'number' &&
+    value['playbackRate'] < 0.1
+  )
+    return 27;
   if (value['windowCornerRadius'] !== undefined) return 15;
   if (value['sourceCrop'] !== undefined) return 13;
   if (value['cameraHiddenRanges'] !== undefined) return 12;
@@ -107,7 +113,7 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 26) &&
+    isBoundedNumber(version, 2, 27) &&
     Number.isInteger(version) &&
     (version >= 26 ||
       (value['compositionJoins'] === undefined &&

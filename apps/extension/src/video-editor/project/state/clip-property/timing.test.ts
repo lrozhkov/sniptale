@@ -5,6 +5,8 @@ import {
   createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
+import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import { parseHydratableVideoProject } from '../../../../features/video/project/validation/root';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
   VideoClipTransitionKind,
@@ -281,4 +283,43 @@ it('keeps visual-origin linked fades at five seconds', () => {
   store.getState().setProject(project);
   store.getState().updateClipFades('clip-1', { fadeInMs: 12000 });
   expect(store.getState().project?.clips[0]?.fadeInMs).toBe(5000);
+});
+
+it('edits linked source clips to exact 1/16 and reopens the resulting schema27 montage', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'slow',
+    filename: 'slow.webm',
+    width: 640,
+    height: 360,
+    duration: 1,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: true,
+  });
+  const before = structuredClone(project);
+  const store = createTimingStore();
+  store.getState().setProject(project);
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  store.getState().selectClip(clip.id);
+  store.getState().updateClipPlaybackRate(clip.id, 0.0625);
+  const changed = store.getState().project!;
+  expect(changed.version).toBe(27);
+  expect(
+    changed.clips.map((clip) => ({
+      duration: clip.duration,
+      rate: 'playbackRate' in clip ? clip.playbackRate : undefined,
+    }))
+  ).toEqual([
+    { duration: 16, rate: 0.0625 },
+    { duration: 16, rate: 0.0625 },
+  ]);
+  expect(changed.duration).toBe(16);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))?.clips).toEqual(
+    changed.clips
+  );
+  expect(store.getState().selection).toEqual({ kind: 'clip', clipId: clip.id });
+  expect(project).toEqual(before);
+  store.getState().updateClipPlaybackRate(clip.id, 1);
+  expect(store.getState().project!.version).toBe(27);
+  expect(store.getState().project!.duration).toBe(1);
 });

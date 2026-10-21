@@ -184,8 +184,8 @@ describe('workspace-sidebar/selection/clip-timing', () => {
       setInputValue(playbackRateInput!, '0');
     });
 
-    expect(mapSliderValueToPlaybackRate(0)).toBe(0.1);
-    expect(onUpdateClipPlaybackRateMock).toHaveBeenCalledWith('clip-1', 0.1);
+    expect(mapSliderValueToPlaybackRate(0)).toBe(0.0625);
+    expect(onUpdateClipPlaybackRateMock).toHaveBeenCalledWith('clip-1', 0.0625);
   });
 });
 
@@ -229,3 +229,22 @@ it.each([
     expect(update).toHaveBeenLastCalledWith('clip', { fadeInMs: maximum * 1000 });
   }
 );
+
+it('displays 1/16 exactly and retains it when the value is focused and left without editing', async () => {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const update = vi.fn();
+  const clip = { ...createClip(), playbackRate: 0.0625, duration: 160 };
+  await act(async () =>
+    root?.render(<ClipTimingControls {...createPanelProps(clip, update)} locked={false} />)
+  );
+  const input = [...container.querySelectorAll<HTMLInputElement>('input[type="text"]')].find(
+    (input) => input.value === '0.0625'
+  );
+  expect(input).toBeDefined();
+  await act(async () => input!.focus());
+  await act(async () => input!.blur());
+  expect(input!.value).toBe('0.0625');
+  expect(update).not.toHaveBeenCalled();
+});

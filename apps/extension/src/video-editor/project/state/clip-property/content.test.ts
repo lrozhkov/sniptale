@@ -72,10 +72,10 @@ it('updates fit mode and clamps fit scale percent for media clips', () => {
   expect(clip).toEqual(
     expect.objectContaining({
       fitMode: VideoMediaFitMode.COVER,
-      fitScalePercent: 10,
+      fitScalePercent: 1,
     })
   );
-  expect(clip?.transform.width).toBe(192);
+  expect(clip?.transform.width).toBe(19);
 });
 
 it('updates textual content and style through the split text style owner', () => {

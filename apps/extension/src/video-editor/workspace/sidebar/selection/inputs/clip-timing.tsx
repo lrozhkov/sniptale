@@ -135,6 +135,7 @@ function ClipPlaybackRateField(props: {
     <SliderField
       label={translate('videoEditor.sidebar.playbackRateLabel')}
       value={playbackRate}
+      precision={4}
       min={VIDEO_EDITOR_PLAYBACK_RATE_MIN}
       max={VIDEO_EDITOR_PLAYBACK_RATE_MAX}
       step={0.01}

@@ -53,7 +53,7 @@ it('admits phases only from schema17 and preserves them through hydration mutati
   expect(isHydratableVideoProject(changed)).toBe(true);
   for (let version = 2; version < 17; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 28 })).toBe(false);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))?.motionRegions).toEqual(
     changed.motionRegions
   );

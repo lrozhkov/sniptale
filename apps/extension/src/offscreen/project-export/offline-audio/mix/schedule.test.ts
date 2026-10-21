@@ -9,10 +9,12 @@ const { clampClipPlaybackRateMock } = vi.hoisted(() => ({
   clampClipPlaybackRateMock: vi.fn((value) => value),
 }));
 
-vi.mock('../../../../features/video/project/timeline', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../features/video/project/timeline')>()),
-  clampClipPlaybackRate: clampClipPlaybackRateMock,
-}));
+vi.mock('../../../../features/video/project/timeline', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../features/video/project/timeline')>();
+  clampClipPlaybackRateMock.mockImplementation(actual.clampClipPlaybackRate);
+  return { ...actual, clampClipPlaybackRate: clampClipPlaybackRateMock };
+});
 
 class FakeOfflineAudioContext {
   gains: Array<NonNullable<FakeOfflineAudioContext['lastGain']>> = [];
@@ -264,3 +266,39 @@ it('uses a separate attenuation stage before crossfade and preserves manual auto
   expect(manual?.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 0);
   expect(manual?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.4, 4);
 });
+
+it.each([0.0625, 0.125, 0.5, 8, 16])(
+  'uses the real clip rate %s for prepared PCM and offline source scheduling',
+  async (rate) => {
+    const { scheduleOfflineAudioClipMix } = await import('./schedule');
+    const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+      OfflineAudioContext;
+    const project = createEmptyVideoProject('Exact rate');
+    const asset = createVideoProjectAsset(
+      'Audio',
+      'AUDIO',
+      { kind: 'project-asset', projectAssetId: 'local' },
+      {
+        width: 0,
+        height: 0,
+        duration: 0.1,
+        mimeType: 'audio/wav',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const clip = {
+      ...createAudioClipFromAsset(project.tracks[0]!.id, asset),
+      startTime: 1,
+      sourceStart: 0.02,
+      sourceDuration: 0.04,
+      duration: 0.04 / rate,
+      playbackRate: rate,
+    };
+    await scheduleOfflineAudioClipMix(context, clip, createAudioBuffer(1, 48000, 4800));
+    expect(context.lastSource?.buffer?.length).toBe(Math.round((0.04 / rate) * 48000));
+    expect(context.lastSource?.start).toHaveBeenCalledWith(1, 0, 0.04 / rate);
+    expect(context.lastSource?.stop).toHaveBeenCalledWith(1 + 0.04 / rate);
+  }
+);

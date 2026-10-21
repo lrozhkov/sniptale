@@ -35,17 +35,20 @@ function mapPlaybackRateToSliderValue(playbackRate: number) {
 }
 
 export function mapSliderValueToPlaybackRate(sliderValue: number) {
-  const progress =
-    clampSliderValue(sliderValue) / (PLAYBACK_RATE_SLIDER_MAX - PLAYBACK_RATE_SLIDER_MIN);
+  const bounded = clampSliderValue(sliderValue);
+  if (bounded === PLAYBACK_RATE_SLIDER_MIN) return VIDEO_EDITOR_PLAYBACK_RATE_MIN;
+  if (bounded === PLAYBACK_RATE_SLIDER_MAX) return VIDEO_EDITOR_PLAYBACK_RATE_MAX;
+  const progress = bounded / (PLAYBACK_RATE_SLIDER_MAX - PLAYBACK_RATE_SLIDER_MIN);
   const playbackRate = Math.exp(
     LOG_PLAYBACK_RATE_MIN + progress * (LOG_PLAYBACK_RATE_MAX - LOG_PLAYBACK_RATE_MIN)
   );
 
-  return roundPlaybackRate(playbackRate);
+  return normalizePlaybackRate(roundPlaybackRate(playbackRate));
 }
 
 export function formatPlaybackRateLabel(playbackRate: number) {
   const normalizedPlaybackRate = normalizePlaybackRate(playbackRate);
+  if (normalizedPlaybackRate < 0.1) return `${normalizedPlaybackRate.toFixed(4)}x`;
   return normalizedPlaybackRate < 1
     ? `${normalizedPlaybackRate.toFixed(3)}x`
     : `${normalizedPlaybackRate.toFixed(2)}x`;

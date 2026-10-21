@@ -50,7 +50,7 @@ it('admits exact bounded anchors and remembered None without rewriting reads or 
   expect(isExportReadyVideoProject(none)).toBe(true);
   expect(resolveVideoProjectCompositionJoinPlans(none)).toEqual([]);
   expect(isHydratableVideoProject({ ...project, version: 25 })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 28 })).toBe(false);
   expect(isHydratableVideoProject(createProject([]))).toBe(true);
   const cleared = { ...project };
   delete cleared.compositionJoins;

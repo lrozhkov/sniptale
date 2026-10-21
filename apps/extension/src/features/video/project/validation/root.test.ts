@@ -92,7 +92,7 @@ it('admits source-bound authored text only in version five and preserves dormant
   expect(isHydratableVideoProject({ ...changed, version: 6 })).toBe(true);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 27])
+  for (const version of [2, 3, 4, 28])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { name: 'Renamed' }).version).toBe(5);
   expect(isExportReadyVideoProject({ ...changed, clips: [] })).toBe(true);
@@ -130,7 +130,7 @@ it('fences camera reflection at schema eight and retains the version after remov
     expect(changed.version).toBe(8);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 27])
+    for (const version of [2, 3, 4, 5, 6, 7, 28])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(8);
   }
@@ -157,7 +157,7 @@ it('admits authored media shadow colors only in schema nine without writing defa
     expect(changed.version).toBe(9);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
     expect(isExportReadyVideoProject(changed)).toBe(true);
-    for (const version of [2, 3, 4, 5, 6, 7, 8, 27])
+    for (const version of [2, 3, 4, 5, 6, 7, 8, 28])
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(9);
   }
@@ -215,7 +215,7 @@ it('fences circle at schema ten and retains dormant camera settings without open
   expect(changed.version).toBe(10);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 27])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 28])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10]) {
     const parsed = parseHydratableVideoProject({ ...project, version });
@@ -257,7 +257,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   expect(changed.version).toBe(11);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toEqual(changed);
   expect(isExportReadyVideoProject(changed)).toBe(true);
-  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 27])
+  for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 28])
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
   for (const version of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     const parsed = parseHydratableVideoProject({
@@ -298,7 +298,7 @@ it('fences positional camera crops at schema eleven and keeps inherited data abs
   ).toBe(11);
 });
 
-it.each([1, 2.5, 16.5, 27, NaN, Infinity, '12', null, undefined])(
+it.each([1, 2.5, 16.5, 28, NaN, Infinity, '12', null, undefined])(
   'refuses unsupported or malformed schema version %j',
   (version) => {
     expect(isHydratableVideoProject({ ...createEmptyVideoProject('Version'), version })).toBe(
@@ -327,7 +327,7 @@ it('fences per-media source crop at schema thirteen and retains the version afte
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version <= 12; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 28 })).toBe(false);
   for (const sourceCrop of [
     null,
     [],
@@ -376,7 +376,7 @@ it('fences decorated window radius at schema fifteen without rewriting old proje
     expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
     for (let version = 2; version <= 14; version++)
       expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-    expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
+    expect(isHydratableVideoProject({ ...changed, version: 28 })).toBe(false);
     expect(applyVideoProjectMutationPatch(changed, { clips: project.clips }).version).toBe(15);
   }
   for (const radius of [null, '12', NaN, Infinity, -1, 4096.01, {}, []])
@@ -405,7 +405,7 @@ it('admits watermark at schema twenty without writing defaults and retains the v
   for (let version = 2; version < 20; version++) {
     expect(isHydratableVideoProject({ ...authored, version })).toBe(false);
   }
-  expect(isHydratableVideoProject({ ...authored, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject({ ...authored, version: 28 })).toBe(false);
   expect(isHydratableVideoProject({ ...authored, watermark: null })).toBe(false);
   expect(
     isHydratableVideoProject({
@@ -515,7 +515,7 @@ it('admits spotlight settings only in schema 22 and refuses malformed or incompa
   const candidate = { ...project, version: 22, motionRegions: [region] };
   expect.soft(isHydratableVideoProject(candidate)).toBe(true);
   expect.soft(isHydratableVideoProject({ ...candidate, version: 21 })).toBe(false);
-  expect.soft(isHydratableVideoProject({ ...candidate, version: 27 })).toBe(false);
+  expect.soft(isHydratableVideoProject({ ...candidate, version: 28 })).toBe(false);
   for (const patch of [
     { spotlight: null },
     { spotlight: { ...region.spotlight, blur: Infinity } },
@@ -591,7 +591,7 @@ it('fences complete scene edges at schema24 and retains their version after rese
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 24; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 27 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 28 })).toBe(false);
   for (const sceneEdges of [
     null,
     {},
@@ -608,3 +608,44 @@ it('fences complete scene edges at schema24 and retains their version after rese
   expect(original.sceneEdges).toBeUndefined();
   expect(original.version).toBe(2);
 });
+
+it.each(['VIDEO', 'AUDIO'] as const)(
+  'fences %s rates below 0.1 at schema27 and retains the version after rate reset',
+  async (type) => {
+    const { createVideoProjectFromRecording } = await import('../factories/creation');
+    const project = createVideoProjectFromRecording({
+      recordingId: 'slow',
+      filename: 'slow.webm',
+      width: 640,
+      height: 360,
+      duration: 1,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: true,
+    });
+    const before = structuredClone(project);
+    const clips = project.clips.map((clip) =>
+      clip.type === type ? { ...clip, playbackRate: 0.0625, duration: 16 } : clip
+    );
+    const changed = applyVideoProjectMutationPatch(project, { clips, duration: 16 });
+    expect(changed.version).toBe(27);
+    expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+    for (let version = 2; version <= 26; version++)
+      expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+    for (const rate of [0, 0.06249, 16.01, NaN, Infinity])
+      expect(
+        isHydratableVideoProject({
+          ...changed,
+          clips: changed.clips.map((clip) =>
+            clip.type === type ? { ...clip, playbackRate: rate } : clip
+          ),
+        })
+      ).toBe(false);
+    const reset = applyVideoProjectMutationPatch(changed, { clips: project.clips, duration: 1 });
+    expect(reset.version).toBe(27);
+    expect(isHydratableVideoProject(reset)).toBe(true);
+    expect(project).toEqual(before);
+    for (const version of [2, 10, 26] as const)
+      expect(isHydratableVideoProject({ ...project, version })).toBe(true);
+  }
+);
