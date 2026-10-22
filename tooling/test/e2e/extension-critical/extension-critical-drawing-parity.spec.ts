@@ -5,6 +5,164 @@ import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critica
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 
+async function arrowShaftY(canvas: Locator, point: { x: number; y: number }) {
+  return canvas.evaluate((node, point) => {
+    if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas unavailable');
+    const rect = node.getBoundingClientRect();
+    const scaleX = node.width / rect.width;
+    const scaleY = node.height / rect.height;
+    const column = Math.round((point.x - rect.x) * scaleX);
+    const firstRow = Math.round((point.y - rect.y - 24) * scaleY);
+    const data = node.getContext('2d')!.getImageData(column, firstRow, 1, Math.round(48 * scaleY));
+    let weight = 0;
+    let weightedY = 0;
+    for (let row = 0; row < data.height; row++) {
+      const offset = row * 4;
+      const red = data.data[offset]!;
+      const green = data.data[offset + 1]!;
+      const blue = data.data[offset + 2]!;
+      const alpha = data.data[offset + 3]!;
+      if (red > green + 40 && red > blue + 40 && alpha > 0) {
+        weight += alpha;
+        weightedY += (rect.y + (firstRow + row + 0.5) / scaleY) * alpha;
+      }
+    }
+    return weight ? weightedY / weight : null;
+  }, point);
+}
+
+async function checkFreeArrowEndpoints(
+  page: Page,
+  canvas: Locator,
+  start: { x: number; y: number },
+  screenshotPath: string,
+  undo?: () => Promise<void>
+) {
+  const end = { x: start.x + 300, y: start.y + 12 };
+  const middle = { x: start.x + 150, y: start.y };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 4 });
+  await page.mouse.up();
+  await page.screenshot({ path: screenshotPath.replace('.png', '-created.png'), fullPage: false });
+  const expectShaft = async (expected: number) => {
+    await expect
+      .poll(async () => {
+        const actual = await arrowShaftY(canvas, middle);
+        return actual === null ? Infinity : Math.abs(actual - expected);
+      })
+      .toBeLessThanOrEqual(1.5);
+  };
+  await expectShaft(start.y + 6);
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, start.y + 8, { steps: 4 });
+  await expectShaft(start.y + 4);
+  await page.keyboard.down('Shift');
+  await page.mouse.move(end.x + 1, start.y + 8);
+  await expectShaft(start.y);
+  await page.keyboard.up('Shift');
+  await page.mouse.move(end.x, start.y + 8);
+  await expectShaft(start.y + 4);
+  await page.mouse.up();
+  await expectShaft(start.y + 4);
+  await page.screenshot({ path: screenshotPath, fullPage: false });
+  if (undo) {
+    await undo();
+    await expectShaft(start.y + 6);
+    await undo();
+  }
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`free arrow creation and endpoint angles across all surfaces ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      for (const mode of ['drawing', 'video-recording', 'crop']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page
+          .locator(`[data-ui="content.toolbar.mode-option.${mode === 'crop' ? 'drawing' : mode}"]`)
+          .click();
+        if (mode === 'crop') {
+          await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+          await page
+            .locator('[data-ui="content.toolbar.timer-menu"]')
+            .getByText('No delay', { exact: true })
+            .click();
+          await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+          await page.mouse.move(200, 180);
+          await page.mouse.down();
+          await page.mouse.move(950, 440, { steps: 4 });
+          await page.mouse.up();
+          await page.locator('[data-ui="content.crop.mode.drawing"]').click();
+        }
+        const scope =
+          mode === 'crop'
+            ? page.locator('[data-ui="content.crop.drawing-slot"]')
+            : page.locator('[data-ui="content.toolbar.root"]');
+        await scope.locator('[data-ui="content.toolbar.drawing.arrow"]').click();
+        const canvas = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-layer"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+            : '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+        );
+        await expect(canvas).toHaveCSS('pointer-events', 'auto');
+        const cropBounds =
+          mode === 'crop'
+            ? (await page.locator('.sniptale-selection-final-frame').boundingBox())!
+            : null;
+        await checkFreeArrowEndpoints(
+          page,
+          canvas,
+          cropBounds
+            ? {
+                x: Math.round(cropBounds.x + 80),
+                y: Math.round(cropBounds.y + cropBounds.height / 2),
+              }
+            : { x: 300, y: mode === 'drawing' ? 230 : 280 },
+          info.outputPath(`${mode}-free-arrow.png`),
+          mode === 'video-recording'
+            ? undefined
+            : mode === 'crop'
+              ? () => page.locator('[data-ui="content.crop.undo"]').click()
+              : () => page.keyboard.press('Control+z')
+        );
+        if (mode === 'crop') await page.keyboard.press('Escape');
+      }
+      const editor = await context.newPage();
+      try {
+        await editor.setViewportSize(size);
+        await applyHarnessBootstrap(editor, {});
+        await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+        await editor.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+        const upper = (await editor
+          .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+          .boundingBox())!;
+        const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.lower-canvas');
+        await checkFreeArrowEndpoints(
+          editor,
+          canvas,
+          {
+            x: Math.round(upper.x + upper.width * 0.3),
+            y: Math.round(upper.y + upper.height * 0.5),
+          },
+          info.outputPath('editor-free-arrow.png')
+        );
+      } finally {
+        await editor.close();
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
 async function checkDrawingPlacement(page: Page, editor: boolean) {
   const toolbar = page.locator(
     `[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.root'}"]`
