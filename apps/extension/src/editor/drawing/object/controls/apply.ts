@@ -13,7 +13,7 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
   if (!drawing) return;
   applyDrawingSelectionChrome(object);
   if (drawing.kind === 'arrow' && object instanceof Path) {
-    object.controls = createDrawingArrowControls();
+    object.controls = createDrawingArrowControls(drawing);
     syncDrawingArrowControlAnchors(object, drawing);
     object.set({ hasBorders: false, lockRotation: true, perPixelTargetFind: true });
     object.setCoords();

@@ -15,6 +15,44 @@ import {
 } from './geometry';
 import type { DrawingObject } from './model';
 
+it('keeps bent-arrow activation on its ink and transforms every authored point', () => {
+  const arrow = {
+    kind: 'arrow' as const,
+    id: 'bent',
+    design: 'freehand' as const,
+    start: { x: 0, y: 0 },
+    end: { x: 200, y: 0 },
+    bendPoints: [{ x: 100, y: 100 }],
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  expect(hitTestDrawingObject(arrow, { x: 100, y: 100 })).toBe(true);
+  expect(hitTestDrawingObject(arrow, { x: 100, y: 0 })).toBe(false);
+  expect(getDrawingObjectBounds(arrow).height).toBeGreaterThanOrEqual(100);
+  expect(translateDrawingObject(arrow, { x: 10, y: 20 })).toMatchObject({
+    bendPoints: [{ x: 110, y: 120 }],
+    start: { x: 10, y: 20 },
+    end: { x: 210, y: 20 },
+  });
+  const rotated = rotateDrawingObjectAround(arrow, { x: 0, y: 0 }, 90);
+  expect(rotated.kind).toBe('arrow');
+  if (rotated.kind !== 'arrow') throw new Error('Expected arrow');
+  expect(rotated.bendPoints![0]!.x).toBeCloseTo(-100);
+  expect(rotated.bendPoints![0]!.y).toBeCloseTo(100);
+  const bounds = getDrawingObjectBounds(arrow);
+  const resized = replaceDrawingObjectBounds(arrow, {
+    x: bounds.x + 20,
+    y: bounds.y + 10,
+    width: bounds.width * 2,
+    height: bounds.height * 2,
+  });
+  if (resized.kind !== 'arrow') throw new Error('Expected arrow');
+  expect(resized.bendPoints![0]!.x).toBeCloseTo(bounds.x + 20 + (100 - bounds.x) * 2);
+  expect(resized.bendPoints![0]!.y).toBeCloseTo(bounds.y + 10 + (100 - bounds.y) * 2);
+  expect(arrow.bendPoints).toEqual([{ x: 100, y: 100 }]);
+});
+
 it('rigidly rotates mixed geometry around one pivot without changing styles or local sizes', () => {
   const objects: DrawingObject[] = [
     {

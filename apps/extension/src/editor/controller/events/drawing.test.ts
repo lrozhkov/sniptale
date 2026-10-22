@@ -96,6 +96,7 @@ function createCanvas() {
     discardActiveObject: vi.fn(),
     defaultCursor: 'tool-cursor',
     endCurrentTransform: vi.fn(),
+    getActiveObject: vi.fn(() => undefined),
     getActiveObjects: vi.fn<() => unknown[]>(() => []),
     getScenePoint: vi.fn(
       (event: { point?: { x: number; y: number } }) => event.point ?? { x: 10, y: 20 }

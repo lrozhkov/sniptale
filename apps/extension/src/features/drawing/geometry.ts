@@ -342,7 +342,12 @@ export function translateDrawingObject(object: DrawingObject, delta: DrawingPoin
     };
   }
   if (object.kind === 'arrow')
-    return { ...object, start: move(object.start), end: move(object.end) };
+    return {
+      ...object,
+      start: move(object.start),
+      end: move(object.end),
+      ...(object.bendPoints ? { bendPoints: object.bendPoints.map(move) } : {}),
+    };
   return { ...object, bounds: { ...object.bounds, ...move(object.bounds) } };
 }
 
@@ -359,6 +364,9 @@ export function rotateDrawingObjectAround(
       ...object,
       start: rotateDrawingPoint(object.start, center, delta),
       end: rotateDrawingPoint(object.end, center, delta),
+      ...(object.bendPoints
+        ? { bendPoints: object.bendPoints.map((point) => rotateDrawingPoint(point, center, delta)) }
+        : {}),
     };
   }
   const originalCenter = getDrawingBoundsCenter(getDrawingObjectBounds(object));
@@ -378,14 +386,21 @@ export function replaceDrawingObjectBounds(
 ): DrawingObject {
   const target = normalizeBounds(nextBounds);
   if (object.kind === 'arrow') {
-    const previous = createDrawingBounds(object.start, object.end);
+    const previous = object.bendPoints?.length
+      ? getDrawingObjectBounds(object)
+      : createDrawingBounds(object.start, object.end);
     const scaleX = previous.width === 0 ? 1 : target.width / previous.width;
     const scaleY = previous.height === 0 ? 1 : target.height / previous.height;
     const projectEndpoint = (point: DrawingPoint) => ({
       x: target.x + (point.x - previous.x) * scaleX,
       y: target.y + (point.y - previous.y) * scaleY,
     });
-    return { ...object, start: projectEndpoint(object.start), end: projectEndpoint(object.end) };
+    return {
+      ...object,
+      start: projectEndpoint(object.start),
+      end: projectEndpoint(object.end),
+      ...(object.bendPoints ? { bendPoints: object.bendPoints.map(projectEndpoint) } : {}),
+    };
   }
   const previous = getDrawingObjectBounds(object);
   const scaleX = previous.width === 0 ? 1 : target.width / previous.width;

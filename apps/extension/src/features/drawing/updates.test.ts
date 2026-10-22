@@ -1,6 +1,32 @@
 import { expect, it } from 'vitest';
 import { resolveUpdatedQuickObject } from './updates';
 
+it.each([true, false])(
+  'drops bends when switching to a filled arrow: dynamic %s',
+  (dynamicWidth) => {
+    const arrow = {
+      kind: 'arrow' as const,
+      id: 'bent',
+      color: '#f00',
+      width: 12,
+      start: { x: 0, y: 0 },
+      end: { x: 200, y: 0 },
+      design: 'freehand' as const,
+      dynamicWidth: false,
+      bendPoints: [{ x: 100, y: 80 }],
+    };
+    expect(resolveUpdatedQuickObject(arrow, { color: '#fff' })).toHaveProperty(
+      'bendPoints',
+      arrow.bendPoints
+    );
+    const straight = resolveUpdatedQuickObject(arrow, { design: 'standard', dynamicWidth });
+    expect(straight).not.toHaveProperty('bendPoints');
+    expect(resolveUpdatedQuickObject(straight, { design: 'freehand' })).not.toHaveProperty(
+      'bendPoints'
+    );
+  }
+);
+
 it('updates pencil, marker, and arrow properties without dropping geometry', () => {
   expect(
     resolveUpdatedQuickObject(

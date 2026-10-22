@@ -27,14 +27,17 @@ function buildRoughArrow(object: DrawingArrowObject): readonly Drawable[] {
     const [start, end] = line;
     if (!start || !end) return [];
     return [
-      ROUGH_GENERATOR.line(start.x, start.y, end.x, end.y, {
-        bowing: 0.7,
-        preserveVertices: true,
-        roughness: 0.8,
-        seed: seed + index,
-        stroke: object.color,
-        strokeWidth,
-      }),
+      ROUGH_GENERATOR.linearPath(
+        line.map((point) => [point.x, point.y]),
+        {
+          bowing: 0.7,
+          preserveVertices: true,
+          roughness: 0.8,
+          seed: seed + index,
+          stroke: object.color,
+          strokeWidth,
+        }
+      ),
     ];
   });
   roughArrowCache.set(object, drawables);

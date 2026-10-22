@@ -71,6 +71,13 @@ export function translateEditorDrawingObject(
       end: translatePoint(drawing.end, translation.x, translation.y),
       id,
       start: translatePoint(drawing.start, translation.x, translation.y),
+      ...(drawing.bendPoints
+        ? {
+            bendPoints: drawing.bendPoints.map((point) =>
+              translatePoint(point, translation.x, translation.y)
+            ),
+          }
+        : {}),
     };
   }
   return {
@@ -175,6 +182,7 @@ export function synchronizeEditorDrawingObjectFromFabric(
       ...drawing,
       end: transformEndpoint(drawing.end),
       start: transformEndpoint(drawing.start),
+      ...(drawing.bendPoints ? { bendPoints: drawing.bendPoints.map(transformEndpoint) } : {}),
       width: drawing.width * scale,
     };
   } else if (

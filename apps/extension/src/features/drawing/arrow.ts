@@ -1,4 +1,4 @@
-import type { DrawingArrowObject, DrawingPoint } from './model';
+import { MAX_DRAWING_ARROW_BENDS, type DrawingArrowObject, type DrawingPoint } from './model';
 
 const EDITOR_DYNAMIC_TAIL_RATIO = 0.38;
 const EDITOR_DYNAMIC_END_RATIO = 1.28;
@@ -64,22 +64,132 @@ export function buildDrawingArrowOutline(object: DrawingArrowObject): DrawingPoi
   ];
 }
 
+type ShaftSample = { point: DrawingPoint; span: number };
+const shaftCache = new WeakMap<DrawingArrowObject, readonly ShaftSample[]>();
+
+function sampleArrowShaft(object: DrawingArrowObject): readonly ShaftSample[] {
+  const cached = shaftCache.get(object);
+  if (cached) return cached;
+  const bends = object.design === 'freehand' ? (object.bendPoints ?? []) : [];
+  if (bends.length === 0) {
+    return [
+      { point: object.start, span: 0 },
+      { point: object.end, span: 0 },
+    ];
+  }
+  const anchors = [object.start, ...bends, object.end];
+  const samples: ShaftSample[] = [{ point: object.start, span: 0 }];
+  for (let span = 0; span < anchors.length - 1; span += 1) {
+    const start = anchors[span]!;
+    const end = anchors[span + 1]!;
+    const previous = anchors[span - 1] ?? start;
+    const next = anchors[span + 2] ?? end;
+    for (let step = 1; step <= 24; step += 1) {
+      const progress = step / 24;
+      const square = progress * progress;
+      const cube = square * progress;
+      const interpolate = (axis: 'x' | 'y') =>
+        0.5 *
+        (2 * start[axis] +
+          (-previous[axis] + end[axis]) * progress +
+          (2 * previous[axis] - 5 * start[axis] + 4 * end[axis] - next[axis]) * square +
+          (-previous[axis] + 3 * start[axis] - 3 * end[axis] + next[axis]) * cube);
+      samples.push({
+        point: step === 24 ? end : { x: interpolate('x'), y: interpolate('y') },
+        span,
+      });
+    }
+  }
+  shaftCache.set(object, samples);
+  return samples;
+}
+
+export type DrawingArrowBendTarget = {
+  readonly point: DrawingPoint;
+  readonly index: number;
+  readonly insert: boolean;
+};
+
+/** Finds an existing bend or a new insertion point on the shaft, never inside its empty bounds. */
+export function resolveDrawingArrowBendTarget(
+  object: DrawingArrowObject,
+  point: DrawingPoint,
+  tolerance = 9
+): DrawingArrowBendTarget | null {
+  if (object.design !== 'freehand') return null;
+  const bends = object.bendPoints ?? [];
+  const existing = bends.findIndex(
+    (bend) => Math.hypot(point.x - bend.x, point.y - bend.y) <= tolerance
+  );
+  if (existing >= 0) return { point: bends[existing]!, index: existing, insert: false };
+  if (bends.length >= MAX_DRAWING_ARROW_BENDS) return null;
+  if ([object.start, object.end].some((end) => Math.hypot(point.x - end.x, point.y - end.y) <= 16))
+    return null;
+  const samples = sampleArrowShaft(object);
+  let nearest: DrawingArrowBendTarget | null = null;
+  let distance = tolerance;
+  for (let index = 1; index < samples.length; index += 1) {
+    const start = samples[index - 1]!.point;
+    const end = samples[index]!.point;
+    const delta = { x: end.x - start.x, y: end.y - start.y };
+    const square = delta.x * delta.x + delta.y * delta.y;
+    const ratio =
+      square === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((point.x - start.x) * delta.x + (point.y - start.y) * delta.y) / square)
+          );
+    const projected = { x: start.x + ratio * delta.x, y: start.y + ratio * delta.y };
+    const candidateDistance = Math.hypot(point.x - projected.x, point.y - projected.y);
+    if (candidateDistance <= distance) {
+      distance = candidateDistance;
+      nearest = { point: projected, index: samples[index]!.span, insert: true };
+    }
+  }
+  return nearest;
+}
+
+/** Returns a new authored arrow without mutating its previous history entry. */
+export function updateDrawingArrowBend(
+  object: DrawingArrowObject,
+  target: DrawingArrowBendTarget,
+  point: DrawingPoint
+): DrawingArrowObject {
+  if (object.design !== 'freehand') return object;
+  const bends = [...(object.bendPoints ?? [])];
+  if (target.insert) {
+    if (bends.length >= MAX_DRAWING_ARROW_BENDS || target.index < 0 || target.index > bends.length)
+      return object;
+    bends.splice(target.index, 0, point);
+  } else {
+    if (!bends[target.index]) return object;
+    bends[target.index] = point;
+  }
+  return { ...object, bendPoints: bends };
+}
+
 /** Builds the ideal open-arrow geometry used for bounds, hit testing, and sketch rendering. */
 export function buildDrawingFreehandArrowLines(object: DrawingArrowObject): DrawingPoint[][] {
-  const dx = object.end.x - object.start.x;
-  const dy = object.end.y - object.start.y;
-  const length = Math.hypot(dx, dy);
-  if (length === 0) return [[object.start, object.end]];
+  const shaft = sampleArrowShaft(object).map((sample) => sample.point);
+  let length = 0;
+  let direction = { x: 0, y: 0 };
+  for (let index = 1; index < shaft.length; index += 1) {
+    const previous = shaft[index - 1]!;
+    const current = shaft[index]!;
+    const dx = current.x - previous.x;
+    const dy = current.y - previous.y;
+    const distance = Math.hypot(dx, dy);
+    length += distance;
+    if (distance > 0) direction = { x: dx / distance, y: dy / distance };
+  }
+  if (length === 0) return [shaft];
 
-  const tangent = { x: dx / length, y: dy / length };
+  const tangent = direction;
   const normal = { x: -tangent.y, y: tangent.x };
   const headLength = Math.min(length * 0.38, Math.max(14, object.width * 2.2));
   const headHalf = headLength * 0.52;
   const leftWing = offsetPoint(object.end, tangent, normal, -headLength, headHalf);
   const rightWing = offsetPoint(object.end, tangent, normal, -headLength, -headHalf);
-  return [
-    [object.start, object.end],
-    [leftWing, object.end],
-    [object.end, rightWing],
-  ];
+  return [shaft, [leftWing, object.end], [object.end, rightWing]];
 }

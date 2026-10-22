@@ -126,6 +126,7 @@ function resolveDrawingCanvasHoverCursor(args: {
   const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
   if (!args.active) return baseCursor;
   const draft = args.pointer.draftRef.current;
+  if (draft?.kind === 'bend') return 'none';
   if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
   if (draft?.kind === 'resize')
     return resolveDrawingResizeCursor(draft.handle, true, getDrawingObjectRotation(draft.original));
@@ -148,6 +149,7 @@ function resolveDrawingCanvasHoverCursor(args: {
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
   if (handle && selected)
     return resolveDrawingResizeCursor(handle, false, getDrawingObjectRotation(selected));
+  if (args.pointer.hoverBendRef.current) return 'grab';
   return baseCursor;
 }
 
@@ -217,7 +219,7 @@ function createDrawingPointerHandlers(args: {
       const draft = pointer.draftRef.current;
       setSelectionDragHidden(isNonTextSelectionDrag(draft));
       textGestureRef.current =
-        draft?.kind === 'rotate' || draft?.kind === 'rotate-selection'
+        draft?.kind === 'rotate' || draft?.kind === 'rotate-selection' || draft?.kind === 'bend'
           ? { dragged: true, start: toDrawingScenePoint(event, root) }
           : (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
             ? { dragged: false, start: toDrawingScenePoint(event, root) }
@@ -341,6 +343,13 @@ function DrawingCanvasLayer(props: {
         {...pointerHandlers}
         onMouseDown={stopDrawingHostEvent}
         onMouseUp={stopDrawingHostEvent}
+        onPointerLeave={() => {
+          props.pointer.hoverBendRef.current = null;
+          props.pointer.changed();
+        }}
+        onLostPointerCapture={(event) => {
+          if (props.pointer.draftRef.current?.kind === 'bend') props.pointer.cancelPointer(event);
+        }}
         onClick={(event) =>
           handleDrawingCanvasClick({
             controller: props.controller,
@@ -484,6 +493,7 @@ export function DrawingSurface(props: {
     controller,
     draftRef,
     draftRevision,
+    hoverBendRef: pointer.hoverBendRef,
     objects: frameObjects,
     selectedIds: snapshot.selectedObjectIds,
     showSelectionChrome: props.showSelectionChrome ?? true,

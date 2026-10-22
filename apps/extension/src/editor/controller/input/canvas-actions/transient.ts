@@ -1,5 +1,6 @@
 import type { Canvas, Rect } from 'fabric';
 import type { DrawSession } from '../../core/types';
+import { cancelEditorDrawingArrowBend } from '../../../drawing/object/controls/arrow';
 
 interface CancelEditorTransientInteractionOptions {
   canvas: Canvas | null;
@@ -29,6 +30,11 @@ export function cancelEditorTransientInteraction(
 
   let changed = false;
   let nextDrawSession = drawSession;
+
+  if (cancelEditorDrawingArrowBend(canvas)) {
+    syncRuntimeState();
+    return { changed: true, drawSession };
+  }
 
   if (drawSession?.object || cropGuide) {
     if (drawSession?.object) {

@@ -110,14 +110,18 @@ export function resolveUpdatedQuickObject(
       opacity: update.opacity ?? selected.opacity,
       width: update.width ?? selected.width,
     };
-  if (selected.kind === 'arrow')
+  if (selected.kind === 'arrow') {
+    const { bendPoints, ...arrow } = selected;
+    const design = update.design ?? selected.design ?? 'standard';
     return {
-      ...selected,
+      ...arrow,
+      ...(design === 'freehand' && bendPoints ? { bendPoints } : {}),
       color: update.color ?? selected.color,
-      design: update.design ?? selected.design ?? 'standard',
+      design,
       dynamicWidth: update.dynamicWidth ?? selected.dynamicWidth,
       width: update.width ?? selected.width,
     };
+  }
   if (selected.kind === 'text') return resolveUpdatedText(selected, update, options.measureText);
   return resolveUpdatedShape(selected, update);
 }

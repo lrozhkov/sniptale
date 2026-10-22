@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DrawingObject } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
-import type { PointerDraft } from './interaction';
+import type { PointerDraft, DrawingArrowHover } from './interaction';
 import { drawDrawingFrame, registerDrawingSnapshotSource } from './frame';
 
 export function useDrawingFrameRedraw(args: {
@@ -13,6 +13,7 @@ export function useDrawingFrameRedraw(args: {
   controller: ContentDrawingController;
   draftRef: RefObject<PointerDraft | null>;
   draftRevision: number;
+  hoverBendRef: RefObject<DrawingArrowHover | null>;
   objects: readonly DrawingObject[];
   selectedIds: readonly string[];
   showSelectionChrome: boolean;
@@ -65,8 +66,10 @@ export function useDrawingFrameRedraw(args: {
         draft: draftRef.current,
         selectedIds,
         root: controller.getScrollRoot(),
-        showChrome: active && !chromeHidden && showSelectionChrome,
+        showChrome: active && !chromeHidden,
+        bendOnly: !showSelectionChrome,
         renderObjects: false,
+        hoverBend: args.hoverBendRef.current,
       });
   }, [
     active,
@@ -79,6 +82,7 @@ export function useDrawingFrameRedraw(args: {
     selectedIds,
     showSelectionChrome,
     args.getObjectOpacity,
+    args.hoverBendRef,
   ]);
 
   const latestRedraw = useRef(redraw);

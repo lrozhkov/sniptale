@@ -4,6 +4,7 @@ import {
   resolveDrawingMarqueeSelection,
   translateDrawingObject,
   updateCreatedDrawingObject,
+  updateDrawingArrowBend,
   type DrawingObject,
   type DrawingPoint,
 } from '../../features/drawing/public';
@@ -63,6 +64,20 @@ export function updateDrawingPointerDraft(args: {
   root: PageScrollRoot;
 }): { draft: PointerDraft; selection?: readonly string[] } {
   const { draft, event, point } = args;
+  if (draft.kind === 'bend') {
+    const moved = Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= 4;
+    return {
+      draft: {
+        ...draft,
+        object: moved
+          ? updateDrawingArrowBend(draft.original, draft.target, {
+              x: draft.target.point.x + point.x - draft.start.x,
+              y: draft.target.point.y + point.y - draft.start.y,
+            })
+          : draft.original,
+      },
+    };
+  }
   if (draft.kind === 'rotate-selection') {
     return {
       draft: rotateDrawingSelection(draft, point, {

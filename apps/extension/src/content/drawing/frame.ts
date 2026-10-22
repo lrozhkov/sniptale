@@ -1,6 +1,6 @@
 import { getDrawingSelectionBounds, type DrawingObject } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
-import type { PointerDraft } from './interaction';
+import type { PointerDraft, DrawingArrowHover } from './interaction';
 import { getDrawingViewportProjection } from './interaction';
 import {
   renderDrawingMarquee,
@@ -17,6 +17,8 @@ export function drawDrawingFrame(args: {
   selectedIds: readonly string[];
   root: PageScrollRoot;
   showChrome: boolean;
+  bendOnly?: boolean;
+  hoverBend?: DrawingArrowHover | null;
   renderObjects?: boolean;
   suppressText?: boolean;
   getObjectOpacity?: (objectId: string) => number;
@@ -62,15 +64,22 @@ export function drawDrawingFrame(args: {
         });
     });
   }
-  if (showChrome && draft?.kind === 'marquee') {
+  if (showChrome && !args.bendOnly && draft?.kind === 'marquee') {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
   if (showChrome && selectedIds.length > 0) {
     const selected = resolveDrawingFrameRenderables(objects, draft)
       .map(({ object }) => object)
       .filter((object) => selectedIds.includes(object.id));
-    if (selected.length === 1) renderDrawingSelection(context, selected[0]!, projection);
-    else
+    if (selected.length === 1) {
+      const hoverPoint =
+        args.hoverBend && args.hoverBend.object === selected[0]
+          ? args.hoverBend.target.point
+          : draft?.kind === 'bend'
+            ? (draft.object.bendPoints?.[draft.target.index] ?? draft.target.point)
+            : undefined;
+      renderDrawingSelection(context, selected[0]!, projection, hoverPoint, args.bendOnly);
+    } else if (!args.bendOnly)
       renderDrawingMultiSelection(
         context,
         selected,

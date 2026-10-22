@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { renderDrawingObject } from './render';
+import { renderDrawingObject, renderDrawingSelection } from './render';
 import type { DrawingObject } from '../../features/drawing/public';
 
 const stencilText: Extract<DrawingObject, { kind: 'text' }> = {
@@ -39,6 +39,49 @@ function createPixelCanvas(pattern = false): CanvasRenderingContext2D {
   }
   return context;
 }
+
+it('renders the curved shaft and bend chrome without filling the empty selection bounds', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    kind: 'arrow',
+    id: 'bent',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [{ x: 120, y: 120 }],
+    color: '#ff0000',
+    width: 12,
+    dynamicWidth: false,
+  };
+  renderDrawingObject(context, arrow, { x: 0, y: 0 });
+  const nearVertex = context.getImageData(114, 114, 12, 12).data;
+  expect([...nearVertex].some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
+  expect(context.getImageData(120, 20, 1, 1).data[3]).toBe(0);
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 70, y: 80 });
+  expect(context.getImageData(120, 120, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(context.getImageData(70, 80, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(context.getImageData(20, 120, 1, 1).data[3]).toBe(0);
+});
+
+it('shows only the transient bend marker when ordinary selection chrome is suppressed', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    kind: 'arrow',
+    id: 'bent',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, undefined, true);
+  expect(context.getImageData(0, 0, 500, 500).data.every((value) => value === 0)).toBe(true);
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 120, y: 20 }, true);
+  expect(context.getImageData(120, 20, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(context.getImageData(20, 20, 1, 1).data[3]).toBe(0);
+  expect(context.getImageData(220, 20, 1, 1).data[3]).toBe(0);
+});
 
 it.each([
   { rotation: 0, zoom: 1, backgroundColor: '#ff8800', opacity: 1 },

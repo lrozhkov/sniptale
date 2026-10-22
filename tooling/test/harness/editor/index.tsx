@@ -24,6 +24,10 @@ declare global {
       applyBrowserFrameMutation: () => Promise<void>;
       clearSelection: () => void;
       getCanvasObjects: () => Array<Record<string, unknown>>;
+      getInteractionState: () => {
+        historyIndex: number;
+        transform: { action: string; actionPerformed: boolean; corner: string } | null;
+      };
       setZoomLevel: (value: number) => void;
     };
   }
@@ -135,6 +139,19 @@ function HarnessEditorDebugBridge() {
       },
       getCanvasObjects: () => {
         return getCanvasObjects(controller).map(snapshotCanvasObject);
+      },
+      getInteractionState: () => {
+        const transform = controller.canvas?._currentTransform;
+        return {
+          historyIndex: useEditorStore.getState().history.index,
+          transform: transform
+            ? {
+                action: transform.action,
+                actionPerformed: transform.actionPerformed,
+                corner: transform.corner,
+              }
+            : null,
+        };
       },
       setZoomLevel: (value) => {
         controller.setZoom(value);

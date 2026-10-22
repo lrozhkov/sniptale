@@ -24,13 +24,27 @@ import {
   type DrawingSession,
   type DrawingSelectionMode,
   createDrawingObject,
+  resolveDrawingArrowBendTarget,
+  type DrawingArrowBendTarget,
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
 import { resizeDrawingBox } from './box-resize';
 
+export type DrawingArrowHover = {
+  object: Extract<DrawingObject, { kind: 'arrow' }>;
+  target: DrawingArrowBendTarget;
+};
+
 export type PointerDraft =
   | { kind: 'create'; start: DrawingPoint; object: DrawingObject; arrowFromTip: boolean }
   | { kind: 'move'; start: DrawingPoint; original: DrawingObject; object: DrawingObject }
+  | {
+      kind: 'bend';
+      start: DrawingPoint;
+      original: Extract<DrawingObject, { kind: 'arrow' }>;
+      object: Extract<DrawingObject, { kind: 'arrow' }>;
+      target: DrawingArrowBendTarget;
+    }
   | {
       kind: 'move-selection';
       start: DrawingPoint;
@@ -71,6 +85,7 @@ export type PointerDraft =
     };
 
 type DrawingPointerModifiers = {
+  altKey?: boolean;
   ctrlKey: boolean;
   shiftKey: boolean;
 };
@@ -514,6 +529,15 @@ export function beginDrawingPointer(args: {
   if (selected && handle) {
     return {
       draft: { kind: 'resize', start: point, original: selected, object: selected, handle },
+    };
+  }
+  const bend =
+    selected?.kind === 'arrow' && !modifiers.altKey && !modifiers.ctrlKey && !modifiers.shiftKey
+      ? resolveDrawingArrowBendTarget(selected, point)
+      : null;
+  if (selected?.kind === 'arrow' && bend) {
+    return {
+      draft: { kind: 'bend', start: point, original: selected, object: selected, target: bend },
     };
   }
   if (selected && hit?.id === selected.id && snapshot.activeTool !== 'select') {

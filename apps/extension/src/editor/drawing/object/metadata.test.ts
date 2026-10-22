@@ -34,6 +34,58 @@ import { createEditorDrawingFabricObject } from './vector';
 import { resizeLayerObject } from '../../controller/layer-actions/state/resize';
 import { applyEditorDrawingInteractionControls } from './controls/apply';
 
+it('preserves bend vertices through duplicate translation, Fabric transforms and metadata revival', async () => {
+  const drawing = {
+    kind: 'arrow' as const,
+    id: 'bent',
+    design: 'freehand' as const,
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 100 },
+      { x: 160, y: 60 },
+    ],
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  expect(translateEditorDrawingObject(drawing, { x: 30, y: 40 }, 'duplicate')).toMatchObject({
+    id: 'duplicate',
+    bendPoints: [
+      { x: 110, y: 140 },
+      { x: 190, y: 100 },
+    ],
+  });
+  const arrow = createEditorDrawingFabricObject(drawing, 1);
+  if (!(arrow instanceof Path)) throw new Error('Expected arrow');
+  arrow.set({ left: 40, top: 60, scaleX: 2, scaleY: 3, angle: 25 });
+  const transform = arrow.calcTransformMatrix();
+  const expected = drawing.bendPoints.map((point) =>
+    new Point(point.x - arrow.pathOffset.x, point.y - arrow.pathOffset.y).transform(transform)
+  );
+  const synchronized = synchronizeEditorDrawingObjectFromFabric(arrow);
+  if (synchronized?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+  synchronized.bendPoints!.forEach((point, index) => {
+    expect(point.x).toBeCloseTo(expected[index]!.x, 3);
+    expect(point.y).toBeCloseTo(expected[index]!.y, 3);
+  });
+  const revived = await Path.fromObject({
+    ...arrow.toObject(),
+    sniptaleDrawingJson: arrow.sniptaleDrawingJson,
+  });
+  expect(readEditorDrawingObject(revived)).toEqual(synchronized);
+  expect(synchronizeEditorDrawingObjectFromFabric(revived)).toMatchObject({
+    bendPoints: synchronized.bendPoints!.map((point) => ({
+      x: expect.closeTo(point.x, 3),
+      y: expect.closeTo(point.y, 3),
+    })),
+  });
+  expect(drawing.bendPoints).toEqual([
+    { x: 80, y: 100 },
+    { x: 160, y: 60 },
+  ]);
+});
+
 function createResizableArrow() {
   const arrow = createEditorDrawingFabricObject(
     {

@@ -275,8 +275,11 @@ export function renderDrawingObject(
 export function renderDrawingSelection(
   context: CanvasRenderingContext2D,
   object: DrawingObject,
-  projection: DrawingViewportProjection
+  projection: DrawingViewportProjection,
+  hoverBend?: DrawingPoint,
+  bendOnly = false
 ): void {
+  if (bendOnly && (!hoverBend || object.kind !== 'arrow' || object.design !== 'freehand')) return;
   const bounds = getDrawingObjectBounds(object);
   const x = bounds.x - projection.x;
   const y = bounds.y - projection.y;
@@ -289,9 +292,19 @@ export function renderDrawingSelection(
     context.strokeRect(x, y, bounds.width, bounds.height);
     context.setLineDash([]);
   }
-  const handles =
-    object.kind === 'arrow'
-      ? [viewportPoint(object.start, projection), viewportPoint(object.end, projection)]
+  const handles = bendOnly
+    ? hoverBend
+      ? [viewportPoint(hoverBend, projection)]
+      : []
+    : object.kind === 'arrow'
+      ? [
+          viewportPoint(object.start, projection),
+          viewportPoint(object.end, projection),
+          ...(object.design === 'freehand'
+            ? (object.bendPoints ?? []).map((point) => viewportPoint(point, projection))
+            : []),
+          ...(hoverBend ? [viewportPoint(hoverBend, projection)] : []),
+        ]
       : object.kind === 'text'
         ? [
             { x, y: y + bounds.height / 2 },

@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { captureDrawingFrame, captureDrawingObjects, registerDrawingSnapshotSource } from './frame';
-import { renderDrawingObject } from './render';
+import {
+  captureDrawingFrame,
+  captureDrawingObjects,
+  registerDrawingSnapshotSource,
+  drawDrawingFrame,
+} from './frame';
+import { renderDrawingObject, renderDrawingSelection } from './render';
 
-vi.mock('./render', () => ({ renderDrawingObject: vi.fn() }));
+vi.mock('./render', () => ({ renderDrawingObject: vi.fn(), renderDrawingSelection: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 import type { DrawingObject } from '../../features/drawing/public';
 import type { PointerDraft } from './interaction';
@@ -22,6 +27,46 @@ const untouched: DrawingObject = {
   id: 'untouched',
   kind: 'blur',
 };
+
+it('drops a hover marker after its immutable arrow version changes', () => {
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    kind: 'arrow',
+    id: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  const target = { point: { x: 120, y: 20 }, index: 0, insert: true };
+  const canvas = document.createElement('canvas');
+  const args = {
+    canvas,
+    draft: null,
+    selectedIds: [arrow.id],
+    root: { kind: 'viewport' as const, element: null },
+    showChrome: true,
+    hoverBend: { object: arrow, target },
+  };
+  drawDrawingFrame({ ...args, objects: [arrow] });
+  expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+    expect.anything(),
+    arrow,
+    expect.anything(),
+    target.point,
+    undefined
+  );
+  const next = { ...arrow, design: 'standard' as const };
+  drawDrawingFrame({ ...args, objects: [next] });
+  expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+    expect.anything(),
+    next,
+    expect.anything(),
+    undefined,
+    undefined
+  );
+});
 
 it.each(['move', 'resize'] as const)(
   'renders the live %s draft in place of its committed object',
