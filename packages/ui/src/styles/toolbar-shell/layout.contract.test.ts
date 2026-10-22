@@ -12,7 +12,9 @@ describe('toolbar-shell layout contract', () => {
       'transition: opacity var(--sniptale-duration-normal) ease-out;'
     );
     expect(toolbarShellLayoutStylesheet).toContain(':focus-within');
-    expect(toolbarShellLayoutStylesheet).toContain(":has([aria-expanded='true'])");
+    expect(toolbarShellLayoutStylesheet).toContain(
+      ":has([aria-expanded='true']:not([data-content-tool='true']))"
+    );
     expect(toolbarShellLayoutStylesheet).toContain('@media (prefers-reduced-motion: reduce)');
   });
   it('keeps toolbar chrome and shell layout on the layout owner', () => {

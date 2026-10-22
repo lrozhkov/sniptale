@@ -40,7 +40,7 @@
     :focus-within,
     [data-menu-open='true'],
     .sniptale-toolbar-dragging,
-    :has([aria-expanded='true'])
+    :has([aria-expanded='true']:not([data-content-tool='true']))
   ) {
   opacity: 1;
 }

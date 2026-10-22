@@ -266,6 +266,27 @@ async function expectAutomaticRecordingFade(page: Page, info: TestInfo) {
     expect(Math.abs(after[dimension] - before[dimension])).toBeLessThanOrEqual(1);
   }
   await page.screenshot({ path: info.outputPath('faded-recording-controls.png'), fullPage: false });
+  await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+  const drawingOptions = toolbar.locator('.sniptale-drawing-options-popover');
+  await expect(drawingOptions).toBeVisible();
+  await page.mouse.move(viewport.width - 4, viewport.height - 4);
+  await expect.poll(opacity).toBeCloseTo(0.2, 2);
+  const optionsOpacity = () =>
+    drawingOptions.evaluate((element) => {
+      let opacity = 1;
+      for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) {
+        opacity *= Number(getComputedStyle(ancestor).opacity);
+      }
+      return opacity;
+    });
+  await expect.poll(optionsOpacity).toBeCloseTo(0.2, 2);
+  await page.screenshot({ path: info.outputPath('faded-recording-drawing.png'), fullPage: false });
+  await drawingOptions.hover();
+  await expect.poll(opacity).toBe(1);
+  await expect.poll(optionsOpacity).toBe(1);
+  await page.mouse.move(viewport.width - 4, viewport.height - 4);
+  await expect.poll(opacity).toBeCloseTo(0.2, 2);
+  await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').click();
   await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').focus();
   await page.keyboard.press('Tab');
   expect(await toolbar.evaluate((element) => element.matches(':focus-within'))).toBe(true);
