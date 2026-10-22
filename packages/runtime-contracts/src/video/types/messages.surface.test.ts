@@ -14,7 +14,11 @@ import {
   isRecordingMediaPermissionResult,
   isRecordingMediaPermissionCancellation,
 } from './messages.surface';
-import { VideoRecordingStatus } from './types';
+import {
+  VideoRecordingStatus,
+  DEFAULT_VIDEO_CURSOR_EFFECTS,
+  isVideoCursorEffectSettings,
+} from './types';
 import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
 const identity = {
@@ -25,6 +29,35 @@ const identity = {
 };
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
+
+it('validates additive live click modes and contour fields without accepting unbounded styles', () => {
+  for (const clickEffect of ['ripple', 'press', 'glow']) {
+    expect(
+      isVideoCursorEffectSettings({
+        ...DEFAULT_VIDEO_CURSOR_EFFECTS,
+        clickEffect,
+        clickStroke: 8,
+        clickPulses: 5,
+        clickEasing: 'linear',
+        haloStroke: 0.5,
+        haloGlow: 0,
+      })
+    ).toBe(true);
+  }
+  for (const patch of [
+    { clickEffect: 'url(x)' },
+    { clickEffect: null },
+    { clickEasing: 'steps(99)' },
+    { clickStroke: Infinity },
+    { clickStroke: 0 },
+    { clickPulses: 1.5 },
+    { clickPulses: 6 },
+    { haloStroke: -1 },
+    { haloGlow: 41 },
+    { unexpected: true },
+  ])
+    expect(isVideoCursorEffectSettings({ ...DEFAULT_VIDEO_CURSOR_EFFECTS, ...patch })).toBe(false);
+});
 
 it('admits bounded cursor appearance only inside the existing spotlight command', () => {
   const cursorEffects = {

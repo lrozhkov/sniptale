@@ -45,6 +45,53 @@ function deliver(type: string, clientX = 0, detail = 1) {
 
 const RIPPLE = '[data-ui="content.video-recording.spotlight-click"]';
 
+it.each(['ripple', 'press', 'glow'] as const)(
+  'renders the live %s style and cleans up after the final pulse',
+  (clickEffect) => {
+    const host = mountClickFeedback();
+    act(() =>
+      root?.render(
+        <VideoRecordingSpotlight
+          cursorHaloEnabled
+          cursorDimmingEnabled={false}
+          clickAnimationEnabled
+          cursorEffects={{
+            ...DEFAULT_VIDEO_CURSOR_EFFECTS,
+            clickEffect,
+            clickColor: '#12345680',
+            clickDuration: 1000,
+            clickPulses: 2,
+            clickStroke: 4,
+            clickEasing: 'linear',
+            haloStroke: 3,
+            haloGlow: 0,
+            haloColor: '#123456',
+          }}
+        />
+      )
+    );
+    deliver('click', 30, 0);
+    const effect = host.querySelector<HTMLElement>(RIPPLE)!;
+    expect(effect.dataset['effect']).toBe(clickEffect);
+    expect(effect.style.animation).toContain('500ms linear 2');
+    expect(effect.style.borderStyle).toBe(clickEffect === 'ripple' ? 'solid' : 'none');
+    if (clickEffect === 'ripple') expect(effect.style.borderWidth).toBe('4px');
+    expect(effect.style.background).toBe(
+      clickEffect === 'ripple' ? 'transparent' : 'rgba(18, 52, 86, 0.5)'
+    );
+    expect(effect.style.boxShadow === 'none').toBe(clickEffect !== 'glow');
+    expect(
+      host.querySelector<HTMLElement>('[data-ui="content.video-recording.spotlight-halo"]')!.style
+        .borderWidth
+    ).toBe('3px');
+    act(() => {
+      effect.dispatchEvent(new Event('animationend', { bubbles: true }));
+      effect.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    });
+    expect(host.querySelector(RIPPLE)).toBeNull();
+  }
+);
+
 it('renders accepted appearance values without replacing the native cursor', () => {
   vi.stubGlobal(
     'requestAnimationFrame',

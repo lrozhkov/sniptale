@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DEFAULT_VIDEO_CURSOR_EFFECTS,
   type VideoCursorEffectSettings,
@@ -12,6 +12,28 @@ function dimmingMask(radius: number) {
     'var(--sniptale-recording-cursor-x, -1000px) var(--sniptale-recording-cursor-y, -1000px)';
   const innerRadius = (radius * 38) / 54;
   return `radial-gradient(circle ${radius}px at ${center}, transparent 0 ${innerRadius}px, black ${radius}px)`;
+}
+
+function clickAppearance(effects: VideoCursorEffectSettings): CSSProperties {
+  const effect = effects.clickEffect ?? 'ripple';
+  const color = effects.clickColor ?? 'var(--sniptale-color-accent)';
+  const pulses = effects.clickPulses ?? 1;
+  return {
+    width: effects.clickSize,
+    height: effects.clickSize,
+    border: effect === 'ripple' ? `${effects.clickStroke ?? 2}px solid ${color}` : 'none',
+    background: effect === 'ripple' ? 'transparent' : color,
+    boxShadow: effect === 'glow' ? `0 0 ${effects.clickSize / 2}px ${color}` : 'none',
+    borderRadius: '999px',
+    transform: 'translate(-50%, -50%)',
+    animation: [
+      `sniptale-recording-click-${effect === 'ripple' ? 'ripple' : 'press'}`,
+      `${effects.clickDuration / pulses}ms`,
+      effects.clickEasing ?? 'ease-out',
+      pulses,
+      'forwards',
+    ].join(' '),
+  };
 }
 
 function readSelection() {
@@ -173,10 +195,10 @@ export function VideoRecordingSpotlight(props: {
             width: effects.haloSize,
             height: effects.haloSize,
             opacity: effects.haloOpacity / 100,
-            border: `2px solid ${haloColor}`,
+            border: `${effects.haloStroke ?? 2}px solid ${haloColor}`,
             borderRadius: '999px',
             transform: 'translate(-100px, -100px)',
-            boxShadow: `0 0 0 8px color-mix(in srgb, ${haloColor} 20%, transparent)`,
+            boxShadow: `0 0 0 ${effects.haloGlow ?? 8}px color-mix(in srgb, ${haloColor} 20%, transparent)`,
           }}
         />
       ) : null}
@@ -184,16 +206,15 @@ export function VideoRecordingSpotlight(props: {
         <div
           key={clickPoint.key}
           data-ui="content.video-recording.spotlight-click"
+          data-effect={effects.clickEffect ?? 'ripple'}
+          onAnimationEnd={() =>
+            setClickPoint((current) => (current?.key === clickPoint.key ? null : current))
+          }
           style={{
             position: 'absolute',
             left: clickPoint.x,
             top: clickPoint.y,
-            width: effects.clickSize,
-            height: effects.clickSize,
-            border: `2px solid ${effects.clickColor ?? 'var(--sniptale-color-accent)'}`,
-            borderRadius: '999px',
-            transform: 'translate(-50%, -50%)',
-            animation: `sniptale-recording-click-ripple ${effects.clickDuration}ms ease-out forwards`,
+            ...clickAppearance(effects),
           }}
         />
       ) : null}

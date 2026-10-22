@@ -57,6 +57,7 @@ it.each(['#2563eb80', '#2563eb00', '#2563eb'])(
         />
       );
     });
+    act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[1]!.click());
     const props = colorField.mock.calls.at(-1)![0];
     expect(props.value).toBe('#11223380');
     expect(props.allowAlpha).toBe(true);
@@ -92,7 +93,7 @@ it('edits click alpha without resetting the independent halo multiplier', () => 
       />
     );
   });
-  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[2]!.click());
+  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[0]!.click());
   const props = colorField.mock.calls.at(-1)![0];
   expect(props.allowAlpha).toBe(true);
   expect(props.value).toBe('#ef444466');
@@ -123,9 +124,9 @@ it.each([false, true])('keeps category switches in the heading with disabled=%s'
     );
   });
   for (const [index, key] of [
-    [0, 'cursorHaloEnabled'],
-    [1, 'cursorDimmingEnabled'],
-    [2, 'clickAnimationEnabled'],
+    [0, 'clickAnimationEnabled'],
+    [1, 'cursorHaloEnabled'],
+    [2, 'cursorDimmingEnabled'],
   ] as const) {
     act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[index]!.click());
     const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;

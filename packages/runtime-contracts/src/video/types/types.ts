@@ -154,6 +154,12 @@ export interface VideoCursorEffectSettings {
   haloColor?: string;
   dimmingColor?: string;
   clickColor?: string;
+  clickEffect?: 'ripple' | 'press' | 'glow';
+  clickEasing?: 'linear' | 'ease-out' | 'ease-in-out';
+  clickStroke?: number;
+  clickPulses?: number;
+  haloStroke?: number;
+  haloGlow?: number;
 }
 
 export const DEFAULT_VIDEO_CURSOR_EFFECTS: Readonly<VideoCursorEffectSettings> = {
@@ -163,6 +169,12 @@ export const DEFAULT_VIDEO_CURSOR_EFFECTS: Readonly<VideoCursorEffectSettings> =
   dimmingOpacity: 34,
   clickSize: 44,
   clickDuration: 420,
+  clickEffect: 'ripple',
+  clickEasing: 'ease-out',
+  clickStroke: 2,
+  clickPulses: 1,
+  haloStroke: 2,
+  haloGlow: 8,
 };
 
 export const VIDEO_CURSOR_EFFECT_LIMITS = {
@@ -172,6 +184,10 @@ export const VIDEO_CURSOR_EFFECT_LIMITS = {
   dimmingOpacity: [0, 80],
   clickSize: [16, 120],
   clickDuration: [150, 1200],
+  clickStroke: [0.5, 8],
+  clickPulses: [1, 5],
+  haloStroke: [0.5, 8],
+  haloGlow: [0, 40],
 } as const;
 
 function isCursorEffectNumber(value: unknown, bounds: readonly [number, number]): boolean {
@@ -191,15 +207,30 @@ export function isVideoCursorEffectSettings(value: unknown): value is VideoCurso
     value !== null &&
     !Array.isArray(value) &&
     Object.keys(value).length >= 6 &&
-    Object.keys(value).length <= 9 &&
+    Object.keys(value).length <= 15 &&
     Object.keys(value).every(
       (key) =>
         Object.hasOwn(VIDEO_CURSOR_EFFECT_LIMITS, key) ||
-        ['haloColor', 'dimmingColor', 'clickColor'].includes(key)
+        ['haloColor', 'dimmingColor', 'clickColor', 'clickEffect', 'clickEasing'].includes(key)
     ) &&
     (!('haloColor' in value) || isCursorEffectColor(value.haloColor)) &&
     (!('dimmingColor' in value) || isCursorEffectColor(value.dimmingColor)) &&
     (!('clickColor' in value) || isCursorEffectColor(value.clickColor)) &&
+    (!('clickEffect' in value) ||
+      (typeof value.clickEffect === 'string' &&
+        ['ripple', 'press', 'glow'].includes(value.clickEffect))) &&
+    (!('clickEasing' in value) ||
+      (typeof value.clickEasing === 'string' &&
+        ['linear', 'ease-out', 'ease-in-out'].includes(value.clickEasing))) &&
+    (!('clickStroke' in value) ||
+      isCursorEffectNumber(value.clickStroke, VIDEO_CURSOR_EFFECT_LIMITS.clickStroke)) &&
+    (!('clickPulses' in value) ||
+      (Number.isInteger(value.clickPulses) &&
+        isCursorEffectNumber(value.clickPulses, VIDEO_CURSOR_EFFECT_LIMITS.clickPulses))) &&
+    (!('haloStroke' in value) ||
+      isCursorEffectNumber(value.haloStroke, VIDEO_CURSOR_EFFECT_LIMITS.haloStroke)) &&
+    (!('haloGlow' in value) ||
+      isCursorEffectNumber(value.haloGlow, VIDEO_CURSOR_EFFECT_LIMITS.haloGlow)) &&
     'haloSize' in value &&
     isCursorEffectNumber(value.haloSize, VIDEO_CURSOR_EFFECT_LIMITS.haloSize) &&
     'haloOpacity' in value &&

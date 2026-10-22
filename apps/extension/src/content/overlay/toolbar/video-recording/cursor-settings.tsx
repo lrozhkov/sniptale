@@ -11,7 +11,7 @@ import {
   type VideoCursorEffectSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n';
-import { ColorField, NumericRow } from '../../../../ui/compact-inspector-controls';
+import { ColorField, NumericRow, SelectField } from '../../../../ui/compact-inspector-controls';
 import { InspectorSurface } from '../../../../ui/compact-inspector-controls/layout';
 import { SettingsPopoverHeader } from '../../../../composition/frame-annotation-controls/popover/header';
 
@@ -26,7 +26,11 @@ type CursorSection = 'halo' | 'dimming' | 'click' | 'cursor';
 type EffectKey = keyof typeof VIDEO_CURSOR_EFFECT_LIMITS;
 
 const EFFECT_FIELDS = {
-  halo: [['haloSize', 'content.toolbar.cursorEffectSize', 'px']],
+  halo: [
+    ['haloSize', 'content.toolbar.cursorEffectSize', 'px'],
+    ['haloStroke', 'gallery.videoReview.clickStroke', 'px'],
+    ['haloGlow', 'gallery.videoReview.click_glow', 'px'],
+  ],
   dimming: [
     ['dimmingRadius', 'content.toolbar.cursorEffectRadius', 'px'],
     ['dimmingOpacity', 'content.toolbar.cursorEffectDimming', '%'],
@@ -34,6 +38,8 @@ const EFFECT_FIELDS = {
   click: [
     ['clickSize', 'content.toolbar.cursorEffectSize', 'px'],
     ['clickDuration', 'content.toolbar.cursorEffectDuration', 's'],
+    ['clickStroke', 'gallery.videoReview.clickStroke', 'px'],
+    ['clickPulses', 'gallery.videoReview.clickPulses', ''],
   ],
 } as const;
 
@@ -44,6 +50,37 @@ const ENABLE_KEYS = {
 } as const;
 
 const COLOR_KEYS = { halo: 'haloColor', dimming: 'dimmingColor', click: 'clickColor' } as const;
+
+function ClickStyleFields(props: {
+  disabled: boolean;
+  effects: VideoCursorEffectSettings;
+  onChange(effects: VideoCursorEffectSettings): void;
+}) {
+  return (
+    <>
+      <SelectField
+        label={translate('gallery.videoReview.clickEffect')}
+        value={props.effects.clickEffect ?? 'ripple'}
+        disabled={props.disabled}
+        options={(['ripple', 'press', 'glow'] as const).map((value) => ({
+          value,
+          label: translate(`gallery.videoReview.click_${value}`),
+        }))}
+        onChange={(clickEffect) => props.onChange({ ...props.effects, clickEffect })}
+      />
+      <SelectField
+        label={translate('gallery.videoReview.clickEasing')}
+        value={props.effects.clickEasing ?? 'ease-out'}
+        disabled={props.disabled}
+        options={(['linear', 'ease-out', 'ease-in-out'] as const).map((value) => ({
+          value,
+          label: translate(`gallery.videoReview.click_${value}`),
+        }))}
+        onChange={(clickEasing) => props.onChange({ ...props.effects, clickEasing })}
+      />
+    </>
+  );
+}
 
 export function RecordingCursorSettingsPanel(props: {
   disabled: boolean;
@@ -63,16 +100,16 @@ export function RecordingCursorSettingsPanel(props: {
       );
   }, [surface, theme]);
   const sections = [
+    {
+      id: 'click',
+      icon: MousePointerClick,
+      label: translate('content.toolbar.videoRecordingClickAnimation'),
+    },
     { id: 'halo', icon: CircleDot, label: translate('content.toolbar.videoRecordingCursorHalo') },
     {
       id: 'dimming',
       icon: SunDim,
       label: translate('content.toolbar.videoRecordingCursorDimming'),
-    },
-    {
-      id: 'click',
-      icon: MousePointerClick,
-      label: translate('content.toolbar.videoRecordingClickAnimation'),
     },
     { id: 'cursor', icon: MousePointer2, label: translate('content.toolbar.cursorNative') },
   ] satisfies Array<{ id: CursorSection; icon: typeof CircleDot; label: string }>;
@@ -97,7 +134,7 @@ export function RecordingCursorSettingsPanel(props: {
       />
       <CategorizedInspector
         ariaLabel={translate('content.toolbar.cursorSettings')}
-        initialSection="halo"
+        initialSection="click"
         sections={sections}
         showSectionHeading
         renderSectionHeadingControl={(section) =>
@@ -127,6 +164,13 @@ export function RecordingCursorSettingsPanel(props: {
             </p>
           ) : (
             <div className="grid gap-1">
+              {section === 'click' ? (
+                <ClickStyleFields
+                  effects={effects}
+                  disabled={props.disabled}
+                  onChange={(cursorEffects) => props.onChange({ ...props.settings, cursorEffects })}
+                />
+              ) : null}
               <ColorField
                 label={translate('content.toolbar.cursorEffectColor')}
                 title={translate('content.toolbar.cursorEffectColor')}
@@ -153,8 +197,12 @@ export function RecordingCursorSettingsPanel(props: {
                 }
               />
               {EFFECT_FIELDS[section].map(([key, label, unit]) => {
+                if (key === 'clickStroke' && (effects.clickEffect ?? 'ripple') !== 'ripple')
+                  return null;
                 const divisor = key === 'clickDuration' ? 1000 : 1;
                 const [minimum, maximum] = VIDEO_CURSOR_EFFECT_LIMITS[key];
+                const fractional = key === 'clickStroke' || key === 'haloStroke';
+                const step = divisor === 1000 ? 0.05 : fractional ? 0.5 : 1;
                 return (
                   <NumericRow
                     key={key}
@@ -163,14 +211,14 @@ export function RecordingCursorSettingsPanel(props: {
                     disabled={props.disabled}
                     min={minimum / divisor}
                     max={maximum / divisor}
-                    step={divisor === 1000 ? 0.05 : 1}
-                    precision={divisor === 1000 ? 2 : 0}
+                    step={step}
+                    precision={divisor === 1000 ? 2 : fractional ? 1 : 0}
                     unit={unit}
-                    value={effects[key] / divisor}
+                    value={(effects[key] ?? DEFAULT_VIDEO_CURSOR_EFFECTS[key]!) / divisor}
                     scrub={{
                       min: minimum / divisor,
                       max: maximum / divisor,
-                      step: divisor === 1000 ? 0.05 : 1,
+                      step,
                     }}
                     onCommitValue={(value) => changeValue(key, value * divisor, false)}
                     onPreviewValue={(value) => changeValue(key, value * divisor, true)}

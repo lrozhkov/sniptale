@@ -35,14 +35,14 @@ type RecordingSpotlightMenuProps = {
 };
 
 const SPOTLIGHT_OPTIONS = [
-  ['cursorHaloEnabled', CircleDot, 'content.toolbar.videoRecordingCursorHalo', 'halo'],
-  ['cursorDimmingEnabled', SunDim, 'content.toolbar.videoRecordingCursorDimming', 'dimming'],
   [
     'clickAnimationEnabled',
     MousePointerClick,
     'content.toolbar.videoRecordingClickAnimation',
     'click',
   ],
+  ['cursorHaloEnabled', CircleDot, 'content.toolbar.videoRecordingCursorHalo', 'halo'],
+  ['cursorDimmingEnabled', SunDim, 'content.toolbar.videoRecordingCursorDimming', 'dimming'],
 ] as const;
 
 function SpotlightOptionItems(props: {
@@ -103,7 +103,17 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
   const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled } = props.settings;
   const { haloSize, haloOpacity, dimmingRadius, dimmingOpacity, clickSize, clickDuration } =
     props.settings.cursorEffects ?? DEFAULT_VIDEO_CURSOR_EFFECTS;
-  const { haloColor, dimmingColor, clickColor } = props.settings.cursorEffects ?? {};
+  const {
+    haloColor,
+    dimmingColor,
+    clickColor,
+    clickEffect,
+    clickEasing,
+    clickStroke,
+    clickPulses,
+    haloStroke,
+    haloGlow,
+  } = props.settings.cursorEffects ?? {};
   const effects = useMemo(
     () => ({
       haloSize,
@@ -115,6 +125,12 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
       ...(haloColor ? { haloColor } : {}),
       ...(dimmingColor ? { dimmingColor } : {}),
       ...(clickColor ? { clickColor } : {}),
+      ...(clickEffect !== undefined ? { clickEffect } : {}),
+      ...(clickEasing !== undefined ? { clickEasing } : {}),
+      ...(clickStroke !== undefined ? { clickStroke } : {}),
+      ...(clickPulses !== undefined ? { clickPulses } : {}),
+      ...(haloStroke !== undefined ? { haloStroke } : {}),
+      ...(haloGlow !== undefined ? { haloGlow } : {}),
     }),
     [
       haloSize,
@@ -126,6 +142,12 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
       haloColor,
       dimmingColor,
       clickColor,
+      clickEffect,
+      clickEasing,
+      clickStroke,
+      clickPulses,
+      haloStroke,
+      haloGlow,
     ]
   );
   const hasEffects = props.settings.cursorEffects !== undefined;
@@ -192,8 +214,8 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
       anchorRef: advanced ? state.advancedTriggerRef : state.triggerRef,
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-      menuHeight: advanced ? 300 : 190,
-      menuWidth: advanced ? 400 : 280,
+      menuHeight: advanced ? 420 : 190,
+      menuWidth: advanced ? 440 : 280,
       preferredAlign: 'start',
     });
     return { placement: dropdown.menuPlacement, style: dropdown.style };
@@ -271,7 +293,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
               ...dropdown.style,
               ...(state.advanced
                 ? {
-                    width: 400,
+                    width: 440,
                     maxWidth: 'calc(100vw - 16px)',
                     maxHeight: 'calc(100vh - 16px)',
                     overflowY: 'auto' as const,

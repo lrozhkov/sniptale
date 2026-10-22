@@ -280,6 +280,15 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   await quick.click();
   await expect(panel).toHaveCount(0);
   const quickMenu = page.locator('[data-ui="content.toolbar.video-recording.spotlight-menu"]');
+  expect(
+    await quickMenu
+      .locator('[data-ui^="content.toolbar.video-recording.spotlight-"]')
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute('data-ui')))
+  ).toEqual(
+    ['click', 'halo', 'dimming'].map(
+      (effect) => `content.toolbar.video-recording.spotlight-${effect}`
+    )
+  );
   for (const effect of ['halo', 'dimming', 'click']) {
     const choice = quickMenu.locator(
       `[data-ui="content.toolbar.video-recording.spotlight-${effect}"]`
@@ -357,7 +366,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       const label = element.firstElementChild!.getBoundingClientRect();
       const control = element
         .querySelector<HTMLElement>(
-          'input[type="text"], button[role="switch"], [data-ui="shared.ui.color-selector.value-trigger"]'
+          'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], [data-ui="shared.ui.color-selector.value-trigger"]'
         )!
         .getBoundingClientRect();
       return {
@@ -366,7 +375,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       };
     })
   );
-  expect(rows).toHaveLength(2);
+  expect(rows).toHaveLength(7);
   for (const row of rows) {
     expect(row.centerDifference).toBeLessThanOrEqual(1);
     expect(row.height).toBeCloseTo(40, 0);
@@ -412,23 +421,23 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   await expect(categories.first()).toHaveCSS('box-shadow', 'none');
   const choices = [
     {
-      section: 0,
-      fields: ['haloSize'],
-      values: ['66'],
+      section: 1,
+      fields: ['haloSize', 'haloStroke', 'haloGlow'],
+      values: ['66', '3', '12'],
       colorKey: 'haloColor',
       color: '#2563eb',
     },
     {
-      section: 1,
+      section: 2,
       fields: ['dimmingRadius', 'dimmingOpacity'],
       values: ['90', '45'],
       colorKey: 'dimmingColor',
       color: '#112233',
     },
     {
-      section: 2,
-      fields: ['clickSize', 'clickDuration'],
-      values: ['60', '0.65'],
+      section: 0,
+      fields: ['clickSize', 'clickDuration', 'clickStroke', 'clickPulses'],
+      values: ['60', '0.65', '4', '2'],
       colorKey: 'clickColor',
       color: '#ef4444',
     },
@@ -437,7 +446,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
     await open();
     await panel.locator('nav button').nth(choice.section).click();
     const colorField = panel.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
-    if (choice.section === 0) {
+    if (choice.section === 1) {
       const accent = await panel.evaluate((element) =>
         getComputedStyle(element).getPropertyValue('--sniptale-color-accent').trim().toUpperCase()
       );
@@ -471,7 +480,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       await alpha.fill('70');
       await alpha.press('Enter');
       await picker.getByRole('button', { name: /^(Apply|Применить)$/u }).click();
-    } else if (choice.section === 2) {
+    } else if (choice.section === 0) {
       await colorField.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
       await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill(choice.color);
@@ -495,7 +504,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
           return stored.sniptale_video_settings.recordingSurface.cursorEffects?.[key];
         }, choice.colorKey)
       )
-      .toBe(choice.section === 0 ? '#2563ebb3' : choice.section === 2 ? '#ef444466' : choice.color);
+      .toBe(choice.section === 1 ? '#2563ebb3' : choice.section === 0 ? '#ef444466' : choice.color);
     await open();
     await panel.locator('nav button').nth(choice.section).click();
     await expect(panel.locator('nav button').nth(choice.section)).toHaveCSS(
@@ -520,7 +529,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       await expect(toggle).toHaveAttribute('aria-checked', String(enabled));
       await expect(panel).toHaveAttribute('data-stability-result', '[]');
     }
-    if (choice.section === 0) {
+    if (choice.section === 1) {
       await toggle.focus();
       await page.keyboard.press('Space');
       await expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -572,10 +581,56 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   await page.getByRole('button', { name: 'Host action', exact: true }).click();
   const ripple = page.locator('[data-ui="content.video-recording.spotlight-click"]');
   await expect(ripple).toHaveCSS('width', '60px');
-  await expect(ripple).toHaveCSS('animation-duration', '0.65s');
+  await expect(ripple).toHaveCSS('animation-duration', '0.325s');
+  await expect(ripple).toHaveCSS('animation-iteration-count', '2');
   await expect(ripple).toHaveCSS('border-top-color', 'rgba(239, 68, 68, 0.4)');
   await open();
+  await panel.locator('nav button').nth(1).click();
   await expect(panel.locator('input[type="text"]').first()).toHaveValue('66');
+  await page.keyboard.press('Escape');
+  await expectLiveClickModes(page, popup, info);
+}
+
+async function expectLiveClickModes(page: Page, popup: Page, info: TestInfo) {
+  const panel = page.locator('[data-ui="content.toolbar.video-recording.cursor-panel"]');
+  const trigger = page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]');
+  for (const [effect, label] of [
+    ['press', /^(Press|Нажатие)$/u],
+    ['glow', /^(Glow|Свечение)$/u],
+    ['ripple', /^(Ripple|Расходящееся кольцо)$/u],
+  ] as const) {
+    await trigger.click();
+    await panel.locator('nav button').first().click();
+    await panel.getByRole('button', { name: /^(Effect|Эффект)$/u }).click();
+    await page.getByRole('option', { name: label, exact: true }).click();
+    await expect
+      .poll(() =>
+        popup.evaluate(async () => {
+          const stored = await chrome.storage.local.get('sniptale_video_settings');
+          return stored.sniptale_video_settings.recordingSurface.cursorEffects.clickEffect;
+        })
+      )
+      .toBe(effect);
+    await panel.getByRole('button', { name: /^(Easing|Плавность)$/u }).click();
+    await page.getByRole('option', { name: /^(Linear|Линейная)$/u }).click();
+    await page.screenshot({
+      path: info.outputPath(`live-click-${effect}-settings.png`),
+      fullPage: false,
+    });
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Host action', exact: true }).click();
+    const animation = page.locator('[data-ui="content.video-recording.spotlight-click"]');
+    await expect(animation).toHaveAttribute('data-effect', effect);
+    await expect(animation).toHaveCSS('animation-timing-function', 'linear');
+    if (effect === 'ripple') await expect(animation).toHaveCSS('border-top-width', '4px');
+    else await expect(animation).toHaveCSS('background-color', 'rgba(239, 68, 68, 0.4)');
+    if (effect === 'glow') await expect(animation).not.toHaveCSS('box-shadow', 'none');
+    await expect(animation).toHaveCount(0);
+  }
+  await trigger.click();
+  await expect(panel.getByRole('button', { name: /^(Effect|Эффект)$/u })).toHaveText(
+    /Ripple|Расходящееся кольцо/u
+  );
   await page.keyboard.press('Escape');
 }
 
