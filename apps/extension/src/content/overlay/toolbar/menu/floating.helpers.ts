@@ -8,6 +8,7 @@ import {
   resolveContentUiViewport,
 } from '@sniptale/ui/floating-interactions/scale';
 import { registerToolbarMenuEscapeOwner } from '../state/menu';
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import {
   resolveToolbarSurfacePlacement,
   TOOLBAR_SURFACE_GAP_PX,
@@ -30,7 +31,21 @@ function clampValue(value: number, min: number, max: number) {
 }
 
 function isMenuEventWithinRefs(event: Event, refs: Array<RefObject<HTMLElement | null>>) {
-  return refs.some((ref) => isContentEventWithinElement(event, ref.current));
+  return refs.some((ref) =>
+    [ref.current, ...getMenuOwnedLayers(ref)].some((element) =>
+      isContentEventWithinElement(event, element)
+    )
+  );
+}
+
+function getMenuOwnedLayers(ref: RefObject<HTMLElement | null>) {
+  const element = ref.current;
+  if (!element) return [];
+  const root = element.getRootNode();
+  return getOwnedFloatingInteractionLayers(
+    element,
+    root instanceof ShadowRoot ? root : element.ownerDocument
+  );
 }
 
 export function getPointerDistanceFromRect(event: MouseEvent, rect: DOMRect): number {
@@ -323,7 +338,10 @@ export function useToolbarFloatingMenuDismissal(params: {
         }
       : undefined;
 
-    const unregisterEscapeOwner = registerToolbarMenuEscapeOwner(onEscapeClose ?? onClose);
+    const unregisterEscapeOwner = registerToolbarMenuEscapeOwner(
+      onEscapeClose ?? onClose,
+      () => getMenuOwnedLayers(menuRef).length > 0
+    );
     const unbindHandlers = bindToolbarFloatingMenuDismissalHandlers({
       handleFocusIn,
       handlePointerDown,

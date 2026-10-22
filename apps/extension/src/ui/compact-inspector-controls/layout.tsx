@@ -9,6 +9,65 @@ export function InspectorLayout({ children }: { children: React.ReactNode }) {
   return <InspectorLayoutContext value>{children}</InspectorLayoutContext>;
 }
 
+/** Opts a surface into canonical inspector geometry and pointer-aware keyboard focus. */
+export function InspectorSurface({
+  children,
+  className,
+  onPointerDownCapture,
+  onMouseDownCapture,
+  onKeyDownCapture,
+  onFocusCapture,
+  onBlurCapture,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  children: React.ReactNode;
+  ref?: React.Ref<HTMLDivElement>;
+}) {
+  const [modality, setModality] = React.useState<'pointer' | 'keyboard'>('pointer');
+  const pointerFocus = React.useRef(false);
+  const markPointerInput = () => {
+    pointerFocus.current = true;
+    setModality('pointer');
+  };
+  return (
+    <InspectorLayout>
+      <div
+        {...props}
+        className={cx('sniptale-compact-workspace sniptale-inspector-surface', className)}
+        data-focus-modality={modality}
+        onPointerDownCapture={(event) => {
+          markPointerInput();
+          onPointerDownCapture?.(event);
+        }}
+        onMouseDownCapture={(event) => {
+          markPointerInput();
+          onMouseDownCapture?.(event);
+        }}
+        onKeyDownCapture={(event) => {
+          pointerFocus.current = false;
+          setModality('keyboard');
+          onKeyDownCapture?.(event);
+        }}
+        onFocusCapture={(event) => {
+          if (!pointerFocus.current && event.target.matches(':focus-visible'))
+            setModality('keyboard');
+          onFocusCapture?.(event);
+        }}
+        onBlurCapture={(event) => {
+          if (
+            !(event.relatedTarget instanceof Node) ||
+            !event.currentTarget.contains(event.relatedTarget)
+          )
+            pointerFocus.current = false;
+          onBlurCapture?.(event);
+        }}
+      >
+        {children}
+      </div>
+    </InspectorLayout>
+  );
+}
+
 export function useInspectorLayout() {
   return React.useContext(InspectorLayoutContext);
 }

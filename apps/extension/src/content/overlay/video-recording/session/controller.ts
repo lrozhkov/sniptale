@@ -150,6 +150,7 @@ function useSurfaceRuntimeSubscriptions(
           cursorSpotlightEnabled: state.spotlightEnabled,
           cursorDimmingEnabled: state.spotlightDimmingEnabled,
           cursorClickAnimationEnabled: state.spotlightClickAnimationEnabled,
+          ...(state.cursorEffects ? { cursorEffects: state.cursorEffects } : {}),
           documentGeneration: identity.documentGeneration,
           duration: runtimeState.duration,
           entry: 'manual',
@@ -526,6 +527,7 @@ function createSurfaceDrawingActions(args: SurfaceControllerProjectionArgs) {
       cursorHaloEnabled: boolean;
       cursorDimmingEnabled: boolean;
       clickAnimationEnabled: boolean;
+      cursorEffects?: NonNullable<VideoRecordingToolbarState['cursorEffects']>;
     }) => args.command({ kind: 'set-spotlight-settings', ...settings }),
   };
 }

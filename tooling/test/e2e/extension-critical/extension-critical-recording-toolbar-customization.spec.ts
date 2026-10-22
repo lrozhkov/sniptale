@@ -22,6 +22,233 @@ async function openRecordingToolbarSettings(page: Page) {
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
 }
 
+async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
+  const trigger = page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]');
+  const panel = page.locator('[data-ui="content.toolbar.video-recording.cursor-panel"]');
+  const open = async () => {
+    if (!(await panel.isVisible())) await trigger.click();
+    await expect(panel).toBeVisible();
+  };
+  const quick = page.locator('[data-ui="content.toolbar.video-recording.spotlight"]');
+  await quick.click();
+  await expect(
+    page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]')
+  ).toBeVisible();
+  await expect(panel).toHaveCount(0);
+  const cursorChevron = (await trigger.boundingBox())!;
+  const mediaChevron = (await page
+    .locator('[data-ui="content.toolbar.video-recording.camera.menu"]')
+    .boundingBox())!;
+  expect(cursorChevron.width).toBeCloseTo(mediaChevron.width, 1);
+  expect(cursorChevron.height).toBeCloseTo(mediaChevron.height, 1);
+  await open();
+  await expect(panel.locator('nav button')).toHaveCount(4);
+  expect(
+    await popup.evaluate(async () => {
+      const stored = await chrome.storage.local.get('sniptale_video_settings');
+      return stored.sniptale_video_settings.recordingSurface?.cursorEffects ?? null;
+    })
+  ).toBeNull();
+  await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible();
+  expect(await trigger.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
+  const viewport = page.viewportSize()!;
+  const bounds = (await panel.boundingBox())!;
+  expect(bounds.width).toBeGreaterThanOrEqual(380);
+  expect(bounds.x).toBeGreaterThanOrEqual(-1);
+  expect(bounds.y).toBeGreaterThanOrEqual(-1);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
+  const rows = await panel.locator('.sniptale-parameter-row').evaluateAll((elements) =>
+    elements.map((element) => {
+      const label = element.firstElementChild!.getBoundingClientRect();
+      const control = element
+        .querySelector<HTMLElement>(
+          'input[type="text"], button[role="switch"], [data-ui="shared.ui.color-selector.value-trigger"]'
+        )!
+        .getBoundingClientRect();
+      return {
+        centerDifference: Math.abs(label.y + label.height / 2 - control.y - control.height / 2),
+        height: element.getBoundingClientRect().height,
+      };
+    })
+  );
+  expect(rows).toHaveLength(4);
+  for (const row of rows) {
+    expect(row.centerDifference).toBeLessThanOrEqual(1);
+    expect(row.height).toBeCloseTo(40, 0);
+  }
+  const categories = panel.locator('nav button');
+  const iconAlignment = await categories.evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const bounds = button.getBoundingClientRect();
+      const icon = button.querySelector('svg')!.getBoundingClientRect();
+      const nav = button.closest('nav')!.getBoundingClientRect();
+      return {
+        horizontal: Math.abs(bounds.x + bounds.width / 2 - icon.x - icon.width / 2),
+        vertical: Math.abs(bounds.y + bounds.height / 2 - icon.y - icon.height / 2),
+        insets: Math.abs(bounds.x - nav.x - (nav.right - bounds.right)),
+      };
+    })
+  );
+  for (const icon of iconAlignment) {
+    expect(icon.horizontal).toBeLessThanOrEqual(1);
+    expect(icon.vertical).toBeLessThanOrEqual(1);
+    expect(icon.insets).toBeLessThanOrEqual(1);
+  }
+  const closeAlignment = await panel
+    .locator('[data-settings-action="close"]')
+    .evaluate((button) => {
+      const bounds = button.getBoundingClientRect();
+      const icon = button.querySelector('svg')!.getBoundingClientRect();
+      return {
+        horizontal: Math.abs(bounds.x + bounds.width / 2 - icon.x - icon.width / 2),
+        vertical: Math.abs(bounds.y + bounds.height / 2 - icon.y - icon.height / 2),
+      };
+    });
+  expect(closeAlignment.horizontal).toBeLessThanOrEqual(1);
+  expect(closeAlignment.vertical).toBeLessThanOrEqual(1);
+  await categories.first().focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(panel).toHaveAttribute('data-focus-modality', 'keyboard');
+  await expect(categories.nth(1)).toBeFocused();
+  await expect(categories.nth(1)).toHaveCSS('outline-width', '1px');
+  await categories.first().click();
+  await expect(panel).toHaveAttribute('data-focus-modality', 'pointer');
+  await expect(categories.first()).toHaveCSS('outline-style', 'none');
+  await expect(categories.first()).toHaveCSS('box-shadow', 'none');
+  const choices = [
+    {
+      section: 0,
+      fields: ['haloSize', 'haloOpacity'],
+      values: ['66', '70'],
+      colorKey: 'haloColor',
+      color: '#2563eb',
+    },
+    {
+      section: 1,
+      fields: ['dimmingRadius', 'dimmingOpacity'],
+      values: ['90', '45'],
+      colorKey: 'dimmingColor',
+      color: '#112233',
+    },
+    {
+      section: 2,
+      fields: ['clickSize', 'clickDuration'],
+      values: ['60', '0.65'],
+      colorKey: 'clickColor',
+      color: '#ef4444',
+    },
+  ] as const;
+  for (const choice of choices) {
+    await open();
+    await panel.locator('nav button').nth(choice.section).click();
+    const colorField = panel.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
+    if (choice.section === 0) {
+      const accent = await panel.evaluate((element) =>
+        getComputedStyle(element).getPropertyValue('--sniptale-color-accent').trim().toUpperCase()
+      );
+      await expect(
+        colorField.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
+      ).toHaveAttribute('title', accent);
+      await colorField.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      await expect(picker).toBeVisible();
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#abcdef');
+      const pickerBounds = (await picker.boundingBox())!;
+      expect(pickerBounds.x).toBeGreaterThanOrEqual(-1);
+      expect(pickerBounds.y).toBeGreaterThanOrEqual(-1);
+      expect(pickerBounds.x + pickerBounds.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(pickerBounds.y + pickerBounds.height).toBeLessThanOrEqual(viewport.height + 1);
+      const panelBounds = (await panel.boundingBox())!;
+      const hasSideRoom =
+        Math.max(panelBounds.x, viewport.width - panelBounds.x - panelBounds.width) >=
+        pickerBounds.width + 16;
+      if (hasSideRoom)
+        expect(
+          pickerBounds.x >= panelBounds.x + panelBounds.width + 7 ||
+            pickerBounds.x + pickerBounds.width <= panelBounds.x - 7
+        ).toBe(true);
+      await page.screenshot({ path: info.outputPath('cursor-color-picker.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await expect(picker).toHaveCount(0);
+      await expect(panel).toBeVisible();
+      await expect(
+        colorField.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
+      ).toHaveAttribute('title', accent);
+      await colorField.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill(choice.color);
+      await picker.getByRole('button', { name: /^(Apply|Применить)$/u }).click();
+    } else {
+      await colorField.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
+      await page.screenshot({ path: info.outputPath('cursor-inline-color.png'), fullPage: false });
+      const colorInput = colorField.getByRole('textbox');
+      await colorInput.fill(choice.color);
+      await colorInput.press('Enter');
+    }
+    await expect
+      .poll(() =>
+        popup.evaluate(async (key) => {
+          const stored = await chrome.storage.local.get('sniptale_video_settings');
+          return stored.sniptale_video_settings.recordingSurface.cursorEffects?.[key];
+        }, choice.colorKey)
+      )
+      .toBe(choice.color);
+    await open();
+    await panel.locator('nav button').nth(choice.section).click();
+    await expect(panel.locator('nav button').nth(choice.section)).toHaveCSS(
+      'outline-style',
+      'none'
+    );
+    const toggle = panel.getByRole('switch');
+    if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+    for (const [index, field] of choice.fields.entries()) {
+      await open();
+      await panel.locator('nav button').nth(choice.section).click();
+      const input = panel.locator('input[type="text"]').nth(index);
+      await input.fill(choice.values[index]!);
+      await input.press('Enter');
+      const expected = Number(choice.values[index]) * (field === 'clickDuration' ? 1000 : 1);
+      await expect
+        .poll(() =>
+          popup.evaluate(async (key) => {
+            const stored = await chrome.storage.local.get('sniptale_video_settings');
+            return stored.sniptale_video_settings.recordingSurface.cursorEffects?.[key];
+          }, field)
+        )
+        .toBe(expected);
+    }
+    await open();
+    await panel.locator('nav button').nth(choice.section).click();
+    await page.screenshot({
+      path: info.outputPath(`cursor-settings-${choice.section}.png`),
+      fullPage: false,
+    });
+  }
+  await panel.locator('nav button').nth(3).click();
+  await expect(
+    panel.locator('[data-ui="content.toolbar.video-recording.native-cursor"]')
+  ).toBeVisible();
+  await expect(panel.locator('input')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.mouse.move(viewport.width - 80, viewport.height - 80);
+  const halo = page.locator('[data-ui="content.video-recording.spotlight-halo"]');
+  await expect(halo).toHaveCSS('width', '66px');
+  await expect(halo).toHaveCSS('opacity', '0.7');
+  await expect(halo).toHaveCSS('border-top-color', 'rgb(37, 99, 235)');
+  const dimming = page.locator('[data-ui="content.video-recording.spotlight-dimming"]');
+  await expect(dimming).toHaveCSS('opacity', '0.45');
+  await expect(dimming).toHaveCSS('background-color', 'rgb(17, 34, 51)');
+  await expect(dimming).toHaveCSS('mask-image', /(?:circle )?90px at/u);
+  await page.getByRole('button', { name: 'Host action', exact: true }).click();
+  const ripple = page.locator('[data-ui="content.video-recording.spotlight-click"]');
+  await expect(ripple).toHaveCSS('width', '60px');
+  await expect(ripple).toHaveCSS('animation-duration', '0.65s');
+  await expect(ripple).toHaveCSS('border-top-color', 'rgb(239, 68, 68)');
+  await open();
+  await expect(panel.locator('input[type="text"]').first()).toHaveValue('66');
+  await page.keyboard.press('Escape');
+}
+
 async function expectAutomaticRecordingFade(page: Page, info: TestInfo) {
   const toolbar = page.locator('[data-ui="content.toolbar.root"]');
   const opacity = () => toolbar.evaluate((element) => Number(getComputedStyle(element).opacity));
@@ -95,6 +322,7 @@ async function expectRecordingControlOrder(
             'eraser',
             'clear',
             'spotlight',
+            'cursor-settings',
             'microphone.toggle',
             'microphone.menu',
             'camera.toggle',
@@ -211,6 +439,7 @@ for (const { name, size } of [
         await page.keyboard.press('Escape');
         await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
         await expectRecordingControlOrder(page, orientation, 'idle');
+        await expectCursorSettings(page, popup, info);
         const bounds = await toolbar.boundingBox();
         expect(bounds).not.toBeNull();
         expect(bounds!.x).toBeGreaterThanOrEqual(-1);

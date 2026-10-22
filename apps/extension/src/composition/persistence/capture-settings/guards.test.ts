@@ -24,6 +24,50 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it('preserves bounded cursor effects and refuses malformed appearance objects', () => {
+    const cursorEffects = {
+      haloSize: 48,
+      haloOpacity: 70,
+      dimmingRadius: 90,
+      dimmingOpacity: 45,
+      clickSize: 60,
+      clickDuration: 650,
+      haloColor: '#2563eb',
+      dimmingColor: '#112233',
+      clickColor: '#ef4444',
+    };
+    const recordingSurface = {
+      toolbarEnabled: true,
+      cursorSpotlightEnabled: true,
+      cursorEffects,
+    };
+    expect(parseCurrentVideoSettings({ recordingSurface }).value).toMatchObject({
+      recordingSurface: { cursorEffects },
+    });
+    for (const invalid of [
+      null,
+      [],
+      {},
+      { ...cursorEffects, extra: true },
+      { ...cursorEffects, haloSize: 121 },
+      { ...cursorEffects, haloOpacity: 0 },
+      { ...cursorEffects, dimmingRadius: 29 },
+      { ...cursorEffects, dimmingOpacity: 81 },
+      { ...cursorEffects, clickSize: '60' },
+      { ...cursorEffects, clickDuration: Infinity },
+      { ...cursorEffects, clickDuration: 149 },
+      { ...cursorEffects, haloColor: 'url(https://example.com/cursor.svg)' },
+      { ...cursorEffects, dimmingColor: '#12345g' },
+      { ...cursorEffects, clickColor: '#ff000080' },
+    ]) {
+      expect(
+        parseCurrentVideoSettings({
+          recordingSurface: { ...recordingSurface, cursorEffects: invalid },
+        }).invalidFieldCount
+      ).toBe(1);
+    }
+  });
+
   it('preserves optional microphone warning booleans and rejects malformed preferences', () => {
     for (const warnWithoutMicrophone of [true, false]) {
       expect(parseCurrentVideoSettings({ warnWithoutMicrophone }).value).toMatchObject({

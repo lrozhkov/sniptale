@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CaptureMode,
+  DEFAULT_VIDEO_CURSOR_EFFECTS,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoFrameRate,
@@ -8,7 +9,10 @@ import {
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
+import {
+  runWithPersistentDataErasureBarrier,
+  runWithExclusivePersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 
 const { browserStorageLocalGetMock, browserStorageLocalSetMock } = vi.hoisted(() => ({
   browserStorageLocalGetMock: vi.fn(),
@@ -240,7 +244,14 @@ describe('video', () => {
       await writeReleased;
       stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
     });
-    const remember = patchVideoSettings({ warnWithoutMicrophone: false });
+    const remember = patchVideoSettings({
+      warnWithoutMicrophone: false,
+      recordingSurface: {
+        toolbarEnabled: true,
+        cursorSpotlightEnabled: true,
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
+      },
+    });
     await writeStarted;
     const erase = vi.fn(async () => {
       stored = { ...DEFAULT_VIDEO_SETTINGS };
@@ -253,6 +264,16 @@ describe('video', () => {
     await erasure;
     expect(erase).toHaveBeenCalledOnce();
     await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: true });
+    expect((await loadVideoSettings()).recordingSurface?.cursorEffects).toBeUndefined();
+    await mutateVideoSettings((current) => ({
+      ...current,
+      recordingSurface: {
+        toolbarEnabled: true,
+        cursorSpotlightEnabled: true,
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 77 },
+      },
+    }));
+    expect((await loadVideoSettings()).recordingSurface?.cursorEffects?.haloSize).toBe(77);
   });
 
   it('serializes concurrent field and profile mutations without stale overwrites', async () => {
@@ -289,6 +310,11 @@ describe('video', () => {
     const preferenceWrite = patchVideoSettings({
       interactionDiagnosticsEnabled: true,
       warnWithoutMicrophone: false,
+      recordingSurface: {
+        toolbarEnabled: true,
+        cursorSpotlightEnabled: true,
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
+      },
     });
     await firstWriteStarted;
     const profileWrite = mutateVideoSettings((current) => ({
@@ -301,6 +327,10 @@ describe('video', () => {
     expect(stored.interactionDiagnosticsEnabled).toBe(true);
     expect(stored.warnWithoutMicrophone).toBe(false);
     expect(stored.qualityProfiles).toEqual([profile]);
+    expect(stored.recordingSurface?.cursorEffects?.haloSize).toBe(66);
+    await expect(loadVideoSettings()).resolves.toMatchObject({
+      recordingSurface: { cursorEffects: { haloSize: 66 } },
+    });
     await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: false });
   });
 
@@ -343,5 +373,78 @@ describe('video', () => {
       webcamDeviceId: 'new-camera',
       warnWithoutMicrophone: false,
     });
+  });
+});
+
+describe('cursor effect persistence', () => {
+  beforeEach(resetVideoStorageMocks);
+
+  it('preserves accepted cursor effects after a failed write and accepts an explicit retry', async () => {
+    let stored = {
+      ...DEFAULT_VIDEO_SETTINGS,
+      recordingSurface: {
+        toolbarEnabled: true,
+        cursorSpotlightEnabled: true,
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, clickSize: 55 },
+      },
+    };
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockRejectedValueOnce(new Error('storage unavailable'));
+    const update = () =>
+      mutateVideoSettings((current) => ({
+        ...current,
+        recordingSurface: {
+          ...stored.recordingSurface,
+          cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, clickSize: 75 },
+        },
+      }));
+    await expect(update()).rejects.toThrow('storage unavailable');
+    expect((await loadVideoSettings()).recordingSurface?.cursorEffects?.clickSize).toBe(55);
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      stored = items.sniptale_video_settings as typeof stored;
+    });
+    await update();
+    expect((await loadVideoSettings()).recordingSurface?.cursorEffects?.clickSize).toBe(75);
+  });
+
+  it('orders a delayed cursor edit before an exclusive settings replacement', async () => {
+    let stored = { ...DEFAULT_VIDEO_SETTINGS };
+    let releaseWrite!: () => void;
+    let notifyStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      notifyStarted = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      notifyStarted();
+      await released;
+      stored = items.sniptale_video_settings as typeof stored;
+    });
+    const edit = mutateVideoSettings((current) => ({
+      ...current,
+      recordingSurface: {
+        toolbarEnabled: true,
+        cursorSpotlightEnabled: true,
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
+      },
+    }));
+    await started;
+    const replace = vi.fn(() => {
+      stored = { ...DEFAULT_VIDEO_SETTINGS };
+    });
+    const replacement = runWithExclusivePersistenceMutationPermit(replace);
+    await Promise.resolve();
+    expect(replace).not.toHaveBeenCalled();
+    releaseWrite();
+    await Promise.all([edit, replacement]);
+    expect(replace).toHaveBeenCalledOnce();
+    expect((await loadVideoSettings()).recordingSurface?.cursorEffects).toBeUndefined();
   });
 });

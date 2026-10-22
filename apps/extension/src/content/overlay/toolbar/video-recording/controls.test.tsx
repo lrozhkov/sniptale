@@ -385,5 +385,6 @@ it('groups auto-hide, eraser, clear, and cursor spotlight in that order', () => 
     'content.toolbar.video-recording.eraser',
     'content.toolbar.video-recording.clear',
     'content.toolbar.video-recording.spotlight',
+    'content.toolbar.video-recording.cursor-settings',
   ]);
 });

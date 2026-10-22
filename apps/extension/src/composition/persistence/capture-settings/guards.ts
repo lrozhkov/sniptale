@@ -1,6 +1,7 @@
 import {
   CaptureMode,
   isVideoOutputProfile,
+  isVideoCursorEffectSettings,
   normalizeVideoSourceCount,
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
@@ -107,10 +108,14 @@ function parseOptionalRecordingSurface(
         'cursorSpotlightEnabled',
         'cursorDimmingEnabled',
         'cursorClickAnimationEnabled',
+        'cursorEffects',
       ].includes(key)
     ) ||
     !isBoolean(value['toolbarEnabled']) ||
     !isBoolean(value['cursorSpotlightEnabled']) ||
+    !(
+      value['cursorEffects'] === undefined || isVideoCursorEffectSettings(value['cursorEffects'])
+    ) ||
     !(value['cursorDimmingEnabled'] === undefined || isBoolean(value['cursorDimmingEnabled'])) ||
     !(
       value['cursorClickAnimationEnabled'] === undefined ||
@@ -125,6 +130,7 @@ function parseOptionalRecordingSurface(
     cursorSpotlightEnabled: value['cursorSpotlightEnabled'],
     cursorDimmingEnabled: value['cursorDimmingEnabled'] ?? false,
     cursorClickAnimationEnabled: value['cursorClickAnimationEnabled'] ?? false,
+    ...(value['cursorEffects'] ? { cursorEffects: value['cursorEffects'] } : {}),
   };
 }
 

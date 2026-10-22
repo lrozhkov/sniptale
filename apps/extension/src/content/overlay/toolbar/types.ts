@@ -55,6 +55,7 @@ export interface ToolbarVideoRecordingProps {
     cursorHaloEnabled: boolean;
     cursorDimmingEnabled: boolean;
     clickAnimationEnabled: boolean;
+    cursorEffects?: NonNullable<VideoRecordingToolbarState['cursorEffects']>;
   }) => Promise<void> | void;
   onStart: (
     activationEvent?: Event,

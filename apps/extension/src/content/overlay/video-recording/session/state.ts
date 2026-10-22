@@ -1,5 +1,11 @@
-import type { WebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
+import type {
+  VideoCursorEffectSettings,
+  WebcamPresentationSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
+import {
+  DEFAULT_VIDEO_CURSOR_EFFECTS,
+  VideoRecordingStatus,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
@@ -27,6 +33,7 @@ export type VideoRecordingToolbarState = {
   spotlightEnabled: boolean;
   spotlightDimmingEnabled: boolean;
   spotlightClickAnimationEnabled: boolean;
+  cursorEffects?: VideoCursorEffectSettings;
   surfaceSessionId: string | null;
   surfaceToken: string | null;
   webcamPresentation: WebcamPresentationSettings;
@@ -47,6 +54,7 @@ export const INITIAL_VIDEO_RECORDING_TOOLBAR_STATE: VideoRecordingToolbarState =
   spotlightEnabled: false,
   spotlightDimmingEnabled: false,
   spotlightClickAnimationEnabled: false,
+  cursorEffects: DEFAULT_VIDEO_CURSOR_EFFECTS,
   surfaceSessionId: null,
   surfaceToken: null,
   webcamPresentation: DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
@@ -115,6 +123,7 @@ function projectSurfaceSnapshot(
     spotlightEnabled: snapshot.cursorSpotlightEnabled,
     spotlightDimmingEnabled: snapshot.cursorDimmingEnabled ?? false,
     spotlightClickAnimationEnabled: snapshot.cursorClickAnimationEnabled ?? false,
+    cursorEffects: snapshot.cursorEffects ?? DEFAULT_VIDEO_CURSOR_EFFECTS,
     surfaceSessionId: snapshot.surfaceSessionId,
     surfaceToken: action.surfaceToken,
     webcamDeviceId: snapshot.webcamDeviceId,

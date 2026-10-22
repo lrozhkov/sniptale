@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoRecordingSpotlight } from './view';
+import { DEFAULT_VIDEO_CURSOR_EFFECTS } from '@sniptale/runtime-contracts/video/types/types';
 
 let root: ReturnType<typeof createRoot> | null = null;
 
@@ -43,6 +44,57 @@ function deliver(type: string, clientX = 0, detail = 1) {
 }
 
 const RIPPLE = '[data-ui="content.video-recording.spotlight-click"]';
+
+it('renders accepted appearance values without replacing the native cursor', () => {
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn(() => 1)
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  act(() =>
+    root?.render(
+      <VideoRecordingSpotlight
+        cursorHaloEnabled
+        cursorDimmingEnabled
+        clickAnimationEnabled
+        cursorEffects={{
+          ...DEFAULT_VIDEO_CURSOR_EFFECTS,
+          haloSize: 66,
+          haloOpacity: 70,
+          dimmingRadius: 90,
+          dimmingOpacity: 45,
+          clickSize: 60,
+          clickDuration: 650,
+          haloColor: '#2563eb',
+          dimmingColor: '#112233',
+          clickColor: '#ef4444',
+        }}
+      />
+    )
+  );
+  const halo = host.querySelector<HTMLElement>(
+    '[data-ui="content.video-recording.spotlight-halo"]'
+  )!;
+  expect(halo.style.width).toBe('66px');
+  expect(halo.style.left).toBe('-33px');
+  expect(halo.style.opacity).toBe('0.7');
+  expect(halo.style.borderColor).toBe('rgb(37, 99, 235)');
+  const dimming = host.querySelector<HTMLElement>(
+    '[data-ui="content.video-recording.spotlight-dimming"]'
+  )!;
+  expect(dimming.style.opacity).toBe('0.45');
+  expect(dimming.style.backgroundColor).toBe('rgb(17, 34, 51)');
+  expect(dimming.style.maskImage).toContain('circle 90px');
+  deliver('click', 30, 0);
+  const ripple = host.querySelector<HTMLElement>(RIPPLE)!;
+  expect(ripple.style.width).toBe('60px');
+  expect(ripple.style.borderColor).toBe('rgb(239, 68, 68)');
+  expect(ripple.style.animation).toContain('650ms');
+  expect(document.documentElement.style.cursor).toBe('');
+});
 
 it.each(['selection-drag', 'return-to-origin', 'cancel', 'native-drag', 'blur'])(
   'does not animate %s completion and accepts the next click',

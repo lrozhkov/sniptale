@@ -5,6 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ColorSelectorTrigger } from './trigger';
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -44,6 +45,30 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('uses the shared release activation before replacing a scoped value button with its editor', () => {
+  act(() =>
+    root?.render(
+      <CommandPressScope value>
+        <ColorSelectorTrigger
+          formatMode="hex"
+          label="Grid color"
+          value="#123456"
+          onOpenPicker={() => undefined}
+          onCommit={() => undefined}
+        />
+      </CommandPressScope>
+    )
+  );
+  const value = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.value-trigger"]'
+  );
+  expect(value?.hasAttribute('data-command-press')).toBe(true);
+  act(() => value?.click());
+  const input = container?.querySelector('input');
+  expect(input?.value).toBe('#123456');
+  expect(document.activeElement).toBe(input);
 });
 
 afterEach(() => {

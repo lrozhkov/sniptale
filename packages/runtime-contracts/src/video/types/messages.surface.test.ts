@@ -26,6 +26,44 @@ const identity = {
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
 
+it('admits bounded cursor appearance only inside the existing spotlight command', () => {
+  const cursorEffects = {
+    haloSize: 48,
+    haloOpacity: 70,
+    dimmingRadius: 90,
+    dimmingOpacity: 45,
+    clickSize: 60,
+    clickDuration: 650,
+    haloColor: '#2563eb',
+    dimmingColor: '#112233',
+    clickColor: '#ef4444',
+  };
+  const message = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: identity.surfaceSessionId,
+    surfaceToken: identity.surfaceToken,
+    documentGeneration: identity.documentGeneration,
+    capabilityEpoch: 4,
+    recordingId: null,
+    command: {
+      kind: 'set-spotlight-settings',
+      cursorHaloEnabled: true,
+      cursorDimmingEnabled: true,
+      clickAnimationEnabled: true,
+      cursorEffects,
+    },
+  };
+  expect(isVideoRecordingSurfaceCommandMessage(message)).toBe(true);
+  for (const invalid of [null, {}, [], { ...cursorEffects, clickDuration: 1201 }]) {
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { ...message.command, cursorEffects: invalid },
+      })
+    ).toBe(false);
+  }
+});
+
 it('accepts only the bounded private permission protocol and read-only authority request', () => {
   const request = {
     type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,

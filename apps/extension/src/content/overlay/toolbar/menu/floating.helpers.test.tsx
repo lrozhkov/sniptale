@@ -228,7 +228,10 @@ function EscapeHarness(props: { onClose: () => void; onEscapeClose?: () => void 
       <button ref={triggerRef} onClick={() => menuState.toggleMenu('reset-confirm')}>
         Open
       </button>
-      <div ref={menuRef}>Menu</div>
+      <div ref={menuRef}>
+        Menu
+        <span data-floating-ui-owner-id="test-picker-owner" />
+      </div>
     </>
   );
 }
@@ -250,6 +253,36 @@ it('retains onClose as the shared Escape fallback', () => {
   const onClose = vi.fn();
   const host = render(<EscapeHarness onClose={onClose} />);
   act(() => host.querySelector('button')?.click());
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('keeps an owned picker interaction inside the menu and defers Escape until it closes', () => {
+  const onClose = vi.fn();
+  const host = render(<EscapeHarness onClose={onClose} />);
+  act(() => host.querySelector('button')?.click());
+  const layer = document.createElement('div');
+  layer.setAttribute('data-floating-ui-owned-by', 'test-picker-owner');
+  const input = document.createElement('input');
+  layer.append(input);
+  document.body.append(layer);
+  act(() => input.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  act(() => input.focus());
+  expect(onClose).not.toHaveBeenCalled();
+  const closePicker = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    event.stopImmediatePropagation();
+    layer.remove();
+  };
+  document.addEventListener('keydown', closePicker, true);
+  try {
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(layer.isConnected).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
+  } finally {
+    document.removeEventListener('keydown', closePicker, true);
+    layer.remove();
+  }
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(onClose).toHaveBeenCalledOnce();
 });

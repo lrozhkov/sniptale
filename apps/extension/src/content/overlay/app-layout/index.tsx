@@ -66,6 +66,9 @@ function VideoRecordingSurfaceSlot(props: {
         />
       ) : null}
       <VideoRecordingSpotlight
+        {...(recording?.state.cursorEffects
+          ? { cursorEffects: recording.state.cursorEffects }
+          : {})}
         cursorHaloEnabled={Boolean(
           videoMode &&
           recording?.state.interaction === 'navigation' &&

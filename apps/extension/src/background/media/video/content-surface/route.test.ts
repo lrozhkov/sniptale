@@ -2,7 +2,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 afterEach(() => vi.unstubAllGlobals());
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  DEFAULT_VIDEO_CURSOR_EFFECTS,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { contentActionRuntimeContracts } from '../../../../contracts/messaging/contracts/runtime/actions/content-action';
 
@@ -569,6 +572,7 @@ it('executes lifecycle and live media surface commands for an active recording',
   await command({ kind: 'set-auto-fade-delay', delay: 5 });
   await command({
     kind: 'set-spotlight-settings',
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
     cursorHaloEnabled: true,
     cursorDimmingEnabled: false,
     clickAnimationEnabled: true,
@@ -600,6 +604,7 @@ it('executes lifecycle and live media surface commands for an active recording',
     cursorSpotlightEnabled: true,
     cursorDimmingEnabled: false,
     cursorClickAnimationEnabled: true,
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
   });
   expect(mocks.updateRecordingSettings).toHaveBeenCalledTimes(4);
 });

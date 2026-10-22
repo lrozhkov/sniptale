@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RecordingSpotlightMenu } from './spotlight-menu';
+import { DEFAULT_VIDEO_CURSOR_EFFECTS } from '@sniptale/runtime-contracts/video/types/types';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -15,7 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('opens one canonical dropdown and changes halo, dimming, and click animation independently', async () => {
+it('opens the categorized cursor panel without enabling effects or writing settings', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -28,9 +29,65 @@ it('opens one canonical dropdown and changes halo, dimming, and click animation 
         disabled={false}
         displayMode="horizontal"
         settings={{
+          cursorHaloEnabled: false,
+          cursorDimmingEnabled: false,
+          clickAnimationEnabled: false,
+        }}
+        onChange={onChange}
+      />
+    )
+  );
+  const advanced = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.video-recording.cursor-settings"]'
+  );
+  expect(advanced).not.toBeNull();
+  await act(async () => advanced?.click());
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]')
+  ).not.toBeNull();
+  expect(
+    host
+      .querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]')
+      ?.classList.contains('sniptale-inspector-surface')
+  ).toBe(true);
+  expect(host.querySelectorAll('nav button')).toHaveLength(4);
+  expect(host.querySelectorAll('input[type="text"]')).toHaveLength(2);
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[3]?.click());
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.native-cursor"]')
+  ).not.toBeNull();
+  expect(host.querySelectorAll('input')).toHaveLength(0);
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        'button[title="content.interactiveFrame.closeEffectSettings"]'
+      )
+      ?.click()
+  );
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('opens one canonical dropdown and changes halo, dimming, and click animation independently', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  const cursorEffects = { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloColor: '#2563eb' };
+  act(() =>
+    root.render(
+      <RecordingSpotlightMenu
+        compact={false}
+        disabled={false}
+        displayMode="horizontal"
+        settings={{
           cursorHaloEnabled: true,
           cursorDimmingEnabled: false,
           clickAnimationEnabled: false,
+          cursorEffects,
         }}
         onChange={onChange}
       />
@@ -66,6 +123,7 @@ it('opens one canonical dropdown and changes halo, dimming, and click animation 
     cursorHaloEnabled: true,
     cursorDimmingEnabled: false,
     clickAnimationEnabled: true,
+    cursorEffects,
   });
   await act(async () => {
     host
@@ -165,5 +223,65 @@ it('rolls an optimistic spotlight selection back when the command fails', async 
       .querySelector('[data-ui="content.toolbar.video-recording.spotlight-click"]')
       ?.classList.contains('sniptale-popover-item-selected')
   ).toBe(false);
+  expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+    'content.toolbar.cursorEffectSaveFailed'
+  );
+  onChange.mockResolvedValueOnce(undefined);
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.video-recording.spotlight-click"]'
+      )
+      ?.click()
+  );
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(onChange).toHaveBeenCalledTimes(2);
+  act(() => root.unmount());
+});
+
+it('admits only one pending cursor change from repeated activation', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const onChange = vi.fn(() => pending);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <RecordingSpotlightMenu
+        compact={false}
+        disabled={false}
+        displayMode="horizontal"
+        settings={{
+          cursorHaloEnabled: false,
+          cursorDimmingEnabled: false,
+          clickAnimationEnabled: false,
+        }}
+        onChange={onChange}
+      />
+    )
+  );
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.video-recording.cursor-settings"]'
+      )
+      ?.click()
+  );
+  const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  act(() => {
+    toggle.click();
+    toggle.click();
+  });
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(toggle.disabled).toBe(true);
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(toggle.disabled).toBe(false);
   act(() => root.unmount());
 });

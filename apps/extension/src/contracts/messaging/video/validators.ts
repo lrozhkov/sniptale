@@ -1,6 +1,7 @@
 import {
   CaptureMode,
   isVideoOutputProfile,
+  isVideoCursorEffectSettings,
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
   VideoResolutionPreset,
@@ -128,12 +129,14 @@ function isVideoRecordingSurfaceSettings(value: unknown): boolean {
         'cursorSpotlightEnabled',
         'cursorDimmingEnabled',
         'cursorClickAnimationEnabled',
+        'cursorEffects',
       ].includes(key)
     ) &&
     isBoolean(value['toolbarEnabled']) &&
     isBoolean(value['cursorSpotlightEnabled']) &&
     hasOptionalField(value, 'cursorDimmingEnabled', isBoolean) &&
-    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean)
+    hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean) &&
+    hasOptionalField(value, 'cursorEffects', isVideoCursorEffectSettings)
   );
 }
 

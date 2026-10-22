@@ -6,6 +6,8 @@ import {
   WebcamPresentationMode,
   WebcamPresentationShape,
   VIDEO_AUTO_FADE_DELAYS,
+  isVideoCursorEffectSettings,
+  type VideoCursorEffectSettings,
   type VideoAutoFadeDelay,
   type WebcamPresentationSettings,
 } from './types';
@@ -54,6 +56,7 @@ export interface VideoRecordingSurfaceSnapshot {
   cursorSpotlightEnabled: boolean;
   cursorDimmingEnabled?: boolean;
   cursorClickAnimationEnabled?: boolean;
+  cursorEffects?: VideoCursorEffectSettings;
   peerGeneration: number;
   status: VideoRecordingStatus;
   duration: number;
@@ -112,6 +115,7 @@ export type VideoRecordingSurfaceCommand =
   | { kind: 'set-auto-fade-delay'; delay: VideoAutoFadeDelay }
   | {
       kind: 'set-spotlight-settings';
+      cursorEffects?: VideoCursorEffectSettings;
       cursorHaloEnabled: boolean;
       cursorDimmingEnabled: boolean;
       clickAnimationEnabled: boolean;
@@ -292,6 +296,7 @@ export function isVideoRecordingSurfaceSnapshot(
         'errorCode',
         'cursorDimmingEnabled',
         'cursorClickAnimationEnabled',
+        'cursorEffects',
       ].includes(key)
     )
   ) {
@@ -308,6 +313,7 @@ export function isVideoRecordingSurfaceSnapshot(
     typeof value['toolbarRequested'] === 'boolean' &&
     isFiniteNonNegativeNumber(value['capabilityEpoch']) &&
     typeof value['cursorSpotlightEnabled'] === 'boolean' &&
+    (value['cursorEffects'] === undefined || isVideoCursorEffectSettings(value['cursorEffects'])) &&
     (value['cursorDimmingEnabled'] === undefined ||
       typeof value['cursorDimmingEnabled'] === 'boolean') &&
     (value['cursorClickAnimationEnabled'] === undefined ||
@@ -440,10 +446,12 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
         'cursorHaloEnabled',
         'cursorDimmingEnabled',
         'clickAnimationEnabled',
+        ...(value['cursorEffects'] === undefined ? [] : ['cursorEffects']),
       ]) &&
       typeof value['cursorHaloEnabled'] === 'boolean' &&
       typeof value['cursorDimmingEnabled'] === 'boolean' &&
-      typeof value['clickAnimationEnabled'] === 'boolean'
+      typeof value['clickAnimationEnabled'] === 'boolean' &&
+      (value['cursorEffects'] === undefined || isVideoCursorEffectSettings(value['cursorEffects']))
     );
   }
   if (value['kind'] === 'set-microphone-enabled' || value['kind'] === 'set-webcam-enabled') {

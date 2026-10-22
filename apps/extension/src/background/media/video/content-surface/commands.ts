@@ -143,7 +143,8 @@ async function applySurfaceCommand(
       await patchVideoSettings({ autoFadeDelay: message.command.delay });
       return { result: 'updated' };
     case 'set-spotlight-settings': {
-      const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled } = message.command;
+      const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled, cursorEffects } =
+        message.command;
       await mutateVideoSettings((current) => ({
         ...current,
         recordingSurface: {
@@ -152,6 +153,7 @@ async function applySurfaceCommand(
           cursorSpotlightEnabled: cursorHaloEnabled,
           cursorDimmingEnabled,
           cursorClickAnimationEnabled: clickAnimationEnabled,
+          ...(cursorEffects ? { cursorEffects } : {}),
         },
       }));
       return { result: 'updated' };

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { getColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import {
@@ -53,6 +54,16 @@ export function ColorValue(props: {
   const [draft, setDraft] = useState(props.value);
   const [invalid, setInvalid] = useState(false);
   const completed = useRef(false);
+  const scoped = useContext(CommandPressScope);
+  const press = useCommandPress({
+    disabled: props.disabled,
+    enabled: scoped,
+    onClick: () => {
+      completed.current = false;
+      setDraft(props.value);
+      setEditing(true);
+    },
+  });
   useEffect(() => {
     setEditing(false);
     setInvalid(false);
@@ -129,23 +140,20 @@ export function ColorValue(props: {
     );
   return (
     <button
+      {...press.props}
       ref={buttonRef}
       type="button"
       disabled={props.disabled}
       aria-label={props.label}
       title={props.displayValue}
       data-ui="shared.ui.color-selector.value-trigger"
+      data-command-press={scoped ? '' : undefined}
       className={[
         COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
         COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
         'min-w-0 flex-1 truncate text-right text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
         'focus-visible:outline focus-visible:outline-1',
       ].join(' ')}
-      onClick={() => {
-        completed.current = false;
-        setDraft(props.value);
-        setEditing(true);
-      }}
     >
       {props.displayValue}
     </button>

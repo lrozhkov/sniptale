@@ -399,6 +399,9 @@ export function ToolbarVideoRecordingControls(props: {
                 cursorHaloEnabled: props.recording.state.spotlightEnabled,
                 cursorDimmingEnabled: props.recording.state.spotlightDimmingEnabled,
                 clickAnimationEnabled: props.recording.state.spotlightClickAnimationEnabled,
+                ...(props.recording.state.cursorEffects
+                  ? { cursorEffects: props.recording.state.cursorEffects }
+                  : {}),
               }}
               onChange={(settings) => {
                 if (props.recording.onSpotlightSettingsChange) {
