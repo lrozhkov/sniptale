@@ -215,7 +215,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
       menuHeight: advanced ? 420 : 190,
-      menuWidth: advanced ? 440 : 280,
+      menuWidth: advanced ? 360 : 280,
       preferredAlign: 'start',
     });
     return { placement: dropdown.menuPlacement, style: dropdown.style };
@@ -293,7 +293,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
               ...dropdown.style,
               ...(state.advanced
                 ? {
-                    width: 440,
+                    width: 360,
                     maxWidth: 'calc(100vw - 16px)',
                     maxHeight: 'calc(100vh - 16px)',
                     overflowY: 'auto' as const,

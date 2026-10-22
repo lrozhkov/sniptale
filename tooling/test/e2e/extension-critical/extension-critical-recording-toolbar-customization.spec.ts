@@ -20,6 +20,92 @@ test.use({ actionTimeout: 10000 });
 for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((viewport) =>
   (['horizontal', 'vertical'] as const).map((orientation) => ({ ...viewport, orientation }))
 )) {
+  test(`recording cursor compact parameters ${name} ${orientation}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      await popup.evaluate(
+        async (theme) => {
+          await chrome.storage.local.set({
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': theme === 'dark' ? 'ru' : 'en',
+          });
+        },
+        size.width === 1920 ? 'dark' : 'light'
+      );
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      if (orientation === 'vertical') {
+        await openRecordingToolbarSettings(page);
+        const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+        if (!(await vertical.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await vertical.click();
+        await page.keyboard.press('Escape');
+      }
+      await page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]').click();
+      const panel = page.locator('[data-ui="content.toolbar.video-recording.cursor-panel"]');
+      const toggle = panel.getByRole('switch');
+      if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+      const value = panel.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      await value.click();
+      const input = panel.locator('[data-ui="shared.ui.color-selector.value-editor"] input');
+      await input.fill('#123456');
+      await panel.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      await expect(panel).toBeVisible();
+      await expect(picker).toBeVisible();
+      await expect(picker.locator('input[type="text"]').first()).toHaveValue('#123456');
+      await page.screenshot({ path: info.outputPath('color-edit-picker.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await expect(panel).toBeVisible();
+      await value.click();
+      await input.fill('#654321');
+      await panel.locator('[data-ui="shared.categorized-inspector.section-heading"]').click();
+      await expect(panel).toBeVisible();
+      await expect(value).toContainText('#654321');
+      await value.click();
+      await expect(input).toHaveCSS('outline-style', 'none');
+      await expect(panel.locator('[data-ui="shared.ui.color-selector.trigger"]')).toHaveCSS(
+        'outline-style',
+        'none'
+      );
+      await input.press('Escape');
+      await expect(panel).toBeVisible();
+      await toggle.click();
+      await expect(
+        panel.locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+      ).toHaveCount(0);
+      await expect(
+        panel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+      ).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('disabled-effect.png'), fullPage: false });
+      await toggle.click();
+      await expect(value).toContainText('#654321');
+      await selectCursorChoice(page, panel, /^(Effect|Эффект)$/u, /^(Press|Нажатие)$/u);
+      await selectCursorChoice(page, panel, /^(Easing|Плавность)$/u, /^(Linear|Линейная)$/u);
+      expect((await panel.boundingBox())!.width).toBeLessThanOrEqual(360);
+      await page.screenshot({ path: info.outputPath('compact-parameters.png'), fullPage: false });
+      await page.setViewportSize({ width: 1000, height: size.height });
+      await page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]').click();
+      await expect(panel).toBeVisible();
+      const bounds = (await panel.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(1000);
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+
   test(`recording media selection feedback ${name} ${orientation}`, async ({}, info) => {
     const host = await startHostServer();
     const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
@@ -538,8 +624,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         ] as const) {
           await page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]').click();
           await panel.locator('nav button').first().click();
-          await panel.getByRole('button', { name: /^(Effect|Эффект)$/u }).click();
-          await page.getByRole('option', { name: label, exact: true }).click();
+          await selectCursorChoice(page, panel, /^(Effect|Эффект)$/u, label);
           await page.screenshot({
             path: info.outputPath(`ui-no-click-${effect}.png`),
             fullPage: false,
@@ -742,7 +827,10 @@ async function observeStablePendingControls(surface: Locator) {
   await surface.evaluate((element) => {
     element.setAttribute('data-stability-result', 'pending');
     const group = element.closest('.sniptale-recording-media-control')!;
-    const controls = [...group.querySelectorAll('button, input')];
+    const controlsRoot = element.matches('[data-ui="shared.categorized-inspector.section-heading"]')
+      ? element
+      : group;
+    const controls = [...controlsRoot.querySelectorAll('button, input')];
     const opacity = controls.map((control) => getComputedStyle(control).opacity);
     const violations: string[] = [];
     let pending = false;
@@ -877,30 +965,34 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   expect(cursorChevron.height).toBeCloseTo(mediaChevron.height, 1);
   await open();
   await expect(panel.locator('nav button')).toHaveCount(4);
+  if ((await panel.getByRole('switch').getAttribute('aria-checked')) !== 'true')
+    await panel.getByRole('switch').click();
   await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible();
   expect(await trigger.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
   const viewport = page.viewportSize()!;
   const bounds = (await panel.boundingBox())!;
-  expect(bounds.width).toBeGreaterThanOrEqual(380);
+  expect(bounds.width).toBeGreaterThanOrEqual(340);
   expect(bounds.x).toBeGreaterThanOrEqual(-1);
   expect(bounds.y).toBeGreaterThanOrEqual(-1);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width + 1);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height + 1);
-  const rows = await panel.locator('.sniptale-parameter-row').evaluateAll((elements) =>
-    elements.map((element) => {
-      const label = element.firstElementChild!.getBoundingClientRect();
-      const control = element
-        .querySelector<HTMLElement>(
-          'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], [data-ui="shared.ui.color-selector.value-trigger"]'
-        )!
-        .getBoundingClientRect();
-      return {
-        centerDifference: Math.abs(label.y + label.height / 2 - control.y - control.height / 2),
-        height: element.getBoundingClientRect().height,
-      };
-    })
-  );
-  expect(rows).toHaveLength(7);
+  const rows = await panel
+    .locator('.sniptale-parameter-row[data-layout="inline"]')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const label = element.firstElementChild!.getBoundingClientRect();
+        const control = element
+          .querySelector<HTMLElement>(
+            'input[type="text"], button[role="switch"], button[aria-haspopup="listbox"], [data-ui="shared.ui.color-selector.value-trigger"]'
+          )!
+          .getBoundingClientRect();
+        return {
+          centerDifference: Math.abs(label.y + label.height / 2 - control.y - control.height / 2),
+          height: element.getBoundingClientRect().height,
+        };
+      })
+    );
+  expect(rows.length).toBeGreaterThanOrEqual(4);
   for (const row of rows) {
     expect(row.centerDifference).toBeLessThanOrEqual(1);
     expect(row.height).toBeCloseTo(40, 0);
@@ -1037,6 +1129,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       'none'
     );
     const toggle = panel.getByRole('switch');
+    if ((await toggle.getAttribute('aria-checked')) === 'true') await toggle.click();
     await expect(
       panel.locator('[data-ui="shared.categorized-inspector.section-heading"]').getByRole('switch')
     ).toHaveCount(1);
@@ -1049,10 +1142,11 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       })
     ).toBeLessThanOrEqual(1);
     for (const enabled of [true, false, true]) {
-      await observeStablePendingControls(panel);
+      const heading = panel.locator('[data-ui="shared.categorized-inspector.section-heading"]');
+      await observeStablePendingControls(heading);
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-checked', String(enabled));
-      await expect(panel).toHaveAttribute('data-stability-result', '[]');
+      await expect(heading).toHaveAttribute('data-stability-result', '[]');
     }
     if (choice.section === 1) {
       await toggle.focus();
@@ -1126,8 +1220,7 @@ async function expectLiveClickModes(page: Page, popup: Page, info: TestInfo) {
   ] as const) {
     await trigger.click();
     await panel.locator('nav button').first().click();
-    await panel.getByRole('button', { name: /^(Effect|Эффект)$/u }).click();
-    await page.getByRole('option', { name: label, exact: true }).click();
+    await selectCursorChoice(page, panel, /^(Effect|Эффект)$/u, label);
     await expect
       .poll(() =>
         popup.evaluate(async () => {
@@ -1136,8 +1229,7 @@ async function expectLiveClickModes(page: Page, popup: Page, info: TestInfo) {
         })
       )
       .toBe(effect);
-    await panel.getByRole('button', { name: /^(Easing|Плавность)$/u }).click();
-    await page.getByRole('option', { name: /^(Linear|Линейная)$/u }).click();
+    await selectCursorChoice(page, panel, /^(Easing|Плавность)$/u, /^(Linear|Линейная)$/u);
     await page.screenshot({
       path: info.outputPath(`live-click-${effect}-settings.png`),
       fullPage: false,
@@ -1153,10 +1245,26 @@ async function expectLiveClickModes(page: Page, popup: Page, info: TestInfo) {
     await expect(animation).toHaveCount(0);
   }
   await trigger.click();
-  await expect(panel.getByRole('button', { name: /^(Effect|Эффект)$/u })).toHaveText(
-    /Ripple|Расходящееся кольцо/u
-  );
+  const effect = panel.getByRole('group', { name: /^(Effect|Эффект)$/u });
+  if (await effect.isVisible())
+    await expect(
+      effect.getByRole('button', { name: /Ripple|Расходящееся кольцо/u })
+    ).toHaveAttribute('aria-pressed', 'true');
+  else
+    await expect(panel.getByRole('button', { name: /^(Effect|Эффект)$/u })).toHaveText(
+      /Ripple|Расходящееся кольцо/u
+    );
   await page.keyboard.press('Escape');
+}
+
+async function selectCursorChoice(page: Page, panel: Locator, name: RegExp, option: RegExp) {
+  const group = panel.getByRole('group', { name });
+  if (await group.isVisible())
+    await group.getByRole('button', { name: option, exact: true }).click();
+  else {
+    await panel.getByRole('button', { name }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+  }
 }
 
 async function expectAutomaticRecordingFade(page: Page, info: TestInfo) {

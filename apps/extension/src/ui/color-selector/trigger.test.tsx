@@ -116,6 +116,33 @@ it('commits a normalized value once and restores keyboard focus', async () => {
   expect(document.activeElement).toBe(getButton('Grid color'));
 });
 
+it('finishes the inline draft before opening the picker when toolbar presses retain focus', async () => {
+  const order: string[] = [];
+  function OwnedColor() {
+    const [color, setColor] = React.useState('#123456');
+    return (
+      <ColorSelectorTrigger
+        formatMode="hex"
+        label="Grid color"
+        value={color}
+        onCommit={(value) => {
+          order.push(value);
+          setColor(value);
+        }}
+        onOpenPicker={() => order.push(`picker:${color}`)}
+      />
+    );
+  }
+  act(() => root?.render(<OwnedColor />));
+  await enterValue('#abcdef', 'Tab');
+  const swatch = getButton('shared.ui.colorSelectorChooseColor')!;
+  await act(async () => {
+    swatch.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    swatch.click();
+  });
+  expect(order).toEqual(['#abcdef', 'picker:#abcdef']);
+});
+
 it('retains invalid input without changing the color and Escape cancels it', async () => {
   const onCommit = vi.fn();
   renderTrigger({ onCommit });

@@ -51,7 +51,7 @@ it('opens the categorized cursor panel without enabling effects or writing setti
       ?.classList.contains('sniptale-inspector-surface')
   ).toBe(true);
   expect(host.querySelectorAll('nav button')).toHaveLength(4);
-  expect(host.querySelectorAll('input[type="text"]')).toHaveLength(4);
+  expect(host.querySelectorAll('input[type="text"]')).toHaveLength(0);
   expect(onChange).not.toHaveBeenCalled();
   act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[3]?.click());
   expect(
@@ -333,7 +333,7 @@ it('keeps advanced controls stable while admitting only one pending cursor chang
   );
   const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
   const panel = host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]');
-  const controls = [...panel!.querySelectorAll('input, button')];
+  const controls = [...panel!.querySelectorAll('nav button, [role="switch"]')];
   act(() => {
     toggle.click();
     toggle.click();
@@ -351,7 +351,7 @@ it('keeps advanced controls stable while admitting only one pending cursor chang
   expect(host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]')).toBe(
     panel
   );
-  expect([...panel!.querySelectorAll('input, button')]).toEqual(controls);
+  expect([...panel!.querySelectorAll('nav button, [role="switch"]')]).toEqual(controls);
   expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
   act(() => root.unmount());
 });

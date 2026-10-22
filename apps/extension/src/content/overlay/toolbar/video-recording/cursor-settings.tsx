@@ -11,7 +11,7 @@ import {
   type VideoCursorEffectSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n';
-import { ColorField, NumericRow, SelectField } from '../../../../ui/compact-inspector-controls';
+import { ColorField, NumericRow, SegmentedRow } from '../../../../ui/compact-inspector-controls';
 import { InspectorSurface } from '../../../../ui/compact-inspector-controls/layout';
 import { SettingsPopoverHeader } from '../../../../composition/frame-annotation-controls/popover/header';
 
@@ -58,21 +58,23 @@ function ClickStyleFields(props: {
 }) {
   return (
     <>
-      <SelectField
+      <SegmentedRow
+        ariaLabel={translate('gallery.videoReview.clickEffect')}
         label={translate('gallery.videoReview.clickEffect')}
         value={props.effects.clickEffect ?? 'ripple'}
-        disabled={props.disabled}
         options={(['ripple', 'press', 'glow'] as const).map((value) => ({
+          disabled: props.disabled,
           value,
           label: translate(`gallery.videoReview.click_${value}`),
         }))}
         onChange={(clickEffect) => props.onChange({ ...props.effects, clickEffect })}
       />
-      <SelectField
+      <SegmentedRow
+        ariaLabel={translate('gallery.videoReview.clickEasing')}
         label={translate('gallery.videoReview.clickEasing')}
         value={props.effects.clickEasing ?? 'ease-out'}
-        disabled={props.disabled}
         options={(['linear', 'ease-out', 'ease-in-out'] as const).map((value) => ({
+          disabled: props.disabled,
           value,
           label: translate(`gallery.videoReview.click_${value}`),
         }))}
@@ -80,6 +82,38 @@ function ClickStyleFields(props: {
       />
     </>
   );
+}
+
+function EffectNumericFields(props: {
+  section: keyof typeof EFFECT_FIELDS;
+  effects: VideoCursorEffectSettings;
+  disabled: boolean;
+  onChange(key: EffectKey, value: number, preview: boolean): void;
+}) {
+  return EFFECT_FIELDS[props.section].map(([key, label, unit]) => {
+    if (key === 'clickStroke' && (props.effects.clickEffect ?? 'ripple') !== 'ripple') return null;
+    const divisor = key === 'clickDuration' ? 1000 : 1;
+    const [minimum, maximum] = VIDEO_CURSOR_EFFECT_LIMITS[key];
+    const fractional = key === 'clickStroke' || key === 'haloStroke';
+    const step = divisor === 1000 ? 0.05 : fractional ? 0.5 : 1;
+    return (
+      <NumericRow
+        key={key}
+        appearance="plain"
+        label={translate(label)}
+        disabled={props.disabled}
+        min={minimum / divisor}
+        max={maximum / divisor}
+        step={step}
+        precision={divisor === 1000 ? 2 : fractional ? 1 : 0}
+        unit={unit}
+        value={(props.effects[key] ?? DEFAULT_VIDEO_CURSOR_EFFECTS[key]!) / divisor}
+        scrub={{ min: minimum / divisor, max: maximum / divisor, step }}
+        onCommitValue={(value) => props.onChange(key, value * divisor, false)}
+        onPreviewValue={(value) => props.onChange(key, value * divisor, true)}
+      />
+    );
+  });
 }
 
 export function RecordingCursorSettingsPanel(props: {
@@ -123,6 +157,7 @@ export function RecordingCursorSettingsPanel(props: {
       ref={setSurface}
       className="sniptale-content-appearance-surface"
       role="dialog"
+      tabIndex={-1}
       aria-label={translate('content.toolbar.cursorSettings')}
       data-ui="content.toolbar.video-recording.cursor-panel"
     >
@@ -162,7 +197,7 @@ export function RecordingCursorSettingsPanel(props: {
             >
               {translate('content.toolbar.cursorNativeDescription')}
             </p>
-          ) : (
+          ) : !props.settings[ENABLE_KEYS[section]] ? null : (
             <div className="grid gap-1">
               {section === 'click' ? (
                 <ClickStyleFields
@@ -196,35 +231,12 @@ export function RecordingCursorSettingsPanel(props: {
                   })
                 }
               />
-              {EFFECT_FIELDS[section].map(([key, label, unit]) => {
-                if (key === 'clickStroke' && (effects.clickEffect ?? 'ripple') !== 'ripple')
-                  return null;
-                const divisor = key === 'clickDuration' ? 1000 : 1;
-                const [minimum, maximum] = VIDEO_CURSOR_EFFECT_LIMITS[key];
-                const fractional = key === 'clickStroke' || key === 'haloStroke';
-                const step = divisor === 1000 ? 0.05 : fractional ? 0.5 : 1;
-                return (
-                  <NumericRow
-                    key={key}
-                    appearance="plain"
-                    label={translate(label)}
-                    disabled={props.disabled}
-                    min={minimum / divisor}
-                    max={maximum / divisor}
-                    step={step}
-                    precision={divisor === 1000 ? 2 : fractional ? 1 : 0}
-                    unit={unit}
-                    value={(effects[key] ?? DEFAULT_VIDEO_CURSOR_EFFECTS[key]!) / divisor}
-                    scrub={{
-                      min: minimum / divisor,
-                      max: maximum / divisor,
-                      step,
-                    }}
-                    onCommitValue={(value) => changeValue(key, value * divisor, false)}
-                    onPreviewValue={(value) => changeValue(key, value * divisor, true)}
-                  />
-                );
-              })}
+              <EffectNumericFields
+                section={section}
+                effects={effects}
+                disabled={props.disabled}
+                onChange={changeValue}
+              />
             </div>
           )
         }

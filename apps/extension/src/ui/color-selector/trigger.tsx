@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { getColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
@@ -190,6 +191,10 @@ export function ColorSelectorTrigger(props: {
         disabled={props.disabled}
         aria-label={translate('shared.ui.colorSelectorChooseColor')}
         title={displayValue}
+        onMouseDown={(event) => {
+          const input = event.currentTarget.parentElement?.querySelector('input');
+          if (input) flushSync(() => input.blur());
+        }}
         onClick={props.onOpenPicker}
         className={[
           'inline-flex h-[var(--sniptale-compact-control-height,32px)] w-6 shrink-0',

@@ -145,3 +145,58 @@ it.each([false, true])('keeps category switches in the heading with disabled=%s'
   act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[3]!.click());
   expect(host.querySelector('[role="switch"]')).toBeNull();
 });
+
+it('hides disabled effect parameters without clearing their saved values', () => {
+  const onChange = vi.fn();
+  const settings = {
+    cursorHaloEnabled: false,
+    cursorDimmingEnabled: false,
+    clickAnimationEnabled: false,
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, clickColor: '#123456', clickSize: 96 },
+  };
+  act(() =>
+    root.render(
+      <RecordingCursorSettingsPanel
+        disabled={false}
+        settings={settings}
+        onChange={onChange}
+        onPreview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+  );
+  expect(host.querySelector('[role="dialog"]')?.getAttribute('tabindex')).toBe('-1');
+  for (const index of [0, 1, 2]) {
+    act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[index]!.click());
+    expect(host.querySelector('input')).toBeNull();
+    expect(colorField).not.toHaveBeenCalled();
+    expect(
+      host.querySelector('[data-ui="shared.ui.compact-inspector.segmented-field"]')
+    ).toBeNull();
+  }
+  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[0]!.click());
+  act(() => host.querySelector<HTMLButtonElement>('[role="switch"]')!.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...settings, clickAnimationEnabled: true });
+});
+
+it('uses shared adaptive segments for click style and easing', () => {
+  act(() =>
+    root.render(
+      <RecordingCursorSettingsPanel
+        disabled={false}
+        settings={{
+          cursorHaloEnabled: false,
+          cursorDimmingEnabled: false,
+          clickAnimationEnabled: true,
+        }}
+        onChange={vi.fn()}
+        onPreview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+  );
+  expect(
+    host.querySelectorAll('[data-ui="shared.ui.compact-inspector.segmented-field"]')
+  ).toHaveLength(2);
+  expect(host.querySelector('[data-ui="shared.ui.compact-inspector.select-field"]')).toBeNull();
+});
