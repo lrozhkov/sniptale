@@ -164,3 +164,84 @@ it.each([false, true])(
     expect(result.project.motionRegions ?? []).toEqual([]);
   }
 );
+
+it('keeps a basic Gallery window header dormant through independent conversion and reopen', () => {
+  const input = fixture();
+  input.ui.mode = 'basic';
+  const header = {
+    kind: 'browser' as const,
+    style: 'macos' as const,
+    theme: 'dark' as const,
+    title: 'Сохранённое окно',
+    url: 'https://example.test/retained',
+    faviconEnabled: false,
+  };
+  input.document.advancedContent.windowHeader = header;
+  input.document.advancedContent.zoom.regions = [
+    {
+      id: 'retained-basic-focus',
+      start: 0,
+      end: 2,
+      sourceAnchor: { start: 0, end: 2 },
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'linear', duration: 0.2 },
+      exit: { type: 'linear', duration: 0.2 },
+    },
+  ];
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const restored = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+  expect(restored.version).toBe(35);
+  expect(restored.utilityLanes?.camera?.visible).toBe(false);
+  expect(restored.motionRegions?.length).toBeGreaterThan(0);
+  expect(isExportReadyVideoProject(restored)).toBe(true);
+  for (const clip of restored.clips) {
+    if (clip.type !== 'VIDEO') continue;
+    expect(clip).not.toHaveProperty('windowHeader');
+    expect(clip).toMatchObject({ rememberedWindowHeader: header });
+    expect(clip.transform).toMatchObject({
+      x: 0,
+      y: 0,
+      width: input.source.width,
+      height: input.source.height,
+    });
+  }
+  expect(input).toEqual(before);
+});
+
+it('retains a basic-mode canvas and crop without changing the visible source', () => {
+  const input = styledFixture();
+  input.ui.mode = 'basic';
+  input.document.advancedContent.background = { enabled: false };
+  delete input.document.advancedContent.windowHeader;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+  expect(project).toMatchObject({
+    version: 35,
+    width: input.source.width,
+    height: input.source.height,
+    rememberedCanvas: { width: 320, height: 360 },
+  });
+  const crop = fitQuickEditSourceCrop(
+    input.source,
+    input.document.advancedContent.canvas!,
+    input.document.advancedContent.canvas!.crop
+  );
+  for (const clip of project.clips) {
+    if (clip.type !== 'VIDEO') continue;
+    expect(clip).not.toHaveProperty('sourceCrop');
+    expect(clip).toMatchObject({
+      rememberedSourceCrop: crop,
+      transform: { x: 0, y: 0, width: input.source.width, height: input.source.height },
+    });
+  }
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(isExportReadyVideoProject({ ...project, version: 34 })).toBe(false);
+  expect(
+    isExportReadyVideoProject({ ...project, rememberedCanvas: { width: -1, height: 360 } })
+  ).toBe(false);
+  expect(input).toEqual(before);
+});

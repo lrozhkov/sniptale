@@ -342,7 +342,8 @@ export interface VideoProject {
     | 31
     | 32
     | 33
-    | 34;
+    | 34
+    | 35;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
@@ -354,6 +355,8 @@ export interface VideoProject {
   baseRecordingId: string | null;
   width: number;
   height: number;
+  /** Inactive authored canvas offered as an ordinary resolution choice. */
+  rememberedCanvas?: { width: number; height: number };
   fps: number;
   backgroundColor: string;
   sceneBackground?: VideoProjectSceneBackground;

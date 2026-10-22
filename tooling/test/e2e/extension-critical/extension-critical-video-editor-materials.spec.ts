@@ -1,6 +1,10 @@
+import { fitQuickEditSourceCrop } from '../../../../apps/extension/src/features/video/review/advanced/canvas';
 import { motionWindowAreaPoints } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
-import { getFittedMediaOriginalWindowFrame } from '../../../../apps/extension/src/features/video/composition/draw/fitted-media';
+import {
+  getFittedMediaOriginalWindowFrame,
+  getFittedMediaWindowFrame,
+} from '../../../../apps/extension/src/features/video/composition/draw/fitted-media';
 import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -2332,6 +2336,298 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         height: final.height,
       });
       expect(Math.abs(exported.duration - final.duration)).toBeLessThanOrEqual(0.1);
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`basic Gallery appearance remains editable after transfer ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const locale = index === 0 ? 'en' : 'ru',
+      theme = index === 0 ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const advanced = dialog.getByRole('button', {
+        name: label('gallery.videoReview.advancedEditing'),
+        exact: true,
+      });
+      await advanced.click();
+      await expect(advanced).toHaveAttribute('aria-pressed', 'true');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+      const canvasCategory = inspector
+        .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+        .getByRole('button', { name: label('gallery.videoReview.canvas'), exact: true });
+      if (await canvasCategory.count()) await canvasCategory.click();
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('videoEditor.sidebar.canvasFormatLabel'),
+        '1:1'
+      );
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.sourceCropMode'),
+        label('gallery.videoReview.sourceCropEnable')
+      );
+      const category = inspector
+        .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+        .getByRole('button', { name: label('gallery.videoReview.windowHeader'), exact: true });
+      if (await category.count()) await category.click();
+      const galleryHeader = inspector.locator('[data-ui="window-header-settings"]');
+      await chooseInspectorValue(
+        page,
+        galleryHeader,
+        label('windowHeader.type'),
+        label('windowHeader.browser')
+      );
+      await chooseInspectorValue(
+        page,
+        galleryHeader,
+        label('windowHeader.style'),
+        label('windowHeader.macos')
+      );
+      await chooseInspectorValue(
+        page,
+        galleryHeader,
+        label('windowHeader.theme'),
+        label('windowHeader.dark')
+      );
+      const authoredTitle = 'Retained Gallery header';
+      const galleryTitle = galleryHeader.getByRole('textbox', {
+        name: label('windowHeader.tabTitle'),
+        exact: true,
+      });
+      await galleryTitle.fill(authoredTitle);
+      await galleryTitle.press('Tab');
+      await advanced.click();
+      await expect(advanced).toHaveAttribute('aria-pressed', 'false');
+      await page.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
+      await expect
+        .poll(
+          async () =>
+            (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+        )
+        .toBe(1);
+      const [tab] = await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []);
+      const target = new URL(tab!.url!);
+      const source = (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))!;
+      const document = replayReviewHistory(
+        source.history,
+        source.cursor,
+        source.source,
+        reviewDocumentBaseline(source)
+      );
+      const canvas = document.advancedContent.canvas!;
+      const crop = fitQuickEditSourceCrop(source.source, canvas, canvas.crop);
+      const header = document.advancedContent.windowHeader!;
+      expect(header).toMatchObject({
+        kind: 'browser',
+        style: 'macos',
+        theme: 'dark',
+        title: authoredTitle,
+      });
+      expect(source.advanced.ui.mode).toBe('basic');
+      await page.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}${target.search}`);
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      const project = (await readNativeVideoProject(page))!;
+      expect(project.id).not.toBe(source.aggregateId);
+      expect(project.version).toBe(35);
+      const video = project.clips.find((clip) => clip.type === 'VIDEO')!;
+      expect(video).toMatchObject({ rememberedWindowHeader: header, rememberedSourceCrop: crop });
+      expect(video).not.toHaveProperty('sourceCrop');
+      expect(project.rememberedCanvas).toEqual({ width: canvas.width, height: canvas.height });
+      expect(video).not.toHaveProperty('windowHeader');
+      expect({ width: project.width, height: project.height }).toEqual({
+        width: source.source.width,
+        height: source.source.height,
+      });
+      await page
+        .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+        .click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupCanvas'),
+          exact: true,
+        })
+        .click();
+      await chooseInspectorValue(
+        page,
+        page.locator('[data-ui="video-editor.scene.canvas"]'),
+        label('videoEditor.sidebar.canvasResolutionLabel'),
+        `${canvas.width} × ${canvas.height}`
+      );
+      await expect
+        .poll(async () => {
+          const accepted = await readNativeVideoProject(page);
+          return { width: accepted?.width, height: accepted?.height };
+        })
+        .toEqual({ width: canvas.width, height: canvas.height });
+      const select = async () => {
+        await page.locator(`[data-project-timeline-clip="${video.id}"]`).click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupFraming'),
+            exact: true,
+          })
+          .click();
+      };
+      await select();
+      const nativeHeader = page.locator('[data-ui="window-header-settings"]');
+      await expect(
+        nativeHeader.getByRole('textbox', { name: label('windowHeader.tabTitle'), exact: true })
+      ).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('retained-header-disabled.png'),
+        fullPage: false,
+      });
+      await chooseInspectorValue(
+        page,
+        nativeHeader,
+        label('windowHeader.type'),
+        label('windowHeader.browser')
+      );
+      const title = nativeHeader.getByRole('textbox', {
+        name: label('windowHeader.tabTitle'),
+        exact: true,
+      });
+      await expect(title).toHaveValue(authoredTitle);
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+        )
+        .toMatchObject({ windowHeader: header });
+      await checkInspectorPaintedFont(page, title, 'input');
+      await title.fill('Edited Native header');
+      await title.press('Tab');
+      await expect
+        .poll(async () => {
+          const clip = (await readNativeVideoProject(page))?.clips.find(
+            (clip) => clip.id === video.id
+          );
+          return clip && (clip.type === 'VIDEO' || clip.type === 'IMAGE')
+            ? clip.windowHeader?.title
+            : undefined;
+        })
+        .toBe('Edited Native header');
+      await chooseInspectorValue(
+        page,
+        nativeHeader,
+        label('windowHeader.type'),
+        label('windowHeader.none')
+      );
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+        )
+        .toMatchObject({ rememberedWindowHeader: { ...header, title: 'Edited Native header' } });
+      const accepted = (await readNativeVideoProject(page))!;
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      expect(await readNativeVideoProject(page)).toEqual(accepted);
+      await select();
+      await chooseInspectorValue(
+        page,
+        nativeHeader,
+        label('windowHeader.type'),
+        label('windowHeader.browser')
+      );
+      await expect(title).toHaveValue('Edited Native header');
+      await title.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('retained-header-restored.png'),
+        fullPage: false,
+      });
+      await page.getByText(label('videoEditor.sidebar.mediaCrop'), { exact: true }).click();
+      const cropControls = page.locator('[data-ui="video-editor.media-crop"]');
+      await cropControls
+        .getByRole('button', { name: label('gallery.videoReview.sourceCropRestore'), exact: true })
+        .click();
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+        )
+        .toMatchObject({ sourceCrop: crop });
+      const restoredCrop = (await readNativeVideoProject(page))!.clips.find(
+        (clip) => clip.id === video.id
+      )!;
+      expect(restoredCrop.transform).toEqual(video.transform);
+      await page
+        .locator('[data-ui="video-editor.framing-presets"]')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.framingWhole'),
+          exact: true,
+        })
+        .click();
+      await expect
+        .poll(async () => {
+          const fitted = (await readNativeVideoProject(page))?.clips.find(
+            (clip) => clip.id === video.id
+          );
+          return fitted?.transform;
+        })
+        .not.toEqual(video.transform);
+      const cropped = (await readNativeVideoProject(page))!;
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      expect(await readNativeVideoProject(page)).toEqual(cropped);
+      await select();
+      if (!(await cropControls.isVisible()))
+        await page.getByText(label('videoEditor.sidebar.mediaCrop'), { exact: true }).click();
+      await cropControls.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('retained-crop-restored.png'),
+        fullPage: false,
+      });
+      const fitted = cropped.clips.find((clip) => clip.id === video.id)!;
+      if (fitted.type !== 'VIDEO') throw new Error('Expected transferred video');
+      const frame = getFittedMediaWindowFrame({
+        frame: fitted.transform,
+        fitMode: fitted.fitMode,
+        sourceWidth: source.source.width,
+        sourceHeight: source.source.height,
+        ...(fitted.sourceCrop ? { sourceCrop: fitted.sourceCrop } : {}),
+        ...(fitted.windowHeader ? { windowHeader: fitted.windowHeader } : {}),
+      });
+      expect(frame.x).toBeGreaterThanOrEqual(-0.001);
+      expect(frame.y).toBeGreaterThanOrEqual(-0.001);
+      expect(frame.x + frame.width).toBeLessThanOrEqual(cropped.width + 0.001);
+      expect(frame.y + frame.height).toBeLessThanOrEqual(cropped.height + 0.001);
+      const unchanged = (await readNativeReviewWorkspace(page, source.aggregateId))!;
+      const original = replayReviewHistory(
+        unchanged.history,
+        unchanged.cursor,
+        unchanged.source,
+        reviewDocumentBaseline(unchanged)
+      );
+      expect(original.advancedContent.windowHeader).toEqual(header);
+      expect(original.advancedContent.canvas).toEqual(canvas);
+      expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

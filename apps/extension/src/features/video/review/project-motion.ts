@@ -79,7 +79,7 @@ export function planReviewProjectMotion(
   const utilityLanes = getVideoProjectUtilityLanes(project);
   return {
     ...project,
-    version: 34,
+    version: project.version > 34 ? project.version : 34,
     motionRegions: regions,
     utilityLanes: { ...utilityLanes, camera: { ...utilityLanes.camera, visible: applied } },
   };

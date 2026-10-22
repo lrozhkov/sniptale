@@ -29,11 +29,21 @@ export function InspectorParameterRow(props: {
   const row = React.useRef<HTMLDivElement>(null);
   const name = React.useRef<HTMLSpanElement>(null);
   const [stacked, setStacked] = React.useState(props.stacked ?? false);
+  const deferredFit = React.useRef<number | null>(null);
   const fit = React.useCallback(() => {
     const element = row.current;
     const label = name.current;
     if (!element || !label || !element.clientWidth || props.stacked || props.keepInline) return;
     if (element.matches(':focus-within') || element.querySelector('[aria-expanded="true"]')) return;
+    // Blur can shrink a preceding row and move the pressed command before click.
+    if (element.ownerDocument.querySelector(':active')) {
+      if (deferredFit.current === null)
+        deferredFit.current = requestAnimationFrame(() => {
+          deferredFit.current = null;
+          fit();
+        });
+      return;
+    }
     const context = document.createElement('canvas').getContext('2d');
     if (!context) return;
     context.font = getComputedStyle(label).font;
@@ -75,6 +85,12 @@ export function InspectorParameterRow(props: {
       observer.disconnect();
     };
   }, [fit]);
+  React.useEffect(
+    () => () => {
+      if (deferredFit.current !== null) cancelAnimationFrame(deferredFit.current);
+    },
+    []
+  );
   const isActivation = (target: EventTarget) =>
     target instanceof Element && !target.closest('button,input,textarea,select,a,[role="slider"]');
   return (

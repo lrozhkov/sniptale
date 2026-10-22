@@ -228,21 +228,27 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || original.muted || !application.originalAudioApplied,
   });
-  const minimumVersion = cursor?.sourceObservations
-    ? 33
-    : camera.clips.length
-      ? 32
-      : externalAudio.sourceVoiceoverDocuments.length || externalAudio.originalSpeech !== undefined
-        ? 31
-        : externalAudio.clips.length
-          ? 30
-          : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-            ? 29
-            : original.ranges?.length || sourceMutes.length
-              ? 28
-              : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                ? 27
-                : 26;
+  const minimumVersion =
+    scene.video.rememberedWindowHeader ||
+    scene.video.rememberedSourceCrop ||
+    scene.scene.rememberedCanvas
+      ? 35
+      : cursor?.sourceObservations
+        ? 33
+        : camera.clips.length
+          ? 32
+          : externalAudio.sourceVoiceoverDocuments.length ||
+              externalAudio.originalSpeech !== undefined
+            ? 31
+            : externalAudio.clips.length
+              ? 30
+              : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                ? 29
+                : original.ranges?.length || sourceMutes.length
+                  ? 28
+                  : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                    ? 27
+                    : 26;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,

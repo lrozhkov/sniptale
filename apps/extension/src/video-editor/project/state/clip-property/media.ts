@@ -71,8 +71,13 @@ export function createClipMediaStyleActions(
             )
           )
             return project;
-          const { sourceCrop: _previous, ...rest } = clip;
-          const updated = crop === undefined ? rest : { ...rest, sourceCrop: crop };
+          const { sourceCrop: previous, rememberedSourceCrop: _remembered, ...rest } = clip;
+          const updated =
+            crop === undefined
+              ? previous
+                ? { ...rest, rememberedSourceCrop: previous }
+                : rest
+              : { ...rest, sourceCrop: crop };
           return applyVideoProjectMutationPatch(project, {
             clips: project.clips.map((item) => (item.id === clipId ? updated : item)),
           });
@@ -129,8 +134,12 @@ export function createClipMediaStyleActions(
           return applyVideoProjectMutationPatch(project, {
             clips: project.clips.map((item) => {
               if (item.id !== clipId || !isMediaClip(item)) return item;
-              const { windowHeader: _previous, ...rest } = item;
-              return header === undefined ? rest : { ...rest, windowHeader: header };
+              const { windowHeader: previous, rememberedWindowHeader: _remembered, ...rest } = item;
+              return header === undefined
+                ? previous
+                  ? { ...rest, rememberedWindowHeader: previous }
+                  : rest
+                : { ...rest, windowHeader: header };
             }),
           });
         })

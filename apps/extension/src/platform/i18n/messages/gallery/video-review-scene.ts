@@ -11,6 +11,7 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   },
   sourceCropSize: { ru: 'Размер области', en: 'Area size' },
   sourceCropReset: { ru: 'Сбросить область', en: 'Reset area' },
+  sourceCropRestore: { ru: 'Восстановить область', en: 'Restore area' },
   sourceCropApply: { ru: 'Применить', en: 'Apply' },
   annotationSourceMissing: {
     ru: 'Исходник аннотации недоступен',

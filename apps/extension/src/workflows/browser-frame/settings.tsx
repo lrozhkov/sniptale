@@ -9,13 +9,14 @@ import { useInspectorLayout } from '../../ui/compact-inspector-controls/layout';
 /** Shared controls for explicit window-header edits in image and video editors. */
 export function WindowHeaderSettings({
   header,
+  rememberedHeader,
   onChange,
   disabled = false,
   allowNone = true,
 }: WindowHeaderSettingsProps) {
   useAppLocale();
   const inspector = useInspectorLayout();
-  const editing = useWindowHeaderEditing({ header, onChange, disabled });
+  const editing = useWindowHeaderEditing({ header, rememberedHeader, onChange, disabled });
   const iconControls =
     header?.kind === 'browser' ? (
       <WindowHeaderIconControls

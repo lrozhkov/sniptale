@@ -94,6 +94,8 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['rememberedWindowHeader'] !== undefined || value['rememberedSourceCrop'] !== undefined)
+    return 35;
   if (value['cameraTiming'] !== undefined) return 32;
   if (value['durationMode'] !== undefined) return 30;
   if (
@@ -124,8 +126,9 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 34) &&
+    isBoundedNumber(version, 2, 35) &&
     Number.isInteger(version) &&
+    (version >= 35 || value['rememberedCanvas'] === undefined) &&
     (version >= 34 ||
       !Array.isArray(value['motionRegions']) ||
       value['motionRegions'].every(
@@ -245,6 +248,12 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     value['width'] <= MAX_VIDEO_PROJECT_DIMENSION &&
     isPositiveNumber(value['height']) &&
     value['height'] <= MAX_VIDEO_PROJECT_DIMENSION &&
+    (value['rememberedCanvas'] === undefined ||
+      (isRecord(value['rememberedCanvas']) &&
+        isPositiveNumber(value['rememberedCanvas']['width']) &&
+        value['rememberedCanvas']['width'] <= MAX_VIDEO_PROJECT_DIMENSION &&
+        isPositiveNumber(value['rememberedCanvas']['height']) &&
+        value['rememberedCanvas']['height'] <= MAX_VIDEO_PROJECT_DIMENSION)) &&
     isPositiveNumber(value['fps']) &&
     value['fps'] <= MAX_VIDEO_PROJECT_FPS &&
     (value['videoEffectsBypassed'] === undefined ||

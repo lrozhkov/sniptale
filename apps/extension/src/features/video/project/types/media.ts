@@ -32,9 +32,13 @@ export interface VideoProjectMediaShadowFields {
 export interface VideoProjectMediaVisualFields extends VideoProjectMediaShadowFields {
   /** Original-source crop; clip placement and source timing remain independent. */
   sourceCrop?: MediaSourceCrop;
+  /** Last accepted source area retained while the complete source is visible. */
+  rememberedSourceCrop?: MediaSourceCrop;
   /** Logical project pixels; camera tracks retain this setting without applying it. */
   windowCornerRadius?: number;
   windowHeader?: WindowHeader;
+  /** Last accepted header retained while the decoration is disabled. */
+  rememberedWindowHeader?: WindowHeader;
   fitMode: VideoMediaFitMode;
   fitScalePercent?: number;
 }

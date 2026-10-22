@@ -95,11 +95,20 @@ export function MediaCropControls(props: {
         ))}
         <InspectorActionButton
           separated
-          disabled={disabled || !props.clip.sourceCrop}
-          onClick={() => props.onEdit?.(props.clip.id, { kind: 'source-crop', crop: null })}
+          disabled={disabled || (!props.clip.sourceCrop && !props.clip.rememberedSourceCrop)}
+          onClick={() =>
+            props.onEdit?.(props.clip.id, {
+              kind: 'source-crop',
+              crop: props.clip.sourceCrop ? null : (props.clip.rememberedSourceCrop ?? null),
+            })
+          }
         >
           <RotateCcw size={14} aria-hidden="true" />
-          {translate('gallery.videoReview.sourceCropReset')}
+          {translate(
+            !props.clip.sourceCrop && props.clip.rememberedSourceCrop
+              ? 'gallery.videoReview.sourceCropRestore'
+              : 'gallery.videoReview.sourceCropReset'
+          )}
         </InspectorActionButton>
       </div>
     </InspectorDetails>

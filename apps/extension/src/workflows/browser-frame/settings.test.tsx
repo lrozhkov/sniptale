@@ -428,3 +428,42 @@ it.each(['favicon', 'fileIcon'] as const)(
     }
   }
 );
+
+it('restores an explicitly supplied dormant header through the existing type control without acquisition', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const remembered = {
+    ...DEFAULT_WINDOW_HEADER,
+    style: 'macos' as const,
+    theme: 'dark' as const,
+    title: 'Сохранённый заголовок',
+    url: 'https://example.test/retained',
+  };
+  let current: WindowHeader | undefined;
+  function Harness() {
+    const [header, setHeader] = useState<WindowHeader | undefined>();
+    current = header;
+    return (
+      <WindowHeaderSettings header={header} rememberedHeader={remembered} onChange={setHeader} />
+    );
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    expect(current).toBeUndefined();
+    expect(host.querySelectorAll('input')).toHaveLength(0);
+    const browser = Array.from(host.querySelectorAll('button')).find(
+      (button) => button.textContent === translate('windowHeader.browser')
+    )!;
+    await act(async () => browser.click());
+    expect(current).toEqual(remembered);
+    expect(
+      Array.from(host.querySelectorAll('input')).some((input) => input.value === remembered.title)
+    ).toBe(true);
+    expect(acquire).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});

@@ -50,6 +50,7 @@ function createSceneGroups(
       content: (
         <SceneCanvasFields
           height={props.project.height}
+          rememberedCanvas={props.project.rememberedCanvas}
           onResizeProject={props.onResizeProject}
           width={props.project.width}
         />

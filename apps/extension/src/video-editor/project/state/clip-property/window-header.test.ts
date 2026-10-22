@@ -78,3 +78,54 @@ it('does not attach a window header to the specialized camera track', () => {
   store.getState().updateMediaClipWindowHeader(video.id, DEFAULT_WINDOW_HEADER);
   expect(store.getState().project).toBe(before);
 });
+
+it('retains a disabled header through root admission duplicate and Undo without affecting another clip', () => {
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(createProjectWithMediaTrack());
+  const header = { ...DEFAULT_WINDOW_HEADER, title: 'Remembered title', theme: 'dark' as const };
+  store.getState().updateMediaClipWindowHeader('clip-video', header);
+  const active = store.getState().project!;
+  const other = active.clips.filter((clip) => clip.id !== 'clip-video');
+  store.getState().updateMediaClipWindowHeader('clip-video', undefined);
+  const dormant = store.getState().project!;
+  expect(dormant.version).toBe(35);
+  expect(dormant.clips.find((clip) => clip.id === 'clip-video')).toMatchObject({
+    rememberedWindowHeader: header,
+  });
+  expect(dormant.clips.find((clip) => clip.id === 'clip-video')).not.toHaveProperty('windowHeader');
+  expect(dormant.clips.filter((clip) => clip.id !== 'clip-video')).toEqual(other);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(dormant)))).toEqual(dormant);
+  expect(parseHydratableVideoProject({ ...dormant, version: 34 })).toBeNull();
+  expect(
+    parseHydratableVideoProject({
+      ...dormant,
+      clips: dormant.clips.map((clip) =>
+        clip.id === 'clip-video'
+          ? {
+              ...clip,
+              rememberedWindowHeader: { ...header, faviconDataUrl: 'https://remote.test/icon' },
+            }
+          : clip
+      ),
+    })
+  ).toBeNull();
+  store.getState().setProject(JSON.parse(JSON.stringify(dormant)));
+  store.getState().duplicateClip('clip-video');
+  const duplicated = store.getState().project!;
+  const copy = duplicated.clips.find(
+    (clip) => !dormant.clips.some((old) => old.id === clip.id) && clip.type === 'VIDEO'
+  )!;
+  expect(copy).toMatchObject({ rememberedWindowHeader: header });
+  expect(copy).not.toHaveProperty('windowHeader');
+  const undone = undoVideoEditorProjectHistory(store.getState().projectHistory, duplicated);
+  expect(undone?.status).toBe('applied');
+  if (undone?.status === 'applied') expect(undone.project.clips).toEqual(dormant.clips);
+  store.getState().updateMediaClipWindowHeader('clip-video', header);
+  const enabled = store.getState().project!;
+  expect(enabled.clips.find((clip) => clip.id === 'clip-video')).toMatchObject({
+    windowHeader: header,
+  });
+  expect(enabled.clips.find((clip) => clip.id === 'clip-video')).not.toHaveProperty(
+    'rememberedWindowHeader'
+  );
+});

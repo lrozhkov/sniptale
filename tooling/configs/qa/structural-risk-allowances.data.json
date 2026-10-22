@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "review:conversion",
-      "reason": "tool-noise: This existing conversion planner owns one unpublished destination value and typed refusal. The candidate calls the motion mapper before final admission. Resource acquisition and guarded publication remain outside this function. Its score11 and delta0 are unchanged. This exact body must retain one failure boundary before publication. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This planner returns one unpublished destination or one typed refusal. The candidate raises its minimum schema for inactive canvas and media fields. Acquisition and guarded publication remain outside this function. Score 11 and delta 0 are unchanged. Local maps and cloned records do not add a writer or session authority. A mechanical split would distribute the same admission decision. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource or recovery lifetime. Remove when the analyzer models this cohesive conversion. Independent architecture review must check this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "da43764b4e9986424b76eb034c8e8a6b38df8ea88610bb03f938f857a8244102",
+      "astHash": "bb90a4fe5f6972665634f743e2981ccda7cc432cae28f9df6555b86c587f2de7",
       "signatureHash": "4723efd60b994dfbbad28fa1cfb6e50a6a8faeb21d3ab9bd0c06f17c43462415"
     },
     {
@@ -2101,6 +2101,17 @@
       "reviewDate": "2026-10-22",
       "astHash": "32a98d45f6f9084cb4a45039723f295179d684aa91c302d861967f38ebe892d8",
       "signatureHash": "2f71cc2f8aa9734e57cce70ec7d8a74784a5c2cb8222e05d67e84617f32392cd"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-scene.ts",
+      "symbol": "planReviewProjectScene",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure adapter maps one Gallery scene into the existing Native scene and media fields. Its guards return one refusal before conversion. It owns no state, effects, acquisition, writer or recovery. The analyzer reports one owner and cohesion 1.00. The branches preserve active and inactive values in that same mapping. A mechanical split would distribute this decision across forwarding helpers. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource or recovery lifetime. Remove when the analyzer models this cohesive conversion. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "318d651336f0ebcb003e395b6eeb232f9ff39d6b48a94d01f4fc174c1040ef4f",
+      "signatureHash": "eb1e16a7d6ca49c559c18b468011a501b1f7cde9d999247fb54e5e33c8efce96"
     }
   ]
 }

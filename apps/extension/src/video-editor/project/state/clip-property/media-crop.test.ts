@@ -35,8 +35,14 @@ it.each(['clip-video', 'clip-image'])(
     if (redo?.status !== 'applied') throw new Error('Expected redo');
     expect(redo.project.clips).toEqual(after.clips);
     store.getState().editMediaClip(id, { kind: 'source-crop', crop: null });
-    expect(store.getState().project!.version).toBe(13);
-    expect(store.getState().project!.clips).toEqual(before.clips);
+    expect(store.getState().project!.version).toBe(35);
+    const disabled = store.getState().project!;
+    expect(disabled.clips.find((clip) => clip.id === id)).toMatchObject({
+      rememberedSourceCrop: crop,
+    });
+    expect(disabled.clips.find((clip) => clip.id === id)).not.toHaveProperty('sourceCrop');
+    store.getState().editMediaClip(id, { kind: 'source-crop', crop });
+    expect(store.getState().project!.clips).toEqual(after.clips);
   }
 );
 it('refuses invalid, locked, missing, non-media and repeated crop commands without history', () => {

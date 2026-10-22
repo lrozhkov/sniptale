@@ -5,6 +5,7 @@ import type {
 } from '../project/types/model';
 import { isVideoProjectAsset } from '../project/validation/assets';
 import { VideoMediaFitMode } from '../project/types';
+import { fitQuickEditSourceCrop } from './advanced/canvas';
 import { computeQuickEditSceneLayout, computeQuickEditSceneSize } from './advanced/scene';
 import type { QuickEditAdvancedContent, QuickEditUiState } from './advanced/types';
 import type { ReviewSource } from './types';
@@ -85,13 +86,15 @@ export function planReviewProjectScene(args: {
       status: 'prepared';
       assets: VideoProjectAsset[];
       scene: Pick<VideoProject, 'width' | 'height' | 'sceneBackground'> &
-        Partial<Pick<VideoProject, 'watermark'>>;
+        Partial<Pick<VideoProject, 'watermark' | 'rememberedCanvas'>>;
       video: Pick<VideoProjectVideoClip, 'transform' | 'fitMode'> &
         Partial<
           Pick<
             VideoProjectVideoClip,
             | 'sourceCrop'
+            | 'rememberedSourceCrop'
             | 'windowHeader'
+            | 'rememberedWindowHeader'
             | 'windowCornerRadius'
             | 'shadowIntensity'
             | 'shadowColor'
@@ -103,8 +106,6 @@ export function planReviewProjectScene(args: {
   const background = content.background;
   const fields: SceneField[] = [];
   if (ui.mode === 'basic') {
-    if (content.canvas) fields.push('canvas');
-    if (content.windowHeader) fields.push('windowHeader');
     if (content.watermark && content.watermark.mode !== 'none') fields.push('watermark');
   }
   if (
@@ -119,8 +120,10 @@ export function planReviewProjectScene(args: {
   const input = {
     source,
     background,
-    ...(content.canvas ? { canvas: content.canvas } : {}),
-    ...(content.windowHeader ? { windowHeader: content.windowHeader } : {}),
+    ...(ui.mode === 'advanced' && content.canvas ? { canvas: content.canvas } : {}),
+    ...(ui.mode === 'advanced' && content.windowHeader
+      ? { windowHeader: content.windowHeader }
+      : {}),
   };
   const size = computeQuickEditSceneSize(input);
   const layout = computeQuickEditSceneLayout({
@@ -161,6 +164,9 @@ export function planReviewProjectScene(args: {
     scene: {
       width: size.width,
       height: size.height,
+      ...(ui.mode === 'basic' && content.canvas
+        ? { rememberedCanvas: { width: content.canvas.width, height: content.canvas.height } }
+        : {}),
       ...(content.watermark
         ? {
             watermark: {
@@ -188,7 +194,20 @@ export function planReviewProjectScene(args: {
       transform: { ...layout.windowRect, rotation: 0, opacity: 1 },
       fitMode: VideoMediaFitMode.CONTAIN,
       ...(layout.sourceCrop ? { sourceCrop: layout.sourceCrop } : {}),
-      ...(content.windowHeader ? { windowHeader: structuredClone(content.windowHeader) } : {}),
+      ...(ui.mode === 'basic' && content.canvas?.crop
+        ? {
+            rememberedSourceCrop: fitQuickEditSourceCrop(
+              source,
+              content.canvas,
+              content.canvas.crop
+            ),
+          }
+        : {}),
+      ...(content.windowHeader
+        ? ui.mode === 'advanced'
+          ? { windowHeader: structuredClone(content.windowHeader) }
+          : { rememberedWindowHeader: structuredClone(content.windowHeader) }
+        : {}),
       ...(background.enabled
         ? {
             windowCornerRadius: background.layout.cornerRadius,

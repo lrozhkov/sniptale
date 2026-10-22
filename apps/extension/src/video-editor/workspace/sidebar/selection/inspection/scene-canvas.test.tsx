@@ -15,7 +15,7 @@ afterEach(() => {
   container?.remove();
   vi.unstubAllGlobals();
 });
-function mount(width = 1920, height = 1080) {
+function mount(width = 1920, height = 1080, rememberedCanvas?: { width: number; height: number }) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
@@ -26,6 +26,7 @@ function mount(width = 1920, height = 1080) {
     return (
       <SceneCanvasFields
         {...size}
+        rememberedCanvas={rememberedCanvas}
         onResizeProject={(w, h) => {
           commit(w, h);
           setSize({ width: w, height: h });
@@ -65,4 +66,11 @@ it('represents custom dimensions without silently rounding on mount and keeps si
   expect(commit).not.toHaveBeenCalled();
   await choose('canvasFormatLabel', '16:9');
   expect(commit).toHaveBeenLastCalledWith(7680, 4320);
+});
+
+it('offers the retained canvas through the existing resolution choice without applying it on mount', async () => {
+  const commit = mount(640, 360, { width: 320, height: 360 });
+  expect(commit).not.toHaveBeenCalled();
+  await choose('canvasResolutionLabel', '320 × 360');
+  expect(commit).toHaveBeenCalledExactlyOnceWith(320, 360);
 });

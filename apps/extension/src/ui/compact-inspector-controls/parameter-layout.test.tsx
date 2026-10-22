@@ -413,3 +413,64 @@ it('presents a scoped static value without an editable or disabled control', () 
   expect(row?.querySelector('.sniptale-parameter-value')?.textContent).toBe(value);
   expect(row?.querySelector('input,textarea,button,[aria-disabled]')).toBeNull();
 });
+
+it('defers a blurred row resize until the command press ends', async () => {
+  let width = 140;
+  let held = false;
+  let frame: FrameRequestCallback | undefined;
+  const query = document.querySelector.bind(document);
+  const selector = vi
+    .spyOn(document, 'querySelector')
+    .mockImplementation((value) =>
+      value === ':active' ? (held ? document.body : null) : query(value)
+    );
+  const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frame = callback;
+    return 1;
+  });
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const metric = vi
+    .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+    .mockImplementation(() => width);
+  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
+  // The layout owner needs only font assignment and text advance from this browser boundary.
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => ({ font: '', measureText: (text: string) => ({ width: text.length * 8 }) }),
+  });
+  try {
+    act(() =>
+      root.render(
+        <>
+          <InspectorParameterRow label="Title">
+            <input />
+          </InspectorParameterRow>
+          <button>None</button>
+        </>
+      )
+    );
+    const row = host.querySelector<HTMLElement>('.sniptale-parameter-row')!;
+    const input = host.querySelector('input')!;
+    expect(row.dataset['layout']).toBe('stacked');
+    act(() => input.focus());
+    width = 500;
+    held = true;
+    await act(async () => {
+      host.querySelector('button')!.focus();
+      await Promise.resolve();
+    });
+    expect(row.dataset['layout']).toBe('stacked');
+    expect(frame).toBeDefined();
+    act(() => frame!(0));
+    expect(row.dataset['layout']).toBe('stacked');
+    held = false;
+    act(() => frame!(1));
+    expect(row.dataset['layout']).toBe('inline');
+  } finally {
+    canvas.mockRestore();
+    metric.mockRestore();
+    selector.mockRestore();
+    request.mockRestore();
+    cancel.mockRestore();
+  }
+});

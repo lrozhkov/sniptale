@@ -109,6 +109,8 @@ function hasCameraPositions(value: unknown): boolean {
 function hasMediaVisualFields(value: Record<string, unknown>): boolean {
   return (
     (value['windowHeader'] === undefined || parseWindowHeader(value['windowHeader']) !== null) &&
+    (value['rememberedWindowHeader'] === undefined ||
+      parseWindowHeader(value['rememberedWindowHeader']) !== null) &&
     isEnumValue(value['fitMode'], VideoMediaFitMode) &&
     (value['fitScalePercent'] === undefined ||
       isBoundedNumber(value['fitScalePercent'], 1, 1000)) &&
@@ -227,13 +229,15 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
   )
     return false;
 
-  if (
-    value['sourceCrop'] !== undefined &&
-    ((value['type'] !== VideoProjectClipType.VIDEO &&
-      value['type'] !== VideoProjectClipType.IMAGE) ||
-      parseMediaSourceCrop(value['sourceCrop']) === null)
-  )
-    return false;
+  for (const field of ['sourceCrop', 'rememberedSourceCrop']) {
+    if (
+      value[field] !== undefined &&
+      ((value['type'] !== VideoProjectClipType.VIDEO &&
+        value['type'] !== VideoProjectClipType.IMAGE) ||
+        parseMediaSourceCrop(value[field]) === null)
+    )
+      return false;
+  }
 
   if (
     value['shadowColor'] !== undefined &&

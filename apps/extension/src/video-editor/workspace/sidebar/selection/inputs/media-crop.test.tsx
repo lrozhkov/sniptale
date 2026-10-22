@@ -67,4 +67,27 @@ it('edits exact source percentages and resets through the typed port', () => {
     )
   );
   expect([...container.querySelectorAll('input')].every((input) => input.disabled)).toBe(true);
+  const { sourceCrop, ...inactive } = clip;
+  onEdit.mockClear();
+  act(() =>
+    root.render(
+      <MediaCropControls
+        project={project}
+        clip={{ ...inactive, rememberedSourceCrop: sourceCrop }}
+        currentTime={2}
+        disabled={false}
+        onEdit={onEdit}
+      />
+    )
+  );
+  const restore = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes(translate('gallery.videoReview.sourceCropRestore'))
+  )!;
+  expect(restore).toBeDefined();
+  expect(onEdit).not.toHaveBeenCalled();
+  act(() => restore.click());
+  expect(onEdit).toHaveBeenCalledExactlyOnceWith(clip.id, {
+    kind: 'source-crop',
+    crop: sourceCrop,
+  });
 });
