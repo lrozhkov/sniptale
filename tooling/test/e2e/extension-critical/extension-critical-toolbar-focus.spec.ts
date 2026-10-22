@@ -115,6 +115,69 @@ test.afterEach(async () => {
   opened = null;
 });
 
+for (const appearance of [
+  { theme: 'light', width: 1280, height: 560 },
+  { theme: 'dark', width: 1280, height: 560 },
+  { theme: 'light', width: 1920, height: 900 },
+  { theme: 'dark', width: 1920, height: 900 },
+] as const) {
+  test(`settings menu trigger uses borderless property chrome ${appearance.theme} ${appearance.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    await worker.evaluate(async (theme) => {
+      await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+    }, appearance.theme);
+    opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
+    const { page } = opened;
+    const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
+    for (const mode of ['cursor', 'video-recording']) {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+      for (const orientation of ['horizontal', 'vertical']) {
+        await trigger.click();
+        const direction = page.getByRole('button', {
+          name:
+            orientation === 'horizontal'
+              ? /Horizontal view|Горизонтальный вид/u
+              : /Vertical view|Вертикальный вид/u,
+        });
+        if (!(await direction.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await direction.click();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+          'data-display-mode',
+          orientation
+        );
+        await page.mouse.move(0, 0);
+        await expect(trigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await trigger.hover();
+        await expect(trigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await expect(trigger).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(trigger).toHaveAttribute('data-command-property', 'true');
+        await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
+        expect(
+          await trigger.evaluate((element) => getComputedStyle(element, '::before').borderTopStyle)
+        ).toBe('solid');
+        await page.screenshot({
+          path: info.outputPath(`${mode}-${orientation}-hover.png`),
+          fullPage: false,
+        });
+        await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        await expect(trigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        await page.keyboard.press('Escape');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+}
+
 test('pointer-open toolbar menu Escape preserves pointer paint at HD', async ({
   context,
   extensionId,

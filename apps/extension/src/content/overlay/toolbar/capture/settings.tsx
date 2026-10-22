@@ -64,6 +64,7 @@ export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
       <ContentToolbarButton
         ref={bindings.triggerRef}
         type="button"
+        tone="property"
         dataUi="content.toolbar.settings-button"
         menuIndicator
         data-menu-side={menuSide}
