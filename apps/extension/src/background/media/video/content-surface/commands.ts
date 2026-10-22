@@ -239,6 +239,11 @@ async function switchIdleCameraWithDurableCommit(
   deviceId: string | null
 ) {
   const previous = await loadVideoSettings();
+  if (previous.webcamEnabled !== true) {
+    await requireAuthorizedSurfaceCommand(tabId, message);
+    await patchVideoSettings({ webcamDeviceId: deviceId });
+    return { result: 'accepted' };
+  }
   const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
   if (!lease || lease.surfaceSessionId !== message.surfaceSessionId) {
     throw new Error('Camera preview surface is unavailable');

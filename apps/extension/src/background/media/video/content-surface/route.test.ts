@@ -610,6 +610,7 @@ it('executes lifecycle and live media surface commands for an active recording',
 });
 
 it('allows idle settings but rejects idle lifecycle commands', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   const base = {
     type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
@@ -651,6 +652,7 @@ it('allows idle settings but rejects idle lifecycle commands', async () => {
 });
 
 it('rolls an idle preview back when its selected camera cannot be persisted', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   mocks.patchVideoSettings.mockRejectedValueOnce(new Error('storage failed'));
 
@@ -683,6 +685,7 @@ it('rolls an idle preview back when its selected camera cannot be persisted', as
 });
 
 it('rejects and rolls back an idle camera switch invalidated by document rebind', async () => {
+  mocks.loadVideoSettings.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   let resolveSwitch!: (value: { success: true; result: 'accepted' }) => void;
   mocks.sendRuntimeMessage.mockImplementationOnce(

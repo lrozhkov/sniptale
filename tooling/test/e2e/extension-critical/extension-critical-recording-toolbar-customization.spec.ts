@@ -20,6 +20,84 @@ test.use({ actionTimeout: 10000 });
 for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((viewport) =>
   (['horizontal', 'vertical'] as const).map((orientation) => ({ ...viewport, orientation }))
 )) {
+  test(`recording disabled camera selection ${name} ${orientation}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      await popup.evaluate(async (defaults) => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach((track) => track.stop());
+        await chrome.storage.local.set({
+          sniptale_video_settings: {
+            ...defaults,
+            webcamEnabled: false,
+            webcamDeviceId: null,
+            webcamPresentation: { ...defaults.webcamPresentation, mode: 'embedded' },
+          },
+        });
+      }, DEFAULT_VIDEO_SETTINGS);
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      if (orientation === 'vertical') {
+        await openRecordingToolbarSettings(page);
+        const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+        if (!(await vertical.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await vertical.click();
+        await page.keyboard.press('Escape');
+      }
+      const toggle = page.locator('[data-ui="content.toolbar.video-recording.camera.toggle"]');
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
+      const menu = page.locator('[data-ui="content.toolbar.video-recording.camera.dropdown"]');
+      const device = menu.getByRole('button', { name: /fake_device|fake_video/iu }).first();
+      await expect(device).toBeVisible();
+      await device.click();
+      await expect(menu).toHaveCount(0);
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await expect
+        .poll(() =>
+          popup.evaluate(async () => {
+            const stored = await chrome.storage.local.get('sniptale_video_settings');
+            return Boolean(stored.sniptale_video_settings.webcamDeviceId);
+          })
+        )
+        .toBe(true);
+      await expect(page.locator('[data-ui="content.video-recording.embedded-camera"]')).toHaveCount(
+        0
+      );
+      await page.screenshot({
+        path: info.outputPath('camera-selected-disabled.png'),
+        fullPage: false,
+      });
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      const video = page.locator('[data-ui="content.video-recording.embedded-camera"] video');
+      await expect
+        .poll(() =>
+          video.evaluate(
+            (element) => element instanceof HTMLVideoElement && element.readyState >= 2
+          )
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('selected-camera-enabled.png'),
+        fullPage: false,
+      });
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+
   test(`recording cursor compact parameters ${name} ${orientation}`, async ({}, info) => {
     const host = await startHostServer();
     const launched = await launchExtensionBrowser({ viewport: size });

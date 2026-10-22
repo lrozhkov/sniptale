@@ -7,6 +7,8 @@ import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/t
 
 const mocks = vi.hoisted(() => ({
   patch: vi.fn(),
+  load: vi.fn<() => Promise<VideoRecordingSettings>>(),
+  switchPeer: vi.fn(async (_lease: unknown, _deviceId: string | null) => undefined),
   mutate: vi.fn<(mutation: VideoSettingsMutation) => Promise<VideoRecordingSettings>>(),
   update: vi.fn(),
   list: vi.fn(),
@@ -18,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../runtime/session-state', () => ({ getVideoRecordingRuntimeState: mocks.runtimeState }));
 vi.mock('../../../../composition/persistence/capture-settings', () => ({
-  loadVideoSettings: async () => DEFAULT_VIDEO_SETTINGS,
+  loadVideoSettings: mocks.load,
   patchVideoSettings: mocks.patch,
   mutateVideoSettings: mocks.mutate,
 }));
@@ -39,7 +41,7 @@ vi.mock('./start', () => ({
 vi.mock('./camera-peer', () => ({
   listVideoRecordingMediaDevices: mocks.list,
   closeVideoRecordingCameraPeerForLease: mocks.closePeer,
-  switchVideoRecordingCameraPeerInput: vi.fn(),
+  switchVideoRecordingCameraPeerInput: mocks.switchPeer,
 }));
 vi.mock('../runtime/manager/controls', () => ({
   cancelRecordingStart: vi.fn(),
@@ -52,6 +54,8 @@ vi.mock('../runtime/manager/controls', () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.validate.mockReturnValue(true);
+  mocks.load.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
+  mocks.switchPeer.mockReset().mockResolvedValue(undefined);
   mocks.runtimeState.mockReturnValue({ status: 'IDLE' });
   mocks.pendingStart.mockReturnValue(false);
   mocks.mutate.mockImplementation(async (mutation) => mutation(DEFAULT_VIDEO_SETTINGS));
@@ -67,6 +71,51 @@ const base = {
   documentGeneration: 1,
   recordingId: null,
 } as const;
+
+it('stores a disabled camera selection without requiring a preview peer', async () => {
+  mocks.load.mockResolvedValue({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: false });
+  mocks.switchPeer.mockRejectedValueOnce(new Error('Camera source peer is not active.'));
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      command: { kind: 'select-webcam-device', deviceId: 'camera-b' },
+    })
+  ).resolves.toMatchObject({ success: true });
+  expect(mocks.switchPeer).not.toHaveBeenCalled();
+  expect(mocks.patch).toHaveBeenCalledExactlyOnceWith({ webcamDeviceId: 'camera-b' });
+  expect(mocks.update).not.toHaveBeenCalled();
+});
+
+it('keeps source switching and rollback for an enabled idle camera', async () => {
+  mocks.load.mockResolvedValue({
+    ...DEFAULT_VIDEO_SETTINGS,
+    webcamEnabled: true,
+    webcamDeviceId: 'camera-a',
+  });
+  mocks.patch.mockRejectedValueOnce(new Error('storage refused'));
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      command: { kind: 'select-webcam-device', deviceId: 'camera-b' },
+    })
+  ).rejects.toThrow('storage refused');
+  expect(mocks.switchPeer.mock.calls.map(([, device]) => device)).toEqual(['camera-b', 'camera-a']);
+});
+
+it('refuses disabled-camera selection if authorization changes while loading settings', async () => {
+  mocks.load.mockImplementationOnce(async () => {
+    mocks.validate.mockReturnValue(false);
+    return { ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: false };
+  });
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      command: { kind: 'select-webcam-device', deviceId: 'camera-b' },
+    })
+  ).rejects.toThrow('Unauthorized or stale');
+  expect(mocks.patch).not.toHaveBeenCalled();
+  expect(mocks.switchPeer).not.toHaveBeenCalled();
+});
 
 it('merges camera placement with current geometry without acquiring or enabling media', async () => {
   await runVideoRecordingSurfaceCommand(12, {
