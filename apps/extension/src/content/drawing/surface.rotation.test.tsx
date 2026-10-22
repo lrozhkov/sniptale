@@ -11,6 +11,7 @@ import { renderDrawingObject } from './render';
 function createCanvasContextFixture(): CanvasRenderingContext2D {
   const fixture: Partial<CanvasRenderingContext2D> = {
     arc: vi.fn(),
+    arcTo: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
     closePath: vi.fn(),
@@ -73,8 +74,10 @@ it('keeps canvas text backgrounds joined in local coordinates after rotation', (
     { x: 0, y: 0 }
   );
   expect(context.rotate).toHaveBeenCalledWith(Math.PI / 4);
-  expect(context.roundRect).toHaveBeenNthCalledWith(1, 100, 102, 72, 25, [3, 3, 3, 0]);
-  expect(context.roundRect).toHaveBeenNthCalledWith(2, 100, 127, 52, 25, [0, 0, 3, 3]);
+  expect(context.moveTo).toHaveBeenCalledWith(169, 102);
+  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 102, 172, 127, 3);
+  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 127, 152, 127, 3);
+  expect(context.roundRect).not.toHaveBeenCalled();
 });
 
 it('shows the standard rotation control without skewing handles and commits live rotation', () => {

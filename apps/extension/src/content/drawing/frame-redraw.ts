@@ -4,6 +4,7 @@ import type { DrawingObject } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import type { PointerDraft, DrawingArrowHover } from './interaction';
 import { drawDrawingFrame, registerDrawingSnapshotSource } from './frame';
+import { resolveDrawingVisualLayers } from './frame-renderables';
 
 export function useDrawingFrameRedraw(args: {
   active: boolean;
@@ -48,14 +49,17 @@ export function useDrawingFrameRedraw(args: {
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const layers = resolveDrawingVisualLayers(objects, draftRef.current);
+    const initial = layers[0];
     drawDrawingFrame({
       canvas,
-      objects,
-      draft: draftRef.current,
+      objects: layers.length === 1 ? objects : initial?.kind === 'ink' ? initial.objects : [],
+      draft: layers.length === 1 ? draftRef.current : null,
       selectedIds,
       root: controller.getScrollRoot(),
       showChrome: false,
       suppressText: true,
+      pixelBudget: 16_777_216 / layers.filter((layer) => layer.kind === 'ink').length,
       ...(args.getObjectOpacity ? { getObjectOpacity: args.getObjectOpacity } : {}),
     });
     const chromeCanvas = chromeCanvasRef.current;

@@ -252,7 +252,7 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         overflow: 'visible',
         transform: `rotate(${props.draft.rotation ?? 0}deg)`,
         transformOrigin: 'center',
-        zIndex: 2,
+        zIndex: 'var(--sniptale-drawing-editor-layer, 2)',
       }}
     >
       <DrawingTextBackgrounds

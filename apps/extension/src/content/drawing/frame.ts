@@ -21,6 +21,7 @@ export function drawDrawingFrame(args: {
   hoverBend?: DrawingArrowHover | null;
   renderObjects?: boolean;
   suppressText?: boolean;
+  pixelBudget?: number;
   getObjectOpacity?: (objectId: string) => number;
 }): void {
   const {
@@ -33,9 +34,12 @@ export function drawDrawingFrame(args: {
     renderObjects = true,
     suppressText = false,
   } = args;
-  const ratio = Math.max(1, window.devicePixelRatio || 1);
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const ratio = Math.min(
+    Math.max(1, window.devicePixelRatio || 1),
+    Math.sqrt((args.pixelBudget ?? 16_777_216) / Math.max(1, width * height))
+  );
   const cssWidth = `${width}px`;
   const cssHeight = `${height}px`;
   if (canvas.style.width !== cssWidth) canvas.style.width = cssWidth;
@@ -129,8 +133,12 @@ export function captureDrawingObjects(canvas: HTMLCanvasElement) {
       : 1;
   });
   const area = areas.reduce((sum, value) => sum + value, 0);
+  const projection = getDrawingViewportProjection(source.root);
+  const clip = source.root.kind === 'element' ? source.root.element.getBoundingClientRect() : null;
   return source.objects.map((object, index) => ({
     object,
+    projection,
+    clip,
     anchor: source.getObjectAnchor?.(object) ?? null,
     canvas:
       object.kind === 'text' || object.kind === 'blur'

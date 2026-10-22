@@ -28,6 +28,32 @@ const untouched: DrawingObject = {
   kind: 'blur',
 };
 
+it('shares a backing-pixel budget across mixed ink runs without changing CSS geometry', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  const canvases = Array.from({ length: 3 }, () => document.createElement('canvas'));
+  for (const canvas of canvases) {
+    drawDrawingFrame({
+      canvas,
+      objects: [],
+      draft: null,
+      selectedIds: [],
+      showChrome: false,
+      root: { kind: 'viewport', element: null },
+      pixelBudget: 2048 / canvases.length,
+    });
+    expect(canvas.style.width).toBe(`${window.innerWidth}px`);
+    expect(canvas.style.height).toBe(`${window.innerHeight}px`);
+  }
+  expect(
+    canvases.reduce((pixels, canvas) => pixels + canvas.width * canvas.height, 0)
+  ).toBeLessThanOrEqual(2048);
+});
+
 it('drops a hover marker after its immutable arrow version changes', () => {
   const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
     kind: 'arrow',

@@ -77,7 +77,7 @@ it('rejects invalid viewport dimensions before decoding', async () => {
 });
 
 it.each(['shape-first', 'text-first'])(
-  'matches live ink-over-text layers for overlapping objects created %s',
+  'respects document order for overlapping ink and text created %s',
   async (order) => {
     vi.stubGlobal('Image', CanvasImage);
     const shape = snapshot().objects[0]!;
@@ -108,7 +108,9 @@ it.each(['shape-first', 'text-first'])(
         const below = textPixels.data.slice(offset, offset + 4);
         if (below[0] === 34 && below[1] === 102 && below[2] === 170) continue;
         textPixelsCoveredByInk += 1;
-        expect(Array.from(combinedPixels.data.slice(offset, offset + 4))).toEqual([255, 0, 0, 255]);
+        expect(Array.from(combinedPixels.data.slice(offset, offset + 4))).toEqual(
+          order === 'shape-first' ? Array.from(below) : [255, 0, 0, 255]
+        );
       }
     }
     expect(textPixelsCoveredByInk).toBeGreaterThan(100);
@@ -139,7 +141,7 @@ it('fails closed when the canvas runtime cannot render requested blur', async ()
   ).rejects.toThrow('blur is unavailable');
 });
 
-it('clips rotated blur over the retained backdrop before drawing ordinary ink', async () => {
+it('clips rotated blur in its document position after ordinary ink', async () => {
   vi.stubGlobal('Image', CanvasImage);
   const original = source();
   const context = document.createElement('canvas').getContext('2d')!;
@@ -156,6 +158,7 @@ it('clips rotated blur over the retained backdrop before drawing ordinary ink', 
   const clip = vi.spyOn(context, 'clip');
   const rotate = vi.spyOn(context, 'rotate');
   const fill = vi.spyOn(context, 'fill');
+  const drawImage = vi.spyOn(context, 'drawImage');
   await compositeContentDrawingCapture(original, {
     ...snapshot(),
     objects: [
@@ -172,7 +175,8 @@ it('clips rotated blur over the retained backdrop before drawing ordinary ink', 
   expect(filterWrites).toHaveBeenCalledWith('blur(16px)');
   expect(rotate).toHaveBeenCalledWith(Math.PI / 4);
   expect(rotate).toHaveBeenCalledWith(-Math.PI / 4);
-  expect(clip.mock.invocationCallOrder[0]).toBeLessThan(fill.mock.invocationCallOrder[0]!);
+  expect(clip.mock.invocationCallOrder[0]).toBeGreaterThan(fill.mock.invocationCallOrder[0]!);
+  expect(drawImage.mock.calls[1]![0]).toBeInstanceOf(HTMLCanvasElement);
 });
 
 it('waits for requested text fonts and keeps stencil glyphs transparent over source', async () => {

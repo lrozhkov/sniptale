@@ -30,14 +30,14 @@ function requireCaptureContext(canvas: HTMLCanvasElement): CanvasRenderingContex
 
 function drawCaptureBlur(
   context: CanvasRenderingContext2D,
-  backdrop: HTMLImageElement,
+  backdrop: HTMLCanvasElement,
   object: Extract<DrawingObject, { kind: 'blur' }>,
   snapshot: ContentDrawingCaptureSnapshot,
   scaleX: number
 ): void {
   const blurred = document.createElement('canvas');
-  blurred.width = backdrop.naturalWidth;
-  blurred.height = Math.max(1, Math.round(snapshot.viewport.height * scaleX));
+  blurred.width = backdrop.width;
+  blurred.height = backdrop.height;
   const blurredContext = requireCaptureContext(blurred);
   if (!('filter' in blurredContext)) throw new Error('Drawing capture blur is unavailable');
   const amount = object.amount ?? 10;
@@ -100,15 +100,8 @@ export async function compositeContentDrawingCapture(
   const scaleY = canvas.height / snapshot.viewport.height;
   context.scale(scaleX, scaleY);
   for (const object of snapshot.objects) {
-    if (object.kind === 'blur') drawCaptureBlur(context, image, object, snapshot, scaleX);
-  }
-  for (const object of snapshot.objects) {
-    if (object.kind === 'text') renderDrawingObject(context, object, snapshot.projection);
-  }
-  for (const object of snapshot.objects) {
-    if (object.kind !== 'blur' && object.kind !== 'text') {
-      renderDrawingObject(context, object, snapshot.projection);
-    }
+    if (object.kind === 'blur') drawCaptureBlur(context, canvas, object, snapshot, scaleX);
+    else renderDrawingObject(context, object, snapshot.projection);
   }
   const result = canvas.toDataURL('image/png');
   if (result === 'data:,') throw new Error('Drawing capture image could not be encoded');

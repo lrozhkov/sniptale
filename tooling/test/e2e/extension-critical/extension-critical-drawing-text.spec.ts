@@ -6,6 +6,92 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
 const TEXT = 'A longer first line\nShort\nA final line';
 
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`mixed text and pencil layers follow toolbar ordering ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    try {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+      const background = page.locator(
+        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+      );
+      if ((await background.getAttribute('aria-pressed')) !== 'true') await background.click();
+      await page
+        .locator(
+          '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#f97316"]'
+        )
+        .click();
+      await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+      await page.mouse.click(400, 230);
+      const input = page.locator('[data-ui="content.drawing.text-input"]');
+      await input.fill('MMMMMMMM');
+      await input.press('Enter');
+      const text = page.locator('[data-ui="content.drawing.text-object"]');
+      await expect(text).toHaveCount(1);
+      const bounds = await text.boundingBox();
+      if (!bounds) throw new Error('Text bounds missing');
+      const point = { x: bounds.x + bounds.width - 20, y: bounds.y + bounds.height - 4 };
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      await page.mouse.move(bounds.x - 10, point.y);
+      await page.mouse.down();
+      await page.mouse.move(bounds.x + bounds.width + 10, point.y, { steps: 12 });
+      await page.mouse.up();
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(bounds.x + 3, bounds.y + 3);
+      await expect(page.locator('[data-ui="drawing.selection.actions.front"]')).toBeVisible();
+      const sample = async (name: string) => {
+        await page.mouse.move(1000, 450);
+        const screenshot = await page.screenshot({
+          path: info.outputPath(`${name}.png`),
+          fullPage: false,
+        });
+        return page.evaluate(
+          async ({ encoded, point }) => {
+            const image = new Image();
+            image.src = `data:image/png;base64,${encoded}`;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(image, 0, 0);
+            return [...context.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data];
+          },
+          { encoded: screenshot.toString('base64'), point }
+        );
+      };
+      const below = await sample('text-below-pencil');
+      await page.locator('[data-ui="drawing.selection.actions.front"]').click();
+      const above = await sample('text-above-pencil');
+      expect(above).not.toEqual(below);
+      expect(above[0]).toBeGreaterThan(220);
+      expect(above[1]).toBeGreaterThan(80);
+      await page.locator('canvas.sniptale-drawing-canvas').focus();
+      await page.keyboard.press('Control+z');
+      expect(await sample('undo-layer-order')).toEqual(below);
+      await page.mouse.click(bounds.x + 3, bounds.y + 3);
+      await page.locator('[data-ui="drawing.selection.actions.front"]').click();
+      await page.mouse.dblclick(bounds.x + 10, bounds.y + 10);
+      await expect(input).toBeVisible();
+      await input.fill('Edited text');
+      await input.press('Enter');
+      await expect(text).toContainText('Edited text');
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
 async function backgroundPath(root: Locator) {
   const background = root.locator('path[data-ui="content.drawing.text-background"]');
   await expect(background).toHaveCount(1);
@@ -80,7 +166,7 @@ test('rotated text backgrounds have continuous raster coverage at line joins', a
         '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#f97316"]'
       )
       .click();
-    await page.keyboard.press('Escape');
+    await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
     await page.mouse.click(300, 230);
     const input = page.locator('[data-ui="content.drawing.text-input"]');
     await input.fill(TEXT);
