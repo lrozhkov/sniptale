@@ -131,6 +131,34 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
   });
 }
 
+async function expectStableSplitFill(group: Locator, destination: Locator) {
+  const recording = group.evaluate(async (element) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d')!;
+    const primary = element.querySelector('.sniptale-split-action-start')!;
+    const sample = () => {
+      context.clearRect(0, 0, 1, 1);
+      for (const node of [element, primary]) {
+        context.fillStyle = getComputedStyle(node).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+      }
+      return context.getImageData(0, 0, 1, 1).data[3]!;
+    };
+    const samples = [sample()];
+    for (let frame = 0; frame < 20; frame++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      samples.push(sample());
+    }
+    return samples;
+  });
+  await destination.hover();
+  const samples = await recording;
+  expect(Math.max(...samples) - Math.min(...samples), JSON.stringify(samples)).toBeLessThanOrEqual(
+    1
+  );
+}
+
 async function expectRecordingSplitChrome(
   page: Page,
   info: TestInfo,
@@ -184,7 +212,8 @@ async function expectRecordingSplitChrome(
     await page.screenshot({ path: info.outputPath(`${kind}-${active}-idle.png`), fullPage: false });
     await primary.hover();
     if (active) await expect.poll(async () => (await surface()).group).toBe('rgba(0, 0, 0, 0)');
-    await arrow.hover();
+    if (active) await expectStableSplitFill(group, arrow);
+    else await arrow.hover();
     await expect.poll(async () => (await surface()).group).not.toBe('rgba(0, 0, 0, 0)');
     await expect.poll(async () => (await surface()).primary).toBe('rgba(0, 0, 0, 0)');
     await expect.poll(async () => (await surface()).arrow).toBe('rgba(0, 0, 0, 0)');
@@ -192,6 +221,10 @@ async function expectRecordingSplitChrome(
       path: info.outputPath(`${kind}-${active}-arrow-hover.png`),
       fullPage: false,
     });
+    if (active) {
+      await expectStableSplitFill(group, primary);
+      await arrow.hover();
+    }
     await page.mouse.down();
     await expect.poll(async () => (await surface()).primary).toBe('rgba(0, 0, 0, 0)');
     await page.mouse.up();

@@ -392,6 +392,12 @@
   }
 
   .sniptale-content-toolbar-adopted
+    .sniptale-recording-media-control:has(> .sniptale-split-action-start[data-active='true'])
+    > .sniptale-btn[data-command-press] {
+    transition-property: border-color, color, box-shadow, transform !important;
+  }
+
+  .sniptale-content-toolbar-adopted
     .sniptale-recording-media-control:is(
       :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
       :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
