@@ -175,7 +175,7 @@ for (const appearance of [
     opened = await openDesignReview(context, extensionId, hostOrigin, appearance);
     const { page } = opened;
     const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
-    for (const mode of ['cursor', 'video-recording']) {
+    for (const mode of ['cursor', 'video-recording', 'design-review']) {
       await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
       await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
       if (mode === 'video-recording')
@@ -195,7 +195,8 @@ for (const appearance of [
             .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
             .click();
         await direction.click();
-        await page.keyboard.press('Escape');
+        if ((await trigger.getAttribute('aria-expanded')) === 'true')
+          await page.keyboard.press('Escape');
         await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
           'data-display-mode',
           orientation
@@ -220,6 +221,34 @@ for (const appearance of [
         await page.keyboard.press('Escape');
         await expect(trigger).toHaveAttribute('aria-expanded', 'false');
         if (mode === 'cursor') await expectScreenshotDelayIndicator(page, info, orientation);
+        if (mode === 'design-review') {
+          if (
+            !(await page
+              .locator('[data-ui="content.toolbar.annotation-export-button"]')
+              .isVisible())
+          ) {
+            await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+            await page.locator('[data-ui="content.toolbar.mode-option.design-review"]').click();
+          }
+          const exportTrigger = page.locator(
+            '[data-ui="content.toolbar.annotation-export-button"]'
+          );
+          await page.mouse.move(0, 0);
+          await expect(exportTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+          await exportTrigger.hover();
+          await expect(exportTrigger).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+          await expect(exportTrigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+          await expect(exportTrigger).toHaveAttribute('data-command-property', 'true');
+          await expect(exportTrigger).toHaveAttribute('data-menu-indicator', 'true');
+          await page.screenshot({
+            path: info.outputPath(`export-${orientation}-hover.png`),
+            fullPage: false,
+          });
+          await exportTrigger.click();
+          await expect(exportTrigger).toHaveAttribute('aria-expanded', 'true');
+          await page.keyboard.press('Escape');
+          await expect(exportTrigger).toHaveAttribute('aria-expanded', 'false');
+        }
       }
     }
   });

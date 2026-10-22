@@ -130,7 +130,7 @@ it('uses the canonical toolbar trigger and horizontally aligns the menu with its
     'calc(100% + 10px)'
   );
   expect(trigger?.className).toContain('sniptale-glass-toolbar-button');
-  expect(trigger?.className).toContain('sniptale-toggle');
+  expect(trigger?.className).not.toContain('sniptale-toggle');
   expect(trigger?.dataset['active']).toBeUndefined();
   expect(trigger?.dataset['menuIndicator']).toBe('true');
   expect(trigger?.querySelector('.lucide-archive')).not.toBeNull();

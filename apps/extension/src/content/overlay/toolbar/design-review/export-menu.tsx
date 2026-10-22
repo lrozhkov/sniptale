@@ -239,6 +239,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
       <ContentToolbarButton
         ref={triggerRef}
         type="button"
+        tone="property"
         aria-expanded={open}
         aria-haspopup="menu"
         data-menu-open={open ? 'true' : 'false'}
