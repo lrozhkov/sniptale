@@ -798,6 +798,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await vertical.click();
           await page.keyboard.press('Escape');
         }
+        await openRecordingToolbarSettings(page);
+        await page.screenshot({ path: info.outputPath('settings-alignment.png'), fullPage: false });
+        await page.keyboard.press('Escape');
         await page.locator('[data-ui="content.toolbar.video-recording.spotlight"]').click();
         await page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]').click();
         await page.locator('[data-ui="content.toolbar.video-recording.spotlight-click"]').click();
@@ -1031,6 +1034,19 @@ async function expectRecordingSplitChrome(
 async function openRecordingToolbarSettings(page: Page) {
   const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+  if ((await toolbar.getAttribute('data-display-mode')) === 'horizontal') {
+    const menu = page.locator('.sniptale-settings-wrapper .sniptale-popover-menu');
+    await expect(menu).toBeVisible();
+    await expect
+      .poll(async () => {
+        const anchor = (await trigger.boundingBox())!;
+        const surface = (await menu.boundingBox())!;
+        const expectedLeft = Math.min(anchor.x, page.viewportSize()!.width - 8 - surface.width);
+        return Math.abs(surface.x - expectedLeft);
+      })
+      .toBeLessThanOrEqual(1);
+  }
 }
 
 async function observeStablePendingControls(surface: Locator) {

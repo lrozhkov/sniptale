@@ -341,6 +341,7 @@ export function useToolbarSettingsDropdownLayout(
     | 'viewportRightInset'
   > & { open: boolean }
 ) {
+  const recording = useContext(RecordingToolbarControlsContext);
   const [menuSize, setMenuSize] = useState({ width: 280, height: 340 });
   useLayoutEffect(() => {
     if (!props.open) {
@@ -369,7 +370,7 @@ export function useToolbarSettingsDropdownLayout(
       menuHeight: menuSize.height,
       menuWidth: menuSize.width,
       placement,
-      preferredAlign: 'end',
+      preferredAlign: recording ? 'start' : 'end',
       ...(props.viewportRightInset === undefined
         ? {}
         : { viewportRightInset: props.viewportRightInset }),

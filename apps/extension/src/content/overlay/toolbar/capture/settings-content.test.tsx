@@ -70,6 +70,8 @@ function createMenuRef() {
 }
 
 function renderSettingsDropdown(params?: {
+  displayMode?: 'horizontal' | 'vertical';
+  anchorLeft?: number;
   freePlacement?: boolean;
   onFreePlacementChange?: (value: boolean) => void;
   onDisableScreenshotMode?: (activationEvent?: Event) => void;
@@ -91,7 +93,7 @@ function renderSettingsDropdown(params?: {
           compactMenus={true}
           {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
           onFreePlacementChange={params?.onFreePlacementChange}
-          displayMode="vertical"
+          displayMode={params?.displayMode ?? 'vertical'}
           menuRef={createMenuRef()}
           onClose={() => undefined}
           onCompactMenusChange={() => undefined}
@@ -103,7 +105,11 @@ function renderSettingsDropdown(params?: {
           pinToTabAvailable={params?.pinToTabAvailable ?? true}
           pinToTabLocked={params?.pinToTabLocked ?? false}
           screenshotMode={true}
-          triggerRef={createButtonRef()}
+          triggerRef={createButtonRef(
+            params?.anchorLeft === undefined
+              ? undefined
+              : { left: params.anchorLeft, x: params.anchorLeft, right: params.anchorLeft + 36 }
+          )}
           viewportRightInset={0}
         />
       </RecordingToolbarControlsContext.Provider>
@@ -168,9 +174,13 @@ afterEach(() => {
 });
 
 describe('ToolbarSettingsDropdown', () => {
-  it.each([true, false])(
-    'exposes acknowledged recording fading state=%s and toggles once',
-    (enabled) => {
+  it.each([
+    { enabled: true, anchorLeft: 500, left: 0 },
+    { enabled: false, anchorLeft: 500, left: 0 },
+    { enabled: false, anchorLeft: 1100, left: -108 },
+  ])(
+    'aligns recording settings and exposes acknowledged fading state %j',
+    ({ enabled, anchorLeft, left }) => {
       const recording: ReturnType<typeof useRecordingToolbarControls> = {
         active: false,
         controls: {},
@@ -184,7 +194,10 @@ describe('ToolbarSettingsDropdown', () => {
         setFadeDuringRecording: vi.fn(async () => undefined),
         toggleEditing: vi.fn(),
       };
-      renderSettingsDropdown({ recording });
+      renderSettingsDropdown({ recording, displayMode: 'horizontal', anchorLeft });
+      expect(container!.querySelector<HTMLElement>('.sniptale-popover-menu')!.style.left).toBe(
+        `${left}px`
+      );
       const item = container!.querySelector<HTMLButtonElement>(
         '[data-ui="content.toolbar.settings.recording-fade"]'
       )!;
@@ -202,7 +215,10 @@ describe('ToolbarSettingsDropdown', () => {
   );
 
   it('omits the recording-only preference from other toolbar settings', () => {
-    renderSettingsDropdown();
+    renderSettingsDropdown({ displayMode: 'horizontal', anchorLeft: 500 });
+    expect(container!.querySelector<HTMLElement>('.sniptale-popover-menu')!.style.left).toBe(
+      '-244px'
+    );
     expect(
       container!.querySelector('[data-ui="content.toolbar.settings.recording-fade"]')
     ).toBeNull();
