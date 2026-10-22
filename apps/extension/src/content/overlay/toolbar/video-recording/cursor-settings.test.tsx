@@ -72,3 +72,34 @@ it.each(['#2563eb80', '#2563eb00', '#2563eb'])(
     expect(settings.cursorEffects.haloOpacity).toBe(50);
   }
 );
+
+it('edits click alpha without resetting the independent halo multiplier', () => {
+  const onChange = vi.fn();
+  const settings = {
+    cursorHaloEnabled: true,
+    cursorDimmingEnabled: false,
+    clickAnimationEnabled: true,
+    cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloOpacity: 50, clickColor: '#ef444466' },
+  };
+  act(() => {
+    root.render(
+      <RecordingCursorSettingsPanel
+        disabled={false}
+        settings={settings}
+        onChange={onChange}
+        onPreview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+  });
+  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[2]!.click());
+  const props = colorField.mock.calls.at(-1)![0];
+  expect(props.allowAlpha).toBe(true);
+  expect(props.value).toBe('#ef444466');
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => props.onChange('#ef444400'));
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({
+    ...settings,
+    cursorEffects: { ...settings.cursorEffects, clickColor: '#ef444400' },
+  });
+});

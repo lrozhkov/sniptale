@@ -177,6 +177,16 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       await alpha.fill('70');
       await alpha.press('Enter');
       await picker.getByRole('button', { name: /^(Apply|Применить)$/u }).click();
+    } else if (choice.section === 2) {
+      await colorField.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill(choice.color);
+      const alpha = picker
+        .locator('[data-ui="shared.ui.color-selector.opacity"]')
+        .getByRole('textbox');
+      await alpha.fill('40');
+      await alpha.press('Enter');
+      await picker.getByRole('button', { name: /^(Apply|Применить)$/u }).click();
     } else {
       await colorField.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
       await page.screenshot({ path: info.outputPath('cursor-inline-color.png'), fullPage: false });
@@ -191,7 +201,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
           return stored.sniptale_video_settings.recordingSurface.cursorEffects?.[key];
         }, choice.colorKey)
       )
-      .toBe(choice.section === 0 ? '#2563ebb3' : choice.color);
+      .toBe(choice.section === 0 ? '#2563ebb3' : choice.section === 2 ? '#ef444466' : choice.color);
     await open();
     await panel.locator('nav button').nth(choice.section).click();
     await expect(panel.locator('nav button').nth(choice.section)).toHaveCSS(
@@ -242,7 +252,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   const ripple = page.locator('[data-ui="content.video-recording.spotlight-click"]');
   await expect(ripple).toHaveCSS('width', '60px');
   await expect(ripple).toHaveCSS('animation-duration', '0.65s');
-  await expect(ripple).toHaveCSS('border-top-color', 'rgb(239, 68, 68)');
+  await expect(ripple).toHaveCSS('border-top-color', 'rgba(239, 68, 68, 0.4)');
   await open();
   await expect(panel.locator('input[type="text"]').first()).toHaveValue('66');
   await page.keyboard.press('Escape');

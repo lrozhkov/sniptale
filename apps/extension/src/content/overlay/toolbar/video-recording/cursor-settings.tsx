@@ -127,7 +127,7 @@ export function RecordingCursorSettingsPanel(props: {
                     : (effects[COLOR_KEYS[section]] ?? (section === 'dimming' ? '#000000' : accent))
                 }
                 disabled={props.disabled}
-                allowAlpha={section === 'halo'}
+                allowAlpha={section !== 'dimming'}
                 allowTransparent={false}
                 triggerVariant="swatch"
                 floatingPlacement="auto"
