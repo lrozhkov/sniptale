@@ -81,13 +81,14 @@ it('offers targeted text editing and a compact reset only for modified text', ()
       />
     )
   );
-  expect(
-    container.querySelector('[data-ui="content.design-review.element-text"]')?.textContent
-  ).toBe('Changed heading');
+  expect(container.querySelector('[data-ui="content.design-review.element-text"]')).toBeNull();
   expect(edit.disabled).toBe(true);
   const reset = container.querySelector<HTMLButtonElement>(
     '[data-ui="content.design-review.reset-text"]'
   )!;
+  expect(reset.previousElementSibling).toBe(
+    container.querySelector('[data-ui="content.design-review.element-selector"]')?.closest('button')
+  );
   act(() => reset.click());
   expect(base.onResetText).toHaveBeenCalledOnce();
   act(() =>

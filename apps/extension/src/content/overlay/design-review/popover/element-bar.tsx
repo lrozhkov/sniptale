@@ -106,27 +106,6 @@ export function DesignReviewElementBar(props: {
           </ContentToolbarButton>
         ))}
       </div>
-      <strong
-        className="max-w-32 truncate text-xs"
-        data-ui="content.design-review.element-text"
-        title={props.text.modified ? translate('content.designReview.textModified') : undefined}
-      >
-        {props.text.preview || selection.tagName}
-      </strong>
-      {props.text.modified ? (
-        <ContentToolbarButton
-          tone="utility"
-          type="button"
-          className="!h-6 !w-6 shrink-0 !p-0 [&_svg]:!size-3"
-          dataUi="content.design-review.reset-text"
-          disabled={!props.text.resettable}
-          aria-label={translate('content.designReview.resetText')}
-          title={translate('content.designReview.resetText')}
-          onClick={props.onResetText}
-        >
-          <RotateCcw size={12} />
-        </ContentToolbarButton>
-      ) : null}
       <button
         type="button"
         className={[
@@ -143,6 +122,20 @@ export function DesignReviewElementBar(props: {
           {selection.selectorLabel}
         </span>
       </button>
+      {props.text.modified ? (
+        <ContentToolbarButton
+          tone="utility"
+          type="button"
+          className="!h-6 !w-6 shrink-0 !p-0 [&_svg]:!size-3"
+          dataUi="content.design-review.reset-text"
+          disabled={!props.text.resettable}
+          aria-label={translate('content.designReview.resetText')}
+          title={translate('content.designReview.resetText')}
+          onClick={props.onResetText}
+        >
+          <RotateCcw size={12} />
+        </ContentToolbarButton>
+      ) : null}
       <ElementActionButton
         disabled={copy.status === 'pending'}
         label={translate('content.designReview.copyElement')}

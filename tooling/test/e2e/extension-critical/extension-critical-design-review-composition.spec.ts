@@ -214,7 +214,10 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const viewport of [
+    ...PRIMARY_BROWSER_VIEWPORTS,
+    { name: '960x560', size: { width: 960, height: 560 } },
+  ]) {
     test(`design review composition ${theme} ${viewport.name}`, async ({
       context,
       extensionId,
@@ -302,6 +305,16 @@ for (const theme of ['light', 'dark'] as const) {
           animations: 'disabled',
         });
         await toolbar.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+        const elementName = (
+          theme === 'dark'
+            ? 'Проверить длинное название выбранного элемента '
+            : 'Review the long selected element name '
+        )
+          .repeat(6)
+          .trim();
+        await page.locator('#measurement-target').evaluate((element, text) => {
+          element.textContent = text;
+        }, elementName);
         const target = (await page.locator('#measurement-target').boundingBox())!;
         await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
         const popover = page.locator('[data-ui="content.design-review.popover"]');
@@ -319,6 +332,9 @@ for (const theme of ['light', 'dark'] as const) {
         const close = popover.getByRole('button', { name: /^(Close|Закрыть)$/u });
         const panelBounds = (await popover.boundingBox())!;
         const closeBounds = (await close.boundingBox())!;
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        );
         const commentLayer = popover.locator('[data-ui="content.design-review.comment-layer"]');
         const tag = popover.locator('[data-ui="content.design-review.element-tag"]');
         await expect(tag).toHaveText('BUTTON');
@@ -332,15 +348,32 @@ for (const theme of ['light', 'dark'] as const) {
         expect(
           Math.abs(tagBounds.y + tagBounds.height / 2 - closeBounds.y - closeBounds.height / 2)
         ).toBeLessThanOrEqual(1);
-        const footerTextBounds = (await popover
-          .locator('[data-ui="content.design-review.element-text"]')
+        const headerText = popover.locator('[data-ui="content.design-review.element-text"]');
+        await expect(headerText).toHaveText(elementName);
+        await expect(headerText).toHaveAttribute('title', elementName);
+        const headerTextBounds = (await headerText.boundingBox())!;
+        expect(headerTextBounds.width).toBeLessThanOrEqual(panelBounds.width / 2 + 1);
+        expect(
+          Math.abs(headerTextBounds.x - tagBounds.x - tagBounds.width - 8)
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(
+            headerTextBounds.y + headerTextBounds.height / 2 - tagBounds.y - tagBounds.height / 2
+          )
+        ).toBeLessThanOrEqual(1);
+        expect(
+          await headerText.evaluate((element) => element.scrollWidth > element.clientWidth)
+        ).toBe(true);
+        await expect(headerText).toHaveCSS('text-overflow', 'ellipsis');
+        const selectorBounds = (await popover
+          .locator('[data-ui="content.design-review.element-selector"]')
           .boundingBox())!;
         const navigationBoundsFooter = (await popover
           .locator('[data-ui="content.design-review.tree-navigation"]')
           .boundingBox())!;
         expect(Math.abs(navigationBoundsFooter.x - panelBounds.x - 13)).toBeLessThanOrEqual(1);
         expect(
-          Math.abs(footerTextBounds.x - navigationBoundsFooter.x - navigationBoundsFooter.width - 8)
+          Math.abs(selectorBounds.x - navigationBoundsFooter.x - navigationBoundsFooter.width - 8)
         ).toBeLessThanOrEqual(1);
         await expect.soft(commentLayer).toHaveCSS('padding-top', '32px', { timeout: 500 });
         expect.soft(closeBounds.width, 'Close retains a compact target').toBe(24);
@@ -377,6 +410,28 @@ for (const theme of ['light', 'dark'] as const) {
           fullPage: false,
           animations: 'disabled',
         });
+        await headerText.hover();
+        await page.mouse.down();
+        await page.mouse.move(
+          headerTextBounds.x + headerTextBounds.width / 2 + 32,
+          headerTextBounds.y + headerTextBounds.height / 2 + 18,
+          { steps: 4 }
+        );
+        await page.mouse.up();
+        await expect
+          .poll(async () => {
+            const moved = (await popover.boundingBox())!;
+            const expectedX = Math.min(
+              Math.max(panelBounds.x + 32, 12),
+              viewport.size.width - panelBounds.width - 12
+            );
+            const expectedY = Math.min(
+              Math.max(panelBounds.y + 18, 12),
+              viewport.size.height - panelBounds.height - 12
+            );
+            return Math.max(Math.abs(moved.x - expectedX), Math.abs(moved.y - expectedY));
+          })
+          .toBeLessThanOrEqual(1);
         await close.click();
         await expect(popover).toHaveCount(0);
         await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);

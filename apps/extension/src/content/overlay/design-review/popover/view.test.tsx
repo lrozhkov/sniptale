@@ -166,10 +166,59 @@ it('uses native non-layout hints for the element tag and full path', () => {
   ).toBe('H1');
   expect(
     root
-      .querySelector('[data-ui="content.design-review.element-text"]')
+      .querySelector('[data-ui="content.design-review.element-selector"]')
+      ?.closest('button')
       ?.previousElementSibling?.getAttribute('data-ui')
   ).toBe('content.design-review.tree-navigation');
+  const preview = root.querySelector('[data-ui="content.design-review.element-text"]');
+  expect(preview?.closest('[data-ui="content.design-review.popover-drag-handle"]')).not.toBeNull();
+  expect(preview?.getAttribute('title')).toBe('Heading');
+  expect(preview?.className).toContain('max-w-[50%]');
+  expect(preview?.hasAttribute('tabindex')).toBe(false);
   expect(root.querySelector('[role="tooltip"]')).toBeNull();
+});
+
+it('keeps the full element text in the bounded header and preserves its reset action', () => {
+  const element = document.createElement('button');
+  const fullText = 'A long selected element label '.repeat(8).trim();
+  element.textContent = fullText;
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover
+      actions={actions}
+      open
+      state={{
+        ...state,
+        selection: { ...state.selection!, element },
+        text: { ...state.text, modified: true, resettable: true, preview: fullText.slice(0, 80) },
+      }}
+    />
+  );
+  const preview = root.querySelector('[data-ui="content.design-review.element-text"]');
+  expect(preview?.textContent).toBe(fullText);
+  expect(preview?.getAttribute('title')).toContain(fullText);
+  const reset = root.querySelector('[data-ui="content.design-review.reset-text"]');
+  const path = root
+    .querySelector('[data-ui="content.design-review.element-selector"]')
+    ?.closest('button');
+  expect(reset?.previousElementSibling).toBe(path);
+  expect(reset?.closest('[data-ui="content.design-review.popover-drag-handle"]')).toBeNull();
+});
+
+it('does not duplicate the tag as header text when the element has no text', () => {
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover
+      actions={actions}
+      open
+      state={{
+        ...state,
+        text: { ...state.text, preview: '' },
+      }}
+    />
+  );
+  expect(root.querySelector('[data-ui="content.design-review.element-text"]')).toBeNull();
+  expect(root.querySelector('[data-ui="content.design-review.element-tag"]')).not.toBeNull();
 });
 
 it('does not render without an active click selection', () => {

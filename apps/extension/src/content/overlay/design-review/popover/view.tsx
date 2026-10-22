@@ -127,6 +127,41 @@ function useDesignReviewPopoverViewModel(props: { open: boolean; state: DesignRe
   };
 }
 
+function ElementIdentity(props: {
+  selection: NonNullable<DesignReviewViewState['selection']>;
+  text: DesignReviewViewState['text'];
+}) {
+  const elementText = props.selection.element.textContent?.trim() || props.text.preview;
+  return (
+    <>
+      <span
+        className={[
+          'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
+          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        ].join(' ')}
+        data-ui="content.design-review.element-tag"
+        tabIndex={0}
+        title={describeDesignReviewElement(props.selection.tagName)}
+      >
+        {props.selection.tagName.toUpperCase()}
+      </span>
+      {elementText ? (
+        <strong
+          className="min-w-0 max-w-[50%] truncate text-xs font-medium"
+          data-ui="content.design-review.element-text"
+          title={
+            props.text.modified
+              ? `${elementText}\n${translate('content.designReview.textModified')}`
+              : elementText
+          }
+        >
+          {elementText}
+        </strong>
+      ) : null}
+    </>
+  );
+}
+
 export function DesignReviewPopover(props: {
   actions: DesignReviewActions;
   open: boolean;
@@ -182,7 +217,7 @@ export function DesignReviewPopover(props: {
         <div className="relative z-20 p-3 pb-2 pt-8" data-ui="content.design-review.comment-layer">
           <div
             className={[
-              'absolute inset-x-0 top-0 z-10 flex h-8 touch-none items-center pl-3 pr-9',
+              'absolute inset-x-0 top-0 z-10 flex h-8 touch-none items-center gap-2 pl-3 pr-9',
               'cursor-grab active:cursor-grabbing',
             ].join(' ')}
             data-ui="content.design-review.popover-drag-handle"
@@ -192,17 +227,7 @@ export function DesignReviewPopover(props: {
             onPointerUp={view.drag.onPointerUp}
             onPointerCancel={view.drag.onPointerUp}
           >
-            <span
-              className={[
-                'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
-                'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-              ].join(' ')}
-              data-ui="content.design-review.element-tag"
-              tabIndex={0}
-              title={describeDesignReviewElement(props.state.selection.tagName)}
-            >
-              {props.state.selection.tagName.toUpperCase()}
-            </span>
+            <ElementIdentity selection={props.state.selection} text={props.state.text} />
           </div>
           <PageStyleCommentField
             actions={{
