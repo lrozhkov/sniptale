@@ -799,8 +799,13 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await page.keyboard.press('Escape');
         }
         await page.locator('[data-ui="content.toolbar.video-recording.spotlight"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]').click();
         await page.locator('[data-ui="content.toolbar.video-recording.spotlight-click"]').click();
         await page.keyboard.press('Escape');
+        await page.mouse.move(size.width - 140, size.height - 140);
+        const halo = page.locator('[data-ui="content.video-recording.spotlight-halo"]');
+        await expect(halo).toHaveCSS('box-shadow', /0px 0px 8px 0px/u);
+        await page.screenshot({ path: info.outputPath('soft-cursor-glow.png'), fullPage: false });
         const animation = page.locator('[data-ui="content.video-recording.spotlight-click"]');
         await expect(animation).toHaveCount(0);
         const surface = page.locator('[data-ui="content.video-recording.spotlight"]');

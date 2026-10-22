@@ -195,7 +195,10 @@ export function VideoRecordingSpotlight(props: {
             border: `${effects.haloStroke ?? 2}px solid ${haloColor}`,
             borderRadius: '999px',
             transform: 'translate(-100px, -100px)',
-            boxShadow: `0 0 0 ${effects.haloGlow ?? 8}px color-mix(in srgb, ${haloColor} 20%, transparent)`,
+            boxShadow:
+              (effects.haloGlow ?? 8) === 0
+                ? 'none'
+                : `0 0 ${effects.haloGlow ?? 8}px 0 color-mix(in srgb, ${haloColor} 20%, transparent)`,
           }}
         />
       ) : null}

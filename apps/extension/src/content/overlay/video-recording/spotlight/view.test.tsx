@@ -46,6 +46,28 @@ function deliver(type: string, clientX = 0, detail = 1) {
 
 const RIPPLE = '[data-ui="content.video-recording.spotlight-click"]';
 
+it.each([0, 8, 40])('renders halo glow %s as blur without a hard spread', (haloGlow) => {
+  const host = mountClickFeedback();
+  act(() =>
+    root?.render(
+      <VideoRecordingSpotlight
+        cursorHaloEnabled
+        cursorDimmingEnabled={false}
+        clickAnimationEnabled={false}
+        cursorEffects={{ ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloGlow, haloColor: '#2563eb' }}
+      />
+    )
+  );
+  const halo = host.querySelector<HTMLElement>(
+    '[data-ui="content.video-recording.spotlight-halo"]'
+  )!;
+  expect(halo.style.boxShadow).toBe(
+    haloGlow === 0 ? 'none' : `0 0 ${haloGlow}px 0 color-mix(in srgb, #2563eb 20%, transparent)`
+  );
+  expect(halo.style.borderColor).toBe('rgb(37, 99, 235)');
+  expect(halo.style.opacity).toBe(String(DEFAULT_VIDEO_CURSOR_EFFECTS.haloOpacity / 100));
+});
+
 it.each(['ripple', 'press', 'glow'] as const)(
   'excludes owned toolbar and portal clicks from %s without excluding page controls',
   (clickEffect) => {
