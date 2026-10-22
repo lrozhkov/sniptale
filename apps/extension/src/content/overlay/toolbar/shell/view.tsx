@@ -12,6 +12,7 @@ import {
   RecordingToolbarControlsContext,
   useRecordingToolbarControls,
 } from '../state/recording-controls';
+import { PageToolbarControlsContext, usePageToolbarControls } from '../state/page-controls';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -69,6 +70,21 @@ export function ToolbarShellContent(props: {
   }, [derivedState.isDragging]);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
+  const pageControls = usePageToolbarControls(!toolbarProps.videoRecordingMode);
+  const wasCustomizing = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (
+      wasCustomizing.current &&
+      !pageControls.editing &&
+      !toolbarProps.videoRecordingMode &&
+      !menuOpen
+    ) {
+      derivedState.toolbarRef.current
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.settings-button"]')
+        ?.focus({ preventScroll: true });
+    }
+    wasCustomizing.current = pageControls.editing;
+  }, [pageControls.editing, toolbarProps.videoRecordingMode, derivedState.toolbarRef, menuOpen]);
   const recordingControls = useRecordingToolbarControls(
     toolbarProps.videoRecordingMode ?? false,
     Boolean(
@@ -80,99 +96,104 @@ export function ToolbarShellContent(props: {
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
 
   return (
-    <RecordingToolbarControlsContext.Provider
-      value={toolbarProps.videoRecordingMode ? recordingControls : null}
+    <PageToolbarControlsContext.Provider
+      value={toolbarProps.videoRecordingMode ? null : pageControls}
     >
-      {derivedState.isDragging && !derivedState.freePlacement ? (
-        <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
-      ) : null}
-      {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
-      <div
-        className="sniptale-toolbar-positioner"
-        tabIndex={-1}
-        data-dragging={derivedState.isDragging ? 'true' : 'false'}
-        data-drag-started={hasDragged ? 'true' : undefined}
-        style={getToolbarVisibilityStyle(
-          derivedState.positionReady,
-          derivedState.position,
-          uiScale
-        )}
+      <RecordingToolbarControlsContext.Provider
+        value={toolbarProps.videoRecordingMode ? recordingControls : null}
       >
-        <CommandPressScope value={true}>
-          <ContentToolbarShell
-            ref={derivedState.toolbarRef}
-            className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
-            dragging={derivedState.isDragging}
-            dataUi="content.toolbar.root"
-            data-display-mode={derivedState.displayMode}
-            data-menu-side={
-              derivedState.displayMode === 'vertical'
-                ? derivedState.position.x * uiScale < window.innerWidth / 2
-                  ? 'right'
-                  : 'left'
-                : derivedState.position.y * uiScale < window.innerHeight / 2
-                  ? 'down'
-                  : 'up'
-            }
-            data-dock-dragging={
-              derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
-            }
-            inert={derivedState.isDragging && !derivedState.freePlacement}
-            data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
-            data-recording-fade={
-              toolbarProps.videoRecordingMode &&
-              recordingControls.ready &&
-              recordingControls.fadeDuringRecording &&
-              toolbarProps.videoRecording?.state.phase === 'recording'
-                ? 'true'
-                : undefined
-            }
-            data-menu-open={menuOpen ? 'true' : undefined}
-            onPointerDownCapture={blurPointerActivatedToolbarFocus}
-            onMouseDownCapture={preventPointerActivatedToolbarFocus}
-            onMouseOverCapture={onHoverCapture}
-          >
-            <ContentToolbarDragHandle
-              onPointerDown={(event) => {
-                if (!derivedState.freePlacement) {
-                  const positioner = event.currentTarget.closest<HTMLElement>(
-                    '.sniptale-toolbar-positioner'
-                  );
-                  if (positioner) {
-                    const root = positioner.getRootNode();
-                    const focused =
-                      root instanceof ShadowRoot ? root.activeElement : document.activeElement;
-                    dragFocus.current = {
-                      positioner,
-                      previous:
-                        focused instanceof HTMLElement && focused !== positioner ? focused : null,
-                    };
-                    positioner.focus({ preventScroll: true });
-                  }
-                }
-                setHasDragged(true);
-                derivedState.handleMouseDown(event);
-              }}
+        {derivedState.isDragging && !derivedState.freePlacement ? (
+          <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
+        ) : null}
+        {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
+        <div
+          className="sniptale-toolbar-positioner"
+          tabIndex={-1}
+          data-dragging={derivedState.isDragging ? 'true' : 'false'}
+          data-drag-started={hasDragged ? 'true' : undefined}
+          style={getToolbarVisibilityStyle(
+            derivedState.positionReady,
+            derivedState.position,
+            uiScale
+          )}
+        >
+          <CommandPressScope value={true}>
+            <ContentToolbarShell
+              ref={derivedState.toolbarRef}
+              className="sniptale-content-ui-zoom-surface sniptale-content-toolbar-adopted"
+              dragging={derivedState.isDragging}
+              dataUi="content.toolbar.root"
+              data-display-mode={derivedState.displayMode}
+              data-menu-side={
+                derivedState.displayMode === 'vertical'
+                  ? derivedState.position.x * uiScale < window.innerWidth / 2
+                    ? 'right'
+                    : 'left'
+                  : derivedState.position.y * uiScale < window.innerHeight / 2
+                    ? 'down'
+                    : 'up'
+              }
+              data-dock-dragging={
+                derivedState.isDragging && !derivedState.freePlacement ? 'true' : undefined
+              }
+              inert={derivedState.isDragging && !derivedState.freePlacement}
+              data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
+              data-page-controls={toolbarProps.videoRecordingMode ? undefined : 'true'}
+              data-recording-fade={
+                toolbarProps.videoRecordingMode &&
+                recordingControls.ready &&
+                recordingControls.fadeDuringRecording &&
+                toolbarProps.videoRecording?.state.phase === 'recording'
+                  ? 'true'
+                  : undefined
+              }
+              data-menu-open={menuOpen ? 'true' : undefined}
+              onPointerDownCapture={blurPointerActivatedToolbarFocus}
+              onMouseDownCapture={preventPointerActivatedToolbarFocus}
+              onMouseOverCapture={onHoverCapture}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
-                <circle cx="9" cy="12" r="1" />
-                <circle cx="9" cy="5" r="1" />
-                <circle cx="9" cy="19" r="1" />
-                <circle cx="15" cy="12" r="1" />
-                <circle cx="15" cy="5" r="1" />
-                <circle cx="15" cy="19" r="1" />
-              </svg>
-            </ContentToolbarDragHandle>
+              <ContentToolbarDragHandle
+                onPointerDown={(event) => {
+                  if (!derivedState.freePlacement) {
+                    const positioner = event.currentTarget.closest<HTMLElement>(
+                      '.sniptale-toolbar-positioner'
+                    );
+                    if (positioner) {
+                      const root = positioner.getRootNode();
+                      const focused =
+                        root instanceof ShadowRoot ? root.activeElement : document.activeElement;
+                      dragFocus.current = {
+                        positioner,
+                        previous:
+                          focused instanceof HTMLElement && focused !== positioner ? focused : null,
+                      };
+                      positioner.focus({ preventScroll: true });
+                    }
+                  }
+                  setHasDragged(true);
+                  derivedState.handleMouseDown(event);
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+                  <circle cx="9" cy="12" r="1" />
+                  <circle cx="9" cy="5" r="1" />
+                  <circle cx="9" cy="19" r="1" />
+                  <circle cx="15" cy="12" r="1" />
+                  <circle cx="15" cy="5" r="1" />
+                  <circle cx="15" cy="19" r="1" />
+                </svg>
+              </ContentToolbarDragHandle>
 
-            <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-            <ToolbarSecondaryControls
-              toolbarProps={toolbarProps}
-              viewModel={viewModel}
-              onViewportChange={onViewportChange}
-            />
-          </ContentToolbarShell>
-        </CommandPressScope>
-      </div>
-    </RecordingToolbarControlsContext.Provider>
+              <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+              <ToolbarSecondaryControls
+                toolbarProps={toolbarProps}
+                viewModel={viewModel}
+                onViewportChange={onViewportChange}
+              />
+            </ContentToolbarShell>
+          </CommandPressScope>
+        </div>
+      </RecordingToolbarControlsContext.Provider>
+    </PageToolbarControlsContext.Provider>
   );
 }

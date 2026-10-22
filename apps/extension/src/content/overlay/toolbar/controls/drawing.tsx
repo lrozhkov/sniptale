@@ -7,7 +7,7 @@ import {
   Type,
   ArrowUpRight,
 } from 'lucide-react';
-import { Fragment, useId, useRef, useState, type ReactNode } from 'react';
+import { createElement, Fragment, useId, useRef, useState, type ReactNode } from 'react';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -20,6 +20,7 @@ import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
 import { useDrawingOptionsLayout, type DrawingMenuLayoutResolver } from './drawing-options-layout';
 import { useToolbarMenuDirection } from '../menu/direction';
+import { PageControlVisibility } from './control-visibility';
 
 type DrawingToolDescriptor = {
   tool: DrawingTool;
@@ -242,9 +243,19 @@ export function ToolbarDrawingControls(props: {
           );
           return (
             <Fragment key={tool}>
-              {props.owner?.renderToolControl
-                ? props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
-                : control}
+              {props.owner?.renderToolControl ? (
+                props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
+              ) : tool === 'select' ? (
+                control
+              ) : (
+                <PageControlVisibility
+                  control={`drawing-${tool}`}
+                  icon={createElement(icon, { size: 18 })}
+                  label={translate(label)}
+                >
+                  {control}
+                </PageControlVisibility>
+              )}
             </Fragment>
           );
         })}

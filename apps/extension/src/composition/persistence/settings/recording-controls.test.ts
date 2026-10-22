@@ -13,6 +13,7 @@ vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
 }));
 
 import { loadSettings, patchSettings } from './index';
+import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -21,6 +22,74 @@ beforeEach(() => {
 });
 
 describe('recording toolbar visibility settings', () => {
+  it('drains an admitted page visibility write before erasure and recreates only the later choice', async () => {
+    let persisted: Record<string, unknown> = {};
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+    storage.set.mockImplementation(
+      async (items: { sniptale_settings: Record<string, unknown> }) => {
+        if (storage.set.mock.calls.length === 1) {
+          enter();
+          await released;
+        }
+        persisted = items.sniptale_settings;
+      }
+    );
+    const write = patchSettings({ contentToolbar: { pageControls: { 'drawing-pencil': false } } });
+    await entered;
+    const erase = vi.fn(() => {
+      persisted = {};
+    });
+    const erasure = runWithPersistentDataErasureBarrier(erase);
+    await Promise.resolve();
+    expect(erase).not.toHaveBeenCalled();
+    release();
+    await Promise.all([write, erasure]);
+    expect((await loadSettings()).contentToolbar?.pageControls).toBeUndefined();
+    await patchSettings({ contentToolbar: { pageControls: { 'capture-size': false } } });
+    expect((await loadSettings()).contentToolbar?.pageControls).toEqual({ 'capture-size': false });
+  });
+  it('admits page visibility independently and rejects mandatory or malformed choices', async () => {
+    const pageControls = { 'capture-delay': false, 'drawing-pencil': false, 'review-export': true };
+    expect(
+      parseStoredSettings({
+        contentToolbar: { pageControls, recordingControls: { camera: false } },
+      })
+    ).toMatchObject({
+      invalidFieldCount: 0,
+      value: { contentToolbar: { pageControls, recordingControls: { camera: false } } },
+    });
+    for (const invalid of [
+      null,
+      [],
+      { settings: false },
+      { 'drawing-select': false },
+      { frame: false },
+      { 'editing-block-selection': false },
+      { 'capture-delay': 'no' },
+    ]) {
+      expect(
+        parseStoredSettings({ contentToolbar: { pageControls: invalid } }).invalidFieldCount
+      ).toBeGreaterThan(0);
+    }
+    storage.get.mockResolvedValue({
+      sniptale_settings: { contentToolbar: { pageControls, recordingControls: { camera: false } } },
+    });
+    const result = await patchSettings({
+      contentToolbar: { pageControls: { 'capture-full': false } },
+    });
+    expect(result.contentToolbar).toMatchObject({
+      pageControls: { ...pageControls, 'capture-full': false },
+      recordingControls: { camera: false },
+    });
+  });
   it.each([true, false])(
     'accepts fadeDuringRecording=%s without changing sibling values',
     (fadeDuringRecording) => {

@@ -17,6 +17,7 @@ import {
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
 import { RecordingToolbarControlsContext } from '../state/recording-controls';
+import { PageToolbarCustomizationSettings } from './page-control-settings';
 import {
   createTrustedContentActionIntentSource,
   type ContentPrivilegedActionIntentSource,
@@ -197,6 +198,7 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
       />
       {props.showPinItem !== false ? renderPinToTabItem(props) : null}
       <RecordingToolbarFadeSetting />
+      <PageToolbarCustomizationSettings onClose={props.onClose} />
       <ProductToolbarMenuDivider />
       {props.showHideItem === false
         ? null

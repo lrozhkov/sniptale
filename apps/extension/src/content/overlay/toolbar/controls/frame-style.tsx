@@ -1,6 +1,6 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   FrameAnnotationCreationControls,
   type FrameAnnotationCreationMenu,
@@ -39,9 +39,26 @@ import {
   SETTINGS_POPOVER_WIDTH,
 } from '../../../../composition/frame-annotation-controls/popover/surface';
 import { resolveMainToolbarFramePopoverDirection } from '../../../selection/interactive-frame/layout/popover-position';
+import { ListOrdered, MessageSquare } from 'lucide-react';
+import { PageControlVisibility } from './control-visibility';
+import { translate } from '../../../../platform/i18n';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
+
+function renderAnnotationVisibility(menu: 'callout' | 'step-badge', control: ReactNode) {
+  return (
+    <PageControlVisibility
+      control={menu === 'callout' ? 'annotation-callout' : 'annotation-step-badge'}
+      icon={menu === 'callout' ? <MessageSquare size={18} /> : <ListOrdered size={18} />}
+      label={translate(
+        menu === 'callout' ? 'content.callout.settingsTitle' : 'content.stepBadge.settingsTitle'
+      )}
+    >
+      {control}
+    </PageControlVisibility>
+  );
+}
 
 function resolveCreationMenuDirection(
   menu: FrameAnnotationCreationMenu,
@@ -138,6 +155,7 @@ export function FutureFrameStyleControls(props: {
     <CommandPressScope value={true}>
       <InspectorLayout>
         <FrameAnnotationCreationControls
+          renderAnnotationControl={renderAnnotationVisibility}
           activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
           context="content"
           resolveMenuDirection={resolveCreationMenuDirection}

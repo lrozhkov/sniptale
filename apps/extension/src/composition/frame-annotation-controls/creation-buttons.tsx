@@ -133,6 +133,7 @@ export function FrameStyleCreationButton(props: {
 }
 
 export function AnnotationCreationButtons(props: {
+  renderControl?: ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode) | undefined;
   activeMenu: FrameAnnotationCreationMenu | null;
   calloutRef: RefObject<HTMLButtonElement | null>;
   contentContext: boolean;
@@ -150,6 +151,7 @@ export function AnnotationCreationButtons(props: {
   const calloutActive = props.settings.callout !== null && props.settings.callout.enabled !== false;
   const stepBadgeActive =
     props.settings.stepBadge !== null && props.settings.stepBadge.enabled !== false;
+  const renderControl = props.renderControl ?? ((_menu, control) => control);
   return (
     <div
       className="sniptale-toolbar-subgroup sniptale-toolbar-annotation-group"
@@ -159,46 +161,52 @@ export function AnnotationCreationButtons(props: {
           : 'frame-annotation.creation-annotations'
       }
     >
-      {props.showCallout ? (
-        <CreationSplitButton
-          active={calloutActive}
-          dataUi={
-            props.contentContext
-              ? 'content.toolbar.future-frame-callout'
-              : 'frame-annotation.creation.callout'
-          }
-          disabled={props.disabled ?? false}
-          menuOpen={props.activeMenu === 'callout'}
-          menuRef={props.calloutRef}
-          menu="callout"
-          resolveMenuDirection={props.resolveMenuDirection}
-          onMenuClick={props.onCalloutMenu}
-          onToggle={props.onToggleCallout}
-          title={translate('content.callout.settingsTitle')}
-        >
-          <FrameCommentIcon size={18} />
-        </CreationSplitButton>
-      ) : null}
-      {props.showStepBadge ? (
-        <CreationSplitButton
-          active={stepBadgeActive}
-          dataUi={
-            props.contentContext
-              ? 'content.toolbar.future-frame-step-badge'
-              : 'frame-annotation.creation.step-badge'
-          }
-          disabled={props.disabled ?? false}
-          menuOpen={props.activeMenu === 'step-badge'}
-          menuRef={props.stepBadgeRef}
-          menu="step-badge"
-          resolveMenuDirection={props.resolveMenuDirection}
-          onMenuClick={props.onStepBadgeMenu}
-          onToggle={props.onToggleStepBadge}
-          title={translate('content.stepBadge.settingsTitle')}
-        >
-          <ListOrdered size={18} />
-        </CreationSplitButton>
-      ) : null}
+      {props.showCallout
+        ? renderControl(
+            'callout',
+            <CreationSplitButton
+              active={calloutActive}
+              dataUi={
+                props.contentContext
+                  ? 'content.toolbar.future-frame-callout'
+                  : 'frame-annotation.creation.callout'
+              }
+              disabled={props.disabled ?? false}
+              menuOpen={props.activeMenu === 'callout'}
+              menuRef={props.calloutRef}
+              menu="callout"
+              resolveMenuDirection={props.resolveMenuDirection}
+              onMenuClick={props.onCalloutMenu}
+              onToggle={props.onToggleCallout}
+              title={translate('content.callout.settingsTitle')}
+            >
+              <FrameCommentIcon size={18} />
+            </CreationSplitButton>
+          )
+        : null}
+      {props.showStepBadge
+        ? renderControl(
+            'step-badge',
+            <CreationSplitButton
+              active={stepBadgeActive}
+              dataUi={
+                props.contentContext
+                  ? 'content.toolbar.future-frame-step-badge'
+                  : 'frame-annotation.creation.step-badge'
+              }
+              disabled={props.disabled ?? false}
+              menuOpen={props.activeMenu === 'step-badge'}
+              menuRef={props.stepBadgeRef}
+              menu="step-badge"
+              resolveMenuDirection={props.resolveMenuDirection}
+              onMenuClick={props.onStepBadgeMenu}
+              onToggle={props.onToggleStepBadge}
+              title={translate('content.stepBadge.settingsTitle')}
+            >
+              <ListOrdered size={18} />
+            </CreationSplitButton>
+          )
+        : null}
     </div>
   );
 }

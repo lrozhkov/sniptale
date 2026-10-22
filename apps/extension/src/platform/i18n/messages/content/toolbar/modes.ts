@@ -11,6 +11,13 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  pageCustomizeControls: { ru: 'Настроить кнопки панели', en: 'Customize toolbar buttons' },
+  pageControlVisible: { ru: 'Показывать «{tool}» на панели', en: 'Show {tool} on the toolbar' },
+  pageShowHidden: { ru: 'Показать скрытые кнопки', en: 'Show hidden buttons' },
+  pageShowHiddenHint: {
+    ru: 'До закрытия панели. Сохранённые настройки не изменятся.',
+    en: 'Until the toolbar closes. Saved preferences stay unchanged.',
+  },
   recordingFadeToolbar: {
     ru: 'Приглушать панель при записи',
     en: 'Fade toolbar while recording',

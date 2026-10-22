@@ -12,6 +12,9 @@ import { ToolbarCaptureButtons } from './options';
 import { ToolbarSettingsMenu } from './settings';
 import { ToolbarCaptureMenuGroup } from './menu-group';
 import type { useToolbarCaptureMenus } from './use-menus';
+import { useContext } from 'react';
+import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageToolbarCustomizationDone } from './page-control-settings';
 
 function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
   const pinned = props.pinToTab || props.pinToTabLocked;
@@ -66,6 +69,13 @@ export function ToolbarCaptureActionGroup(
   }
 ) {
   const { menus, onSelectCaptureAction, ...captureProps } = props;
+  const visibility = useContext(PageToolbarControlsContext);
+  const capturesVisible =
+    !visibility ||
+    (['capture-visible', 'capture-selection', 'capture-full'] as const).some(visibility.isVisible);
+  const optionsVisible =
+    !visibility ||
+    (['after-capture', 'capture-delay', 'capture-size'] as const).some(visibility.isVisible);
 
   return (
     <>
@@ -73,24 +83,28 @@ export function ToolbarCaptureActionGroup(
         className="sniptale-capture-leading-divider"
         dataUi="content.toolbar.capture-leading-divider"
       />
-      <ContentToolbarGroup>
-        <ToolbarCaptureButtons
-          compactMenus={captureProps.compactMenus}
-          currentViewport={captureProps.currentViewport}
-          displayMode={captureProps.displayMode}
-          isLoading={captureProps.isLoading}
-          onTakeScreenshot={captureProps.onTakeScreenshot}
-          toolbarMenuState={captureProps.toolbarMenuState}
-        />
-      </ContentToolbarGroup>
-      <ContentToolbarDivider />
-      <ContentToolbarGroup>
-        <ToolbarCaptureMenuGroup
-          {...captureProps}
-          menus={menus}
-          onSelectCaptureAction={onSelectCaptureAction}
-        />
-      </ContentToolbarGroup>
+      {capturesVisible ? (
+        <ContentToolbarGroup>
+          <ToolbarCaptureButtons
+            compactMenus={captureProps.compactMenus}
+            currentViewport={captureProps.currentViewport}
+            displayMode={captureProps.displayMode}
+            isLoading={captureProps.isLoading}
+            onTakeScreenshot={captureProps.onTakeScreenshot}
+            toolbarMenuState={captureProps.toolbarMenuState}
+          />
+        </ContentToolbarGroup>
+      ) : null}
+      {capturesVisible && optionsVisible ? <ContentToolbarDivider /> : null}
+      {optionsVisible ? (
+        <ContentToolbarGroup>
+          <ToolbarCaptureMenuGroup
+            {...captureProps}
+            menus={menus}
+            onSelectCaptureAction={onSelectCaptureAction}
+          />
+        </ContentToolbarGroup>
+      ) : null}
       {!captureProps.videoRecordingMode &&
       (captureProps.screenshotMode ||
         captureProps.canClearPagePreparation ||
@@ -135,6 +149,7 @@ export function ToolbarCaptureActionGroup(
           onFreePlacementChange={captureProps.onFreePlacementChange}
           onPinToTabChange={captureProps.onPinToTabChange}
         />
+        <PageToolbarCustomizationDone onCloseMenus={menus.closeMenus} />
       </ContentToolbarGroup>
     </>
   );

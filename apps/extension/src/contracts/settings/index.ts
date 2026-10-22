@@ -86,7 +86,34 @@ export const RECORDING_TOOLBAR_CONTROLS = [
 ] as const;
 export type RecordingToolbarControl = (typeof RECORDING_TOOLBAR_CONTROLS)[number];
 
+export const PAGE_TOOLBAR_CONTROLS = [
+  'auto-blur',
+  'capture-visible',
+  'capture-selection',
+  'capture-full',
+  'after-capture',
+  'capture-delay',
+  'capture-size',
+  'drawing-pencil',
+  'drawing-marker',
+  'drawing-text',
+  'drawing-shape',
+  'drawing-arrow',
+  'drawing-blur',
+  'annotation-callout',
+  'annotation-step-badge',
+  'editing-direct-text',
+  'editing-ai',
+  'review-panel',
+  'review-measurements',
+  'review-layout-guides',
+  'review-export',
+] as const;
+export type PageToolbarControl = (typeof PAGE_TOOLBAR_CONTROLS)[number];
+
 export interface ContentToolbarPreferences {
+  /** Shared non-recording toolbar choices. Missing controls remain visible. */
+  pageControls?: Partial<Record<PageToolbarControl, boolean>>;
   cropMode?: 'drawing' | 'resize';
   /** Missing controls remain visible during recording. This does not enable their tools. */
   recordingControls?: Partial<Record<RecordingToolbarControl, boolean>>;

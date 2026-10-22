@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { CalloutSettings } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 import {
@@ -26,6 +26,9 @@ export type {
 } from './contracts';
 
 export function FrameAnnotationCreationControls(props: {
+  renderAnnotationControl?:
+    | ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode)
+    | undefined;
   activeMenu?: FrameAnnotationCreationMenu | null;
   allowInactiveFrameMenu?: boolean;
   context?: 'content' | 'editor';
@@ -128,6 +131,7 @@ export function FrameAnnotationCreationControls(props: {
         resolveMenuDirection={contentContext ? props.resolveMenuDirection : undefined}
       />
       <AnnotationCreationButtons
+        renderControl={props.renderAnnotationControl}
         activeMenu={activeMenu}
         calloutRef={calloutRef}
         contentContext={contentContext}

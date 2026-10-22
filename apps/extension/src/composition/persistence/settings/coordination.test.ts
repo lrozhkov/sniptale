@@ -106,6 +106,67 @@ it('merges visibility edits from independent pages after an in-flight write', as
   });
 });
 
+it('merges page controls from independent toolbars without replacing recording preferences', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: {
+      pageControls: { 'capture-delay': false },
+      recordingControls: { camera: false },
+    },
+  };
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const firstPage = await import('./index');
+  vi.resetModules();
+  const secondPage = await import('./index');
+  const first = firstPage.patchSettings({
+    contentToolbar: { pageControls: { 'drawing-pencil': false } },
+  });
+  await entered.promise;
+  const second = secondPage.patchSettings({
+    contentToolbar: { pageControls: { 'review-panel': false } },
+  });
+  releaseWrite.release();
+  await Promise.all([first, second]);
+  expect((await secondPage.loadSettings()).contentToolbar).toMatchObject({
+    pageControls: { 'capture-delay': false, 'drawing-pencil': false, 'review-panel': false },
+    recordingControls: { camera: false },
+  });
+});
+
+it('orders page visibility reset and a later choice without resurrecting hidden controls', async () => {
+  let persisted: Record<string, unknown> = {};
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const first = page.patchSettings({
+    contentToolbar: { pageControls: { 'drawing-pencil': false } },
+  });
+  await entered.promise;
+  const reset = page.resetSettingsToDefaults();
+  const next = page.patchSettings({ contentToolbar: { pageControls: { 'capture-size': false } } });
+  releaseWrite.release();
+  await Promise.all([first, reset, next]);
+  expect((await page.loadSettings()).contentToolbar?.pageControls).toEqual({
+    'capture-size': false,
+  });
+});
+
 it('orders visibility write, reset, and a new choice without restoring a stale map', async () => {
   let persisted: Record<string, unknown> = {};
   const entered = controlledGate();

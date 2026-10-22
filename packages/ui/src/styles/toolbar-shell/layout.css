@@ -23,6 +23,11 @@
   user-select: none;
 }
 
+.sniptale-toolbar[data-page-controls='true'] > .sniptale-divider + .sniptale-divider,
+.sniptale-toolbar[data-page-controls='true'] .sniptale-toolbar-annotation-group:empty {
+  display: none;
+}
+
 /* Runtime recording snapshots may rebind the visible projection. Replaying the
  * fractional shell scale makes one-pixel split-control borders visibly uneven. */
 .sniptale-toolbar[data-video-recording='true'] {

@@ -1,6 +1,7 @@
 import {
   CONTENT_TOOLBAR_DOCK_EDGES,
   RECORDING_TOOLBAR_CONTROLS,
+  PAGE_TOOLBAR_CONTROLS,
 } from '../../../contracts/settings';
 import type {
   CaptureActionType,
@@ -107,6 +108,24 @@ function parseOptionalImageFormat(value: unknown): ParsedFieldValue<Settings['im
     : INVALID_FIELD;
 }
 
+function parseToolbarControls<Control extends string>(
+  value: unknown,
+  allowed: readonly Control[]
+): ParsedFieldValue<Partial<Record<Control, boolean>>> {
+  if (value === undefined) return undefined;
+  if (!isPlainRecord(value)) return INVALID_FIELD;
+  if (Object.keys(value).some((key) => !allowed.some((control) => control === key)))
+    return INVALID_FIELD;
+  const parsed: Partial<Record<Control, boolean>> = {};
+  for (const control of allowed) {
+    const visible = value[control];
+    if (visible === undefined) continue;
+    if (!isBoolean(visible)) return INVALID_FIELD;
+    parsed[control] = visible;
+  }
+  return parsed;
+}
+
 function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentToolbarPreferences> {
   if (value === undefined) {
     return undefined;
@@ -124,23 +143,12 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   const freePlacement = value['freePlacement'];
   const fadeDuringRecording = value['fadeDuringRecording'];
   if (fadeDuringRecording !== undefined && !isBoolean(fadeDuringRecording)) return INVALID_FIELD;
-  const rawRecordingControls = value['recordingControls'];
-  const recordingControls: NonNullable<ContentToolbarPreferences['recordingControls']> = {};
-  if (rawRecordingControls !== undefined) {
-    if (!isPlainRecord(rawRecordingControls)) return INVALID_FIELD;
-    if (
-      Object.keys(rawRecordingControls).some(
-        (key) => !RECORDING_TOOLBAR_CONTROLS.some((control) => control === key)
-      )
-    )
-      return INVALID_FIELD;
-    for (const control of RECORDING_TOOLBAR_CONTROLS) {
-      const visible = rawRecordingControls[control];
-      if (visible === undefined) continue;
-      if (!isBoolean(visible)) return INVALID_FIELD;
-      recordingControls[control] = visible;
-    }
-  }
+  const pageControls = parseToolbarControls(value['pageControls'], PAGE_TOOLBAR_CONTROLS);
+  const recordingControls = parseToolbarControls(
+    value['recordingControls'],
+    RECORDING_TOOLBAR_CONTROLS
+  );
+  if (pageControls === INVALID_FIELD || recordingControls === INVALID_FIELD) return INVALID_FIELD;
   const cropMode = value['cropMode'];
   if (cropMode !== undefined && cropMode !== 'drawing' && cropMode !== 'resize')
     return INVALID_FIELD;
@@ -165,7 +173,8 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
         };
 
   return {
-    ...(rawRecordingControls === undefined ? {} : { recordingControls }),
+    ...(recordingControls === undefined ? {} : { recordingControls }),
+    ...(pageControls === undefined ? {} : { pageControls }),
     ...(fadeDuringRecording === undefined ? {} : { fadeDuringRecording }),
     ...(cropMode === undefined ? {} : { cropMode }),
     ...(freePlacement === undefined ? {} : { freePlacement }),

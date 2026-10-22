@@ -130,6 +130,7 @@ function cloneContentToolbarSettings(
   return {
     ...settings,
     ...(settings.recordingControls ? { recordingControls: { ...settings.recordingControls } } : {}),
+    ...(settings.pageControls ? { pageControls: { ...settings.pageControls } } : {}),
     position: settings.position ? { ...settings.position } : null,
   };
 }
@@ -433,6 +434,14 @@ function applySettingsPatch(
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...currentSettings.contentToolbar,
       ...settingsPatch.contentToolbar,
+      ...(currentSettings.contentToolbar?.pageControls || settingsPatch.contentToolbar?.pageControls
+        ? {
+            pageControls: {
+              ...currentSettings.contentToolbar?.pageControls,
+              ...settingsPatch.contentToolbar?.pageControls,
+            },
+          }
+        : {}),
       ...(currentSettings.contentToolbar?.recordingControls ||
       settingsPatch.contentToolbar?.recordingControls
         ? {

@@ -35,6 +35,7 @@ import { getToolbarMenuPosition } from '../menu/position';
 import { useToolbarMenuDirection } from '../menu/direction';
 import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
+import { PageControlVisibility } from './control-visibility';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
@@ -341,7 +342,7 @@ function PageEditingModeButton(props: {
 }) {
   const copy = getPageEditingModeCopy(props.mode);
 
-  return (
+  const control = (
     <ContentToolbarButton
       type="button"
       active={props.active}
@@ -359,6 +360,17 @@ function PageEditingModeButton(props: {
     >
       {getPageEditingModeIcon(props.mode)}
     </ContentToolbarButton>
+  );
+  return props.mode === 'block-selection' ? (
+    control
+  ) : (
+    <PageControlVisibility
+      control={props.mode === 'ai' ? 'editing-ai' : 'editing-direct-text'}
+      icon={getPageEditingModeIcon(props.mode)}
+      label={copy.label}
+    >
+      {control}
+    </PageControlVisibility>
   );
 }
 
