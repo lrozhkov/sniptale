@@ -48,18 +48,26 @@ export function PageControlVisibility(props: {
           void preferences.setVisible(props.control, !visible);
         }}
       >
-        <Indicator
-          size={10}
-          style={{ width: 10, height: 10 }}
-          className="absolute bottom-0 right-0 text-[var(--sniptale-color-text-secondary)]"
-        />
-        {overridden ? (
-          <span
-            aria-hidden="true"
-            data-ui="content.toolbar.visibility-override"
-            className="absolute left-0 top-0 h-1 w-1 rounded-full bg-[var(--sniptale-color-text-secondary)]"
+        <span
+          className="relative inline-flex shrink-0"
+          style={{
+            width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+            height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+          }}
+        >
+          <Indicator
+            size={10}
+            style={{ width: 10, height: 10 }}
+            className="absolute bottom-0 right-0 text-[var(--sniptale-color-text-secondary)]"
           />
-        ) : null}
+          {overridden ? (
+            <span
+              aria-hidden="true"
+              data-ui="content.toolbar.visibility-override"
+              className="absolute left-0 top-0 h-1 w-1 rounded-full bg-[var(--sniptale-color-text-secondary)]"
+            />
+          ) : null}
+        </span>
       </ContentToolbarButton>
     </div>
   );

@@ -10,6 +10,23 @@ import { translate } from '../../../../platform/i18n';
 
 type Controls = NonNullable<ContentToolbarPreferences['pageControls']>;
 
+const NAVIGATION_CONTROLS: readonly PageToolbarControl[] = [
+  'auto-blur',
+  'capture-visible',
+  'capture-selection',
+  'capture-full',
+  'after-capture',
+  'capture-delay',
+  'capture-size',
+];
+const MODE_CONTROL_PREFIX: Record<PageToolbarMode, string | null> = {
+  cursor: null,
+  drawing: 'drawing-',
+  highlighter: 'annotation-',
+  'quick-edit': 'editing-',
+  'design-review': 'review-',
+};
+
 /** Owns persistent visibility and disposable customization for one mounted page toolbar. */
 export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode = 'cursor') {
   const [controls, setControls] = useState<Controls>({});
@@ -84,6 +101,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
     }
   };
   const modeOverrides = mode === 'cursor' ? undefined : overrides[mode];
+  const modePrefix = MODE_CONTROL_PREFIX[mode];
   const effectiveControls = { ...controls };
   for (const control of PAGE_TOOLBAR_CONTROLS) {
     const choice = modeOverrides?.[control];
@@ -92,8 +110,17 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
   return {
     controls: effectiveControls,
     mode,
-    hasOverrides: Object.values(modeOverrides ?? {}).some((choice) => typeof choice === 'boolean'),
-    isOverridden: (control: PageToolbarControl) => typeof modeOverrides?.[control] === 'boolean',
+    hasOverrides: NAVIGATION_CONTROLS.some(
+      (control) => typeof modeOverrides?.[control] === 'boolean'
+    ),
+    hasHidden: PAGE_TOOLBAR_CONTROLS.some(
+      (control) =>
+        effectiveControls[control] === false &&
+        (NAVIGATION_CONTROLS.includes(control) ||
+          (modePrefix !== null && control.startsWith(modePrefix)))
+    ),
+    isOverridden: (control: PageToolbarControl) =>
+      NAVIGATION_CONTROLS.includes(control) && typeof modeOverrides?.[control] === 'boolean',
     editing: enabled && editing,
     revealed: enabled && revealed,
     ready,
@@ -111,7 +138,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
         ? Promise.resolve()
         : setPreferences({
             pageControlOverrides: {
-              [mode]: Object.fromEntries(PAGE_TOOLBAR_CONTROLS.map((control) => [control, null])),
+              [mode]: Object.fromEntries(NAVIGATION_CONTROLS.map((control) => [control, null])),
             },
           }),
     isVisible: (control: PageToolbarControl) =>

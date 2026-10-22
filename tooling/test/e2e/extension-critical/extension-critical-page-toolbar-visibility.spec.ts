@@ -33,9 +33,23 @@ async function hide(page: Page, control: string) {
     observer.observe(root, { attributes: true, subtree: true, attributeFilter: ['disabled'] });
     Reflect.set(root, '__visibilityProof', { buttons, changes, observer });
   });
-  await button.click();
+  await button.hover();
+  await page.mouse.down();
+  await expect(button).toHaveAttribute('data-pressing', 'true');
+  await expect(button.locator(':scope > .sniptale-command-content')).toHaveCSS(
+    'transform',
+    'matrix(1, 0, 0, 1, 0, 1)'
+  );
+  await expect
+    .poll(async () => {
+      const pressed = (await indicator.boundingBox())!;
+      return Math.abs(pressed.x - before!.x) <= 0.5 && Math.abs(pressed.y - before!.y) <= 1.1;
+    })
+    .toBe(true);
+  await page.mouse.up();
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   await expect(button).toBeEnabled();
+  await expect(button.locator(':scope > .sniptale-command-content')).toHaveCSS('transform', 'none');
   const after = await indicator.boundingBox();
   expect(Math.abs(after!.x - before!.x)).toBeLessThanOrEqual(0.5);
   expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(0.5);
@@ -86,10 +100,10 @@ async function verifyOverrideReset(page: Page) {
   await expect(ui(page, 'capture-full-button')).toBeVisible();
   await ui(page, 'settings-button').click();
   await ui(page, 'settings.inherit-buttons').click();
-  await expect(ui(page, 'settings.inherit-buttons')).toBeDisabled();
+  await expect(ui(page, 'settings.inherit-buttons')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(ui(page, 'capture-full-button')).toHaveCount(0);
-  await expect(ui(page, 'drawing.pencil')).toBeVisible();
+  await expect(ui(page, 'drawing.pencil')).toHaveCount(0);
   await mode(page, 'highlighter');
   await expect(ui(page, 'future-frame-callout')).toHaveCount(0);
   await mode(page, 'cursor');
@@ -148,10 +162,14 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(ui(page, 'navigation.collapse')).toBeDisabled();
         await ui(page, 'customize-done').click();
         await ui(page, 'settings-button').click();
-        await ui(page, 'settings.show-hidden-buttons').focus();
-        await page.keyboard.press('Enter');
+        await expect(ui(page, 'settings.show-hidden-buttons')).toHaveCount(0);
+        await expect(ui(page, 'settings.inherit-buttons')).toHaveCount(0);
+        expect(
+          await ui(page, 'settings.customize-buttons').evaluate((element) =>
+            element.previousElementSibling?.classList.contains('sniptale-popover-divider')
+          )
+        ).toBe(true);
         await expect(ui(page, 'customize-done')).toHaveCount(0);
-        await expect(ui(page, 'settings.show-hidden-buttons')).toBeVisible();
         await page.keyboard.press('Escape');
         await customize(page);
         await page.setViewportSize({ width: 1000, height: size.height });
@@ -211,6 +229,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           )
         ).toBeVisible();
         await hide(page, 'drawing-pencil');
+        await expect(
+          ui(page, 'visibility.drawing-pencil').locator(
+            '[data-ui="content.toolbar.visibility-override"]'
+          )
+        ).toHaveCount(0);
         await ui(page, 'customize-done').click();
         await expect(ui(page, 'drawing.pencil')).toHaveCount(0);
         await expect(ui(page, 'drawing.select')).toBeVisible();
@@ -237,7 +260,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await verifyOverrideReset(page);
         await expectSeparators(page);
         await ui(page, 'settings-button').click();
-        await ui(page, 'settings.show-hidden-buttons').click();
+        await ui(page, 'settings.show-hidden-buttons').focus();
+        await page.keyboard.press('Enter');
         await page.keyboard.press('Escape');
         await expect(ui(page, 'timer-button')).toBeVisible();
         await ui(page, 'timer-button').click();

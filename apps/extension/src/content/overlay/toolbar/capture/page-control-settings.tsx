@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import eyeCogIcon from '@iconify-icons/tabler/eye-cog';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
+  ProductToolbarMenuDivider,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
@@ -19,6 +20,7 @@ export function PageToolbarCustomizationSettings(props: {
   if (!preferences) return null;
   return (
     <>
+      <ProductToolbarMenuDivider />
       <ProductToolbarMenuItem
         dataUi="content.toolbar.settings.customize-buttons"
         disabled={!preferences.ready || preferences.pending}
@@ -35,26 +37,28 @@ export function PageToolbarCustomizationSettings(props: {
             : { hint: translate('content.toolbar.pageCustomizeControlsHint') })}
         />
       </ProductToolbarMenuItem>
-      <ProductToolbarMenuItem
-        dataUi="content.toolbar.settings.show-hidden-buttons"
-        selected={preferences.revealed}
-        ariaPressed={preferences.revealed}
-        disabled={!preferences.ready || preferences.pending}
-        onClick={() => {
-          preferences.toggleRevealed();
-        }}
-      >
-        <Eye className="sniptale-popover-icon" />
-        <ProductToolbarMenuItemCopy
-          label={translate('content.toolbar.pageShowHidden')}
-          hint={translate('content.toolbar.pageShowHiddenHint')}
-        />
-        {preferences.revealed ? <PopoverCheckIcon /> : null}
-      </ProductToolbarMenuItem>
-      {preferences.mode !== 'cursor' ? (
+      {preferences.hasHidden ? (
+        <ProductToolbarMenuItem
+          dataUi="content.toolbar.settings.show-hidden-buttons"
+          selected={preferences.revealed}
+          ariaPressed={preferences.revealed}
+          disabled={!preferences.ready || preferences.pending}
+          onClick={() => {
+            preferences.toggleRevealed();
+          }}
+        >
+          <Eye className="sniptale-popover-icon" />
+          <ProductToolbarMenuItemCopy
+            label={translate('content.toolbar.pageShowHidden')}
+            hint={translate('content.toolbar.pageShowHiddenHint')}
+          />
+          {preferences.revealed ? <PopoverCheckIcon /> : null}
+        </ProductToolbarMenuItem>
+      ) : null}
+      {preferences.mode !== 'cursor' && preferences.hasOverrides ? (
         <ProductToolbarMenuItem
           dataUi="content.toolbar.settings.inherit-buttons"
-          disabled={!preferences.hasOverrides || preferences.pending}
+          disabled={preferences.pending}
           onClick={() => void preferences.resetOverrides()}
         >
           <Undo2 className="sniptale-popover-icon" />

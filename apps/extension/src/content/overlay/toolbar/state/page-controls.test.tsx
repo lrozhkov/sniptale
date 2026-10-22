@@ -31,6 +31,79 @@ function Harness(props: { enabled: boolean; mode?: PageToolbarMode }) {
   return null;
 }
 
+it('omits reveal and inheritance actions when the current mode has no applicable choices', async () => {
+  const defaults = createDefaultSettings();
+  persistence.load.mockResolvedValueOnce({
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageControls: {},
+      pageControlOverrides: { drawing: { 'drawing-pencil': false } },
+    },
+  });
+  function SettingsHarness(props: { mode: PageToolbarMode }) {
+    controls = usePageToolbarControls(true, props.mode);
+    return (
+      <PageToolbarControlsContext.Provider value={controls}>
+        <PageToolbarCustomizationSettings onClose={() => undefined} />
+      </PageToolbarControlsContext.Provider>
+    );
+  }
+  const item = (name: string) => host.querySelector(`[data-ui="content.toolbar.settings.${name}"]`);
+  await act(async () => root.render(<SettingsHarness mode="cursor" />));
+  expect(item('show-hidden-buttons')).toBeNull();
+  expect(item('inherit-buttons')).toBeNull();
+  expect(
+    item('customize-buttons')?.previousElementSibling?.classList.contains(
+      'sniptale-popover-divider'
+    )
+  ).toBe(true);
+  await act(async () => root.render(<SettingsHarness mode="drawing" />));
+  expect(item('show-hidden-buttons')).not.toBeNull();
+  expect(item('inherit-buttons')).toBeNull();
+  expect(controls.isOverridden('drawing-pencil')).toBe(false);
+  act(() => controls.toggleRevealed());
+  expect(item('show-hidden-buttons')).not.toBeNull();
+  expect(controls.isVisible('drawing-pencil')).toBe(true);
+});
+
+it.each([
+  ['drawing', 'drawing-pencil'],
+  ['highlighter', 'annotation-callout'],
+  ['quick-edit', 'editing-ai'],
+  ['design-review', 'review-export'],
+] as const)(
+  'preserves %s tools when restoring only shared navigation choices',
+  async (mode, tool) => {
+    const defaults = createDefaultSettings();
+    const toolbar = {
+      ...defaults.contentToolbar!,
+      pageControls: {},
+      pageControlOverrides: { [mode]: { [tool]: false, 'capture-full': true } },
+    };
+    persistence.load.mockResolvedValueOnce({ ...defaults, contentToolbar: toolbar });
+    await act(async () => root.render(<Harness enabled mode={mode} />));
+    expect(controls.hasOverrides).toBe(true);
+    expect(controls.isOverridden(tool)).toBe(false);
+    expect(controls.hasHidden).toBe(true);
+    persistence.patch.mockResolvedValueOnce({
+      ...defaults,
+      contentToolbar: {
+        ...toolbar,
+        pageControlOverrides: { [mode]: { [tool]: false, 'capture-full': null } },
+      },
+    });
+    await act(async () => controls.resetOverrides());
+    const reset =
+      persistence.patch.mock.calls.at(-1)![0].contentToolbar!.pageControlOverrides![mode]!;
+    expect(Object.keys(reset)).toHaveLength(7);
+    expect(reset[tool]).toBeUndefined();
+    expect(reset['capture-full']).toBeNull();
+    expect(controls.isVisible(tool)).toBe(false);
+    expect(controls.hasOverrides).toBe(false);
+  }
+);
+
 it('uses native disabled semantics for required controls only while customizing', async () => {
   function ProtectedHarness() {
     controls = usePageToolbarControls(true);
