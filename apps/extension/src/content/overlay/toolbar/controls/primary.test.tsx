@@ -5,6 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarPrimaryControls } from './primary';
 import { useToolbarMenuState } from '../state/menu';
+import {
+  RecordingToolbarControlsContext,
+  type useRecordingToolbarControls,
+} from '../state/recording-controls';
 
 vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/browser/runtime')>()),
@@ -161,7 +165,10 @@ function createToolbarPrimaryControlsProps(params?: ToolbarPrimaryFixtureParams)
   };
 }
 
-function renderToolbarPrimaryControls(props: ToolbarPrimaryHarnessProps) {
+function renderToolbarPrimaryControls(
+  props: ToolbarPrimaryHarnessProps,
+  visibility: ReturnType<typeof useRecordingToolbarControls> | null = null
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -169,7 +176,11 @@ function renderToolbarPrimaryControls(props: ToolbarPrimaryHarnessProps) {
   }
 
   act(() => {
-    root?.render(<ToolbarPrimaryControlsHarness {...props} />);
+    root?.render(
+      <RecordingToolbarControlsContext.Provider value={visibility}>
+        <ToolbarPrimaryControlsHarness {...props} />
+      </RecordingToolbarControlsContext.Provider>
+    );
   });
 }
 
@@ -219,6 +230,27 @@ function expectModeMenuIcon(mode: 'quick-edit'): void {
 }
 
 describe('ToolbarPrimaryControls', () => {
+  it('disables the mode selector during customization and removes it during recording', () => {
+    const fixture = createToolbarPrimaryControlsProps();
+    const visibility: ReturnType<typeof useRecordingToolbarControls> = {
+      active: false,
+      controls: {},
+      editing: true,
+      error: null,
+      pending: false,
+      ready: true,
+      reload: vi.fn(async () => undefined),
+      setVisible: vi.fn(async () => undefined),
+      toggleEditing: vi.fn(),
+    };
+    renderToolbarPrimaryControls(fixture.props, visibility);
+    expect(queryModeSelectorButton()?.matches(':disabled')).toBe(true);
+    renderToolbarPrimaryControls(fixture.props, { ...visibility, active: true, editing: false });
+    expect(queryModeSelectorButton()).toBeNull();
+    renderToolbarPrimaryControls(fixture.props, { ...visibility, editing: false });
+    expect(queryModeSelectorButton()?.matches(':disabled')).toBe(false);
+  });
+
   it('shows the selected mode without a persistent active frame', async () => {
     const inactive = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(inactive.props);

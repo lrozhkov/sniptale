@@ -129,6 +129,7 @@ function cloneContentToolbarSettings(
 ): ContentToolbarPreferences {
   return {
     ...settings,
+    ...(settings.recordingControls ? { recordingControls: { ...settings.recordingControls } } : {}),
     position: settings.position ? { ...settings.position } : null,
   };
 }
@@ -432,6 +433,15 @@ function applySettingsPatch(
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...currentSettings.contentToolbar,
       ...settingsPatch.contentToolbar,
+      ...(currentSettings.contentToolbar?.recordingControls ||
+      settingsPatch.contentToolbar?.recordingControls
+        ? {
+            recordingControls: {
+              ...currentSettings.contentToolbar?.recordingControls,
+              ...settingsPatch.contentToolbar?.recordingControls,
+            },
+          }
+        : {}),
     },
     contextMenu: {
       ...currentSettings.contextMenu,

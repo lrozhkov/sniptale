@@ -8,6 +8,7 @@ import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { useToolbarEventDeliveryDiagnostics } from './event-diagnostics';
 import { useContentUiScale } from '../../../platform/dom-host';
+import { RecordingToolbarControlsProvider } from '../video-recording/control-visibility';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -142,12 +143,21 @@ export function ToolbarShellContent(props: {
               </svg>
             </ContentToolbarDragHandle>
 
-            <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-            <ToolbarSecondaryControls
-              toolbarProps={toolbarProps}
-              viewModel={viewModel}
-              onViewportChange={onViewportChange}
-            />
+            <RecordingToolbarControlsProvider
+              enabled={toolbarProps.videoRecordingMode ?? false}
+              active={Boolean(
+                toolbarProps.videoRecording &&
+                toolbarProps.videoRecording.state.phase !== 'idle' &&
+                toolbarProps.videoRecording.state.phase !== 'error'
+              )}
+            >
+              <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+              <ToolbarSecondaryControls
+                toolbarProps={toolbarProps}
+                viewModel={viewModel}
+                onViewportChange={onViewportChange}
+              />
+            </RecordingToolbarControlsProvider>
           </ContentToolbarShell>
         </CommandPressScope>
       </div>

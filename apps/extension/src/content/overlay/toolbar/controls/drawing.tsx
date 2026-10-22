@@ -7,7 +7,7 @@ import {
   Type,
   ArrowUpRight,
 } from 'lucide-react';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useId, useRef, useState, type ReactNode } from 'react';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -77,6 +77,12 @@ export interface ToolbarDrawingControlsOwner {
   readonly persistOptionsDisclosure?: boolean;
   readonly tools?: readonly DrawingTool[];
   onToolActivated(tool: DrawingTool): void;
+  renderToolControl?(params: {
+    tool: DrawingTool;
+    control: ReactNode;
+    icon: typeof PenLine;
+    label: string;
+  }): ReactNode;
   renderLeadingControls?(snapshot: DrawingSessionSnapshot): ReactNode;
   renderTrailingControls?(snapshot: DrawingSessionSnapshot): ReactNode;
   renderActions?(snapshot: DrawingSessionSnapshot): ReactNode;
@@ -196,42 +202,52 @@ export function ToolbarDrawingControls(props: {
         dataUi="content.toolbar.drawing-tools-group"
       >
         {props.owner?.renderLeadingControls?.(snapshot)}
-        {visibleTools.map(({ tool, icon, label, modifierHint }) => (
-          <DrawingToolControl
-            key={tool}
-            {...(props.owner?.resolveMenuLayout
-              ? { resolveMenuLayout: props.owner.resolveMenuLayout }
-              : {})}
-            {...(props.owner?.preferredMenuPlacement
-              ? { preferredMenuPlacement: props.owner.preferredMenuPlacement }
-              : {})}
-            controller={controller}
-            displayMode={props.displayMode}
-            icon={icon}
-            label={label}
-            modifierHint={modifierHint}
-            optionsTool={optionsTool}
-            showOptions={
-              optionsAnchorTool === tool &&
-              collapsedOptionsTool !== tool &&
-              !(props.owner?.persistOptionsDisclosure && optionsSuppressed)
-            }
-            snapshot={snapshot}
-            tool={tool}
-            active={activeTool === tool}
-            {...(props.owner?.onToolActivated ? { onActivated: props.owner.onToolActivated } : {})}
-            onActivateTool={() => {
-              if (!props.owner?.persistOptionsDisclosure) setCollapsedOptionsTool(null);
-            }}
-            onToggleOptions={() => {
-              if (props.owner?.persistOptionsDisclosure) {
-                setOptionsSuppressed((current) => !current);
-              } else {
-                setCollapsedOptionsTool((current) => (current === tool ? null : tool));
+        {visibleTools.map(({ tool, icon, label, modifierHint }) => {
+          const control = (
+            <DrawingToolControl
+              {...(props.owner?.resolveMenuLayout
+                ? { resolveMenuLayout: props.owner.resolveMenuLayout }
+                : {})}
+              {...(props.owner?.preferredMenuPlacement
+                ? { preferredMenuPlacement: props.owner.preferredMenuPlacement }
+                : {})}
+              controller={controller}
+              displayMode={props.displayMode}
+              icon={icon}
+              label={label}
+              modifierHint={modifierHint}
+              optionsTool={optionsTool}
+              showOptions={
+                optionsAnchorTool === tool &&
+                collapsedOptionsTool !== tool &&
+                !(props.owner?.persistOptionsDisclosure && optionsSuppressed)
               }
-            }}
-          />
-        ))}
+              snapshot={snapshot}
+              tool={tool}
+              active={activeTool === tool}
+              {...(props.owner?.onToolActivated
+                ? { onActivated: props.owner.onToolActivated }
+                : {})}
+              onActivateTool={() => {
+                if (!props.owner?.persistOptionsDisclosure) setCollapsedOptionsTool(null);
+              }}
+              onToggleOptions={() => {
+                if (props.owner?.persistOptionsDisclosure) {
+                  setOptionsSuppressed((current) => !current);
+                } else {
+                  setCollapsedOptionsTool((current) => (current === tool ? null : tool));
+                }
+              }}
+            />
+          );
+          return (
+            <Fragment key={tool}>
+              {props.owner?.renderToolControl
+                ? props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
+                : control}
+            </Fragment>
+          );
+        })}
         {props.owner?.renderTrailingControls?.(snapshot)}
       </ContentToolbarGroup>
       {props.owner?.showActions === false || !props.owner?.renderActions ? null : (

@@ -1,5 +1,5 @@
 import { BrushCleaning, Clock3, Eraser, Touchpad, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
@@ -19,6 +19,8 @@ import {
   type RecordingDrawingOwner,
 } from './drawing-session';
 import type { ToolbarMenuState } from '../state/menu';
+import { RecordingToolbarControlsContext } from '../state/recording-controls';
+import { RecordingControlVisibility } from './control-visibility';
 
 export type RecordingDrawingInteractionMode = 'navigation' | 'eraser' | DrawingTool;
 
@@ -165,19 +167,11 @@ function AutoHideControl(props: {
   );
 }
 
-export function RecordingDrawingControls(props: {
-  actionTail?: ReactNode;
-  compactMenus: boolean;
-  disabled?: boolean;
-  displayMode: 'horizontal' | 'vertical';
-  interactionMode: RecordingDrawingInteractionMode;
-  owner: RecordingDrawingOwner;
-  toolbarMenuState?: ToolbarMenuState;
-  onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
-  onInteractionModeChange(mode: RecordingDrawingInteractionMode): void;
-}) {
-  const { disabled, interactionMode, owner } = props;
-
+function useRecordingEraser(
+  owner: RecordingDrawingOwner,
+  interactionMode: RecordingDrawingInteractionMode,
+  disabled: boolean | undefined
+) {
   useEffect(() => {
     if (disabled || interactionMode !== 'eraser') return;
     let pointerId: number | null = null;
@@ -225,6 +219,21 @@ export function RecordingDrawingControls(props: {
       document.removeEventListener('pointerup', up, true);
     };
   }, [disabled, interactionMode, owner]);
+}
+
+export function RecordingDrawingControls(props: {
+  actionTail?: ReactNode;
+  compactMenus: boolean;
+  disabled?: boolean;
+  displayMode: 'horizontal' | 'vertical';
+  interactionMode: RecordingDrawingInteractionMode;
+  owner: RecordingDrawingOwner;
+  toolbarMenuState?: ToolbarMenuState;
+  onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
+  onInteractionModeChange(mode: RecordingDrawingInteractionMode): void;
+}) {
+  const visibility = useContext(RecordingToolbarControlsContext);
+  useRecordingEraser(props.owner, props.interactionMode, props.disabled);
 
   const activateNavigation = () => {
     props.owner.controller.finalizeInteraction();
@@ -240,10 +249,17 @@ export function RecordingDrawingControls(props: {
     activeTool: isDrawingTool(props.interactionMode) ? props.interactionMode : null,
     persistOptionsDisclosure: true,
     tools: DRAWING_TOOLS,
-    // Recording lifecycle transitions return interaction to Navigation. Keep
-    // these meaningful actions mounted so the canonical shell does not resize.
-    showActions: true,
+    showActions:
+      !visibility?.active ||
+      (['eraser', 'clear', 'cursor'] as const).some(
+        (control) => visibility.controls[control] !== false
+      ),
     onToolActivated: props.onInteractionModeChange,
+    renderToolControl: ({ tool, control, icon, label }) => (
+      <RecordingControlVisibility control={tool} icon={icon} label={label}>
+        {control}
+      </RecordingControlVisibility>
+    ),
     renderLeadingControls: () => (
       <InteractionButton
         active={props.interactionMode === 'navigation'}
@@ -255,33 +271,49 @@ export function RecordingDrawingControls(props: {
     ),
     renderActions: (snapshot: DrawingSessionSnapshot) => (
       <>
-        <AutoHideControl
-          compactMenus={props.compactMenus}
-          delay={props.owner.getAutoHideDelay()}
-          displayMode={props.displayMode}
-          onChange={(delay) => {
-            void props.onAutoHideDelayChange?.(delay);
-          }}
-          {...(props.toolbarMenuState ? { toolbarMenuState: props.toolbarMenuState } : {})}
-        />
-        <InteractionButton
-          active={props.interactionMode === 'eraser'}
-          dataUi="content.toolbar.video-recording.eraser"
+        {!visibility?.active ? (
+          <fieldset disabled={visibility?.editing} className="contents">
+            <AutoHideControl
+              compactMenus={props.compactMenus}
+              delay={props.owner.getAutoHideDelay()}
+              displayMode={props.displayMode}
+              onChange={(delay) => {
+                void props.onAutoHideDelayChange?.(delay);
+              }}
+              {...(props.toolbarMenuState ? { toolbarMenuState: props.toolbarMenuState } : {})}
+            />
+          </fieldset>
+        ) : null}
+        <RecordingControlVisibility
+          control="eraser"
           icon={Eraser}
           label={translate('content.toolbar.recordingDrawingEraser')}
-          onClick={activateEraser}
-        />
-        <ContentToolbarButton
-          type="button"
-          tone="danger"
-          disabled={snapshot.document.objects.length === 0}
-          aria-label={translate('content.toolbar.drawingClear')}
-          title={translate('content.toolbar.drawingClear')}
-          dataUi="content.toolbar.video-recording.clear"
-          onClick={() => props.owner.controller.session.clear()}
         >
-          <BrushCleaning size={18} strokeWidth={2} />
-        </ContentToolbarButton>
+          <InteractionButton
+            active={props.interactionMode === 'eraser'}
+            dataUi="content.toolbar.video-recording.eraser"
+            icon={Eraser}
+            label={translate('content.toolbar.recordingDrawingEraser')}
+            onClick={activateEraser}
+          />
+        </RecordingControlVisibility>
+        <RecordingControlVisibility
+          control="clear"
+          icon={BrushCleaning}
+          label={translate('content.toolbar.drawingClear')}
+        >
+          <ContentToolbarButton
+            type="button"
+            tone="danger"
+            disabled={snapshot.document.objects.length === 0}
+            aria-label={translate('content.toolbar.drawingClear')}
+            title={translate('content.toolbar.drawingClear')}
+            dataUi="content.toolbar.video-recording.clear"
+            onClick={() => props.owner.controller.session.clear()}
+          >
+            <BrushCleaning size={18} strokeWidth={2} />
+          </ContentToolbarButton>
+        </RecordingControlVisibility>
         {props.actionTail}
       </>
     ),

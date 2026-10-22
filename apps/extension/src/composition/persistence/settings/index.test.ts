@@ -70,7 +70,7 @@ const DEFAULT_CONTEXT_MENU = {
   showVideoEditor: false,
   showGallery: true,
   showPageLinkCopy: true,
-  showWindowResize: false,
+  showWindowResize: true,
   showSettings: true,
 };
 const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
@@ -523,7 +523,7 @@ const expectedInvalidStoredSettingsResult = {
     showVideoEditor: false,
     showGallery: true,
     showPageLinkCopy: true,
-    showWindowResize: false,
+    showWindowResize: true,
     showSettings: false,
   },
   saveCapturesToGallery: true,

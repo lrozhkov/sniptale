@@ -1,4 +1,7 @@
-import { CONTENT_TOOLBAR_DOCK_EDGES } from '../../../contracts/settings';
+import {
+  CONTENT_TOOLBAR_DOCK_EDGES,
+  RECORDING_TOOLBAR_CONTROLS,
+} from '../../../contracts/settings';
 import type {
   CaptureActionType,
   ContentToolbarDisplayMode,
@@ -16,7 +19,13 @@ import {
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { parseVoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
-import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
+import {
+  isBoolean,
+  isNumber,
+  isPlainRecord,
+  isRecord,
+  isString,
+} from '../infrastructure/guards/primitives';
 import { parseSavePresets, parseViewportPresets } from './array.guards.ts';
 import { assignParsedContextMenuSettings } from './context-menu.guards.ts';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../library-lifecycle/policy';
@@ -113,6 +122,23 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   }
 
   const freePlacement = value['freePlacement'];
+  const rawRecordingControls = value['recordingControls'];
+  const recordingControls: NonNullable<ContentToolbarPreferences['recordingControls']> = {};
+  if (rawRecordingControls !== undefined) {
+    if (!isPlainRecord(rawRecordingControls)) return INVALID_FIELD;
+    if (
+      Object.keys(rawRecordingControls).some(
+        (key) => !RECORDING_TOOLBAR_CONTROLS.some((control) => control === key)
+      )
+    )
+      return INVALID_FIELD;
+    for (const control of RECORDING_TOOLBAR_CONTROLS) {
+      const visible = rawRecordingControls[control];
+      if (visible === undefined) continue;
+      if (!isBoolean(visible)) return INVALID_FIELD;
+      recordingControls[control] = visible;
+    }
+  }
   const cropMode = value['cropMode'];
   if (cropMode !== undefined && cropMode !== 'drawing' && cropMode !== 'resize')
     return INVALID_FIELD;
@@ -137,6 +163,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
         };
 
   return {
+    ...(rawRecordingControls === undefined ? {} : { recordingControls }),
     ...(cropMode === undefined ? {} : { cropMode }),
     ...(freePlacement === undefined ? {} : { freePlacement }),
     ...(dockEdge === undefined ? {} : { dockEdge }),

@@ -70,8 +70,26 @@ export interface ContentToolbarPosition {
   y: number;
 }
 
+export const RECORDING_TOOLBAR_CONTROLS = [
+  'select',
+  'pencil',
+  'marker',
+  'text',
+  'shape',
+  'arrow',
+  'blur',
+  'eraser',
+  'clear',
+  'cursor',
+  'microphone',
+  'camera',
+] as const;
+export type RecordingToolbarControl = (typeof RECORDING_TOOLBAR_CONTROLS)[number];
+
 export interface ContentToolbarPreferences {
   cropMode?: 'drawing' | 'resize';
+  /** Missing controls remain visible during recording. This does not enable their tools. */
+  recordingControls?: Partial<Record<RecordingToolbarControl, boolean>>;
   /** Legacy absence uses docking at the top edge. */
   freePlacement?: boolean;
   dockEdge?: ContentToolbarDockEdge;

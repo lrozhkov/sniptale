@@ -11,6 +11,18 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  recordingCustomizeControls: {
+    ru: 'Настроить кнопки во время записи',
+    en: 'Customize controls during recording',
+  },
+  recordingCustomizeDone: {
+    ru: 'Завершить настройку кнопок',
+    en: 'Finish customizing controls',
+  },
+  recordingControlVisible: {
+    ru: 'Показывать «{tool}» во время записи',
+    en: 'Show {tool} during recording',
+  },
   videoRecordingPermissionTitle: {
     ru: 'Доступ к устройствам',
     en: 'Device access',

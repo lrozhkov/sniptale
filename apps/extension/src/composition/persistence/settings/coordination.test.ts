@@ -73,6 +73,60 @@ it('serializes independent page instances and preserves Crop with disjoint setti
   });
 });
 
+it('merges visibility edits from independent pages after an in-flight write', async () => {
+  let persisted: Record<string, unknown> = {
+    contentToolbar: { compactMenus: true, recordingControls: { camera: false } },
+  };
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const firstPage = await import('./index');
+  vi.resetModules();
+  const secondPage = await import('./index');
+  const first = firstPage.patchSettings({
+    contentToolbar: { recordingControls: { pencil: false } },
+  });
+  await entered.promise;
+  const second = secondPage.patchSettings({
+    contentToolbar: { recordingControls: { camera: true } },
+  });
+  releaseWrite.release();
+  await Promise.all([first, second]);
+  expect((await secondPage.loadSettings()).contentToolbar).toMatchObject({
+    compactMenus: true,
+    recordingControls: { camera: true, pencil: false },
+  });
+});
+
+it('orders visibility write, reset, and a new choice without restoring a stale map', async () => {
+  let persisted: Record<string, unknown> = {};
+  const entered = controlledGate();
+  const releaseWrite = controlledGate();
+  storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
+  storage.set.mockImplementation(async (items: { sniptale_settings: Record<string, unknown> }) => {
+    if (storage.set.mock.calls.length === 1) {
+      entered.release();
+      await releaseWrite.promise;
+    }
+    persisted = items.sniptale_settings;
+  });
+  const page = await import('./index');
+  const first = page.patchSettings({ contentToolbar: { recordingControls: { pencil: false } } });
+  await entered.promise;
+  const reset = page.resetSettingsToDefaults();
+  const next = page.patchSettings({ contentToolbar: { recordingControls: { camera: false } } });
+  releaseWrite.release();
+  await Promise.all([first, reset, next]);
+  expect((await page.loadSettings()).contentToolbar?.recordingControls).toEqual({ camera: false });
+});
+
 it('rejects an obsolete policy edit after a conflicting page commit', async () => {
   let persisted: Record<string, unknown> = {};
   storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
