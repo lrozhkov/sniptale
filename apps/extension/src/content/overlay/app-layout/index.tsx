@@ -56,7 +56,6 @@ function VideoRecordingSurfaceSlot(props: {
           chromeHidden={props.chromeHidden}
           controller={recording.drawingOwner.controller}
           escapeImmediately
-          showSelectionChrome={false}
           onExit={() => recording.onInteractionChange('navigation')}
           visualEffects={{
             getOpacity: recording.drawingOwner.getVisualOpacity,

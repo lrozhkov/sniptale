@@ -370,6 +370,87 @@ for (const { name, size: viewport } of PRIMARY_BROWSER_VIEWPORTS) {
   });
 }
 
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`recording cursor shows selection chrome ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await popup.evaluate(
+        async (theme) => {
+          await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+        },
+        size.width === 1920 ? 'dark' : 'light'
+      );
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      const surface = page.locator('[data-ui="content.drawing.surface"]').first();
+      const ink = surface.locator('canvas.sniptale-drawing-canvas');
+      await expect(ink).toHaveCSS('pointer-events', 'auto');
+      const chrome = surface.locator('[data-ui="content.drawing.selection-chrome"]');
+      const visiblePixels = () =>
+        chrome.evaluate((canvas) => {
+          if (!(canvas instanceof HTMLCanvasElement))
+            throw new Error('Selection canvas unavailable');
+          const data = canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let offset = 3; offset < data.length; offset += 4) if (data[offset]! > 0) count++;
+          return count;
+        });
+      await page.mouse.move(500, 260);
+      await page.mouse.down();
+      await page.mouse.move(660, 320, { steps: 8 });
+      await page.mouse.up();
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(900, 440);
+      await expect.poll(visiblePixels).toBe(0);
+      await page.mouse.move(450, 190);
+      await page.mouse.down();
+      try {
+        await page.mouse.move(720, 380, { steps: 6 });
+        await expect.poll(visiblePixels).toBeGreaterThan(0);
+        await page.screenshot({
+          path: info.outputPath('recording-selection-marquee.png'),
+          fullPage: false,
+        });
+      } finally {
+        await page.mouse.up();
+      }
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await expect(page.locator('[data-ui="drawing.selection.actions"]')).toBeVisible();
+      await page.mouse.click(900, 440);
+      await expect.poll(visiblePixels).toBe(0);
+      await page.mouse.click(580, 290);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await page.screenshot({
+        path: info.outputPath('recording-selected-object.png'),
+        fullPage: false,
+      });
+      const beforeMove = await pixels(ink);
+      await page.mouse.move(580, 290);
+      await page.mouse.down();
+      await page.mouse.move(620, 330, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeMove);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').click();
+      await expect(ink).toHaveCSS('pointer-events', 'none');
+      await expect.poll(visiblePixels).toBe(0);
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(620, 330);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
+
 async function pixels(canvas: Locator): Promise<string> {
   return canvas.evaluate(async (element) => {
     await new Promise<void>((resolve) =>
