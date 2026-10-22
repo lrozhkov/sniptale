@@ -1,3 +1,4 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import { motionCameraProjection } from './spatial';
 import { quickEditPlaneProjection, projectQuickEditPoint } from './spatial-geometry';
@@ -730,6 +731,13 @@ it.each(
     const before = structuredClone(project);
     expect(resolveProjectCameraConflicts(project, undefined, { start: 0, end: 0.5 })).toEqual([]);
     const conflicts = resolveProjectCameraConflicts(project, undefined, { start: 1.9, end: 2.1 });
+    expect(
+      resolveProjectCameraConflicts(
+        { ...project, clips: [], [VIDEO_PROJECT_ATTACHMENT_GEOMETRY]: project },
+        undefined,
+        { start: 1.9, end: 2.1 }
+      )
+    ).toEqual(conflicts);
     if (excursion || instant)
       expect(conflicts).toContainEqual(
         expect.objectContaining({

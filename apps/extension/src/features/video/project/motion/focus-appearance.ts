@@ -25,7 +25,7 @@ export type MotionFocusEdit =
   | {
       kind: 'spotlight';
       enabled?: boolean;
-      target?: 'viewport' | 'window' | 'scene';
+      target?: 'viewport' | 'window' | 'scene' | 'source-scene';
       settings?: AppearancePatch<QuickEditSpotlight>;
     };
 
@@ -64,7 +64,7 @@ export function editMotionFocus(
       ...edit.settings,
       area: clampQuickEditSpotlightArea({ ...previous.area, ...edit.settings?.area }),
     });
-    if (!border || target === 'scene') return null;
+    if (!border || target === 'scene' || target === 'source-scene') return null;
     if (
       !region.spotlight &&
       target === region.borderTarget &&
@@ -98,7 +98,7 @@ function isMotionFocusEdit(edit: MotionFocusEdit): boolean {
     edit.target !== undefined &&
     edit.target !== 'window' &&
     edit.target !== 'viewport' &&
-    (edit.kind !== 'spotlight' || edit.target !== 'scene')
+    (edit.kind !== 'spotlight' || (edit.target !== 'scene' && edit.target !== 'source-scene'))
   )
     return false;
   return edit.settings === undefined || isRecord(edit.settings);

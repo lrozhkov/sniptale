@@ -402,6 +402,22 @@ it.each([false, true])(
     expect(drawCompositionBorders).not.toHaveBeenCalled();
     expect(context.drawImage).not.toHaveBeenCalled();
     expect(context.arc).toHaveBeenCalled();
+    vi.mocked(drawCompositionBorders).mockClear();
+    vi.mocked(context.drawImage).mockClear();
+    vi.mocked(context.arc).mockClear();
+    drawCompositionVisualLayer(
+      context,
+      { ...layer, effectActionsOnly: true, deferSourceBorders: true },
+      1,
+      1,
+      {},
+      sources
+    );
+    expect(drawCompositionBorders).toHaveBeenCalledOnce();
+    expect(context.drawImage).not.toHaveBeenCalled();
+    expect(vi.mocked(context.arc).mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      vi.mocked(drawCompositionBorders).mock.invocationCallOrder[0]!
+    );
   }
 );
 
@@ -442,4 +458,36 @@ it('paints original-window border coordinates while clipping to the retained vis
     { x: -2.5, y: 7.5, width: 125, height: 125 },
     undefined
   );
+});
+
+it('clips a source-attached effect before inner motion and retains its independent bitmap', () => {
+  const context = createContext();
+  context.transform = vi.fn();
+  const layer = createEffectVisualLayer();
+  const owner = createCapturedVideoLayer();
+  owner.opacity = 0.6;
+  layer.sourceAttachment = {
+    owner,
+    mapping: {
+      frame: { x: 10, y: 20, width: 100, height: 100, rotation: 0 },
+      sourceWidth: 200,
+      sourceHeight: 120,
+      fitMode: 'CONTAIN',
+      windowCornerRadius: 8,
+      renderState: { translateX: 0, translateY: 0, scaleX: 1, scaleY: 1 },
+    },
+    innerTransform: [2, 0, -10, 0, 2, -20, 0, 0, 1],
+  };
+  const bitmap = new FakeBitmap(40, 20);
+  drawCompositionVisualLayerBitmap(context, layer, bitmap, 2, 2, 0.5);
+  expect(context.roundRect).toHaveBeenCalledWith(20, 80, 200, 120, 16);
+  expect(context.transform).toHaveBeenCalledWith(2, 0, 0, 2, -20, -40);
+  expect(context.translate).toHaveBeenCalledWith(20, 80);
+  expect(context.scale).toHaveBeenCalledWith(0.5, 0.5);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(vi.mocked(context.clip).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(context.transform).mock.invocationCallOrder[0]!
+  );
+  expect(context.globalAlpha).toBe(1);
+  expect(bitmap.close).not.toHaveBeenCalled();
 });

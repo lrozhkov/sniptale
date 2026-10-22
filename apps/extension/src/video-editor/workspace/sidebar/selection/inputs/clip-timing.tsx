@@ -1,3 +1,4 @@
+import { EffectSourceTimingRestore } from '../effect-instance/groups';
 import { getAudioFadeLimitSeconds } from '../../../../../features/video/audio/fades';
 import { DetailItem, DetailList } from '../shared/panel';
 import { InspectorDetails } from '../shared/details';
@@ -66,6 +67,14 @@ export function ClipTimingControls(props: ClipTimingControlsProps) {
             value={`${props.clip.duration.toFixed(2)} ${translate('videoEditor.sidebar.typingSeconds')}`}
           />
         </DetailList>
+      ) : null}
+      {props.clip.type === 'EFFECT' && props.clip.sourceRange ? (
+        <EffectSourceTimingRestore
+          project={props.project}
+          host={props.clip}
+          separated
+          disabled={props.locked}
+        />
       ) : null}
     </>
   );

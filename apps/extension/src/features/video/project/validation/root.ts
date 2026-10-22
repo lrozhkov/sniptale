@@ -94,6 +94,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
   if (value['rememberedWindowLayout'] !== undefined) return 36;
   if (value['rememberedWindowHeader'] !== undefined || value['rememberedSourceCrop'] !== undefined)
     return 35;
@@ -127,8 +128,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 37) &&
+    isBoundedNumber(version, 2, 39) &&
     Number.isInteger(version) &&
+    (version >= 39 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) => !isRecord(region) || region['spotlightTarget'] !== 'source-scene'
+      )) &&
     (version >= 37 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['zoomBehavior'] === undefined) &&
@@ -323,6 +329,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
         ((region.borderTarget !== 'window' &&
           region.spotlightTarget !== 'window' &&
           region.spotlightTarget !== 'scene' &&
+          region.spotlightTarget !== 'source-scene' &&
           region.sourceBinding?.coordinateSpace !== 'source-window') ||
           project.clips.some(
             (clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId

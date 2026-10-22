@@ -143,10 +143,19 @@ function MotionFocusTargetFields(props: FocusProps & { onEdit(edit: MotionFocusE
         ]}
         onChange={(value) => {
           panel.onPreviewMotion?.(null);
-          const attachment = value === '' ? 'viewport' : target === 'scene' ? 'scene' : 'window';
+          const attachment =
+            value === ''
+              ? 'viewport'
+              : target === 'scene' || target === 'source-scene'
+                ? target
+                : 'window';
           const focusEdit: MotionFocusEdit =
             kind === 'border'
-              ? { kind: 'border', target: attachment === 'scene' ? 'window' : attachment }
+              ? {
+                  kind: 'border',
+                  target:
+                    attachment === 'scene' || attachment === 'source-scene' ? 'window' : attachment,
+                }
               : { kind: 'spotlight', target: attachment };
           panel.onUpdateMotionRegion(motionRegion.id, {
             ...(value ? { sourceClipId: value } : {}),
@@ -155,14 +164,18 @@ function MotionFocusTargetFields(props: FocusProps & { onEdit(edit: MotionFocusE
         }}
       />
       {spotlight && target !== 'viewport' && motionRegion.sourceBinding ? (
-        <SegmentedRow<'window' | 'scene'>
-          columns={2}
+        <SegmentedRow<'window' | 'source-scene' | 'scene'>
+          columns={3}
           layout="stacked"
           label={translate('videoEditor.sidebar.spotlightCoverage')}
           ariaLabel={translate('videoEditor.sidebar.spotlightCoverage')}
-          value={target === 'scene' ? 'scene' : 'window'}
+          value={target === 'scene' || target === 'source-scene' ? target : 'window'}
           options={[
             { value: 'window', label: translate('videoEditor.sidebar.spotlightCoverageWindow') },
+            {
+              value: 'source-scene',
+              label: translate('videoEditor.sidebar.spotlightCoverageSourceScene'),
+            },
             { value: 'scene', label: translate('videoEditor.sidebar.spotlightCoverageScene') },
           ]}
           onChange={(target) => props.onEdit({ kind: 'spotlight', target })}

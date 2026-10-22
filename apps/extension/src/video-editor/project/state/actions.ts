@@ -92,6 +92,8 @@ type VideoEditorProjectActionKeys =
   | 'selectEffectInstance'
   | 'setEffectTargetBypassed'
   | 'setClipEffectsBypassed'
+  | 'restoreEffectSourceRange'
+  | 'updateEffectAttachment'
   | 'updateEffectInstance'
   | 'upsertObjectTrack'
   | 'deleteObjectTrack'

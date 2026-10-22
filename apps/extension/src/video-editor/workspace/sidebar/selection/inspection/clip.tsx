@@ -34,7 +34,7 @@ import {
   renderTextStyleFields,
 } from '../inputs/text-shape';
 import { renderTransformFields } from '../inputs/transform-fields';
-import { createEffectInstanceGroups } from '../effect-instance/groups';
+import { createEffectInstanceGroups, EffectAttachmentControls } from '../effect-instance/groups';
 import { TextTemplateUpgradeFields } from '../inputs/text-upgrade';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
@@ -141,12 +141,25 @@ function createStandardClipGroups(
   const cameraPosition = isCameraRoleVideoClip(props.project, clip)
     ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
     : undefined;
-  const transformContent = renderTransformFields(
+  const transformFields = renderTransformFields(
     cameraPosition ? { ...clip, transform: cameraPosition.transform } : clip,
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform,
     isCameraRoleVideoClip(props.project, clip)
   );
+  const transformContent =
+    clip.type === 'EFFECT' && clip.attachment ? (
+      <>
+        <EffectAttachmentControls
+          project={props.project}
+          host={clip}
+          disabled={runtime.selectedTrackLocked}
+        />
+        {transformFields}
+      </>
+    ) : (
+      transformFields
+    );
   const audioContent = renderAudioFields(props);
   const contentFields = renderClipContentFields(props, clip, runtime);
   const styleFields = renderClipStyleFields(props, clip, runtime);
@@ -390,6 +403,7 @@ function createClipEffectGroup(
     clip.type === VideoProjectClipType.EFFECT ? clip.effectInstanceId : undefined;
   return createEffectInstanceGroups({
     disabled: locked,
+    includeHostControls: false,
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),
     onMoveEffectInstance: props.onMoveEffectInstance ?? (() => undefined),

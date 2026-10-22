@@ -205,6 +205,7 @@ export function getFittedMediaWindowFrame(params: {
 export function getFittedMediaOriginalWindowFrame(
   params: Parameters<typeof getFittedMediaWindowFrame>[0]
 ): MediaFrame {
+  if (!params.sourceCrop) return getFittedMediaWindowFrame(params);
   const content = getFittedMediaContentFrame(params);
   const header = params.windowHeader
     ? (windowHeaderGeometry(params.windowHeader, {

@@ -377,6 +377,7 @@ async function resolvePreviewEffectRuntimeFrames(
       : params.effectRuntimeExecutor;
   if (!executor) throw new Error('EFFECT_RUNTIME_PREVIEW_EXECUTOR_MISSING');
   return renderEffectRuntimeComposition({
+    project: params.project,
     clipMediaElements,
     executor,
     imageBank: params.imageBank,

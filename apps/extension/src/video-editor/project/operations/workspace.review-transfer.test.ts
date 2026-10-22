@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { beforeEach, expect, it, vi } from 'vitest';
+import { Blob as NodeBlob, File as NodeFile } from 'node:buffer';
+import { readFileSync } from 'node:fs';
+import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { readReviewAnnotationEffectDocument } from '../../../features/video/review/annotation-effects/validation';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
 import { loadInitialProjectFromLocation } from './workspace';
 
@@ -205,6 +209,8 @@ async function transferFixture() {
   );
   return accepted;
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -912,4 +918,125 @@ it('admits canonical webcam codec MIME metadata without changing immutable bytes
     })
   );
   expect(saveVideoProject).toHaveBeenCalledOnce();
+});
+
+async function annotationTransferFixture() {
+  vi.stubGlobal('Blob', NodeBlob);
+  vi.stubGlobal('File', NodeFile);
+  const snapshot = await transferFixture();
+  const bytes = Uint8Array.from(
+    readFileSync('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg')
+  );
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+    'utf8'
+  );
+  const document = readReviewAnnotationEffectDocument(source)!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const resourceHash = await sha256EffectV1Bytes(bytes);
+  const id = `effect:${sha256}`;
+  snapshot.workspace.effectSnapshots = [
+    {
+      id,
+      sha256,
+      source,
+      documentId: document.id,
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      retainedByteLength: new TextEncoder().encode(source).byteLength + bytes.byteLength,
+      assets: [
+        {
+          id: 'neutral-mark',
+          assetId: 'project-asset:annotation-resource',
+          byteLength: bytes.byteLength,
+          sha256: resourceHash,
+          kind: 'svg',
+          mimeType: 'image/svg+xml',
+        },
+      ],
+    },
+  ];
+  snapshot.workspace.advanced.annotationEffects = {
+    enabled: true,
+    instances: ['content', 'viewport'].map((attachment, order) => ({
+      id: attachment,
+      snapshotId: id,
+      attachment: attachment === 'content' ? ('content' as const) : ('viewport' as const),
+      start: 0,
+      end: 5,
+      enabled: true,
+      controls: { intensity: 0.55 },
+      transform: { x: 0.1, y: 0.1, width: 0.5, height: 0.4, rotation: 0 },
+      order,
+    })),
+  };
+  const file = new File([bytes], 'neutral-mark.svg', { type: 'image/svg+xml' });
+  Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.slice().buffer });
+  const entry = { status: 'ready', entry: { id: 'annotation-resource', file } };
+  getProjectAsset.mockResolvedValue(entry);
+  return { snapshot, entry };
+}
+
+it('transfers resource-bearing EffectV1 annotations into independent Native snapshots', async () => {
+  const { snapshot } = await annotationTransferFixture();
+  const before = structuredClone(snapshot);
+  const result = await loadInitialProjectFromLocation();
+  const project = result.project!;
+  expect(project.id).not.toBe(snapshot.workspace.aggregateId);
+  expect(project.clips.filter((clip) => clip.type === 'EFFECT')).toHaveLength(2);
+  expect(
+    project.effectInstances!.every((instance) => instance.controls['intensity'] === 0.55)
+  ).toBe(true);
+  expect(project.effectSnapshots).toHaveLength(1);
+  const asset = project.effectSnapshots![0]!.assets[0]!;
+  expect(asset.blob.type).toBe('image/svg+xml');
+  expect(asset.blob.size).toBe(358);
+  expect(asset).not.toHaveProperty('assetId');
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(snapshot).toEqual(before);
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+
+it.each(['missing', 'corrupt'] as const)(
+  'refuses %s annotation bytes before publication and permits a fresh retry',
+  async (failure) => {
+    const { snapshot, entry } = await annotationTransferFixture();
+    const before = structuredClone(snapshot);
+    getProjectAsset.mockResolvedValue(
+      failure === 'missing'
+        ? undefined
+        : {
+            ...entry,
+            entry: {
+              ...entry.entry,
+              file: new File(['bad'], 'neutral-mark.svg', { type: 'image/svg+xml' }),
+            },
+          }
+    );
+    await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+      'Annotation effect is unavailable:'
+    );
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(snapshot).toEqual(before);
+    getProjectAsset.mockResolvedValue(entry);
+    expect((await loadInitialProjectFromLocation()).project!.effectSnapshots).toHaveLength(1);
+    expect(saveVideoProject).toHaveBeenCalledOnce();
+  }
+);
+
+it('refuses publication when Gallery changes during a pending annotation resource read', async () => {
+  const { snapshot, entry } = await annotationTransferFixture();
+  const started = Promise.withResolvers<void>();
+  const resource = Promise.withResolvers<typeof entry>();
+  getProjectAsset.mockImplementation(() => {
+    started.resolve();
+    return resource.promise;
+  });
+  const pending = loadInitialProjectFromLocation();
+  await started.promise;
+  snapshot.workspace.revision++;
+  resource.resolve(entry);
+  await expect(pending).rejects.toThrow('Review project changed before transfer.');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
 });

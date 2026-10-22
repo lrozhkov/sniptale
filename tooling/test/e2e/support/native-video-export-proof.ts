@@ -1,8 +1,13 @@
+import { ALL_FORMATS, BufferSource, Input } from 'mediabunny';
+import type { ProjectExportInputReference } from '../../../../apps/extension/src/contracts/video/types/project-export-input';
 import type {
   VideoProject,
   VideoProjectExportSettings,
 } from '../../../../apps/extension/src/features/video/project/types';
-import { resolveVideoExportDimensions } from '../../../../apps/extension/src/features/video/project/export/output-dimensions';
+import {
+  resolveProjectOutputTransform,
+  resolveVideoExportDimensions,
+} from '../../../../apps/extension/src/features/video/project/export/output-dimensions';
 import { assertVideoProjectExportSettingsCompatibleWithProject } from '../../../../apps/extension/src/features/video/project/export/settings-validation';
 import { expect, type Page } from '@playwright/test';
 import {
@@ -19,9 +24,11 @@ export async function encodedNativeVideoSamples(
   project: VideoProject,
   format: 'MP4' | 'WEBM',
   points: readonly { time: number; x: number; y: number; expected: readonly number[] }[],
-  range?: { start: number; end: number }
+  range?: { start: number; end: number },
+  preparedInput?: ProjectExportInputReference,
+  preparedSettings?: VideoProjectExportSettings
 ) {
-  const settings: VideoProjectExportSettings = {
+  const settings: VideoProjectExportSettings = preparedSettings ?? {
     burnInSubtitles: false,
     downloadAfterExport: false,
     format,
@@ -37,14 +44,44 @@ export async function encodedNativeVideoSamples(
   assertVideoProjectExportSettingsCompatibleWithProject(project, settings);
   await page.goto(`${origin}${OFFSCREEN_HARNESS_PATH}`);
   await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
-  const jobId = `native-video-${format}-${crypto.randomUUID()}`;
-  const input = await page.evaluate(
-    async ({ jobId, project }) => {
-      if (!window.__sniptaleOffscreenHarness) throw new Error('Missing export bridge');
-      return window.__sniptaleOffscreenHarness.stageProjectExportInput(jobId, project);
-    },
-    { jobId, project }
-  );
+  const jobId = preparedInput?.jobId ?? `native-video-${format}-${crypto.randomUUID()}`;
+  const resources = preparedInput
+    ? []
+    : await Promise.all(
+        (project.effectSnapshots ?? []).flatMap((snapshot) =>
+          snapshot.assets.map(async (asset) => ({
+            snapshotId: snapshot.id,
+            assetId: asset.id,
+            mimeType: asset.blob.type,
+            bytes: [...new Uint8Array(await asset.blob.arrayBuffer())],
+          }))
+        )
+      );
+  const input =
+    preparedInput ??
+    (await page.evaluate(
+      async ({ jobId, project, resources }) => {
+        if (!window.__sniptaleOffscreenHarness) throw new Error('Missing export bridge');
+        const hydrated = {
+          ...project,
+          effectSnapshots: project.effectSnapshots?.map((snapshot) => ({
+            ...snapshot,
+            assets: snapshot.assets.map((asset) => {
+              const resource = resources.find(
+                (item) => item.snapshotId === snapshot.id && item.assetId === asset.id
+              );
+              if (!resource) throw new Error('Missing exported fixture resource.');
+              return {
+                ...asset,
+                blob: new Blob([Uint8Array.from(resource.bytes)], { type: resource.mimeType }),
+              };
+            }),
+          })),
+        };
+        return window.__sniptaleOffscreenHarness.stageProjectExportInput(jobId, hydrated);
+      },
+      { jobId, project, resources }
+    ));
   await emitTrustedOffscreenHarnessRuntimeMessage(page, {
     input,
     jobId,
@@ -68,8 +105,9 @@ export async function encodedNativeVideoSamples(
     await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED)
   ).find((message) => message.jobId === jobId)!;
   if (typeof completion.exportId !== 'string') throw new Error('Missing export identity');
-  return page.evaluate(
-    async ({ exportId, points }) => {
+  const transform = resolveProjectOutputTransform(project, settings);
+  const output = await page.evaluate(
+    async ({ exportId, points, fps, inspectAudio }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('sniptale-db');
         request.onsuccess = () => resolve(request.result);
@@ -111,10 +149,13 @@ export async function encodedNativeVideoSamples(
         const context = canvas.getContext('2d')!;
         const samples = [];
         for (const time of [...new Set(points.map((point) => point.time))]) {
+          let mediaTime = time;
           await new Promise<void>((resolve) => {
             const presented: VideoFrameRequestCallback = (_now, metadata) => {
-              if (Math.abs(metadata.mediaTime - time) < 0.012501) resolve();
-              else video.requestVideoFrameCallback(presented);
+              if (Math.abs(metadata.mediaTime - time) < 0.5 / fps + 0.000001) {
+                mediaTime = metadata.mediaTime;
+                resolve();
+              } else video.requestVideoFrameCallback(presented);
             };
             video.requestVideoFrameCallback(presented);
             video.currentTime = time;
@@ -124,6 +165,7 @@ export async function encodedNativeVideoSamples(
             const pixel = Array.from(context.getImageData(x, y, 1, 1).data);
             samples.push({
               time,
+              mediaTime,
               x,
               y,
               pixel,
@@ -132,7 +174,16 @@ export async function encodedNativeVideoSamples(
             });
           }
         }
+        let audioInspection: string | null = null;
+        if (inspectAudio) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = '';
+          for (let i = 0; i < bytes.length; i += 32768)
+            binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+          audioInspection = btoa(binary);
+        }
         return {
+          audioInspection,
           width: video.videoWidth,
           height: video.videoHeight,
           duration: video.duration,
@@ -145,6 +196,29 @@ export async function encodedNativeVideoSamples(
         URL.revokeObjectURL(url);
       }
     },
-    { exportId: completion.exportId, points }
+    {
+      exportId: completion.exportId,
+      points: points.map((point) => ({
+        ...point,
+        x: Math.round(transform.offsetX + point.x * transform.scale),
+        y: Math.round(transform.offsetY + point.y * transform.scale),
+      })),
+      fps: settings.fps,
+      inspectAudio: settings.scope === 'selected-clip',
+    }
   );
+  const { audioInspection, ...result } = output;
+  let audioTrackCount: number | undefined;
+  if (audioInspection !== null) {
+    const input = new Input({
+      formats: ALL_FORMATS,
+      source: new BufferSource(Buffer.from(audioInspection, 'base64')),
+    });
+    try {
+      audioTrackCount = (await input.getAudioTracks()).length;
+    } finally {
+      input.dispose();
+    }
+  }
+  return { ...result, audioTrackCount };
 }

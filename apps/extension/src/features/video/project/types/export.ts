@@ -3,6 +3,9 @@ import {
   type VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 
+/** Runtime-only source geometry cannot be supplied or retained by project JSON/IPC. */
+export const VIDEO_PROJECT_ATTACHMENT_GEOMETRY = Symbol('video-project-attachment-geometry');
+
 export const VideoExportQualityPreset = VideoQuality;
 export type VideoExportQualityPreset = VideoQuality;
 

@@ -232,7 +232,9 @@ it.each(['border', 'spotlight'] as const)(
 
 it.each(
   [false, true].flatMap((original) =>
-    (['border', 'window', 'scene'] as const).map((target) => [target, original] as const)
+    (['border', 'window', 'scene', 'source-scene'] as const).map(
+      (target) => [target, original] as const
+    )
   )
 )(
   'uses the concrete %s attachment with original=%s and never substitutes a source',
@@ -291,7 +293,7 @@ it.each(
   }
 );
 
-function useSpotlight(target: 'viewport' | 'window' | 'scene' = 'viewport') {
+function useSpotlight(target: 'viewport' | 'window' | 'scene' | 'source-scene' = 'viewport') {
   const region = params.selectedMotionRegion!;
   delete region.border;
   delete region.borderTarget;

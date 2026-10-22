@@ -98,6 +98,8 @@ type VideoEditorProjectEffectActionSurface = Pick<
   | 'updateTransitionDuration'
   | 'updateTransitionEasing'
   | 'updateTransitionTemplate'
+  | 'restoreEffectSourceRange'
+  | 'updateEffectAttachment'
   | 'updateEffectInstance'
 >;
 

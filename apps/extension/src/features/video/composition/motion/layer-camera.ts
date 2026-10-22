@@ -5,6 +5,11 @@ export function shouldLockVisualLayerToViewport(
   layer: VideoCompositionVisualLayer,
   camera: VideoCompositionCameraState
 ): boolean {
+  if (layer.kind === 'effect') {
+    if (layer.clip.attachment?.kind === 'viewport') return true;
+    if (layer.sourceAttachment)
+      return shouldLockVisualLayerToViewport(layer.sourceAttachment.owner, camera);
+  }
   if (camera.sourceClipId && layer.clipId !== camera.sourceClipId) return true;
   if (layer.effectViewportRaster) return true;
   if (layer.kind === 'video' && layer.trackRole === VideoProjectTrackRole.CAMERA) return true;

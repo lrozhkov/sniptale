@@ -1,5 +1,7 @@
 import { admittedVisualWindowHeader } from './window-header';
 import { drawVideoLayer } from './video';
+import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from './fitted-media';
+import { roundedWindowRadius } from '../../project/window-geometry';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
@@ -45,6 +47,18 @@ export function drawCompositionVisualLayerBitmap(
   opacityMultiplier = 1,
   bitmapBounds = { x: 0, y: 0, width: 1, height: 1 }
 ): void {
+  if (layer.kind === 'effect' && layer.sourceAttachment) {
+    drawSourceAttachedEffectBitmap(
+      context,
+      layer,
+      bitmap,
+      scaleX,
+      scaleY,
+      opacityMultiplier,
+      bitmapBounds
+    );
+    return;
+  }
   const frame = getScaledLayerFrame(layer, scaleX, scaleY);
   const displayScale = (scaleX + scaleY) / 2;
   const renderState = layer.renderState ?? IDENTITY_TRANSITION_VISUAL_STATE;
@@ -65,6 +79,89 @@ export function drawCompositionVisualLayerBitmap(
     frame.height * bitmapBounds.height
   );
   context.restore();
+}
+
+/** Uses the source's static window mask before its disposable inner content camera. */
+function drawSourceAttachedEffectBitmap(
+  context: CanvasRenderingContext2D,
+  layer: Extract<VideoCompositionVisualLayer, { kind: 'effect' }>,
+  bitmap: ImageBitmap,
+  scaleX: number,
+  scaleY: number,
+  opacityMultiplier: number,
+  bitmapBounds: { x: number; y: number; width: number; height: number }
+): void {
+  const { sourceAttachment, ...body } = layer;
+  if (!sourceAttachment) return;
+  const { owner, mapping, innerTransform } = sourceAttachment;
+  const window = getFittedMediaWindowFrame(mapping);
+  const content = getFittedMediaContentFrame(mapping);
+  const radius = roundedWindowRadius(
+    window.width * scaleX,
+    window.height * scaleY,
+    ((mapping.windowCornerRadius ?? 0) * (scaleX + scaleY)) / 2
+  );
+  context.save();
+  try {
+    applyLayerTransform(
+      context,
+      owner,
+      owner.renderState,
+      getScaledLayerFrame(owner, scaleX, scaleY),
+      scaleX,
+      scaleY
+    );
+    context.beginPath();
+    if (radius > 0)
+      context.roundRect(
+        window.x * scaleX,
+        window.y * scaleY,
+        window.width * scaleX,
+        window.height * scaleY,
+        radius
+      );
+    else
+      context.rect(
+        window.x * scaleX,
+        window.y * scaleY,
+        window.width * scaleX,
+        window.height * scaleY
+      );
+    context.clip();
+    if (mapping.sourceCrop) {
+      const crop = mapping.sourceCrop;
+      context.beginPath();
+      context.rect(
+        (content.x + crop.x * content.width) * scaleX,
+        (content.y + crop.y * content.height) * scaleY,
+        crop.width * content.width * scaleX,
+        crop.height * content.height * scaleY
+      );
+      context.clip();
+    }
+    if (innerTransform)
+      context.transform(
+        innerTransform[0],
+        (innerTransform[3] * scaleY) / scaleX,
+        (innerTransform[1] * scaleX) / scaleY,
+        innerTransform[4],
+        innerTransform[2] * scaleX,
+        innerTransform[5] * scaleY
+      );
+    context.translate(content.x * scaleX, content.y * scaleY);
+    context.scale(content.width / mapping.sourceWidth, content.height / mapping.sourceHeight);
+    drawCompositionVisualLayerBitmap(
+      context,
+      body,
+      bitmap,
+      scaleX,
+      scaleY,
+      opacityMultiplier * owner.opacity,
+      bitmapBounds
+    );
+  } finally {
+    context.restore();
+  }
 }
 
 function buildLayerFilter(blurAmount: number): string {

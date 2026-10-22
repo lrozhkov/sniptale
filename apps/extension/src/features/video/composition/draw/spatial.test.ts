@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createVideoClip, createImageClip } from '../../project/timeline/project-meta.test.helpers';
 import { createDefaultCameraState } from '../motion/defaults';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
@@ -357,5 +358,41 @@ it('avoids resources for plain or key-only overlays and refuses unavailable spat
   const { spatialRenderer: _provider, ...missing } = base;
   expect(() => drawSpatialSceneOverlays({ ...missing, actions: [video().actions![0]!] })).toThrow(
     'Perspective renderer is unavailable.'
+  );
+});
+
+it('paints a deferred source border in the sharp projection without replaying source pixels', () => {
+  const layer = video();
+  layer.actions = [];
+  layer.effectActionsOnly = true;
+  layer.deferSourceBorders = true;
+  layer.borders = [
+    {
+      id: 'border',
+      border: createQuickEditBorder(),
+      clock: {
+        time: 1,
+        duration: 3,
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    },
+  ];
+  const { args } = setup([layer]);
+  drawSpatialCompositionGroup(args);
+  expect(drawEffectRuntimeVisualLayer).not.toHaveBeenCalled();
+  expect(drawSpatialCameraGroup).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(drawSpatialCameraGroup).mock.calls[1]![0].sharp).toBe(true);
+  expect(drawCompositionVisualLayer).toHaveBeenCalledExactlyOnceWith(
+    expect.anything(),
+    expect.objectContaining({
+      effectActionsOnly: true,
+      deferSourceBorders: true,
+      borders: layer.borders,
+    }),
+    1,
+    1,
+    expect.anything(),
+    expect.anything()
   );
 });

@@ -697,3 +697,113 @@ it.each(
     expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
   }
 );
+
+it('purges confirmed source-attached effect hosts but retains viewport hosts and shared snapshots', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { sha256EffectV1Bytes, validateEffectV1Document } =
+    await import('@sniptale/runtime-contracts/effect-v1');
+  const { createEffectHostClip } = await import('./factories/overlay-clip');
+  const source = { kind: 'project-asset' as const, projectAssetId: 'attached-source' };
+  const { project, removed, removedClip, keptClip } = fixture(source);
+  if (removedClip.type !== 'VIDEO') throw new Error('Expected video');
+  removedClip.sourceInstanceId = 'attached-placement';
+  const text = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'utf8'
+  );
+  const document = validateEffectV1Document(JSON.parse(text)).document!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(text));
+  const attached = createEffectHostClip({
+    duration: 3,
+    effectInstanceId: 'attached',
+    name: 'Attached',
+    startTime: 0,
+    trackId: removedClip.trackId,
+    projectWidth: 100,
+    projectHeight: 100,
+  });
+  attached.attachment = {
+    kind: 'source',
+    assetId: removed.id,
+    sourceInstanceId: 'attached-placement',
+  };
+  const viewport = {
+    ...attached,
+    id: 'viewport',
+    effectInstanceId: 'viewport',
+    attachment: { kind: 'viewport' as const },
+  };
+  project.version = 38;
+  project.clips.push(attached, viewport);
+  project.effectSnapshots = [
+    {
+      id: `effect:${sha256}`,
+      sha256,
+      documentId: document.id,
+      source: text,
+      schemaVersion: 'sniptale.effect.v1',
+      kind: 'standalone',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(text).byteLength,
+    },
+  ];
+  project.effectInstances = ['attached', 'viewport'].map((id) => ({
+    id,
+    snapshotId: `effect:${sha256}`,
+    kind: 'standalone',
+    controls: {},
+    enabled: true,
+    startTime: 0,
+    duration: 3,
+    playbackRate: 1,
+    target: { kind: 'scene' },
+  }));
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const original = structuredClone(project);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.clips).toEqual([keptClip, viewport]);
+  expect(result.effectInstances?.map(({ id }) => id)).toEqual(['viewport']);
+  expect(result.effectSnapshots).toEqual(project.effectSnapshots);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(original);
+  const sourceRange = {
+    assetId: removed.id,
+    sourceInstanceId: 'attached-placement',
+    start: 0,
+    end: 3,
+  };
+  const dormantViewport = {
+    ...viewport,
+    id: 'dormant-viewport',
+    effectInstanceId: 'dormant-viewport',
+    sourceRange: { ...sourceRange, dormant: true as const },
+  };
+  const retained = {
+    ...project,
+    clips: [
+      ...project.clips.map((clip) =>
+        clip.id === viewport.id ? { ...viewport, sourceRange } : clip
+      ),
+      dormantViewport,
+    ],
+    effectInstances: [
+      ...project.effectInstances,
+      { ...project.effectInstances[1]!, id: 'dormant-viewport' },
+    ],
+  };
+  expect(isExportReadyVideoProject(retained)).toBe(true);
+  const retainedBefore = structuredClone(retained);
+  const purged = removeVideoProjectLibrarySources(retained, [source]);
+  expect(purged.clips).toEqual([keptClip, viewport]);
+  expect(purged.effectInstances!.map((instance) => instance.id)).toEqual(['viewport']);
+  expect(purged.effectSnapshots).toEqual(retained.effectSnapshots);
+  expect(retained).toEqual(retainedBefore);
+  const onlyAttached = {
+    ...project,
+    clips: [removedClip, keptClip, attached],
+    effectInstances: [project.effectInstances[0]!],
+  };
+  const unique = removeVideoProjectLibrarySources(onlyAttached, [source]);
+  expect(unique.effectInstances).toEqual([]);
+  expect(unique.effectSnapshots).toEqual([]);
+});

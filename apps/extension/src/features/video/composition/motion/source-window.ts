@@ -1,3 +1,5 @@
+import { resolveEffectSourceClip } from '../../project/effect-instance/placement';
+import type { VideoProjectClip } from '../../project/types';
 import { resolveCameraWindowWeight } from '../../project/motion/spatial';
 import {
   invertQuickEditProjection,
@@ -19,7 +21,10 @@ import {
   mapWindowNormalizedPointToVisualLayer,
   mapVisualLayerPointToWindowNormalized,
 } from '../draw/fitted-media';
-import { resolveCursorSourcePointMapping } from '../timeline/frame/cursor';
+import {
+  resolveCursorSourcePointMapping,
+  mapCursorFocusControlPoint,
+} from '../timeline/frame/cursor';
 import { evaluateMotionSpatial } from './spatial';
 
 /** The original decorated plane retains authoring coordinates when the visible crop changes. */
@@ -373,4 +378,41 @@ export function projectSourceContentRect(
       height: (end.y - start.y) * rasterScale,
     },
   };
+}
+
+/** Disposable affine source projection shared by hit testing, body gestures and handles. */
+export function resolveEffectSourceProjection(
+  project: VideoProject,
+  clip: VideoProjectClip,
+  camera: VideoCompositionCameraState,
+  time: number
+): QuickEditHomography | null {
+  if (clip.type !== 'EFFECT' || clip.attachment?.kind !== 'source') return null;
+  const source = resolveEffectSourceClip(project, clip, time);
+  const mapping = source && resolveCursorSourcePointMapping(project, source.id, time);
+  if (!source || !mapping) return null;
+  const map = (x: number, y: number) => {
+    const point = mapCursorFocusControlPoint(mapping, {
+      x: x / mapping.sourceWidth,
+      y: y / mapping.sourceHeight,
+    });
+    return camera.sourceClipId === source.id
+      ? mapCompositionPointThroughSourceContent(project, camera, time, point)
+      : point;
+  };
+  const origin = map(0, 0),
+    x = map(1, 0),
+    y = map(0, 1);
+  const matrix: QuickEditHomography = [
+    x.x - origin.x,
+    y.x - origin.x,
+    origin.x,
+    x.y - origin.y,
+    y.y - origin.y,
+    origin.y,
+    0,
+    0,
+    1,
+  ];
+  return matrix.every(Number.isFinite) && invertQuickEditProjection(matrix) ? matrix : null;
 }

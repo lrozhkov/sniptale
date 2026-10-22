@@ -1,3 +1,22 @@
+import {
+  resolveEffectSourceInterval,
+  activateRetainedEffectHost,
+} from '../../../features/video/project/effect-instance/placement';
+import { readEffectPresentationDocument } from '../../../features/video/project/effect-bundle/presentation-document';
+import { transformReviewAnnotationEffectAttachment } from '../../../features/video/review/annotation-effects/layout';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
+import { resolveEffectSourceProjection } from '../../../features/video/composition/motion/source-window';
+import { motionCameraProjection } from '../../../features/video/composition/motion/spatial';
+import { shouldLockVisualLayerToViewport } from '../../../features/video/composition/motion/layer-camera';
+import {
+  invertQuickEditProjection,
+  multiplyQuickEditProjections,
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../../features/video/composition/motion/spatial-geometry';
+import { resolveEffectSourceClip } from '../../../features/video/project/effect-instance/placement';
+import type { VideoProject, VideoProjectEffectClip } from '../../../features/video/project/types';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { resolveEffectApplicationTarget } from './effects.junction';
 import { resolveEffectOwner } from '../../../features/video/project/effect-instance/owner';
 import {
@@ -25,6 +44,8 @@ type EffectInstanceActions = Pick<
   | 'deleteEffectInstance'
   | 'duplicateEffectInstance'
   | 'moveEffectInstance'
+  | 'restoreEffectSourceRange'
+  | 'updateEffectAttachment'
   | 'updateEffectInstance'
 >;
 
@@ -92,6 +113,46 @@ export function createEffectInstanceActions(
     deleteEffectInstance: createDeleteEffectInstance(set),
     duplicateEffectInstance: createDuplicateEffectInstance(set),
     moveEffectInstance: createMoveEffectInstance(set),
+    restoreEffectSourceRange: (instanceId) => {
+      let accepted = false;
+      set((state) => {
+        const project = state.project;
+        if (!project) return {};
+        const plan = planEffectSourceRangeRestore(project, instanceId);
+        if (!plan) return {};
+        accepted = true;
+        return applyProjectUpdate(state, () =>
+          applyVideoProjectMutationPatch(project, {
+            clips: project.clips.map((clip) => (clip.id === plan.host.id ? plan.host : clip)),
+            effectInstances: (project.effectInstances ?? []).map((instance) =>
+              instance.id === instanceId ? plan.instance : instance
+            ),
+          })
+        );
+      });
+      return accepted;
+    },
+    updateEffectAttachment: (instanceId, attachment) => {
+      let accepted = false;
+      set((state) => {
+        const project = state.project;
+        if (!project) return {};
+        const plan = planEffectAttachmentChange(project, instanceId, attachment, state.currentTime);
+        if (!plan) return {};
+        accepted = true;
+        return applyProjectUpdate(state, () =>
+          applyVideoProjectMutationPatch(project, {
+            clips: project.clips.map((clip) => (clip.id === plan.host.id ? plan.host : clip)),
+            effectInstances: (project.effectInstances ?? []).map((instance) =>
+              instance.id === instanceId
+                ? { ...instance, ...(plan.anchors ? { sceneAnchors: plan.anchors } : {}) }
+                : instance
+            ),
+          })
+        );
+      });
+      return accepted;
+    },
     updateEffectInstance: createUpdateEffectInstance(set),
   };
 }
@@ -295,4 +356,179 @@ function mergeControls(
     if (value !== undefined) next[key] = value;
   }
   return next;
+}
+
+/** Plans one attachment change using the renderer's current source and camera planes. */
+export function planEffectAttachmentChange(
+  project: VideoProject,
+  instanceId: string,
+  attachment: NonNullable<VideoProjectEffectClip['attachment']>,
+  time: number
+) {
+  const instance = project.effectInstances?.find((entry) => entry.id === instanceId);
+  const host = project.clips.find(
+    (clip): clip is VideoProjectEffectClip =>
+      clip.type === 'EFFECT' && clip.effectInstanceId === instanceId
+  );
+  if (
+    !host?.attachment ||
+    !instance ||
+    instance.kind !== 'standalone' ||
+    !isEffectInstanceEditable(project, instance)
+  )
+    return null;
+  if (
+    host.attachment.kind === attachment.kind &&
+    (attachment.kind === 'viewport' ||
+      (host.attachment.kind === 'source' &&
+        host.attachment.assetId === attachment.assetId &&
+        host.attachment.sourceInstanceId === attachment.sourceInstanceId))
+  )
+    return null;
+  const canonical: NonNullable<VideoProjectEffectClip['attachment']> =
+    attachment.kind === 'viewport'
+      ? { kind: 'viewport' }
+      : {
+          kind: 'source',
+          assetId: attachment.assetId,
+          sourceInstanceId: attachment.sourceInstanceId,
+        };
+  const nextHost = { ...host, attachment: canonical };
+  const from = effectAttachmentPlane(project, host, time);
+  const to = effectAttachmentPlane(
+    { ...project, clips: project.clips.map((clip) => (clip.id === host.id ? nextHost : clip)) },
+    nextHost,
+    time
+  );
+  const inverse = to && invertQuickEditProjection(to.matrix);
+  if (!from || !to || !inverse) return null;
+  const mapping = multiplyQuickEditProjections(inverse, from.matrix);
+  const transform = transformReviewAnnotationEffectAttachment(
+    {
+      x: host.transform.x / from.width,
+      y: host.transform.y / from.height,
+      width: host.transform.width / from.width,
+      height: host.transform.height / from.height,
+      rotation: (host.transform.rotation * Math.PI) / 180,
+    },
+    from,
+    to,
+    mapping
+  );
+  if (!transform) return null;
+  const anchors: Record<string, { x: number; y: number }> = {};
+  for (const [id, point] of Object.entries(instance.sceneAnchors ?? {})) {
+    const mapped = projectQuickEditPoint(mapping, point);
+    if (!mapped) return null;
+    anchors[id] = mapped;
+  }
+  const result = {
+    host: {
+      ...nextHost,
+      transform: {
+        ...host.transform,
+        x: transform.x * to.width,
+        y: transform.y * to.height,
+        width: transform.width * to.width,
+        height: transform.height * to.height,
+        rotation: (transform.rotation * 180) / Math.PI,
+      },
+    },
+    ...(instance.sceneAnchors ? { anchors } : {}),
+  };
+  const candidate = {
+    ...project,
+    clips: project.clips.map((clip) => (clip.id === host.id ? result.host : clip)),
+    effectInstances: (project.effectInstances ?? []).map((entry) =>
+      entry.id === instanceId
+        ? { ...entry, ...(result.anchors ? { sceneAnchors: result.anchors } : {}) }
+        : entry
+    ),
+  };
+  return isExportReadyVideoProject(candidate) ? result : null;
+}
+
+function effectAttachmentPlane(project: VideoProject, host: VideoProjectEffectClip, time: number) {
+  const frame = resolveVideoCompositionFrame(project, time);
+  const layer = frame.visualLayers.find((entry) => entry.clipId === host.id);
+  if (!layer || layer.kind !== 'effect') return null;
+  const source =
+    host.attachment?.kind === 'source' ? resolveEffectSourceClip(project, host, time) : undefined;
+  const asset = source && project.assets.find((entry) => entry.id === source.assetId);
+  if (
+    host.attachment?.kind === 'source' &&
+    (!source ||
+      !asset ||
+      project.tracks.some((track) => track.id === source.trackId && track.role === 'CAMERA'))
+  )
+    return null;
+  const sourceMatrix =
+    host.attachment?.kind === 'source'
+      ? resolveEffectSourceProjection(project, host, frame.camera, time)
+      : ([1, 0, 0, 0, 1, 0, 0, 0, 1] satisfies QuickEditHomography);
+  if (!sourceMatrix) return null;
+  const camera = frame.camera;
+  const outer: QuickEditHomography | null = shouldLockVisualLayerToViewport(layer, camera)
+    ? [1, 0, 0, 0, 1, 0, 0, 0, 1]
+    : camera.spatial
+      ? motionCameraProjection(camera)
+      : [
+          camera.scale,
+          0,
+          -camera.viewportX * camera.scale,
+          0,
+          camera.scale,
+          -camera.viewportY * camera.scale,
+          0,
+          0,
+          1,
+        ];
+  return outer
+    ? {
+        width: asset?.metadata.width ?? project.width,
+        height: asset?.metadata.height ?? project.height,
+        matrix: multiplyQuickEditProjections(outer, sourceMatrix),
+      }
+    : null;
+}
+
+/** Explicitly restores the ordinary Native interval from the retained source recipe. */
+export function planEffectSourceRangeRestore(project: VideoProject, instanceId: string) {
+  const host = project.clips.find(
+    (clip): clip is VideoProjectEffectClip =>
+      clip.type === 'EFFECT' && clip.effectInstanceId === instanceId
+  );
+  const instance = project.effectInstances?.find((entry) => entry.id === instanceId);
+  if (
+    !host?.sourceRange ||
+    !instance ||
+    instance.kind !== 'standalone' ||
+    !isEffectInstanceEditable(project, instance)
+  )
+    return null;
+  const interval = resolveEffectSourceInterval(project, host);
+  const snapshot = project.effectSnapshots?.find((entry) => entry.id === instance.snapshotId);
+  const document = snapshot && readEffectPresentationDocument(snapshot.source).document;
+  if (!interval || !document) return null;
+  const duration = interval.end - interval.start;
+  const playbackRate = document.duration / duration;
+  if (
+    !host.sourceRange.dormant &&
+    Math.abs(host.startTime - interval.start) <= 1e-7 &&
+    Math.abs(host.duration - duration) <= 1e-7 &&
+    Math.abs(instance.sourceStart ?? 0) <= 1e-7 &&
+    Math.abs(instance.playbackRate - playbackRate) <= 1e-7
+  )
+    return null;
+  const restored = { ...activateRetainedEffectHost(host), startTime: interval.start, duration };
+  const timed = { ...instance, startTime: interval.start, duration, sourceStart: 0, playbackRate };
+  return isExportReadyVideoProject({
+    ...project,
+    clips: project.clips.map((clip) => (clip.id === host.id ? restored : clip)),
+    effectInstances: (project.effectInstances ?? []).map((entry) =>
+      entry.id === instanceId ? timed : entry
+    ),
+  })
+    ? { host: restored, instance: timed }
+    : null;
 }

@@ -553,7 +553,7 @@ it('admits each bound spotlight coverage only for its concrete video instance at
     size: 100,
   });
   const clip = project.clips.find((item) => item.type === 'VIDEO')!;
-  for (const spotlightTarget of ['window', 'scene'] as const) {
+  for (const spotlightTarget of ['window', 'scene', 'source-scene'] as const) {
     const region = bindMotionRegionToClip(
       {
         ...createVideoProjectMotionRegion(project, 1),
@@ -563,6 +563,11 @@ it('admits each bound spotlight coverage only for its concrete video instance at
       clip
     );
     const authored = applyVideoProjectMutationPatch(project, { motionRegions: [region] });
+    if (spotlightTarget === 'source-scene') {
+      expect(authored.version).toBe(39);
+      for (const version of [22, 34, 37, 38])
+        expect(isHydratableVideoProject({ ...authored, version })).toBe(false);
+    }
     expect(isExportReadyVideoProject(authored)).toBe(true);
     expect(isExportReadyVideoProject({ ...authored, clips: [] })).toBe(false);
     expect(
@@ -577,7 +582,7 @@ it('admits each bound spotlight coverage only for its concrete video instance at
       })
     ).toBe(false);
     const removed = applyVideoProjectMutationPatch(authored, { motionRegions: [] });
-    expect(removed.version).toBe(22);
+    expect(removed.version).toBe(spotlightTarget === 'source-scene' ? 39 : 22);
     expect(isExportReadyVideoProject(removed)).toBe(true);
   }
 });
@@ -662,7 +667,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 38, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 40, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -702,7 +707,7 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 38 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });
 
@@ -749,7 +754,7 @@ it('admits complete source cursor observations only at schema33 without changing
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 33; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 38 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
   for (const invalid of [
     null,
@@ -839,4 +844,171 @@ it('fences and validates converted motion area directions at the project boundar
         motionRegions: [{ ...motionRegions[0], focusArea: { ...focusArea, axes } }],
       })
     ).toBe(false);
+});
+
+it('fences explicit effect attachment at schema38 and retains dormant source placement', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { sha256EffectV1Bytes, validateEffectV1Document } =
+    await import('@sniptale/runtime-contracts/effect-v1');
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { createEffectHostClip } = await import('../factories/overlay-clip');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'attachment',
+    filename: 'attachment.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    size: 1,
+    mimeType: 'video/webm',
+  });
+  const sourceClip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (sourceClip.type !== 'VIDEO') throw new Error('Expected video source');
+  sourceClip.sourceInstanceId = 'source-instance';
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'utf8'
+  );
+  const document = validateEffectV1Document(JSON.parse(source)).document!;
+  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const host = createEffectHostClip({
+    effectInstanceId: 'annotation',
+    duration: 3,
+    name: 'Annotation',
+    startTime: 0,
+    trackId: sourceClip.trackId,
+    projectWidth: 640,
+    projectHeight: 360,
+  });
+  host.attachment = {
+    kind: 'source',
+    assetId: sourceClip.assetId,
+    sourceInstanceId: 'source-instance',
+  };
+  const changed = applyVideoProjectMutationPatch(project, {
+    clips: [...project.clips, host],
+    effectSnapshots: [
+      {
+        id: `effect:${sha256}`,
+        sha256,
+        source,
+        documentId: document.id,
+        kind: 'standalone',
+        schemaVersion: 'sniptale.effect.v1',
+        assets: [],
+        retainedByteLength: new TextEncoder().encode(source).byteLength,
+      },
+    ],
+    effectInstances: [
+      {
+        id: 'annotation',
+        snapshotId: `effect:${sha256}`,
+        controls: {},
+        enabled: true,
+        kind: 'standalone',
+        target: { kind: 'scene' },
+        startTime: 0,
+        duration: 3,
+        playbackRate: 1,
+      },
+    ],
+  });
+  expect(changed.version).toBe(38);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  for (let version = 2; version < 38; version++)
+    expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, clips: [host] })).toBe(true);
+  for (const attachment of [
+    null,
+    {},
+    { kind: 'unknown' },
+    { kind: 'viewport', clipId: 'other' },
+    { kind: 'source', assetId: '', sourceInstanceId: 'source-instance' },
+    { kind: 'source', assetId: sourceClip.assetId, sourceInstanceId: ' source-instance' },
+    {
+      kind: 'source',
+      assetId: sourceClip.assetId,
+      sourceInstanceId: 'source-instance',
+      extra: true,
+    },
+  ])
+    expect(
+      isHydratableVideoProject({ ...changed, clips: [sourceClip, { ...host, attachment }] })
+    ).toBe(false);
+  expect(
+    isExportReadyVideoProject({
+      ...changed,
+      clips: [
+        sourceClip,
+        {
+          ...host,
+          attachment: {
+            kind: 'source',
+            assetId: 'missing',
+            sourceInstanceId: 'source-instance',
+          },
+        },
+      ],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...changed,
+      clips: [{ ...sourceClip, attachment: { kind: 'viewport' } }, host],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...changed,
+      clips: [sourceClip, { ...host, attachment: { kind: 'viewport' } }],
+    })
+  ).toBe(true);
+  const sourceRange = {
+    assetId: sourceClip.assetId,
+    sourceInstanceId: 'source-instance',
+    start: 1,
+    end: 4,
+    dormant: true,
+  };
+  expect(
+    isExportReadyVideoProject({ ...changed, clips: [sourceClip, { ...host, sourceRange }] })
+  ).toBe(true);
+  expect(
+    isHydratableVideoProject({
+      ...changed,
+      version: 37,
+      clips: [sourceClip, { ...host, sourceRange }],
+    })
+  ).toBe(false);
+  for (const invalid of [
+    null,
+    {},
+    { ...sourceRange, extra: true },
+    { ...sourceRange, dormant: false },
+    { ...sourceRange, start: 4 },
+    { ...sourceRange, end: Infinity },
+    { ...sourceRange, end: 86401 },
+    { ...sourceRange, sourceInstanceId: '' },
+  ])
+    expect(
+      isHydratableVideoProject({
+        ...changed,
+        clips: [sourceClip, { ...host, sourceRange: invalid }],
+      })
+    ).toBe(false);
+  expect(
+    isHydratableVideoProject({ ...changed, clips: [{ ...sourceClip, sourceRange }, host] })
+  ).toBe(false);
+  const { attachment: _attachment, ...unbound } = host;
+  expect(
+    isHydratableVideoProject({ ...changed, clips: [sourceClip, { ...unbound, sourceRange }] })
+  ).toBe(false);
+  expect(
+    isExportReadyVideoProject({
+      ...changed,
+      clips: [sourceClip, { ...host, sourceRange: { ...sourceRange, assetId: 'missing-origin' } }],
+    })
+  ).toBe(false);
+  expect(applyVideoProjectMutationPatch(changed, { clips: [sourceClip] }).version).toBe(38);
 });

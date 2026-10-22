@@ -1,9 +1,10 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../../project/types/export';
+import type { VideoProjectRenderScope } from '../../../project/export/render-scope';
 import { mapCompositionPointThroughSourceContent } from '../../motion/source-window';
 import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
 import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionBorders } from './borders';
 import type { CameraOutputViewport } from '../../../project/export/output-dimensions';
-import type { VideoProject } from '../../../project/types/index';
 import { resolveVideoCompositionCamera } from '../../motion/index';
 import { resolveEffectRuntimeFramePlans } from '../../effect-runtime/frame/plan';
 import type { VideoCompositionFrame } from '../../types';
@@ -24,7 +25,7 @@ export type { VideoCompositionTimelineIndex } from './composition-index';
 export { resolveVideoCompositionCursor } from './cursor';
 
 export function resolveVideoCompositionFrame(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   options: {
     includeSubtitles?: boolean;
@@ -32,7 +33,11 @@ export function resolveVideoCompositionFrame(
     cameraViewport?: CameraOutputViewport;
   } = {}
 ): VideoCompositionFrame {
+  const attachmentGeometryProject = project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY];
   project = projectMotionSourcePhases(project);
+  const geometryProject = attachmentGeometryProject
+    ? projectMotionSourcePhases(attachmentGeometryProject)
+    : project;
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const actions = resolveVideoCompositionActions(project, currentTime);
   const cursorSample = resolveCursorSample(project, currentTime);
@@ -48,10 +53,16 @@ export function resolveVideoCompositionFrame(
   };
 
   const camera = resolveVideoCompositionCamera({
-    actions,
-    cursorSample,
+    actions:
+      geometryProject === project
+        ? actions
+        : resolveVideoCompositionActions(geometryProject, currentTime),
+    cursorSample:
+      geometryProject === project
+        ? cursorSample
+        : resolveCursorSample(geometryProject, currentTime),
     currentTime,
-    project,
+    project: geometryProject,
     ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
   });
   const cursor = resolveVideoCompositionCursor(project, currentTime, actions);
@@ -61,7 +72,17 @@ export function resolveVideoCompositionFrame(
       ? layers.map((layer) =>
           layer.kind === 'video' && layer.clipId === camera.sourceClipId
             ? { ...layer, sourceContentTransform }
-            : layer
+            : layer.kind === 'effect' &&
+                layer.sourceAttachment &&
+                layer.sourceAttachment.owner.clipId === camera.sourceClipId
+              ? {
+                  ...layer,
+                  sourceAttachment: {
+                    ...layer.sourceAttachment,
+                    innerTransform: sourceContentTransform,
+                  },
+                }
+              : layer
         )
       : layers;
   return {

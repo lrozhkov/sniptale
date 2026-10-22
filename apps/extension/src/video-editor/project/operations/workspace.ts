@@ -1,3 +1,6 @@
+import { verifyReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/validation';
+import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
+import type { VideoProjectEffectSnapshot } from '../../../features/video/project/effect-instance/types';
 import type { VideoWorkspaceSnapshot } from '../../../composition/persistence/review-workspaces/contracts';
 import {
   replayReviewHistory,
@@ -169,12 +172,36 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
 /** Resolve existing immutable media before the new root claims its references. */
 async function prepareReviewResources(
   project: VideoProject,
-  document: ReviewDocument
+  document: ReviewDocument,
+  snapshots: readonly ReviewAnnotationEffectSnapshot[]
 ): Promise<{
+  annotations: VideoProjectEffectSnapshot[];
   audio?: ReviewProjectAudioResources;
   images: readonly ReviewProjectSceneImageResource[];
   camera?: ReviewProjectCameraResource;
 }> {
+  const annotations: VideoProjectEffectSnapshot[] = [];
+  const signal = new AbortController().signal;
+  for (const id of new Set(
+    document.advancedContent.annotationEffects?.instances.map((entry) => entry.snapshotId)
+  )) {
+    const retained = snapshots.find((entry) => entry.id === id);
+    const verified = await verifyReviewAnnotationEffectSnapshot(
+      retained,
+      async (reference) => {
+        const assetId = reference.slice('project-asset:'.length);
+        const result = await getProjectAsset(assetId);
+        return result?.status === 'ready' && result.entry.id === assetId
+          ? result.entry.file
+          : undefined;
+      },
+      signal
+    );
+    annotations.push({
+      ...verified.snapshot,
+      assets: verified.assets.map(({ assetId: _reference, ...asset }) => asset),
+    });
+  }
   const audio = document.advancedContent.audio;
   const audioIds = new Set([
     ...[...audio.voiceover, ...audio.music].flatMap((take) => [
@@ -289,6 +316,7 @@ async function prepareReviewResources(
     }
   }
   return {
+    annotations,
     images,
     ...(camera ? { camera } : {}),
     ...(audioIds.size || audio.laneVolumes !== undefined
@@ -372,7 +400,11 @@ async function createProjectFromReview(
       buildMaterialPlacement({ ...empty, assets }, primary, 0, 'append').project
     );
   }
-  const resources = await prepareReviewResources(seed, document);
+  const resources = await prepareReviewResources(
+    seed,
+    document,
+    snapshot.workspace.effectSnapshots ?? []
+  );
   const result = planReviewProjectConversion({
     seed,
     name: name ?? primary.name,
@@ -381,6 +413,7 @@ async function createProjectFromReview(
     ui: snapshot.workspace.advanced.ui,
     ...(resources.audio ? { externalAudio: resources.audio } : {}),
     imageAssets: resources.images,
+    annotationSnapshots: resources.annotations,
     ...(resources.camera ? { camera: resources.camera } : {}),
   });
   if (result.status !== 'prepared')

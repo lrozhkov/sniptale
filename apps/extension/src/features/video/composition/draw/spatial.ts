@@ -88,7 +88,14 @@ export function drawSpatialCompositionGroup(args: {
       }
     },
   });
-  if (!args.layers.some((layer) => layer.kind === 'video' && layer.actions?.length)) return true;
+  if (
+    !args.layers.some(
+      (layer) =>
+        layer.kind === 'video' &&
+        (layer.actions?.length || (layer.deferSourceBorders && layer.borders?.length))
+    )
+  )
+    return true;
   const explicitActions = new Set(
     args.layers.filter((layer) => layer.effectActionsOnly).map((layer) => layer.clipId)
   );
@@ -108,7 +115,7 @@ export function drawSpatialCompositionGroup(args: {
         }
         if (
           layer.kind === 'video' &&
-          layer.actions?.length &&
+          (layer.actions?.length || (layer.deferSourceBorders && layer.borders?.length)) &&
           (layer.effectActionsOnly || !explicitActions.has(layer.clipId))
         )
           drawCompositionVisualLayer(

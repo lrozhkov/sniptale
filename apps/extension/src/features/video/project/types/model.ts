@@ -279,6 +279,16 @@ export interface VideoProjectAnnotationClip
 export interface VideoProjectEffectClip extends VideoProjectBaseClip {
   type: typeof VideoProjectClipType.EFFECT;
   effectInstanceId: string;
+  /** Original authoring interval; dormant content is retained without contributing output time. */
+  sourceRange?: {
+    assetId: string;
+    sourceInstanceId: string;
+    start: number;
+    end: number;
+    dormant?: true;
+  };
+  /** Omission retains Native camera policy; explicit placement uses the selected coordinate plane. */
+  attachment?: { kind: 'viewport' } | { kind: 'source'; assetId: string; sourceInstanceId: string };
 }
 
 export interface VideoProjectSubtitleClip extends VideoProjectBaseClip {
@@ -345,7 +355,9 @@ export interface VideoProject {
     | 34
     | 35
     | 36
-    | 37;
+    | 37
+    | 38
+    | 39;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

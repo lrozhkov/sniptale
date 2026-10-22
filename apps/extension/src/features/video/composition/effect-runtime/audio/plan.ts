@@ -153,6 +153,7 @@ function resolveTargetAvailability(
       !isEffectInstanceTimingEqual(host.duration, instance.duration)
     )
       return { status: 'invalid' };
+    if (host.type === 'EFFECT' && host.sourceRange?.dormant) return { status: 'hidden' };
     const track = project.tracks.find(({ id }) => id === host.trackId);
     return track?.visible === true
       ? {

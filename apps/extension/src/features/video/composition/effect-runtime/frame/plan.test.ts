@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
+import { resolveEffectV1ObjectRenderBounds } from '@sniptale/runtime-contracts/effect-v1';
+import { parseEffectRuntimeSnapshotDocument } from '../runtime/snapshot-document';
 
 import {
   createEmptyVideoProject,
@@ -19,6 +21,11 @@ import {
   type VideoProjectClip,
 } from '../../../project/types/index';
 import { resolveVideoCompositionFrame } from '../../timeline/frame/index';
+import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
+import {
+  createRecordingBaseClip,
+  createRecordingProjectAsset,
+} from '../../../project/factories/recording';
 import { resolveEffectRuntimeFramePlans } from './plan';
 
 describe('shared EffectV1 preview/export frame plan', () => {
@@ -321,4 +328,141 @@ it('preserves an external callout pointer through its clip FX chain', () => {
     expect(fx.dimensions).toEqual(host.dimensions);
     expect(fx.renderDimensions).toEqual(host.renderDimensions);
   }
+});
+
+it.each(['title', 'callout', 'corners', 'frame'])(
+  'keeps %s annotation geometry and current frame at fractional time',
+  (name) => {
+    const project = createProject();
+    const snapshot = project.effectSnapshots![0]!;
+    const source = readFileSync(
+      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+      'utf8'
+    );
+    snapshot.source = source;
+    const document = parseEffectRuntimeSnapshotDocument(snapshot);
+    snapshot.documentId = document.id;
+    const instance = project.effectInstances![0]!;
+    instance.controls = Object.fromEntries(
+      document.controls.map((control) => [control.id, control.defaultValue])
+    );
+    instance.sceneAnchors = { tip: { x: -100, y: -70 } };
+    const host = project.clips.find((clip) => clip.id === 'standalone-host')!;
+    host.transform = {
+      ...host.transform,
+      width: document.objectLayout!.width * 2,
+      height: document.objectLayout!.height * 2,
+      rotation: 23,
+    };
+    const plan = resolveEffectRuntimeFramePlans(project, 1.019).find(
+      (entry) => entry.effectInstanceId === instance.id
+    )!;
+    const layout = document.objectLayout!;
+    const local =
+      layout.resize === 'reflow'
+        ? { ...layout, width: host.transform.width, height: host.transform.height }
+        : layout;
+    const bounds = resolveEffectV1ObjectRenderBounds(local, plan.controls);
+    expect(plan.dimensions.width).toBeCloseTo(
+      (host.transform.width * bounds.width) / local.width,
+      7
+    );
+    expect(plan.dimensions.height).toBeCloseTo(
+      (host.transform.height * bounds.height) / local.height,
+      7
+    );
+    expect(plan.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 }).toEqual({
+      x: bounds.x / local.width,
+      y: bounds.y / local.height,
+      width: bounds.width / local.width,
+      height: bounds.height / local.height,
+    });
+    expect(plan.renderDimensions.width).toBeCloseTo(
+      Math.floor((host.transform.width * bounds.width) / local.width),
+      0
+    );
+    expect(plan.renderDimensions.height).toBeCloseTo(
+      Math.floor((host.transform.height * bounds.height) / local.height),
+      0
+    );
+    expect(plan.time).toBeCloseTo(1.019, 7);
+    expect(plan.frameIndex).toBe(Math.floor(plan.time * project.fps));
+  }
+);
+
+it('projects an ordinary effect onto its exact source and keeps missing placements dormant', () => {
+  const project = createProject();
+  const asset = createRecordingProjectAsset({
+    duration: 5,
+    filename: 'source.webm',
+    width: 1280,
+    height: 720,
+    recordingId: 'source-recording',
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  const source = createRecordingBaseClip(
+    asset,
+    { duration: 5, width: 1280, height: 720 },
+    project.tracks[0]!.id,
+    null
+  );
+  source.sourceInstanceId = 'source-placement';
+  source.transform = { ...source.transform, x: 100, y: 60, width: 640, height: 360 };
+  source.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+  const second = { ...source, id: 'second', sourceInstanceId: 'another-placement' };
+  const host = project.clips.find((clip) => clip.type === 'EFFECT')!;
+  if (host.type !== 'EFFECT') throw new Error('Expected effect host');
+  host.attachment = {
+    kind: 'source',
+    assetId: asset.id,
+    sourceInstanceId: source.sourceInstanceId,
+  };
+  project.assets = [asset];
+  project.clips = [source, second, host];
+  project.transitions = [];
+  project.effectInstances = [project.effectInstances![0]!];
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const effect = frame.visualLayers.find((layer) => layer.clipId === host.id)!;
+  if (effect.kind !== 'effect') throw new Error('Expected effect layer');
+  expect(effect.sourceAttachment?.owner.clipId).toBe(source.id);
+  expect(effect.sourceAttachment?.mapping.sourceCrop).toEqual(source.sourceCrop);
+  expect(effect.sourceAttachment?.mapping.frame).toEqual(source.transform);
+  expect(effect.clip.transform).toEqual(host.transform);
+  expect(frame.effectRuntimePlans).toHaveLength(1);
+  expect(
+    shouldLockVisualLayerToViewport(effect, { ...frame.camera, sourceClipId: source.id })
+  ).toBe(false);
+  expect(
+    shouldLockVisualLayerToViewport(effect, { ...frame.camera, sourceClipId: second.id })
+  ).toBe(true);
+
+  const tail = {
+    ...source,
+    id: 'tail',
+    startTime: 2,
+    duration: 3,
+    sourceStart: 2,
+    sourceDuration: 3,
+  };
+  project.clips = [{ ...source, duration: 2, sourceDuration: 2 }, tail, second, host];
+  const afterSplit = resolveVideoCompositionFrame(project, 2);
+  const tailEffect = afterSplit.visualLayers.find((layer) => layer.clipId === host.id)!;
+  if (tailEffect.kind !== 'effect') throw new Error('Expected effect layer');
+  expect(tailEffect.sourceAttachment?.owner.clipId).toBe(tail.id);
+  expect(afterSplit.effectRuntimePlans[0]!.time).toBe(2);
+  project.clips = [second, host];
+  const missing = resolveVideoCompositionFrame(project, 1);
+  expect(missing.effectRuntimePlans).toEqual([]);
+  expect(missing.visualLayers.some((layer) => layer.clipId === host.id)).toBe(false);
+  expect(host.attachment.sourceInstanceId).toBe('source-placement');
+  host.attachment = { kind: 'viewport' };
+  const viewport = resolveVideoCompositionFrame(project, 1);
+  const viewportEffect = viewport.visualLayers.find((layer) => layer.clipId === host.id)!;
+  expect(
+    shouldLockVisualLayerToViewport(viewportEffect, {
+      ...viewport.camera,
+      overlayZoomMode: 'FOLLOW_CAMERA',
+    })
+  ).toBe(true);
 });

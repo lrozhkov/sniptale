@@ -61,6 +61,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   spotlightTarget: { ru: 'Объект подсветки', en: 'Spotlight target' },
   spotlightCoverage: { ru: 'Область действия', en: 'Coverage' },
   spotlightCoverageWindow: { ru: 'Окно', en: 'Window' },
+  spotlightCoverageSourceScene: { ru: 'Сцена источника', en: 'Source scene' },
   spotlightCoverageScene: { ru: 'Вся сцена', en: 'Whole scene' },
   spotlightConnection: { ru: 'Переход подсветки', en: 'Spotlight transition' },
   connectSpotlight: { ru: 'Связать подсветку', en: 'Connect spotlights' },

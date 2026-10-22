@@ -76,10 +76,13 @@ export function planReviewProjectMotion(
         easing: region.linkEasing === 'linear' ? 'LINEAR' : 'EASE_IN_OUT',
       };
   }
+  const minimumVersion = regions.some((region) => region.spotlightTarget === 'source-scene')
+    ? 39
+    : 34;
   const utilityLanes = getVideoProjectUtilityLanes(project);
   return {
     ...project,
-    version: project.version > 34 ? project.version : 34,
+    version: project.version > minimumVersion ? project.version : minimumVersion,
     motionRegions: regions,
     utilityLanes: { ...utilityLanes, camera: { ...utilityLanes.camera, visible: applied } },
   };
@@ -115,7 +118,7 @@ function mappedRegion(
       ? { border: structuredClone(region.border), borderTarget: 'window' as const }
       : {}),
     ...(region.spotlight
-      ? { spotlight: structuredClone(region.spotlight), spotlightTarget: 'scene' as const }
+      ? { spotlight: structuredClone(region.spotlight), spotlightTarget: 'source-scene' as const }
       : {}),
     targetAction: null,
     scale: region.transform.scale,

@@ -36,7 +36,16 @@ export function removeVideoProjectLibrarySources(
   if (removedAssetIds.size === 0) return project;
   const removedClipIds = new Set(
     project.clips
-      .filter((clip) => 'assetId' in clip && removedAssetIds.has(clip.assetId))
+      .filter(
+        (clip) =>
+          ('assetId' in clip && removedAssetIds.has(clip.assetId)) ||
+          (clip.type === 'EFFECT' &&
+            clip.attachment?.kind === 'source' &&
+            removedAssetIds.has(clip.attachment.assetId)) ||
+          (clip.type === 'EFFECT' &&
+            clip.sourceRange?.dormant === true &&
+            removedAssetIds.has(clip.sourceRange.assetId))
+      )
       .map(({ id }) => id)
   );
   const removedTransitions = (project.transitions ?? []).filter(
@@ -50,6 +59,12 @@ export function removeVideoProjectLibrarySources(
     .filter(({ id }) => !removedClipIds.has(id))
     .map((clip) => {
       const next = { ...clip };
+      if (
+        next.type === 'EFFECT' &&
+        next.sourceRange &&
+        removedAssetIds.has(next.sourceRange.assetId)
+      )
+        delete next.sourceRange;
       if (
         next.type === 'SHAPE' &&
         next.embeddedAsset &&
@@ -254,10 +269,17 @@ function removeSourceEffects(
   removedClipIds: ReadonlySet<string>,
   removedTransitionIds: ReadonlySet<string>
 ): Pick<VideoProject, 'effectInstances' | 'effectSnapshots'> {
-  const effectInstances = project.effectInstances?.filter(({ target }) =>
-    target.kind === 'clip'
-      ? !removedClipIds.has(target.clipId)
-      : target.kind !== 'transition' || !removedTransitionIds.has(target.transitionId)
+  const removedHosts = new Set(
+    project.clips.flatMap((clip) =>
+      clip.type === 'EFFECT' && removedClipIds.has(clip.id) ? [clip.effectInstanceId] : []
+    )
+  );
+  const effectInstances = project.effectInstances?.filter(({ id, target }) =>
+    target.kind === 'scene'
+      ? !removedHosts.has(id)
+      : target.kind === 'clip'
+        ? !removedClipIds.has(target.clipId)
+        : target.kind !== 'transition' || !removedTransitionIds.has(target.transitionId)
   );
   const removedSnapshots = new Set(
     project.effectInstances

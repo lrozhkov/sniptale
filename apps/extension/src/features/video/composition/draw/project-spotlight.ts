@@ -149,11 +149,16 @@ function resolveBoundSceneSpotlight(
     scale: projectionDensity(projection, attachment.window) * attachment.sourceScale,
   });
   const opacity = Math.max(0, Math.min(1, layer.opacity));
+  const weight = state.sourceTransition?.blend ? layer.renderState.opacityMultiplier : 1;
+  const strengthOpacity = weight > 0 ? Math.min(1, opacity / weight) : 0;
   return {
     ...sample,
-    dim: sample.dim * opacity,
-    blur: sample.blur * opacity,
+    dim: sample.dim * strengthOpacity,
+    blur: sample.blur * strengthOpacity,
     presence: (sample.presence ?? 1) * opacity,
+    ...(state.sourceTransition?.blend
+      ? { blend: { groupId: state.sourceTransition.id, weight } }
+      : {}),
   };
 }
 
@@ -180,11 +185,22 @@ function spotlightViewportExtent(
 
 /** Both Native runtimes apply scene masks once, before viewport overlays and viewport borders. */
 export function drawCompositionSceneSpotlights(
-  args: Omit<CompositionSpotlightGeometry, 'transform'> & { context: CanvasRenderingContext2D }
+  args: Omit<CompositionSpotlightGeometry, 'transform'> & {
+    context: CanvasRenderingContext2D;
+    afterClipId?: string;
+    blurSource?: () => HTMLCanvasElement | OffscreenCanvas;
+  }
 ): void {
-  if (!args.frame.sceneSpotlights?.length) return;
+  const states = args.frame.sceneSpotlights?.filter(
+    (state) => state.afterClipId === args.afterClipId
+  );
+  if (!states?.length) return;
   const transform = args.context.getTransform();
-  const layers = resolveCompositionSceneSpotlights({ ...args, transform });
+  const layers = resolveCompositionSceneSpotlights({
+    ...args,
+    frame: { ...args.frame, sceneSpotlights: states },
+    transform,
+  });
   if (!layers.length) return;
   args.context.save();
   try {
@@ -192,7 +208,11 @@ export function drawCompositionSceneSpotlights(
     args.context.rect(args.viewport.x, args.viewport.y, args.viewport.width, args.viewport.height);
     args.context.clip();
     args.context.setTransform(1, 0, 0, 1, 0, 0);
-    drawSceneSpotlights(args.context, args.context.canvas, null, layers);
+    const source =
+      layers.some((layer) => layer.blur > 0) && args.blurSource
+        ? args.blurSource()
+        : args.context.canvas;
+    drawSceneSpotlights(args.context, source, null, layers);
   } finally {
     args.context.restore();
   }

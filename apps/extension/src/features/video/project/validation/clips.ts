@@ -47,8 +47,49 @@ function isTransform(value: unknown): boolean {
   );
 }
 
+function isEffectAttachment(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value['kind'] === 'viewport') return Object.keys(value).length === 1;
+  return (
+    value['kind'] === 'source' &&
+    Object.keys(value).length === 3 &&
+    isBoundedString(value['assetId'], 256) &&
+    isString(value['assetId']) &&
+    value['assetId'].length > 0 &&
+    value['assetId'].trim() === value['assetId'] &&
+    isBoundedString(value['sourceInstanceId'], 256) &&
+    isString(value['sourceInstanceId']) &&
+    value['sourceInstanceId'].length > 0 &&
+    value['sourceInstanceId'].trim() === value['sourceInstanceId']
+  );
+}
+
+function isEffectSourceRange(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) =>
+      ['assetId', 'sourceInstanceId', 'start', 'end', 'dormant'].includes(key)
+    ) &&
+    isEffectAttachment({
+      kind: 'source',
+      assetId: value['assetId'],
+      sourceInstanceId: value['sourceInstanceId'],
+    }) &&
+    isBoundedNumber(value['start'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    isBoundedNumber(value['end'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    value['end'] > value['start'] &&
+    (value['dormant'] === undefined || value['dormant'] === true)
+  );
+}
+
 function hasBaseClipFields(value: Record<string, unknown>): boolean {
   return (
+    (value['sourceRange'] === undefined ||
+      (value['type'] === VideoProjectClipType.EFFECT &&
+        value['attachment'] !== undefined &&
+        isEffectSourceRange(value['sourceRange']))) &&
+    (value['attachment'] === undefined ||
+      (value['type'] === VideoProjectClipType.EFFECT && isEffectAttachment(value['attachment']))) &&
     isString(value['id']) &&
     isString(value['trackId']) &&
     isEnumValue(value['type'], VideoProjectClipType) &&

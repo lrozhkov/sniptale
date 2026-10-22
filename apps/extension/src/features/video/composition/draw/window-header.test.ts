@@ -16,6 +16,16 @@ import {
   windowHeaderImageKey,
 } from './window-header';
 import { expect, it, vi } from 'vitest';
+import { planReviewProjectScene } from '../../review/project-scene';
+import {
+  createQuickEditAdvancedContent,
+  createQuickEditAdvancedState,
+} from '../../review/advanced/defaults';
+import {
+  computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
+  computeQuickEditSourceWindowTransform,
+} from '../../review/advanced/scene';
 import {
   DEFAULT_WINDOW_HEADER,
   windowHeaderGeometry,
@@ -23,6 +33,7 @@ import {
 import {
   drawFittedMediaLayer,
   getFittedMediaContentFrame,
+  getFittedMediaOriginalWindowFrame,
   mapSourceNormalizedPointToVisualLayer,
   mapVisualLayerPointToSourceNormalized,
 } from './fitted-media';
@@ -335,4 +346,43 @@ it('describes independent video and image header rasters without camera or unava
   }
   expect(projectWindowHeaderImages(project, [image])).toEqual([rasters[1]]);
   expect(JSON.stringify(project)).toBe(before);
+});
+
+it.each([false, true])('retains the Gallery source-window header plane; cropped=%s', (cropped) => {
+  const source = { width: 640, height: 360, duration: 3, mimeType: 'video/webm', size: 1 };
+  const content = createQuickEditAdvancedContent();
+  content.background = {
+    enabled: true,
+    type: 'solid',
+    color: '#123456ff',
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  content.windowHeader = DEFAULT_WINDOW_HEADER;
+  if (cropped)
+    content.canvas = { width: 640, height: 360, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } };
+  const ui = { ...createQuickEditAdvancedState().ui, mode: 'advanced' as const };
+  const result = planReviewProjectScene({ source, content, ui });
+  if (result.status !== 'prepared') throw new Error('Expected scene');
+  const scene = {
+    source,
+    background: content.background,
+    windowHeader: content.windowHeader,
+    canvas: content.canvas,
+  };
+  const layout = computeQuickEditSceneLayout({
+    ...scene,
+    output: computeQuickEditSceneSize(scene),
+    camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+  });
+  const actual = getFittedMediaOriginalWindowFrame({
+    sourceWidth: source.width,
+    sourceHeight: source.height,
+    frame: result.video.transform,
+    fitMode: result.video.fitMode,
+    windowHeader: content.windowHeader,
+    ...(result.video.sourceCrop ? { sourceCrop: result.video.sourceCrop } : {}),
+  });
+  const expected = computeQuickEditSourceWindowTransform(layout);
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(actual[key]).toBeCloseTo(expected[key], 7);
 });

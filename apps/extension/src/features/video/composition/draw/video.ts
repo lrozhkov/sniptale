@@ -101,7 +101,7 @@ export function drawVideoLayer(
     },
   };
   const deferActions =
-    !layer.effectActionsOnly &&
+    (!layer.effectActionsOnly || layer.deferSourceBorders) &&
     (!!layer.borders?.length || !!layer.spotlights?.length) &&
     !!layer.actions?.length;
   const paintWindow = (target: CanvasRenderingContext2D) =>
@@ -137,7 +137,8 @@ export function drawVideoLayer(
   if (!layer.effectActionsOnly && layer.spotlights?.length)
     drawIsolatedVideoWindow(context, layer, media, frame, displayScale, paintWindow);
   else paintWindow(context);
-  if (!layer.effectActionsOnly) drawVideoWindowBorders(context, layer, media, frame, displayScale);
+  if (!layer.effectActionsOnly || layer.deferSourceBorders)
+    drawVideoWindowBorders(context, layer, media, frame, displayScale);
   if (deferActions)
     drawFittedMediaLayer({
       ...media,

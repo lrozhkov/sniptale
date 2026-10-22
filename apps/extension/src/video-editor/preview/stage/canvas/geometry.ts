@@ -1,7 +1,15 @@
+import { resolveEffectSourceProjection as resolvePreviewEffectSourceProjection } from '../../../../features/video/composition/motion/source-window';
+export { resolvePreviewEffectSourceProjection };
+import { shouldLockVideoClipToViewport } from '../../../../features/video/composition/action-occurrence-geometry';
+import type {
+  VideoProjectClip,
+  VideoProjectEffectClip,
+} from '../../../../features/video/project/types';
 import type { CSSProperties } from 'react';
 import { motionCameraProjection } from '../../../../features/video/composition/motion/spatial';
 import {
   invertQuickEditProjection,
+  multiplyQuickEditProjections,
   projectQuickEditPoint,
   quickEditProjectionCss,
   type QuickEditHomography,
@@ -19,7 +27,6 @@ export {
   canEditVideoActionOccurrence as canEditActionOccurrenceOnCanvas,
   mapScenePointToVideoActionOccurrence as mapScenePointToActionOccurrence,
   mapVideoActionOccurrencePointToScene as mapActionOccurrencePointToScene,
-  shouldLockVideoClipToViewport as shouldLockPreviewClipToViewport,
 } from '../../../../features/video/composition/action-occurrence-geometry';
 
 interface PreviewStageBounds {
@@ -91,6 +98,8 @@ export function resolvePreviewStageViewportMetrics(
 
 export function mapClientPointToCompositionPoint(params: {
   camera: PreviewStageCanvasProps['camera'];
+  clip?: VideoProjectClip;
+  currentTime?: number;
   clientX: number;
   clientY: number;
   lockToViewport?: boolean;
@@ -113,9 +122,19 @@ export function mapClientPointToCompositionPoint(params: {
     y: (viewportY / viewport.height) * params.project.height,
   };
 
-  return params.lockToViewport
+  const point = params.lockToViewport
     ? viewportPoint
     : mapViewportPointToComposition(viewportPoint, params.camera);
+  return point && params.clip
+    ? mapPreviewEffectPoint(
+        params.project,
+        params.clip,
+        params.camera,
+        params.currentTime ?? 0,
+        point,
+        true
+      )
+    : point;
 }
 
 export function getCompositionPointStageStyle(
@@ -140,14 +159,44 @@ export function getCompositionRectStageStyle(
   rect: { height: number; width: number; x: number; y: number; rotation?: number },
   camera: PreviewStageCanvasProps['camera'],
   lockToViewport: boolean,
-  stage: HTMLDivElement
+  stage: HTMLDivElement,
+  sourceProjection?: QuickEditHomography
 ): CSSProperties {
   const { bounds, viewport } = resolvePreviewStageViewportMetrics(stage, project);
   if (bounds.width <= 0 || bounds.height <= 0) return { display: 'none' };
-  if (!lockToViewport && camera.spatial) {
+  if (sourceProjection || (!lockToViewport && camera.spatial)) {
     if (rect.width === 0 && rect.height === 0)
       return getCompositionPointStageStyle(project, rect, camera, false, stage);
-    const matrix = motionCameraProjection(camera, viewport.scale);
+    const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    let matrix = lockToViewport
+      ? identity
+      : camera.spatial
+        ? motionCameraProjection(camera, viewport.scale)
+        : ([
+            camera.scale,
+            0,
+            -camera.viewportX * camera.scale * viewport.scale,
+            0,
+            camera.scale,
+            -camera.viewportY * camera.scale * viewport.scale,
+            0,
+            0,
+            1,
+          ] satisfies QuickEditHomography);
+    if (matrix && sourceProjection) {
+      const [a, b, c, d, e, f, g, h, i] = sourceProjection;
+      matrix = multiplyQuickEditProjections(matrix, [
+        a,
+        b,
+        c * viewport.scale,
+        d,
+        e,
+        f * viewport.scale,
+        g / viewport.scale,
+        h / viewport.scale,
+        i,
+      ]);
+    }
     if (!matrix || !matrix.every(Number.isFinite) || !invertQuickEditProjection(matrix))
       return { display: 'none' };
     const radians = ((rect.rotation ?? 0) * Math.PI) / 180;
@@ -211,4 +260,43 @@ export function getPreviewStageInteractionScale(
     scaleX: scaledValue,
     scaleY: scaledValue,
   };
+}
+
+/** Explicit Effect attachments use their source owner's camera partition. */
+export function shouldLockPreviewClipToViewport(
+  clip: Pick<VideoProjectClip, 'type' | 'trackId'> & {
+    attachment?: VideoProjectEffectClip['attachment'];
+  },
+  camera: PreviewStageCanvasProps['camera'],
+  project: Pick<VideoProject, 'tracks'> & Partial<Pick<VideoProject, 'clips'>>
+) {
+  if (clip.type === 'EFFECT' && clip.attachment) {
+    if (clip.attachment.kind === 'viewport') return true;
+    const binding = clip.attachment;
+    return (
+      !!camera.sourceClipId &&
+      !project.clips?.some(
+        (source) =>
+          source.type === 'VIDEO' &&
+          source.id === camera.sourceClipId &&
+          source.assetId === binding.assetId &&
+          (source.sourceInstanceId ?? source.id) === binding.sourceInstanceId
+      )
+    );
+  }
+  return shouldLockVideoClipToViewport(clip, camera, project);
+}
+
+export function mapPreviewEffectPoint(
+  project: VideoProject,
+  clip: VideoProjectClip,
+  camera: PreviewStageCanvasProps['camera'],
+  time: number,
+  point: { x: number; y: number },
+  inverse = false
+) {
+  if (clip.type !== 'EFFECT' || clip.attachment?.kind !== 'source') return point;
+  const matrix = resolvePreviewEffectSourceProjection(project, clip, camera, time);
+  const mapping = matrix && (inverse ? invertQuickEditProjection(matrix) : matrix);
+  return mapping ? projectQuickEditPoint(mapping, point) : null;
 }

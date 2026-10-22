@@ -1,6 +1,10 @@
+import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
-import { resolveOrderedVisualPassLayers } from '../../../../features/video/composition/visual-pass-layers';
+import {
+  resolveOrderedVisualPassLayers,
+  splitVisualLayersForSourceSpotlights,
+} from '../../../../features/video/composition/visual-pass-layers';
 import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
@@ -174,6 +178,7 @@ export function drawPreviewVisualPasses(params: {
   }
 
   drawPreviewOrderedVisualLayers({
+    project: params.project,
     canvas: params.canvas,
     clipMediaElements: params.clipMediaElements,
     frame: params.overlayFrame,
@@ -193,6 +198,7 @@ export function drawPreviewVisualPasses(params: {
 }
 
 function drawPreviewOrderedVisualLayers(params: {
+  project: VideoProject;
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, HTMLMediaElement>;
   frame: ReturnType<typeof resolveVideoCompositionRenderPasses>['overlayFrame'];
@@ -213,34 +219,55 @@ function drawPreviewOrderedVisualLayers(params: {
   const passEffectStates = new Map<number, EffectRuntimeDrawState>();
 
   for (const segment of segments) {
-    if (segment.isLocked) {
-      for (const layer of segment.layers) {
-        drawLockedPreviewLayer(
-          params.prepared,
-          mapVisualLayerToViewportSpace(layer, params.frame.camera),
-          {
-            clipMediaElements: params.clipMediaElements,
-            effectRuntimeFrames: params.effectRuntimeFrames?.overlayFrames,
-            effectRuntimeState: overlayEffectState,
-            imageBank: params.imageBank,
-            pass: { alpha: 1, frame: params.frame, time: 0, transitionOverlays: [] },
-          }
-        );
-      }
-      continue;
+    for (const part of splitVisualLayersForSourceSpotlights(
+      segment.layers,
+      params.frame.sceneSpotlights
+    )) {
+      if (segment.isLocked) {
+        for (const layer of part.layers)
+          drawLockedPreviewLayer(
+            params.prepared,
+            mapVisualLayerToViewportSpace(layer, params.frame.camera),
+            {
+              clipMediaElements: params.clipMediaElements,
+              effectRuntimeFrames: params.effectRuntimeFrames?.overlayFrames,
+              effectRuntimeState: overlayEffectState,
+              imageBank: params.imageBank,
+              pass: { alpha: 1, frame: params.frame, time: 0, transitionOverlays: [] },
+            }
+          );
+      } else
+        drawPreviewUnlockedLayerGroup({
+          canvas: params.canvas,
+          clipMediaElements: params.clipMediaElements,
+          effectRuntimeFrames: params.effectRuntimeFrames,
+          effectRuntimeStates: passEffectStates,
+          imageBank: params.imageBank,
+          layers: part.layers,
+          passes: params.passes,
+          prepared: params.prepared,
+          spatialRenderer: params.spatialRenderer,
+        });
+      if (part.afterClipId)
+        drawCompositionSceneSpotlights({
+          context: params.prepared.context,
+          afterClipId: part.afterClipId,
+          frame: params.frame,
+          project: params.project,
+          images: params.imageBank,
+          viewport: {
+            x: params.prepared.viewport.offsetX,
+            y: params.prepared.viewport.offsetY,
+            width: params.prepared.viewport.width,
+            height: params.prepared.viewport.height,
+          },
+          composition: {
+            x: params.prepared.viewport.offsetX,
+            y: params.prepared.viewport.offsetY,
+            scale: params.prepared.viewport.scale,
+          },
+        });
     }
-
-    drawPreviewUnlockedLayerGroup({
-      canvas: params.canvas,
-      clipMediaElements: params.clipMediaElements,
-      effectRuntimeFrames: params.effectRuntimeFrames,
-      effectRuntimeStates: passEffectStates,
-      imageBank: params.imageBank,
-      layers: segment.layers,
-      passes: params.passes,
-      prepared: params.prepared,
-      spatialRenderer: params.spatialRenderer,
-    });
   }
 }
 

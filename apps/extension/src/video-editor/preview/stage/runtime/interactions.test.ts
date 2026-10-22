@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
+import { createVideoProjectAsset } from '../../../../features/video/project/factories/creation';
 
 import { act } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -272,3 +274,77 @@ it('does not start a spatial transform gesture when the camera inverse is singul
   window.dispatchEvent(new Event('pointerup'));
   expect(f.onUpdateClipTransform).not.toHaveBeenCalled();
 });
+
+it.each(['commit', 'cancel'] as const)(
+  'uses source pixels for a transferred annotation gesture and %s through the existing owner',
+  (ending) => {
+    const scenario = createUnlockedStageScenario();
+    const { project, stage } = scenario;
+    const source = scenario.clip;
+    if (source.type !== 'VIDEO') throw new Error('Expected video fixture');
+    const asset = createVideoProjectAsset(
+      'Source',
+      'VIDEO',
+      { kind: 'project-asset', projectAssetId: 'source' },
+      {
+        width: 1000,
+        height: 500,
+        duration: 4,
+        size: 100,
+        mimeType: 'video/webm',
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    asset.id = source.assetId;
+    source.sourceInstanceId = 'placement';
+    source.transform = { ...source.transform, x: 0, y: 0, width: 200, height: 100 };
+    const host = createEffectHostClip({
+      duration: 4,
+      effectInstanceId: 'annotation',
+      name: 'Annotation',
+      projectWidth: 1000,
+      projectHeight: 500,
+      startTime: 0,
+      trackId: source.trackId,
+    });
+    host.attachment = { kind: 'source', assetId: asset.id, sourceInstanceId: 'placement' };
+    host.transform = { x: 100, y: 100, width: 200, height: 100, rotation: 0, opacity: 1 };
+    project.assets = [asset];
+    project.clips = [source, host];
+    createStageRectSpy(stage);
+    const preview = vi.fn(),
+      restore = vi.fn();
+    beginPreviewStageInteraction({
+      ...scenario,
+      clip: host,
+      currentTime: 1,
+      interactionRef: { current: null },
+      event: createPointerEvent(100, 60),
+      mode: 'move',
+      gestureHooks: { onPreviewTransform: preview, onRestore: restore },
+      tracks: project.tracks,
+    });
+    act(() => dispatchPointerMove(140, 80));
+    expect(scenario.onUpdateClipTransform).not.toHaveBeenCalled();
+    act(() =>
+      window.dispatchEvent(
+        ending === 'commit'
+          ? new Event('pointerup')
+          : new KeyboardEvent('keydown', { key: 'Escape' })
+      )
+    );
+    if (ending === 'commit') {
+      expect(scenario.onUpdateClipTransform).toHaveBeenCalledOnce();
+      expect(scenario.onUpdateClipTransform).toHaveBeenCalledWith(
+        host.id,
+        expect.objectContaining({ x: expect.closeTo(200, 7), y: expect.closeTo(150, 7) })
+      );
+    } else {
+      expect(scenario.onUpdateClipTransform).not.toHaveBeenCalled();
+      expect(restore).toHaveBeenCalledWith(host.id);
+    }
+    expect(host.transform).toMatchObject({ x: 100, y: 100 });
+    expect(preview).toHaveBeenLastCalledWith(host.id, null);
+  }
+);

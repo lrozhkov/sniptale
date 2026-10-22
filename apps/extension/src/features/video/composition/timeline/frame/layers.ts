@@ -1,4 +1,8 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../../project/types/export';
+import type { VideoProjectRenderScope } from '../../../project/export/render-scope';
 import { resolveVideoCompositionSpotlights } from './spotlights';
+import { resolveEffectSourceClip } from '../../../project/effect-instance/placement';
+import { resolveCursorSourcePointMapping } from './cursor';
 import { resolveVideoCompositionBorders } from './borders';
 import type { VideoCompositionBorderState, VideoCompositionSpotlightState } from '../../types';
 import { hasCameraMediaAt, resolveCameraVisualClip } from '../../../project/camera/animation';
@@ -15,11 +19,7 @@ import {
   resolveSubtitleClipStyle,
   resolveTextualClipStyle,
 } from '../../../project/text/subtitle-track';
-import {
-  VideoProjectTrackRole,
-  type VideoProject,
-  type VideoProjectClip,
-} from '../../../project/types/index';
+import { VideoProjectTrackRole, type VideoProjectClip } from '../../../project/types/index';
 import type { EffectRuntimeFramePlan } from '../../effect-runtime/runtime/types';
 import type { VideoCompositionVisualLayer, VideoCompositionActionState } from '../../types';
 import { createAnnotationVisualLayer } from './annotation-layer';
@@ -30,7 +30,7 @@ import {
 
 function createBaseVisualLayer(
   clip: Extract<VideoProjectClip, { transform: VideoProjectClip['transform'] }>,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   opacity: number,
   zIndex: number
@@ -56,7 +56,7 @@ function createBaseVisualLayer(
 function createVisualLayer(
   clip: VideoProjectClip,
   currentTime: number,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   zIndex: number,
   options: {
     includeSubtitles: boolean;
@@ -108,8 +108,22 @@ function createVisualLayer(
       return createTextVisualLayer(clip, project, resolvedBaseLayer);
     case 'ANNOTATION':
       return createAnnotationVisualLayer(clip, currentTime, project, zIndex);
-    case 'EFFECT':
-      return { ...resolvedBaseLayer, clip, kind: 'effect' };
+    case 'EFFECT': {
+      if (clip.attachment?.kind !== 'source') return { ...resolvedBaseLayer, clip, kind: 'effect' };
+      const geometryProject = project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project;
+      const source = resolveEffectSourceClip(geometryProject, clip, currentTime);
+      const mapping =
+        source && resolveCursorSourcePointMapping(geometryProject, source.id, currentTime);
+      const owner =
+        source && createVisualLayer(source, currentTime, geometryProject, zIndex, options);
+      if (!mapping || owner?.kind !== 'video') return null;
+      return {
+        ...resolvedBaseLayer,
+        clip,
+        kind: 'effect',
+        sourceAttachment: { owner, mapping },
+      };
+    }
     case 'SHAPE':
       return { ...resolvedBaseLayer, clip, kind: 'shape' };
   }
@@ -117,7 +131,7 @@ function createVisualLayer(
 
 function createTextVisualLayer(
   clip: Extract<VideoProjectClip, { type: 'TEXT' | 'SUBTITLE' }>,
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   baseLayer: ReturnType<typeof createBaseVisualLayer>
 ): VideoCompositionVisualLayer {
   return {
@@ -134,7 +148,7 @@ function createTextVisualLayer(
 }
 
 export function resolveVideoCompositionVisualLayers(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   options: {
     includeSubtitles?: boolean;
@@ -179,7 +193,7 @@ export function resolveVideoCompositionVisualLayers(
 }
 
 export function resolveVideoCompositionEffectInputLayers(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   currentTime: number,
   plans: readonly EffectRuntimeFramePlan[],
   options: {

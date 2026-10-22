@@ -142,7 +142,12 @@ function resolveInstanceFramePlan(args: {
     duration: document.duration,
     effectInstanceId: instance.id,
     fps: args.project.fps,
-    frameIndex: Math.max(0, Math.round(timing.effectTime * args.project.fps)),
+    frameIndex: Math.max(
+      0,
+      instance.kind === 'standalone'
+        ? Math.floor(timing.effectTime * args.project.fps)
+        : Math.round(timing.effectTime * args.project.fps)
+    ),
     kind: instance.kind,
     progress: timing.progress,
     renderDimensions,

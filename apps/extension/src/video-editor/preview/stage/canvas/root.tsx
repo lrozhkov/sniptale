@@ -232,6 +232,7 @@ export function createPreviewStageSelectionOverlay(
   return (
     <>
       <PreviewStageSelectionOverlay
+        currentTime={params.currentTime}
         beginInteraction={params.beginInteraction}
         camera={params.camera}
         project={params.project}

@@ -1,3 +1,6 @@
+import { getPreviewStageSelection } from '../runtime/surface-state';
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
+import { mapCompositionPointThroughCamera } from '../../../../features/video/composition/motion';
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import {
@@ -13,6 +16,9 @@ import {
 import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import {
   shouldLockPreviewClipToViewport,
+  mapPreviewEffectPoint,
+  mapClientPointToCompositionPoint,
+  resolvePreviewEffectSourceProjection,
   getPreviewStageInteractionScale,
   getCompositionRectStageStyle,
 } from './geometry';
@@ -115,4 +121,98 @@ it('projects all rotated selection corners with the same perspective as the scen
     );
     expect((m[1]! * x! + m[5]! * y! + m[13]!) / actualW).toBeCloseTo((90 + (py - 90) / w) * 2.5, 9);
   }
+});
+
+it('maps transferred source annotation body and pointer through the same fitted source plane', () => {
+  const project = createEmptyVideoProject();
+  project.width = 1280;
+  project.height = 720;
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'source' },
+    {
+      width: 640,
+      height: 360,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const source = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0);
+  if (source.type !== 'VIDEO') throw new Error('Expected video fixture');
+  source.sourceInstanceId = 'placement';
+  source.transform = { ...source.transform, x: 240, y: 120, width: 640, height: 360, rotation: 15 };
+  const host = createEffectHostClip({
+    duration: 4,
+    effectInstanceId: 'effect',
+    name: 'Annotation',
+    projectWidth: 640,
+    projectHeight: 360,
+    startTime: 0,
+    trackId: project.tracks[0]!.id,
+  });
+  host.attachment = { kind: 'source', assetId: asset.id, sourceInstanceId: 'placement' };
+  project.assets = [asset];
+  project.clips = [source, host];
+  expect(
+    getPreviewStageSelection({
+      project,
+      activeClips: [source, host],
+      selectedClipId: null,
+      selectedEffectInstanceId: 'effect',
+    }).selectedClip
+  ).toBe(host);
+  expect(
+    getPreviewStageSelection({
+      project,
+      activeClips: [source],
+      selectedClipId: null,
+      selectedEffectInstanceId: 'effect',
+    }).selectedClip
+  ).toBeNull();
+  const camera = {
+    ...resolveVideoCompositionFrame({ ...project, clips: [source] }, 1).camera,
+    scale: 2,
+    viewportX: 100,
+    viewportY: 80,
+  };
+  const stage = document.createElement('div');
+  stage.getBoundingClientRect = () => new DOMRect(10, 20, 1280, 720);
+  const raw = { x: 160, y: 90 };
+  const mapped = mapPreviewEffectPoint(project, host, camera, 1, raw)!;
+  const angle = (15 * Math.PI) / 180;
+  expect(mapped.x).toBeCloseTo(560 - 160 * Math.cos(angle) + 90 * Math.sin(angle), 7);
+  expect(mapped.y).toBeCloseTo(300 - 160 * Math.sin(angle) - 90 * Math.cos(angle), 7);
+  const viewport = mapCompositionPointThroughCamera(mapped, camera)!;
+  const inverse = mapClientPointToCompositionPoint({
+    project,
+    camera,
+    clip: host,
+    currentTime: 1,
+    stage,
+    clientX: 10 + viewport.x,
+    clientY: 20 + viewport.y,
+    clampToViewport: false,
+  });
+  expect(inverse!.x).toBeCloseTo(raw.x, 7);
+  expect(inverse!.y).toBeCloseTo(raw.y, 7);
+  expect(shouldLockPreviewClipToViewport(host, camera, project)).toBe(false);
+  expect(resolvePreviewEffectSourceProjection(project, host, camera, 4)).toBeNull();
+  expect(mapPreviewEffectPoint(project, host, camera, 4, raw)).toBeNull();
+  const style = getCompositionRectStageStyle(
+    project,
+    host.transform,
+    camera,
+    false,
+    stage,
+    resolvePreviewEffectSourceProjection(project, host, camera, 1)!
+  );
+  expect(style.transform).toContain('matrix3d');
+  expect(style.transformOrigin).toBe('0 0');
+  host.attachment = { kind: 'viewport' };
+  expect(shouldLockPreviewClipToViewport(host, camera, project)).toBe(true);
+  expect(mapPreviewEffectPoint(project, host, camera, 1, raw)).toEqual(raw);
 });

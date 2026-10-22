@@ -51,6 +51,7 @@ export interface InteractionState extends PreviewTransformGestureState {
 function createPreviewStageInteractionState(params: {
   clip: VideoProjectClip;
   camera: VideoCompositionCameraState;
+  currentTime?: number;
   event: React.PointerEvent;
   mode: ResizeHandle;
   project: VideoProject;
@@ -64,10 +65,16 @@ function createPreviewStageInteractionState(params: {
     shouldLockPreviewClipToViewport(clip, camera, project)
   );
   let projectivePointer: InteractionState['projectivePointer'];
-  if (camera.spatial && !shouldLockPreviewClipToViewport(clip, camera, project)) {
+  if (
+    (clip.type === 'EFFECT' && clip.attachment?.kind === 'source') ||
+    (camera.spatial && !shouldLockPreviewClipToViewport(clip, camera, project))
+  ) {
     const map = (point: PreviewTransformClientPoint) =>
       mapClientPointToCompositionPoint({
         camera,
+        clip,
+        currentTime: params.currentTime ?? 0,
+        lockToViewport: shouldLockPreviewClipToViewport(clip, camera, project),
         project,
         stage,
         clientX: point.clientX,
@@ -99,6 +106,7 @@ function createPreviewStageInteractionState(params: {
 export function beginPreviewStageInteraction(params: {
   clip: VideoProjectClip;
   camera: VideoCompositionCameraState;
+  currentTime?: number;
   cleanupRef: React.MutableRefObject<(() => void) | null>;
   event: React.PointerEvent;
   gestureHooks?: PreviewTransformGestureHooks;
@@ -122,6 +130,7 @@ export function beginPreviewStageInteraction(params: {
   const state = createPreviewStageInteractionState({
     clip: params.clip,
     camera: params.camera,
+    currentTime: params.currentTime ?? 0,
     event: params.event,
     mode: params.mode,
     project: params.project,
@@ -178,6 +187,10 @@ function resolvePreviewStageTransform(params: {
           y: (params.point.clientY - params.state.origin.clientY) / params.state.scaleY,
         };
   const transform = resolveUnsnappedTransform(params.state, delta);
+  if (params.state.clip.type === 'EFFECT' && params.state.clip.attachment?.kind === 'source') {
+    params.onGuideChange([]);
+    return transform;
+  }
   const snapped = snapClipTransform({
     clip: params.state.clip,
     mode: params.state.mode === 'move' || params.state.aspectRatio ? 'move' : 'resize',

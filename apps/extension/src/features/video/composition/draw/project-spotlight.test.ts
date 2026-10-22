@@ -176,31 +176,36 @@ it('skips a bound window behind the scene plane instead of masking another insta
   expect(resolveCompositionSceneSpotlights(args)).toEqual([]);
 });
 
-it('restores the output context when scene mask drawing fails', () => {
-  const args = sceneFixture();
-  const context = {
-    canvas: { width: 1280, height: 720 },
-    getTransform: () => args.transform,
-    save: vi.fn(),
-    restore: vi.fn(),
-    beginPath: vi.fn(),
-    rect: vi.fn(),
-    clip: vi.fn(),
-    setTransform: vi.fn(),
-  };
-  vi.mocked(drawSceneSpotlights).mockImplementationOnce(() => {
-    throw new Error('mask failed');
-  });
-  expect(() =>
-    drawCompositionSceneSpotlights({
-      ...args,
-      context: context as unknown as CanvasRenderingContext2D,
-    })
-  ).toThrow('mask failed');
-  expect(context.rect).toHaveBeenCalledWith(0, 0, 640, 360);
-  expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
-  expect(context.restore).toHaveBeenCalledOnce();
-});
+it.each([false, true])(
+  'restores the output context when scene mask drawing fails with source scope=%s',
+  (sourceScope) => {
+    const args = sceneFixture();
+    if (sourceScope) args.frame.sceneSpotlights![0]!.afterClipId = args.clip.id;
+    const context = {
+      canvas: { width: 1280, height: 720 },
+      getTransform: () => args.transform,
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      setTransform: vi.fn(),
+    };
+    vi.mocked(drawSceneSpotlights).mockImplementationOnce(() => {
+      throw new Error('mask failed');
+    });
+    expect(() =>
+      drawCompositionSceneSpotlights({
+        ...args,
+        ...(sourceScope ? { afterClipId: args.clip.id } : {}),
+        context: context as unknown as CanvasRenderingContext2D,
+      })
+    ).toThrow('mask failed');
+    expect(context.rect).toHaveBeenCalledWith(0, 0, 640, 360);
+    expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
+    expect(context.restore).toHaveBeenCalledOnce();
+  }
+);
 
 it.each([false, true])(
   'projects inner source masks without moving the window clip: source=%s',
@@ -220,5 +225,85 @@ it.each([false, true])(
     );
     expect(mask.clip).toMatchObject({ radius: 12, rect: { x: 50, y: 30, width: 160, height: 90 } });
     expect(mask.blur).toBe(source ? 40 : 20);
+  }
+);
+
+it.each(['dim', 'blur'] as const)(
+  'samples an explicit composed source only for active %s blur',
+  (effect) => {
+    const args = sceneFixture();
+    args.frame.sceneSpotlights![0]!.spotlight.effect = effect;
+    const context = {
+      canvas: { width: 1280, height: 720 },
+      getTransform: () => args.transform,
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      setTransform: vi.fn(),
+    };
+    const snapshot = { width: 1280, height: 720 };
+    const blurSource = vi.fn(() => snapshot as HTMLCanvasElement);
+    drawCompositionSceneSpotlights({
+      ...args,
+      context: context as unknown as CanvasRenderingContext2D,
+      blurSource,
+    });
+    expect(blurSource).toHaveBeenCalledTimes(effect === 'blur' ? 1 : 0);
+    expect(vi.mocked(drawSceneSpotlights).mock.lastCall?.[1]).toBe(
+      effect === 'blur' ? snapshot : context.canvas
+    );
+  }
+);
+
+it.each(['dim', 'blur'] as const)(
+  'retains the authored %s kernel and carries Native crossfade coverage separately',
+  (effect) => {
+    const args = sceneFixture();
+    const original = args.frame.visualLayers[0]!;
+    if (original.kind !== 'video') throw new Error('Expected source video.');
+    args.frame.visualLayers = [0.25, 0.75].map((weight, index) => ({
+      ...original,
+      clipId: index ? 'trailing' : original.clipId,
+      clip: { ...original.clip, id: index ? 'trailing' : original.clipId },
+      opacity: weight,
+      renderState: { ...original.renderState, opacityMultiplier: weight },
+    }));
+    const transition = {
+      id: 'authored-focus-crossfade',
+      blend: true as const,
+      leadingClipId: original.clipId,
+      trailingClipId: 'trailing',
+    };
+    args.frame.sceneSpotlights = args.frame.visualLayers.map((layer, index) => ({
+      ...args.frame.sceneSpotlights![0]!,
+      id: `mask-${index}`,
+      clipId: layer.clipId,
+      afterClipId: 'trailing',
+      sourceTransition: transition,
+      spotlight: { ...createQuickEditSpotlight(), effect },
+      phase: 'hold',
+      progress: 1,
+    }));
+    const before = structuredClone(args.frame);
+    const layers = resolveCompositionSceneSpotlights(args);
+    const full = sampleCompositionSpotlightLayer({
+      ...geometry,
+      state: args.frame.sceneSpotlights[0]!,
+      window: layers[0]!.protectionOpening!,
+      scale: 4,
+    });
+    expect(layers.map((layer) => layer.blend)).toEqual([
+      { groupId: transition.id, weight: 0.25 },
+      { groupId: transition.id, weight: 0.75 },
+    ]);
+    expect(layers.map((layer) => layer.presence)).toEqual([0.25, 0.75]);
+    if (effect === 'dim') expect(layers.map((layer) => layer.dim)).toEqual([0.65, 0.65]);
+    else {
+      expect(full.blur).toBe(48);
+      expect(layers.map((layer) => layer.blur)).toEqual([48, 48]);
+    }
+    expect(args.frame).toEqual(before);
   }
 );

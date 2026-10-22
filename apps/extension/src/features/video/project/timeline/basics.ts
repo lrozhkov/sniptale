@@ -53,8 +53,9 @@ export function getClipEndTime(clip: VideoProjectClip): number {
 export function calculateProjectDuration(project: VideoProject): number {
   let duration = project.clips.reduce(
     (maxEnd, clip) =>
-      clip.type === VideoProjectClipType.AUDIO &&
-      clip.durationMode === VideoProjectDurationMode.PROJECT
+      (clip.type === VideoProjectClipType.EFFECT && clip.sourceRange?.dormant) ||
+      (clip.type === VideoProjectClipType.AUDIO &&
+        clip.durationMode === VideoProjectDurationMode.PROJECT)
         ? maxEnd
         : Math.max(maxEnd, getClipEndTime(clip)),
     0
@@ -111,7 +112,11 @@ export function isAudioClip(
 }
 
 export function isClipActiveAtTime(clip: VideoProjectClip, currentTime: number): boolean {
-  return currentTime >= clip.startTime && currentTime < getClipEndTime(clip);
+  return (
+    !(clip.type === VideoProjectClipType.EFFECT && clip.sourceRange?.dormant) &&
+    currentTime >= clip.startTime &&
+    currentTime < getClipEndTime(clip)
+  );
 }
 
 export function getLinkedClipIds(project: VideoProject, clipId: string): string[] {

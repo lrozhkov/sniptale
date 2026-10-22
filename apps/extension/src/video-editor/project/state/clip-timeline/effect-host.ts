@@ -1,3 +1,4 @@
+import { activateRetainedEffectHost } from '../../../../features/video/project/effect-instance/placement';
 import { getEffectClipLabel } from '../../../../features/video/project/effect-instance/presentation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { applyTimelinePlacementPolicy } from '../../../../features/video/project/timeline';
@@ -86,11 +87,12 @@ export function splitStandaloneEffectHostWithResult(
   const localOffset = splitTime - sourceHost.startTime;
   if (localOffset <= 0.05 || localOffset >= sourceHost.duration - 0.05) return null;
 
+  const activeHost = activateRetainedEffectHost(sourceHost);
   const secondDuration = sourceHost.duration - localOffset;
   const sourceStart = sourceInstance.sourceStart ?? 0;
   const instanceId = crypto.randomUUID();
   const secondHost: VideoProjectEffectClip = {
-    ...sourceHost,
+    ...activeHost,
     duration: secondDuration,
     effectInstanceId: instanceId,
     id: crypto.randomUUID(),
@@ -113,7 +115,7 @@ export function splitStandaloneEffectHostWithResult(
   };
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((clip) =>
-      clip.id === sourceHost.id ? [{ ...sourceHost, duration: localOffset }, secondHost] : [clip]
+      clip.id === sourceHost.id ? [{ ...activeHost, duration: localOffset }, secondHost] : [clip]
     ),
     effectInstances: (project.effectInstances ?? []).flatMap((instance) =>
       instance.id === sourceInstance.id ? [firstInstance, secondInstance] : [instance]

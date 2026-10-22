@@ -308,7 +308,8 @@ it('uses global raster coverage with bounded tile readbacks and releases masks e
       Array.from({ length: 3 }, (_, i) => (write.x + i >= 4 && write.x + i < 6 ? 204 : 0))
     );
   expect(owner.writes.filter((write) => write.role === 'spotlight.dim')).toHaveLength(9);
-  expect(owner.resources.bytes).toHaveBeenCalledWith('spotlight.coverage', 96);
+  // Tile data and prefix use 96 bytes. Group indices and references add 32 bytes.
+  expect(owner.resources.bytes).toHaveBeenCalledWith('spotlight.coverage', 128);
   expect(owner.released).toEqual(['bytes', 'spotlight.hole']);
   masks.dispose();
   masks.dispose();

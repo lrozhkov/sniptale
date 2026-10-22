@@ -160,6 +160,8 @@ function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
     duplicateEffectInstance: state.duplicateEffectInstance,
     moveEffectInstance: state.moveEffectInstance,
     updateEffectInstance: state.updateEffectInstance,
+    updateEffectAttachment: state.updateEffectAttachment,
+    restoreEffectSourceRange: state.restoreEffectSourceRange,
   };
 }
 

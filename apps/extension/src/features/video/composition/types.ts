@@ -1,4 +1,5 @@
 import type { QuickEditHomography } from './motion/spatial-geometry';
+import type { VisualLayerSourcePointMapping } from './draw/fitted-media';
 import type { QuickEditBorder, QuickEditSpotlight } from '../project/scene/focus-appearance';
 import type { SceneBorderClock } from './scene-border';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
@@ -41,6 +42,8 @@ interface VideoCompositionLayerBase<TClip, TKind extends string> {
   /** Already composed in viewport coordinates by a track/global FX stage. */
   effectViewportRaster?: boolean;
   effectActionsOnly?: boolean;
+  /** Source-scene utility projection also paints its deferred border after the scene mask. */
+  deferSourceBorders?: boolean;
   clip: TClip;
   clipId: string;
   kind: TKind;
@@ -87,6 +90,10 @@ export interface VideoCompositionBorderState {
 
 /** Evaluated Native source phase; an optional concrete clip anchors scene-wide coverage. */
 export interface VideoCompositionSpotlightState {
+  /** Source-scene masks run after this authored layer, before later layers. */
+  afterClipId?: string;
+  /** Split appearances of one authored focus share a single Native transition mask pass. */
+  sourceTransition?: { id: string; leadingClipId: string; trailingClipId: string; blend?: true };
   coordinateSpace?: 'source-window';
   id: string;
   spotlight: QuickEditSpotlight;
@@ -103,7 +110,7 @@ export type VideoCompositionVisualLayer =
       /** Inner source exposure remains inside the decorated window mask. */
       sourceContentTransform?: QuickEditHomography;
       actions?: readonly VideoCompositionActionState[];
-      /** Window-local borders enter the same clip/effect input and transform pipeline once. */
+      /** Window borders enter clip FX once; source-scene utility borders follow their scene mask. */
       borders?: readonly VideoCompositionBorderState[];
       /** Window masks operate on isolated source pixels before clip/track effects. */
       spotlights?: readonly VideoCompositionSpotlightState[];
@@ -111,7 +118,14 @@ export type VideoCompositionVisualLayer =
   | VideoCompositionLayerBase<VideoProjectImageClip, 'image'>
   | VideoCompositionLayerBase<VideoCompositionResolvedTextClip, 'text'>
   | VideoCompositionLayerBase<VideoCompositionResolvedAnnotationClip, 'annotation'>
-  | VideoCompositionLayerBase<VideoProjectEffectClip, 'effect'>
+  | (VideoCompositionLayerBase<VideoProjectEffectClip, 'effect'> & {
+      /** Disposable source geometry; the host still owns body geometry and animation timing. */
+      sourceAttachment?: {
+        owner: Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
+        mapping: Omit<VisualLayerSourcePointMapping, 'point'>;
+        innerTransform?: QuickEditHomography;
+      };
+    })
   | VideoCompositionLayerBase<VideoProjectShapeClip, 'shape'>;
 
 export interface VideoCompositionCursorState {

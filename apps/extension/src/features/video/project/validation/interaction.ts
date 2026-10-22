@@ -297,7 +297,9 @@ export function isMotionRegion(value: unknown): boolean {
       : value['border'] === undefined &&
         parseQuickEditSpotlight(value['spotlight']) !== null &&
         (value['spotlightTarget'] === 'viewport' ||
-          ((value['spotlightTarget'] === 'window' || value['spotlightTarget'] === 'scene') &&
+          ((value['spotlightTarget'] === 'window' ||
+            value['spotlightTarget'] === 'scene' ||
+            value['spotlightTarget'] === 'source-scene') &&
             value['sourceBinding'] !== undefined))) &&
     parseCameraPerspective(value['perspective']) !== null &&
     parseCameraDepth(value['depthOfField']) !== null &&

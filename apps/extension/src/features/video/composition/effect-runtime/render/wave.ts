@@ -1,3 +1,6 @@
+import { drawSceneBackground, getProjectSceneBackground } from '../../../project/scene/background';
+import { resolveSceneBackgroundAudioEnvelope } from '../../../project/scene/background-audio';
+import type { VideoProject } from '../../../project/types';
 import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../runtime/resource-limits';
 // policyStateIds: [] - empty render maps are immutable sentinels, not authority state.
@@ -17,6 +20,7 @@ import type {
 const EMPTY_EFFECT_RUNTIME_FRAMES: EffectRuntimeRenderedFrameMap = new Map();
 
 export async function renderEffectRuntimeComposition(args: {
+  project?: VideoProject;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   executor: EffectRuntimeSandboxExecutor;
   imageBank: Record<string, HTMLImageElement>;
@@ -31,11 +35,11 @@ export async function renderEffectRuntimeComposition(args: {
   const renderedByTime = new Map<number, EffectRuntimeRenderedFrameMap>();
   const resourceLedger = createEffectRuntimeCompositionResourceLedger();
   try {
-    const overlayFrames = await renderFrame(args.overlayFrame);
+    const overlayFrames = await renderFrame(args.overlayFrame, args.overlayTime);
     renderedByTime.set(args.overlayTime, overlayFrames);
     for (const pass of args.visualPasses) {
       if (renderedByTime.has(pass.time)) continue;
-      renderedByTime.set(pass.time, await renderFrame(pass.frame));
+      renderedByTime.set(pass.time, await renderFrame(pass.frame, pass.time));
     }
     return { framesByTime: renderedByTime, overlayFrames };
   } catch (error) {
@@ -46,19 +50,42 @@ export async function renderEffectRuntimeComposition(args: {
     throw error;
   }
 
-  function renderFrame(frame: VideoCompositionFrame): Promise<EffectRuntimeRenderedFrameMap> {
+  function renderFrame(
+    frame: VideoCompositionFrame,
+    time: number
+  ): Promise<EffectRuntimeRenderedFrameMap> {
     args.signal?.throwIfAborted();
     if ((frame.effectRuntimePlans ?? []).length === 0) {
       return Promise.resolve(EMPTY_EFFECT_RUNTIME_FRAMES);
     }
+    if (frame.sceneSpotlights?.some((state) => state.afterClipId) && !args.project)
+      throw new Error('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
     const resourceScope = resourceLedger.createFrameScope();
-    const plans = (frame.effectRuntimePlans ?? []).map((plan) =>
-      scaleEffectRuntimeFramePlan(plan, args.rasterScale)
+    const plans = orderBackdropTrackPlans(
+      (frame.effectRuntimePlans ?? []).map((plan) =>
+        scaleEffectRuntimeFramePlan(plan, args.rasterScale)
+      ),
+      frame
     );
     return renderEffectRuntimeFramePlans({
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
         camera: frame.camera,
+        ...(args.project ? { scene: { project: args.project, frame } } : {}),
+        drawBackground: (context, dimensions) => {
+          const project = args.project;
+          if (!project) throw new Error('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
+          drawSceneBackground({
+            context,
+            ...dimensions,
+            currentTime: time,
+            projectScale: dimensions.width / project.width,
+            audioEnvelope: resolveSceneBackgroundAudioEnvelope(project, time),
+            sceneBackground: getProjectSceneBackground(project),
+            loadedImages: args.imageBank,
+            ...(frame.camera.backgroundCamera ? { camera: frame.camera.backgroundCamera } : {}),
+          });
+        },
         ...(args.spatialRenderer ? { spatialRenderer: args.spatialRenderer } : {}),
         clipMediaElements: args.clipMediaElements,
         imageBank: args.imageBank,
@@ -71,6 +98,27 @@ export async function renderEffectRuntimeComposition(args: {
       ...(args.signal ? { signal: args.signal } : {}),
     });
   }
+}
+
+/** Backdrop readers depend on lower track results; each FX chain retains its authored order. */
+function orderBackdropTrackPlans(plans: EffectRuntimeFramePlan[], frame: VideoCompositionFrame) {
+  if (
+    !frame.sceneSpotlights?.some(
+      (state) =>
+        state.afterClipId && (state.spotlight.effect === 'blur' || state.from?.effect === 'blur')
+    )
+  )
+    return plans;
+  const positions = new Map(frame.visualLayers.map((layer, index) => [layer.clipId, index]));
+  const rank = (plan: EffectRuntimeFramePlan) =>
+    plan.target.kind === 'track'
+      ? Math.min(...plan.target.clipIds.map((id) => positions.get(id) ?? Number.MAX_SAFE_INTEGER))
+      : Number.MAX_SAFE_INTEGER;
+  const tracks = plans
+    .filter((plan) => plan.target.kind === 'track')
+    .toSorted((left, right) => rank(left) - rank(right));
+  let nextTrack = 0;
+  return plans.map((plan) => (plan.target.kind === 'track' ? tracks[nextTrack++]! : plan));
 }
 
 function scaleEffectRuntimeFramePlan(

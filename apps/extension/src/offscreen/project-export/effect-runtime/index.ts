@@ -51,6 +51,7 @@ export function createOffscreenProjectEffectRuntime(
           : {}),
       });
       return renderEffectRuntimeComposition({
+        project: projectArgs.project,
         clipMediaElements: projectArgs.clipMediaElements,
         executor,
         imageBank: projectArgs.loadedImages,

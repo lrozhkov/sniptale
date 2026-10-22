@@ -1,3 +1,6 @@
+import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
+import { buildProjectTransitionSegments } from '../../../project/transition/project';
+import { getClipCompositeVisualOpacity } from '../../../project/timeline/presentation';
 import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
 import { isVideoProjectUtilityLaneVisible } from '../../../project/utility-lanes';
 import { getMotionAnimationTime, motionTransitionSettings } from '../../../project/motion/timing';
@@ -68,8 +71,72 @@ export function resolveVideoCompositionSpotlights(project: VideoProject, time: n
       windows.set(clipId, states);
     } else if (region.spotlightTarget === 'viewport') scene.push(state);
     else if (region.spotlightTarget === 'scene' && clipId) scene.push({ ...state, clipId });
+    else if (region.spotlightTarget === 'source-scene' && clipId)
+      scene.push({ ...state, clipId, afterClipId: clipId });
   }
+  joinSourceTransitionMasks(project, time, regions, scene);
   return { scene, windows };
+}
+
+function joinSourceTransitionMasks(
+  project: VideoProject,
+  time: number,
+  regions: readonly VideoProjectMotionRegion[],
+  states: VideoCompositionSpotlightState[]
+) {
+  if (!states.some((state) => state.afterClipId)) return;
+  const segments = buildProjectTransitionSegments(project).filter(
+    (segment) => time >= segment.start && time < segment.end
+  );
+  if (!segments.length) return;
+  const byId = new Map(states.map((state) => [state.id, state]));
+  const groups = new Map<
+    string,
+    { clipIds: Set<string>; states: VideoCompositionSpotlightState[] }
+  >();
+  for (const region of regions) {
+    const binding = region.sourceBinding;
+    if (region.spotlightTarget !== 'source-scene' || !binding?.animationGroupId) continue;
+    const group = groups.get(binding.animationGroupId) ?? {
+      clipIds: new Set<string>(),
+      states: [],
+    };
+    group.clipIds.add(binding.clipId);
+    const state = byId.get(region.id);
+    if (state) group.states.push(state);
+    groups.set(binding.animationGroupId, group);
+  }
+  if (!groups.size) return;
+  for (const segment of segments) {
+    const pair = [segment.leadingClipId, segment.trailingClipId];
+    const clips = project.clips.filter((clip) => pair.includes(clip.id) && clip.type === 'VIDEO');
+    const last = clips
+      .filter(
+        (clip) =>
+          getClipCompositeVisualOpacity(project, clip, time) > 0 &&
+          project.tracks.some((track) => track.id === clip.trackId && track.visible)
+      )
+      .toSorted((a, b) => b.startTime - a.startTime)[0];
+    const alpha = clips.reduce(
+      (sum, clip) => sum + resolveClipTransitionVisualState(project, clip, time).opacityMultiplier,
+      0
+    );
+    if (!last) continue;
+    for (const [groupId, group] of groups) {
+      if (!pair.every((id) => group.clipIds.has(id))) continue;
+      for (const state of group.states) {
+        if (!state.clipId || !pair.includes(state.clipId)) continue;
+        state.afterClipId = last.id;
+        state.sourceTransition = {
+          id: JSON.stringify([segment.transition.id, groupId]),
+          leadingClipId: segment.leadingClipId,
+          trailingClipId: segment.trailingClipId,
+          // Complementary Native fades blend coverage. Full overlapping exposures retain union coverage.
+          ...(alpha <= 1 + 4 * Number.EPSILON ? { blend: true as const } : {}),
+        };
+      }
+    }
+  }
 }
 
 function sampleSpotlightPhase(

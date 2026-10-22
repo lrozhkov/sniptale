@@ -26,6 +26,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
   if (
     regions?.some(
       (region) =>
@@ -62,6 +63,13 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (
+    clips.some(
+      (clip) =>
+        clip.type === 'EFFECT' && (clip.attachment !== undefined || clip.sourceRange !== undefined)
+    )
+  )
+    return 38;
   if (
     clips.some(
       (clip) =>

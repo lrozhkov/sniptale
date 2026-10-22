@@ -1,3 +1,5 @@
+import { planReviewProjectAnnotations } from './project-annotations';
+import type { VideoProjectEffectSnapshot } from '../project/effect-instance/types';
 import { planReviewProjectMotion } from './project-motion';
 import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
 import { planReviewProjectCursor } from './project-cursor';
@@ -67,6 +69,7 @@ export function planReviewProjectConversion(args: {
   externalAudio?: ReviewProjectAudioResources;
   camera?: ReviewProjectCameraResource;
   imageAssets?: readonly ReviewProjectSceneImageResource[];
+  annotationSnapshots?: readonly VideoProjectEffectSnapshot[];
   ui: QuickEditUiState;
 }): ReviewProjectConversionPlan {
   const blocked = (...issues: ReviewProjectConversionIssue[]): ReviewProjectConversionPlan => ({
@@ -215,6 +218,17 @@ export function planReviewProjectConversion(args: {
       linkMode: 'LINKED',
     }));
   }
+  const annotations = planReviewProjectAnnotations({
+    operationId: args.seed.id,
+    annotations: document.advancedContent.annotationEffects,
+    snapshots: args.annotationSnapshots ?? [],
+    segments: buildReviewTimeMap(args.source.duration, document.edits),
+    source: { ...args.source, assetId: asset.id, sourceInstanceId: timeline.sourceInstanceId },
+    scene: { width: scene.scene.width, height: scene.scene.height },
+    visible: args.ui.mode === 'advanced' && args.ui.tracks.annotationEffects !== false,
+    tracks: [...seedTracks, ...externalAudio.tracks, ...camera.tracks],
+  });
+  if (!annotations) return blocked({ kind: 'unmapped-content', field: 'annotationEffects' });
   const original = document.advancedContent.audio.original;
   const sourceMutes = (original.mutes ?? []).flatMap((mute) =>
     mute.kind === 'range'
@@ -228,8 +242,9 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || original.muted || !application.originalAudioApplied,
   });
-  const minimumVersion =
-    scene.scene.sceneBackground?.zoomBehavior !== undefined
+  const minimumVersion = annotations.clips.length
+    ? 38
+    : scene.scene.sceneBackground?.zoomBehavior !== undefined
       ? 37
       : scene.video.rememberedWindowLayout ||
           scene.scene.watermarkEnabled === false ||
@@ -271,12 +286,20 @@ export function planReviewProjectConversion(args: {
       ...scene.assets,
       ...camera.assets,
     ],
-    tracks: [...structuredClone(seedTracks), ...externalAudio.tracks, ...camera.tracks],
+    tracks: [
+      ...structuredClone(seedTracks),
+      ...externalAudio.tracks,
+      ...camera.tracks,
+      ...annotations.tracks,
+    ],
+    effectSnapshots: annotations.snapshots,
+    effectInstances: annotations.instances,
     clips: [
       ...timeline.videoClips.map((clip) => ({ ...master(clip), ...scene.video })),
       ...timeline.audioClips.map(master),
       ...externalAudio.clips,
       ...camera.clips,
+      ...annotations.clips,
     ],
     ...(original.ranges?.length || sourceMutes.length || externalAudio.originalSpeech !== undefined
       ? {
@@ -504,6 +527,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     windowHeader: false,
     webcam: false,
     watermark: false,
+    annotationEffects: false,
     presentation:
       content.presentation !== undefined &&
       (content.presentation.intro.mode !== 'none' ||
@@ -516,7 +540,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
         content.presentation.outroControl !== undefined),
     cameraFollowDefaults: false,
     cursorFocusPath: false,
-    annotationEffects: content.annotationEffects !== undefined,
+
     actionAudio: false,
     clickAnimations: false,
     keyAnimations: false,

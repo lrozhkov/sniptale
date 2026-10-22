@@ -381,7 +381,7 @@ export interface VideoProjectMotionRegion {
   /** Active spotlight mode retains dormant camera settings and the same interval clock. */
   spotlight?: import('../scene/focus-appearance').QuickEditSpotlight;
   /** Bound openings can affect their own window or the composed scene explicitly. */
-  spotlightTarget?: 'viewport' | 'window' | 'scene';
+  spotlightTarget?: 'viewport' | 'window' | 'scene' | 'source-scene';
   /** Absent settings inherit the project policy or the retained legacy path coefficients. */
   cameraFollow?: import('../camera/cursor-policy').CameraFollowSettings;
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */

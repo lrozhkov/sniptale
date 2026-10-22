@@ -1,3 +1,8 @@
+import { createEffectRuntimeInputMaterializer } from '../frame/inputs';
+import { drawSceneBackground } from '../../../project/scene/background';
+import { createVideoProjectFromRecording } from '../../../project/factories/creation';
+import { resolveVideoCompositionFrame } from '../../timeline/frame';
+import { createQuickEditSpotlight } from '../../../project/scene/focus-appearance';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -13,6 +18,18 @@ vi.mock('../runtime/driver', async (importOriginal) => ({
   renderEffectRuntimeFramePlans: renderPlans,
 }));
 
+vi.mock('../frame/inputs', async (original) => {
+  const actual = await original<typeof import('../frame/inputs')>();
+  return {
+    ...actual,
+    createEffectRuntimeInputMaterializer: vi.fn(actual.createEffectRuntimeInputMaterializer),
+  };
+});
+vi.mock('../../../project/scene/background', async (original) => ({
+  ...(await original<typeof import('../../../project/scene/background')>()),
+  drawSceneBackground: vi.fn(),
+}));
+
 class FakeBitmap implements ImageBitmap {
   readonly close = vi.fn();
   constructor(
@@ -25,6 +42,8 @@ const executor = { dispose: vi.fn(), renderFrame: vi.fn() } satisfies EffectRunt
 
 beforeEach(() => {
   renderPlans.mockReset();
+  vi.mocked(createEffectRuntimeInputMaterializer).mockClear();
+  vi.mocked(drawSceneBackground).mockClear();
   vi.stubGlobal('createImageBitmap', vi.fn());
 });
 
@@ -193,3 +212,135 @@ function createFrames(id: string): EffectRuntimeRenderedFrameMap {
     ],
   ]);
 }
+
+it('refuses source scene rendering without its accepted project geometry', async () => {
+  const overlayFrame = createFrame([createPlan('group')]);
+  overlayFrame.sceneSpotlights = [
+    {
+      id: 'mask',
+      clipId: 'source',
+      afterClipId: 'source',
+      spotlight: createQuickEditSpotlight(),
+      phase: 'hold',
+      progress: 1,
+    },
+  ];
+  renderPlans.mockResolvedValue(new Map());
+  await expect(
+    renderEffectRuntimeComposition({
+      clipMediaElements: new Map(),
+      executor,
+      imageBank: {},
+      overlayFrame,
+      overlayTime: 1,
+      visualPasses: [],
+    })
+  ).rejects.toThrow('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
+  expect(renderPlans).not.toHaveBeenCalled();
+});
+
+it('renders lower track FX before a higher backdrop consumer regardless of effect insertion order', async () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'source.webm',
+    width: 20,
+    height: 10,
+    duration: 2,
+    size: 1,
+    mimeType: 'video/webm',
+  });
+  const lower = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const upper = { ...lower, id: 'upper', trackId: 'upper-track' };
+  project.tracks.push({
+    ...project.tracks[0]!,
+    id: upper.trackId,
+    order: project.tracks[0]!.order - 1,
+    isRoot: false,
+  });
+  project.clips.push(upper);
+  const overlayFrame = resolveVideoCompositionFrame(project, 1);
+  const lowerPlan = {
+    ...createPlan('lower'),
+    kind: 'targetEffect' as const,
+    target: { kind: 'track' as const, trackId: lower.trackId, clipIds: [lower.id] },
+  };
+  const upperPlan = {
+    ...createPlan('upper'),
+    kind: 'targetEffect' as const,
+    target: { kind: 'track' as const, trackId: upper.trackId, clipIds: [upper.id] },
+  };
+  overlayFrame.effectRuntimePlans = [upperPlan, lowerPlan];
+  overlayFrame.sceneSpotlights = [
+    {
+      id: 'mask',
+      clipId: upper.id,
+      afterClipId: upper.id,
+      spotlight: { ...createQuickEditSpotlight(), effect: 'blur' },
+      phase: 'hold',
+      progress: 1,
+    },
+  ];
+  renderPlans.mockResolvedValue(new Map());
+  await renderEffectRuntimeComposition({
+    project,
+    clipMediaElements: new Map(),
+    executor,
+    imageBank: {},
+    overlayFrame,
+    overlayTime: 1,
+    visualPasses: [],
+  });
+  expect(
+    renderPlans.mock.lastCall?.[0].plans.map(
+      (plan: EffectRuntimeFramePlan) => plan.effectInstanceId
+    )
+  ).toEqual(['lower', 'upper']);
+});
+
+it('samples the shared background with each unique frame time and its own camera', async () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'source.webm',
+    width: 20,
+    height: 10,
+    duration: 2,
+    size: 1,
+    mimeType: 'video/webm',
+  });
+  const overlayFrame = createFrame([createPlan('overlay')]);
+  overlayFrame.camera.backgroundCamera = { scale: 1.2, viewportX: 3, viewportY: 4 };
+  const earlier = createFrame([createPlan('earlier')]);
+  renderPlans.mockResolvedValue(new Map());
+  const imageBank = {};
+  await renderEffectRuntimeComposition({
+    project,
+    executor,
+    imageBank,
+    clipMediaElements: new Map(),
+    overlayFrame,
+    overlayTime: 1,
+    visualPasses: [createPass(0.5, earlier), createPass(1, overlayFrame)],
+  });
+  const calls = vi.mocked(createEffectRuntimeInputMaterializer).mock.calls;
+  expect(calls).toHaveLength(2);
+  const context = {} as CanvasRenderingContext2D;
+  for (const [input] of calls) input.drawBackground?.(context, { width: 20, height: 10 });
+  expect(drawSceneBackground).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({
+      context,
+      currentTime: 1,
+      width: 20,
+      height: 10,
+      projectScale: 1,
+      audioEnvelope: 0,
+      loadedImages: imageBank,
+      camera: overlayFrame.camera.backgroundCamera,
+    })
+  );
+  expect(drawSceneBackground).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ currentTime: 0.5 })
+  );
+  expect(vi.mocked(drawSceneBackground).mock.calls[1]![0]).not.toHaveProperty('camera');
+});

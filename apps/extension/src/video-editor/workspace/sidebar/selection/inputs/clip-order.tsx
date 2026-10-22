@@ -22,6 +22,13 @@ export function ClipOrderControls(props: {
   const descriptionId = useId();
   const left = planClipSwap(props.project, props.clipId, 'left');
   const right = planClipSwap(props.project, props.clipId, 'right');
+  if (
+    left.status === 'unavailable' &&
+    left.reason === 'no-neighbor' &&
+    right.status === 'unavailable' &&
+    right.reason === 'no-neighbor'
+  )
+    return null;
   return (
     <div data-ui="video-editor.inspector.clip-order" className="space-y-1">
       <InspectorParameterRow
@@ -67,11 +74,6 @@ export function ClipOrderControls(props: {
           {translate('videoEditor.app.clipLater')}: {planHint(right)}
         </p>
       </div>
-      {left.status === 'unavailable' && right.status === 'unavailable' ? (
-        <p className="text-[11px] leading-relaxed text-[var(--sniptale-color-text-muted)]">
-          {planHint(left.reason === 'no-neighbor' ? right : left)}
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -28,7 +28,10 @@ import type {
 import { drawExportSceneBackground, type ExportSceneBackgroundCache } from './background';
 import { drawCompositionLayer } from './clip';
 import type { LoadedImagesMap } from './types';
-import { resolveOrderedVisualPassLayers } from '../../../features/video/composition/visual-pass-layers';
+import {
+  resolveOrderedVisualPassLayers,
+  splitVisualLayersForSourceSpotlights,
+} from '../../../features/video/composition/visual-pass-layers';
 import { drawExportTransitionOverlayPasses, resolveExportEffectDrawState } from './frame-effects';
 import { drawExportOverlayPass } from './frame-overlays';
 
@@ -69,6 +72,7 @@ function drawVisualPasses(params: {
   scaleX: number;
   scaleY: number;
   settings: VideoProjectExportSettings;
+  project: VideoProject;
   logicalSize: { width: number; height: number };
   spatialRenderer?: () => ReviewSpatialRenderer;
 }) {
@@ -83,19 +87,31 @@ function drawVisualPasses(params: {
   const passEffectStates = new Map<number, EffectRuntimeDrawState>();
 
   for (const segment of segments) {
-    if (segment.isLocked) {
-      drawLockedOverlayLayers(
-        params.context,
-        segment.layers,
-        params.renderPasses.overlayFrame,
-        params,
-        params.effectRuntimeFrames?.overlayFrames,
-        overlayEffectState
-      );
-      continue;
+    for (const part of splitVisualLayersForSourceSpotlights(
+      segment.layers,
+      params.renderPasses.overlayFrame.sceneSpotlights
+    )) {
+      if (segment.isLocked) {
+        drawLockedOverlayLayers(
+          params.context,
+          part.layers,
+          params.renderPasses.overlayFrame,
+          params,
+          params.effectRuntimeFrames?.overlayFrames,
+          overlayEffectState
+        );
+      } else drawUnlockedOverlayGroup(part.layers, params, passEffectStates);
+      if (part.afterClipId)
+        drawCompositionSceneSpotlights({
+          context: params.context,
+          afterClipId: part.afterClipId,
+          frame: params.renderPasses.overlayFrame,
+          project: params.project,
+          images: params.loadedImages,
+          viewport: { x: 0, y: 0, width: params.settings.width, height: params.settings.height },
+          composition: { x: params.offsetX, y: params.offsetY, scale: params.scaleX },
+        });
     }
-
-    drawUnlockedOverlayGroup(segment.layers, params, passEffectStates);
   }
 }
 
@@ -311,6 +327,7 @@ export function drawProjectFrame(
     offsetX,
     offsetY,
     renderPasses,
+    project,
     logicalSize: { width: project.width, height: project.height },
     ...(options.spatialRenderer ? { spatialRenderer: options.spatialRenderer } : {}),
     scaleX: scale,

@@ -1,3 +1,5 @@
+import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
+import type { VideoProjectRenderScope } from '../../project/export/render-scope';
 import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
 import { motionFocusAreaPoint } from '../../project/motion/focus-area';
 import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
@@ -719,11 +721,11 @@ function resolveProjectWindowLinkConflict(
 
 /** Refuse only exports that use an unresolved active follow camera. This check acquires no resources. */
 export function resolveProjectCameraConflicts(
-  project: VideoProject,
+  project: VideoProjectRenderScope,
   output?: CameraOutputViewport,
   interval = { start: 0, end: project.duration }
 ): ProjectCameraConflict[] {
-  project = projectMotionSourcePhases(project);
+  project = projectMotionSourcePhases(project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project);
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return [];
   const conflicts = (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
     if (

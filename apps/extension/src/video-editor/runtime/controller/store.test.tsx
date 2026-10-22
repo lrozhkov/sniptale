@@ -46,6 +46,8 @@ const expectedKeys = {
     'selectEffectInstance',
     'setClipEffectsBypassed',
     'setEffectTargetBypassed',
+    'restoreEffectSourceRange',
+    'updateEffectAttachment',
     'updateEffectInstance',
   ],
   export: [

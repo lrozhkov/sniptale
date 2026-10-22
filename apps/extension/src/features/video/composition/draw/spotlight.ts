@@ -18,6 +18,8 @@ export type SceneSpotlightClip = {
 
 /** Each opening retains its own decorated-window clip and output projection. */
 export interface SceneSpotlightLayer extends SceneSpotlightFrame {
+  /** Mutually exclusive source appearances blend coverage. Independent masks retain union coverage. */
+  blend?: { groupId: string; weight: number };
   clip?: SceneSpotlightClip | undefined;
   projection?: QuickEditHomography | undefined;
 }
@@ -130,6 +132,19 @@ export function createSceneSpotlightMasks(
     leases.push(dim);
     const blur = maskCanvas(output, 'spotlight.blur', resources);
     leases.push(blur);
+    const groups: number[][] = [];
+    const blends = new Map<string, number[]>();
+    if (frames.length > 1)
+      frames.forEach((frame, index) => {
+        const members = frame.blend ? blends.get(frame.blend.groupId) : undefined;
+        if (members) members.push(index);
+        else {
+          const group = [index];
+          groups.push(group);
+          if (frame.blend) blends.set(frame.blend.groupId, group);
+        }
+      });
+    blends.clear();
     const width = dim.canvas.width,
       height = dim.canvas.height;
     // Tile readbacks and output ImageData stay within one scene-sized working set.
@@ -145,7 +160,8 @@ export function createSceneSpotlightMasks(
         'spotlight.coverage',
         frames.length === 1
           ? 3 * tileWidth * tileHeight * 4
-          : (2 * frames.length + 2) * tileWidth * tileHeight * 4 + (frames.length + 1) * 8
+          : (2 * frames.length + 2) * tileWidth * tileHeight * 4 +
+              (2 * frames.length + groups.length + 1) * 8
       );
       const single = frames.length === 1 ? frames[0] : undefined;
       const prefix = single ? null : new Float64Array(frames.length + 1);
@@ -169,7 +185,7 @@ export function createSceneSpotlightMasks(
           };
           if (single) paintSingleMaskTile(dim.context, blur.context, hole, single, radius, tile);
           else if (prefix)
-            paintMaskTile(dim.context, blur.context, hole, frames, prefix, radius, tile);
+            paintMaskTile(dim.context, blur.context, hole, frames, groups, prefix, radius, tile);
         }
     } finally {
       reservation?.release();
@@ -187,7 +203,7 @@ function paintSingleMaskTile(
   dim: CanvasRenderingContext2D,
   blur: CanvasRenderingContext2D,
   hole: RenderCanvasLease,
-  frame: SceneSpotlightFrame,
+  frame: SceneSpotlightLayer,
   radius: number,
   tile: SceneSpotlightRect
 ) {
@@ -196,8 +212,8 @@ function paintSingleMaskTile(
   const blurPixels = blur.createImageData(tile.width, tile.height);
   for (let pixel = 3; pixel < dimPixels.data.length; pixel += 4) {
     const outside = 1 - opening[pixel]! / 255;
-    const dimCoverage = Math.max(0, frame.dim * outside);
-    const blurCoverage = Math.max(0, frame.blur * outside);
+    const dimCoverage = Math.max(0, frame.dim * (frame.blend?.weight ?? 1) * outside);
+    const blurCoverage = Math.max(0, frame.blur * (frame.blend?.weight ?? 1) * outside);
     writeSpotlightCoverage(dimPixels, blurPixels, pixel, dimCoverage, blurCoverage, radius);
   }
   publishSpotlightPixels(dim, blur, dimPixels, blurPixels, tile);
@@ -246,6 +262,7 @@ function paintMaskTile(
   blur: CanvasRenderingContext2D,
   hole: RenderCanvasLease,
   frames: readonly SceneSpotlightLayer[],
+  groups: readonly number[][],
   prefix: Float64Array,
   radius: number,
   tile: SceneSpotlightRect
@@ -280,19 +297,29 @@ function paintMaskTile(
   );
   const dimPixels = dim.createImageData(tile.width, tile.height),
     blurPixels = blur.createImageData(tile.width, tile.height);
+  const protection = (members: readonly number[], pixel: number) => {
+    let sum = 0;
+    for (const i of members) sum += ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255;
+    return Math.min(1, sum);
+  };
   for (let pixel = 3; pixel < dimPixels.data.length; pixel += 4) {
-    for (let i = 0; i < frames.length; i++)
-      prefix[i + 1] =
-        prefix[i]! * (1 - ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255);
+    for (let group = 0; group < groups.length; group++)
+      prefix[group + 1] = prefix[group]! * (1 - protection(groups[group]!, pixel));
     let suffix = 1,
       dimCoverage = 0,
       blurCoverage = 0;
-    for (let i = frames.length - 1; i >= 0; i--) {
-      // Exclude this frame's protection, including its fractional edges.
-      const outside = (1 - openings[i]![pixel]! / 255) * prefix[i]! * suffix;
-      dimCoverage = Math.max(dimCoverage, frames[i]!.dim * outside);
-      blurCoverage = Math.max(blurCoverage, frames[i]!.blur * outside);
-      suffix *= 1 - ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255;
+    for (let group = groups.length - 1; group >= 0; group--) {
+      let groupDim = 0,
+        groupBlur = 0;
+      for (const i of groups[group]!) {
+        const outside = (1 - openings[i]![pixel]! / 255) * prefix[group]! * suffix;
+        const weight = frames[i]!.blend?.weight ?? 1;
+        groupDim += frames[i]!.dim * weight * outside;
+        groupBlur += frames[i]!.blur * weight * outside;
+      }
+      dimCoverage = Math.max(dimCoverage, groupDim);
+      blurCoverage = Math.max(blurCoverage, groupBlur);
+      suffix *= 1 - protection(groups[group]!, pixel);
     }
     writeSpotlightCoverage(dimPixels, blurPixels, pixel, dimCoverage, blurCoverage, radius);
   }
@@ -309,6 +336,7 @@ export function drawSceneSpotlights(
 ) {
   if (
     frames.length <= 1 &&
+    !frames[0]?.blend &&
     (!frames[0] || (!frames[0].projection && !sceneSpotlightNeedsClip(frames[0], frames[0].clip)))
   ) {
     drawSceneSpotlight(context, canvas, scratch, frames[0] ?? null, resources);

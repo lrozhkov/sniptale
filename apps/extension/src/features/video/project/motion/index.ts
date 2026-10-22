@@ -381,7 +381,10 @@ export function normalizeVideoProjectMotionRegion(
       : {}),
     ...(spotlight &&
     (spotlightTarget === 'viewport' ||
-      ((spotlightTarget === 'window' || spotlightTarget === 'scene') && sourceBinding))
+      ((spotlightTarget === 'window' ||
+        spotlightTarget === 'scene' ||
+        spotlightTarget === 'source-scene') &&
+        sourceBinding))
       ? { spotlight, spotlightTarget }
       : {}),
     ...(cameraFollow ? { cameraFollow } : {}),

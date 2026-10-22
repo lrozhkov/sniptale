@@ -259,7 +259,7 @@ function focusTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
   let mapping: VisualLayerSourcePointMapping | null = null;
   let lock = true;
   const target = region.border ? region.borderTarget : region.spotlightTarget;
-  if (target === 'window' || target === 'scene') {
+  if (target === 'window' || target === 'scene' || target === 'source-scene') {
     const layer = resolveVideoCompositionVisualLayers(project, params.currentTime ?? 0).find(
       (item) => item.clipId === region.sourceBinding?.clipId && item.kind === 'video'
     );
