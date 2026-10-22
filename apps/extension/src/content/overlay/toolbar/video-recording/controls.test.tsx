@@ -185,6 +185,9 @@ it('customizes icons without activating their tools or media controls', () => {
   const pencil = queryButton('content.toolbar.video-recording.visibility.pencil')!;
   expect(pencil.getAttribute('aria-pressed')).toBe('false');
   expect(pencil.querySelector('.lucide-eye-off')).not.toBeNull();
+  const indicator = pencil.querySelector('.lucide-eye-off')!;
+  expect(indicator.parentElement?.style.position).toBe('relative');
+  expect(indicator.parentElement?.contains(pencil.querySelector('svg'))).toBe(true);
   act(() => pencil.click());
   act(() => queryButton('content.toolbar.video-recording.visibility.microphone')?.click());
   act(() => queryButton('content.toolbar.video-recording.visibility.camera')?.click());

@@ -32,12 +32,24 @@ export function RecordingControlVisibility(props: {
         className="relative"
         onClick={() => void visibility.setVisible(props.control, !visible)}
       >
-        <Icon size={18} className={visible ? undefined : 'opacity-40'} />
-        <Indicator
-          size={10}
-          style={{ width: 10, height: 10 }}
-          className="absolute bottom-0 right-0 text-[var(--sniptale-color-text-secondary)]"
-        />
+        <span
+          style={{
+            position: 'relative',
+            display: 'inline-flex',
+            flexShrink: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+            height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+          }}
+        >
+          <Icon size={18} className={visible ? undefined : 'opacity-40'} />
+          <Indicator
+            size={10}
+            style={{ width: 10, height: 10 }}
+            className="absolute bottom-0 right-0 text-[var(--sniptale-color-text-secondary)]"
+          />
+        </span>
       </ContentToolbarButton>
     );
   }

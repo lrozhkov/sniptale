@@ -799,8 +799,34 @@ for (const { name, size } of [
             `[data-ui="content.toolbar.video-recording.visibility.${control}"]`
           );
           await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-          await toggle.click();
+          const indicator = toggle.locator('svg.lucide-eye, svg.lucide-eye-off');
+          const before = (await indicator.boundingBox())!;
+          await toggle.hover();
+          await page.mouse.down();
+          try {
+            await expect(toggle).toHaveAttribute('data-pressing', 'true');
+            await expect
+              .poll(async () => Math.abs((await indicator.boundingBox())!.x - before.x))
+              .toBeLessThanOrEqual(0.5);
+            await expect
+              .poll(async () => Math.abs((await indicator.boundingBox())!.y - before.y))
+              .toBeLessThanOrEqual(1.25);
+            if (control === 'pencil')
+              await page.screenshot({
+                path: info.outputPath('visibility-eye-held.png'),
+                fullPage: false,
+              });
+          } finally {
+            await page.mouse.up();
+          }
           await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+          await expect(indicator).toHaveClass(/lucide-eye-off/u);
+          await expect
+            .poll(async () => Math.abs((await indicator.boundingBox())!.x - before.x))
+            .toBeLessThanOrEqual(0.5);
+          await expect
+            .poll(async () => Math.abs((await indicator.boundingBox())!.y - before.y))
+            .toBeLessThanOrEqual(1.25);
           expect(await toggle.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
         }
         await page.evaluate(async () => document.fonts.ready);
