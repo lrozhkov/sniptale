@@ -74,6 +74,104 @@ for (const { name, size } of [
           .click();
         await page.keyboard.press('Escape');
         await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
+        for (const kind of ['microphone', 'camera', 'cursor'] as const) {
+          const primary = toolbar.locator(
+            `[data-ui="content.toolbar.video-recording.${kind === 'cursor' ? 'spotlight' : `${kind}.toggle`}"]`
+          );
+          const arrow = toolbar.locator(
+            `[data-ui="content.toolbar.video-recording.${kind === 'cursor' ? 'cursor-settings' : `${kind}.menu`}"]`
+          );
+          const iconBounds = (await primary.boundingBox())!;
+          const arrowBounds = (await arrow.boundingBox())!;
+          if (orientation === 'vertical') {
+            expect(Math.abs(arrowBounds.x - iconBounds.x)).toBeLessThanOrEqual(1);
+            expect(arrowBounds.y).toBeGreaterThanOrEqual(iconBounds.y + iconBounds.height - 1);
+            expect(arrowBounds.height).toBeCloseTo(18, 0);
+          } else {
+            expect(Math.abs(arrowBounds.y - iconBounds.y)).toBeLessThanOrEqual(1);
+            expect(arrowBounds.x).toBeGreaterThanOrEqual(iconBounds.x + iconBounds.width - 1);
+          }
+        }
+        for (const edge of ['interior', 'near', 'far'] as const) {
+          if (edge === 'interior' && orientation === 'horizontal') continue;
+          const grip = (await toolbar.locator('.sniptale-drag-handle').boundingBox())!;
+          await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(
+            orientation === 'vertical'
+              ? edge === 'near'
+                ? 20
+                : edge === 'far'
+                  ? size.width - 20
+                  : size.width - 360
+              : size.width / 2,
+            orientation === 'vertical' ? size.height / 2 : edge === 'near' ? 20 : size.height - 20,
+            { steps: 5 }
+          );
+          await page.mouse.up();
+          const defaultSide =
+            orientation === 'vertical'
+              ? edge === 'near'
+                ? 'right'
+                : 'left'
+              : edge === 'near'
+                ? 'down'
+                : 'up';
+          for (const kind of ['microphone', 'camera', 'cursor'] as const) {
+            const side = edge === 'interior' ? (kind === 'cursor' ? 'left' : 'right') : defaultSide;
+            const arrow = toolbar.locator(
+              `[data-ui="content.toolbar.video-recording.${kind === 'cursor' ? 'cursor-settings' : `${kind}.menu`}"]`
+            );
+            await expect(arrow).toHaveAttribute('data-menu-side', side);
+            const readVector = () =>
+              arrow.evaluate((button) => {
+                const transform = getComputedStyle(button.querySelector('svg')!).transform;
+                const matrix = new DOMMatrixReadOnly(transform === 'none' ? undefined : transform);
+                const vector = matrix.transformPoint(new DOMPoint(0, 1));
+                return { x: vector.x, y: vector.y };
+              });
+            const expected =
+              side === 'left'
+                ? { x: -1, y: 0 }
+                : side === 'right'
+                  ? { x: 1, y: 0 }
+                  : side === 'up'
+                    ? { x: 0, y: -1 }
+                    : { x: 0, y: 1 };
+            await expect.poll(async () => (await readVector()).x).toBeCloseTo(expected.x, 2);
+            await expect.poll(async () => (await readVector()).y).toBeCloseTo(expected.y, 2);
+            await arrow.click();
+            await expect(arrow).toHaveAttribute('aria-expanded', 'true');
+            const menu = toolbar.locator('.sniptale-popover-menu:visible').last();
+            await expect(menu).toBeVisible();
+            const menuBounds = (await menu.boundingBox())!;
+            const arrowBounds = (await arrow.boundingBox())!;
+            if (side === 'left')
+              expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(arrowBounds.x + 1);
+            if (side === 'right')
+              expect(menuBounds.x).toBeGreaterThanOrEqual(arrowBounds.x + arrowBounds.width - 1);
+            if (side === 'up')
+              expect(menuBounds.y + menuBounds.height).toBeLessThanOrEqual(arrowBounds.y + 1);
+            if (side === 'down')
+              expect(menuBounds.y).toBeGreaterThanOrEqual(arrowBounds.y + arrowBounds.height - 1);
+            expect(menuBounds.x).toBeGreaterThanOrEqual(-1);
+            expect(menuBounds.y).toBeGreaterThanOrEqual(-1);
+            expect(menuBounds.x + menuBounds.width).toBeLessThanOrEqual(size.width + 1);
+            expect(menuBounds.y + menuBounds.height).toBeLessThanOrEqual(size.height + 1);
+            await page.screenshot({
+              path: info.outputPath(`${edge}-${kind}-direction.png`),
+              fullPage: false,
+            });
+            await page.keyboard.press('Escape');
+            await expect.poll(async () => (await readVector()).x).toBeCloseTo(expected.x, 2);
+            await expect.poll(async () => (await readVector()).y).toBeCloseTo(expected.y, 2);
+          }
+          const toolbarBounds = (await toolbar.boundingBox())!;
+          expect(toolbarBounds.x).toBeGreaterThanOrEqual(-1);
+          expect(toolbarBounds.y).toBeGreaterThanOrEqual(-1);
+          expect(toolbarBounds.x + toolbarBounds.width).toBeLessThanOrEqual(size.width + 1);
+          expect(toolbarBounds.y + toolbarBounds.height).toBeLessThanOrEqual(size.height + 1);
+        }
         const trigger = page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]');
         await trigger.click();
         const placement = page.locator(

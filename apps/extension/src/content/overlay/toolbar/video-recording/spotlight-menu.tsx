@@ -177,19 +177,20 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
 
 export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
   const state = useSpotlightMenuState(props);
-  const resolveLayout = () => {
+  const resolveLayout = (advanced = state.advanced) => {
     const dropdown = resolveToolbarDropdownState({
-      anchorRef: state.advanced ? state.advancedTriggerRef : state.triggerRef,
+      anchorRef: advanced ? state.advancedTriggerRef : state.triggerRef,
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-      menuHeight: state.advanced ? 300 : 190,
-      menuWidth: state.advanced ? 400 : 280,
+      menuHeight: advanced ? 300 : 190,
+      menuWidth: advanced ? 400 : 280,
       preferredAlign: 'start',
     });
     return { placement: dropdown.menuPlacement, style: dropdown.style };
   };
   const dropdown = resolveLayout();
-  const menuSide = useToolbarMenuDirection(resolveLayout);
+  const menuSide = useToolbarMenuDirection(() => resolveLayout(false));
+  const advancedMenuSide = useToolbarMenuDirection(() => resolveLayout(true));
   const label = translate('content.toolbar.videoRecordingSpotlight');
   return (
     <div
@@ -232,7 +233,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
         aria-expanded={state.open && state.advanced}
         aria-haspopup="dialog"
         data-menu-open={state.open && state.advanced ? 'true' : 'false'}
-        data-menu-side={menuSide}
+        data-menu-side={advancedMenuSide}
         dataUi="content.toolbar.video-recording.cursor-settings"
         onClick={() => {
           if (state.open && state.advanced) state.closeMenu();

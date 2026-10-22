@@ -51,7 +51,7 @@ it('opens the categorized cursor panel without enabling effects or writing setti
       ?.classList.contains('sniptale-inspector-surface')
   ).toBe(true);
   expect(host.querySelectorAll('nav button')).toHaveLength(4);
-  expect(host.querySelectorAll('input[type="text"]')).toHaveLength(2);
+  expect(host.querySelectorAll('input[type="text"]')).toHaveLength(1);
   expect(onChange).not.toHaveBeenCalled();
   act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[3]?.click());
   expect(
