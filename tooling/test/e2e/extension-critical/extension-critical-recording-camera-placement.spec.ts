@@ -311,6 +311,16 @@ for (const { name, size } of [
         await expect(resize).toHaveCSS('opacity', '0');
         await camera.hover();
         await expect(resize).toHaveCSS('opacity', '1');
+        await resize.hover();
+        await expect(resize).toHaveCSS('cursor', 'grab');
+        await expect(resize.locator('svg')).toHaveCSS('cursor', 'grab');
+        await expect(resize.locator('svg')).toHaveCSS('pointer-events', 'none');
+        await resize.click();
+        await expect(resize).toBeFocused();
+        await page.mouse.move(20, 20);
+        await expect(resize).toHaveCSS('opacity', '0');
+        await camera.hover();
+        await expect(resize).toHaveCSS('opacity', '1');
         expect(
           await resize.evaluate((button) => getComputedStyle(button).backgroundColor)
         ).not.toBe('rgba(0, 0, 0, 0)');
@@ -324,9 +334,7 @@ for (const { name, size } of [
             const root = button.getRootNode();
             return (
               root instanceof ShadowRoot &&
-              button.contains(
-                root.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
-              )
+              root.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button
             );
           })
         ).toBe(true);
@@ -336,10 +344,18 @@ for (const { name, size } of [
         expect(streamId).not.toBeNull();
         await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
         await page.mouse.down();
+        await expect(resize).toHaveCSS('cursor', 'grabbing');
+        await expect(resize.locator('svg')).toHaveCSS('cursor', 'grabbing');
+        await expect(camera).toHaveCSS('cursor', 'grabbing');
         await page.mouse.move(grip.x + grip.width / 2 + 28, grip.y + grip.height / 2 + 28, {
           steps: 5,
         });
+        await expect(resize).toHaveCSS('cursor', 'grabbing');
+        await expect(resize).toHaveCSS('opacity', '1');
         await page.mouse.up();
+        await expect(resize).toHaveCSS('cursor', 'grab');
+        await page.mouse.move(20, 20);
+        await expect(resize).toHaveCSS('opacity', '0');
         await expect(resize).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
         await expect
           .poll(async () => (await camera.boundingBox())!.width)

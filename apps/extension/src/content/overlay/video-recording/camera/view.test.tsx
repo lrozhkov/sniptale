@@ -54,6 +54,12 @@ it.each(['circle', 'rectangle'] as const)(
     expect(camera.style.overflow).not.toBe('hidden');
     expect((camera.firstElementChild as HTMLElement).style.overflow).toBe('hidden');
     expect(camera.querySelector('button')?.getAttribute('aria-label')).not.toBe('Camera');
+    const handle = camera.querySelector<HTMLElement>('[data-resize="true"]')!;
+    expect(handle.style.cursor).toBe('grab');
+    expect(handle.querySelector('svg')?.style.cursor).toBe('inherit');
+    expect(handle.querySelector('svg')?.style.pointerEvents).toBe('none');
+    expect(handle.className).not.toContain('group-focus-within:opacity-100');
+    expect(handle.className).toContain('focus-visible:opacity-100');
   }
 );
 
@@ -142,9 +148,18 @@ it('resizes from a corner with a locked aspect ratio and disables page interacti
     handle
       .querySelector('svg')!
       .dispatchEvent(pointer('pointerdown', { clientX: 700, clientY: 500 }));
+  });
+  expect(handle.style.cursor).toBe('grabbing');
+  expect(camera.style.cursor).toBe('grabbing');
+  act(() => {
     camera.dispatchEvent(pointer('pointermove', { clientX: 780, clientY: 580 }));
+  });
+  expect(handle.style.cursor).toBe('grabbing');
+  act(() => {
     camera.dispatchEvent(pointer('pointercancel', { clientX: 780, clientY: 580 }));
   });
+  expect(handle.style.cursor).toBe('grab');
+  expect(camera.style.cursor).toBe('grab');
   expect(onGeometryChange).toHaveBeenCalledWith(
     expect.objectContaining({ shape: 'rectangle', sizeFraction: expect.any(Number) })
   );

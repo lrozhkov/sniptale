@@ -62,6 +62,7 @@ function useEmbeddedCameraGeometry(
     event.currentTarget.setPointerCapture(event.pointerId);
     const resizing =
       event.target instanceof Element && event.target.closest('[data-resize="true"]') !== null;
+    if (resizing) setDragging(true);
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -144,7 +145,7 @@ function CameraMedia(props: {
   );
 }
 
-function CameraResizeHandle(props: { shape: EmbeddedCameraGeometry['shape'] }) {
+function CameraResizeHandle(props: { dragging: boolean; shape: EmbeddedCameraGeometry['shape'] }) {
   const inset = props.shape === 'circle' ? 'max(0px, calc(14.65% - 12px))' : '4px';
   return (
     <ProductGlassIconButton
@@ -161,19 +162,24 @@ function CameraResizeHandle(props: { shape: EmbeddedCameraGeometry['shape'] }) {
         padding: 0,
         background: 'var(--sniptale-color-surface-canvas)',
         border: '1px solid var(--sniptale-color-border-strong)',
-        cursor: 'nwse-resize',
+        cursor: props.dragging ? 'grabbing' : 'grab',
         outlineStyle: 'solid',
         transition: 'opacity 120ms ease',
         bottom: inset,
         right: inset,
       }}
       className={[
-        'opacity-0 outline-2 outline-offset-2 outline-transparent',
-        'group-hover:opacity-100 group-focus-within:opacity-100',
+        props.dragging ? 'opacity-100' : 'opacity-0',
+        'outline-2 outline-offset-2 outline-transparent',
+        'group-hover:opacity-100 focus-visible:opacity-100',
         'focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
     >
-      <MoveDiagonal2 size={16} strokeWidth={1.75} />
+      <MoveDiagonal2
+        size={16}
+        strokeWidth={1.75}
+        style={{ cursor: 'inherit', pointerEvents: 'none' }}
+      />
     </ProductGlassIconButton>
   );
 }
@@ -255,7 +261,9 @@ export function EmbeddedRecordingCamera(props: {
           width={width}
         />
       </div>
-      {props.interactive && <CameraResizeHandle shape={geometry.shape} />}
+      {props.interactive && (
+        <CameraResizeHandle dragging={interaction.dragging} shape={geometry.shape} />
+      )}
     </div>
   );
 }
