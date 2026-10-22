@@ -1,6 +1,6 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import React, { useLayoutEffect, useState } from 'react';
-import { Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Blend, Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { PopoverCheckIcon } from '../../icons/icons';
 import { translate } from '../../../../platform/i18n';
@@ -16,6 +16,7 @@ import {
   resolveToolbarMenuPlacement,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { RecordingToolbarControlsContext } from '../state/recording-controls';
 import {
   createTrustedContentActionIntentSource,
   type ContentPrivilegedActionIntentSource,
@@ -155,6 +156,31 @@ type ToolbarSettingsUtilityItemsProps = {
   showHideItem?: boolean;
 };
 
+function RecordingToolbarFadeSetting() {
+  const preferences = useContext(RecordingToolbarControlsContext);
+  if (!preferences) return null;
+  return (
+    <ProductToolbarMenuItem
+      dataUi="content.toolbar.settings.recording-fade"
+      selected={preferences.fadeDuringRecording}
+      ariaPressed={preferences.fadeDuringRecording}
+      disabled={!preferences.ready || preferences.pending || preferences.active}
+      onMouseDown={stopMenuEvent}
+      onClick={(event) => {
+        stopMenuEvent(event);
+        void preferences.setFadeDuringRecording(!preferences.fadeDuringRecording);
+      }}
+    >
+      <Blend className="sniptale-popover-icon" />
+      <ProductToolbarMenuItemCopy
+        label={translate('content.toolbar.recordingFadeToolbar')}
+        hint={translate('content.toolbar.recordingFadeToolbarHint')}
+      />
+      {preferences.fadeDuringRecording ? <PopoverCheckIcon /> : null}
+    </ProductToolbarMenuItem>
+  );
+}
+
 function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsProps) {
   return (
     <>
@@ -170,6 +196,7 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         }}
       />
       {props.showPinItem !== false ? renderPinToTabItem(props) : null}
+      <RecordingToolbarFadeSetting />
       <ProductToolbarMenuDivider />
       {props.showHideItem === false
         ? null

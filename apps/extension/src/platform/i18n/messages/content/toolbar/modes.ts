@@ -11,6 +11,14 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
+  recordingFadeToolbar: {
+    ru: 'Приглушать панель при записи',
+    en: 'Fade toolbar while recording',
+  },
+  recordingFadeToolbarHint: {
+    ru: 'Полная видимость при наведении и работе с панелью.',
+    en: 'Fully visible while you use the toolbar.',
+  },
   recordingCustomizeControls: {
     ru: 'Настроить кнопки во время записи',
     en: 'Customize controls during recording',

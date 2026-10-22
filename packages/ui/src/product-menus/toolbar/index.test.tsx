@@ -13,6 +13,19 @@ import {
 } from './index';
 
 describe('ProductToolbarMenu', () => {
+  it.each([true, false])('exposes an explicitly pressed=%s command', (pressed) => {
+    expect(
+      renderToStaticMarkup(
+        <ProductToolbarMenuItem ariaPressed={pressed}>Fade</ProductToolbarMenuItem>
+      )
+    ).toContain(`aria-pressed="${String(pressed)}"`);
+  });
+
+  it('does not add pressed state to ordinary menu actions', () => {
+    expect(
+      renderToStaticMarkup(<ProductToolbarMenuItem>Download</ProductToolbarMenuItem>)
+    ).not.toContain('aria-pressed');
+  });
   it('renders placement, compact, selected, and disabled menu states', () => {
     const markup = renderToStaticMarkup(
       <ProductToolbarMenu title="Viewport" variant="viewport" compact placement="up">

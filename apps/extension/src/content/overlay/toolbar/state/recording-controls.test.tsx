@@ -58,6 +58,71 @@ it('does not read or write recording preferences in other toolbar modes', async 
   expect(persistence.patch).not.toHaveBeenCalled();
 });
 
+it('defaults fading to enabled without writing and loads an explicit disabled value', async () => {
+  await act(async () => root.render(<Harness />));
+  expect(controls.fadeDuringRecording).toBe(true);
+  const settings = createDefaultSettings();
+  settings.contentToolbar = {
+    displayMode: 'horizontal',
+    compactMenus: false,
+    position: null,
+    fadeDuringRecording: false,
+  };
+  persistence.load.mockResolvedValueOnce(settings);
+  await act(async () => controls.reload());
+  expect(controls.fadeDuringRecording).toBe(false);
+  expect(persistence.patch).not.toHaveBeenCalled();
+});
+
+it('projects fading only after acknowledgement and blocks duplicate preference edits', async () => {
+  await act(async () => root.render(<Harness />));
+  const writing = gate<NormalizedSettings>();
+  persistence.patch.mockReturnValueOnce(writing.promise);
+  let pending: Promise<void>;
+  act(() => {
+    pending = controls.setFadeDuringRecording(false);
+  });
+  expect(controls.fadeDuringRecording).toBe(true);
+  expect(controls.pending).toBe(true);
+  await act(async () => controls.setVisible('camera', false));
+  expect(persistence.patch).toHaveBeenCalledExactlyOnceWith({
+    contentToolbar: { fadeDuringRecording: false },
+  });
+  const accepted = createDefaultSettings();
+  accepted.contentToolbar = {
+    displayMode: 'horizontal',
+    compactMenus: false,
+    position: null,
+    fadeDuringRecording: false,
+    recordingControls: { camera: false },
+  };
+  await act(async () => {
+    writing.accept(accepted);
+    await pending;
+  });
+  expect(controls.fadeDuringRecording).toBe(false);
+  expect(controls.controls).toEqual({ camera: false });
+});
+
+it('retains accepted fading after failure and permits retry', async () => {
+  await act(async () => root.render(<Harness />));
+  persistence.patch.mockRejectedValueOnce(new Error('write refused'));
+  await act(async () => controls.setFadeDuringRecording(false));
+  expect(controls.fadeDuringRecording).toBe(true);
+  expect(controls.error).toBeTruthy();
+  const accepted = createDefaultSettings();
+  accepted.contentToolbar = {
+    displayMode: 'horizontal',
+    compactMenus: false,
+    position: null,
+    fadeDuringRecording: false,
+  };
+  persistence.patch.mockResolvedValueOnce(accepted);
+  await act(async () => controls.setFadeDuringRecording(false));
+  expect(controls.fadeDuringRecording).toBe(false);
+  expect(controls.error).toBeNull();
+});
+
 it('loads acknowledged preferences without writing and waits before allowing edits', async () => {
   const loading = gate<NormalizedSettings>();
   persistence.load.mockReturnValue(loading.promise);
@@ -65,6 +130,7 @@ it('loads acknowledged preferences without writing and waits before allowing edi
   await act(async () => {
     controls.toggleEditing();
     await controls.setVisible('pencil', false);
+    await controls.setFadeDuringRecording(false);
   });
   expect(controls.ready).toBe(false);
   expect(controls.editing).toBe(false);

@@ -21,6 +21,33 @@ beforeEach(() => {
 });
 
 describe('recording toolbar visibility settings', () => {
+  it.each([true, false])(
+    'accepts fadeDuringRecording=%s without changing sibling values',
+    (fadeDuringRecording) => {
+      expect(
+        parseStoredSettings({ contentToolbar: { fadeDuringRecording, compactMenus: true } })
+      ).toMatchObject({
+        invalidFieldCount: 0,
+        value: { contentToolbar: { fadeDuringRecording, compactMenus: true } },
+      });
+      expect(parseStoredSettings({ contentToolbar: {} }).value.contentToolbar).not.toHaveProperty(
+        'fadeDuringRecording'
+      );
+    }
+  );
+
+  it.each([null, [], 'false', 0, {}].map((fadeDuringRecording) => ({ fadeDuringRecording })))(
+    'rejects malformed fading preference $fadeDuringRecording',
+    ({ fadeDuringRecording }) => {
+      const parsed = parseStoredSettings({
+        imageQuality: 85,
+        contentToolbar: { fadeDuringRecording },
+      });
+      expect(parsed.invalidFieldCount).toBe(1);
+      expect(parsed.value).toEqual({ imageQuality: 85 });
+    }
+  );
+
   it('accepts every optional control without inventing values for absent controls', () => {
     const recordingControls = Object.fromEntries(
       RECORDING_TOOLBAR_CONTROLS.map((control) => [control, false])

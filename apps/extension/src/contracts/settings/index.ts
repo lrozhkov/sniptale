@@ -90,6 +90,8 @@ export interface ContentToolbarPreferences {
   cropMode?: 'drawing' | 'resize';
   /** Missing controls remain visible during recording. This does not enable their tools. */
   recordingControls?: Partial<Record<RecordingToolbarControl, boolean>>;
+  /** Missing values enable fading during recording. */
+  fadeDuringRecording?: boolean;
   /** Legacy absence uses docking at the top edge. */
   freePlacement?: boolean;
   dockEdge?: ContentToolbarDockEdge;

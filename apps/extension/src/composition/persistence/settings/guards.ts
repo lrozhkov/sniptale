@@ -122,6 +122,8 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   }
 
   const freePlacement = value['freePlacement'];
+  const fadeDuringRecording = value['fadeDuringRecording'];
+  if (fadeDuringRecording !== undefined && !isBoolean(fadeDuringRecording)) return INVALID_FIELD;
   const rawRecordingControls = value['recordingControls'];
   const recordingControls: NonNullable<ContentToolbarPreferences['recordingControls']> = {};
   if (rawRecordingControls !== undefined) {
@@ -164,6 +166,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
 
   return {
     ...(rawRecordingControls === undefined ? {} : { recordingControls }),
+    ...(fadeDuringRecording === undefined ? {} : { fadeDuringRecording }),
     ...(cropMode === undefined ? {} : { cropMode }),
     ...(freePlacement === undefined ? {} : { freePlacement }),
     ...(dockEdge === undefined ? {} : { dockEdge }),

@@ -30,6 +30,27 @@
   transition: none;
 }
 
+.sniptale-toolbar[data-video-recording='true'][data-recording-fade='true'] {
+  opacity: 0.2;
+  transition: opacity var(--sniptale-duration-normal) ease-out;
+}
+
+.sniptale-toolbar[data-video-recording='true'][data-recording-fade='true']:is(
+    :hover,
+    :focus-within,
+    [data-menu-open='true'],
+    .sniptale-toolbar-dragging,
+    :has([aria-expanded='true'])
+  ) {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-toolbar[data-video-recording='true'][data-recording-fade='true'] {
+    transition: none;
+  }
+}
+
 .sniptale-toolbar.sniptale-toolbar-dragging {
   opacity: 0.96;
   box-shadow:

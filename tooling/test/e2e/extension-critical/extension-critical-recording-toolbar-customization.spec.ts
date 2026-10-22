@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { RECORDING_TOOLBAR_CONTROLS } from '../../../../apps/extension/src/contracts/settings';
@@ -16,6 +16,55 @@ import { parseRuntimeResponseForMessage } from '../../../../apps/extension/src/c
 
 test.setTimeout(120000);
 test.use({ actionTimeout: 10000 });
+
+async function openRecordingToolbarSettings(page: Page) {
+  const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+}
+
+async function expectAutomaticRecordingFade(page: Page, info: TestInfo) {
+  const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+  const opacity = () => toolbar.evaluate((element) => Number(getComputedStyle(element).opacity));
+  await expect(toolbar).toHaveAttribute('data-recording-fade', 'true');
+  await toolbar.hover();
+  await expect.poll(opacity).toBe(1);
+  const before = (await toolbar.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  await page.mouse.move(viewport.width - 4, viewport.height - 4);
+  await expect.poll(opacity).toBeCloseTo(0.2, 2);
+  await expect(toolbar).toHaveCSS('transition-property', 'opacity');
+  await expect(toolbar).toHaveCSS('transition-duration', '0.25s');
+  const after = (await toolbar.boundingBox())!;
+  for (const dimension of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(after[dimension] - before[dimension])).toBeLessThanOrEqual(1);
+  }
+  await page.screenshot({ path: info.outputPath('faded-recording-controls.png'), fullPage: false });
+  await page.locator('[data-ui="content.toolbar.video-recording.navigation"]').focus();
+  await page.keyboard.press('Tab');
+  expect(await toolbar.evaluate((element) => element.matches(':focus-within'))).toBe(true);
+  await expect.poll(opacity).toBe(1);
+  await page.getByRole('button', { name: 'Host action', exact: true }).click();
+  await expect.poll(opacity).toBeCloseTo(0.2, 2);
+  await page.locator('[data-ui="content.toolbar.video-recording.spotlight"]').click();
+  await page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]').hover();
+  await expect(toolbar).toHaveAttribute('data-menu-open', 'true');
+  await expect.poll(opacity).toBe(1);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Host action', exact: true }).click();
+  await expect.poll(opacity).toBeCloseTo(0.2, 2);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(toolbar).toHaveCSS('transition-property', 'none');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const grip = (await toolbar.locator('.sniptale-drag-handle').boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2 + 16, grip.y + grip.height / 2 + 16, { steps: 3 });
+  await expect(toolbar).toHaveClass(/sniptale-toolbar-dragging/u);
+  await expect.poll(opacity).toBe(1);
+  await page.mouse.up();
+  await toolbar.hover();
+  await expect.poll(opacity).toBe(1);
+}
 
 async function expectRecordingControlOrder(
   page: Page,
@@ -173,17 +222,28 @@ for (const { name, size } of [
         ).toBe(true);
         const customize = page.locator('[data-ui="content.toolbar.video-recording.customize"]');
         await expect(customize).toBeEnabled();
+        const fadeSetting = page.locator('[data-ui="content.toolbar.settings.recording-fade"]');
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await expect(fadeSetting).toHaveAttribute('aria-pressed', 'true');
+        await page.screenshot({
+          path: info.outputPath('recording-fade-setting.png'),
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
         await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
         await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeVisible(
           { timeout: 30000 }
         );
         await expectRecordingControlOrder(page, orientation, 'recording');
+        await expectAutomaticRecordingFade(page, info);
         await page.screenshot({
           path: info.outputPath('full-recording-controls.png'),
           fullPage: false,
         });
         await page.locator('[data-ui="content.toolbar.video-recording.pause"]').click();
         await expectRecordingControlOrder(page, orientation, 'paused');
+        await page.mouse.move(size.width - 4, size.height - 4);
+        await expect(toolbar).toHaveCSS('opacity', '1');
         await page.locator('[data-ui="content.toolbar.video-recording.resume"]').click();
         await expectRecordingControlOrder(page, orientation, 'recording');
         await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
@@ -210,6 +270,20 @@ for (const { name, size } of [
             })
           )
         ).toMatchObject({ success: true, result: 'acknowledged' });
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await fadeSetting.click();
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+                  .contentToolbar.fadeDuringRecording
+            )
+          )
+          .toBe(false);
+        await openRecordingToolbarSettings(page);
+        await expect(fadeSetting).toHaveAttribute('aria-pressed', 'false');
+        await page.keyboard.press('Escape');
         await customize.click();
         await expect(customize).toHaveAttribute('aria-pressed', 'true');
         await expect(
@@ -263,6 +337,9 @@ for (const { name, size } of [
         }
         await expect(customize).toHaveCount(0);
         await expectRecordingControlOrder(page, orientation, 'recording', true);
+        await page.mouse.move(size.width - 4, size.height - 4);
+        await expect(toolbar).toHaveCSS('opacity', '1');
+        expect(await toolbar.getAttribute('data-recording-fade')).toBeNull();
         await expect(page.locator('[data-ui="content.toolbar.mode-selector-button"]')).toHaveCount(
           0
         );
@@ -316,6 +393,35 @@ for (const { name, size } of [
         await page.keyboard.press('Enter');
         await expect(text).toHaveAttribute('aria-pressed', 'true');
         await customize.click();
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await expect(fadeSetting).toHaveAttribute('aria-pressed', 'false');
+        await fadeSetting.focus();
+        await page.keyboard.press('Enter');
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+                  .contentToolbar.fadeDuringRecording
+            )
+          )
+          .toBe(true);
+        await openRecordingToolbarSettings(page);
+        await expect(fadeSetting).toHaveAttribute('aria-pressed', 'true');
+        await fadeSetting.focus();
+        await page.keyboard.press('Space');
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+                  .contentToolbar.fadeDuringRecording
+            )
+          )
+          .toBe(false);
+        await openRecordingToolbarSettings(page);
+        await expect(fadeSetting).toHaveAttribute('aria-pressed', 'false');
+        await page.keyboard.press('Escape');
         const media = await popup.evaluate(
           async () =>
             (await chrome.storage.local.get('sniptale_video_settings'))['sniptale_video_settings']

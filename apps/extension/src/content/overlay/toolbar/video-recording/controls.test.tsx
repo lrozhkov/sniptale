@@ -129,6 +129,8 @@ function visibilityState(
     ready: true,
     reload: vi.fn(async () => undefined),
     setVisible: vi.fn(async () => undefined),
+    fadeDuringRecording: true,
+    setFadeDuringRecording: vi.fn(async () => undefined),
     toggleEditing: vi.fn(),
     ...overrides,
   };

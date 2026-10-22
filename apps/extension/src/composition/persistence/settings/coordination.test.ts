@@ -91,7 +91,7 @@ it('merges visibility edits from independent pages after an in-flight write', as
   vi.resetModules();
   const secondPage = await import('./index');
   const first = firstPage.patchSettings({
-    contentToolbar: { recordingControls: { pencil: false } },
+    contentToolbar: { recordingControls: { pencil: false }, fadeDuringRecording: false },
   });
   await entered.promise;
   const second = secondPage.patchSettings({
@@ -102,6 +102,7 @@ it('merges visibility edits from independent pages after an in-flight write', as
   expect((await secondPage.loadSettings()).contentToolbar).toMatchObject({
     compactMenus: true,
     recordingControls: { camera: true, pencil: false },
+    fadeDuringRecording: false,
   });
 });
 
@@ -232,7 +233,7 @@ it('completes an in-flight Crop and corner write before a queued reset', async (
   });
   const page = await import('./index');
   const write = page.patchSettings({
-    contentToolbar: { dockEdge: 'top-right', cropMode: 'resize' },
+    contentToolbar: { dockEdge: 'top-right', cropMode: 'resize', fadeDuringRecording: false },
   });
   await entered.promise;
   const reset = page.resetSettingsToDefaults();
@@ -245,7 +246,12 @@ it('completes an in-flight Crop and corner write before a queued reset', async (
 
 it('recreates the settings key only with a new accepted Crop and dock choice after deletion', async () => {
   let persisted: Record<string, unknown> = {
-    contentToolbar: { dockEdge: 'right-bottom', compactMenus: true, cropMode: 'resize' },
+    contentToolbar: {
+      dockEdge: 'right-bottom',
+      compactMenus: true,
+      cropMode: 'resize',
+      fadeDuringRecording: false,
+    },
   };
   const entered = controlledGate();
   const releaseDelete = controlledGate();
@@ -262,7 +268,7 @@ it('recreates the settings key only with a new accepted Crop and dock choice aft
   const deletion = page.clearSettings();
   await entered.promise;
   const recreation = page.patchSettings({
-    contentToolbar: { dockEdge: 'left-top', cropMode: 'drawing' },
+    contentToolbar: { dockEdge: 'left-top', cropMode: 'drawing', fadeDuringRecording: true },
   });
   releaseDelete.release();
   await Promise.all([deletion, recreation]);
@@ -270,12 +276,13 @@ it('recreates the settings key only with a new accepted Crop and dock choice aft
     dockEdge: 'left-top',
     compactMenus: false,
     cropMode: 'drawing',
+    fadeDuringRecording: true,
   });
 });
 
 it('retains accepted Crop and dock preferences after failure and permits retry', async () => {
   let persisted: Record<string, unknown> = {
-    contentToolbar: { dockEdge: 'left-top', cropMode: 'resize' },
+    contentToolbar: { dockEdge: 'left-top', cropMode: 'resize', fadeDuringRecording: true },
   };
   storage.get.mockImplementation(async () => ({ sniptale_settings: persisted }));
   storage.set
@@ -285,13 +292,19 @@ it('retains accepted Crop and dock preferences after failure and permits retry',
     });
   const page = await import('./index');
   await expect(
-    page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing' } })
+    page.patchSettings({
+      contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing', fadeDuringRecording: false },
+    })
   ).rejects.toThrow('write refused');
   expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('left-top');
   expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('resize');
-  await page.patchSettings({ contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing' } });
+  expect((await page.loadSettings()).contentToolbar?.fadeDuringRecording).toBe(true);
+  await page.patchSettings({
+    contentToolbar: { dockEdge: 'right-bottom', cropMode: 'drawing', fadeDuringRecording: false },
+  });
   expect((await page.loadSettings()).contentToolbar?.dockEdge).toBe('right-bottom');
   expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('drawing');
+  expect((await page.loadSettings()).contentToolbar?.fadeDuringRecording).toBe(false);
 });
 
 it('completes an in-flight Crop choice before a settings replacement', async () => {
@@ -307,16 +320,19 @@ it('completes an in-flight Crop choice before a settings replacement', async () 
     persisted = items.sniptale_settings;
   });
   const page = await import('./index');
-  const write = page.patchSettings({ contentToolbar: { cropMode: 'resize' } });
+  const write = page.patchSettings({
+    contentToolbar: { cropMode: 'resize', fadeDuringRecording: false },
+  });
   await entered.promise;
   const defaults = page.createDefaultSettings();
   const replacement = page.saveSettings({
     ...defaults,
-    contentToolbar: { ...defaults.contentToolbar!, cropMode: 'drawing' },
+    contentToolbar: { ...defaults.contentToolbar!, cropMode: 'drawing', fadeDuringRecording: true },
   });
   releaseWrite.release();
   await Promise.all([write, replacement]);
   expect((await page.loadSettings()).contentToolbar?.cropMode).toBe('drawing');
+  expect((await page.loadSettings()).contentToolbar?.fadeDuringRecording).toBe(true);
 });
 
 it('retains the last rapid Crop choice through the existing settings queue', async () => {

@@ -8,7 +8,10 @@ import type { useToolbarViewModel } from '../state/view-model';
 import type { ToolbarProps } from '../types';
 import { useToolbarEventDeliveryDiagnostics } from './event-diagnostics';
 import { useContentUiScale } from '../../../platform/dom-host';
-import { RecordingToolbarControlsProvider } from '../video-recording/control-visibility';
+import {
+  RecordingToolbarControlsContext,
+  useRecordingToolbarControls,
+} from '../state/recording-controls';
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
@@ -66,10 +69,20 @@ export function ToolbarShellContent(props: {
   }, [derivedState.isDragging]);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
+  const recordingControls = useRecordingToolbarControls(
+    toolbarProps.videoRecordingMode ?? false,
+    Boolean(
+      toolbarProps.videoRecording &&
+      toolbarProps.videoRecording.state.phase !== 'idle' &&
+      toolbarProps.videoRecording.state.phase !== 'error'
+    )
+  );
   useToolbarEventDeliveryDiagnostics(derivedState.toolbarRef);
 
   return (
-    <>
+    <RecordingToolbarControlsContext.Provider
+      value={toolbarProps.videoRecordingMode ? recordingControls : null}
+    >
       {derivedState.isDragging && !derivedState.freePlacement ? (
         <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
       ) : null}
@@ -106,6 +119,14 @@ export function ToolbarShellContent(props: {
             }
             inert={derivedState.isDragging && !derivedState.freePlacement}
             data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
+            data-recording-fade={
+              toolbarProps.videoRecordingMode &&
+              recordingControls.ready &&
+              recordingControls.fadeDuringRecording &&
+              toolbarProps.videoRecording?.state.phase === 'recording'
+                ? 'true'
+                : undefined
+            }
             data-menu-open={menuOpen ? 'true' : undefined}
             onPointerDownCapture={blurPointerActivatedToolbarFocus}
             onMouseDownCapture={preventPointerActivatedToolbarFocus}
@@ -143,24 +164,15 @@ export function ToolbarShellContent(props: {
               </svg>
             </ContentToolbarDragHandle>
 
-            <RecordingToolbarControlsProvider
-              enabled={toolbarProps.videoRecordingMode ?? false}
-              active={Boolean(
-                toolbarProps.videoRecording &&
-                toolbarProps.videoRecording.state.phase !== 'idle' &&
-                toolbarProps.videoRecording.state.phase !== 'error'
-              )}
-            >
-              <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
-              <ToolbarSecondaryControls
-                toolbarProps={toolbarProps}
-                viewModel={viewModel}
-                onViewportChange={onViewportChange}
-              />
-            </RecordingToolbarControlsProvider>
+            <ToolbarPrimaryControls toolbarProps={toolbarProps} viewModel={viewModel} />
+            <ToolbarSecondaryControls
+              toolbarProps={toolbarProps}
+              viewModel={viewModel}
+              onViewportChange={onViewportChange}
+            />
           </ContentToolbarShell>
         </CommandPressScope>
       </div>
-    </>
+    </RecordingToolbarControlsContext.Provider>
   );
 }

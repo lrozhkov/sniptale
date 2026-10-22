@@ -3,23 +3,7 @@ import { useContext, type ReactNode } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { RecordingToolbarControl } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
-import {
-  RecordingToolbarControlsContext,
-  useRecordingToolbarControls,
-} from '../state/recording-controls';
-
-export function RecordingToolbarControlsProvider(props: {
-  enabled: boolean;
-  active: boolean;
-  children: ReactNode;
-}) {
-  const value = useRecordingToolbarControls(props.enabled, props.active);
-  return (
-    <RecordingToolbarControlsContext.Provider value={props.enabled ? value : null}>
-      {props.children}
-    </RecordingToolbarControlsContext.Provider>
-  );
-}
+import { RecordingToolbarControlsContext } from '../state/recording-controls';
 
 export function RecordingControlVisibility(props: {
   control: RecordingToolbarControl;

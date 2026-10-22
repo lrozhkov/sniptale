@@ -5,6 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { ToolbarSettingsDropdown, useToolbarSettingsDropdownLayout } from './settings-content';
+import {
+  RecordingToolbarControlsContext,
+  type useRecordingToolbarControls,
+} from '../state/recording-controls';
 
 const createTrustedContentActionIntentSource = vi.hoisted(() =>
   vi.fn(() => ({ kind: 'trusted-content-event' as const }))
@@ -72,6 +76,7 @@ function renderSettingsDropdown(params?: {
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
   pinToTabLocked?: boolean;
+  recording?: ReturnType<typeof useRecordingToolbarControls>;
 }) {
   ensureContainer();
   const onPinToTabChange = vi.fn();
@@ -81,25 +86,27 @@ function renderSettingsDropdown(params?: {
 
   act(() => {
     root?.render(
-      <SettingsDropdownHarness
-        compactMenus={true}
-        {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
-        onFreePlacementChange={params?.onFreePlacementChange}
-        displayMode="vertical"
-        menuRef={createMenuRef()}
-        onClose={() => undefined}
-        onCompactMenusChange={() => undefined}
-        onDisplayModeChange={() => undefined}
-        onDisableScreenshotMode={onDisableScreenshotMode}
-        onHide={() => undefined}
-        onPinToTabChange={onPinToTabChange}
-        pinToTab={params?.pinToTab ?? false}
-        pinToTabAvailable={params?.pinToTabAvailable ?? true}
-        pinToTabLocked={params?.pinToTabLocked ?? false}
-        screenshotMode={true}
-        triggerRef={createButtonRef()}
-        viewportRightInset={0}
-      />
+      <RecordingToolbarControlsContext.Provider value={params?.recording ?? null}>
+        <SettingsDropdownHarness
+          compactMenus={true}
+          {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
+          onFreePlacementChange={params?.onFreePlacementChange}
+          displayMode="vertical"
+          menuRef={createMenuRef()}
+          onClose={() => undefined}
+          onCompactMenusChange={() => undefined}
+          onDisplayModeChange={() => undefined}
+          onDisableScreenshotMode={onDisableScreenshotMode}
+          onHide={() => undefined}
+          onPinToTabChange={onPinToTabChange}
+          pinToTab={params?.pinToTab ?? false}
+          pinToTabAvailable={params?.pinToTabAvailable ?? true}
+          pinToTabLocked={params?.pinToTabLocked ?? false}
+          screenshotMode={true}
+          triggerRef={createButtonRef()}
+          viewportRightInset={0}
+        />
+      </RecordingToolbarControlsContext.Provider>
     );
   });
 
@@ -161,6 +168,46 @@ afterEach(() => {
 });
 
 describe('ToolbarSettingsDropdown', () => {
+  it.each([true, false])(
+    'exposes acknowledged recording fading state=%s and toggles once',
+    (enabled) => {
+      const recording: ReturnType<typeof useRecordingToolbarControls> = {
+        active: false,
+        controls: {},
+        editing: false,
+        error: null,
+        pending: false,
+        ready: true,
+        fadeDuringRecording: enabled,
+        reload: vi.fn(async () => undefined),
+        setVisible: vi.fn(async () => undefined),
+        setFadeDuringRecording: vi.fn(async () => undefined),
+        toggleEditing: vi.fn(),
+      };
+      renderSettingsDropdown({ recording });
+      const item = container!.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.settings.recording-fade"]'
+      )!;
+      expect(item.getAttribute('aria-pressed')).toBe(String(enabled));
+      act(() => {
+        item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      });
+      expect(recording.setFadeDuringRecording).not.toHaveBeenCalled();
+      act(() => {
+        item.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      });
+      expect(recording.setFadeDuringRecording).toHaveBeenCalledExactlyOnceWith(!enabled);
+      expect(item.getAttribute('aria-pressed')).toBe(String(enabled));
+    }
+  );
+
+  it('omits the recording-only preference from other toolbar settings', () => {
+    renderSettingsDropdown();
+    expect(
+      container!.querySelector('[data-ui="content.toolbar.settings.recording-fade"]')
+    ).toBeNull();
+  });
+
   it('opens beside the toolbar in vertical mode', () => {
     renderSettingsDropdown();
 

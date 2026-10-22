@@ -7,10 +7,15 @@ import { loadSettings, patchSettings } from '../../../../composition/persistence
 import { translate } from '../../../../platform/i18n';
 
 type VisibilityPreferences = NonNullable<ContentToolbarPreferences['recordingControls']>;
+type RecordingPreferencesPatch = Pick<
+  ContentToolbarPreferences,
+  'recordingControls' | 'fadeDuringRecording'
+>;
 
 /** Projects acknowledged recording toolbar preferences without changing recording settings. */
 export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
   const [controls, setControls] = useState<VisibilityPreferences>({});
+  const [fadeDuringRecording, setFadeDuringRecording] = useState(true);
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -26,6 +31,7 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
       const settings = await loadSettings();
       if (generation.current !== request) return;
       setControls(settings.contentToolbar?.recordingControls ?? {});
+      setFadeDuringRecording(settings.contentToolbar?.fadeDuringRecording ?? true);
       setReady(true);
     } catch {
       if (generation.current === request) setError(translate('common.errors.loadFailed'));
@@ -44,7 +50,7 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
     if (active) setEditing(false);
   }, [active]);
 
-  const setVisible = async (control: RecordingToolbarControl, visible: boolean) => {
+  const setPreferences = async (patch: RecordingPreferencesPatch) => {
     if (!enabled || active || !ready || pendingRef.current) return;
     const request = generation.current;
     pendingRef.current = true;
@@ -52,10 +58,11 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
     setError(null);
     try {
       const settings = await patchSettings({
-        contentToolbar: { recordingControls: { [control]: visible } },
+        contentToolbar: patch,
       });
       if (generation.current === request) {
         setControls(settings.contentToolbar?.recordingControls ?? {});
+        setFadeDuringRecording(settings.contentToolbar?.fadeDuringRecording ?? true);
       }
     } catch {
       if (generation.current === request) setError(translate('common.errors.saveFailed'));
@@ -68,12 +75,15 @@ export function useRecordingToolbarControls(enabled: boolean, active: boolean) {
   return {
     active,
     controls,
+    fadeDuringRecording,
     editing: editing && !active,
     error,
     pending,
     ready,
     reload,
-    setVisible,
+    setVisible: (control: RecordingToolbarControl, visible: boolean) =>
+      setPreferences({ recordingControls: { [control]: visible } }),
+    setFadeDuringRecording: (enabled: boolean) => setPreferences({ fadeDuringRecording: enabled }),
     toggleEditing: () => {
       if (enabled && ready && !pendingRef.current && !active) setEditing((value) => !value);
     },
