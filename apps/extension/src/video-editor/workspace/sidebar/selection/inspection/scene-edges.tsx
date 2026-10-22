@@ -99,23 +99,37 @@ function useSceneEdgeEditing(
   const [refused, setRefused] = useState(false);
   useLayoutEffect(() => () => onPreview(null), [project, onPreview]);
   const settings = project.sceneEdges ?? createVideoProjectSceneEdges();
-  const proposal = (side: keyof VideoProjectSceneEdges, change: Partial<PresentationFade>) =>
-    parseVideoProjectSceneEdges({ ...settings, [side]: { ...settings[side], ...change } });
+  const proposal = (side: keyof VideoProjectSceneEdges, change: Partial<PresentationFade>) => {
+    const plain = project.bookendPresets?.[side].edgeControl?.plain;
+    const previous = change.enabled === true && plain ? plain : settings[side];
+    return parseVideoProjectSceneEdges({ ...settings, [side]: { ...previous, ...change } });
+  };
   const commit = (side: keyof VideoProjectSceneEdges, change: Partial<PresentationFade>) => {
+    if (change.enabled !== undefined && settings[side].enabled === change.enabled) return;
     const next = proposal(side, change);
     const lease = next ? begin({ onlyIfIdle: true }) : null;
     if (!next || !lease) {
       setRefused(true);
       return;
     }
+    const recipes = project.bookendPresets;
+    const slot = recipes?.[side];
+    const bookendPresets =
+      recipes && slot?.edgeControl && change.enabled !== false
+        ? {
+            ...recipes,
+            [side]: { ...slot, edgeControl: { ...slot.edgeControl, plain: next[side] } },
+          }
+        : recipes;
     let accepted = false;
     try {
       updateProject((current) => {
         if (current !== project) return current;
         accepted = true;
-        return JSON.stringify(settings) === JSON.stringify(next)
+        return JSON.stringify(settings) === JSON.stringify(next) &&
+          JSON.stringify(recipes) === JSON.stringify(bookendPresets)
           ? current
-          : { ...current, sceneEdges: next };
+          : { ...current, sceneEdges: next, ...(bookendPresets ? { bookendPresets } : {}) };
       });
     } finally {
       end(lease);

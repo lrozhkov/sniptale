@@ -213,6 +213,17 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       });
       await pan.fill('37');
       await pan.press('Enter');
+      const advanced = preset
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationAdvanced') });
+      await advanced.click();
+      const mediaFade = preset.locator('[data-ui="shared.ui.presentation-fade-fields"]');
+      const mediaFadeEnabled = mediaFade.getByRole('switch', {
+        name: label('gallery.videoReview.presentationFadeIn'),
+        exact: true,
+      });
+      await mediaFadeEnabled.click();
+      await expect(mediaFadeEnabled).toHaveAttribute('aria-checked', 'true');
       for (const width of [359, 360, 361, 520]) {
         const current = (await inspector.boundingBox())!.width;
         const box = (await handle.boundingBox())!;
@@ -236,7 +247,22 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           path: info.outputPath(`bookend-preset-${width}.png`),
           fullPage: false,
         });
+        await checkInspectorPaintedFont(page, mediaFade, `preset-media-fade-font-${width}`);
+        await checkInspectorLabels(mediaFade);
+        expect(
+          await mediaFade.evaluate((node) => {
+            const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+            return body instanceof HTMLElement && body.scrollWidth <= body.clientWidth + 1;
+          })
+        ).toBe(true);
+        await page.screenshot({
+          path: info.outputPath(`bookend-preset-fade-${width}.png`),
+          fullPage: false,
+        });
       }
+      await mediaFadeEnabled.click();
+      await expect(mediaFadeEnabled).toHaveAttribute('aria-checked', 'false');
+      await advanced.click();
       await chooseInspectorValue(
         page,
         preset,

@@ -9,6 +9,7 @@ import {
 import { evaluateCompositionJoin } from '../../../features/video/project/scene/composition-join';
 import {
   resolveVideoProjectCompositionJoinPlans,
+  resolveActiveVideoProjectCompositionJoinPlan,
   resolveVideoProjectCompositionJoinEndpoints,
 } from '../../../features/video/project/scene/joins';
 import { createPreviewRenderResources } from '../../../workflows/video-review/preview-render-resources';
@@ -230,8 +231,9 @@ function createMaterializedJoinPresentation(
   state: VideoPreviewMaterializerState,
   canvas: HTMLCanvasElement,
   stage: HTMLDivElement,
-  plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>
-) {
+  plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>,
+  sceneEdges: 'include' | 'omit' = 'include'
+): Pick<VideoPreviewFrameMaterializer, 'dispose' | 'renderFrame'> {
   const resources = createPreviewRenderResources({
     maximumCanvases: 2,
     maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 8,
@@ -239,10 +241,24 @@ function createMaterializedJoinPresentation(
   });
   let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
   let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
+  const cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
+  let nestedCuts: ReturnType<typeof createMaterializedJoinPresentation> | undefined;
+  let disposed = false;
   let cameraOverride: VideoCompositionCameraState | undefined;
   let busy = false;
   const renderSample = async (time: number, signal: AbortSignal) => {
-    if (!cutPlan)
+    if (!cutPlan) {
+      if (resolveActiveVideoProjectCompositionJoinPlan(cutPlans, time)) {
+        nestedCuts ??= createMaterializedJoinPresentation(
+          params,
+          state,
+          canvas,
+          stage,
+          cutPlans,
+          'omit'
+        );
+        return nestedCuts.renderFrame(time, signal, cameraOverride);
+      }
       return renderMaterializedFrame(
         params,
         state,
@@ -253,6 +269,7 @@ function createMaterializedJoinPresentation(
         cameraOverride,
         'omit'
       );
+    }
     cutSampler ??= createCompositionCutSampleSource({
       project: params.project,
       sourceUrl: (clip) => params.assetUrls[clip.assetId],
@@ -291,22 +308,28 @@ function createMaterializedJoinPresentation(
   });
   return {
     dispose() {
+      if (disposed) return;
+      disposed = true;
       endpoints.dispose();
+      nestedCuts?.dispose();
       cutSampler?.dispose();
       resources.dispose();
     },
     async renderFrame(time: number, signal: AbortSignal, nextCamera?: VideoCompositionCameraState) {
       throwIfAborted(signal);
-      if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+      if (disposed || state.disposed)
+        throw new DOMException('Preview preparation was cancelled', 'AbortError');
       if (busy) throw new Error('Composition frame is already being materialized.');
       if (cameraOverride !== nextCamera) endpoints.clear();
       cameraOverride = nextCamera;
       busy = true;
       try {
-        const plan = plans.find((item) =>
-          evaluateCompositionJoin(time, item.seam, item.before, item.after)
-        );
+        const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, time);
         cutPlan = plan?.boundary.sampling === 'cut' ? plan : undefined;
+        if (cutPlan || !plan) {
+          nestedCuts?.dispose();
+          nestedCuts = undefined;
+        }
         if (!cutPlan) {
           cutSampler?.dispose();
           cutSampler = undefined;
@@ -320,7 +343,8 @@ function createMaterializedJoinPresentation(
             stage,
             time,
             signal,
-            cameraOverride
+            cameraOverride,
+            sceneEdges === 'omit' ? 'omit' : undefined
           );
         }
         const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
@@ -354,7 +378,14 @@ function createMaterializedJoinPresentation(
         throwIfAborted(signal);
         if (state.disposed)
           throw new DOMException('Preview preparation was cancelled', 'AbortError');
-        drawVideoProjectSceneEdges(context, params.project, time);
+        if (sceneEdges !== 'omit')
+          drawVideoProjectSceneEdges(
+            context,
+            params.project,
+            time,
+            undefined,
+            params.sampleFps ?? params.project.fps
+          );
         return canvas;
       } catch (error) {
         endpoints.clear();
@@ -456,6 +487,7 @@ async function renderMaterializedFrame(
     await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
   assertActive();
   const drawn = await renderPreviewScene({
+    sampleFps: params.sampleFps ?? params.project.fps,
     ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
     captionRenderer: state.captionRenderer,
     watermarkRenderer: state.watermarkRenderer,

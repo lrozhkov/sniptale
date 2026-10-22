@@ -446,10 +446,11 @@ it('materializes complete held compositions and applies outer fades exactly once
   expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.75, 1]);
   expect(renderPreviewScene.mock.calls.every(([input]) => input.sceneEdges === 'omit')).toBe(true);
   const color = f.pixel();
-  expect(Math.abs(color[0]! - 64)).toBeLessThanOrEqual(1);
+  // At 4 fps the last frame is 1.75 s. The mixed frame at 1 s has gain 1 / 1.75.
+  expect(Math.abs(color[0]! - 73)).toBeLessThanOrEqual(1);
   expect(color[1]).toBe(0);
-  expect(Math.abs(color[2]! - 64)).toBeLessThanOrEqual(1);
-  expect(Math.abs(f.pixel(7, 0)[1]! - 128)).toBeLessThanOrEqual(1);
+  expect(Math.abs(color[2]! - 73)).toBeLessThanOrEqual(1);
+  expect(Math.abs(f.pixel(7, 0)[1]! - 146)).toBeLessThanOrEqual(1);
   await f.owner.renderFrame(1.1, new AbortController().signal);
   expect(renderPreviewScene).toHaveBeenCalledTimes(2);
   f.owner.dispose();
@@ -580,3 +581,151 @@ it('materializes the moving cut side without rounding scene clocks to preview ca
   f.owner.dispose();
   expect(cut.dispose).toHaveBeenCalledOnce();
 });
+
+it.each([
+  ['dissolve', 'dissolve', 2, [34, 153, 68]],
+  ['fade-black', 'dissolve', 2, [0, 153, 0]],
+  ['dissolve', 'fade-black', 1.8, [113, 0, 57]],
+  ['fade-black', 'fade-black', 1.8, [85, 0, 0]],
+] as const)(
+  'composes inner %s beneath outer %s without changing either authored window',
+  async (inner, outer, time, expected) => {
+    const project = createEmptyVideoProject('Nested composition');
+    const base = createImageClip({ trackId: project.tracks[0]!.id });
+    project.clips = [
+      { ...base, id: 'intro', startTime: 0, duration: 1 },
+      { ...base, id: 'left', startTime: 1, duration: 0.9 },
+      { ...base, id: 'right', startTime: 1.9, duration: 0.1 },
+      { ...base, id: 'outro', startTime: 2, duration: 1 },
+    ];
+    project.duration = 3;
+    project.fps = 10;
+    project.compositionJoins = [
+      {
+        id: 'intro',
+        clipId: 'intro',
+        edge: 'end',
+        transition: { type: 'dissolve', before: 0.2, after: 0.3 },
+      },
+      {
+        id: 'cut',
+        clipId: 'right',
+        edge: 'start',
+        sampling: 'cut',
+        transition: { type: inner, before: 0.2, after: 0.1 },
+      },
+      {
+        id: 'outro',
+        clipId: 'outro',
+        edge: 'start',
+        transition: { type: outer, before: 0.3, after: 0.2 },
+      },
+    ];
+    renderPreviewScene.mockImplementation(async (input) => {
+      const context = input.canvas.getContext('2d')!;
+      context.clearRect(0, 0, 8, 4);
+      context.fillStyle =
+        input.currentTime < 1.9 ? '#ff0000' : input.currentTime < 2 ? '#0000ff' : '#00ff00';
+      context.fillRect(0, 0, 8, 4);
+      if (input.sceneEdges !== 'omit')
+        drawVideoProjectSceneEdges(context, input.project, input.currentTime);
+    });
+    const owner = createVideoPreviewFrameMaterializer({
+      project,
+      assetUrls: {},
+      ownerDocument: document,
+      rasterSize: { width: 8, height: 4 },
+    });
+    const pixel = () => Array.from(owner.canvas.getContext('2d')!.getImageData(4, 2, 1, 1).data);
+    try {
+      renderPreviewScene.mockRejectedValueOnce(new Error('nested sample failed'));
+      await expect(owner.renderFrame(time, new AbortController().signal)).rejects.toThrow(
+        'nested sample failed'
+      );
+      await owner.renderFrame(time, new AbortController().signal);
+      for (const [channel, value] of expected.entries())
+        expect(Math.abs(pixel()[channel]! - value)).toBeLessThanOrEqual(2);
+      project.sceneEdges = {
+        intro: { enabled: true, duration: 3 },
+        outro: { enabled: false, duration: 0.4 },
+      };
+      await owner.renderFrame(time, new AbortController().signal);
+      for (const [channel, value] of expected.entries())
+        expect(Math.abs(pixel()[channel]! - Math.round((value * time) / 2.9))).toBeLessThanOrEqual(
+          2
+        );
+      expect(cut.sample).toHaveBeenCalled();
+    } finally {
+      owner.dispose();
+    }
+    expect(cut.dispose).toHaveBeenCalledTimes(2);
+    expect(document.body.children).toHaveLength(0);
+  }
+);
+
+it.each(['none', 'dissolve', 'fade-black'] as const)(
+  'uses output cadence for final scene fades through %s materialization',
+  async (join) => {
+    for (const sampleFps of [24, 60]) {
+      const project = createEmptyVideoProject('Output cadence');
+      project.fps = 30;
+      project.duration = 1;
+      project.clips = [
+        createImageClip({ id: 'left', trackId: project.tracks[0]!.id, duration: 0.5 }),
+        createImageClip({
+          id: 'right',
+          trackId: project.tracks[0]!.id,
+          startTime: 0.5,
+          duration: 0.5,
+        }),
+      ];
+      project.sceneEdges = {
+        intro: { enabled: false, duration: 0.4 },
+        outro: { enabled: true, duration: 0.4, color: '#000000' },
+      };
+      if (join !== 'none')
+        project.compositionJoins = [
+          {
+            id: 'estimate',
+            clipId: 'left',
+            edge: 'end',
+            transition: { type: join, before: 0.5, after: 0.5, color: '#ffffff' },
+          },
+        ];
+      renderPreviewScene.mockImplementation(async (input) => {
+        const context = input.canvas.getContext('2d')!;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, 8, 4);
+        if (input.sceneEdges !== 'omit')
+          drawVideoProjectSceneEdges(
+            context,
+            input.project,
+            input.currentTime,
+            undefined,
+            input.sampleFps
+          );
+      });
+      const owner = createVideoPreviewFrameMaterializer({
+        assetUrls: {},
+        ownerDocument: document,
+        project,
+        sampleFps,
+        rasterSize: { width: 8, height: 4 },
+      });
+      try {
+        const signal = new AbortController().signal;
+        await owner.renderFrame((sampleFps - 2) / sampleFps, signal);
+        const expected = sampleFps === 24 ? 27 : 11;
+        const preceding = owner.canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data;
+        for (const channel of preceding.slice(0, 3))
+          expect(Math.abs(channel - expected)).toBeLessThanOrEqual(1);
+        await owner.renderFrame((sampleFps - 1) / sampleFps, signal);
+        expect(Array.from(owner.canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data)).toEqual([
+          0, 0, 0, 255,
+        ]);
+      } finally {
+        owner.dispose();
+      }
+    }
+  }
+);

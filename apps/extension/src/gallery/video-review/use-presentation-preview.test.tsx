@@ -3,6 +3,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { usePresentationPreview } from './use-presentation-preview';
+import {
+  createQuickEditWatermark,
+  parseQuickEditWatermark,
+} from '../../features/video/project/scene/watermark';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { PresentationPreviewInput } from '../../workflows/video-review/presentation-preview';
@@ -64,6 +68,22 @@ it('pauses once, aborts superseded work, rejects late results and revokes owned 
   act(() => hook.close());
   expect(revoked).toHaveBeenCalledWith('blob:owned');
   expect(pause).toHaveBeenCalledOnce();
+  const watermark = {
+    ...createQuickEditWatermark(''),
+    image: { assetId: 'project-asset:logo', width: 32, height: 32, size: 0.2, opacity: 1 },
+  };
+  const persistedWatermark = parseQuickEditWatermark(watermark);
+  expect(persistedWatermark).toEqual(watermark);
+  expect(JSON.stringify(persistedWatermark)).not.toBe(JSON.stringify(watermark));
+  input = { ...input, advanced: { ...input.advanced, watermark } };
+  await act(async () => root.render(<View />));
+  act(() => hook.open('intro'));
+  const normalized = pending.at(-1)!;
+  input = { ...input, advanced: { ...input.advanced, watermark: persistedWatermark ?? watermark } };
+  await act(async () => root.render(<View />));
+  expect(normalized.signal.aborted).toBe(false);
+  expect(hook!.selection).not.toBeNull();
+  act(() => hook.close());
   act(() => hook.open('outro'));
   const stale = pending.at(-1)!;
   input = { ...input, index: { ...input.index, duration: 11 } };

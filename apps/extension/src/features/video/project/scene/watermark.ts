@@ -311,3 +311,14 @@ export function getVideoProjectWatermarkAsset(
   const id = reference.slice('project-asset:'.length);
   return project.assets.find((asset) => asset.id === id && asset.type === 'IMAGE');
 }
+
+/** Admits passive experimental metadata; it does not select watermark scope or resource access. */
+export function parseVideoProjectWatermarkSource(
+  value: unknown
+): NonNullable<VideoProject['watermarkSource']> | null {
+  if (!isRecord(value) || !onlyFields(value, ['assetId', 'sourceInstanceId'])) return null;
+  const { assetId, sourceInstanceId } = value;
+  const valid = (entry: unknown): entry is string =>
+    typeof entry === 'string' && entry.length > 0 && entry.length <= 256 && entry.trim() === entry;
+  return valid(assetId) && valid(sourceInstanceId) ? { assetId, sourceInstanceId } : null;
+}

@@ -235,9 +235,9 @@ it('maps plain fades with per-edge overrides and inherited audio/color on the wh
   expect(getVideoProjectSceneEdgeAudioGain(dormant.project, 0)).toBe(1);
   expect(getVideoProjectSceneEdgeAudioGain(dormant.project, 7)).toBe(1);
   expect(resolveVideoProjectSceneEdgePlan(constrained.project).visualEnvelope).toEqual({
-    span: 7,
-    fadeIn: 3,
-    fadeOut: 4,
+    span: 6.966667,
+    fadeIn: expect.closeTo((12 * 6.966667) / 28, 12),
+    fadeOut: expect.closeTo((16 * 6.966667) / 28, 12),
   });
 });
 
@@ -259,13 +259,13 @@ it.each(['none', 'image'] as const)(
     const before = structuredClone(input);
     expect(planReviewProjectConversion(input)).toEqual({
       status: 'blocked',
-      issues: [{ kind: 'unmapped-content', field: 'presentation' }],
+      issues: [{ kind: 'unmapped-content', field: 'presentation-assets' }],
     });
     expect(input).toEqual(before);
   }
 );
 
-it('refuses remembered edge controls but transfers disabled camera modes', () => {
+it('retains independent edge recipes and transfers disabled camera modes', () => {
   const input = fixture();
   const settings = createNeutralPresentationSettings();
   settings.introControl = {
@@ -274,10 +274,14 @@ it('refuses remembered edge controls but transfers disabled camera modes', () =>
     media: { enabled: true, duration: 3, color: '#123456ff', audioFade: true },
   };
   input.document.advancedContent.presentation = settings;
-  expect(planReviewProjectConversion(input)).toEqual({
-    status: 'blocked',
-    issues: [{ kind: 'unmapped-content', field: 'presentation' }],
+  const retained = planReviewProjectConversion(input);
+  if (retained.status !== 'prepared') throw new Error(JSON.stringify(retained));
+  expect(retained.project.version).toBe(41);
+  expect(retained.project.bookendPresets?.intro.edgeControl).toEqual({
+    ...settings.introControl,
+    plain: { ...settings.introControl.plain, color: '#000000ff', audioFade: false },
   });
+  expect(retained.project.sceneEdges?.intro.enabled).toBe(false);
   delete input.document.advancedContent.presentation;
   input.document.advancedContent.background = { enabled: false, zoomBehavior: 'content' };
   const result = planReviewProjectConversion(input);
@@ -712,4 +716,32 @@ it('retains edge and adjacent cut transition recipes without inventing media pla
     parseHydratableVideoProject(JSON.parse(JSON.stringify(converted.project)))?.compositionJoins
   ).toEqual(converted.project.compositionJoins);
   expect(input).toEqual(before);
+});
+
+it.each([
+  { duration: 2.13, fps: 10 },
+  { duration: 2.13, fps: 30 },
+  { duration: 0.1, fps: 1 },
+])('matches Gallery outer fades on the actual output lattice: %o', ({ duration, fps }) => {
+  const input = fixture();
+  const settings = createNewWorkspacePresentationSettings();
+  settings.audioFade = true;
+  settings.fadeIn.duration = 0.8;
+  settings.fadeOut.duration = 1.2;
+  const gallery = planReviewPresentationSequence({
+    settings,
+    mainDuration: duration,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: fps, denominator: 1 },
+  });
+  if (!gallery.ok) throw new Error(gallery.reason);
+  input.document.advancedContent.presentation = settings;
+  const converted = planReviewProjectConversion(input);
+  if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+  const native = resolveVideoProjectSceneEdgePlan({ ...converted.project, duration, fps });
+  expect(native.visualEnvelope).toEqual(gallery.plan.visualEnvelope);
+  expect(native.audioEnvelope).toEqual(gallery.plan.audioEnvelope);
+  expect(converted.project.sceneEdges?.intro.duration).toBe(0.8);
+  expect(converted.project.sceneEdges?.outro.duration).toBe(1.2);
 });

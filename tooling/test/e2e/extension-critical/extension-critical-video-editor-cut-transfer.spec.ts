@@ -442,6 +442,12 @@ for (const variant of [
           JSON.stringify({ native: sample, gallery: gallery.samples[index] })
         ).toBeLessThanOrEqual(12);
         if (!variant.inactive && sample.mediaTime >= 1.8) expect(sample.pixel[0]).toBeLessThan(15);
+        if (variant.inactive && index === gallery.samples.length - 1) {
+          const reference = gallery.samples[index]!;
+          expect(reference.mediaTime).toBeCloseTo(3.3, 6);
+          for (const [channel, value] of sample.pixel.slice(0, 3).entries())
+            expect(Math.abs(value - reference.pixel[channel]!)).toBeLessThanOrEqual(3);
+        }
       }
       await writeFile(
         info.outputPath('actual-cut-parity.json'),

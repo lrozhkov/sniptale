@@ -10,11 +10,14 @@ const { loadInitialProjectFromLocationMock } = vi.hoisted(() => ({
   loadInitialProjectFromLocationMock: vi.fn(),
 }));
 
-vi.mock('../../project/operations/ops', () => ({
+vi.mock('../../project/operations/ops', async (original) => ({
+  ...(await original<typeof import('../../project/operations/ops')>()),
   loadInitialProjectFromLocation: loadInitialProjectFromLocationMock,
 }));
 
 import { useVideoEditorBootstrap } from './bootstrap';
+import { ReviewProjectTransferError } from '../../project/operations/ops';
+import { createTranslator } from '../../../platform/i18n';
 
 function createDeferred<T>() {
   let rejectPromise: (error: unknown) => void;
@@ -167,8 +170,49 @@ describe('useVideoEditorBootstrap', () => {
     expect(applyLoadedProject).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
     expect(setError).toHaveBeenCalledOnce();
+    expect(setError.mock.calls[0]?.[0]).not.toContain('Source unavailable');
+    expect(setError.mock.calls[0]?.[0]).toMatch(/Sniptale/);
     expect(setReady).toHaveBeenCalledWith(true);
   });
+  it.each(['timing', 'joins', 'overlays', 'resources', 'settings'] as const)(
+    'reports a %s transfer refusal without a false storage diagnosis or technical text',
+    async (reason) => {
+      const applyLoadedProject = vi.fn<ApplyLoadedProject>();
+      const setError = vi.fn();
+      const setReady = vi.fn();
+      const refresh = vi.fn(async () => undefined);
+      loadInitialProjectFromLocationMock.mockRejectedValue(new ReviewProjectTransferError(reason));
+      await renderBootstrapHarness({
+        applyLoadedProject,
+        setError,
+        setReady,
+        refreshRecordings: refresh,
+        refreshProjects: refresh,
+        refreshProjectExports: refresh,
+      });
+      await flushEffects();
+      expect(applyLoadedProject).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
+      expect(setReady).toHaveBeenCalledWith(true);
+      const message = setError.mock.calls[0]?.[0];
+      expect(typeof message).toBe('string');
+      expect(message).not.toContain('Review project settings cannot be transferred.');
+      for (const locale of ['en', 'ru'] as const) {
+        const t = createTranslator(locale);
+        expect(message).not.toContain(t('common.errors.storageDetail'));
+      }
+      const key = {
+        timing: 'videoEditor.app.transferTimingUnsupported',
+        joins: 'videoEditor.app.transferJoinsUnsupported',
+        overlays: 'videoEditor.app.transferOverlaysUnsupported',
+        resources: 'videoEditor.app.transferResourcesUnavailable',
+        settings: 'videoEditor.app.transferSettingsUnsupported',
+      } as const;
+      expect(
+        ['en', 'ru'].map((locale) => createTranslator(locale === 'en' ? 'en' : 'ru')(key[reason]))
+      ).toContain(message);
+    }
+  );
   it('opens an idle start page without a project write or export refresh', async () => {
     const applyLoadedProject = vi.fn<ApplyLoadedProject>();
     const setError = vi.fn();

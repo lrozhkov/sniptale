@@ -135,6 +135,10 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (patch.watermarkSource !== undefined || project.watermarkSource !== undefined) return 42;
+  const bookends = patch.bookendPresets ?? project.bookendPresets;
+  if (bookends?.intro.edgeControl !== undefined || bookends?.outro.edgeControl !== undefined)
+    return 41;
   if (
     (patch.compositionJoins ?? project.compositionJoins)?.some(
       (join) => join.sampling !== undefined

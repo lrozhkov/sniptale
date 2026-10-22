@@ -73,6 +73,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
           .click();
         await page
+          .locator('[data-ui="video-editor.inspector.categories"] > nav')
           .getByRole('button', { name: label('gallery.videoReview.watermark'), exact: true })
           .click();
       };
@@ -247,12 +248,19 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(withLogo.watermark!.image!.assetId).toBe(`project-asset:${logo.id}`);
       await mode('gallery.videoReview.watermarkNone').click();
       await expect
-        .poll(async () => (await readNativeVideoProject(page))?.watermark?.mode)
-        .toBe('none');
+        .poll(async () => (await readNativeVideoProject(page))?.watermarkEnabled)
+        .toBe(false);
+      expect((await readNativeVideoProject(page))?.watermark).toEqual(withLogo.watermark);
+      await expect(mode('gallery.videoReview.watermarkNone')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await page.reload();
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       await select();
       const reopened = (await readNativeVideoProject(page))!;
+      expect(reopened.watermarkEnabled).toBe(false);
+      expect(reopened.watermark).toEqual(withLogo.watermark);
       expect(reopened.assets).toEqual(withLogo.assets);
       expect(reopened.clips).toEqual(baseline.clips);
       expect(reopened.watermark?.image).toEqual(withLogo.watermark!.image);
@@ -286,7 +294,12 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(page.locator('[data-ui="video-editor.source-viewer"]')).toBeHidden();
       expect(Number(await playhead.getAttribute('aria-valuenow'))).toBeCloseTo(time, 5);
       await expect(page.locator('[data-ui="video-editor.materials.remove-unused"]')).toBeDisabled();
-      expect((await readNativeVideoProject(page))?.watermark?.mode).toBe('none');
+      expect((await readNativeVideoProject(page))?.watermarkEnabled).toBe(false);
+      expect((await readNativeVideoProject(page))?.watermark).toEqual(withLogo.watermark);
+      await expect(mode('gallery.videoReview.watermarkNone')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await page.screenshot({
         path: info.outputPath('watermark-material-use.png'),
         fullPage: false,

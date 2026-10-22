@@ -1,5 +1,7 @@
-import { evaluateCompositionJoin } from '../../../../features/video/project/scene/composition-join';
-import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
+import {
+  resolveVideoProjectCompositionJoinPlans,
+  resolveActiveVideoProjectCompositionJoinPlan,
+} from '../../../../features/video/project/scene/joins';
 import type { VideoProject } from '../../../../features/video/project/types/model';
 import {
   createVideoPreviewFrameMaterializer,
@@ -51,8 +53,9 @@ export function createVideoPreviewCompositionJoinRenderer(
           plans: resolveVideoProjectCompositionJoinPlans(input.project),
         };
       }
-      const selected = projection.plans.find((plan) =>
-        evaluateCompositionJoin(input.currentTime, plan.seam, plan.before, plan.after)
+      const selected = resolveActiveVideoProjectCompositionJoinPlan(
+        projection.plans,
+        input.currentTime
       );
       if (!selected) {
         releaseSampler();

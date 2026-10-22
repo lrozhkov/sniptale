@@ -1755,11 +1755,11 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "review:conversion",
-      "reason": "tool-noise: This existing admission operation builds one detached Native candidate. Cut settings use its accepted timeline and final root validation. It adds no writer, resource lifetime or recovery authority. The unchanged score reflects branches within this single conversion contract. A separate owner would divide the same admission decision.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
+      "reason": "tool-noise: This existing admission operation builds one detached Native candidate. The added presentation call uses accepted media receipts and returns through final root validation. It adds no writer, resource lifetime or recovery authority. The score remains11. A separate coordinator would divide the same admission decision.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "b553a63c8e674373cd62a38f818f7b2a5f202c5f9ff6b97e456e998c634652bd",
-      "signatureHash": "93bd2d4f6608cce3759f15c9d32a3008214d46490e5e857c090009fb4366d437"
+      "astHash": "10fa7292fe8999164a83b07c272b62abad916ae214b60acf47bd0a8b473f3488",
+      "signatureHash": "aff1ec32267bff7533ef76c684c337421199883ca7e1fad8d395795e6fc50eb7"
     },
     {
       "rule": "structural-function-risk",
@@ -1854,11 +1854,11 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
       "symbol": "prepareReviewResources",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This existing workflow verifies one captured resource bundle before publication. Canonical adapters admit media and effect bytes. All results belong to the same opening snapshot. It adds no writer, resource lifetime or recovery owner. Splitting acquisition ownership would obscure the final stale-snapshot barrier.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This existing workflow verifies one captured immutable resource bundle before publication. Canonical adapters admit effect, audio, image, camera and bookend bytes. A single deduplicated acquisition loop detects conflicting roles and retains shared image identity. All results cross the same final stale-snapshot barrier. No writer, second resource lifetime or recovery authority applies.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "5da276a4007d25ad4b77322f2251d8b7c299cae36413b3971205414c9fb751e5",
-      "signatureHash": "ca5e831be2bf1911f2bed2516d3760d058b54d1851d90fdf5a100acb2959fbf8"
+      "astHash": "f2dc5b4dfac012599eb55054a68015b9f1c0beaeea7601209ef7ad4916bd04ee",
+      "signatureHash": "61d42269b9a47647c3d55d69c5f2ee4589db4306015f090645afaf7e51c79c33"
     },
     {
       "rule": "structural-file-risk",
@@ -1920,21 +1920,21 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This suite proves the existing opening workflow from Gallery to Native. Mock state belongs to isolated source and storage fixtures. Controlled resource reads test refusal, retry and publication ordering. Multiple dependency owners are consumers of one opening operation. The suite introduces no product authority.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite tests one Gallery opening and atomic publication workflow through existing source and storage fixtures. New bookend cases reuse controlled resource reads for refusal and retry. Mock state belongs to those fixtures, not product authorities. The score remains7 and cohesion remains1. A split would duplicate fixture ownership without isolating a product boundary.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "c9c34b7a5bf70b13dc8700073aafa75a4509924b2a2d33d442242e468fbce841",
-      "signatureHash": "4d268a76a7b9cfe08141a069f8ff279cecae4caedc4ce7dff6201634d7ddd659"
+      "astHash": "119316f89415cfc8b0623a4cbf7a6632eceb6121832ac32f4b7b22d2c9579060",
+      "signatureHash": "3945c9c609bb72de6c6661c873250ad62b091a9b5afd6e0ef927f1b774b2c43a"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/features/video/project/validation/root.test.ts",
       "symbol": "<file>",
       "owner": "project:validation:proof",
-      "reason": "tool-noise: This file tests one Native root admission contract. The candidate adds bounded attachment and ephemeral render-context cases. Fixture projects are test values, not state authorities. The cases share the same parser receiver.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite tests one Native root parser with the existing project fixtures. New cases check schema41 preset recipes and passive schema42 metadata. Fixture values and negative assertions do not own product state. The score remains2 and cohesion remains1. Splitting these version fences would duplicate the same parser fixture.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "196883da553de1eec2762b95caccdc9c20bb9f02fc756bea35f140230bc42147",
+      "astHash": "7c87e0705909c086b3d43b0fd89841acd025d667329a46b5435230855ea90792",
       "signatureHash": "85d80d305d90413787f4fd06541033136498dab3df551a6e51d559b3b9548a63"
     },
     {
@@ -2266,6 +2266,39 @@
       "reviewDate": "2026-10-22",
       "astHash": "84290317dc0afc7346173d5c3c6ae56ae40a28dc7f9522e506be3011856d98e3",
       "signatureHash": "9363d88940764326f650e04a20c1097cbe0cd2a8980d51588308f2481e321c63"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/review/project-presentation.ts",
+      "symbol": "planReviewProjectPresentation",
+      "owner": "review:presentation-conversion",
+      "reason": "tool-noise: This pure operation admits and materializes one detached presentation candidate. Its branches reject incompatible resource or timing input and assemble existing clips, presets and edge fields. It has no effect, state or recovery authority, one owner and cohesion1. Independent helpers already own media admission, insertion and join verification. Further forwarding would distribute this decision.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "4680ca8090efc89dfaaf130f7e3325f667bbc40f1bab5788190d2530908918c2",
+      "signatureHash": "dca6a94e45b1c026177f33861f6273f3a2b3d6e73b74254a897912f494af4c75"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
+      "symbol": "createProjectExportCompositionJoinRenderer",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: This factory owns one staging, cancellation and cleanup lifetime. Its157 lines include nested sample and returned lifecycle methods, which analysis also measures separately. The outer body has14 statements and cyclomatic2. One subordinate cut renderer shares parent cancellation. Controlled failure and disposal tests prove no late publication. Splitting the closures would distribute this lifetime.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "024ef1665f7de05179f231b18a15f69cc052682b532bf66cd102e7fb44633dbb",
+      "signatureHash": "3e3aac676fafdc23b6a94224f2aea7ccf3955812b51827e6a6018f6f0e1b0775"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "symbol": "createMaterializedJoinPresentation",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This factory owns one serial frame preparation lifetime. Its163 lines include nested sample and returned frame methods, which analysis also measures separately. The outer body has11 statements and cyclomatic1. Existing injected media state and canvas remain the same receiver. The subordinate cut renderer omits final scene edges. Failure, retry and disposal tests cover the same lifetime. The correction forwards output sampling to final scene fades through the existing input. Independent architecture review must assess this changed body again.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "c19667a07e89fd8e9191ede0711cf80dc059fcb41145b6e94d394185276a042d",
+      "signatureHash": "d124a5c7e4a4a1fcffed5cc4aa1ec6dcadaff12efa7f44644016471279b89945"
     }
   ]
 }

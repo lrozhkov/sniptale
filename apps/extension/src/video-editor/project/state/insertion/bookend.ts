@@ -1,3 +1,4 @@
+import { createVideoProjectSceneEdges } from '../../../../features/video/project/scene/edge-fades';
 import {
   applyBookendMaterialPresentation,
   resolveBookendMaterialPresentation,
@@ -86,8 +87,22 @@ export function createBookendPlacementAction(
           ? project.bookendPresets?.introTransition
           : project.bookendPresets?.outroTransition
         : undefined;
+      const edgeFade = preset?.edgeControl?.media;
       const proposed = retainOwnerEffectCoverage(project, {
         ...composition,
+        ...(edgeFade
+          ? {
+              sceneEdges: {
+                ...(project.sceneEdges ?? createVideoProjectSceneEdges()),
+                [side]: {
+                  ...edgeFade,
+                  duration: edgeFade.enabled
+                    ? Math.min(edgeFade.duration, span)
+                    : edgeFade.duration,
+                },
+              },
+            }
+          : {}),
         compositionJoins: [
           ...(composition.compositionJoins ?? []),
           {

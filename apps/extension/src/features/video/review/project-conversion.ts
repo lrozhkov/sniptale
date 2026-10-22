@@ -1,3 +1,7 @@
+import {
+  planReviewProjectPresentation,
+  type ReviewProjectBookendResource,
+} from './project-presentation';
 import type { VideoProjectCompositionJoin } from '../project/scene/joins-types';
 import { planReviewProjectAnnotations } from './project-annotations';
 import type { VideoProjectEffectSnapshot } from '../project/effect-instance/types';
@@ -9,7 +13,6 @@ import { planReviewProjectScene, type ReviewProjectSceneImageResource } from './
 import { loadQuickEditAdvancedState } from './advanced/validation';
 import { resolveQuickEditEffectiveFeatures } from './advanced/effective';
 import { buildReviewTimeMap } from './timeline';
-import { resolvePresentationSettings } from './advanced/presentation';
 import type {
   VideoProject,
   VideoProjectAudioClip,
@@ -70,6 +73,7 @@ export function planReviewProjectConversion(args: {
   externalAudio?: ReviewProjectAudioResources;
   camera?: ReviewProjectCameraResource;
   imageAssets?: readonly ReviewProjectSceneImageResource[];
+  bookendAssets?: readonly ReviewProjectBookendResource[];
   annotationSnapshots?: readonly VideoProjectEffectSnapshot[];
   ui: QuickEditUiState;
 }): ReviewProjectConversionPlan {
@@ -95,7 +99,7 @@ export function planReviewProjectConversion(args: {
   const advanced = loadQuickEditAdvancedState({ ...document.advancedContent, ui: args.ui });
   if (!advanced) return blocked({ kind: 'invalid-document', field: 'ui' });
   const application = resolveQuickEditEffectiveFeatures(advanced);
-  const pending = pendingContent(document.advancedContent);
+  const pending = pendingContent();
   const scene = planReviewProjectScene({
     content: document.advancedContent,
     ui: args.ui,
@@ -299,7 +303,6 @@ export function planReviewProjectConversion(args: {
     ...(compositionJoins.length ? { compositionJoins } : {}),
     backgroundColor: '#00000000',
     ...scene.scene,
-    ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),
     assets: [
       ...structuredClone(args.seed.assets),
       ...externalAudio.assets,
@@ -372,47 +375,17 @@ export function planReviewProjectConversion(args: {
   );
   if (!motion) return blocked({ kind: 'unmapped-content', field: 'zoom' });
   project = motion;
+  const presentation = planReviewProjectPresentation({
+    project,
+    settings: document.advancedContent.presentation,
+    applied: application.presentationApplied,
+    resources: args.bookendAssets ?? [],
+  });
+  if (presentation.status === 'blocked')
+    return blocked({ kind: 'unmapped-content', field: presentation.field });
+  project = presentation.project;
   if (!isExportReadyVideoProject(project)) return blocked({ kind: 'native-admission' });
   return { status: 'prepared', project, timeline };
-}
-
-function projectPresentation(
-  settings: QuickEditAdvancedContent['presentation'],
-  applied: boolean
-): Partial<Pick<VideoProject, 'sceneEdges' | 'bookendPresets'>> {
-  const presentation = settings ? resolvePresentationSettings(settings) : undefined;
-  return presentation
-    ? {
-        sceneEdges: {
-          intro: {
-            ...presentation.fadeIn,
-            enabled: presentation.fadeIn.enabled && applied,
-            color: presentation.fadeIn.color ?? presentation.color,
-            audioFade: presentation.fadeIn.audioFade ?? presentation.audioFade,
-          },
-          outro: {
-            ...presentation.fadeOut,
-            enabled: presentation.fadeOut.enabled && applied,
-            color: presentation.fadeOut.color ?? presentation.color,
-            audioFade: presentation.fadeOut.audioFade ?? presentation.audioFade,
-          },
-        },
-        ...(presentation.introTransition || presentation.outroTransition
-          ? {
-              bookendPresets: {
-                intro: { mode: 'none' as const },
-                outro: { mode: 'none' as const },
-                ...(presentation.introTransition
-                  ? { introTransition: structuredClone(presentation.introTransition) }
-                  : {}),
-                ...(presentation.outroTransition
-                  ? { outroTransition: structuredClone(presentation.outroTransition) }
-                  : {}),
-              },
-            }
-          : {}),
-      }
-    : {};
 }
 
 function projectRecordingFeedback(args: {
@@ -533,7 +506,7 @@ function sourceTemplates(seed: VideoProject): {
   return { video, cursorTrack: cursor.track, ...(audio[0] ? { audio: audio[0] } : {}) };
 }
 
-function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConversionIssue[] {
+function pendingContent(): ReviewProjectConversionIssue[] {
   // Every source field requires a deliberate mapping or a neutral-state check during implementation.
   const pending: Record<keyof QuickEditAdvancedContent, boolean> = {
     schemaVersion: false,
@@ -548,16 +521,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     webcam: false,
     watermark: false,
     annotationEffects: false,
-    presentation:
-      content.presentation !== undefined &&
-      (content.presentation.intro.mode !== 'none' ||
-        content.presentation.outro.mode !== 'none' ||
-        content.presentation.intro.image !== undefined ||
-        content.presentation.intro.video !== undefined ||
-        content.presentation.outro.image !== undefined ||
-        content.presentation.outro.video !== undefined ||
-        content.presentation.introControl !== undefined ||
-        content.presentation.outroControl !== undefined),
+    presentation: false,
     cameraFollowDefaults: false,
     cursorFocusPath: false,
 

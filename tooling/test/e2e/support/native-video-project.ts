@@ -2,7 +2,8 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { Page } from '@playwright/test';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 
-export async function readNativeVideoProject(page: Page) {
+export async function readNativeVideoProject(page: Page, expectedProjectId?: string) {
+  const projectId = expectedProjectId ?? new URL(page.url()).searchParams.get('project');
   const values = await page.evaluate(async () => {
     const entries = await new Promise<unknown[]>((resolve, reject) => {
       const request = indexedDB.open('sniptale-db');
@@ -76,5 +77,6 @@ export async function readNativeVideoProject(page: Page) {
         ? [parseHydratableVideoProject(value.project)]
         : []
     )
-    .find((value) => value !== null);
+    .filter((value) => value !== null)
+    .find((value) => projectId === null || value.id === projectId);
 }

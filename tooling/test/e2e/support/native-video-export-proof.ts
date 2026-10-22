@@ -222,3 +222,53 @@ export async function encodedNativeVideoSamples(
   }
   return { ...result, audioTrackCount };
 }
+
+/** Measures 20ms RMS windows in the latest completed actual Native export. */
+export async function readEncodedAudioWindows(page: Page, times: readonly number[]) {
+  const messages = await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED);
+  const exportId = messages.at(-1)?.exportId;
+  if (typeof exportId !== 'string') throw new Error('Missing encoded export');
+  return page.evaluate(
+    async ({ id, times }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const entry: unknown = await new Promise((resolve, reject) => {
+        const request = db.transaction('project_exports').objectStore('project_exports').get(id);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      db.close();
+      if (
+        typeof entry !== 'object' ||
+        entry === null ||
+        !('assetId' in entry) ||
+        typeof entry.assetId !== 'string'
+      )
+        throw new Error('Missing encoded asset');
+      const objects = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+      ).getDirectoryHandle('objects');
+      const file = await (await objects.getFileHandle(entry.assetId)).getFile();
+      const decoder = new AudioContext({ sampleRate: 48000 });
+      try {
+        const audio = await decoder.decodeAudioData(await file.arrayBuffer());
+        const pcm = audio.getChannelData(0);
+        return times.map((time) => {
+          const first = Math.round(time * audio.sampleRate),
+            last = Math.round((time + 0.02) * audio.sampleRate);
+          if (first < 0 || last > pcm.length)
+            throw new Error('Encoded audio window is outside the export.');
+          let squares = 0;
+          for (let frame = first; frame < last; frame++) squares += pcm[frame]! ** 2;
+          return Math.sqrt(squares / (last - first));
+        });
+      } finally {
+        await decoder.close();
+      }
+    },
+    { id: exportId, times }
+  );
+}

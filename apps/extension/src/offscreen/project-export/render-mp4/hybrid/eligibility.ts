@@ -159,7 +159,7 @@ export function createCleanSourceSpan(
     )
   )
     return createCompositeSpan(start, end, 'transition');
-  const edges = resolveVideoProjectSceneEdgePlan(project).visualEnvelope;
+  const edges = resolveVideoProjectSceneEdgePlan(project, settings.fps).visualEnvelope;
   if (edges.fadeIn > 0 || edges.fadeOut > 0) {
     return createCompositeSpan(start, end, 'visual-layer');
   }

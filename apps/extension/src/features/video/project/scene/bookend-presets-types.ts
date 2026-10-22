@@ -1,3 +1,4 @@
+import type { PresentationEdgeControl } from './edge-fades';
 import type { CompositionJoinSettings } from './composition-join';
 import type { BookendImagePresentation, BookendVideoPresentation } from './bookend-media';
 
@@ -6,14 +7,15 @@ type VideoProjectBookendImagePreset = BookendImagePresentation & { assetId: stri
 type VideoProjectBookendVideoPreset = BookendVideoPresentation & { assetId: string };
 
 /** Both remembered variants survive selecting None or another media kind. */
-export type VideoProjectBookendPreset =
+export type VideoProjectBookendPreset = { edgeControl?: PresentationEdgeControl } & (
   | { mode: 'none'; image?: VideoProjectBookendImagePreset; video?: VideoProjectBookendVideoPreset }
   | { mode: 'image'; image: VideoProjectBookendImagePreset; video?: VideoProjectBookendVideoPreset }
   | {
       mode: 'video';
       image?: VideoProjectBookendImagePreset;
       video: VideoProjectBookendVideoPreset;
-    };
+    }
+);
 
 /** Recipes author future insertions; accepted timeline instances remain independent. */
 export interface VideoProjectBookendPresets {

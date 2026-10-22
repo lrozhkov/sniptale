@@ -12,7 +12,11 @@ export async function applyOfflineSceneEdgeGain(
   signal?: AbortSignal
 ): Promise<void> {
   signal?.throwIfAborted();
-  const envelope = resolveVideoProjectSceneEdgePlan(project).audioEnvelope;
+  const envelope = resolveVideoProjectSceneEdgePlan(
+    project,
+    project.fps,
+    output.sampleRate
+  ).audioEnvelope;
   if (envelope.fadeIn === 0 && envelope.fadeOut === 0) return;
   const channels = Array.from({ length: output.numberOfChannels }, (_, channel) =>
     output.getChannelData(channel)

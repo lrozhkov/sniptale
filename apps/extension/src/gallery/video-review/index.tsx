@@ -89,12 +89,14 @@ function useEditorPresentationPreview(
             clickCues: state.clickCues,
             keyCues: state.keyCues,
             readProjectAsset: resolveReviewAssetBytes,
+            effectSnapshots: snapshot.snapshot.workspace.effectSnapshots ?? [],
           }
         : null,
     [
       resource.file,
       editing.exporter.index,
       snapshot.document,
+      snapshot.snapshot.workspace.effectSnapshots,
       advanced,
       editing.exporter.renderSettings,
       features.overlaysVisible,

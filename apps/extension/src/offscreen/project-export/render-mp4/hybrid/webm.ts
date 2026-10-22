@@ -204,7 +204,13 @@ async function drawDecodedCompositeFrame(
     backgroundCache: args.backgroundCache,
     ...(ownerDocument ? { ownerDocument } : {}),
   });
-  drawVideoProjectSceneEdges(args.request.context, project, args.projectTime);
+  drawVideoProjectSceneEdges(
+    args.request.context,
+    project,
+    args.projectTime,
+    undefined,
+    args.request.settings.fps
+  );
 }
 
 function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Document | undefined {

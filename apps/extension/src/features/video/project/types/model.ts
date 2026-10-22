@@ -358,7 +358,9 @@ export interface VideoProject {
     | 37
     | 38
     | 39
-    | 40;
+    | 40
+    | 41
+    | 42;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
@@ -379,6 +381,8 @@ export interface VideoProject {
   watermark?: import('../scene/watermark-types').QuickEditWatermarkSettings;
   /** Suppress the authored watermark without rewriting its selected mode. */
   watermarkEnabled?: false;
+  /** Passive experimental metadata retained for recovery. Watermarks render on the final canvas. */
+  watermarkSource?: { assetId: string; sourceInstanceId: string };
   /** Project-clock presentation after the complete visual and audio composition. */
   sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
   /** Authored insertion recipes; existing timeline instances remain independent. */

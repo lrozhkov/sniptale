@@ -205,3 +205,21 @@ it('resets image presentation defaults while preserving its bytes and authored t
   expect(reset.image).toEqual({ ...logo, size: 0.2, opacity: 1 });
   expect(reset.text).toEqual(base.text);
 });
+
+it('strictly admits retained experimental watermark identities', async () => {
+  const { parseVideoProjectWatermarkSource: parse } = await import('./watermark');
+  expect(parse({ assetId: 'video', sourceInstanceId: 'instance' })).toEqual({
+    assetId: 'video',
+    sourceInstanceId: 'instance',
+  });
+  for (const value of [
+    null,
+    {},
+    { assetId: '', sourceInstanceId: 'instance' },
+    { assetId: ' video', sourceInstanceId: 'instance' },
+    { assetId: 'video', sourceInstanceId: 1 },
+    { assetId: 'video', sourceInstanceId: 'x'.repeat(257) },
+    { assetId: 'video', sourceInstanceId: 'instance', start: 0 },
+  ])
+    expect(parse(value)).toBeNull();
+});

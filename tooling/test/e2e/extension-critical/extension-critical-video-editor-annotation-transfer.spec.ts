@@ -1,3 +1,7 @@
+import {
+  replayReviewHistory,
+  reviewDocumentBaseline,
+} from '../../../../apps/extension/src/features/video/review/document';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { resolveEffectSourceProjection } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
@@ -28,8 +32,15 @@ import {
 import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import { readNativeVideoProject } from '../support/native-video-project';
-import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
-import { checkInspectorPaintedFont, chooseInspectorValue } from '../support/inspector-utilities';
+import {
+  encodedNativeVideoSamples,
+  readEncodedAudioWindows,
+} from '../support/native-video-export-proof';
+import {
+  checkInspectorLabels,
+  checkInspectorPaintedFont,
+  chooseInspectorValue,
+} from '../support/inspector-utilities';
 
 async function drawAnnotation(page: Page, start: number, end: number) {
   const lane = page.locator('[data-ui="gallery.videoReview.annotationEffectsLane"]');
@@ -54,6 +65,8 @@ const baseCase = {
   spotlight: false,
   spotlightEffect: 'dim',
   galleryCut: 'none',
+  bookends: false,
+  activeIntro: false,
 } as const;
 
 for (const {
@@ -69,8 +82,42 @@ for (const {
   spotlight,
   spotlightEffect,
   galleryCut,
+  bookends,
+  activeIntro,
 } of [
   { ...baseCase, nativeFx: true },
+  {
+    ...baseCase,
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'dissolve',
+    bookends: true,
+    activeIntro: true,
+  },
+  { ...baseCase, crop: true, nativeFx: true, galleryCut: 'dissolve', bookends: true },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'fade-black',
+    bookends: true,
+  },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    crop: true,
+    nativeFx: true,
+    galleryCut: 'fade-black',
+    bookends: true,
+    activeIntro: true,
+  },
   {
     ...baseCase,
     viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
@@ -139,7 +186,7 @@ for (const {
     galleryCut: 'fade-black',
   },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -150,6 +197,7 @@ for (const {
     const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
     const aggregate = 'recording:beta-v1-recording';
     const title = 'Retained SVG annotation';
+    const outroFixture = activeIntro ? 'review-cut-vfr-audio.webm' : 'review-cut-vfr.webm';
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
@@ -387,6 +435,202 @@ for (const {
         steps: 8,
       });
       await page.mouse.up();
+      if (bookends) {
+        const fields = dialog.locator('[data-ui="gallery.videoReview.editRangeFields"]');
+        for (const [field, value] of [
+          ['gallery.videoReview.rangeStart', '0.03'],
+          ['gallery.videoReview.rangeEnd', (sourceDuration - 11.2 + 0.03).toFixed(6)],
+        ] as const) {
+          const input = fields.getByRole('textbox', { name: label(field), exact: true });
+          await input.fill(value);
+          await input.press('Enter');
+        }
+        await button('gallery.videoReview.scene').click();
+        const presentation = dialog.locator(
+          '[data-ui="gallery.videoReview.presentationInspector"]'
+        );
+        const intro = presentation.locator(
+          `section[aria-label="${label('gallery.videoReview.presentationIntro')}"]`
+        );
+        await intro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationBookend'),
+            exact: true,
+          })
+          .click();
+        const image = await page.evaluate(() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 32;
+          canvas.height = 16;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = '#ff0000';
+          context.fillRect(0, 0, 32, 16);
+          return canvas.toDataURL('image/png').split(',')[1]!;
+        });
+        const card = page.waitForEvent('filechooser');
+        await intro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationComputer'),
+            exact: true,
+          })
+          .click();
+        await (
+          await card
+        ).setFiles({
+          name: 'retained-opening.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(image, 'base64'),
+        });
+        await expect(presentation).toHaveAttribute('aria-busy', 'false');
+        if (activeIntro) {
+          const duration = intro
+            .locator('[data-ui="shared.ui.presentation-media-fields"]')
+            .getByRole('textbox', {
+              name: label('gallery.videoReview.presentationDuration'),
+              exact: true,
+            });
+          await duration.fill('0.15');
+          await duration.press('Enter');
+          await chooseInspectorValue(
+            page,
+            intro,
+            label('gallery.videoReview.presentationJoinIntro'),
+            label(
+              format === 'WEBM'
+                ? 'gallery.videoReview.cutDissolve'
+                : 'gallery.videoReview.cutFadeColor'
+            )
+          );
+        } else {
+          await intro
+            .getByRole('button', {
+              name: label('gallery.videoReview.presentationNoEffect'),
+              exact: true,
+            })
+            .click();
+        }
+        const outro = presentation.locator(
+          `section[aria-label="${label('gallery.videoReview.presentationOutro')}"]`
+        );
+        if (activeIntro) {
+          await outro
+            .getByRole('button', {
+              name: label('gallery.videoReview.presentationFadeOut'),
+              exact: true,
+            })
+            .click();
+          const plain = outro.locator('[data-ui="shared.ui.presentation-fade-fields"]');
+          const duration = plain.getByRole('textbox', {
+            name: label('gallery.videoReview.presentationDuration'),
+            exact: true,
+          });
+          await duration.fill('0.7');
+          await duration.press('Enter');
+        }
+        await outro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationBookend'),
+            exact: true,
+          })
+          .click();
+        const movie = page.waitForEvent('filechooser');
+        await outro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationComputer'),
+            exact: true,
+          })
+          .click();
+        await (await movie).setFiles(`tooling/test/e2e/fixtures/${outroFixture}`);
+        await expect(presentation).toHaveAttribute('aria-busy', 'false');
+        const trim = outro.getByRole('textbox', {
+          name: label('gallery.videoReview.presentationTrimEnd'),
+          exact: true,
+        });
+        if (!(await trim.isVisible()))
+          await outro
+            .locator('summary')
+            .filter({ hasText: label('gallery.videoReview.presentationTrim') })
+            .click();
+        await trim.fill('1');
+        await trim.press('Enter');
+        if (activeIntro) {
+          const gain = outro.getByRole('textbox', {
+            name: label('gallery.videoReview.presentationVolume'),
+            exact: true,
+          });
+          await gain.fill('70');
+          await gain.press('Enter');
+        }
+        await expect
+          .poll(async () => {
+            const workspace = (await readNativeReviewWorkspace(page, aggregate))!;
+            const content = replayReviewHistory(
+              workspace.history,
+              workspace.cursor,
+              workspace.source,
+              reviewDocumentBaseline(workspace)
+            ).advancedContent;
+            return content.presentation?.outro.video?.trim.end;
+          })
+          .toBe(1);
+        if (activeIntro) {
+          const beforeRefusal = await readNativeReviewWorkspace(page, aggregate);
+          await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+          await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
+          await expect
+            .poll(
+              async () =>
+                (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+            )
+            .toBe(1);
+          const refusedTab = (
+            await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])
+          )[0]!;
+          const refusedQuery = new URL(refusedTab.url!).searchParams;
+          refusedQuery.set('theme', theme);
+          const refusedPage = await page.context().newPage();
+          try {
+            await refusedPage.setViewportSize({ ...viewport.size });
+            await refusedPage.emulateMedia({ colorScheme: theme });
+            await applyHarnessBootstrap(refusedPage, {
+              preserveMediaLibrary: true,
+              storage: {
+                'sniptale-locale-preference': locale,
+                'sniptale-theme-preference': theme,
+              },
+            });
+            await refusedPage.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${refusedQuery}`);
+            const feedback = refusedPage.getByText(
+              label('videoEditor.app.transferTimingUnsupported'),
+              { exact: true }
+            );
+            await expect(feedback).toBeVisible();
+            await expect(
+              refusedPage.getByText(label('common.errors.storageDetail'), { exact: false })
+            ).toHaveCount(0);
+            expect(await readNativeVideoProject(refusedPage)).toBeUndefined();
+            expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(beforeRefusal);
+            await refusedPage.screenshot({
+              path: info.outputPath('native-transfer-refused.png'),
+              fullPage: false,
+            });
+          } finally {
+            await refusedPage.close();
+          }
+          await button('gallery.videoReview.scene').click();
+          const duration = intro
+            .locator('[data-ui="shared.ui.presentation-media-fields"]')
+            .getByRole('textbox', {
+              name: label('gallery.videoReview.presentationDuration'),
+              exact: true,
+            });
+          await duration.fill('0.1');
+          await duration.press('Enter');
+        }
+        await page.screenshot({ path: info.outputPath('gallery-bookends.png'), fullPage: false });
+        await button('gallery.videoReview.pointerTool').click();
+        await dialog.locator('[data-ui="gallery.videoReview.editBlock"]').first().click();
+      }
       if (galleryCut !== 'none') {
         const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
         if (!(await settings.isVisible()))
@@ -410,6 +654,253 @@ for (const {
           async () => (await readNativeReviewWorkspace(page, aggregate))?.effectSnapshots?.length
         )
         .toBe(1);
+      if (activeIntro) {
+        await button('gallery.videoReview.scene').click();
+        const category = dialog
+          .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+          .getByRole('button', { name: label('gallery.videoReview.watermark'), exact: true });
+        if (await category.count()) await category.click();
+        const watermark = dialog.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
+        await chooseInspectorValue(
+          page,
+          watermark,
+          label('gallery.videoReview.watermark'),
+          label('gallery.videoReview.watermarkImage')
+        );
+        const logo = await page.evaluate(() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 32;
+          canvas.height = 32;
+          const context = canvas.getContext('2d')!;
+          context.fillStyle = '#ffff00';
+          context.fillRect(0, 0, 32, 32);
+          return canvas.toDataURL('image/png').split(',')[1]!;
+        });
+        await watermark.locator('input[type="file"]').setInputFiles({
+          name: 'source-watermark.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(logo, 'base64'),
+        });
+        await expect(watermark).toHaveAttribute('aria-busy', 'false');
+        const size = watermark.getByRole('textbox', {
+          name: label('gallery.videoReview.watermarkSize'),
+          exact: true,
+        });
+        await size.fill('20');
+        await size.press('Enter');
+        await watermark
+          .locator('[data-ui="watermark.anchors"]')
+          .getByRole('button', {
+            name: label('gallery.videoReview.watermarkAnchor_bottom-left'),
+            exact: true,
+          })
+          .click();
+        const presentationCategory = dialog
+          .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+          .getByRole('button', { name: label('gallery.videoReview.presentation'), exact: true });
+        if (await presentationCategory.count()) await presentationCategory.click();
+        await button('gallery.videoReview.presentationPreviewJoinIntro').click();
+        const preview = page.locator('[data-ui="gallery.videoReview.presentationPreview"]');
+        const clip = preview.locator('video');
+        await expect(clip).toBeVisible({ timeout: 45_000 });
+        await expect
+          .poll(() => clip.evaluate((video: HTMLVideoElement) => video.readyState))
+          .toBeGreaterThanOrEqual(4);
+        await clip.evaluate(async (video: HTMLVideoElement) => {
+          await video.play();
+          video.pause();
+          video.currentTime = 0.001;
+        });
+        await expect
+          .poll(() =>
+            clip.evaluate((video: HTMLVideoElement) => !video.seeking && video.readyState >= 2)
+          )
+          .toBe(true);
+        const reference = await clip.evaluate((video: HTMLVideoElement) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(video, 0, 0);
+          return {
+            width: canvas.width,
+            height: canvas.height,
+            time: video.currentTime,
+            pixel: Array.from(
+              context.getImageData(
+                Math.round((canvas.width * 10) / 160),
+                Math.round((canvas.height * 70) / 100),
+                1,
+                1
+              ).data
+            ),
+          };
+        });
+        await writeFile(
+          info.outputPath('gallery-bookend-watermark-reference.json'),
+          JSON.stringify(reference, null, 2)
+        );
+        for (const [channel, value] of [255, 255, 0].entries())
+          expect(Math.abs(reference.pixel[channel]! - value)).toBeLessThanOrEqual(12);
+        await page.screenshot({
+          path: info.outputPath('gallery-bookend-watermark-reference.png'),
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
+        await expect(preview).toHaveCount(0);
+      }
+      let dormantNativeProjectId: string | undefined;
+      if (activeIntro) {
+        const saved = async () =>
+          expect(dialog.locator('[data-ui="autosave-control"] button').first()).toHaveAttribute(
+            'aria-label',
+            `${label('editor.documentActions.autosaveTitle')}: ${label('common.states.saved')}`
+          );
+        await saved();
+        const beforeCut = (await readNativeReviewWorkspace(page, aggregate))!;
+        await button('gallery.videoReview.cutMode').click();
+        const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+        const lane = plane.locator(
+          (await plane.getAttribute('data-active-tool-lane')) === 'source'
+            ? '[data-ui="gallery.videoReview.sourceLane"]'
+            : '[data-ui="gallery.videoReview.ruler"]'
+        );
+        await lane.scrollIntoViewIfNeeded();
+        const box = (await lane.boundingBox())!;
+        const duration = Number(await plane.getAttribute('aria-valuemax'));
+        await page.mouse.move(box.x + box.width / duration, box.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(box.x + (box.width * 11) / duration, box.y + 12, { steps: 8 });
+        await page.mouse.up();
+        const fields = dialog.locator('[data-ui="gallery.videoReview.editRangeFields"]');
+        for (const [key, value] of [
+          ['gallery.videoReview.rangeStart', '1'],
+          ['gallery.videoReview.rangeEnd', '11'],
+        ] as const) {
+          const field = fields.getByRole('textbox', { name: label(key), exact: true });
+          await field.fill(value);
+          await field.press('Enter');
+        }
+        await saved();
+        const cutWorkspace = (await readNativeReviewWorkspace(page, aggregate))!;
+        await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+        await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
+        await expect
+          .poll(
+            async () =>
+              (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
+          )
+          .toBe(2);
+        const tab = (
+          await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])
+        ).at(-1)!;
+        const query = new URL(tab.url!).searchParams;
+        query.set('theme', theme);
+        const isolated = await page.context().newPage();
+        try {
+          await isolated.setViewportSize({ ...viewport.size });
+          await isolated.emulateMedia({ colorScheme: theme });
+          await applyHarnessBootstrap(isolated, {
+            preserveMediaLibrary: true,
+            storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+          });
+          await isolated.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${query}`);
+          await expect(isolated.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(isolated))?.clips.filter(
+                  (clip) => clip.type === 'EFFECT'
+                ).length
+            )
+            .toBe(3);
+          const project = (await readNativeVideoProject(isolated))!;
+          dormantNativeProjectId = project.id;
+          expect(project.duration).toBeCloseTo(2.3, 6);
+          const hosts = project.clips.filter((clip) => clip.type === 'EFFECT');
+          expect(hosts).toHaveLength(3);
+          expect(hosts.every((clip) => clip.sourceRange?.dormant)).toBe(true);
+          expect(project.effectSnapshots).toHaveLength(1);
+          expect(project.effectSnapshots![0]!.assets).toHaveLength(1);
+          await isolated.reload();
+          await expect(isolated.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+          const reopened = (await readNativeVideoProject(isolated))!;
+          expect(reopened.duration).toBe(project.duration);
+          expect(reopened.effectSnapshots).toEqual(project.effectSnapshots);
+          expect(
+            reopened.clips.filter((clip) => clip.type === 'EFFECT').map((clip) => clip.sourceRange)
+          ).toEqual(hosts.map((clip) => clip.sourceRange));
+          await isolated.screenshot({
+            path: info.outputPath('native-wholly-cut-annotations-reopened.png'),
+            fullPage: false,
+          });
+          const output = await encodedNativeVideoSamples(isolated, host.origin, reopened, format, [
+            {
+              time: 0.001,
+              x: Math.round(reopened.width / 2),
+              y: Math.round(reopened.height / 2),
+              expected: [255, 0, 0],
+            },
+            {
+              time: 0.201,
+              x: Math.round(reopened.width / 2),
+              y: Math.round(reopened.height / 2),
+              expected: [224, 32, 176],
+            },
+            {
+              time: Math.round((reopened.duration - 0.8) * 1_000_000) / 1_000_000 + 0.001,
+              x: Math.round(reopened.width / 2),
+              y: Math.round(reopened.height / 2),
+              expected: [255, 0, 0],
+            },
+          ]);
+          await writeFile(
+            info.outputPath('wholly-cut-annotations-encoded.json'),
+            JSON.stringify(
+              {
+                format,
+                projectDuration: reopened.duration,
+                sourceRanges: hosts.map((clip) => clip.sourceRange),
+                output,
+              },
+              null,
+              2
+            )
+          );
+          for (const sample of output.samples) {
+            if (sample.time === 0.201)
+              expect(sample.error, JSON.stringify(sample)).toBeGreaterThan(32);
+            else expect(sample.error, JSON.stringify(sample)).toBeLessThanOrEqual(12);
+          }
+          expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(cutWorkspace);
+        } finally {
+          await isolated.close();
+        }
+        for (let cursor = cutWorkspace.cursor; cursor > beforeCut.cursor; cursor--) {
+          await button('gallery.videoReview.undo').click();
+          await expect
+            .poll(async () => (await readNativeReviewWorkspace(page, aggregate))?.cursor)
+            .toBe(cursor - 1);
+        }
+        await saved();
+        const restored = (await readNativeReviewWorkspace(page, aggregate))!;
+        expect(
+          replayReviewHistory(
+            restored.history,
+            restored.cursor,
+            restored.source,
+            reviewDocumentBaseline(restored)
+          )
+        ).toEqual(
+          replayReviewHistory(
+            beforeCut.history,
+            beforeCut.cursor,
+            beforeCut.source,
+            reviewDocumentBaseline(beforeCut)
+          )
+        );
+        await button('gallery.videoReview.scene').click();
+      }
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
       await expect
@@ -417,11 +908,15 @@ for (const {
           async () =>
             (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).length
         )
-        .toBe(1);
+        .toBe(activeIntro ? 3 : 1);
       const gallery = (await readNativeReviewWorkspace(page, aggregate))!;
-      const tab = (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []))[0]!;
+      const tab = (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? [])).at(
+        -1
+      )!;
       const nativeQuery = new URL(tab.url!).searchParams;
       nativeQuery.set('theme', theme);
+      if (bookends)
+        await writeFile(info.outputPath('gallery-bookend-workspace.json'), JSON.stringify(gallery));
       await page.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${nativeQuery}`);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
@@ -434,6 +929,173 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      if (activeIntro) expect(native.id).not.toBe(dormantNativeProjectId);
+      if (bookends) {
+        expect(native.version).toBe(41);
+        expect(
+          native.assets.find(({ id }) => id === native.bookendPresets?.intro.image?.assetId)?.name
+        ).toBe('retained-opening.png');
+        expect(
+          native.assets.find(({ id }) => id === native.bookendPresets?.outro.video?.assetId)?.name
+        ).toBe(outroFixture);
+        expect(native.bookendPresets?.intro.image).toBeDefined();
+        expect(native.bookendPresets?.intro.edgeControl?.mode).toBe(activeIntro ? 'media' : 'none');
+        if (activeIntro)
+          expect(native.clips).toContainEqual(
+            expect.objectContaining({
+              id: `${native.id}:bookend:intro:media`,
+              type: 'IMAGE',
+              startTime: 0,
+              duration: 0.1,
+            })
+          );
+        expect(native.bookendPresets?.outro.video?.trim).toEqual({ start: 0, end: 1 });
+        if (activeIntro) {
+          expect(native.bookendPresets?.outro.video?.audio).toEqual({ muted: false, gain: 0.7 });
+          expect(
+            native.clips.find(({ id }) => id === `${native.id}:bookend:outro:audio`)
+          ).toMatchObject({ type: 'AUDIO', muted: false, audioGainStart: 0.7, audioGainEnd: 0.7 });
+        }
+        expect(native.clips).toContainEqual(
+          expect.objectContaining({
+            id: `${native.id}:bookend:outro:media`,
+            type: 'VIDEO',
+            duration: 1,
+            sourceStart: 0,
+            sourceDuration: 1,
+            playbackRate: 1,
+          })
+        );
+      }
+      if (activeIntro) {
+        expect(native.watermarkSource).toBeUndefined();
+        expect(native.watermark?.image?.size).toBe(0.2);
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+          .click();
+        await page
+          .locator('[data-ui="video-editor.inspector.categories"] > nav')
+          .getByRole('button', { name: label('gallery.videoReview.watermark'), exact: true })
+          .click();
+        const watermark = page.locator('[data-ui="video-editor.watermark.inspector"]');
+        const size = watermark.getByRole('textbox', {
+          name: label('gallery.videoReview.watermarkSize'),
+          exact: true,
+        });
+        await size.fill('25');
+        await size.press('Enter');
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.watermark?.image?.size)
+          .toBe(0.25);
+        await size.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: info.outputPath('native-watermark-inspector.png'),
+          fullPage: false,
+        });
+        expect(native.bookendPresets?.outro.edgeControl?.plain.duration).toBe(0.7);
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+          .click();
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneEdges'), exact: true })
+          .click();
+        const outro = page
+          .locator('[data-ui="video-editor.scene-bookends.outro"]')
+          .locator('xpath=ancestor::details[1]');
+        await chooseInspectorValue(
+          page,
+          outro,
+          label('gallery.videoReview.presentationOutro'),
+          label('gallery.videoReview.presentationFadeOut')
+        );
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.outro)
+          .toEqual(native.bookendPresets!.outro.edgeControl!.plain);
+        const plainFields = outro.locator('[data-ui="shared.ui.presentation-fade-fields"]');
+        const duration = plainFields.getByRole('textbox', {
+          name: label('gallery.videoReview.presentationDuration'),
+          exact: true,
+        });
+        await duration.fill('0.9');
+        await duration.press('Enter');
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.bookendPresets?.outro.edgeControl?.plain
+                .duration
+          )
+          .toBe(0.9);
+        const authored = (await readNativeVideoProject(page))!;
+        expect(authored.bookendPresets?.outro.edgeControl?.media).toEqual(
+          native.bookendPresets?.outro.edgeControl?.media
+        );
+        expect(authored.clips).toEqual(hydrateVideoProject(native).clips);
+        await checkInspectorPaintedFont(page, plainFields, 'native-restored-plain-fade');
+        await page.screenshot({
+          path: info.outputPath('native-restored-plain-fade.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.outro.duration)
+          .toBe(0.7);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges)
+          .toEqual(native.sceneEdges);
+        expect((await readNativeVideoProject(page))?.bookendPresets).toEqual(native.bookendPresets);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.outro.duration)
+          .toBe(0.7);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.outro.duration)
+          .toBe(0.9);
+        expect(
+          (await readNativeVideoProject(page))?.bookendPresets?.outro.edgeControl?.plain.duration
+        ).toBe(0.9);
+      }
+      if (bookends) {
+        const mediaId = `${native.id}:bookend:outro:media`;
+        await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
+        await page.locator(`[data-project-timeline-clip="${mediaId}"]`).click();
+        const bookendPlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+        await bookendPlayhead.press('End');
+        for (let n = 0; n < 15; n++) await bookendPlayhead.press('ArrowLeft');
+        await page
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupTransform'),
+            exact: true,
+          })
+          .click();
+        const rotation = page.getByRole('textbox', {
+          name: label('videoEditor.sidebar.rotationLabel'),
+          exact: true,
+        });
+        await rotation.fill('5');
+        await rotation.press('Enter');
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))!.clips.find(({ id }) => id === mediaId)
+                ?.transform.rotation
+          )
+          .toBe(5);
+        await checkInspectorPaintedFont(page, rotation, 'transferred-bookend-rotation');
+        await page.screenshot({
+          path: info.outputPath('native-bookend-inspector.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))!.clips.find(({ id }) => id === mediaId)
+                ?.transform.rotation
+          )
+          .toBe(0);
+      }
       if (galleryCut !== 'none') {
         expect(
           native.compositionJoins?.some(
@@ -447,11 +1109,16 @@ for (const {
         await page
           .getByRole('button', { name: label('videoEditor.sidebar.sceneEdges'), exact: true })
           .click();
-        const joinFields = page
-          .locator(
-            '[data-ui="video-editor.scene-edges.inspector"] [data-ui="shared.ui.presentation-join-fields"]'
-          )
-          .first();
+        const cutBoundary = native.compositionJoins!.find(
+          (join) => join.sampling === 'cut' && join.transition?.type === galleryCut
+        )!;
+        const sourceAsset = native.assets.find(
+          ({ id }) => id === cutBoundary.sourceRange?.assetId
+        )!;
+        const joinGroup = page
+          .getByRole('heading', { name: sourceAsset.name, exact: true })
+          .locator('xpath=ancestor::details[1]');
+        const joinFields = joinGroup.locator('[data-ui="shared.ui.presentation-join-fields"]');
         const other = galleryCut === 'dissolve' ? 'fade-black' : 'dissolve';
         await chooseInspectorValue(
           page,
@@ -466,7 +1133,9 @@ for (const {
         await expect
           .poll(
             async () =>
-              (await readNativeVideoProject(page))?.compositionJoins?.[0]?.transition?.type
+              (await readNativeVideoProject(page))?.compositionJoins?.find(
+                ({ id }) => id === cutBoundary.id
+              )?.transition?.type
           )
           .toBe(other);
         await chooseInspectorValue(
@@ -485,7 +1154,7 @@ for (const {
         expect((await readNativeVideoProject(page))!.clips).toEqual(
           hydrateVideoProject(native).clips
         );
-        const seek = page
+        const seek = joinGroup
           .getByRole('button', {
             name: label('videoEditor.sidebar.compositionJoinSeek'),
             exact: true,
@@ -570,11 +1239,11 @@ for (const {
       const content = native.clips.find(
         (clip) => clip.type === 'EFFECT' && clip.attachment?.kind === 'source'
       )!;
-      const viewport = native.clips.find(
+      const viewportAnnotation = native.clips.find(
         (clip) => clip.type === 'EFFECT' && clip.attachment?.kind === 'viewport'
       )!;
       expect(content).toBeTruthy();
-      expect(viewport).toBeTruthy();
+      expect(viewportAnnotation).toBeTruthy();
       const dormant = native.clips.find(
         (clip) => clip.type === 'EFFECT' && clip.sourceRange?.dormant
       )!;
@@ -1272,7 +1941,130 @@ for (const {
           }
         }
       }
+      if (activeIntro) {
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+          .click();
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneEdges'), exact: true })
+          .click();
+        const fields = page.locator('[data-ui="video-editor.scene-bookends.outro"]');
+        await fields
+          .getByRole('button', { name: label('videoEditor.sidebar.bookendPreset'), exact: true })
+          .click();
+        const preset = fields.locator('[data-ui="video-editor.scene-bookends.preset"]');
+        const advanced = preset
+          .locator('details')
+          .filter({
+            has: page
+              .locator('summary')
+              .filter({ hasText: label('gallery.videoReview.presentationAdvanced') }),
+          })
+          .last();
+        await advanced.locator('summary').click();
+        const fade = advanced.locator('[data-ui="shared.ui.presentation-fade-fields"]');
+        const beforeRecipe = (await readNativeVideoProject(page))!;
+        const enabled = fade.getByRole('switch', {
+          name: label('gallery.videoReview.presentationFadeOut'),
+          exact: true,
+        });
+        if ((await enabled.getAttribute('aria-checked')) === 'false') await enabled.click();
+        const duration = fade.getByRole('textbox', {
+          name: label('gallery.videoReview.presentationDuration'),
+          exact: true,
+        });
+        await duration.fill('0.4');
+        await duration.press('Enter');
+        const audio = fade.getByRole('switch', {
+          name: label('gallery.videoReview.presentationAudioFade'),
+          exact: true,
+        });
+        if ((await audio.getAttribute('aria-checked')) === 'false') await audio.click();
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.bookendPresets?.outro.edgeControl?.media
+          )
+          .toMatchObject({ enabled: true, duration: 0.4, audioFade: true });
+        const recipe = (await readNativeVideoProject(page))!;
+        expect(recipe.clips).toEqual(beforeRecipe.clips);
+        expect(recipe.sceneEdges).toEqual(beforeRecipe.sceneEdges);
+        expect(recipe.bookendPresets?.outro.edgeControl?.plain).toEqual(
+          beforeRecipe.bookendPresets?.outro.edgeControl?.plain
+        );
+        await checkInspectorLabels(preset);
+        await checkInspectorPaintedFont(page, fade, 'native-bookend-media-fade');
+        const recipeGeometry = await preset.evaluate((node) => {
+          const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+          return {
+            preset: { width: node.clientWidth, scrollWidth: node.scrollWidth },
+            scrollOwner:
+              body instanceof HTMLElement
+                ? { width: body.clientWidth, scrollWidth: body.scrollWidth }
+                : null,
+          };
+        });
+        await writeFile(
+          info.outputPath('native-bookend-fade-geometry.json'),
+          JSON.stringify(recipeGeometry)
+        );
+        expect(recipeGeometry.scrollOwner).not.toBeNull();
+        expect(recipeGeometry.scrollOwner!.scrollWidth).toBeLessThanOrEqual(
+          recipeGeometry.scrollOwner!.width + 1
+        );
+        await page.screenshot({
+          path: info.outputPath('native-bookend-fade-recipe.png'),
+          fullPage: false,
+        });
+        await fields
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.bookendInsertOutro'),
+            exact: true,
+          })
+          .click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.duration)
+          .toBeCloseTo(recipe.duration + 1, 6);
+        const placed = (await readNativeVideoProject(page))!;
+        expect(placed.sceneEdges?.outro).toMatchObject({
+          enabled: true,
+          duration: 0.4,
+          audioFade: true,
+        });
+        expect(
+          placed.clips.filter(({ id }) => recipe.clips.some((clip) => clip.id === id))
+        ).toEqual(recipe.clips);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.clips)
+          .toEqual(recipe.clips);
+        expect((await readNativeVideoProject(page))?.sceneEdges).toEqual(recipe.sceneEdges);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.clips)
+          .toEqual(placed.clips);
+        expect((await readNativeVideoProject(page))?.sceneEdges).toEqual(placed.sceneEdges);
+      }
       const final = (await readNativeVideoProject(page))!;
+      const otherVideo = final.clips.find(
+        (clip) => clip.type === 'VIDEO' && clip.assetId === asset.id
+      )!;
+      const otherVideoSampleTime =
+        Math.round(
+          (Math.ceil((otherVideo.startTime + Math.min(0.2, otherVideo.duration / 2)) * final.fps) /
+            final.fps) *
+            1_000_000
+        ) /
+          1_000_000 +
+        0.001;
+      if (activeIntro) {
+        expect(final.watermarkSource).toBeUndefined();
+        expect(final.watermark?.image?.size).toBe(0.25);
+      }
+      if (activeIntro) {
+        expect(final.bookendPresets?.outro.edgeControl?.plain.duration).toBe(0.9);
+        expect(final.bookendPresets?.outro.edgeControl?.media.duration).toBe(0.4);
+      }
       if (spatial) {
         const spatialFrame = resolveVideoCompositionFrame(final, 0.6);
         expect(spatialFrame.camera.spatial).toBeTruthy();
@@ -1293,7 +2085,7 @@ for (const {
       }
       await page.reload();
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
-      expect(await readNativeVideoProject(page)).toEqual(final);
+      expect(await readNativeVideoProject(page, final.id)).toEqual(final);
       expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(gallery);
       if (spotlight) {
         await page.goto(
@@ -1317,7 +2109,7 @@ for (const {
           .click();
         await expect(catalogRow).toHaveCount(0);
         expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(gallery);
-        expect(await readNativeVideoProject(page)).toEqual(final);
+        expect(await readNativeVideoProject(page, final.id)).toEqual(final);
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
         await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
         await page
@@ -1352,7 +2144,7 @@ for (const {
           `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(final.id)}&theme=${theme}`
         );
         await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
-        expect(await readNativeVideoProject(page)).toEqual(final);
+        expect(await readNativeVideoProject(page, final.id)).toEqual(final);
       }
       await page.locator(`[data-project-timeline-clip="${content.id}"]`).click();
       await playhead.press('Home');
@@ -1564,127 +2356,267 @@ for (const {
           transitionCamera!
         );
       if (sourceTransitionPair) expect(transitionPoint).toBeTruthy();
+      const bookendMedia = bookends
+        ? final.clips.find(({ id }) => id === `${final.id}:bookend:outro:media`)
+        : undefined;
+      if (bookends) expect(bookendMedia).toBeTruthy();
       const output = await encodedNativeVideoSamples(
         page,
         host.origin,
         final,
         format,
-        selectedOnly
-          ? [
-              ...(greenPoint
-                ? [
-                    {
-                      time: 2,
-                      x: Math.round(greenPoint.x),
-                      y: Math.round(greenPoint.y),
-                      expected: [32, 176, 96],
-                    },
-                  ]
-                : []),
-              ...(spatial
-                ? [
-                    {
-                      time: 0.35,
-                      x: Math.round(final.width / 2),
-                      y: Math.round(final.height / 2),
-                      expected: [224, 32, 176],
-                    },
-                  ]
-                : []),
-              {
-                time: 1,
-                x: Math.round(edited.transform.x + edited.transform.width / 2),
-                y: Math.round(edited.transform.y + edited.transform.height / 2),
-                expected: [224, 32, 176],
-              },
-              { time: 2, x: Math.round(final.width / 2), y: 2, expected: [0, 0, 0] },
-            ]
-          : [
-              ...(sourceTransitionTime !== null && transitionPoint
-                ? [
-                    {
-                      time: sourceTransitionTime,
-                      x: Math.round(transitionPoint.x),
-                      y: Math.round(transitionPoint.y),
-                      expected: [224, 32, 176],
-                    },
-                  ]
-                : []),
-              ...(sourceTransitionTime !== null && !spatial && spotlightEffect === 'dim'
-                ? [
-                    {
-                      time: sourceTransitionTime,
-                      x: Math.round(final.width / 2),
-                      y: 2,
-                      expected: [0, 0, 0],
-                    },
-                  ]
-                : []),
-              ...(checksBackdrop
-                ? [0.6, 2].flatMap((time) =>
-                    Array.from({ length: 16 }, (_, index) => ({
-                      time,
-                      x: 9 + index * 2,
-                      y: 11,
-                      expected: [0, 0, 0],
-                    }))
-                  )
-                : []),
-              ...(spotlight
-                ? [
-                    {
-                      time: 0.6,
-                      x: Math.round(spotlightPoint!.x),
-                      y: Math.round(spotlightPoint!.y),
-                      expected: [224, 32, 176],
-                    },
-                    { time: 6.6, x: 30, y: 30, expected: [224, 32, 176] },
-                    ...(!spatial && spotlightEffect === 'dim'
-                      ? [
-                          { time: 0.6, x: Math.round(final.width / 2), y: 2, expected: [0, 0, 0] },
-                          { time: 2, x: Math.round(final.width / 2), y: 2, expected: [0, 0, 0] },
-                        ]
-                      : []),
-                  ]
-                : []),
-              ...(greenPoint
-                ? [
-                    {
-                      time: 2,
-                      x: Math.round(greenPoint.x),
-                      y: Math.round(greenPoint.y),
-                      expected: [32, 176, 96],
-                    },
-                  ]
-                : []),
-              ...(spatial
-                ? [
-                    {
-                      time: 0.6,
-                      x: Math.round(final.width / 2),
-                      y: Math.round(final.height / 2),
-                      expected: [224, 32, 176],
-                    },
-                  ]
-                : []),
-              { time: 0.2, x: dormantPoint.x, y: dormantPoint.y, expected: [224, 32, 176] },
-              {
-                time: 2,
-                x: Math.round(reopenedPoint.x),
-                y: Math.round(reopenedPoint.y),
-                expected: [224, 32, 176],
-              },
-              {
-                time: 7,
-                x: Math.round(viewport.transform.x + viewport.transform.width / 2),
-                y: Math.round(viewport.transform.y + viewport.transform.height / 2),
-                expected: [224, 32, 176],
-              },
-            ],
+        [
+          ...(selectedOnly
+            ? [
+                ...(greenPoint
+                  ? [
+                      {
+                        time: 2,
+                        x: Math.round(greenPoint.x),
+                        y: Math.round(greenPoint.y),
+                        expected: [32, 176, 96],
+                      },
+                    ]
+                  : []),
+                ...(spatial
+                  ? [
+                      {
+                        time: 0.35,
+                        x: Math.round(final.width / 2),
+                        y: Math.round(final.height / 2),
+                        expected: [224, 32, 176],
+                      },
+                    ]
+                  : []),
+                {
+                  time: 1,
+                  x: Math.round(edited.transform.x + edited.transform.width / 2),
+                  y: Math.round(edited.transform.y + edited.transform.height / 2),
+                  expected: [224, 32, 176],
+                },
+                { time: 2, x: Math.round(final.width / 2), y: 2, expected: [0, 0, 0] },
+              ]
+            : [
+                ...(sourceTransitionTime !== null && transitionPoint
+                  ? [
+                      {
+                        time: sourceTransitionTime,
+                        x: Math.round(transitionPoint.x),
+                        y: Math.round(transitionPoint.y),
+                        expected: [224, 32, 176],
+                      },
+                    ]
+                  : []),
+                ...(sourceTransitionTime !== null && !spatial && spotlightEffect === 'dim'
+                  ? [
+                      {
+                        time: sourceTransitionTime,
+                        x: Math.round(final.width / 2),
+                        y: 2,
+                        expected: [0, 0, 0],
+                      },
+                    ]
+                  : []),
+                ...(checksBackdrop
+                  ? [0.6, 2].flatMap((time) =>
+                      Array.from({ length: 16 }, (_, index) => ({
+                        time,
+                        x: 9 + index * 2,
+                        y: 11,
+                        expected: [0, 0, 0],
+                      }))
+                    )
+                  : []),
+                ...(spotlight
+                  ? [
+                      {
+                        time: 0.6,
+                        x: Math.round(spotlightPoint!.x),
+                        y: Math.round(spotlightPoint!.y),
+                        expected: [224, 32, 176],
+                      },
+                      { time: 6.6, x: 30, y: 30, expected: [224, 32, 176] },
+                      ...(!spatial && spotlightEffect === 'dim'
+                        ? [
+                            {
+                              time: 0.6,
+                              x: Math.round(final.width / 2),
+                              y: 2,
+                              expected: [0, 0, 0],
+                            },
+                            { time: 2, x: Math.round(final.width / 2), y: 2, expected: [0, 0, 0] },
+                          ]
+                        : []),
+                    ]
+                  : []),
+                ...(greenPoint
+                  ? [
+                      {
+                        time: 2,
+                        x: Math.round(greenPoint.x),
+                        y: Math.round(greenPoint.y),
+                        expected: [32, 176, 96],
+                      },
+                    ]
+                  : []),
+                ...(spatial
+                  ? [
+                      {
+                        time: 0.6,
+                        x: Math.round(final.width / 2),
+                        y: Math.round(final.height / 2),
+                        expected: [224, 32, 176],
+                      },
+                    ]
+                  : []),
+                { time: 0.2, x: dormantPoint.x, y: dormantPoint.y, expected: [224, 32, 176] },
+                {
+                  time: 2,
+                  x: Math.round(reopenedPoint.x),
+                  y: Math.round(reopenedPoint.y),
+                  expected: [224, 32, 176],
+                },
+                {
+                  time: 7,
+                  x: Math.round(
+                    viewportAnnotation.transform.x + viewportAnnotation.transform.width / 2
+                  ),
+                  y: Math.round(
+                    viewportAnnotation.transform.y + viewportAnnotation.transform.height / 2
+                  ),
+                  expected: [224, 32, 176],
+                },
+              ]),
+          ...(activeIntro
+            ? [
+                { time: otherVideoSampleTime, x: 10, y: 70, expected: [255, 255, 0] },
+                { time: 2, x: 10, y: 70, expected: [255, 255, 0] },
+                { time: 0.001, x: 10, y: 70, expected: [255, 255, 0] },
+                {
+                  time: Math.round((final.duration - 0.8) * 1_000_000) / 1_000_000 + 0.001,
+                  x: 10,
+                  y: 70,
+                  expected: [255, 255, 0],
+                },
+              ]
+            : []),
+          ...(activeIntro
+            ? [
+                {
+                  time: 0.001,
+                  x: Math.round(final.width / 2),
+                  y: Math.round(final.height / 2),
+                  expected: [255, 0, 0],
+                },
+              ]
+            : []),
+          ...(activeIntro
+            ? [
+                {
+                  time:
+                    Math.round(
+                      ((Math.ceil(final.duration * start.settings.fps) - 1) / start.settings.fps) *
+                        1_000_000
+                    ) /
+                      1_000_000 +
+                    0.001,
+                  x: Math.round(final.width / 2),
+                  y: Math.round(final.height / 2),
+                  expected: [0, 0, 0],
+                },
+                {
+                  time: Math.round((final.duration - 0.8) * 1_000_000) / 1_000_000 + 0.001,
+                  x: Math.round(final.width / 2),
+                  y: Math.round(final.height / 2),
+                  expected: [255, 0, 0],
+                },
+                {
+                  time:
+                    Math.round(
+                      ((Math.ceil(final.duration * start.settings.fps) - 1) / start.settings.fps -
+                        0.2) *
+                        1_000_000
+                    ) /
+                      1_000_000 +
+                    0.001,
+                  x: Math.round(final.width / 2),
+                  y: Math.round(final.height / 2),
+                  expected: [128, 0, 0],
+                },
+              ]
+            : []),
+          ...(bookendMedia
+            ? [
+                {
+                  time: Math.round((bookendMedia.startTime + 0.5) * 1_000_000) / 1_000_000 + 0.001,
+                  x: Math.round(final.width / 2),
+                  y: Math.round(final.height / 2),
+                  expected: [255, 0, 0],
+                },
+              ]
+            : []),
+        ],
         undefined,
         start.input,
-        selectedOnly ? start.settings : undefined
+        selectedOnly || activeIntro ? start.settings : undefined
       );
+      if (bookends)
+        await writeFile(
+          info.outputPath('bookend-encoded-pixels.json'),
+          JSON.stringify(
+            {
+              format,
+              activeIntro,
+              ...(activeIntro ? { exportSettings: start.settings } : {}),
+              ...output,
+            },
+            null,
+            2
+          )
+        );
+      if (activeIntro) {
+        const offsets = [0.25, 0.65, 0.85, 0.95];
+        const sourceAudio = await page.evaluate(
+          async ({ encoded, times }) => {
+            const decoder = new AudioContext({ sampleRate: 48000 });
+            try {
+              const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+              const buffer = await decoder.decodeAudioData(bytes.buffer);
+              const pcm = buffer.getChannelData(0);
+              return times.map((time) => {
+                const first = Math.round(time * buffer.sampleRate),
+                  last = Math.round((time + 0.02) * buffer.sampleRate);
+                let squares = 0;
+                for (let frame = first; frame < last; frame++) squares += pcm[frame]! ** 2;
+                return Math.sqrt(squares / (last - first));
+              });
+            } finally {
+              await decoder.close();
+            }
+          },
+          {
+            encoded: (await readFile(`tooling/test/e2e/fixtures/${outroFixture}`)).toString(
+              'base64'
+            ),
+            times: offsets,
+          }
+        );
+        const decoded = await readEncodedAudioWindows(
+          page,
+          offsets.map((offset) => final.duration - 1 + offset)
+        );
+        const ratios = decoded.map((value, index) => value / sourceAudio[index]!);
+        await writeFile(
+          info.outputPath('bookend-encoded-audio.json'),
+          JSON.stringify({ format, offsets, sourceAudio, decoded, ratios }, null, 2)
+        );
+        for (const [index, offset] of offsets.entries()) {
+          expect(sourceAudio[index]!).toBeGreaterThan(0.001);
+          expect(decoded[index]!).toBeGreaterThan(0.001);
+          const expected = 0.7 * Math.min(1, (1 - offset - 0.01) / 0.4);
+          expect(Math.abs(ratios[index]! - expected)).toBeLessThan(0.06);
+        }
+      }
       expect(output.size).toBeGreaterThan(0);
       for (const sample of output.samples) {
         if (sample.time === sourceTransitionTime && sample.y !== 2) continue;
@@ -1855,7 +2787,7 @@ for (const {
         : final.duration;
       expect(Math.abs(output.duration - expectedDuration)).toBeLessThanOrEqual(0.1);
       if (selectedOnly) expect(output.audioTrackCount).toBe(0);
-      expect(await readNativeVideoProject(page)).toEqual(final);
+      expect(await readNativeVideoProject(page, final.id)).toEqual(final);
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();

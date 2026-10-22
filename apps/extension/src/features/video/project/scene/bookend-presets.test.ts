@@ -164,3 +164,37 @@ it('admits shared transition recipes only in schema26 and keeps independent inac
   ).toBeNull();
   expect(project.bookendPresets).toBeUndefined();
 });
+
+it('retains independent Gallery edge variants in schema41 and through exact media removal', () => {
+  const { project, presets, image } = fixture();
+  const edgeControl = {
+    mode: 'none' as const,
+    plain: { enabled: true, duration: 2, color: '#123456ff', audioFade: true },
+    media: { enabled: false, duration: 0.7, color: '#abcdefFF', audioFade: false },
+  };
+  const changed = applyVideoProjectMutationPatch(project, {
+    bookendPresets: { ...presets, intro: { ...presets.intro, edgeControl } },
+  });
+  expect(changed.version).toBe(41);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 43 })).toBe(false);
+  const reopened = hydrateVideoProject(changed);
+  expect(reopened.bookendPresets?.intro.edgeControl).toEqual(edgeControl);
+  expect(
+    parseVideoProjectBookendPresets(reopened.bookendPresets)?.intro.edgeControl?.media.color
+  ).toBe('#abcdefff');
+  const removed = removeVideoProjectLibrarySources(reopened, [image.source]);
+  expect(removed.bookendPresets?.intro.edgeControl).toEqual(
+    reopened.bookendPresets?.intro.edgeControl
+  );
+  expect(
+    parseVideoProjectBookendPresets({
+      ...presets,
+      intro: {
+        ...presets.intro,
+        edgeControl: { ...edgeControl, media: { enabled: true, duration: 61 } },
+      },
+    })
+  ).toBeNull();
+});

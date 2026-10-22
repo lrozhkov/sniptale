@@ -60,7 +60,7 @@ it('paints independent colors in backing space after camera and shadow state', (
     },
     {
       bounds: [0, 0, 640, 360],
-      alpha: 0.5,
+      alpha: expect.closeTo(0.5166665, 6),
       color: '#0000ff',
       filter: 'none',
       shadow: 0,
@@ -98,4 +98,44 @@ it('uses the same final-canvas color paint for joins without inheriting caller c
   expect(context.globalAlpha).toBe(savedAlpha);
   expect(context.globalCompositeOperation).toBe('multiply');
   expect(context.shadowBlur).toBe(12);
+});
+
+it('uses the export cadence instead of project fps and leaves a single output frame neutral', () => {
+  const { context, project } = fixture();
+  const opacity: number[] = [];
+  const fill = vi.spyOn(context, 'fillRect').mockImplementation(() => {
+    opacity.push(context.globalAlpha);
+  });
+  project.sceneEdges.intro.enabled = false;
+  drawVideoProjectSceneEdges(context, { ...project, duration: 2.13, fps: 60 }, 2.1, undefined, 10);
+  expect(context.globalAlpha).toBe(1);
+  expect(fill).toHaveBeenCalledOnce();
+  expect(opacity).toEqual([1]);
+  fill.mockClear();
+  drawVideoProjectSceneEdges(context, { ...project, duration: 0.1, fps: 1 }, 0);
+  expect(fill).not.toHaveBeenCalled();
+});
+
+it('keeps the preceding low-rate Native frame visible and fades only the normalized final frame', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 8;
+  canvas.height = 4;
+  const context = canvas.getContext('2d')!;
+  const sceneEdges = createVideoProjectSceneEdges();
+  sceneEdges.outro = { enabled: true, duration: 0.4 };
+  const project = { duration: 4, fps: 0.5, sceneEdges };
+  for (const [time, expected] of [
+    [2, 255],
+    [3, 0],
+  ] as const) {
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 8, 4);
+    drawVideoProjectSceneEdges(context, project, time);
+    expect(Array.from(context.getImageData(0, 0, 1, 1).data)).toEqual([
+      expected,
+      expected,
+      expected,
+      255,
+    ]);
+  }
 });

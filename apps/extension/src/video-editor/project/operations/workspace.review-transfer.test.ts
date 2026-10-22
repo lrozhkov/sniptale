@@ -81,6 +81,9 @@ vi.mock('../../../workflows/background-images/static-logo', () => ({
 }));
 
 vi.mock('./import-validation', () => ({ assertImportableProjectAssetFile: vi.fn() }));
+vi.mock('../../../workflows/video-review/presentation-admission', () => ({
+  inspectReviewPresentationVideo: vi.fn(),
+}));
 
 vi.mock('./assets', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./assets')>();
@@ -1039,4 +1042,197 @@ it('refuses publication when Gallery changes during a pending annotation resourc
   await expect(pending).rejects.toThrow('Review project changed before transfer.');
   expect(saveVideoProject).not.toHaveBeenCalled();
   expect(deleteProjectAsset).not.toHaveBeenCalled();
+});
+
+async function bookendTransferFixture() {
+  const snapshot = await transferFixture();
+  const { createNeutralPresentationSettings } =
+    await import('../../../features/video/review/advanced/presentation');
+  const { createBookendImagePresentation, createBookendVideoPresentation } =
+    await import('../../../features/video/project/scene/bookend-media');
+  const settings = createNeutralPresentationSettings();
+  settings.intro = {
+    mode: 'image',
+    image: {
+      ...createBookendImagePresentation(),
+      duration: 1,
+      assetId: 'project-asset:bookend-card',
+      filename: 'Opening.png',
+      width: 32,
+      height: 16,
+    },
+  };
+  settings.outro = {
+    mode: 'video',
+    video: {
+      ...createBookendVideoPresentation(3),
+      trim: { start: 1, end: 2 },
+      assetId: 'project-asset:bookend-movie',
+      filename: 'Outro.webm',
+      source: { width: 160, height: 90, duration: 3, size: 4, mimeType: 'video/webm' },
+    },
+  };
+  settings.introControl = {
+    mode: 'media',
+    plain: { enabled: true, duration: 2 },
+    media: { enabled: true, duration: 0.4 },
+  };
+  snapshot.workspace.advanced.presentation = settings;
+  const { inspectReviewPresentationVideo } =
+    await import('../../../workflows/video-review/presentation-admission');
+  vi.mocked(inspectReviewPresentationVideo).mockResolvedValue({
+    source: structuredClone(settings.outro.video.source),
+    hasAudio: false,
+  });
+  const entry = (id: string, type: string) => ({
+    status: 'ready' as const,
+    entry: {
+      id,
+      assetId: `${id}-bytes`,
+      createdAt: 1,
+      size: 4,
+      mimeType: type,
+      file: new File(['data'], id, { type }),
+    },
+  });
+  const card = entry('bookend-card', 'image/png');
+  const movie = entry('bookend-movie', 'video/webm');
+  getProjectAsset.mockImplementation(async (id: string) =>
+    id === 'bookend-card' ? card : id === 'bookend-movie' ? movie : undefined
+  );
+  const { prepareBackgroundImage } = await import('../../../workflows/background-images/intake');
+  const { loadImageMetadata, loadVideoMetadata } = await import('../media-metadata');
+  vi.mocked(prepareBackgroundImage).mockImplementation(async (file) => file);
+  vi.mocked(loadImageMetadata).mockResolvedValue({
+    width: 32,
+    height: 16,
+    size: 4,
+    mimeType: 'image/png',
+  });
+  vi.mocked(loadVideoMetadata).mockResolvedValue({
+    width: 160,
+    height: 90,
+    duration: 3,
+    size: 4,
+    mimeType: 'video/webm',
+    hasAudio: false,
+    audioPeaks: null,
+  });
+  return { snapshot, card, movie };
+}
+
+it.each([false, true])(
+  'admits immutable intro/outro media once with shared scene=%s and publishes an independent editable project',
+  async (sharedScene) => {
+    const { snapshot } = await bookendTransferFixture();
+    if (sharedScene)
+      snapshot.workspace.advanced.background = {
+        enabled: true,
+        type: 'image',
+        assetId: 'project-asset:bookend-card',
+        imageFit: 'contain',
+        layout: { padding: 12, cornerRadius: 8 },
+      };
+    const before = structuredClone(snapshot);
+    const result = await loadInitialProjectFromLocation();
+    expect(result.project).toMatchObject({ version: 41, duration: 6 });
+    expect(
+      result.project!.assets.filter((asset) => asset.source.kind === 'project-asset')
+    ).toHaveLength(2);
+    expect(result.project!.clips).toContainEqual(
+      expect.objectContaining({ type: 'IMAGE', startTime: 0, duration: 1 })
+    );
+    expect(result.project!.clips).toContainEqual(
+      expect.objectContaining({
+        type: 'VIDEO',
+        startTime: 5,
+        duration: 1,
+        sourceStart: 1,
+        sourceDuration: 1,
+      })
+    );
+    expect(result.project!.bookendPresets?.intro.edgeControl?.plain.duration).toBe(2);
+    expect(
+      result
+        .project!.assets.filter((asset) => asset.source.kind === 'project-asset')
+        .map(({ name }) => name)
+    ).toEqual(['Opening.png', 'Outro.webm']);
+    expect(getProjectAsset).toHaveBeenCalledTimes(2);
+    expect(saveVideoProject).toHaveBeenCalledOnce();
+    expect(saveVideoProject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: result.project!.id }),
+      { baseRevision: null, expectedReviewWorkspace: snapshot.workspace }
+    );
+    expect(snapshot).toEqual(before);
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['missing', 'corrupt'] as const)(
+  'refuses %s bookend bytes before publication and permits a fresh retry',
+  async (failure) => {
+    const { snapshot, card, movie } = await bookendTransferFixture();
+    const before = structuredClone(snapshot);
+    if (failure === 'missing')
+      getProjectAsset.mockImplementation(async (id: string) =>
+        id === 'bookend-card' ? card : undefined
+      );
+    else {
+      const { assertImportableProjectAssetFile } = await import('./import-validation');
+      vi.mocked(assertImportableProjectAssetFile).mockRejectedValueOnce(
+        new Error('Corrupt bookend media.')
+      );
+    }
+    await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+      failure === 'missing' ? 'Review bookend resource is unavailable.' : 'Corrupt bookend media.'
+    );
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(snapshot).toEqual(before);
+    getProjectAsset.mockImplementation(async (id: string) =>
+      id === 'bookend-card' ? card : movie
+    );
+    expect((await loadInitialProjectFromLocation()).project!.duration).toBe(6);
+    expect(saveVideoProject).toHaveBeenCalledOnce();
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['revision', 'recreated'] as const)(
+  'refuses publication after Gallery %s changes during a bookend read',
+  async (change) => {
+    const { snapshot, card, movie } = await bookendTransferFixture();
+    const started = Promise.withResolvers<void>();
+    const held = Promise.withResolvers<typeof card>();
+    getProjectAsset.mockImplementation(async (id: string) => {
+      if (id !== 'bookend-card') return movie;
+      started.resolve();
+      return held.promise;
+    });
+    const pending = loadInitialProjectFromLocation();
+    await started.promise;
+    if (change === 'revision') snapshot.workspace.revision++;
+    else snapshot.workspace.createdAt++;
+    held.resolve(card);
+    await expect(pending).rejects.toThrow('Review project changed before transfer.');
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+  }
+);
+
+it('reports unsupported bookend timing before publication and accepts a corrected retry', async () => {
+  const { snapshot } = await bookendTransferFixture();
+  const settings = snapshot.workspace.advanced.presentation!;
+  settings.intro.image!.duration = 0.15;
+  const source = structuredClone(snapshot);
+  await expect(loadInitialProjectFromLocation()).rejects.toMatchObject({
+    name: 'ReviewProjectTransferError',
+    reason: 'timing',
+  });
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+  expect(snapshot).toEqual(source);
+  settings.intro.image!.duration = 1;
+  const result = await loadInitialProjectFromLocation();
+  expect(result.project).not.toBeNull();
+  expect(saveVideoProject).toHaveBeenCalledOnce();
 });

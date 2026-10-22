@@ -10,6 +10,8 @@ import {
 } from '../../project/scene/bookend-media';
 import {
   createPresentationFade,
+  parsePresentationEdgeControl as edgeControl,
+  type PresentationEdgeControl,
   parsePresentationFade as fade,
   type PresentationFade as Fade,
 } from '../../project/scene/edge-fades';
@@ -32,12 +34,7 @@ type Slot =
   | { mode: 'none'; image?: Image; video?: Video }
   | { mode: 'image'; image: Image; video?: Video }
   | { mode: 'video'; image?: Image; video: Video };
-/** Independent authored edge; legacy scalar fields are fallback only when this is absent. */
-export interface PresentationEdgeControl {
-  mode: 'none' | 'fade' | 'media';
-  plain: Fade;
-  media: Fade;
-}
+export type { PresentationEdgeControl } from '../../project/scene/edge-fades';
 
 /** Authored seconds and immutable references; dormant slot variants remain retained. */
 export interface QuickEditPresentationSettings {
@@ -259,18 +256,6 @@ export function parseQuickEditPresentationSettings(
     ...(introTransition ? { introTransition } : {}),
     ...(outroTransition ? { outroTransition } : {}),
   };
-}
-
-function edgeControl(value: unknown): PresentationEdgeControl | null {
-  if (
-    !isRecord(value) ||
-    !fields(value, ['mode', 'plain', 'media']) ||
-    (value['mode'] !== 'none' && value['mode'] !== 'fade' && value['mode'] !== 'media')
-  )
-    return null;
-  const plain = fade(value['plain']);
-  const media = fade(value['media']);
-  return plain && media ? { mode: value['mode'], plain, media } : null;
 }
 
 /** Projects legacy combinations without mutating history or inventing authored operations. */

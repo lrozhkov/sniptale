@@ -1,4 +1,5 @@
 export {
+  ReviewProjectTransferError,
   createBlankProject,
   copyProject,
   loadInitialProjectFromLocation,

@@ -21,6 +21,8 @@ import {
   redoVideoEditorProjectHistory,
 } from '../../history';
 import { setup } from './material.test-support';
+import { createBookendVideoPresentation } from '../../../../features/video/project/scene/bookend-media';
+import { createVideoProjectBookendPresets } from '../../../../features/video/project/scene/bookend-presets';
 
 afterEach(() => vi.restoreAllMocks());
 function populated() {
@@ -566,3 +568,65 @@ it('appends with unaffected utility locks but refuses a locked receiving track',
   });
   expect(store.getState()).toBe(before);
 });
+
+it.each([
+  ['intro', true],
+  ['outro', true],
+  ['intro', false],
+  ['outro', false],
+] as const)(
+  'applies %s media fade enabled=%s atomically and retains independent recipes',
+  (side, enabled) => {
+    const { store, asset } = populated();
+    const before = store.getState().project!;
+    const presets = createVideoProjectBookendPresets();
+    presets[side] = {
+      mode: 'video',
+      video: {
+        ...createBookendVideoPresentation(6),
+        assetId: asset.id,
+        trim: { start: 1, end: 2 },
+      },
+      edgeControl: {
+        mode: 'none',
+        plain: { enabled: true, duration: 0.2, color: '#112233ff', audioFade: false },
+        media: { enabled, duration: 2, color: '#223344ff', audioFade: true },
+      },
+    };
+    const project: VideoProject = {
+      ...before,
+      version: 41,
+      bookendPresets: presets,
+      sceneEdges: {
+        intro: { enabled: false, duration: 0.7 },
+        outro: { enabled: false, duration: 0.8 },
+      },
+    };
+    store.setState({ project });
+    const history = store.getState().projectHistory;
+    expect(store.getState().placeBookendMaterial(asset.id, side, project).status).toBe('placed');
+    const after = store.getState();
+    expect(after.project!.sceneEdges![side]).toEqual({
+      enabled,
+      duration: enabled ? 1 : 2,
+      color: '#223344ff',
+      audioFade: true,
+    });
+    const other = side === 'intro' ? 'outro' : 'intro';
+    expect(after.project!.sceneEdges![other]).toEqual(project.sceneEdges![other]);
+    expect(after.project!.bookendPresets).toEqual(presets);
+    expect(after.projectHistory.past).toHaveLength(history.past.length + 1);
+    const undo = undoVideoEditorProjectHistory(
+      after.projectHistory,
+      after.project!,
+      after.selection
+    );
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.sceneEdges).toEqual(project.sceneEdges);
+    expect(undo.project.clips).toEqual(project.clips);
+    const redo = redoVideoEditorProjectHistory(undo.history, undo.project, undo.selection);
+    if (redo?.status !== 'applied') throw new Error('Expected redo');
+    expect(redo.project.sceneEdges).toEqual(after.project!.sceneEdges);
+    expect(redo.project.clips).toEqual(after.project!.clips);
+  }
+);

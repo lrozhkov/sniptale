@@ -7,11 +7,12 @@ import type { VideoProject } from '../../project/types/model';
 /** Paint after the complete scene; editor chrome remains outside the supplied backing rectangle. */
 export function drawVideoProjectSceneEdges(
   context: CanvasRenderingContext2D,
-  project: Pick<VideoProject, 'duration' | 'sceneEdges'>,
+  project: Pick<VideoProject, 'duration' | 'sceneEdges'> & Partial<Pick<VideoProject, 'fps'>>,
   time: number,
-  bounds?: { x: number; y: number; width: number; height: number }
+  bounds?: { x: number; y: number; width: number; height: number },
+  fps = project.fps ?? 30
 ): void {
-  const plan = resolveVideoProjectSceneEdgePlan(project);
+  const plan = resolveVideoProjectSceneEdgePlan(project, fps);
   const alpha = presentationEnvelopeOpacity(plan.visualEnvelope, time);
   drawCompositionColorOverlay(
     context,

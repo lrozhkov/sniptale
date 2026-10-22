@@ -25,7 +25,8 @@ it('scales the complete stereo mix once at absolute project sample times', async
   await applyOfflineSceneEdgeGain(output, project, 0);
   for (let frame = 0; frame < output.length; frame++) {
     const time = frame / output.sampleRate;
-    const gain = time <= 2 ? time / 2 : (4 - time) / 2;
+    // Sixteen samples at 4 Hz end at 3.75 s. Both 2 s fades fit to 1.875 s.
+    const gain = time <= 1.875 ? time / 1.875 : (3.75 - time) / 1.875;
     expect(Math.abs(channels[0]![frame]! - 0.8 * gain)).toBeLessThan(1e-6);
     expect(Math.abs(channels[1]![frame]! + 0.4 * gain)).toBeLessThan(1e-6);
   }
@@ -40,7 +41,7 @@ it('keeps disabled audio neutral while visual overlap still constrains the activ
   project.sceneEdges!.outro.duration = 4;
   project.sceneEdges!.outro.audioFade = false;
   await applyOfflineSceneEdgeGain(output, project, 0);
-  expect(channels[0]![4]).toBeCloseTo(0.4, 6);
+  expect(channels[0]![4]).toBeCloseTo(0.8 / 1.875, 6);
   expect(channels[0]![15]).toBeCloseTo(0.8, 6);
   const neutral = fixture();
   neutral.project.sceneEdges!.intro.audioFade = false;

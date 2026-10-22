@@ -129,6 +129,8 @@ function drawPreviewSceneOverlays(params: {
 type PreviewSceneParams = {
   /** Held composition samples exclude outer fades; their caller applies presentation once. */
   sceneEdges?: 'omit';
+  /** Output sampling for size estimation; absence retains the project cadence. */
+  sampleFps?: number;
   watermarkRenderer?: VideoProjectWatermarkRenderer;
   cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
@@ -366,12 +368,18 @@ function drawResolvedPreviewSceneContent(
     }
   }
   if (args.params.sceneEdges !== 'omit')
-    drawVideoProjectSceneEdges(context, args.params.project, args.params.currentTime, {
-      x: viewport.offsetX * overlayPrepared.dpr,
-      y: viewport.offsetY * overlayPrepared.dpr,
-      width: viewport.width * overlayPrepared.dpr,
-      height: viewport.height * overlayPrepared.dpr,
-    });
+    drawVideoProjectSceneEdges(
+      context,
+      args.params.project,
+      args.params.currentTime,
+      {
+        x: viewport.offsetX * overlayPrepared.dpr,
+        y: viewport.offsetY * overlayPrepared.dpr,
+        width: viewport.width * overlayPrepared.dpr,
+        height: viewport.height * overlayPrepared.dpr,
+      },
+      args.params.sampleFps ?? args.params.project.fps
+    );
   return true;
 }
 

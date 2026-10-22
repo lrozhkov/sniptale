@@ -181,3 +181,52 @@ it('authors a future join recipe without changing existing instances or timeline
     before.project!.compositionJoins
   );
 });
+
+it('edits a retained media fade without changing current clips, scene edges or its plain recipe', () => {
+  render();
+  click('gallery.videoReview.presentationImage');
+  click('videoEditor.sidebar.bookendChooseImage');
+  click('Card');
+  const before = useVideoEditorStore.getState().project!;
+  click('gallery.videoReview.presentationFadeIn');
+  const enabled = useVideoEditorStore.getState().project!;
+  expect(enabled.bookendPresets!.intro.edgeControl?.media.enabled).toBe(true);
+  expect(enabled.clips).toEqual(before.clips);
+  expect(enabled.sceneEdges).toEqual(before.sceneEdges);
+  const plain = enabled.bookendPresets!.intro.edgeControl!.plain;
+  click('gallery.videoReview.presentationAudioFade');
+  const after = useVideoEditorStore.getState().project!;
+  expect(after.bookendPresets!.intro.edgeControl?.media.audioFade).toBe(true);
+  expect(after.bookendPresets!.intro.edgeControl?.plain).toEqual(plain);
+  click('gallery.videoReview.presentationNone');
+  click('gallery.videoReview.presentationImage');
+  expect(useVideoEditorStore.getState().project!.bookendPresets!.intro.edgeControl).toEqual(
+    after.bookendPresets!.intro.edgeControl
+  );
+});
+
+it('shows the inherited active edge for a Native preset without an independent fade recipe', () => {
+  const project = useVideoEditorStore.getState().project!;
+  const fade = { enabled: true, duration: 0.7, color: '#112233ff', audioFade: true };
+  act(() =>
+    useVideoEditorStore.getState().setProject({
+      ...project,
+      version: 24,
+      sceneEdges: { intro: fade, outro: { enabled: false, duration: 0.4 } },
+    })
+  );
+  render();
+  click('gallery.videoReview.presentationImage');
+  click('videoEditor.sidebar.bookendChooseImage');
+  click('Card');
+  const control = host.querySelector(
+    '[role="switch"][aria-label="gallery.videoReview.presentationFadeIn"]'
+  );
+  expect(control?.getAttribute('aria-checked')).toBe('true');
+  expect(useVideoEditorStore.getState().project!.bookendPresets!.intro.edgeControl).toBeUndefined();
+  click('gallery.videoReview.presentationAudioFade');
+  const current = useVideoEditorStore.getState().project!;
+  expect(current.bookendPresets!.intro.edgeControl?.plain).toEqual(fade);
+  expect(current.bookendPresets!.intro.edgeControl?.media).toEqual({ ...fade, audioFade: false });
+  expect(current.sceneEdges!.intro).toEqual(fade);
+});

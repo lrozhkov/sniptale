@@ -1,3 +1,10 @@
+import { createClipGroupId, createVideoProjectTrack } from '../factories/creation';
+import { createShapeClip } from '../factories/overlay-clip';
+import { resolveMediaFitFrame } from '../window-geometry';
+import type { VideoProjectClip } from '../types/model';
+import type { VideoProjectTrack } from '../types/layout';
+import { translate } from '../../../../platform/i18n';
+import { parsePresentationEdgeControl } from './edge-fades';
 import { parseCompositionJoinSettings } from './composition-join';
 import { isRecord, isString } from '../validation/primitives';
 import type { VideoProject, VideoProjectAsset } from '../types/model';
@@ -20,7 +27,12 @@ function hasFields(value: Record<string, unknown>, allowed: readonly string[]): 
   return Object.keys(value).every((key) => allowed.includes(key));
 }
 function parseSlot(value: unknown): VideoProjectBookendPreset | null {
-  if (!isRecord(value) || !hasFields(value, ['mode', 'image', 'video'])) return null;
+  if (!isRecord(value) || !hasFields(value, ['mode', 'image', 'video', 'edgeControl'])) return null;
+  const edgeControl =
+    value['edgeControl'] === undefined
+      ? undefined
+      : parsePresentationEdgeControl(value['edgeControl']);
+  if (edgeControl === null) return null;
   const image = value['image'];
   const video = value['video'];
   if (
@@ -43,6 +55,7 @@ function parseSlot(value: unknown): VideoProjectBookendPreset | null {
   const videoSettings = video === undefined ? undefined : parseBookendVideoPresentation(video);
   if (imageSettings === null || videoSettings === null) return null;
   const variants = {
+    ...(edgeControl ? { edgeControl } : {}),
     ...(imageSettings && isRecord(image) && isString(image['assetId'])
       ? { image: { ...imageSettings, assetId: image['assetId'] } }
       : {}),
@@ -148,10 +161,112 @@ export function removeVideoProjectBookendSources(
   const clear = (slot: VideoProjectBookendPreset): VideoProjectBookendPreset => {
     const image = slot.image && !removed.has(slot.image.assetId) ? slot.image : undefined;
     const video = slot.video && !removed.has(slot.video.assetId) ? slot.video : undefined;
-    const variants = { ...(image ? { image } : {}), ...(video ? { video } : {}) };
+    const variants = {
+      ...(slot.edgeControl ? { edgeControl: slot.edgeControl } : {}),
+      ...(image ? { image } : {}),
+      ...(video ? { video } : {}),
+    };
     if (slot.mode === 'image' && image) return { ...variants, mode: 'image', image };
     if (slot.mode === 'video' && video) return { ...variants, mode: 'video', video };
     return { ...variants, mode: 'none' };
   };
   return { ...presets, intro: clear(presets.intro), outro: clear(presets.outro) };
+}
+
+/** Creates independent ordinary clips; no later recipe edit can rebuild this instance. */
+export function createBookendClipPresentation(
+  previous: VideoProject,
+  placements: readonly VideoProjectClip[],
+  selectedClipId: string,
+  preset: Exclude<VideoProjectBookendPreset, { mode: 'none' }>
+): { clips: VideoProjectClip[]; track: VideoProjectTrack } | null {
+  const main = placements.find((clip) => clip.id === selectedClipId);
+  if (!main || (main.type !== 'IMAGE' && main.type !== 'VIDEO')) return null;
+  if ((preset.mode === 'image') !== (main.type === 'IMAGE')) return null;
+  const asset = previous.assets.find((item) => item.id === main.assetId);
+  if (!asset || asset.metadata.width <= 0 || asset.metadata.height <= 0) return null;
+  const settings = preset.mode === 'image' ? preset.image : preset.video;
+  const frame = resolveMediaFitFrame({
+    source: asset.metadata,
+    output: previous,
+    fit: settings.fit,
+    crop: settings.crop,
+  });
+  const duration = preset.mode === 'image' ? preset.image.duration : main.duration;
+  const groupId = main.groupId ?? createClipGroupId();
+  const clips = placements.map((clip) => {
+    const grouped = { ...clip, groupId, linkMode: 'LINKED' as const };
+    if (clip.type === 'AUDIO' && preset.mode === 'video')
+      return {
+        ...grouped,
+        muted: preset.video.audio.muted,
+        volume: preset.video.audio.gain,
+        audioGainStart: preset.video.audio.gain,
+        audioGainEnd: preset.video.audio.gain,
+      };
+    if (clip.id !== main.id) return grouped;
+    if (settings.fit === 'contain')
+      return {
+        ...grouped,
+        duration,
+        transform: {
+          x: frame.x,
+          y: frame.y,
+          width: frame.width,
+          height: frame.height,
+          rotation: 0,
+          opacity: 1,
+        },
+      };
+    const width = Math.min(1, previous.width / frame.width);
+    const height = Math.min(1, previous.height / frame.height);
+    return {
+      ...grouped,
+      duration,
+      fitMode: 'COVER' as const,
+      sourceCrop: {
+        x: Math.max(0, Math.min(1 - width, -frame.x / frame.width)),
+        y: Math.max(0, Math.min(1 - height, -frame.y / frame.height)),
+        width,
+        height,
+      },
+      transform: {
+        x: 0,
+        y: 0,
+        width: previous.width,
+        height: previous.height,
+        rotation: 0,
+        opacity: 1,
+      },
+    };
+  });
+  const track = createVideoProjectTrack(
+    translate('gallery.videoReview.presentationFill'),
+    Math.max(0, ...previous.tracks.map(({ order }) => order)) + 1,
+    'PRIMARY'
+  );
+  const background = createShapeClip(
+    track.id,
+    previous.width,
+    previous.height,
+    main.startTime,
+    'RECTANGLE'
+  );
+  clips.push({
+    ...background,
+    name: translate('gallery.videoReview.presentationFill'),
+    duration,
+    groupId,
+    linkMode: 'LINKED',
+    transform: {
+      x: 0,
+      y: 0,
+      width: previous.width,
+      height: previous.height,
+      rotation: 0,
+      opacity: 1,
+    },
+    style: { ...background.style, fillColor: settings.fillColor, strokeWidth: 0, borderRadius: 0 },
+  });
+  return { clips, track };
 }

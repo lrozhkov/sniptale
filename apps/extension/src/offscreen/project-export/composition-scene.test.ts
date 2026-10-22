@@ -133,3 +133,15 @@ it('checks the held caption sample outside the selected range before drawing any
   expect(owners.effects).not.toHaveBeenCalled();
   expect(owners.draw).not.toHaveBeenCalled();
 });
+
+it('paints the final-canvas watermark despite retained experimental source metadata', async () => {
+  const args = input();
+  args.project.watermarkSource = { assetId: 'missing', sourceInstanceId: 'main' };
+  const clear = vi.fn();
+  args.job.watermarkRenderer = { clear, prepare: vi.fn() };
+  await renderProjectCompositionScene(args);
+  expect(owners.watermark).toHaveBeenCalledOnce();
+  expect(owners.mark).toHaveBeenCalledOnce();
+  expect(clear).not.toHaveBeenCalled();
+  expect(owners.draw).toHaveBeenCalledOnce();
+});

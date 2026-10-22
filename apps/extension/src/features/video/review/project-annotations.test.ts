@@ -292,3 +292,80 @@ it('does not accept annotation geometry authority from an unknown imported JSON 
   expect(JSON.stringify(scoped)).not.toContain('"attachmentGeometryProject"');
   expect(structuredClone(scoped)[VIDEO_PROJECT_ATTACHMENT_GEOMETRY]).toBeUndefined();
 });
+
+it('retains dormant source annotations through bookend transfer and reopen', async () => {
+  const input = await annotationsFixture();
+  input.document.edits = [
+    { id: 'all-annotation', kind: 'cut', start: 1, end: 7, requestedStart: 1, requestedEnd: 7 },
+  ];
+  const { createNeutralPresentationSettings } = await import('./advanced/presentation');
+  const { createBookendImagePresentation } = await import('../project/scene/bookend-media');
+  const { createVideoProjectAsset } = await import('../project/factories/creation');
+  const settings = createNeutralPresentationSettings();
+  settings.intro = {
+    mode: 'image',
+    image: {
+      ...createBookendImagePresentation(),
+      assetId: 'project-asset:card',
+      width: 32,
+      height: 16,
+      duration: 1,
+    },
+  };
+  input.document.advancedContent.presentation = settings;
+  const asset = createVideoProjectAsset(
+    'Card',
+    'IMAGE',
+    { kind: 'project-asset', projectAssetId: 'card' },
+    {
+      width: 32,
+      height: 16,
+      duration: null,
+      hasAudio: false,
+      audioPeaks: null,
+      size: 100,
+      mimeType: 'image/png',
+    }
+  );
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion({
+    ...input,
+    bookendAssets: [{ reviewAssetId: 'project-asset:card', asset }],
+  });
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  const reopened = syncProjectDuration(
+    hydrateVideoProject(JSON.parse(JSON.stringify(result.project)))
+  );
+  expect(reopened.duration).toBe(3);
+  const hosts = reopened.clips.filter((clip) => clip.type === 'EFFECT');
+  expect(hosts).toHaveLength(2);
+  expect(
+    hosts.every(
+      (clip) =>
+        clip.sourceRange?.dormant && clip.sourceRange.start === 1 && clip.sourceRange.end === 7
+    )
+  ).toBe(true);
+  expect(reopened.effectSnapshots).toEqual(input.annotationSnapshots);
+  const { planReviewProjectPresentation } = await import('./project-presentation');
+  const activeOverhang = {
+    ...reopened,
+    clips: reopened.clips.map((clip) => {
+      if (clip.type !== 'EFFECT') return clip;
+      const { sourceRange: _sourceRange, ...active } = clip;
+      return active;
+    }),
+  };
+  expect(isExportReadyVideoProject(activeOverhang)).toBe(true);
+  expect(
+    planReviewProjectPresentation({
+      project: activeOverhang,
+      settings,
+      applied: true,
+      resources: [{ reviewAssetId: 'project-asset:card', asset }],
+    })
+  ).toEqual({ status: 'blocked', field: 'presentation-overlays' });
+  expect(resolveEffectRuntimeFramePlans(reopened, 0.5)).toEqual([]);
+  expect(resolveEffectRuntimeFramePlans(reopened, 1.5)).toEqual([]);
+  expect(isExportReadyVideoProject(reopened)).toBe(true);
+  expect(input).toEqual(before);
+});

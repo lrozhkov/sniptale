@@ -3,12 +3,15 @@ import {
   parseEffectV1Source,
   resolveEffectV1ControlDefault,
 } from '@sniptale/runtime-contracts/effect-v1';
-import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { readFile, writeFile } from 'node:fs/promises';
+import { expect, test } from '@playwright/test';
 import { createShapeClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import { createVideoProjectTrack } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createQuickEditWatermark } from '../../../../apps/extension/src/features/video/project/scene/watermark';
-import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
+import {
+  encodedNativeVideoSamples,
+  readEncodedAudioWindows,
+} from '../support/native-video-export-proof';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -20,8 +23,6 @@ import {
   applyHarnessBootstrap,
   GALLERY_HARNESS_PATH,
   VIDEO_EDITOR_HARNESS_PATH,
-  getRuntimeMessagesByType,
-  VideoMessageType,
 } from '../extension-critical.helpers';
 
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
@@ -392,8 +393,9 @@ for (const format of ['MP4', 'WEBM'] as const) {
         { time: 0.025, expected: [242, 13, 0] },
         { time: 0.25, expected: [128, 128, 0] },
         { time: 0.6, expected: [0, 255, 0] },
-        { time: 0.95, expected: [0, 128, 128] },
-        { time: 1.175, expected: [0, 13, 242] },
+        // At40fps the last frame is1.175s. The visual envelope ends on that frame.
+        { time: 0.95, expected: [0, 115, 140] },
+        { time: 1.175, expected: [0, 0, 255] },
       ].flatMap((point) => [180, 325].map((y) => ({ ...point, x: 320, y })));
       const proof = await encodedNativeVideoSamples(page, host.origin, project, format, points);
       expect(proof.width).toBe(640);
@@ -401,12 +403,20 @@ for (const format of ['MP4', 'WEBM'] as const) {
       // An Opus packet can extend the container tail by 20 ms, within one 40 fps frame.
       expect(Math.abs(proof.duration - 1.2)).toBeLessThanOrEqual(0.0250001);
       expect(proof.samples).toHaveLength(points.length);
-      const fadedAudio = await readEncodedAudioWindows(page);
+      await writeFile(
+        test.info().outputPath('scene-edge-encoded-video.json'),
+        JSON.stringify({ format, ...proof }, null, 2)
+      );
+      const fadedAudio = await readEncodedAudioWindows(page, [0.1, 0.3, 0.6, 0.8, 1.1]);
       const neutral = structuredClone(project);
       neutral.sceneEdges!.intro.audioFade = false;
       neutral.sceneEdges!.outro.audioFade = false;
       await encodedNativeVideoSamples(page, host.origin, neutral, format, points.slice(0, 1));
-      const referenceAudio = await readEncodedAudioWindows(page);
+      const referenceAudio = await readEncodedAudioWindows(page, [0.1, 0.3, 0.6, 0.8, 1.1]);
+      await writeFile(
+        test.info().outputPath('scene-edge-encoded-audio.json'),
+        JSON.stringify({ format, fadedAudio, referenceAudio }, null, 2)
+      );
       for (const [i, time] of [0.1, 0.3, 0.6, 0.8, 1.1].entries()) {
         expect(referenceAudio[i]!).toBeGreaterThan(0.001);
         const middle = time + 0.01;
@@ -424,48 +434,4 @@ for (const format of ['MP4', 'WEBM'] as const) {
       );
     }
   });
-}
-
-async function readEncodedAudioWindows(page: Page) {
-  const messages = await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED);
-  const exportId = messages.at(-1)?.exportId;
-  if (typeof exportId !== 'string') throw new Error('Missing encoded export');
-  return page.evaluate(async (id) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sniptale-db');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const entry: unknown = await new Promise((resolve, reject) => {
-      const request = db.transaction('project_exports').objectStore('project_exports').get(id);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    db.close();
-    if (
-      typeof entry !== 'object' ||
-      entry === null ||
-      !('assetId' in entry) ||
-      typeof entry.assetId !== 'string'
-    )
-      throw new Error('Missing encoded asset');
-    const objects = await (
-      await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
-    ).getDirectoryHandle('objects');
-    const file = await (await objects.getFileHandle(entry.assetId)).getFile();
-    const decoder = new AudioContext({ sampleRate: 48000 });
-    try {
-      const audio = await decoder.decodeAudioData(await file.arrayBuffer());
-      const pcm = audio.getChannelData(0);
-      return [0.1, 0.3, 0.6, 0.8, 1.1].map((time) => {
-        const first = Math.round(time * audio.sampleRate),
-          last = Math.round((time + 0.02) * audio.sampleRate);
-        let squares = 0;
-        for (let frame = first; frame < last; frame++) squares += pcm[frame]! ** 2;
-        return Math.sqrt(squares / (last - first));
-      });
-    } finally {
-      await decoder.close();
-    }
-  }, exportId);
 }

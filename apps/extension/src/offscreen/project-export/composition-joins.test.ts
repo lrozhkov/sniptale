@@ -231,3 +231,95 @@ it('samples moving cut sides at their own clocks and keeps the held join contrac
   args.job.compositionJoinRenderer!.dispose();
   expect(owners.cutDispose).toHaveBeenCalledOnce();
 });
+
+it.each([
+  ['dissolve', 'dissolve', 2, [34, 153, 68]],
+  ['fade-black', 'dissolve', 2, [0, 153, 0]],
+  ['dissolve', 'fade-black', 1.8, [113, 0, 57]],
+  ['fade-black', 'fade-black', 1.8, [85, 0, 0]],
+] as const)(
+  'composes inner %s beneath outer %s without changing either authored window',
+  async (inner, outer, time, expected) => {
+    const args = input();
+    const base = args.project.clips[0]!;
+    args.project.clips = [
+      { ...base, id: 'intro', startTime: 0, duration: 1 },
+      { ...base, id: 'left', startTime: 1, duration: 0.9 },
+      { ...base, id: 'right', startTime: 1.9, duration: 0.1 },
+      { ...base, id: 'outro', startTime: 2, duration: 1 },
+    ];
+    args.project.duration = 3;
+    args.project.fps = args.settings.fps = 10;
+    args.project.compositionJoins = [
+      {
+        id: 'intro',
+        clipId: 'intro',
+        edge: 'end',
+        transition: { type: 'dissolve', before: 0.2, after: 0.3 },
+      },
+      {
+        id: 'cut',
+        clipId: 'right',
+        edge: 'start',
+        sampling: 'cut',
+        transition: { type: inner, before: 0.2, after: 0.1 },
+      },
+      {
+        id: 'outro',
+        clipId: 'outro',
+        edge: 'start',
+        transition: { type: outer, before: 0.3, after: 0.2 },
+      },
+    ];
+    owners.scene.mockImplementation(async ({ context, currentTime }) => {
+      context.clearRect(0, 0, 8, 4);
+      context.fillStyle = currentTime < 1.9 ? '#ff0000' : currentTime < 2 ? '#0000ff' : '#00ff00';
+      context.fillRect(0, 0, 8, 4);
+    });
+    try {
+      args.context.fillStyle = '#abcdef';
+      args.context.fillRect(0, 0, 8, 4);
+      const previous = pixel(args);
+      owners.scene.mockRejectedValueOnce(new Error('nested sample failed'));
+      await expect(renderProjectCompositionFrame({ ...args, currentTime: time })).rejects.toThrow(
+        'nested sample failed'
+      );
+      expect(pixel(args)).toEqual(previous);
+      expect(args.job.compositionJoinRenderer).toBeUndefined();
+      await renderProjectCompositionFrame({ ...args, currentTime: time });
+      for (const [channel, value] of expected.entries())
+        expect(Math.abs(pixel(args)[channel]! - value)).toBeLessThanOrEqual(2);
+      args.project.sceneEdges = {
+        intro: { enabled: true, duration: 3 },
+        outro: { enabled: false, duration: 0.4 },
+      };
+      await renderProjectCompositionFrame({ ...args, currentTime: time });
+      for (const [channel, value] of expected.entries())
+        expect(
+          Math.abs(pixel(args)[channel]! - Math.round((value * time) / 2.9))
+        ).toBeLessThanOrEqual(2);
+      expect(owners.cutSample).toHaveBeenCalled();
+      const parent = args.job.compositionJoinRenderer!;
+      parent.clear();
+      const presented = pixel(args);
+      let release: (() => void) | undefined;
+      owners.scene.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          })
+      );
+      const pending = renderProjectCompositionFrame({ ...args, currentTime: time });
+      await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+      parent.dispose();
+      release!();
+      await expect(pending).rejects.toThrow();
+      expect(pixel(args)).toEqual(presented);
+      expect(args.job.compositionJoinRenderer).toBeUndefined();
+    } finally {
+      args.job.compositionJoinRenderer?.dispose();
+    }
+    expect(owners.cutDispose).toHaveBeenCalledTimes(3);
+    expect(owners.dispose).toHaveBeenCalledTimes(4);
+  }
+);

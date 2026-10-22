@@ -6,6 +6,7 @@ import {
 } from '../../features/video/composition/canvas/scene-edges';
 import { evaluateCompositionJoin } from '../../features/video/project/scene/composition-join';
 import {
+  resolveActiveVideoProjectCompositionJoinPlan,
   resolveVideoProjectCompositionJoinEndpoints,
   resolveVideoProjectCompositionJoinPlans,
 } from '../../features/video/project/scene/joins';
@@ -43,13 +44,19 @@ export interface ProjectExportCompositionJoinRenderer {
 /** Applies final composition joins and outer fades after the caller synchronizes its ordinary media. */
 export async function renderProjectCompositionFrame(args: Input): Promise<void> {
   if (args.job.cancelled || args.signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
-  const plan = resolveVideoProjectCompositionJoinPlans(args.project).find((item) =>
-    evaluateCompositionJoin(args.currentTime, item.seam, item.before, item.after)
-  );
+  const plans = resolveVideoProjectCompositionJoinPlans(args.project);
+  const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, args.currentTime);
   if (!plan) {
     args.job.compositionJoinRenderer?.clear();
     await renderProjectCompositionScene(args);
-  } else if (plan.boundary.transition?.type === 'fade-black' && plan.boundary.sampling !== 'cut') {
+  } else if (
+    plan.boundary.transition?.type === 'fade-black' &&
+    plan.boundary.sampling !== 'cut' &&
+    !resolveActiveVideoProjectCompositionJoinPlan(
+      plans.filter(({ boundary }) => boundary.sampling === 'cut'),
+      args.currentTime
+    )
+  ) {
     args.job.compositionJoinRenderer?.clear();
     await renderProjectCompositionScene(args);
     const blend = evaluateCompositionJoin(args.currentTime, plan.seam, plan.before, plan.after)!;
@@ -81,7 +88,13 @@ export async function renderProjectCompositionFrame(args: Input): Promise<void> 
     }
   }
   if (args.job.cancelled || args.signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
-  drawVideoProjectSceneEdges(args.context, args.project, args.currentTime);
+  drawVideoProjectSceneEdges(
+    args.context,
+    args.project,
+    args.currentTime,
+    undefined,
+    args.settings.fps
+  );
 }
 
 function createProjectExportCompositionJoinRenderer(
@@ -99,9 +112,16 @@ function createProjectExportCompositionJoinRenderer(
   const effectRuntime = createOffscreenProjectEffectRuntime({ ownerDocument });
   let disposed = false;
   let cutPlan: VideoProjectCompositionJoinPlan | undefined;
+  const cutPlans = resolveVideoProjectCompositionJoinPlans(args.project).filter(
+    ({ boundary }) => boundary.sampling === 'cut'
+  );
+  let nestedCuts: ProjectExportCompositionJoinRenderer | undefined;
   let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
   const renderSample = async (time: number, signal: AbortSignal) => {
-    if (!cutPlan)
+    const nested = cutPlan
+      ? undefined
+      : resolveActiveVideoProjectCompositionJoinPlan(cutPlans, time);
+    if (!cutPlan && !nested)
       for (const clip of args.project.clips) {
         signal.throwIfAborted();
         if (clip.type !== 'VIDEO' || !isClipActiveAtTime(clip, time)) continue;
@@ -123,7 +143,7 @@ function createProjectExportCompositionJoinRenderer(
         await waitForMediaElementReady(video, { signal });
         signal.throwIfAborted();
       }
-    if (!cutPlan)
+    if (!cutPlan && !nested)
       await syncVideoClipFrame({ clipMediaElements: videos }, args.project, time, signal);
     signal.throwIfAborted();
     if (cutPlan)
@@ -140,16 +160,20 @@ function createProjectExportCompositionJoinRenderer(
     let sample: ReturnType<typeof resources.canvas> | undefined;
     try {
       sample = resources.canvas('export-composition-sample', size);
-      await renderProjectCompositionScene({
-        ...args,
-        context: sample.context,
-        currentTime: time,
-        captionSampleTime: time,
-        clipMediaElements: frames?.media ?? videos,
-        ownerDocument,
-        effectRuntime,
-        signal,
-      });
+      if (nested) {
+        nestedCuts ??= createProjectExportCompositionJoinRenderer(args);
+        await nestedCuts.draw(sample.context, nested, time, signal);
+      } else
+        await renderProjectCompositionScene({
+          ...args,
+          context: sample.context,
+          currentTime: time,
+          captionSampleTime: time,
+          clipMediaElements: frames?.media ?? videos,
+          ownerDocument,
+          effectRuntime,
+          signal,
+        });
       signal.throwIfAborted();
       return sample;
     } catch (error) {
@@ -165,6 +189,7 @@ function createProjectExportCompositionJoinRenderer(
     settings: args.settings,
     clear() {
       endpoints.clear();
+      nestedCuts?.clear();
       cutSampler?.dispose();
       cutSampler = undefined;
     },
@@ -173,6 +198,7 @@ function createProjectExportCompositionJoinRenderer(
       disposed = true;
       controller.abort();
       endpoints.dispose();
+      nestedCuts?.dispose();
       cutSampler?.dispose();
       effectRuntime.dispose();
       resources.dispose();
@@ -186,13 +212,19 @@ function createProjectExportCompositionJoinRenderer(
     },
     async draw(context, plan, time, signal) {
       if (disposed) throw new Error('Composition export sampler is disposed.');
+      const samplingSignal = AbortSignal.any([signal, controller.signal]);
+      samplingSignal.throwIfAborted();
       cutPlan = plan.boundary.sampling === 'cut' ? plan : undefined;
+      if (cutPlan) {
+        nestedCuts?.dispose();
+        nestedCuts = undefined;
+      }
       if (!cutPlan) {
         cutSampler?.dispose();
         cutSampler = undefined;
       }
-      if (cutPlan && plan.boundary.transition?.type === 'fade-black') {
-        const sample = await renderSample(time, signal);
+      if (plan.boundary.transition?.type === 'fade-black') {
+        const sample = await renderSample(time, samplingSignal);
         try {
           context.clearRect(0, 0, size.width, size.height);
           context.drawImage(sample.canvas, 0, 0);
@@ -217,7 +249,7 @@ function createProjectExportCompositionJoinRenderer(
           ...samples,
           incomingWeight: blend.incoming,
         },
-        AbortSignal.any([signal, controller.signal])
+        samplingSignal
       );
     },
   };

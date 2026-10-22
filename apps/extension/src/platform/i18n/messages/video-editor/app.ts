@@ -236,6 +236,26 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Не удалось открыть проект',
     en: 'Failed to open project',
   },
+  transferTimingUnsupported: {
+    ru: 'Длительности вступления или завершения пока не поддерживают перенос. Продолжите редактирование в галерее.',
+    en: 'The intro or outro timing cannot be transferred yet. Continue editing in Gallery.',
+  },
+  transferJoinsUnsupported: {
+    ru: 'Это сочетание переходов пока нельзя перенести без изменений. Продолжите редактирование в галерее.',
+    en: 'This combination of transitions cannot be transferred unchanged yet. Continue editing in Gallery.',
+  },
+  transferOverlaysUnsupported: {
+    ru: 'Наложения вместе со вступлением или завершением пока не поддерживают перенос. Продолжите редактирование в галерее.',
+    en: 'Overlays combined with an intro or outro cannot be transferred yet. Continue editing in Gallery.',
+  },
+  transferResourcesUnavailable: {
+    ru: 'Не удалось прочитать материалы вступления или завершения. Проверьте их в редакторе галереи и повторите перенос.',
+    en: 'Could not read the intro or outro media. Check the media in Gallery and retry the transfer.',
+  },
+  transferSettingsUnsupported: {
+    ru: 'Настройки проекта пока нельзя перенести без изменений. Продолжите редактирование в галерее.',
+    en: 'The project settings cannot be transferred unchanged yet. Continue editing in Gallery.',
+  },
   projectMissing: {
     ru: 'Проект не найден.',
     en: 'Project not found.',

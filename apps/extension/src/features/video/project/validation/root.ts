@@ -20,7 +20,11 @@ import {
   parseVideoProjectCommentDocuments,
   hasValidVideoProjectCommentReferences,
 } from '../comments/validation';
-import { getVideoProjectWatermarkAsset, parseQuickEditWatermark } from '../scene/watermark';
+import {
+  getVideoProjectWatermarkAsset,
+  parseQuickEditWatermark,
+  parseVideoProjectWatermarkSource,
+} from '../scene/watermark';
 import { parseSceneBackgroundSettings } from '../scene/background-settings';
 import {
   parseVideoProjectTextDocuments,
@@ -128,8 +132,14 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 40) &&
+    isBoundedNumber(version, 2, 42) &&
     Number.isInteger(version) &&
+    (version >= 42 || value['watermarkSource'] === undefined) &&
+    (version >= 41 ||
+      !isRecord(value['bookendPresets']) ||
+      [value['bookendPresets']['intro'], value['bookendPresets']['outro']].every(
+        (slot: unknown) => !isRecord(slot) || slot['edgeControl'] === undefined
+      )) &&
     (version >= 40 ||
       !Array.isArray(value['compositionJoins']) ||
       value['compositionJoins'].every(
@@ -294,6 +304,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['actionEvents'], isActionEvent) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
+    (value['watermarkSource'] === undefined ||
+      parseVideoProjectWatermarkSource(value['watermarkSource']) !== null) &&
     (value['watermarkEnabled'] === undefined || value['watermarkEnabled'] === false) &&
     (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
     (value['bookendPresets'] === undefined ||

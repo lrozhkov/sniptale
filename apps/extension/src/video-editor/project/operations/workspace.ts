@@ -1,3 +1,7 @@
+import {
+  reviewProjectBookendReferences,
+  type ReviewProjectBookendResource,
+} from '../../../features/video/review/project-presentation';
 import { verifyReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/validation';
 import type { ReviewAnnotationEffectSnapshot } from '../../../features/video/review/annotation-effects/types';
 import type { VideoProjectEffectSnapshot } from '../../../features/video/project/effect-instance/types';
@@ -49,6 +53,14 @@ import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
 } from './telemetry';
+
+/** Carries a safe refusal category across the operation-to-bootstrap boundary. */
+export class ReviewProjectTransferError extends Error {
+  constructor(readonly reason: 'timing' | 'joins' | 'overlays' | 'resources' | 'settings') {
+    super('Review project settings cannot be transferred.');
+    this.name = 'ReviewProjectTransferError';
+  }
+}
 
 async function buildRecordingSourceProject(
   asset: VideoProjectAsset,
@@ -178,6 +190,7 @@ async function prepareReviewResources(
   annotations: VideoProjectEffectSnapshot[];
   audio?: ReviewProjectAudioResources;
   images: readonly ReviewProjectSceneImageResource[];
+  bookends: readonly ReviewProjectBookendResource[];
   camera?: ReviewProjectCameraResource;
 }> {
   const annotations: VideoProjectEffectSnapshot[] = [];
@@ -213,20 +226,40 @@ async function prepareReviewResources(
     ),
   ]);
   const imageIds = new Set(reviewProjectSceneImageReferences(document.advancedContent));
+  const bookendReferences = reviewProjectBookendReferences(document.advancedContent.presentation);
+  const bookendIds = new Set([...bookendReferences.images, ...bookendReferences.videos]);
+  const presentation = document.advancedContent.presentation;
+  const bookendMedia = [
+    presentation?.intro.image,
+    presentation?.intro.video,
+    presentation?.outro.image,
+    presentation?.outro.video,
+  ];
+  const bookends: ReviewProjectBookendResource[] = [];
   const cameraId = document.advancedContent.webcam?.assetId;
   let camera: ReviewProjectCameraResource | undefined;
   const audioAssets: ReviewProjectAudioResources['assets'][number][] = [];
   const images: ReviewProjectSceneImageResource[] = [];
-  for (const id of new Set([...audioIds, ...imageIds, ...(cameraId ? [cameraId] : [])])) {
-    const image = imageIds.has(id);
-    const video = id === cameraId;
+  for (const id of new Set([
+    ...audioIds,
+    ...imageIds,
+    ...bookendIds,
+    ...(cameraId ? [cameraId] : []),
+  ])) {
+    const bookendName = bookendMedia.find(
+      (media) => media?.assetId === id && media.filename
+    )?.filename;
+    const image = imageIds.has(id) || bookendReferences.images.includes(id);
+    const video = id === cameraId || bookendReferences.videos.includes(id);
     const unavailable = () =>
       new Error(
-        video
+        id === cameraId
           ? 'Review camera resource is unavailable.'
-          : image
-            ? 'Review image resource is unavailable.'
-            : 'Review audio resource is unavailable.'
+          : bookendIds.has(id)
+            ? 'Review bookend resource is unavailable.'
+            : image
+              ? 'Review image resource is unavailable.'
+              : 'Review audio resource is unavailable.'
       );
     if (Number(image) + Number(video) + Number(audioIds.has(id)) > 1)
       throw new Error('Review resource roles conflict.');
@@ -248,25 +281,45 @@ async function prepareReviewResources(
         metadata.size !== result.entry.size
       )
         throw unavailable();
-      camera = {
-        reviewAssetId: id,
-        asset: createVideoProjectAsset(
-          file.name && file.name !== projectAssetId
+      const admittedAsset = createVideoProjectAsset(
+        bookendName ??
+          (file.name && file.name !== projectAssetId
             ? file.name
-            : translate('gallery.videoReview.webcam'),
-          'VIDEO',
-          { kind: 'project-asset', projectAssetId },
-          metadata
-        ),
-        track: {
-          ...createVideoProjectTrack(
-            translate('gallery.videoReview.webcam'),
-            Math.min(0, ...project.tracks.map((track) => track.order)) - 1,
-            'PRIMARY'
-          ),
-          role: 'CAMERA',
-        },
-      };
+            : translate(
+                id === cameraId
+                  ? 'gallery.videoReview.webcam'
+                  : 'gallery.videoReview.presentationBookend'
+              )),
+        'VIDEO',
+        { kind: 'project-asset', projectAssetId },
+        metadata
+      );
+      if (bookendIds.has(id)) {
+        const { inspectReviewPresentationVideo } =
+          await import('../../../workflows/video-review/presentation-admission');
+        const slots = [
+          document.advancedContent.presentation?.intro.video,
+          document.advancedContent.presentation?.outro.video,
+        ];
+        const muted = slots
+          .filter((slot) => slot?.assetId === id)
+          .every((slot) => slot?.audio.muted);
+        const verified = await inspectReviewPresentationVideo(file, signal, { muted });
+        bookends.push({ reviewAssetId: id, asset: admittedAsset, source: verified.source });
+      }
+      if (id === cameraId)
+        camera = {
+          reviewAssetId: id,
+          asset: admittedAsset,
+          track: {
+            ...createVideoProjectTrack(
+              translate('gallery.videoReview.webcam'),
+              Math.min(0, ...project.tracks.map((track) => track.order)) - 1,
+              'PRIMARY'
+            ),
+            role: 'CAMERA',
+          },
+        };
     } else if (image) {
       const file = result.entry.file;
       if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw unavailable();
@@ -289,21 +342,26 @@ async function prepareReviewResources(
       const metadata = await loadImageMetadata(admitted);
       if (metadata.mimeType !== result.entry.mimeType || metadata.size !== result.entry.size)
         throw unavailable();
-      images.push({
+      const resource = {
         reviewAssetId: id,
         asset: createVideoProjectAsset(
-          file.name && file.name !== projectAssetId
-            ? file.name
-            : translate(
-                document.advancedContent.watermark?.image?.assetId === id
-                  ? 'gallery.videoReview.watermark'
-                  : 'gallery.videoReview.background'
-              ),
+          bookendName ??
+            (file.name && file.name !== projectAssetId
+              ? file.name
+              : translate(
+                  document.advancedContent.watermark?.image?.assetId === id
+                    ? 'gallery.videoReview.watermark'
+                    : bookendIds.has(id)
+                      ? 'gallery.videoReview.presentationBookend'
+                      : 'gallery.videoReview.background'
+                )),
           'IMAGE',
           { kind: 'project-asset', projectAssetId },
           { ...metadata, duration: null, hasAudio: false, audioPeaks: null }
         ),
-      });
+      };
+      if (imageIds.has(id)) images.push(resource);
+      if (bookendIds.has(id)) bookends.push(resource);
     } else {
       const metadata = await loadAudioMetadata(result.entry.file);
       const asset = createVideoProjectAsset(
@@ -318,6 +376,7 @@ async function prepareReviewResources(
   return {
     annotations,
     images,
+    bookends,
     ...(camera ? { camera } : {}),
     ...(audioIds.size || audio.laneVolumes !== undefined
       ? {
@@ -413,11 +472,24 @@ async function createProjectFromReview(
     ui: snapshot.workspace.advanced.ui,
     ...(resources.audio ? { externalAudio: resources.audio } : {}),
     imageAssets: resources.images,
+    bookendAssets: resources.bookends,
     annotationSnapshots: resources.annotations,
     ...(resources.camera ? { camera: resources.camera } : {}),
   });
-  if (result.status !== 'prepared')
-    throw new Error('Review project settings cannot be transferred.');
+  if (result.status !== 'prepared') {
+    const field = result.issues.find((issue) => issue.kind === 'unmapped-content')?.field;
+    const reason =
+      field === 'presentation-timing'
+        ? 'timing'
+        : field === 'presentation-joins'
+          ? 'joins'
+          : field === 'presentation-overlays'
+            ? 'overlays'
+            : field === 'presentation-assets'
+              ? 'resources'
+              : 'settings';
+    throw new ReviewProjectTransferError(reason);
+  }
   const latest = await readVideoWorkspace(aggregateId);
   if (
     !matchesReviewSnapshot(

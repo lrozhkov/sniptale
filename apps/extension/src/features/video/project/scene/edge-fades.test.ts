@@ -67,15 +67,22 @@ it('limits visual edges proportionally before masking independent audio switches
   const project = { duration: 2, sceneEdges };
   const before = structuredClone(sceneEdges);
   const plan = resolveVideoProjectSceneEdgePlan(project);
-  expect(plan.visualEnvelope).toEqual({ span: 2, fadeIn: 1, fadeOut: 1 });
-  expect(plan.audioEnvelope).toEqual({ span: 2, fadeIn: 1, fadeOut: 0 });
+  expect(plan.visualEnvelope).toEqual({ span: 1.966667, fadeIn: 0.9833335, fadeOut: 0.9833335 });
+  expect(plan.audioEnvelope).toEqual({
+    span: 2 - 1 / 48_000,
+    fadeIn: (2 - 1 / 48_000) / 2,
+    fadeOut: 0,
+  });
   expect(plan.color).toBe('#ff0000ff');
   expect(plan.endColor).toBe('#0000ffff');
-  expect(getVideoProjectSceneEdgeAudioGain(project, 0.5)).toBe(0.5);
+  expect(getVideoProjectSceneEdgeAudioGain(project, 0.5)).toBeCloseTo(
+    0.5 / ((2 - 1 / 48_000) / 2),
+    12
+  );
   expect(getVideoProjectSceneEdgeAudioGain(project, 1.5)).toBe(1);
   expect(sceneEdges).toEqual(before);
   expect(resolveVideoProjectSceneEdgePlan({ ...project, duration: 10 }).visualEnvelope).toEqual({
-    span: 10,
+    span: 9.966667,
     fadeIn: 2,
     fadeOut: 2,
   });
@@ -93,13 +100,13 @@ it('keeps disabled remembered fades neutral and evaluates absolute composition t
     [0, 1],
     [1, 0.5],
     [2, 0],
-    [6, 0],
-    [8, 0.5],
+    [6, (10 - 9.966667) / 4],
+    [8, 1 - (9.966667 - 8) / 4],
     [10, 1],
     [11, 1],
   ])
-    expect(presentationEnvelopeOpacity(plan.visualEnvelope, time!)).toBe(expected);
-  expect(getVideoProjectSceneEdgeAudioGain(project, 8)).toBe(0.5);
+    expect(presentationEnvelopeOpacity(plan.visualEnvelope, time!)).toBeCloseTo(expected!, 12);
+  expect(getVideoProjectSceneEdgeAudioGain(project, 8)).toBeCloseTo((10 - 1 / 48_000 - 8) / 4, 12);
   const disabled = {
     ...project,
     sceneEdges: { ...sceneEdges, outro: { ...sceneEdges.outro, enabled: false } },
@@ -109,5 +116,18 @@ it('keeps disabled remembered fades neutral and evaluates absolute composition t
   expect(constrainPresentationEnvelope(0, 0, 0)).toEqual({ span: 0, fadeIn: 0, fadeOut: 0 });
   expect(() => presentationEnvelopeOpacity(plan.visualEnvelope, NaN)).toThrow(
     'Invalid presentation'
+  );
+});
+
+it.each([0.01, 0.5])('uses the Native one-fps minimum for visual fades at %s fps', (fps) => {
+  const sceneEdges = createVideoProjectSceneEdges();
+  sceneEdges.outro = { enabled: true, duration: 0.4, audioFade: true };
+  const project = { duration: 4, fps, sceneEdges };
+  const plan = resolveVideoProjectSceneEdgePlan(project);
+  expect(plan.visualEnvelope.span).toBe(3);
+  expect(presentationEnvelopeOpacity(plan.visualEnvelope, 2)).toBe(0);
+  expect(presentationEnvelopeOpacity(plan.visualEnvelope, 3)).toBe(1);
+  expect(plan.audioEnvelope).toEqual(
+    resolveVideoProjectSceneEdgePlan({ ...project, fps: 30 }).audioEnvelope
   );
 });

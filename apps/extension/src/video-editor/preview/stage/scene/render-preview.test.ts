@@ -386,3 +386,66 @@ it('paints borrowed decoded cut frames while the unused live video is seeking', 
     source
   );
 });
+
+it('prepares the global watermark when passive experimental metadata names a hidden source', async () => {
+  const { job } = setup();
+  const source = job.project.clips[0]!;
+  if (source.type !== 'VIDEO') throw new Error('Missing video');
+  job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+  job.project.watermarkSource = {
+    assetId: source.assetId,
+    sourceInstanceId: source.sourceInstanceId ?? source.id,
+  };
+  job.project.tracks[0]!.visible = false;
+  const watermarkRenderer = { prepare: vi.fn(), clear: vi.fn() };
+  await renderPreviewScene({ ...job, watermarkRenderer });
+  expect(watermarkRenderer.prepare).toHaveBeenCalledExactlyOnceWith(
+    job.project,
+    job.project,
+    undefined
+  );
+  expect(watermarkRenderer.clear).not.toHaveBeenCalled();
+});
+
+it.each([24, 60])(
+  'paints ordinary estimate fades at output %s fps for a 30 fps project',
+  async (sampleFps) => {
+    const { job } = setup();
+    job.project.fps = 30;
+    job.project.duration = 1;
+    job.project.sceneEdges = {
+      intro: { enabled: false, duration: 0.4 },
+      outro: { enabled: true, duration: 0.4, color: '#000000' },
+    };
+    vi.mocked(drawPreviewVisualPasses).mockImplementation(({ canvas }) => {
+      canvas.width = 8;
+      canvas.height = 4;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, 8, 4);
+      return {
+        context,
+        bounds: { width: 8, height: 4 },
+        dpr: 1,
+        viewport: { width: 8, height: 4, offsetX: 0, offsetY: 0, scale: 1 },
+      };
+    });
+    await renderPreviewScene({
+      ...job,
+      ...{ sampleFps },
+      currentTime: (sampleFps - 2) / sampleFps,
+    });
+    const expected = sampleFps === 24 ? 27 : 11;
+    const preceding = job.canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data;
+    for (const channel of preceding.slice(0, 3))
+      expect(Math.abs(channel - expected)).toBeLessThanOrEqual(1);
+    await renderPreviewScene({
+      ...job,
+      ...{ sampleFps },
+      currentTime: (sampleFps - 1) / sampleFps,
+    });
+    expect(Array.from(job.canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data)).toEqual([
+      0, 0, 0, 255,
+    ]);
+  }
+);

@@ -411,3 +411,23 @@ it('routes a timed camera through decoded composition instead of copying uncover
     { kind: 'accelerated-composite', reason: 'decoded-frame-provider', start: 0, end: 4 },
   ]);
 });
+
+it('uses export fps when a single project frame becomes multiple encoded frames', () => {
+  const project = createProject({
+    fps: 1,
+    duration: 0.5,
+    sceneEdges: {
+      intro: { enabled: true, duration: 0.1 },
+      outro: { enabled: false, duration: 0.4 },
+    },
+  });
+  const spans = planMp4VideoRenderSpans(project, createSettings({ fps: 30 }));
+  expect(spans).toHaveLength(1);
+  expect(spans[0]).toMatchObject({ start: 0, end: 0.5 });
+  expect(spans.every((span) => span.kind !== 'clean-source')).toBe(true);
+  expect(
+    planMp4VideoRenderSpans(project, createSettings({ fps: 1 })).every(
+      (span) => span.kind === 'clean-source'
+    )
+  ).toBe(true);
+});

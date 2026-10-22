@@ -48,8 +48,8 @@ function Harness() {
 function mount() {
   act(() => root.render(<Harness />));
 }
-function click(label: string) {
-  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+function click(label: string, owner: ParentNode = host) {
+  const button = [...owner.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) => node.getAttribute('aria-label') === label || node.textContent === label
   );
   if (!button) throw new Error(`Missing button ${label}`);
@@ -92,6 +92,22 @@ it('authors independent dormant scene edges through history without changing cli
 });
 
 it('refuses stale same-id roots and accepts a fresh retry without history loss', () => {
+  const seed = useVideoEditorStore.getState().project!;
+  useVideoEditorStore.getState().setProject({
+    ...seed,
+    version: 41,
+    bookendPresets: {
+      intro: {
+        mode: 'none',
+        edgeControl: {
+          mode: 'media',
+          plain: { enabled: true, duration: 1.2 },
+          media: { enabled: true, duration: 0.3 },
+        },
+      },
+      outro: { mode: 'none' },
+    },
+  });
   const stale = useVideoEditorStore.getState().project!;
   useVideoEditorStore.getState().setProject(structuredClone(stale));
   const accepted = useVideoEditorStore.getState().project!;
@@ -99,15 +115,36 @@ it('refuses stale same-id roots and accepts a fresh retry without history loss',
   click('gallery.videoReview.presentationFadeIn');
   expect(useVideoEditorStore.getState().project).toBe(accepted);
   expect(accepted.sceneEdges).toBeUndefined();
+  expect(accepted.bookendPresets).toEqual(stale.bookendPresets);
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
   mount();
   click('gallery.videoReview.presentationFadeIn');
   expect(useVideoEditorStore.getState().project!.sceneEdges!.intro.enabled).toBe(true);
+  expect(useVideoEditorStore.getState().project!.sceneEdges!.intro.duration).toBe(1.2);
+  expect(
+    useVideoEditorStore.getState().project!.bookendPresets!.intro.edgeControl!.media.duration
+  ).toBe(0.3);
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
 });
 
 it('preserves a foreign history lease and retries after its owner ends it', () => {
+  const seed = useVideoEditorStore.getState().project!;
+  useVideoEditorStore.getState().setProject({
+    ...seed,
+    version: 41,
+    bookendPresets: {
+      intro: { mode: 'none' },
+      outro: {
+        mode: 'none',
+        edgeControl: {
+          mode: 'media',
+          plain: { enabled: true, duration: 0.8 },
+          media: { enabled: false, duration: 3.4 },
+        },
+      },
+    },
+  });
   mount();
   const accepted = useVideoEditorStore.getState().project;
   const lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
@@ -119,4 +156,84 @@ it('preserves a foreign history lease and retries after its owner ends it', () =
   act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
   click('gallery.videoReview.presentationFadeOut');
   expect(useVideoEditorStore.getState().project!.sceneEdges!.outro.enabled).toBe(true);
+  expect(useVideoEditorStore.getState().project!.sceneEdges!.outro.duration).toBe(0.8);
+  expect(
+    useVideoEditorStore.getState().project!.bookendPresets!.outro.edgeControl!.media.duration
+  ).toBe(3.4);
 });
+
+it.each(['intro', 'outro'] as const)(
+  'restores the retained %s plain fade and edits it without changing the media recipe or clips',
+  (side) => {
+    const project = useVideoEditorStore.getState().project!;
+    const plain = { enabled: true, duration: 1.2, color: '#112233ff', audioFade: false };
+    const media = { enabled: true, duration: 0.3, color: '#445566ff', audioFade: true };
+    const edges = {
+      intro: { enabled: false, duration: 0.4 },
+      outro: { enabled: false, duration: 0.4 },
+      [side]: media,
+    };
+    const presets = {
+      intro: { mode: 'none' as const },
+      outro: { mode: 'none' as const },
+      [side]: { mode: 'none' as const, edgeControl: { mode: 'media' as const, plain, media } },
+    };
+    act(() =>
+      useVideoEditorStore
+        .getState()
+        .setProject({ ...project, version: 41, sceneEdges: edges, bookendPresets: presets })
+    );
+    mount();
+    const controls = host
+      .querySelector(`[data-ui="video-editor.scene-bookends.${side}"]`)!
+      .closest('details')!;
+    const active = useVideoEditorStore.getState();
+    click(
+      side === 'intro'
+        ? 'gallery.videoReview.presentationFadeIn'
+        : 'gallery.videoReview.presentationFadeOut',
+      controls
+    );
+    expect(useVideoEditorStore.getState().project).toBe(active.project);
+    expect(useVideoEditorStore.getState().projectHistory).toBe(active.projectHistory);
+    duration('0.3');
+    expect(useVideoEditorStore.getState().project).toBe(active.project);
+    expect(useVideoEditorStore.getState().project!.bookendPresets).toEqual(presets);
+    click('gallery.videoReview.presentationNoEffect', controls);
+    expect(useVideoEditorStore.getState().project!.bookendPresets).toEqual(presets);
+    click(
+      side === 'intro'
+        ? 'gallery.videoReview.presentationFadeIn'
+        : 'gallery.videoReview.presentationFadeOut',
+      controls
+    );
+    const restored = useVideoEditorStore.getState().project!;
+    expect(restored.sceneEdges![side]).toEqual(plain);
+    expect(restored.bookendPresets![side].edgeControl).toEqual({ mode: 'media', plain, media });
+    expect(restored.clips).toEqual(project.clips);
+    duration('2');
+    const edited = useVideoEditorStore.getState().project!;
+    expect(edited.sceneEdges![side].duration).toBe(2);
+    expect(edited.bookendPresets![side].edgeControl!.plain).toEqual({ ...plain, duration: 2 });
+    expect(edited.bookendPresets![side].edgeControl!.media).toEqual(media);
+    expect(edited.clips).toEqual(project.clips);
+    act(() => useVideoEditorStore.getState().undoProject());
+    expect(useVideoEditorStore.getState().project!.sceneEdges![side]).toEqual(plain);
+    expect(
+      useVideoEditorStore.getState().project!.bookendPresets![side].edgeControl!.plain
+    ).toEqual(plain);
+    act(() => useVideoEditorStore.getState().redoProject());
+    expect(useVideoEditorStore.getState().project!.sceneEdges![side].duration).toBe(2);
+    expect(
+      useVideoEditorStore.getState().project!.bookendPresets![side].edgeControl!.plain.duration
+    ).toBe(2);
+    click('gallery.videoReview.presentationNoEffect', controls);
+    click(
+      side === 'intro'
+        ? 'gallery.videoReview.presentationFadeIn'
+        : 'gallery.videoReview.presentationFadeOut',
+      controls
+    );
+    expect(useVideoEditorStore.getState().project!.sceneEdges![side].duration).toBe(2);
+  }
+);

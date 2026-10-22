@@ -10,6 +10,26 @@ export interface PresentationFade {
   audioFade?: boolean;
 }
 
+/** Independent authored edge; legacy scalar fields are fallback only when this is absent. */
+export interface PresentationEdgeControl {
+  mode: 'none' | 'fade' | 'media';
+  plain: PresentationFade;
+  media: PresentationFade;
+}
+
+/** Admits active and remembered edge variants without resolving their resources. */
+export function parsePresentationEdgeControl(value: unknown): PresentationEdgeControl | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !['mode', 'plain', 'media'].includes(key)) ||
+    (value['mode'] !== 'none' && value['mode'] !== 'fade' && value['mode'] !== 'media')
+  )
+    return null;
+  const plain = parsePresentationFade(value['plain']);
+  const media = parsePresentationFade(value['media']);
+  return plain && media ? { mode: value['mode'], plain, media } : null;
+}
+
 /** Derived seconds on the complete composition clock. */
 export interface PresentationEnvelope {
   span: number;
@@ -23,7 +43,7 @@ export interface VideoProjectSceneEdges {
   outro: PresentationFade;
 }
 
-type SceneEdgeProject = { duration: number; sceneEdges?: VideoProjectSceneEdges };
+type SceneEdgeProject = { duration: number; fps?: number; sceneEdges?: VideoProjectSceneEdges };
 
 /** Neutral defaults do not opt an existing document into processing. */
 export function createPresentationFade(): PresentationFade {
@@ -91,20 +111,35 @@ export function presentationEnvelopeOpacity(envelope: PresentationEnvelope, posi
   return Math.max(incoming, outgoing);
 }
 
-/** Native uses project seconds; Gallery retains its separate tick/sample adapters. */
-export function resolveVideoProjectSceneEdgePlan(project: SceneEdgeProject) {
+/** Uses the last output frame and sample, while authored seconds remain unchanged. */
+export function resolveVideoProjectSceneEdgePlan(
+  project: SceneEdgeProject,
+  fps = project.fps ?? 30,
+  sampleRate = 48_000
+) {
+  if (!Number.isFinite(fps) || fps <= 0 || !Number.isFinite(sampleRate) || sampleRate <= 0)
+    throw new Error('Invalid presentation sampling rate.');
   const settings = project.sceneEdges;
-  const visualEnvelope = constrainPresentationEnvelope(
-    project.duration,
-    settings?.intro.enabled ? settings.intro.duration : 0,
-    settings?.outro.enabled ? settings.outro.duration : 0
+  const durationUs = Math.round(project.duration * 1_000_000);
+  // Native playback and join sampling share the same minimum cadence.
+  const visualFps = Math.max(1, fps);
+  // A rounded frame timestamp belongs to the half-open output interval.
+  const frames = Math.max(1, Math.ceil(((durationUs - 0.5) * visualFps) / 1_000_000));
+  const visualSpan = Math.max(0, Math.round(((frames - 1) * 1_000_000) / visualFps) / 1_000_000);
+  const audioSpan = Math.max(
+    0,
+    (Math.round((durationUs * sampleRate) / 1_000_000) - 1) / sampleRate
   );
+  const fadeIn = settings?.intro.enabled ? settings.intro.duration : 0;
+  const fadeOut = settings?.outro.enabled ? settings.outro.duration : 0;
+  const visualEnvelope = constrainPresentationEnvelope(visualSpan, fadeIn, fadeOut);
+  const audioEnvelope = constrainPresentationEnvelope(audioSpan, fadeIn, fadeOut);
   return {
     visualEnvelope,
     audioEnvelope: {
-      span: visualEnvelope.span,
-      fadeIn: settings?.intro.audioFade ? visualEnvelope.fadeIn : 0,
-      fadeOut: settings?.outro.audioFade ? visualEnvelope.fadeOut : 0,
+      span: audioEnvelope.span,
+      fadeIn: settings?.intro.audioFade ? audioEnvelope.fadeIn : 0,
+      fadeOut: settings?.outro.audioFade ? audioEnvelope.fadeOut : 0,
     },
     color: settings?.intro.color ?? '#000000ff',
     endColor: settings?.outro.color ?? '#000000ff',

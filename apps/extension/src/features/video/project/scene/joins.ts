@@ -2,7 +2,11 @@ import { isBoundedNumber, MAX_VIDEO_PROJECT_DURATION_SECONDS } from '../validati
 import { resolveClipLogicalLaneId } from '../timeline/logical-lanes';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { VideoProject } from '../types/model';
-import { parseCompositionJoinSettings, fitCompositionJoinPortions } from './composition-join';
+import {
+  parseCompositionJoinSettings,
+  fitCompositionJoinPortions,
+  evaluateCompositionJoin,
+} from './composition-join';
 import type { VideoProjectCompositionJoin, VideoProjectCompositionJoinPlan } from './joins-types';
 
 function identity(value: unknown): value is string {
@@ -207,13 +211,16 @@ export function resolveVideoProjectCompositionJoinPlans(
       return [{ boundary, seam }];
     })
     .sort((a, b) => a.seam - b.seam);
+  const presentationPositions = positions.filter(({ boundary }) => boundary.sampling !== 'cut');
   const plans: VideoProjectCompositionJoinPlan[] = [];
-  for (const [index, position] of positions.entries()) {
+  for (const position of positions) {
     const { boundary, seam } = position;
     const transition = boundary.transition;
     if (!transition || seam <= 0 || seam >= project.duration) continue;
-    const beforeStart = positions[index - 1]?.seam ?? 0;
-    const afterEnd = positions[index + 1]?.seam ?? project.duration;
+    const bounds = boundary.sampling === 'cut' ? positions : presentationPositions;
+    const index = bounds.indexOf(position);
+    const beforeStart = bounds[index - 1]?.seam ?? 0;
+    const afterEnd = bounds[index + 1]?.seam ?? project.duration;
     if (beforeStart >= seam || afterEnd <= seam)
       throw new Error('Composition join regions have collapsed.');
     plans.push({
@@ -225,34 +232,50 @@ export function resolveVideoProjectCompositionJoinPlans(
       incomingEnd: afterEnd,
     });
   }
-  for (let index = 1; index < plans.length; index++) {
-    const previous = plans[index - 1]!;
-    const current = plans[index]!;
-    const span = current.seam - previous.seam;
-    const outgoing = previous.boundary.transition,
-      incoming = current.boundary.transition;
-    if (
-      previous.boundary.sampling === 'cut' &&
-      current.boundary.sampling === 'cut' &&
-      outgoing &&
-      incoming &&
-      previous.incomingEnd === current.seam &&
-      current.outgoingStart === previous.seam
-    ) {
-      if (outgoing.after + incoming.before > span) {
-        const fitted = fitCompositionJoinPortions(outgoing.after, incoming.before, span);
-        previous.after = fitted.outgoing;
-        current.before = fitted.incoming;
+  for (const cuts of [true, false]) {
+    const layer = plans.filter(({ boundary }) => (boundary.sampling === 'cut') === cuts);
+    for (let index = 1; index < layer.length; index++) {
+      const previous = layer[index - 1]!;
+      const current = layer[index]!;
+      const span = current.seam - previous.seam;
+      const outgoing = previous.boundary.transition,
+        incoming = current.boundary.transition;
+      if (
+        previous.boundary.sampling === 'cut' &&
+        current.boundary.sampling === 'cut' &&
+        outgoing &&
+        incoming &&
+        previous.incomingEnd === current.seam &&
+        current.outgoingStart === previous.seam
+      ) {
+        if (outgoing.after + incoming.before > span) {
+          const fitted = fitCompositionJoinPortions(outgoing.after, incoming.before, span);
+          previous.after = fitted.outgoing;
+          current.before = fitted.incoming;
+        }
+        continue;
       }
-      continue;
-    }
-    const requested = previous.after + current.before;
-    if (requested > span) {
-      previous.after *= span / requested;
-      current.before *= span / requested;
+      const requested = previous.after + current.before;
+      if (requested > span) {
+        previous.after *= span / requested;
+        current.before *= span / requested;
+      }
     }
   }
   return plans;
+}
+
+/** Presentation joins wrap the main composition, including its independently allocated source cuts. */
+export function resolveActiveVideoProjectCompositionJoinPlan(
+  plans: readonly VideoProjectCompositionJoinPlan[],
+  time: number
+): VideoProjectCompositionJoinPlan | undefined {
+  const active = (plan: VideoProjectCompositionJoinPlan) =>
+    evaluateCompositionJoin(time, plan.seam, plan.before, plan.after) !== null;
+  return (
+    plans.find((plan) => plan.boundary.sampling !== 'cut' && active(plan)) ??
+    plans.find((plan) => plan.boundary.sampling === 'cut' && active(plan))
+  );
 }
 
 /** Selects held frames only when sampled; other valid preview positions remain available. */

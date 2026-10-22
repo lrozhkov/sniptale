@@ -15,6 +15,11 @@ import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import { PresentationJoinFields } from '../../../../../ui/presentation-join-fields';
 import type { CompositionJoinSettings } from '../../../../../features/video/project/scene/composition-join';
 import { PresentationMediaFields } from '../../../../../ui/presentation-media-fields';
+import { PresentationFadeFields } from '../../../../../ui/presentation-fade-fields';
+import {
+  createPresentationFade,
+  type PresentationFade,
+} from '../../../../../features/video/project/scene/edge-fades';
 import { useVideoEditorTimelineEditingPort } from '../../../../runtime/controller/store';
 import { InspectorDetails } from '../shared/details';
 import { SceneBookendMaterials } from './scene-bookend-materials';
@@ -89,6 +94,25 @@ export function SceneBookendPreset(props: { project: VideoProject; side: 'intro'
           onPreview={editor.previewTransition}
         />
       )}
+      {mode !== 'none' && asset && (
+        <InspectorDetails
+          label={translate('gallery.videoReview.presentationAdvanced')}
+          preferenceId={`scene-bookend-preset.${props.side}.advanced`}
+        >
+          <PresentationFadeFields
+            value={editor.fade}
+            enabledLabel={translate(
+              props.side === 'intro'
+                ? 'gallery.videoReview.presentationFadeIn'
+                : 'gallery.videoReview.presentationFadeOut'
+            )}
+            fallbackColor="#000000ff"
+            fallbackAudioFade={false}
+            onChange={(change) => editor.patchFade(change, false)}
+            onPreview={(change) => editor.patchFade(change, true)}
+          />
+        </InspectorDetails>
+      )}
       {refused && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('common.errors.actionFailed')}
@@ -109,6 +133,13 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     value: BookendImagePresentation | BookendVideoPresentation;
   } | null>(null);
   const [refused, setRefused] = useState(false);
+  const [fadeDraft, setFadeDraft] = useState<{
+    project: VideoProject;
+    value: PresentationFade;
+  } | null>(null);
+  const mediaFade =
+    slot.edgeControl?.media ?? props.project.sceneEdges?.[props.side] ?? createPresentationFade();
+  const fade = fadeDraft?.project === props.project ? fadeDraft.value : mediaFade;
   const [joinDraft, setJoinDraft] = useState<{
     project: VideoProject;
     value: CompositionJoinSettings;
@@ -125,6 +156,7 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     setRefused(!result || result.status === 'rejected');
     setPreview(null);
     setJoinDraft(null);
+    setFadeDraft(null);
     if (result && result.status !== 'rejected') setPending(null);
   };
   const commit = (proposal: unknown) => commitSettings({ ...settings, [props.side]: proposal });
@@ -143,9 +175,25 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     if (transient) setPreview(value ? { project: props.project, value } : null);
     else if (value && media) commit({ ...slot, [mode]: { ...media, ...value } });
   };
+  const patchFade = (change: Partial<PresentationFade> | null, transient: boolean) => {
+    const value = change ? { ...mediaFade, ...change } : null;
+    if (transient) setFadeDraft(value ? { project: props.project, value } : null);
+    else if (value)
+      commit({
+        ...slot,
+        edgeControl: {
+          ...(slot.edgeControl ?? {
+            mode: 'media',
+            plain: props.project.sceneEdges?.[props.side] ?? createPresentationFade(),
+          }),
+          media: value,
+        },
+      });
+  };
   const current = preview?.project === props.project ? preview.value : media;
   const changeMode = (next: Mode) => {
     setPreview(null);
+    setFadeDraft(null);
     if (next === 'none' || slot[next]) commit({ ...slot, mode: next });
     else setPending({ project: props.project, mode: next });
   };
@@ -162,6 +210,8 @@ function useBookendPresetEditing(props: { project: VideoProject; side: 'intro' |
     current,
     refused,
     patch,
+    fade,
+    patchFade,
     changeMode,
     choose,
     transition,
