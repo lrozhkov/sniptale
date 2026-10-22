@@ -2,10 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { installBackgroundRuntimeMessagingMock } from '../../../routing-contracts/runtime-messaging/mock';
 
 const {
+  acknowledgePendingVideoPostRecordResultMock,
   beginVideoRecordingPreparationMock,
   beginPreparedRecordingMock,
   finalizeRecordingStartMock,
   initializeRecordingContextMock,
+  createCameraRecorderLaunchGrantMock,
+  isVideoRecordingPreparationInProgressMock,
   issueCameraRecorderLaunchTokenMock,
   issuePreparedVideoRecordingLeaseMock,
   readStoredVideoPostRecordResultMock,
@@ -14,10 +17,13 @@ const {
   sendRuntimeMessageMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
+  acknowledgePendingVideoPostRecordResultMock: vi.fn(),
   beginVideoRecordingPreparationMock: vi.fn(),
   beginPreparedRecordingMock: vi.fn(),
   finalizeRecordingStartMock: vi.fn(),
   initializeRecordingContextMock: vi.fn(),
+  createCameraRecorderLaunchGrantMock: vi.fn(),
+  isVideoRecordingPreparationInProgressMock: vi.fn(),
   issueCameraRecorderLaunchTokenMock: vi.fn(),
   issuePreparedVideoRecordingLeaseMock: vi.fn(),
   readStoredVideoPostRecordResultMock: vi.fn(),
@@ -34,7 +40,7 @@ vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
   beginVideoRecordingPreparation: beginVideoRecordingPreparationMock,
   hasActiveVideoRecordingSession: vi.fn(() => false),
-  isVideoRecordingPreparationInProgress: vi.fn(() => false),
+  isVideoRecordingPreparationInProgress: isVideoRecordingPreparationInProgressMock,
   setVideoRecordingId: setVideoRecordingIdMock,
 }));
 vi.mock('./flow', async (importOriginal) => ({
@@ -65,6 +71,13 @@ vi.mock('../../../storage/video/post-record-result', async (importOriginal) => (
   ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
   readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
 }));
+vi.mock('../../../storage/video/post-record-acknowledgement', () => ({
+  acknowledgePendingVideoPostRecordResult: acknowledgePendingVideoPostRecordResultMock,
+}));
+vi.mock('../../../storage/video/camera-recorder-grant', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../storage/video/camera-recorder-grant')>()),
+  createCameraRecorderLaunchGrant: createCameraRecorderLaunchGrantMock,
+}));
 
 import {
   CaptureMode,
@@ -89,6 +102,9 @@ const defaultSettings: VideoRecordingSettings = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  beginVideoRecordingPreparationMock.mockReset();
+  isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
+  acknowledgePendingVideoPostRecordResultMock.mockReset().mockResolvedValue('acknowledged');
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'recording-1') });
   installBackgroundRuntimeMessagingMock({ sendRuntimeMessage: sendRuntimeMessageMock });
   runCountdownMock.mockResolvedValue(true);
@@ -98,8 +114,98 @@ beforeEach(() => {
     controlToken: 'control-token-1',
     recordingId: 'recording-1',
   });
-  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
+  readStoredVideoPostRecordResultMock.mockReset().mockResolvedValue(null);
   issueCameraRecorderLaunchTokenMock.mockResolvedValue('recording-1');
+});
+
+it('preserves the admitted camera launch when a duplicate saved-result acknowledgement finishes late', async () => {
+  const { issueCameraRecorderLaunchToken } = await vi.importActual<
+    typeof import('../runtime/camera-recorder-control')
+  >('../runtime/camera-recorder-control');
+  const previous = {
+    status: 'ready',
+    result: {
+      recordingId: 'previous-recording',
+      primaryRecordingId: 'previous-recording',
+      projectId: null,
+    },
+  };
+  readStoredVideoPostRecordResultMock
+    .mockResolvedValueOnce(previous)
+    .mockResolvedValueOnce(previous);
+  let releaseDuplicate!: () => void;
+  const duplicateGate = new Promise<void>((resolve) => {
+    releaseDuplicate = resolve;
+  });
+  acknowledgePendingVideoPostRecordResultMock
+    .mockResolvedValueOnce('acknowledged')
+    .mockImplementationOnce(async () => {
+      await duplicateGate;
+      return 'acknowledged';
+    });
+  let signalGrantStarted!: () => void;
+  const grantStarted = new Promise<void>((resolve) => {
+    signalGrantStarted = resolve;
+  });
+  let releaseGrant!: () => void;
+  const grantGate = new Promise<void>((resolve) => {
+    releaseGrant = resolve;
+  });
+  createCameraRecorderLaunchGrantMock.mockImplementationOnce(
+    async (recordingId, registrationToken) => {
+      signalGrantStarted();
+      await grantGate;
+      return {
+        documentId: '',
+        expiresAt: Date.now() + 60000,
+        previousRegistrationToken: null,
+        registrationToken,
+        recordingId,
+        senderUrl: '',
+        stage: 'launch',
+        tabId: null,
+      };
+    }
+  );
+  issueCameraRecorderLaunchTokenMock.mockImplementationOnce(issueCameraRecorderLaunchToken);
+  beginVideoRecordingPreparationMock.mockImplementation(() =>
+    isVideoRecordingPreparationInProgressMock.mockReturnValue(true)
+  );
+  initializeRecordingContextMock.mockResolvedValue({
+    captureMode: CaptureMode.CAMERA,
+    captureSource: { cameraDeviceId: 'camera-1', mode: CaptureMode.CAMERA, streamId: 'camera' },
+    generation: 1,
+    settings: defaultSettings,
+    surface: null,
+    tabId: null,
+    viewportPresetId: null,
+  });
+  const winner = startRecording(
+    undefined,
+    defaultSettings,
+    CaptureMode.CAMERA,
+    null,
+    ownerSenderUrl
+  );
+  const duplicate = startRecording(
+    undefined,
+    defaultSettings,
+    CaptureMode.CAMERA,
+    null,
+    ownerSenderUrl
+  );
+  await grantStarted;
+  expect(acknowledgePendingVideoPostRecordResultMock).toHaveBeenCalledTimes(2);
+  releaseDuplicate();
+  await expect(duplicate).resolves.toEqual({ result: 'duplicate-preparing' });
+  releaseGrant();
+  await expect(winner).resolves.toMatchObject({
+    result: 'accepted',
+    recordingId: 'recording-1',
+    cameraLaunchToken: 'recording-1',
+  });
+  expect(beginVideoRecordingPreparationMock).toHaveBeenCalledOnce();
+  expect(createCameraRecorderLaunchGrantMock).toHaveBeenCalledOnce();
 });
 
 it('finalizes a camera recording with a launch token and control capability', async () => {

@@ -32,6 +32,7 @@ import {
 import { acknowledgePendingVideoPostRecordResult } from './post-record-acknowledgement';
 import {
   commitPendingVideoPostRecordResult,
+  clearPendingVideoPostRecordResult,
   isAcknowledgedVideoPostRecordResultForCamera,
   persistPendingVideoPostRecordResult,
   readPendingVideoPostRecordResult,
@@ -213,6 +214,27 @@ it('serializes a newer result behind an admitted exact acknowledgement', async (
     projectId: null,
     recordingId: 'rec-b',
   });
+});
+
+it('does not recreate a result when acknowledgement is queued after its deletion', async () => {
+  await persistPendingVideoPostRecordResult(RESULT_A);
+  await commitPendingVideoPostRecordResult('rec-a');
+  const deletionStarted = createDeferred();
+  const releaseDeletion = createDeferred();
+  removeMock.mockImplementationOnce(async (keys: string | string[]) => {
+    deletionStarted.resolve();
+    await releaseDeletion.promise;
+    removeStorageKeys(keys);
+  });
+  setMock.mockClear();
+  const deletion = clearPendingVideoPostRecordResult('rec-a');
+  await deletionStarted.promise;
+  const acknowledgement = acknowledgePendingVideoPostRecordResult('rec-a');
+  releaseDeletion.resolve();
+  await expect(deletion).resolves.toBe(true);
+  await expect(acknowledgement).resolves.toBe('stale');
+  await expect(readStoredVideoPostRecordResult()).resolves.toBeNull();
+  expect(setMock).not.toHaveBeenCalled();
 });
 
 it('keeps a staged result undisclosed and unacknowledgeable until cleanup commits it', async () => {

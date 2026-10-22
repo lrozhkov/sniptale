@@ -26,6 +26,8 @@ const {
   resetVideoRecordingRuntimeStateMock,
   resetVideoRecordingStartSessionMock,
   readStoredVideoPostRecordResultMock,
+  acknowledgePendingVideoPostRecordResultMock,
+  forgetCameraRecorderControlGrantMock,
   setVideoRecordingIdMock,
 } = vi.hoisted(() => ({
   beginVideoRecordingPreparationMock: vi.fn(),
@@ -44,6 +46,8 @@ const {
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   resetVideoRecordingStartSessionMock: vi.fn(),
   readStoredVideoPostRecordResultMock: vi.fn(),
+  acknowledgePendingVideoPostRecordResultMock: vi.fn(),
+  forgetCameraRecorderControlGrantMock: vi.fn(),
   setVideoRecordingIdMock: vi.fn(),
 }));
 
@@ -92,6 +96,13 @@ vi.mock('../../../storage/video/post-record-result', async (importOriginal) => (
   ...(await importOriginal<typeof import('../../../storage/video/post-record-result')>()),
   readStoredVideoPostRecordResult: readStoredVideoPostRecordResultMock,
 }));
+vi.mock('../../../storage/video/post-record-acknowledgement', () => ({
+  acknowledgePendingVideoPostRecordResult: acknowledgePendingVideoPostRecordResultMock,
+}));
+vi.mock('../runtime/camera-recorder-control', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../runtime/camera-recorder-control')>()),
+  forgetCameraRecorderControlGrant: forgetCameraRecorderControlGrantMock,
+}));
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { startRecording } from './start';
@@ -104,12 +115,14 @@ import {
 
 function resetStartRecordingTestState() {
   vi.clearAllMocks();
+  beginVideoRecordingPreparationMock.mockReset();
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'recording-1') });
   hasActiveVideoRecordingSessionMock.mockReturnValue(false);
   isVideoRecordingPreparationInProgressMock.mockReturnValue(false);
   initializeRecordingContextMock.mockResolvedValue(recordingContext);
   runCountdownMock.mockResolvedValue(true);
-  readStoredVideoPostRecordResultMock.mockResolvedValue(null);
+  readStoredVideoPostRecordResultMock.mockReset().mockResolvedValue(null);
+  acknowledgePendingVideoPostRecordResultMock.mockReset().mockResolvedValue('acknowledged');
   sendRuntimeMessageMock.mockImplementation((message: { type?: string }) =>
     Promise.resolve(
       message.type === VideoMessageType.OFFSCREEN_STOP_RECORDING ||
@@ -134,6 +147,129 @@ function startRecordingFromPopup(
 ) {
   return startRecording(17, settings, captureMode, nextViewportPresetId, ownerSenderUrl);
 }
+
+const savedResult = {
+  acknowledgedBy: null,
+  createdAt: 1,
+  expiresAt: null,
+  status: 'ready',
+  result: {
+    recordingId: 'previous-recording',
+    primaryRecordingId: 'previous-recording',
+    projectId: null,
+  },
+};
+
+describe('saved recording result admission', () => {
+  beforeEach(resetStartRecordingTestState);
+
+  it('closes only the saved result and accepts a new recording without a popup decision', async () => {
+    readStoredVideoPostRecordResultMock.mockResolvedValueOnce(savedResult);
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({
+      result: 'accepted',
+      recordingId: 'recording-1',
+    });
+    expect(acknowledgePendingVideoPostRecordResultMock).toHaveBeenCalledExactlyOnceWith(
+      'previous-recording'
+    );
+    expect(forgetCameraRecorderControlGrantMock).toHaveBeenCalledExactlyOnceWith(
+      'previous-recording'
+    );
+    expect(beginVideoRecordingPreparationMock).toHaveBeenCalledOnce();
+  });
+
+  it.each(['preparing', 'active'] as const)(
+    'does not acknowledge a saved result while %s recording exists',
+    async (phase) => {
+      readStoredVideoPostRecordResultMock.mockResolvedValue(savedResult);
+      if (phase === 'preparing') isVideoRecordingPreparationInProgressMock.mockReturnValue(true);
+      else hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+      await expect(startRecordingFromPopup()).resolves.toMatchObject({
+        result: phase === 'preparing' ? 'duplicate-preparing' : 'already-active',
+      });
+      expect(acknowledgePendingVideoPostRecordResultMock).not.toHaveBeenCalled();
+      expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps unfinished publication pending instead of auto-closing it', async () => {
+    readStoredVideoPostRecordResultMock.mockResolvedValue({ ...savedResult, status: 'staged' });
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({ result: 'failed' });
+    expect(acknowledgePendingVideoPostRecordResultMock).not.toHaveBeenCalled();
+    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves a saved result on acknowledgement failure and permits an explicit start retry', async () => {
+    readStoredVideoPostRecordResultMock
+      .mockResolvedValueOnce(savedResult)
+      .mockResolvedValueOnce(savedResult);
+    acknowledgePendingVideoPostRecordResultMock.mockRejectedValueOnce(
+      new Error('Storage refused acknowledgement')
+    );
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({
+      result: 'failed',
+      error: 'Storage refused acknowledgement',
+    });
+    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+    expect(forgetCameraRecorderControlGrantMock).not.toHaveBeenCalled();
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({ result: 'accepted' });
+  });
+
+  it('does not admit capture when an exact acknowledgement encounters a replacement result', async () => {
+    readStoredVideoPostRecordResultMock.mockResolvedValueOnce(savedResult).mockResolvedValueOnce({
+      ...savedResult,
+      result: { ...savedResult.result, recordingId: 'replacement' },
+    });
+    acknowledgePendingVideoPostRecordResultMock.mockResolvedValueOnce('stale');
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({ result: 'failed' });
+    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+    expect(forgetCameraRecorderControlGrantMock).not.toHaveBeenCalled();
+  });
+
+  it('allows one start when concurrent attempts resolve the same saved result', async () => {
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    readStoredVideoPostRecordResultMock.mockImplementation(async () => {
+      await gate;
+      return savedResult;
+    });
+    acknowledgePendingVideoPostRecordResultMock.mockImplementation(async () => {
+      readStoredVideoPostRecordResultMock.mockResolvedValue(null);
+      return 'acknowledged';
+    });
+    beginVideoRecordingPreparationMock.mockImplementation(() =>
+      isVideoRecordingPreparationInProgressMock.mockReturnValue(true)
+    );
+    const first = startRecordingFromPopup();
+    const second = startRecordingFromPopup();
+    finish();
+    const results = await Promise.all([first, second]);
+    expect(results.map((result) => result.result).sort()).toEqual([
+      'accepted',
+      'duplicate-preparing',
+    ]);
+    expect(beginVideoRecordingPreparationMock).toHaveBeenCalledOnce();
+  });
+
+  it('allows a start if the popup already cleared the exact saved result', async () => {
+    readStoredVideoPostRecordResultMock.mockResolvedValueOnce(savedResult);
+    acknowledgePendingVideoPostRecordResultMock.mockResolvedValueOnce('stale');
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({ result: 'accepted' });
+    expect(forgetCameraRecorderControlGrantMock).not.toHaveBeenCalled();
+  });
+
+  it('rechecks active recording admission after asynchronous acknowledgement', async () => {
+    readStoredVideoPostRecordResultMock.mockResolvedValueOnce(savedResult);
+    acknowledgePendingVideoPostRecordResultMock.mockImplementationOnce(async () => {
+      hasActiveVideoRecordingSessionMock.mockReturnValue(true);
+      return 'acknowledged';
+    });
+    await expect(startRecordingFromPopup()).resolves.toMatchObject({ result: 'already-active' });
+    expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
+  });
+});
 
 function expectFullStartRollback() {
   expect(completionBoundary.rollback).toHaveBeenCalledWith('recording-1');
