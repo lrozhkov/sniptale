@@ -3,6 +3,48 @@ import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { evaluateInTarget } from '../support/recording-action';
 
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`reset icon follows toolbar mode ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await popup.evaluate(
+        async (theme) => {
+          await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+        },
+        size.width === 1920 ? 'dark' : 'light'
+      );
+      const reset = page.locator('[data-ui="content.toolbar.reset-all-button"]');
+      for (const mode of [
+        'cursor',
+        'drawing',
+        'highlighter',
+        'quick-edit',
+        'design-review',
+        'cursor',
+      ]) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        const icon = mode === 'cursor' ? 'rotate-ccw' : 'brush-cleaning';
+        await expect(reset.locator(`svg.lucide-${icon}`)).toBeVisible();
+        await expect(reset.locator('svg')).toHaveCount(1);
+        await expect(reset.locator('svg')).toHaveAttribute('width', '18');
+        await page.screenshot({
+          path: info.outputPath(`reset-${mode}.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+      }
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
+
 for (const theme of ['light', 'dark'] as const) {
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`design review export compact controls ${theme} ${viewport.name}`, async ({

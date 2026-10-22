@@ -189,7 +189,9 @@ it.each([
 ] as const)('confirms only the advertised %s scope', (resetScope, message, label) => {
   render();
   act(() => root?.render(<Harness resetScope={resetScope} />));
-  expect(trigger().querySelector('svg.lucide-brush-cleaning')).not.toBeNull();
+  const icon = resetScope === 'all' ? 'rotate-ccw' : 'brush-cleaning';
+  expect(trigger().querySelector(`svg.lucide-${icon}`)).not.toBeNull();
+  expect(trigger().querySelectorAll('svg')).toHaveLength(1);
   expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('18');
   expect(trigger().getAttribute('aria-label')).toBe(`content.toolbar.${label}`);
   expect(trigger().title).toBe(`content.toolbar.${label}`);

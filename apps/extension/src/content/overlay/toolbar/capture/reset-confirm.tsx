@@ -1,6 +1,6 @@
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { BrushCleaning } from 'lucide-react';
+import { BrushCleaning, RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -46,6 +46,7 @@ export function ToolbarResetConfirmControl(props: {
   const titleId = useId();
   const messageId = useId();
   const actionLabel = translate(RESET_LABELS[props.scope ?? 'all']);
+  const ResetIcon = (props.scope ?? 'all') === 'all' ? RotateCcw : BrushCleaning;
   const { closeMenu, toggleMenu, activeMenuType } = props.toolbarMenuState;
   const open = props.available && activeMenuType === 'reset-confirm';
   const close = useCallback(() => closeMenu('reset-confirm'), [closeMenu]);
@@ -103,7 +104,7 @@ export function ToolbarResetConfirmControl(props: {
           toggleMenu('reset-confirm');
         }}
       >
-        <BrushCleaning size={18} strokeWidth={2} />
+        <ResetIcon size={18} strokeWidth={2} />
       </ContentToolbarButton>
       {open ? (
         <ProductToolbarMenu
