@@ -9,7 +9,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
-import { chooseInspectorValue } from '../support/inspector-utilities';
+import { checkInspectorPaintedFont, chooseInspectorValue } from '../support/inspector-utilities';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import {
@@ -77,17 +77,57 @@ async function readGalleryPixels(
 }
 
 for (const variant of [
-  { type: 'dissolve', format: 'WEBM', viewport: PRIMARY_BROWSER_VIEWPORTS[0]!, inactive: false },
-  { type: 'dissolve', format: 'WEBM', viewport: PRIMARY_BROWSER_VIEWPORTS[0]!, inactive: true },
-  { type: 'fade-black', format: 'MP4', viewport: PRIMARY_BROWSER_VIEWPORTS[1]!, inactive: false },
-  { type: 'fade-black', format: 'MP4', viewport: PRIMARY_BROWSER_VIEWPORTS[1]!, inactive: true },
+  {
+    type: 'dissolve',
+    format: 'WEBM',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
+    inactive: false,
+    imageEdges: false,
+  },
+  {
+    type: 'dissolve',
+    format: 'WEBM',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
+    inactive: true,
+    imageEdges: false,
+  },
+  {
+    type: 'fade-black',
+    format: 'MP4',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    inactive: false,
+    imageEdges: false,
+  },
+  {
+    type: 'fade-black',
+    format: 'MP4',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    inactive: true,
+    imageEdges: false,
+  },
+  {
+    type: 'dissolve',
+    format: 'WEBM',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
+    inactive: false,
+    imageEdges: true,
+  },
+  {
+    type: 'fade-black',
+    format: 'MP4',
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    inactive: false,
+    imageEdges: true,
+  },
 ] as const) {
-  test(`Gallery cut VFR pixels survive Native transfer and real ${variant.format} export ${variant.type}${variant.inactive ? ' retained edge-adjacent' : ''}`, async ({
+  test(`Gallery cut VFR pixels survive Native transfer and real ${variant.format} export ${variant.type}${variant.inactive ? ' retained edge-adjacent' : ''}${variant.imageEdges ? ' fractional-image-edges' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(180000);
     page.setDefaultTimeout(10000);
     await page.setViewportSize({ ...variant.viewport.size });
+    const theme = variant.imageEdges && variant.format === 'MP4' ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
     const host = await startHostServer();
     try {
       const fixture = await readFile(new URL('../fixtures/review-cut-vfr.webm', import.meta.url));
@@ -113,9 +153,10 @@ for (const variant of [
       }
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
-        storage: { 'sniptale-locale-preference': 'en' },
+        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': theme },
       });
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
       await page.reload();
@@ -173,6 +214,86 @@ for (const variant of [
         await total.fill('1');
         await total.press('Tab');
       }
+      if (variant.imageEdges) {
+        await button('gallery.videoReview.scene').click();
+        const presentation = dialog.locator(
+          '[data-ui="gallery.videoReview.presentationInspector"]'
+        );
+        for (const side of ['intro', 'outro'] as const) {
+          const section = presentation.locator(
+            `section[aria-label="${label(
+              side === 'intro'
+                ? 'gallery.videoReview.presentationIntro'
+                : 'gallery.videoReview.presentationOutro'
+            )}"]`
+          );
+          await section
+            .getByRole('button', {
+              name: label('gallery.videoReview.presentationBookend'),
+              exact: true,
+            })
+            .click();
+          const chooser = page.waitForEvent('filechooser');
+          await section
+            .getByRole('button', {
+              name: label('gallery.videoReview.presentationComputer'),
+              exact: true,
+            })
+            .click();
+          const png = await page.evaluate(() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 16;
+            const context = canvas.getContext('2d')!;
+            context.fillStyle = '#ff0000';
+            context.fillRect(0, 0, 32, 16);
+            return canvas.toDataURL('image/png').split(',')[1]!;
+          });
+          await (
+            await chooser
+          ).setFiles({
+            name: `${side}-card.png`,
+            mimeType: 'image/png',
+            buffer: Buffer.from(png, 'base64'),
+          });
+          await expect(presentation).toHaveAttribute('aria-busy', 'false');
+          const duration = section
+            .locator('[data-ui="shared.ui.presentation-media-fields"]')
+            .getByRole('textbox', {
+              name: label('gallery.videoReview.presentationDuration'),
+              exact: true,
+            });
+          await duration.fill('0.15');
+          await duration.press('Enter');
+          await expect(section.locator('[data-out-of-scale="true"]')).toHaveCount(0);
+          await duration.focus();
+          await checkInspectorPaintedFont(page, duration, 'numeric');
+          await duration.press('Tab');
+          await duration.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: info.outputPath(`fractional-gallery-${side}.png`),
+            fullPage: false,
+          });
+          await chooseInspectorValue(
+            page,
+            section,
+            label(
+              side === 'intro'
+                ? 'gallery.videoReview.presentationJoinIntro'
+                : 'gallery.videoReview.presentationJoinOutro'
+            ),
+            label(
+              variant.type === 'dissolve'
+                ? 'gallery.videoReview.cutDissolve'
+                : 'gallery.videoReview.cutFadeColor'
+            )
+          );
+        }
+        await page.screenshot({
+          path: info.outputPath('fractional-gallery-cards.png'),
+          fullPage: false,
+        });
+      }
       await button('gallery.videoReview.pointerTool').click();
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await chooseInspectorValue(
@@ -196,7 +317,9 @@ for (const variant of [
       await download.saveAs(referencePath);
       const times = (
         variant.inactive ? [0, 0.3, 1.5, 1.8, 2, 3.3] : [1.5, 1.7, 1.9, 2, 2.1, 2.3, 74 / 30]
-      ).map((time) => time + 0.001);
+      ).map((time) => time + (variant.imageEdges ? 5 / 30 : 0) + 0.001);
+      if (variant.imageEdges)
+        times.push(0.001, 4 / 30 + 0.001, 5 / 30 + 0.001, 125 / 30 + 0.001, 128 / 30 + 0.001);
       const gallery = await readGalleryPixels(
         page,
         (await readFile(referencePath)).toString('base64'),
@@ -206,7 +329,12 @@ for (const variant of [
       await writeFile(info.outputPath('gallery-cut-pixels.json'), JSON.stringify(gallery, null, 2));
       // Red also exists in retained moving frames. The endpoint window begins with blue at1.8.
       for (const sample of gallery.samples)
-        if (!variant.inactive && sample.mediaTime >= 1.8) expect(sample.pixel[0]).toBeLessThan(15);
+        if (
+          !variant.inactive &&
+          sample.mediaTime >= 1.8 + (variant.imageEdges ? 5 / 30 : 0) &&
+          sample.mediaTime < (variant.imageEdges ? 125 / 30 : 4)
+        )
+          expect(sample.pixel[0]).toBeLessThan(15);
       await dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
       await expect
         .poll(
@@ -215,16 +343,58 @@ for (const variant of [
         )
         .toBe(1);
       const tab = (await page.evaluate(() => window.__sniptaleHarness?.getCreatedTabs() ?? []))[0]!;
-      await page.goto(
-        `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${new URL(tab.url!).searchParams}`
-      );
+      const nativeQuery = new URL(tab.url!).searchParams;
+      nativeQuery.set('theme', theme);
+      await page.goto(`${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?${nativeQuery}`);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await page.locator('[data-ui="video-editor.timeline.surface"]').waitFor();
       let native = (await readNativeVideoProject(page))!;
       expect(native.compositionJoins?.[0]).toMatchObject({
         sampling: 'cut',
         transition: { type: variant.type },
       });
-      expect(native.duration).toBeCloseTo(variant.inactive ? 3.6 : 4, 5);
+      expect(native.duration).toBeCloseTo(variant.inactive ? 3.6 : variant.imageEdges ? 4.3 : 4, 5);
+      if (variant.imageEdges) {
+        expect(native.bookendPresets?.intro.image?.duration).toBe(0.15);
+        expect(native.bookendPresets?.outro.image?.duration).toBe(0.15);
+        const intro = native.clips.find(({ id }) => id === `${native.id}:bookend:intro:media`)!;
+        const outro = native.clips.find(({ id }) => id === `${native.id}:bookend:outro:media`)!;
+        expect(intro).toMatchObject({ type: 'IMAGE', startTime: 0, duration: 5 / 30 });
+        expect(outro.type).toBe('IMAGE');
+        expect(outro.startTime).toBeCloseTo(125 / 30, 12);
+        expect(outro.duration).toBeCloseTo(4.3 - 125 / 30, 12);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.fit-project"]').click();
+        await page.locator(`[data-project-timeline-clip="${intro.id}"]`).click();
+        await page
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupTransform'),
+            exact: true,
+          })
+          .click();
+        const rotation = page.getByRole('textbox', {
+          name: label('videoEditor.sidebar.rotationLabel'),
+          exact: true,
+        });
+        await rotation.fill('5');
+        await rotation.press('Enter');
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.clips.find(({ id }) => id === intro.id)
+                ?.transform.rotation
+          )
+          .toBe(5);
+        await checkInspectorPaintedFont(page, rotation, 'numeric');
+        await page.screenshot({
+          path: info.outputPath('fractional-native-card-inspector.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.clips)
+          .toEqual(hydrateVideoProject(native).clips);
+        native = (await readNativeVideoProject(page))!;
+      }
       if (variant.inactive) {
         const workspace = (await readNativeReviewWorkspace(page, 'recording:beta-v1-recording'))!;
         const cuts = inspectVideoWorkspace(workspace).document!.edits.filter(
@@ -318,7 +488,7 @@ for (const variant of [
         ...(variant.format === 'MP4' ? { mp4VideoCodec: 'VP9' } : { webmVideoCodec: 'VP9' }),
       } as const;
 
-      if (!variant.inactive) {
+      if (!variant.inactive && !variant.imageEdges) {
         const originalNative = native;
         const outgoing = native.clips.find(
           (clip) => clip.type === 'VIDEO' && clip.startTime === 0
@@ -369,7 +539,7 @@ for (const variant of [
         try {
           await applyHarnessBootstrap(worker, {
             preserveMediaLibrary: true,
-            storage: { 'sniptale-locale-preference': 'en' },
+            storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': theme },
           });
           const modified = await encodedNativeVideoSamples(
             worker,
@@ -441,7 +611,12 @@ for (const variant of [
           sample.error,
           JSON.stringify({ native: sample, gallery: gallery.samples[index] })
         ).toBeLessThanOrEqual(12);
-        if (!variant.inactive && sample.mediaTime >= 1.8) expect(sample.pixel[0]).toBeLessThan(15);
+        if (
+          !variant.inactive &&
+          sample.mediaTime >= 1.8 + (variant.imageEdges ? 5 / 30 : 0) &&
+          sample.mediaTime < (variant.imageEdges ? 125 / 30 : 4)
+        )
+          expect(sample.pixel[0]).toBeLessThan(15);
         if (variant.inactive && index === gallery.samples.length - 1) {
           const reference = gallery.samples[index]!;
           expect(reference.mediaTime).toBeCloseTo(3.3, 6);

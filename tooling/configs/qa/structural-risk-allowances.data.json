@@ -2269,17 +2269,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/review/project-presentation.ts",
-      "symbol": "planReviewProjectPresentation",
-      "owner": "review:presentation-conversion",
-      "reason": "tool-noise: This pure operation admits and materializes one detached presentation candidate. Its branches reject incompatible resource or timing input and assemble existing clips, presets and edge fields. It has no effect, state or recovery authority, one owner and cohesion1. Independent helpers already own media admission, insertion and join verification. Further forwarding would distribute this decision.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "4680ca8090efc89dfaaf130f7e3325f667bbc40f1bab5788190d2530908918c2",
-      "signatureHash": "dca6a94e45b1c026177f33861f6273f3a2b3d6e73b74254a897912f494af4c75"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
       "symbol": "createProjectExportCompositionJoinRenderer",
       "owner": "extension:offscreen:project-export",

@@ -5,6 +5,10 @@ import { hydrateVideoProject } from '../project/hydration';
 import { isExportReadyVideoProject } from '../project/validation/root';
 import { resolveVideoProjectCompositionJoinPlans } from '../project/scene/joins';
 import { getProjectAssetUseCounts } from '../project/media-usage';
+import { getClipAudioGain } from '../project/timeline/presentation.gain';
+import { getMediaClipSourceTime } from '../project/timeline/rate';
+import { calculateProjectDuration, isClipActiveAtTime } from '../project/timeline/basics';
+import { planReviewPresentationSequence } from './presentation-sequence';
 import {
   createBookendImagePresentation,
   createBookendVideoPresentation,
@@ -202,6 +206,106 @@ it('refuses a nonaligned video boundary instead of retiming its source or losing
   const settings = input.document.advancedContent.presentation!;
   settings.intro = { ...settings.intro, mode: 'video', video: settings.intro.video! };
   settings.intro.video.trim.end = 1.15;
+  const before = structuredClone(input);
+  expect(planReviewProjectConversion(input)).toEqual({
+    status: 'blocked',
+    issues: [{ kind: 'unmapped-content', field: 'presentation-timing' }],
+  });
+  expect(input).toEqual(before);
+});
+
+it('retains authored transition portions when a short card already fits the frame lattice', () => {
+  const input = bookendFixture();
+  const settings = input.document.advancedContent.presentation!;
+  settings.intro.image!.duration = 0.1;
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(
+    result.project.compositionJoins?.find(
+      ({ id }) => id === `${result.project.id}:bookend:intro:join`
+    )?.transition
+  ).toEqual(settings.introTransition);
+  expect(
+    result.project.compositionJoins?.find(
+      ({ id }) => id === `${result.project.id}:bookend:outro:join`
+    )?.transition
+  ).toEqual(settings.outroTransition);
+});
+
+it.each([24, 30, 60])(
+  'places fractional image cards at %sfps without changing main clocks',
+  (fps) => {
+    const input = bookendFixture();
+    input.seed.fps = fps;
+    const settings = input.document.advancedContent.presentation!;
+    const duration = fps === 60 ? 0.145 : 0.15;
+    settings.intro.image!.duration = duration;
+    settings.outro = { ...settings.outro, mode: 'image', image: { ...settings.intro.image! } };
+    const original = structuredClone(input);
+    const baselineInput = structuredClone(input);
+    delete baselineInput.document.advancedContent.presentation;
+    baselineInput.bookendAssets = [];
+    const baseline = planReviewProjectConversion(baselineInput);
+    const result = planReviewProjectConversion(input);
+    if (result.status !== 'prepared' || baseline.status !== 'prepared')
+      throw new Error(JSON.stringify(result));
+    const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
+    const offset = Math.round(duration * fps) / fps;
+    expect(project.duration).toBeCloseTo(7 + 2 * duration, 12);
+    expect(calculateProjectDuration(project)).toBeCloseTo(project.duration, 12);
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    expect(project.bookendPresets?.intro.image?.duration).toBe(duration);
+    expect(project.bookendPresets?.outro.image?.duration).toBe(duration);
+    const intro = project.clips.find(({ id }) => id === `${project.id}:bookend:intro:media`)!;
+    const outro = project.clips.find(({ id }) => id === `${project.id}:bookend:outro:media`)!;
+    expect(intro.duration).toBe(offset);
+    expect(outro.startTime).toBe(7 + offset);
+    expect(outro.startTime + outro.duration).toBeCloseTo(project.duration, 12);
+    for (const clip of hydrateVideoProject(baseline.project).clips) {
+      const moved = project.clips.find(({ id }) => id === clip.id)!;
+      expect(moved).toEqual({ ...clip, startTime: clip.startTime + offset });
+      if (moved.type === 'VIDEO' && clip.type === 'VIDEO') {
+        expect(getMediaClipSourceTime(moved, moved.startTime + 0.2)).toBeCloseTo(
+          getMediaClipSourceTime(clip, clip.startTime + 0.2),
+          12
+        );
+      }
+      expect(getClipAudioGain(moved, moved.startTime + 0.2)).toBeCloseTo(
+        getClipAudioGain(clip, clip.startTime + 0.2),
+        12
+      );
+    }
+    const sequence = planReviewPresentationSequence({
+      settings,
+      mainDuration: 7,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator: fps, denominator: 1 },
+    });
+    if (!sequence.ok) throw new Error('Missing Gallery sequence');
+    for (let tick = 0; tick < sequence.plan.candidateCount; tick++) {
+      const time = tick / fps;
+      const expected = sequence.plan.segments.find(
+        (segment) => tick >= segment.startTick && tick < segment.endTick
+      )!;
+      if (expected.name === 'intro') expect(isClipActiveAtTime(intro, time)).toBe(true);
+      else if (expected.name === 'outro') expect(isClipActiveAtTime(outro, time)).toBe(true);
+      else {
+        expect(isClipActiveAtTime(intro, time)).toBe(false);
+        expect(isClipActiveAtTime(outro, time)).toBe(false);
+      }
+    }
+    expect(input).toEqual(original);
+  }
+);
+
+it('still refuses image cards when their main slot needs a different content duration', () => {
+  const input = bookendFixture();
+  input.document.edits[0]!.end = 3.87;
+  input.document.edits[0]!.requestedEnd = 3.87;
+  const settings = input.document.advancedContent.presentation!;
+  settings.intro.image!.duration = 0.15;
+  settings.outro = { ...settings.outro, mode: 'image', image: { ...settings.intro.image! } };
   const before = structuredClone(input);
   expect(planReviewProjectConversion(input)).toEqual({
     status: 'blocked',

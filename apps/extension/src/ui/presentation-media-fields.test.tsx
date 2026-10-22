@@ -117,3 +117,29 @@ it('groups video bounds and sound, retains gain on mute, and accepts Native sour
   expect(host.querySelector('[role="switch"]')).toBeNull();
   expect(host.textContent).not.toContain('gallery.videoReview.presentationVolume');
 });
+
+it.each([0.1, 0.15, 0.99])(
+  'keeps an accepted short card duration %s inside its slider',
+  (duration) => {
+    const change = vi.fn();
+    act(() =>
+      root.render(
+        <PresentationMediaFields
+          kind="image"
+          value={{ ...createBookendImagePresentation(), duration }}
+          Details={Details}
+          preferenceId="intro"
+          onChange={change}
+          onPreview={vi.fn()}
+        />
+      )
+    );
+    const input = host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.presentationDuration"]'
+    )!;
+    expect(input.value).toBe(String(duration));
+    expect(host.querySelector('[data-out-of-scale="true"]')).toBeNull();
+    expect(host.textContent).not.toContain('shared.ui.numericOutsideSliderRange');
+    expect(change).not.toHaveBeenCalled();
+  }
+);

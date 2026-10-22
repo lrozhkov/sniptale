@@ -1,3 +1,4 @@
+import type { CompositionJoinSettings } from '../project/scene/composition-join';
 import { calculateProjectDuration } from '../project/timeline/basics';
 import { resolveVideoProjectCompositionJoinPlans } from '../project/scene/joins';
 import type { ReviewSource } from './types';
@@ -160,7 +161,8 @@ function presetSlot(
 function insertBookend(
   project: VideoProject,
   side: 'intro' | 'outro',
-  preset: Exclude<VideoProjectBookendPreset, { mode: 'none' }>
+  preset: Exclude<VideoProjectBookendPreset, { mode: 'none' }>,
+  placement: { start: number; duration: number; transition?: CompositionJoinSettings }
 ): VideoProject | null {
   const prefix = `${project.id}:bookend:${side}`;
   const asset = project.assets.find(
@@ -174,11 +176,9 @@ function insertBookend(
     ),
     id: `${prefix}:track`,
   };
-  const start = side === 'intro' ? 0 : project.duration;
+  const start = placement.start;
   const duration =
-    preset.mode === 'image'
-      ? preset.image.duration
-      : preset.video.trim.end - preset.video.trim.start;
+    preset.mode === 'image' ? placement.duration : preset.video.trim.end - preset.video.trim.start;
   const raw = createVideoClipFromAsset(track.id, asset, project.width, project.height, start, {
     groupId: prefix,
     muted: true,
@@ -219,19 +219,29 @@ function insertBookend(
     { ...project, tracks: [...project.tracks, ...tracks] },
     clips,
     media.id,
-    preset
+    preset.mode === 'image' ? { ...preset, image: { ...preset.image, duration } } : preset
   );
   if (!styled) return null;
   const fillTrack = { ...styled.track, id: `${prefix}:fill-track` };
   const composition = side === 'intro' ? prefixVideoProjectComposition(project, duration) : project;
   if (!composition) return null;
-  const transition =
+  const authoredTransition =
     side === 'intro'
       ? project.bookendPresets?.introTransition
       : project.bookendPresets?.outroTransition;
+  const adjustedImage =
+    preset.mode === 'image' && Math.abs(duration - preset.image.duration) > 0.000001;
+  const transition =
+    adjustedImage && authoredTransition && placement.transition
+      ? {
+          ...authoredTransition,
+          before: placement.transition.before,
+          after: placement.transition.after,
+        }
+      : authoredTransition;
   return {
     ...composition,
-    duration: project.duration + duration,
+    duration: side === 'intro' ? project.duration + duration : start + duration,
     tracks: [...composition.tracks, ...tracks, fillTrack],
     clips: [
       ...composition.clips,
@@ -292,6 +302,47 @@ function preservesJoinTiming(
   }
 }
 
+/** Static slots can absorb lattice rounding; media and main clocks must retain their span. */
+function sequencePlacements(sequence: PresentationSequencePlan) {
+  const fps = sequence.rate.numerator / sequence.rate.denominator;
+  const placements = new Map<
+    string,
+    { start: number; duration: number; transition?: CompositionJoinSettings }
+  >();
+  for (const segment of sequence.segments) {
+    // Native samples exact ticks. Rounded microseconds can put the first sample before a clip.
+    const start = segment.startTick / fps;
+    const end =
+      segment.endUs === sequence.totalDurationUs
+        ? sequence.totalDurationUs / 1_000_000
+        : segment.endTick / fps;
+    const duration = end - start;
+    if (
+      duration <= 0 ||
+      (segment.content.kind !== 'image' && Math.abs(duration - segment.contentDuration) > 0.000001)
+    )
+      return null;
+    const seam = segment.name === 'intro' ? segment.endUs : segment.startUs;
+    const join =
+      segment.name === 'main' ? undefined : sequence.joins?.find(({ seamUs }) => seamUs === seam);
+    placements.set(segment.name, {
+      start,
+      duration,
+      ...(join
+        ? {
+            transition: {
+              type: join.type,
+              color: join.color,
+              before: join.beforeUs / 1_000_000,
+              after: join.afterUs / 1_000_000,
+            },
+          }
+        : {}),
+    });
+  }
+  return placements;
+}
+
 /** Materializes supported bookends with existing clips, prefixes and scene-edge fields. */
 export function planReviewProjectPresentation(args: {
   project: VideoProject;
@@ -316,19 +367,8 @@ export function planReviewProjectPresentation(args: {
   });
   if (!sequence.ok) return { status: 'blocked', field: 'presentation-timing' };
   const active = applied && (resolved.intro.mode !== 'none' || resolved.outro.mode !== 'none');
-  let end = 0;
-  if (
-    active &&
-    sequence.plan.segments.some((segment) => {
-      const start = end;
-      end += segment.contentDuration;
-      return (
-        Math.abs(segment.startUs / 1_000_000 - start) > 0.000001 ||
-        Math.abs(segment.endUs / 1_000_000 - end) > 0.000001
-      );
-    })
-  )
-    return { status: 'blocked', field: 'presentation-timing' };
+  const placements = sequencePlacements(sequence.plan);
+  if (active && !placements) return { status: 'blocked', field: 'presentation-timing' };
   if (active && calculateProjectDuration(args.project) > args.project.duration + 0.000001)
     return { status: 'blocked', field: 'presentation-overlays' };
   const independent = settings.introControl !== undefined || settings.outroControl !== undefined;
@@ -380,7 +420,9 @@ export function planReviewProjectPresentation(args: {
   for (const side of ['intro', 'outro'] as const) {
     const preset = project.bookendPresets?.[side];
     if (!applied || resolved[side].mode === 'none' || !preset || preset.mode === 'none') continue;
-    const inserted = insertBookend(project, side, preset);
+    const placement = placements?.get(side);
+    if (!placement) return { status: 'blocked', field: 'presentation-timing' };
+    const inserted = insertBookend(project, side, preset, placement);
     if (!inserted) return { status: 'blocked', field: 'presentation-timing' };
     project = inserted;
   }

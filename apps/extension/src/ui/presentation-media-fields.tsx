@@ -100,7 +100,7 @@ export function PresentationMediaFields(props: Props) {
           0.1,
           (duration) => ({ duration }),
           's',
-          { min: 1, max: 10 }
+          { min: 0.1, max: 10 }
         )}
       {props.kind === 'video' && (
         <>
