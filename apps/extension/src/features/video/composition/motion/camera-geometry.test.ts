@@ -1,3 +1,6 @@
+import { createWindowCameraLinkGeometry } from './window-camera-geometry';
+import { motionWindowFocusToComposition } from './source-window';
+import { mapCompositionPointThroughCamera } from './index';
 import { resolveProjectCursorCameraPlan } from './project-follow';
 import { motionCameraProjection } from './spatial';
 import { projectQuickEditPoint } from './spatial-geometry';
@@ -10,6 +13,7 @@ import {
   VideoMediaFitMode,
   VideoMotionFocusMode,
   VideoTemporalEasing,
+  VideoTransitionKind,
 } from '../../project/types';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import { createProjectWorkingZoneCameraGeometry } from './camera-geometry';
@@ -606,4 +610,295 @@ it('admits a real perspective CURSOR plan and keeps the rendered observation vis
   }
   expect(resolveProjectCursorCameraPlan(project, region)).toBe(plan);
   expect(project).toEqual(before);
+});
+
+it.each(
+  Object.values(VideoTransitionKind).flatMap((kind) =>
+    (['LINEAR', 'EASE_IN_OUT'] as const).flatMap((easing) =>
+      [false, true].map((trailing) => [kind, easing, trailing] as const)
+    )
+  )
+)(
+  'bounds the source-window affine during %s with %s easing and trailing=%s',
+  (kind, easing, trailing) => {
+    const { project, region, policy } = fixture();
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing source');
+    clip.transform.rotation = 30;
+    if (trailing) {
+      project.clips = [
+        { ...clip, id: 'previous-video', sourceInstanceId: 'previous-instance' },
+        clip,
+      ];
+      clip.startTime = 2;
+    } else {
+      project.clips.push({
+        ...clip,
+        id: 'next-video',
+        startTime: 2,
+        sourceInstanceId: 'next-instance',
+      });
+    }
+    project.duration = 5;
+    project.transitions = [
+      {
+        id: 'moving-source',
+        leadingClipId: trailing ? 'previous-video' : clip.id,
+        trailingClipId: trailing ? clip.id : 'next-video',
+        kind,
+        duration: 1,
+        intensity: 'BOLD',
+        easing,
+        direction: 'RIGHT',
+      },
+    ];
+    const selected = {
+      ...region,
+      startTime: clip.startTime,
+      focusPoint: { x: 50, y: 50 },
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+      phaseTransitions: { enter: 'none' as const, exit: 'none' as const },
+      sourceBinding: {
+        clipId: clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.motionRegions = [selected];
+    const before = structuredClone(project);
+    const geometry = createProjectWorkingZoneCameraGeometry({
+      project,
+      region: selected,
+      policy,
+      connectedIn: false,
+      connectedOut: false,
+      bindings: new Map([['source', { focusClipId: clip.id, actualClipId: clip.id }]]),
+    });
+    const point = { x: 0.6, y: 0.4 };
+    for (const time of [2.01, 2.25, 2.5, 2.75, 2.9, 2.95, 2.99]) {
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const physical = motionWindowFocusToComposition(
+        project,
+        selected,
+        { x: point.x * project.width, y: point.y * project.height },
+        time
+      );
+      const pixel = mapCompositionPointThroughCamera(physical, camera)!;
+      const clearance = Math.min(
+        pixel.x,
+        pixel.y,
+        project.width - pixel.x,
+        project.height - pixel.y
+      );
+      const bounds = geometry.clearanceBounds({
+        start: time,
+        end: time,
+        segmentId: 'source',
+        targetScale: 2,
+        pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+        actual: { from: point, to: point },
+      })!;
+      expect(bounds.viewport!.low).toBeLessThanOrEqual(clearance + 1e-6);
+      expect(bounds.viewport!.high).toBeGreaterThanOrEqual(clearance - 1e-6);
+    }
+    const edges = [...new Set(geometry.breaks.filter((time) => time >= 2 && time <= 3))].sort(
+      (a, b) => a - b
+    );
+    for (let index = 0; index < edges.length - 1; index++) {
+      const start = edges[index]!,
+        end = edges[index + 1]!;
+      const bounds = geometry.clearanceBounds({
+        start,
+        end,
+        segmentId: 'source',
+        targetScale: 2,
+        pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+        actual: { from: point, to: point },
+      })!;
+      expect(bounds).not.toBeNull();
+      for (let sample = 0; sample <= 12; sample++) {
+        const time = start + ((end - start) * sample) / 12;
+        if (!trailing && time >= 3) continue;
+        const camera = resolveVideoCompositionCamera({
+          project,
+          currentTime: time,
+          actions: [],
+          cursorSample: null,
+        });
+        const physical = motionWindowFocusToComposition(
+          project,
+          selected,
+          { x: point.x * project.width, y: point.y * project.height },
+          time
+        );
+        const pixel = mapCompositionPointThroughCamera(physical, camera)!;
+        const clearance = Math.min(
+          pixel.x,
+          pixel.y,
+          project.width - pixel.x,
+          project.height - pixel.y
+        );
+        expect(clearance).toBeGreaterThanOrEqual(bounds.viewport!.low - 1e-6);
+        expect(clearance).toBeLessThanOrEqual(bounds.viewport!.high + 1e-6);
+      }
+    }
+    expect(project).toEqual(before);
+  }
+);
+
+it.each(
+  (['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const).flatMap((type) =>
+    [false, true].map((exiting) => [type, exiting] as const)
+  )
+)('matches source-window %s phase and exact boundaries with exiting=%s', (type, exiting) => {
+  const { project, region, policy } = fixture();
+  const selected: VideoProjectMotionRegion = {
+    ...region,
+    focusPoint: { x: 50, y: 50 },
+    zoomInDuration: 1,
+    zoomOutDuration: 1,
+    phaseTransitions: { enter: exiting ? 'none' : type, exit: exiting ? type : 'none' },
+    sourceBinding: {
+      clipId: project.clips[0]!.id,
+      coordinateSpace: 'source-window',
+      sourceStart: 0,
+      sourceEnd: 3,
+      animation: { start: 0, end: 3, duration: 3 },
+    },
+  };
+  project.motionRegions = [selected];
+  const before = structuredClone(project);
+  const geometry = createProjectWorkingZoneCameraGeometry({
+    project,
+    region: selected,
+    policy,
+    connectedIn: false,
+    connectedOut: false,
+    bindings: new Map(),
+  });
+  const point = { x: 0.58, y: 0.5 };
+  const edge = exiting ? 2 : 0;
+  for (const offset of [-0.000001, 0, 0.000001, 0.1, 0.5, 0.999999, 1]) {
+    const time = edge + offset;
+    if (time < 0 || time >= 3) continue;
+    const camera = resolveVideoCompositionCamera({
+      project,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+    const pixel = mapCompositionPointThroughCamera({ x: point.x * 100, y: point.y * 100 }, camera)!;
+    const clearance = Math.min(pixel.x, pixel.y, 100 - pixel.x, 100 - pixel.y);
+    const bounds = geometry.clearanceBounds({
+      start: time,
+      end: time,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+      actual: { from: point, to: point },
+    })!;
+    expect(bounds.viewport!.low).toBeCloseTo(clearance, 7);
+    expect(bounds.viewport!.high).toBeCloseTo(clearance, 7);
+  }
+  if (type === 'instant') {
+    expect(geometry.breaks).toContain(edge);
+    expect(geometry.discontinuities?.(2)).toContain(edge);
+    const interval = geometry.clearanceBounds({
+      start: edge,
+      end: edge + 0.000001,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 50, maxX: 50, minY: 50, maxY: 50 },
+      actual: { from: point, to: point },
+    })!;
+    for (const time of [edge, edge + 0.000001]) {
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const pixel = mapCompositionPointThroughCamera({ x: 58, y: 50 }, camera)!;
+      const clearance = Math.min(pixel.x, pixel.y, 100 - pixel.x, 100 - pixel.y);
+      expect(interval.viewport!.low).toBeLessThanOrEqual(clearance + 1e-7);
+      expect(interval.viewport!.high).toBeGreaterThanOrEqual(clearance - 1e-7);
+    }
+  }
+  expect(project).toEqual(before);
+});
+
+it('matches source-window ease-out connection bounds to the rendered connection', () => {
+  const { project, region, policy } = fixture();
+  const source: VideoProjectMotionRegion = {
+    ...region,
+    id: 'from',
+    duration: 0.5,
+    scale: 1,
+    focusPoint: { x: 50, y: 50 },
+    phaseTransitions: { enter: 'none', exit: 'none' },
+    sourceBinding: {
+      clipId: project.clips[0]!.id,
+      coordinateSpace: 'source-window',
+      sourceStart: 0,
+      sourceEnd: 0.5,
+      animation: { start: 0, end: 0.5, duration: 0.5 },
+    },
+  };
+  const destination: VideoProjectMotionRegion = {
+    ...region,
+    id: 'to',
+    startTime: 2,
+    duration: 1,
+    focusPoint: { x: 40, y: 40 },
+    phaseTransitions: { enter: 'none', exit: 'none' },
+    incomingConnection: { fromRegionId: source.id, easing: VideoTemporalEasing.EASE_OUT },
+    sourceBinding: {
+      clipId: project.clips[0]!.id,
+      coordinateSpace: 'source-window',
+      sourceStart: 2,
+      sourceEnd: 3,
+      animation: { start: 0, end: 1, duration: 1 },
+    },
+  };
+  project.motionRegions = [source, destination];
+  const { geometry } = createWindowCameraLinkGeometry({
+    output: { width: 100, height: 100 },
+    window: { x: 0, y: 0, width: 100, height: 100 },
+    video: { x: 0, y: 0, width: 100, height: 100 },
+    cornerRadius: 0,
+    windowWeight: 'window',
+    type: 'ease-out',
+    from: { end: 0.5, scale: 1, pan: { x: 0, y: 0 } },
+    to: { start: 2, scale: 2, pan: { x: 30, y: 30 } },
+    policy,
+  });
+  const point = { x: 0.1, y: 0.5 };
+  for (const time of [0.5, 0.75, 1.25, 1.75, 2]) {
+    const camera = resolveVideoCompositionCamera({
+      project,
+      currentTime: time,
+      actions: [],
+      cursorSample: null,
+    });
+    const pixel = mapCompositionPointThroughCamera({ x: 10, y: 50 }, camera)!;
+    const bounds = geometry.clearanceBounds({
+      start: time,
+      end: time,
+      segmentId: 'source',
+      targetScale: 2,
+      pan: { minX: 30, maxX: 30, minY: 30, maxY: 30 },
+      actual: { from: point, to: point },
+    })!;
+    const clearance = Math.min(pixel.x, pixel.y, 100 - pixel.x, 100 - pixel.y);
+    expect(bounds.viewport!.low).toBeCloseTo(clearance, 7);
+    expect(bounds.viewport!.high).toBeCloseTo(clearance, 7);
+  }
 });

@@ -28,6 +28,18 @@ function getMutationSchemaVersion(
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
   if (
     regions?.some(
+      (region) =>
+        region.focusArea?.axes !== undefined ||
+        region.phaseTransitions?.link !== undefined ||
+        region.sourceBinding?.unresolvedLinkTo !== undefined ||
+        region.sourceBinding?.dormant !== undefined ||
+        region.sourceBinding?.phaseProjection !== undefined ||
+        region.sourceBinding?.coordinateSpace !== undefined
+    )
+  )
+    return 34;
+  if (
+    regions?.some(
       (region) => region.spotlight !== undefined || region.spotlightTarget !== undefined
     )
   )

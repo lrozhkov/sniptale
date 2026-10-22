@@ -19,7 +19,7 @@ export type AreaOverlayParams = Pick<
 
 export interface AreaDragParams {
   area: VideoProjectMotionArea;
-  event: React.PointerEvent<HTMLElement>;
+  event: React.PointerEvent<HTMLElement | SVGElement>;
   mode: 'move' | 'resize';
   params: AreaOverlayParams;
 }

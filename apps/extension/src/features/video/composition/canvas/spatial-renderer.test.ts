@@ -574,3 +574,39 @@ it.each([true, false])(
     }
   }
 );
+
+it('uses the composed source projection and resets local depth coordinates for legacy callers', () => {
+  const { gl, context } = graphics();
+  const renderer = createReviewSpatialRenderer();
+  const plane = renderer.surface('plane', 320, 180);
+  const request = {
+    source: plane.canvas,
+    sourceRect: { x: 0, y: 0, width: 320, height: 180 },
+    output: { width: 320, height: 180 },
+    base: rect,
+    target: rect,
+    frame,
+  };
+  renderer.draw(context, {
+    ...request,
+    projection: [1, 0, 7, 0, 1, 9, 0, 0, 1],
+    planeInverse: [0, 1, 0, -1, 0, 320, 0, 0, 1],
+  });
+  expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(
+    'inverseProjection',
+    false,
+    new Float32Array([1, 0, 0, 0, 1, 0, -7, -9, 1])
+  );
+  expect(gl.uniformMatrix3fv).toHaveBeenCalledWith(
+    'inversePlane',
+    false,
+    new Float32Array([0, -1, 0, 1, 0, 0, 0, 320, 1])
+  );
+  renderer.draw(context, request);
+  expect(gl.uniformMatrix3fv).toHaveBeenLastCalledWith(
+    'inversePlane',
+    false,
+    new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1])
+  );
+  renderer.dispose();
+});

@@ -26,6 +26,7 @@ export function resolveVideoCompositionBorders(project: VideoProject, time: numb
     const state: VideoCompositionBorderState = {
       id: region.id,
       border: region.border!,
+      ...(binding?.coordinateSpace ? { coordinateSpace: binding.coordinateSpace } : {}),
       clock: {
         time: getMotionAnimationTime(region, time - region.startTime),
         duration: region.animation?.duration ?? binding?.animation.duration ?? region.duration,

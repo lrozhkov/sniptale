@@ -6,6 +6,7 @@ import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } fro
 import { isExportReadyVideoProject, isHydratableVideoProject } from '../validation/root';
 import {
   parseMotionSourceBinding,
+  projectMotionSourcePhases,
   projectMotionSourceBinding,
   reconcileMotionSourceBindings,
   bindMotionRegionToUniqueVideo,
@@ -387,4 +388,188 @@ it('retains window border authoring and its source phase through trim, untrim an
   expect(restored.sourceBinding).toEqual(region.sourceBinding);
   expect(restored.border).toEqual(region.border);
   expect(isHydratableVideoProject({ ...project, motionRegions: [restored] })).toBe(true);
+});
+
+it('preserves Gallery phase policy on resize, persistence and raw phase editing', async () => {
+  const { applyVideoProjectMutationPatch } = await import('../mutation');
+  const { editMotionTransitionPhase } = await import('./timing');
+  const { clip, project, region } = fixture();
+  const bound = {
+    ...region,
+    sourceBinding: {
+      ...region.sourceBinding,
+      phaseProjection: 'retained-result' as const,
+      coordinateSpace: 'source-window' as const,
+      animationGroupId: 'authored',
+    },
+    phaseTransitions: { enter: 'linear' as const, exit: 'linear' as const },
+    zoomInDuration: 2,
+    zoomOutDuration: 2,
+  };
+  const saved = applyVideoProjectMutationPatch(project, { motionRegions: [bound] });
+  expect(saved.version).toBe(34);
+  expect(isHydratableVideoProject(saved)).toBe(true);
+  expect(isExportReadyVideoProject(JSON.parse(JSON.stringify(saved)))).toBe(true);
+  for (let version = 2; version < 34; version++)
+    expect(isHydratableVideoProject({ ...saved, version })).toBe(false);
+  expect(isHydratableVideoProject({ ...saved, version: 35 })).toBe(false);
+  expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: 'other' })).toBeNull();
+  expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: null })).toBeNull();
+  expect(parseMotionSourceBinding(bound.sourceBinding)).toEqual(bound.sourceBinding);
+  expect(parseMotionSourceBinding({ ...bound.sourceBinding, coordinateSpace: 'other' })).toBeNull();
+  expect(parseMotionSourceBinding({ ...bound.sourceBinding, coordinateSpace: null })).toBeNull();
+  const { phaseProjection: _projection, ...windowOnly } = bound.sourceBinding;
+  const windowSaved = applyVideoProjectMutationPatch(project, {
+    motionRegions: [{ ...bound, sourceBinding: windowOnly }],
+  });
+  expect(windowSaved.version).toBe(34);
+  expect(isHydratableVideoProject(windowSaved)).toBe(true);
+  expect(isHydratableVideoProject({ ...windowSaved, version: 33 })).toBe(false);
+  const fast = reconcileMotionSourceBindings(saved, {
+    ...saved,
+    clips: [{ ...clip, playbackRate: 2, duration: 4 }],
+  });
+  const raw = fast.motionRegions![0]!;
+  expect(raw.sourceBinding).toEqual(bound.sourceBinding);
+  expect(projectMotionSourcePhases(fast).motionRegions![0]!.zoomInDuration).toBe(1);
+  expect(raw.zoomInDuration).toBe(2);
+  const edited = editMotionTransitionPhase(raw, { phase: 'enter', duration: 1.5 });
+  expect(edited?.zoomInDuration).toBe(1.5);
+  expect(edited?.sourceBinding).toEqual(bound.sourceBinding);
+  const fastClip = fast.clips[0]!;
+  if (fastClip.type !== 'VIDEO') throw new Error('Expected video');
+  const resized = bindMotionRegionToClip({ ...raw, duration: 1 }, fastClip);
+  expect(resized.sourceBinding).toMatchObject({
+    phaseProjection: 'retained-result',
+    animationGroupId: 'authored',
+    animation: { start: 0, end: 2, duration: 2 },
+  });
+  expect(
+    projectMotionSourcePhases(saved).motionRegions![0]!.sourceBinding?.phaseProjection
+  ).toBeUndefined();
+  expect(saved.motionRegions![0]!.sourceBinding?.phaseProjection).toBe('retained-result');
+});
+
+it.each(['gap', 'overlap', 'reorder', 'independent'] as const)(
+  'does not merge Gallery phases across an unrelated %s segment',
+  (kind) => {
+    const { clip, project, region } = fixture();
+    const first = {
+      ...clip,
+      sourceStart: 12,
+      sourceDuration: 2,
+      startTime: 0,
+      duration: 2,
+      sourceInstanceId: 'original',
+    };
+    const second = {
+      ...first,
+      id: 'second',
+      sourceStart: kind === 'reorder' ? 10 : 14,
+      startTime: kind === 'gap' ? 3 : kind === 'overlap' ? 1 : 2,
+      sourceInstanceId: kind === 'independent' ? 'other' : 'original',
+    };
+    const bound = {
+      ...region,
+      startTime: 0,
+      duration: 2,
+      zoomInDuration: 4,
+      zoomOutDuration: 0,
+      phaseTransitions: { enter: 'linear' as const, exit: 'none' as const },
+      sourceBinding: {
+        ...region.sourceBinding,
+        clipId: first.id,
+        animationGroupId: 'focus',
+        phaseProjection: 'retained-result' as const,
+      },
+    };
+    const next = {
+      ...project,
+      clips: [first, second],
+      motionRegions: [
+        bound,
+        {
+          ...bound,
+          id: 'second-focus',
+          sourceBinding: { ...bound.sourceBinding, clipId: second.id },
+        },
+      ],
+    };
+    const effective = projectMotionSourcePhases(next).motionRegions![0]!;
+    expect(effective.animation).toEqual({ start: 0, end: 2, duration: 2 });
+    expect(effective.zoomInDuration).toBe(2);
+    expect(bound.zoomInDuration).toBe(4);
+  }
+);
+
+it.each([false, true])(
+  'preserves explicit dormant=%s through clip edits and source rebinding',
+  (dormant) => {
+    const clip = createVideoClip();
+    const project = createProject([clip]);
+    const active = bindMotionRegionToClip(
+      { ...createVideoProjectMotionRegion(project, 0), duration: 2 },
+      clip
+    );
+    const region = { ...active, sourceBinding: { ...active.sourceBinding!, dormant } };
+    project.motionRegions = [projectMotionSourceBinding(project, region)];
+    for (const playbackRate of [0.5, 2]) {
+      const edited = reconcileMotionSourceBindings(project, {
+        ...project,
+        clips: [{ ...clip, playbackRate, duration: clip.duration / playbackRate }],
+      });
+      const accepted = edited.motionRegions![0]!;
+      expect(accepted.sourceBinding?.dormant).toBe(dormant);
+      expect(accepted.duration === 0).toBe(dormant);
+      const target = edited.clips[0]!;
+      if (target.type !== 'VIDEO') throw new Error('Missing bound video');
+      const rebound = projectMotionSourceBinding(edited, bindMotionRegionToClip(accepted, target));
+      expect(rebound.sourceBinding?.dormant).toBe(dormant);
+      expect(parseMotionSourceBinding(rebound.sourceBinding)).toEqual(rebound.sourceBinding);
+      if (dormant) expect(rebound.sourceBinding).toEqual(region.sourceBinding);
+    }
+  }
+);
+
+it('refuses malformed dormant bindings and does not admit active dormant intervals', () => {
+  const clip = createVideoClip();
+  const project = createProject([clip]);
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 0), duration: 2 },
+    clip
+  );
+  const binding = { ...region.sourceBinding!, dormant: true };
+  expect(parseMotionSourceBinding(binding)).toEqual(binding);
+  for (const dormant of ['true', 0, null])
+    expect(parseMotionSourceBinding({ ...binding, dormant })).toBeNull();
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      version: 34,
+      motionRegions: [{ ...region, sourceBinding: binding }],
+    })
+  ).toBe(false);
+  const hidden = projectMotionSourceBinding(project, { ...region, sourceBinding: binding });
+  expect(isExportReadyVideoProject({ ...project, version: 34, motionRegions: [hidden] })).toBe(
+    true
+  );
+  expect(isHydratableVideoProject({ ...project, version: 33, motionRegions: [hidden] })).toBe(
+    false
+  );
+});
+
+it('retains a passive missing target through rebinding and rejects malformed target identities', () => {
+  const { project, clip, region } = fixture();
+  const binding = { ...region.sourceBinding!, unresolvedLinkTo: 'missing-target' };
+  expect(parseMotionSourceBinding(binding)).toEqual(binding);
+  for (const unresolvedLinkTo of ['', null, 4])
+    expect(parseMotionSourceBinding({ ...binding, unresolvedLinkTo })).toBeNull();
+  const rebound = bindMotionRegionToClip({ ...region, sourceBinding: binding }, clip);
+  expect(rebound.sourceBinding?.unresolvedLinkTo).toBe('missing-target');
+  expect(isHydratableVideoProject({ ...project, version: 34, motionRegions: [rebound] })).toBe(
+    true
+  );
+  expect(isHydratableVideoProject({ ...project, version: 33, motionRegions: [rebound] })).toBe(
+    false
+  );
 });

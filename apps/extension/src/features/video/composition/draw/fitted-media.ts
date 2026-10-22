@@ -4,7 +4,7 @@ import {
   roundedWindowRadius,
 } from '../../project/window-geometry';
 import { uncropMediaSourceRect, type MediaSourceCrop } from '../../project/media-crop';
-import { type WindowHeader } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import { acquireVideoCompositionBuffer } from '../canvas/buffer-pool';
 import {
   cameraContentFrame,
@@ -198,6 +198,22 @@ export function getFittedMediaWindowFrame(params: {
     sourceWidth: params.sourceWidth * (params.sourceCrop?.width ?? 1),
     sourceHeight: params.sourceHeight * (params.sourceCrop?.height ?? 1),
   });
+}
+
+/** Retain the complete decorated source plane while its visible crop and fit change. */
+export function getFittedMediaOriginalWindowFrame(
+  params: Parameters<typeof getFittedMediaWindowFrame>[0]
+): MediaFrame {
+  const content = getFittedMediaContentFrame(params);
+  const header = params.windowHeader
+    ? (windowHeaderGeometry(params.windowHeader, {
+        width: params.sourceWidth,
+        height: params.sourceHeight,
+      }).height *
+        content.width) /
+      params.sourceWidth
+    : 0;
+  return { ...content, y: content.y - header, height: content.height + header };
 }
 
 export function mapSourcePointToFittedMediaFrame(params: FittedMediaPointMapping): SourcePoint {
@@ -434,6 +450,7 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
 export interface VisualLayerSourcePointMapping {
+  coordinateSpace?: 'source-window';
   windowCornerRadius?: number;
   sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
@@ -565,7 +582,9 @@ export function mapWindowNormalizedPointToVisualLayer(
   if (!isValidPointMapping(params)) return null;
   const window = params.cameraAppearance
     ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
-    : getFittedMediaWindowFrame(params);
+    : params.coordinateSpace === 'source-window'
+      ? getFittedMediaOriginalWindowFrame(params)
+      : getFittedMediaWindowFrame(params);
   const { center, angle } = visualLayerRotation(params.frame);
   const x = window.x + params.point.x * window.width - center.x;
   const y = window.y + params.point.y * window.height - center.y;
@@ -588,7 +607,9 @@ export function mapVisualLayerPointToWindowNormalized(
   if (!isValidPointMapping(params)) return null;
   const window = params.cameraAppearance
     ? cameraWindowFrame(params.frame, params.cameraAppearance.shape)
-    : getFittedMediaWindowFrame(params);
+    : params.coordinateSpace === 'source-window'
+      ? getFittedMediaOriginalWindowFrame(params)
+      : getFittedMediaWindowFrame(params);
   if (window.width <= 0 || window.height <= 0) return null;
   const { center, angle } = visualLayerRotation(params.frame);
   const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;

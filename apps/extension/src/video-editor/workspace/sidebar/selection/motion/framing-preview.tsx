@@ -5,7 +5,6 @@ import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
   type VideoProjectMotionRegion,
-  type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
 import type { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
@@ -56,10 +55,8 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
       : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { area, camera, viewport, left, top, width, height, handlers } = useFramingInteraction(
-    props,
-    overview
-  );
+  const { areaPoints, camera, viewport, left, top, width, height, handlers } =
+    useFramingInteraction(props, overview);
   const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
 
   return (
@@ -97,7 +94,7 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
           canvasRef={canvasRef}
           ready={ready}
           failed={failed}
-          area={overview ? area : null}
+          areaPoints={overview ? areaPoints : null}
           showOutline={overview}
           viewport={viewport}
           world={{ left, top, width, height }}
@@ -116,7 +113,7 @@ function FramingOverlays({
   canvasRef,
   ready,
   failed,
-  area,
+  areaPoints,
   viewport,
   world,
   showOutline,
@@ -124,7 +121,7 @@ function FramingOverlays({
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   ready: boolean;
   failed: boolean;
-  area: VideoProjectMotionArea | null;
+  areaPoints: ReturnType<typeof useFramingInteraction>['areaPoints'];
   viewport: ReturnType<typeof resolveCameraViewportFrame>;
   world: { left: number; top: number; width: number; height: number };
   showOutline: boolean;
@@ -143,34 +140,45 @@ function FramingOverlays({
           height: '100%',
         }}
       />
-      {ready && area ? (
-        <span
-          aria-hidden="true"
-          className={`absolute border border-dashed border-[color:var(--sniptale-color-border-accent-strong)]
-pointer-events-none`}
-          style={{
-            left: `${((area.x - left) / width) * 100}%`,
-            top: `${((area.y - top) / height) * 100}%`,
-            width: `${(area.width / width) * 100}%`,
-            height: `${(area.height / height) * 100}%`,
-          }}
-        >
+      {ready && areaPoints ? (
+        <>
+          <svg
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full pointer-events-none"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
+            <polygon
+              data-framing-area-outline="true"
+              points={Object.values(areaPoints)
+                .map(
+                  (point) =>
+                    `${((point.x - left) / width) * 100},${((point.y - top) / height) * 100}`
+                )
+                .join(' ')}
+              fill="none"
+              className="stroke-[var(--sniptale-color-border-accent-strong)]"
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
           {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
             <span
               key={corner}
+              aria-hidden="true"
               data-framing-corner={corner}
               className={`absolute z-10 h-3 w-3 rounded-sm border
 border-[color:var(--sniptale-color-border-accent-strong)]
 bg-[var(--sniptale-color-surface-panel)] pointer-events-auto`}
               style={{
-                left: corner.endsWith('w') ? 0 : '100%',
-                top: corner.startsWith('n') ? 0 : '100%',
+                left: `${((areaPoints[corner].x - left) / width) * 100}%`,
+                top: `${((areaPoints[corner].y - top) / height) * 100}%`,
                 transform: 'translate(-50%, -50%)',
                 cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
               }}
             />
           ))}
-        </span>
+        </>
       ) : null}
       {ready && showOutline ? (
         <span

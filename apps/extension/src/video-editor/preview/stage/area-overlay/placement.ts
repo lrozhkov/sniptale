@@ -32,7 +32,9 @@ export function handleStageAreaPlacement(
     event.clientY,
     stage,
     params.project,
-    params.camera
+    params.camera,
+    params.selectedMotionRegion ?? undefined,
+    params.currentTime ?? 0
   );
   if (!anchorPoint) {
     params.onClearPlacementMode();
@@ -68,7 +70,9 @@ function startAreaPlacementSession(
       moveEvent.clientY,
       stage,
       params.project,
-      params.camera
+      params.camera,
+      params.selectedMotionRegion ?? undefined,
+      params.currentTime ?? 0
     );
     if (!nextPoint || !anchorPoint) {
       return;

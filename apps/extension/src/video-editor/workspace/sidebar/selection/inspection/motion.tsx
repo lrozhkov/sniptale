@@ -1,3 +1,4 @@
+import { OptionButtonsField } from '../shared/option-buttons';
 import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
 import {
   MotionEffectModeField,
@@ -25,7 +26,6 @@ import {
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { resolveMotionConnectionSource } from '../../../../../features/video/project/motion';
-import { SelectInput } from '../shared/controls';
 import { getTemporalEasingOptions } from '../effect-controls/options';
 
 export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
@@ -45,8 +45,9 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
       <MotionInspectorFieldset locked={locked}>
-        <SelectInput
+        <OptionButtonsField
           label={translate('videoEditor.sidebar.motionEasingLabel')}
+          layout="stacked"
           value={connection.easing}
           options={getTemporalEasingOptions()}
           onChange={(easing) =>
@@ -144,7 +145,9 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'spatial-reference',
-            visible: isCameraMotionRegion(motionRegion),
+            visible:
+              isCameraMotionRegion(motionRegion) &&
+              motionRegion.sourceBinding?.coordinateSpace !== 'source-window',
             semantic: 'framing' as const,
             label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
             content: (

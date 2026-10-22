@@ -3,6 +3,7 @@ import {
   quickEditPlaneProjection,
   invertQuickEditProjection,
   quickEditRotationMatrix,
+  type QuickEditHomography,
 } from '../motion/spatial-geometry';
 import type { CameraSpatialFrame as QuickEditSpatialFrame } from '../../project/motion/spatial';
 import type { CameraSpatialRect as QuickEditRect } from '../../project/motion/spatial';
@@ -17,6 +18,8 @@ interface ReviewSpatialDrawRequest {
   base: QuickEditRect;
   target: QuickEditRect;
   frame: QuickEditSpatialFrame;
+  projection?: QuickEditHomography;
+  planeInverse?: QuickEditHomography;
   sharp?: boolean;
 }
 
@@ -134,30 +137,37 @@ function setSpatialFrameUniforms(
     base: QuickEditRect;
     target: QuickEditRect;
     frame: QuickEditSpatialFrame;
+    projection?: QuickEditHomography;
+    planeInverse?: QuickEditHomography;
     sharp: boolean;
     output: { width: number; height: number };
     sourceRect: QuickEditRect;
   }
 ) {
   const { base, target, frame, sharp, output } = args;
-  const m = quickEditPlaneProjection(base, target, frame);
+  const m = args.projection ?? quickEditPlaneProjection(base, target, frame);
+  if (!m.every(Number.isFinite) || (args.planeInverse && !args.planeInverse.every(Number.isFinite)))
+    throw new Error('Perspective projection is unavailable.');
   const inverse = invertQuickEditProjection(m);
   if (!inverse) throw new Error('Perspective projection is unavailable.');
-  gl.uniformMatrix3fv(
-    uniform('inverseProjection'),
-    false,
-    new Float32Array([
-      inverse[0],
-      inverse[3],
-      inverse[6],
-      inverse[1],
-      inverse[4],
-      inverse[7],
-      inverse[2],
-      inverse[5],
-      inverse[8],
-    ])
-  );
+  const matrix = (name: string, value: QuickEditHomography) =>
+    gl.uniformMatrix3fv(
+      uniform(name),
+      false,
+      new Float32Array([
+        value[0],
+        value[3],
+        value[6],
+        value[1],
+        value[4],
+        value[7],
+        value[2],
+        value[5],
+        value[8],
+      ])
+    );
+  matrix('inverseProjection', inverse);
+  matrix('inversePlane', args.planeInverse ?? [1, 0, 0, 0, 1, 0, 0, 0, 1]);
   gl.uniform2f(uniform('outputSize'), output.width, output.height);
   const source = args.sourceRect;
   gl.uniform4f(uniform('sourceRect'), source.x, source.y, source.width, source.height);
@@ -325,7 +335,16 @@ export function createReviewSpatialRenderer(
           gl.viewport(0, 0, canvas.width, canvas.height);
           gl.clearColor(0, 0, 0, 0);
           gl.clear(gl.COLOR_BUFFER_BIT);
-          setSpatialFrameUniforms(gl, uniform, { base, target, frame, sharp, output, sourceRect });
+          setSpatialFrameUniforms(gl, uniform, {
+            base,
+            target,
+            frame,
+            sharp,
+            output,
+            sourceRect,
+            ...(args.projection ? { projection: args.projection } : {}),
+            ...(args.planeInverse ? { planeInverse: args.planeInverse } : {}),
+          });
           let levelSizes: Float32Array;
           try {
             levelSizes = textures.upload(source);

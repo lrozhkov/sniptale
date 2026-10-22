@@ -65,6 +65,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   spotlightConnection: { ru: 'Переход подсветки', en: 'Spotlight transition' },
   connectSpotlight: { ru: 'Связать подсветку', en: 'Connect spotlights' },
   disconnectSpotlight: { ru: 'Разъединить подсветку', en: 'Disconnect spotlights' },
+  motionCoverage: { ru: 'Область действия', en: 'Coverage' },
   framingBinding: { ru: 'Привязка', en: 'Binding' },
   framingBindingScene: { ru: 'Сцена', en: 'Scene' },
   framingExactPosition: { ru: 'Точное положение', en: 'Exact position' },

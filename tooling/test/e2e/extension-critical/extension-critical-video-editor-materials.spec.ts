@@ -1,3 +1,7 @@
+import { motionWindowAreaPoints } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
+import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
+import { getFittedMediaOriginalWindowFrame } from '../../../../apps/extension/src/features/video/composition/draw/fitted-media';
+import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { createVideoProjectCursorTrack } from '../../../../apps/extension/src/features/video/project/defaults';
@@ -11,13 +15,22 @@ import {
   computeQuickEditSceneLayout,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { webcamVideoPixels } from '../support/quick-editor-webcam-proof';
-import { seedReviewWebcamBundle, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewWebcamBundle,
+  seedReviewVideo,
+} from '../support/quick-editor-media-fixture';
 import {
   replayReviewHistory,
   reviewDocumentBaseline,
 } from '../../../../apps/extension/src/features/video/review/document';
 import { buildReviewTimeMap } from '../../../../apps/extension/src/features/video/review/timeline';
-import { readNativeReviewWorkspace } from '../support/native-review-workspace';
+import {
+  readNativeReviewWorkspace,
+  replaceNativeReviewWorkspace,
+} from '../support/native-review-workspace';
+import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
+import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import {
   EFFECT_V1_TARGET_FIXTURE,
@@ -465,6 +478,59 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect
         .poll(async () => (await readNativeReviewWorkspace(page, aggregateId))?.project?.name)
         .toBeTruthy();
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      const legacyWorkspace = (await readNativeReviewWorkspace(page, aggregateId))!;
+      const legacyContent = replayReviewHistory(
+        legacyWorkspace.history,
+        legacyWorkspace.cursor,
+        legacyWorkspace.source,
+        reviewDocumentBaseline(legacyWorkspace)
+      ).advancedContent;
+      const legacyHistory = [
+        ...legacyWorkspace.history.slice(0, legacyWorkspace.cursor),
+        {
+          id: 'retained-dormant-focus',
+          at: Date.now(),
+          target: 'advancedContent' as const,
+          before: legacyContent,
+          after: {
+            ...legacyContent,
+            zoom: {
+              ...legacyContent.zoom,
+              regions: [
+                ...legacyContent.zoom.regions,
+                {
+                  ...createQuickEditZoomRegion({
+                    id: 'legacy-dormant-focus',
+                    at: 0,
+                    duration: 12,
+                    sourceAnchor: { start: 0, end: 12 },
+                  }),
+                  dormant: true,
+                  linkTo: 'legacy-deleted-target',
+                  linkEasing: 'linear',
+                  transform: { scale: 4, centerX: 0.9, centerY: 0.9 },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      const legacyRow = parseVideoWorkspace({
+        ...legacyWorkspace,
+        revision: legacyWorkspace.revision + 1,
+        history: legacyHistory,
+        cursor: legacyHistory.length,
+        updatedAt: Date.now(),
+      });
+      if (!legacyRow) throw new Error('Dormant Gallery fixture is invalid');
+      await replaceNativeReviewWorkspace(page, aggregateId, legacyRow);
+      await page.reload();
+      await page
+        .getByRole('button', { name: /: Screen$/ })
+        .first()
+        .click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
@@ -744,6 +810,97 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         path: info.outputPath('gallery-authored-scene.png'),
         fullPage: false,
       });
+      await plane.focus();
+      await page.keyboard.press('Home');
+      await expect
+        .poll(async () => Number(await plane.getAttribute('aria-valuenow')))
+        .toBeCloseTo(0, 3);
+      await addReviewFocus(page);
+      const galleryMotion = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      await expect(galleryMotion).toBeVisible();
+      await chooseInspectorValue(
+        page,
+        galleryMotion,
+        label('videoEditor.sidebar.cursorFocusMode'),
+        label(
+          index === 0
+            ? 'videoEditor.sidebar.cursorFocusFixed'
+            : 'videoEditor.sidebar.cursorFocusFollow'
+        )
+      );
+      const focusRuler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      for (const sourceTime of [4, 8]) {
+        await focusRuler.scrollIntoViewIfNeeded();
+        const focusRulerBox = (await focusRuler.boundingBox())!;
+        const focusDuration = Number(await plane.getAttribute('aria-valuemax'));
+        await page.mouse.click(
+          focusRulerBox.x + (focusRulerBox.width * sourceTime) / focusDuration,
+          focusRulerBox.y + 12
+        );
+        await addReviewFocus(page);
+        await chooseInspectorValue(
+          page,
+          galleryMotion,
+          label('videoEditor.sidebar.cursorFocusMode'),
+          label(
+            index === 0
+              ? 'videoEditor.sidebar.cursorFocusFixed'
+              : 'videoEditor.sidebar.cursorFocusFollow'
+          )
+        );
+      }
+      const galleryLink = dialog.locator('[data-ui="gallery.videoReview.zoomLink"]');
+      await expect(galleryLink).toHaveCount(1);
+      await galleryLink.click();
+      await expect(galleryLink).toHaveAttribute('data-connected', 'true');
+      for (const [typeKey, kind] of [
+        ['gallery.videoReview.focusBorder', 'border'],
+        ['gallery.videoReview.focusSpotlight', 'spotlight'],
+      ] as const) {
+        await plane.focus();
+        await page.keyboard.press('Home');
+        await dialog
+          .getByRole('button', { name: label('gallery.videoReview.focusRangeTool'), exact: true })
+          .click();
+        await dialog
+          .locator('[data-ui="gallery.videoReview.editingTools"]')
+          .getByRole('button', { name: label('gallery.videoReview.focusType'), exact: true })
+          .click();
+        await page.getByRole('option', { name: label(typeKey), exact: true }).click();
+        await addReviewFocus(page);
+        const authored = (await readAuthoredScene())!.zoom.regions.find((region) => region[kind])!;
+        const block = dialog.locator(`[data-review-removal-key="focus:${authored.id}"]`);
+        const end = block.locator('[data-zoom-edge="end"]');
+        await end.scrollIntoViewIfNeeded();
+        const edge = (await end.boundingBox())!;
+        const row = await block.evaluate((element) => {
+          const rect = element.parentElement!.getBoundingClientRect();
+          return { x: rect.x, width: rect.width };
+        });
+        const sourceDuration = Number(await plane.getAttribute('aria-valuemax'));
+        await page.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(
+          edge.x +
+            edge.width / 2 +
+            (row.width * (0.5 - (authored.sourceAnchor?.end ?? authored.end))) / sourceDuration,
+          edge.y + edge.height / 2,
+          { steps: 8 }
+        );
+        await page.mouse.up();
+        await expect
+          .poll(async () =>
+            Math.abs(
+              ((await readAuthoredScene())!.zoom.regions.find((region) => region.id === authored.id)
+                ?.sourceAnchor?.end ?? -1) - 0.5
+            )
+          )
+          .toBeLessThanOrEqual(sourceDuration / row.width + 1e-6);
+      }
+      await page.screenshot({
+        path: info.outputPath('gallery-authored-motion.png'),
+        fullPage: false,
+      });
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       const transfer = dialog.locator('[data-ui="gallery.videoReview.openVideoEditor"]');
       await transfer.scrollIntoViewIfNeeded();
@@ -793,7 +950,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         zoomBehavior: 'window',
         layout: { padding: 8, cornerRadius: 6, shadow: { intensity: 60 } },
       });
-      expect(document.advancedContent.zoom.regions).toEqual([]);
+      expect(document.advancedContent.zoom.regions).toHaveLength(6);
+      expect(document.advancedContent.zoom.regions.some((region) => region.linkTo)).toBe(true);
       const output = computeQuickEditSceneSize(scene);
       const layout = computeQuickEditSceneLayout({
         ...scene,
@@ -810,6 +968,567 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(migrated.id).not.toBe(gallery.aggregateId);
       expect(migrated.name).toBe(gallery.project!.name);
       expect(migrated.duration).toBeCloseTo(expectedDuration, 5);
+      const passiveMotion = migrated.motionRegions!.filter(
+        (region) => region.sourceBinding?.dormant
+      );
+      expect(passiveMotion.length).toBeGreaterThan(0);
+      for (const region of passiveMotion) {
+        expect(region).toMatchObject({
+          duration: 0,
+          scale: 4,
+          sourceBinding: {
+            dormant: true,
+            sourceStart: 0,
+            sourceEnd: 12,
+            unresolvedLinkTo: 'legacy-deleted-target',
+          },
+          phaseTransitions: { link: 'LINEAR' },
+        });
+        await expect(page.locator(`[data-timeline-effect-segment="${region.id}"]`)).toHaveCount(0);
+      }
+      const importedMotion = migrated.motionRegions!.find((region) => region.duration > 0)!;
+      expect(importedMotion).toMatchObject({
+        focusMode: index === 0 ? 'MANUAL' : 'CURSOR',
+        sourceBinding: { coordinateSpace: 'source-window' },
+      });
+      const motionSegment = page.locator(`[data-timeline-effect-segment="${importedMotion.id}"]`);
+      await motionSegment.scrollIntoViewIfNeeded();
+      await motionSegment
+        .getByRole('button', {
+          name: `${label('videoEditor.timeline.motionSegment')} · ${importedMotion.scale.toFixed(2)}x`,
+          exact: true,
+        })
+        .click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupFraming'),
+          exact: true,
+        })
+        .click();
+      const motionControls = page.locator('[data-video-editor-motion-controls]');
+      await expect(motionControls.locator('[data-video-editor-local-navigation]')).toBeEnabled();
+      await chooseInspectorValue(
+        page,
+        motionControls,
+        label('videoEditor.sidebar.motionCoverage'),
+        label('videoEditor.sidebar.spotlightCoverageScene')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions?.find(
+              (region) => region.id === importedMotion.id
+            )?.sourceBinding?.coordinateSpace
+        )
+        .toBeUndefined();
+      await chooseInspectorValue(
+        page,
+        motionControls,
+        label('videoEditor.sidebar.motionCoverage'),
+        label('videoEditor.sidebar.spotlightCoverageWindow')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions?.find(
+              (region) => region.id === importedMotion.id
+            )?.sourceBinding?.coordinateSpace
+        )
+        .toBe('source-window');
+      await checkInspectorPaintedFont(
+        page,
+        motionControls.getByRole('button', {
+          name: label('videoEditor.sidebar.spotlightCoverageWindow'),
+          exact: true,
+        }),
+        'motion-coverage'
+      );
+      await page.screenshot({
+        path: info.outputPath('native-imported-motion.png'),
+        fullPage: false,
+      });
+
+      const importedWindowId = importedMotion.sourceBinding!.clipId;
+      for (const rotation of [30, 0]) {
+        await page.locator(`[data-project-timeline-clip="${importedWindowId}"]`).click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupTransform'),
+            exact: true,
+          })
+          .click();
+        const rotationField = page.getByRole('textbox', {
+          name: label('videoEditor.sidebar.rotationLabel'),
+          exact: true,
+        });
+        await rotationField.fill(String(rotation));
+        await rotationField.press('Tab');
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.clips.find(
+                (clip) => clip.id === importedWindowId
+              )?.transform.rotation
+          )
+          .toBe(rotation);
+        if (rotation !== 0) {
+          await checkInspectorPaintedFont(page, rotationField, 'window-rotation');
+          await motionSegment
+            .getByRole('button', {
+              name: `${label('videoEditor.timeline.motionSegment')} · ${importedMotion.scale.toFixed(2)}x`,
+              exact: true,
+            })
+            .click();
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupFraming'),
+              exact: true,
+            })
+            .click();
+          const rotatedPlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+          await rotatedPlayhead.press('Home');
+          for (let frame = 0; frame < Math.round(migrated.fps * 0.3); frame++)
+            await rotatedPlayhead.press('ArrowRight');
+          await page.screenshot({
+            path: info.outputPath('native-rotated-window-motion.png'),
+            fullPage: false,
+          });
+          const beforeSpatial = (await readNativeVideoProject(page))!.motionRegions!.find(
+            (region) => region.id === importedMotion.id
+          )!;
+          let spatialUndo = 0;
+          if (beforeSpatial.focusMode !== 'MANUAL') {
+            await chooseInspectorValue(
+              page,
+              motionControls,
+              label('videoEditor.sidebar.motionFocusLabel'),
+              label('videoEditor.sidebar.motionFocusManual')
+            );
+            spatialUndo++;
+          }
+          const stageCanvas = page.locator('[data-preview-stage-canvas]');
+          const stagePixels = () =>
+            stageCanvas.evaluate(async (node: HTMLCanvasElement) => {
+              const pixels = node
+                .getContext('2d')!
+                .getImageData(0, 0, node.width, node.height).data;
+              const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(pixels));
+              return Array.from(new Uint8Array(hash), (byte) =>
+                byte.toString(16).padStart(2, '0')
+              ).join('');
+            });
+          await page
+            .locator('nav')
+            .getByRole('button', { name: label('gallery.videoReview.perspective'), exact: true })
+            .click();
+          const perspective = page.locator('[data-ui="video-editor.motion.perspective"]');
+          if (!beforeSpatial.perspective?.enabled) {
+            await perspective
+              .getByRole('switch', {
+                name: label('gallery.videoReview.spatialEnabled'),
+                exact: true,
+              })
+              .click();
+            spatialUndo++;
+          }
+          const tilt = perspective.getByRole('textbox', {
+            name: label('gallery.videoReview.perspectiveY'),
+            exact: true,
+          });
+          const beforeTilt = await stagePixels();
+          const tiltValue = beforeSpatial.perspective?.rotateY === 35 ? 20 : 35;
+          await tilt.fill(String(tiltValue));
+          await tilt.press('Tab');
+          spatialUndo++;
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(page))!.motionRegions!.find(
+                  (region) => region.id === importedMotion.id
+                )!.perspective?.rotateY
+            )
+            .toBe(tiltValue);
+          await expect.poll(stagePixels).not.toBe(beforeTilt);
+          await checkInspectorPaintedFont(page, tilt, 'rotated-perspective-input');
+          const spatialProject = (await readNativeVideoProject(page))!;
+          expect(
+            resolveVideoCompositionFrame(spatialProject, 0.3).camera.spatial?.planeTransform
+          ).toBeDefined();
+          await page.screenshot({
+            path: info.outputPath('native-rotated-window-perspective.png'),
+            fullPage: false,
+          });
+          await page
+            .locator('nav')
+            .getByRole('button', { name: label('gallery.videoReview.depthOfField'), exact: true })
+            .click();
+          const depth = page.locator('[data-ui="video-editor.motion.depth"]');
+          if (!beforeSpatial.depthOfField?.enabled) {
+            const beforeDepth = await stagePixels();
+            await depth
+              .getByRole('switch', {
+                name: label('gallery.videoReview.spatialEnabled'),
+                exact: true,
+              })
+              .click();
+            spatialUndo++;
+            await expect.poll(stagePixels).not.toBe(beforeDepth);
+          }
+          await page.screenshot({
+            path: info.outputPath('native-rotated-window-depth.png'),
+            fullPage: false,
+          });
+          for (let undo = 0; undo < spatialUndo; undo++)
+            await page
+              .getByRole('button', {
+                name: `${label('videoEditor.app.undo')} (${label('videoEditor.app.undoShortcut')})`,
+                exact: true,
+              })
+              .click();
+          await expect
+            .poll(async () =>
+              (await readNativeVideoProject(page))!.motionRegions!.find(
+                (region) => region.id === importedMotion.id
+              )
+            )
+            .toEqual(beforeSpatial);
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupFraming'),
+              exact: true,
+            })
+            .click();
+          const beforeArea = (await readNativeVideoProject(page))!.motionRegions!.find(
+            (region) => region.id === importedMotion.id
+          )!;
+          await chooseInspectorValue(
+            page,
+            motionControls,
+            label('videoEditor.sidebar.motionFocusLabel'),
+            label('videoEditor.sidebar.motionFocusManualArea')
+          );
+          const areaPreview = motionControls.locator('[data-video-editor-local-navigation]');
+          await expect(areaPreview).toBeEnabled();
+          await expect
+            .poll(async () =>
+              areaPreview.evaluate((preview) => {
+                const bounds = preview.getBoundingClientRect();
+                const handles = [...preview.querySelectorAll('[data-framing-corner]')];
+                return (
+                  handles.length === 4 &&
+                  handles.every((handle) => {
+                    const rect = handle.getBoundingClientRect();
+                    return (
+                      rect.left >= bounds.left + 1 &&
+                      rect.top >= bounds.top + 1 &&
+                      rect.right <= bounds.right - 1 &&
+                      rect.bottom <= bounds.bottom - 1
+                    );
+                  })
+                );
+              })
+            )
+            .toBe(true);
+          const corner = areaPreview.locator('[data-framing-corner="se"]');
+          await corner.scrollIntoViewIfNeeded();
+          const areaBeforeDrag = (await readNativeVideoProject(page))!.motionRegions!.find(
+            (region) => region.id === importedMotion.id
+          )!.focusArea!;
+          const cornerBox = (await corner.boundingBox())!;
+          await page.mouse.move(
+            cornerBox.x + cornerBox.width / 2,
+            cornerBox.y + cornerBox.height / 2
+          );
+          await page.mouse.down();
+          await page.mouse.move(
+            cornerBox.x + cornerBox.width / 2 + 6,
+            cornerBox.y + cornerBox.height / 2 + 3,
+            { steps: 4 }
+          );
+          await page.mouse.up();
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(page))!.motionRegions!.find(
+                  (region) => region.id === importedMotion.id
+                )!.focusArea
+            )
+            .not.toEqual(areaBeforeDrag);
+          await expect(page.locator('polygon[data-preview-stage-area-body="true"]')).toBeVisible();
+          await expect(areaPreview.locator('[data-framing-area-outline]')).toBeVisible();
+          await page.screenshot({
+            path: info.outputPath('native-rotated-window-area.png'),
+            fullPage: false,
+          });
+          const areaProject = (await readNativeVideoProject(page))!;
+          const areaRegion = areaProject.motionRegions!.find(
+            (region) => region.id === importedMotion.id
+          )!;
+          const areaCorners = motionWindowAreaPoints(
+            areaProject,
+            areaRegion,
+            areaRegion.focusArea!,
+            0.3
+          );
+          const assertAreaCorners = async () => {
+            const project = (await readNativeVideoProject(page))!;
+            const region = project.motionRegions!.find((item) => item.id === importedMotion.id)!;
+            const corners = motionWindowAreaPoints(project, region, region.focusArea!, 0.3);
+            for (const corner of ['nw', 'ne', 'se', 'sw'] as const) {
+              expect(corners[corner].x).toBeCloseTo(areaCorners[corner].x, 6);
+              expect(corners[corner].y).toBeCloseTo(areaCorners[corner].y, 6);
+            }
+          };
+          for (const coverage of ['scene', 'window'] as const) {
+            await chooseInspectorValue(
+              page,
+              motionControls,
+              label('videoEditor.sidebar.motionCoverage'),
+              label(
+                coverage === 'scene'
+                  ? 'videoEditor.sidebar.spotlightCoverageScene'
+                  : 'videoEditor.sidebar.spotlightCoverageWindow'
+              )
+            );
+            await expect
+              .poll(
+                async () =>
+                  (await readNativeVideoProject(page))!.motionRegions!.find(
+                    (region) => region.id === importedMotion.id
+                  )!.sourceBinding?.coordinateSpace
+              )
+              .toBe(coverage === 'window' ? 'source-window' : undefined);
+            await assertAreaCorners();
+          }
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupTiming'),
+              exact: true,
+            })
+            .click();
+          await chooseInspectorValue(
+            page,
+            motionControls,
+            label('videoEditor.sidebar.framingBinding'),
+            label('videoEditor.sidebar.framingBindingScene')
+          );
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(page))!.motionRegions!.find(
+                  (region) => region.id === importedMotion.id
+                )!.sourceBinding
+            )
+            .toBeUndefined();
+          await assertAreaCorners();
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupFraming'),
+              exact: true,
+            })
+            .click();
+          await expect(motionControls.locator('[data-framing-area-outline]')).toBeVisible();
+          await page.screenshot({
+            path: info.outputPath('native-detached-rotated-area.png'),
+            fullPage: false,
+          });
+          for (let undo = 0; undo < 5; undo++) {
+            await page
+              .getByRole('button', {
+                name: `${label('videoEditor.app.undo')} (${label('videoEditor.app.undoShortcut')})`,
+                exact: true,
+              })
+              .click();
+          }
+          await expect
+            .poll(async () =>
+              (await readNativeVideoProject(page))!.motionRegions!.find(
+                (region) => region.id === importedMotion.id
+              )
+            )
+            .toEqual(beforeArea);
+        }
+      }
+
+      const linkedMotion = migrated.motionRegions!.find((region) => region.incomingConnection)!;
+      const nativeLink = page.locator(
+        `button[data-ui="video-editor.timeline.framing-connection"][data-framing-destination="${linkedMotion.id}"]`
+      );
+      await nativeLink.scrollIntoViewIfNeeded();
+      await nativeLink.click();
+      await chooseInspectorValue(
+        page,
+        page.locator('body'),
+        label('videoEditor.sidebar.motionEasingLabel'),
+        label('videoEditor.sidebar.temporalEasingLinear')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions?.find(
+              (region) => region.id === linkedMotion.id
+            )?.incomingConnection?.easing
+        )
+        .toBe('LINEAR');
+      const linkedSourceId = linkedMotion.incomingConnection!.fromRegionId;
+      await page
+        .getByRole('button', { name: label('videoEditor.timeline.disconnectFraming'), exact: true })
+        .click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))!.motionRegions!.find(
+              (region) => region.id === linkedMotion.id
+            )?.incomingConnection
+        )
+        .toBeUndefined();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))!.motionRegions!.find(
+              (region) => region.id === linkedSourceId
+            )?.phaseTransitions?.link
+        )
+        .toBe('LINEAR');
+      const reconnect = page.locator(
+        `[data-ui="video-editor.timeline.framing-connection"][data-framing-destination="${linkedMotion.id}"]`
+      );
+      await reconnect.scrollIntoViewIfNeeded();
+      await reconnect.hover();
+      await reconnect
+        .getByRole('button', { name: label('videoEditor.timeline.connectFraming'), exact: true })
+        .click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))!.motionRegions!.find(
+              (region) => region.id === linkedMotion.id
+            )?.incomingConnection?.easing
+        )
+        .toBe('LINEAR');
+      await page.screenshot({
+        path: info.outputPath('native-reconnected-motion-link.png'),
+        fullPage: false,
+      });
+      await chooseInspectorValue(
+        page,
+        page.locator('body'),
+        label('videoEditor.sidebar.motionEasingLabel'),
+        label('videoEditor.sidebar.temporalEasingEaseInOut')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions?.find(
+              (region) => region.id === linkedMotion.id
+            )?.incomingConnection?.easing
+        )
+        .toBe('EASE_IN_OUT');
+      await checkInspectorPaintedFont(
+        page,
+        page.getByText(label('videoEditor.sidebar.motionEasingLabel'), { exact: true }),
+        'motion-link-curve'
+      );
+      await page.screenshot({
+        path: info.outputPath('native-imported-motion-link.png'),
+        fullPage: false,
+      });
+
+      for (const kind of ['border', 'spotlight'] as const) {
+        const appearance = migrated.motionRegions!.find((region) => region[kind])!;
+        expect(appearance.sourceBinding?.coordinateSpace).toBe('source-window');
+        const segment = page.locator(`[data-timeline-effect-segment="${appearance.id}"]`);
+        await segment.scrollIntoViewIfNeeded();
+        await segment
+          .getByRole('button', {
+            name: label(
+              kind === 'border'
+                ? 'gallery.videoReview.focusBorder'
+                : 'gallery.videoReview.focusSpotlight'
+            ),
+            exact: true,
+          })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupAppearance'),
+            exact: true,
+          })
+          .click();
+        const fieldKey =
+          kind === 'border'
+            ? 'gallery.videoReview.borderWidth'
+            : 'gallery.videoReview.focusStrength';
+        const field = page.getByRole('textbox', { name: label(fieldKey), exact: true });
+        await field.fill(kind === 'border' ? '5' : '40');
+        await field.press('Enter');
+        await expect
+          .poll(async () => {
+            const current = (await readNativeVideoProject(page))!.motionRegions!.find(
+              (region) => region.id === appearance.id
+            )!;
+            return kind === 'border' ? current.border?.width : current.spotlight?.strength;
+          })
+          .toBe(kind === 'border' ? 5 : 0.4);
+        if (kind === 'border') {
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupAnimation'),
+              exact: true,
+            })
+            .click();
+          for (const [phaseKey, revealKey] of [
+            ['gallery.videoReview.zoomTransitionIn', 'gallery.videoReview.borderAppear'],
+            ['gallery.videoReview.zoomTransitionOut', 'gallery.videoReview.borderDisappear'],
+          ] as const) {
+            await chooseInspectorValue(
+              page,
+              page.getByRole('group', { name: label(phaseKey), exact: true }),
+              label('gallery.videoReview.focusReveal'),
+              label(revealKey)
+            );
+          }
+          await expect
+            .poll(
+              async () =>
+                (await readNativeVideoProject(page))!.motionRegions!.find(
+                  (region) => region.id === appearance.id
+                )!.phaseTransitions
+            )
+            .toMatchObject({ enter: 'none', exit: 'none' });
+          await page
+            .locator('nav')
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.inspectorGroupAppearance'),
+              exact: true,
+            })
+            .click();
+        }
+        const appearancePlayhead = page.locator(
+          '[data-ui="video-editor.timeline.playhead-handle"]'
+        );
+        await appearancePlayhead.press('Home');
+        for (let frame = 0; frame < Math.round(migrated.fps * 0.3); frame++)
+          await appearancePlayhead.press('ArrowRight');
+        await checkInspectorPaintedFont(
+          page,
+          page.getByRole('textbox', { name: label(fieldKey), exact: true }),
+          `motion-${kind}-appearance`
+        );
+        await page.screenshot({
+          path: info.outputPath(`native-imported-${kind}.png`),
+          fullPage: false,
+        });
+      }
+
       const primaryTrack = migrated.tracks.find((track) => track.isRoot)!;
       const originalVideos = migrated.clips.filter(
         (clip) => clip.type === 'VIDEO' && clip.trackId === primaryTrack.id
@@ -1188,7 +1907,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .toMatchObject({ kind: 'image', assetId: backgroundAsset.id, imageFit: 'cover' });
       const scenePlayhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
       await scenePlayhead.press('Home');
-      for (let step = 0; step < migrated.fps; step++) await scenePlayhead.press('ArrowRight');
+      // Inspect the unchanged scene after all authored camera intervals and their link.
+      for (let step = 0; step < Math.round(migrated.fps * 9); step++)
+        await scenePlayhead.press('ArrowRight');
       await expect
         .poll(() =>
           page.locator('[data-preview-stage-canvas]').evaluate(
@@ -1392,6 +2113,23 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.locator('[data-ui="video-editor.materials.close"]').click();
       const final = (await readNativeVideoProject(page))!;
       expect(final.id).toBe(migrated.id);
+      const finalPassiveMotion = final.motionRegions!.filter(
+        (region) => region.sourceBinding?.dormant
+      );
+      expect(finalPassiveMotion.length).toBeGreaterThanOrEqual(passiveMotion.length);
+      for (const region of finalPassiveMotion)
+        expect(region).toMatchObject({
+          duration: 0,
+          scale: 4,
+          sourceBinding: {
+            dormant: true,
+            sourceStart: 0,
+            sourceEnd: 12,
+            unresolvedLinkTo: 'legacy-deleted-target',
+          },
+          phaseTransitions: { link: 'LINEAR' },
+        });
+
       expect(await readNativeReviewWorkspace(page, aggregateId)).toEqual(gallery);
       await page.screenshot({
         path: info.outputPath('migrated-project-effects.png'),
@@ -1432,6 +2170,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       );
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       expect(await readNativeVideoProject(page)).toEqual(final);
+      await expect(
+        page.locator('button[data-ui="video-editor.timeline.framing-connection"]')
+      ).not.toHaveCount(0);
       await page.screenshot({
         path: info.outputPath('migrated-project-reopened.png'),
         fullPage: false,
@@ -1508,12 +2249,60 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         },
         settings: { format: index === 0 ? 'WEBM' : 'MP4', scope: 'project' },
       });
+      const borderSampleTime = 0.45;
+      expect(final.sceneEdges?.intro.duration ?? 0).toBeLessThan(borderSampleTime);
+      const borderFrame = resolveVideoCompositionFrame(final, borderSampleTime);
+      const borderLayer = borderFrame.visualLayers.find(
+        (layer) => layer.kind === 'video' && layer.borders?.length
+      );
+      if (!borderLayer || borderLayer.kind !== 'video')
+        throw new Error('Missing transferred border layer');
+      const border = borderLayer.borders![0]!.border;
+      const borderMetadata = final.assets.find(
+        (asset) => asset.id === borderLayer.clip.assetId
+      )!.metadata;
+      const originalWindow = getFittedMediaOriginalWindowFrame({
+        frame: borderLayer.clip.transform,
+        fitMode: borderLayer.clip.fitMode,
+        sourceWidth: borderMetadata.width,
+        sourceHeight: borderMetadata.height,
+        ...(borderLayer.clip.sourceCrop ? { sourceCrop: borderLayer.clip.sourceCrop } : {}),
+        ...(borderLayer.clip.windowHeader ? { windowHeader: borderLayer.clip.windowHeader } : {}),
+      });
+      const stroke = [
+        border.area.y * originalWindow.height + border.width / 2,
+        (border.area.y + border.area.height) * originalWindow.height - border.width / 2,
+      ]
+        .map((y) =>
+          mapCompositionPointThroughCamera(
+            {
+              x: originalWindow.x + (border.area.x + border.area.width / 2) * originalWindow.width,
+              y: originalWindow.y + y,
+            },
+            borderFrame.camera
+          )
+        )
+        .find(
+          (point) =>
+            point &&
+            point.x >= 1 &&
+            point.x < final.width - 1 &&
+            point.y >= 1 &&
+            point.y < final.height - 1
+        );
+      if (!stroke) throw new Error('Transferred border is outside the output');
       const exported = await encodedNativeVideoSamples(
         page,
         host.origin,
         final,
         index === 0 ? 'WEBM' : 'MP4',
         [
+          {
+            time: borderSampleTime,
+            x: Math.round(stroke.x),
+            y: Math.round(stroke.y),
+            expected: [255, 136, 0],
+          },
           {
             time: 1,
             x: Math.round(cameraCenter.x),

@@ -1,3 +1,6 @@
+import { motionTransitionTypeForEasing } from '../../project/motion/timing';
+import { cameraTransitionProgress } from '../../project/motion/transitions';
+import type { VideoProjectMotionRegion } from '../../project/types';
 import { VideoTemporalEasing } from '../../project/types/index';
 
 export function clampProgress(value: number): number {
@@ -33,4 +36,12 @@ export function lerpPoint(
     x: lerpNumber(start.x, end.x, progress),
     y: lerpNumber(start.y, end.y, progress),
   };
+}
+
+/** Window links use the shared camera curve; old scene links retain their scalar easing. */
+export function motionConnectionProgress(region: VideoProjectMotionRegion, progress: number) {
+  const easing = region.incomingConnection?.easing ?? VideoTemporalEasing.EASE_IN_OUT;
+  if (region.sourceBinding?.coordinateSpace !== 'source-window')
+    return applyTemporalEasing(progress, easing);
+  return cameraTransitionProgress(progress, motionTransitionTypeForEasing(easing));
 }

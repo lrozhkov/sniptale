@@ -25,6 +25,7 @@ import {
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
 import {
   createActionPointPlacementMode,
+  createMotionFocusPlacementMode,
   createObjectTrackAnchorPlacementMode,
 } from '../../../project/selection/placement';
 import { PreviewStagePointOverlay, handleStagePointPlacement } from './index';
@@ -619,5 +620,78 @@ it.each(['border', 'spotlight'] as const)(
       )
     );
     expect(container?.querySelector('[data-preview-stage-point-handle="true"]')).toBeNull();
+  }
+);
+
+it.each(['available', 'rotated', 'outside', 'missing'] as const)(
+  'edits source-window focus only with an active target: %s',
+  async (target) => {
+    const { createVideoProjectMotionRegion } =
+      await import('../../../../features/video/project/motion');
+    const { project, clip } = createCapturedOverlayFixture();
+    clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+    if (target === 'rotated') clip.transform.rotation = 90;
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 3,
+      focusMode: VideoMotionFocusMode.MANUAL,
+      focusPoint: { x: 100, y: 50 },
+      sourceBinding: {
+        clipId: target === 'missing' ? 'missing' : clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.motionRegions = [region];
+    const before = structuredClone(project);
+    const onUpdateMotionRegion = vi.fn();
+    act(() =>
+      root?.render(
+        <PreviewStagePointOverlay
+          camera={createCamera()}
+          currentTime={target === 'outside' ? 4 : 1}
+          onClearPlacementMode={vi.fn()}
+          onUpdateActionEventDetails={vi.fn()}
+          onUpdateMotionRegion={onUpdateMotionRegion}
+          placementMode={null}
+          project={project}
+          selectedActionOccurrence={null}
+          selectedMotionRegion={region}
+          stageRef={{ current: createStage() }}
+        />
+      )
+    );
+    const handle = container?.querySelector<HTMLElement>(
+      '[data-preview-stage-point-handle="true"]'
+    );
+    if (target !== 'available' && target !== 'rotated') {
+      expect(handle).toBeNull();
+      expect(
+        handleStagePointPlacement(createPointEvent(80, 50), {
+          camera: createCamera(),
+          currentTime: target === 'outside' ? 4 : 1,
+          onClearPlacementMode: vi.fn(),
+          onUpdateActionEventDetails: vi.fn(),
+          onUpdateMotionRegion,
+          placementMode: createMotionFocusPlacementMode(region.id),
+          project,
+          selectedActionOccurrence: null,
+          selectedMotionRegion: region,
+          stageRef: { current: createStage() },
+        })
+      ).toBe(true);
+      expect(onUpdateMotionRegion).not.toHaveBeenCalled();
+      expect(project).toEqual(before);
+      return;
+    }
+    expect(parseFloat(handle!.style.left)).toBeCloseTo(30, 8);
+    expect(parseFloat(handle!.style.top)).toBeCloseTo(40, 8);
+    dragRenderedPointHandle(60, 40, 80, 50);
+    expect(onUpdateMotionRegion).toHaveBeenLastCalledWith(region.id, {
+      focusPoint: target === 'rotated' ? { x: 120, y: 10 } : { x: 140, y: 70 },
+    });
+    expect(project).toEqual(before);
   }
 );

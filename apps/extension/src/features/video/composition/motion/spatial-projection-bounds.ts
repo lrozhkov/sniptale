@@ -1,3 +1,4 @@
+import type { QuickEditHomography } from './spatial-geometry';
 import { roundedWindowClearance } from '../../project/window-geometry';
 import { cameraTrajectoryBounds } from './camera-trajectory';
 import type { CameraPanBounds, CameraTrajectory } from './camera-trajectory';
@@ -227,6 +228,12 @@ export interface QuickEditCameraProjectionInterval {
   video: QuickEditRect;
   output: { width: number; height: number };
   cornerRadius: number;
+  planeTransform?: QuickEditHomography;
+  planeTransition?: {
+    from: QuickEditHomography;
+    to: QuickEditHomography;
+    phase: number | CameraTrajectory;
+  };
   targetScale: number;
   phase: number | CameraTrajectory;
   pan: CameraPanBounds;
@@ -244,26 +251,32 @@ export interface QuickEditCameraProjectionInterval {
   actual?: { from: { x: number; y: number }; to: { x: number; y: number } };
 }
 
+function projectionPhaseJet(
+  phase: number | CameraTrajectory,
+  start: number,
+  end: number,
+  motion: boolean
+) {
+  if (typeof phase === 'number') return constant(phase);
+  const bounds = motion
+    ? trajectoryIntervalBounds(phase, start, end)
+    : [cameraTrajectoryBounds(phase, start, end)];
+  return motion ? trajectoryJet(bounds, 'x') : boxed([bounds[0]!.minX, bounds[0]!.maxX]);
+}
+
 function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boolean) {
-  const phaseBounds =
-    typeof input.phase === 'number'
-      ? null
-      : motion
-        ? trajectoryIntervalBounds(input.phase, input.start, input.end)
-        : [cameraTrajectoryBounds(input.phase, input.start, input.end)];
-  const g =
-    typeof input.phase === 'number'
-      ? constant(input.phase)
-      : motion
-        ? trajectoryJet(phaseBounds!, 'x')
-        : boxed([phaseBounds![0]!.minX, phaseBounds![0]!.maxX]);
+  const g = projectionPhaseJet(input.phase, input.start, input.end, motion);
   const panBounds =
     motion && input.trajectory
       ? trajectoryIntervalBounds(input.trajectory, input.start, input.end)
       : null;
   const pan = (axis: 'x' | 'y') =>
     panBounds
-      ? trajectoryJet(panBounds, axis, typeof input.phase !== 'number')
+      ? trajectoryJet(
+          panBounds,
+          axis,
+          typeof input.phase !== 'number' || input.planeTransition !== undefined
+        )
       : boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY]);
   const startScale = input.from?.scale ?? 1;
   const translation = (axis: 'x' | 'y') => {
@@ -343,7 +356,7 @@ function unrotatedOutputCoordinate(
   );
 }
 
-function projectInterval(input: QuickEditCameraProjectionInterval, motion: boolean) {
+function projectWindowInterval(input: QuickEditCameraProjectionInterval, motion: boolean) {
   const { window: windowRect } = input;
   const jets = nominalCameraJets(input, motion);
   if (!jets) return null;
@@ -379,6 +392,42 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
     center(windowRect.x, windowRect.width, tx),
     center(windowRect.y, windowRect.height, ty)
   );
+}
+
+function projectInterval(input: QuickEditCameraProjectionInterval, motion: boolean) {
+  const result = projectWindowInterval(input, motion);
+  const plane = input.planeTransform;
+  const transition = input.planeTransition;
+  if (!result || (!plane && !transition)) return result;
+  const affine = (matrix: QuickEditHomography) =>
+    matrix.every(Number.isFinite) && matrix[6] === 0 && matrix[7] === 0 && matrix[8] === 1;
+  if (
+    (plane && !affine(plane)) ||
+    (transition && (!affine(transition.from) || !affine(transition.to)))
+  )
+    return null;
+  const phase = transition && projectionPhaseJet(transition.phase, input.start, input.end, motion);
+  const coefficient = (index: number) =>
+    transition && phase
+      ? add(
+          constant(transition.from[index]!),
+          multiply(phase, constant(transition.to[index]! - transition.from[index]!))
+        )
+      : constant(plane![index]!);
+  const determinant = subtract(
+    multiply(coefficient(0), coefficient(4)),
+    multiply(coefficient(1), coefficient(3))
+  ).value;
+  if (determinant[0] <= 1e-12 && determinant[1] >= -1e-12) return null;
+  const coordinate = (offset: 0 | 3) =>
+    add(
+      add(
+        multiply(coefficient(offset), result.outX),
+        multiply(coefficient(offset + 1), result.outY)
+      ),
+      coefficient(offset + 2)
+    );
+  return { ...result, outX: coordinate(0), outY: coordinate(3) };
 }
 
 function projectPlaneJets(
@@ -493,10 +542,14 @@ export function boundQuickEditCameraMotion(input: QuickEditCameraProjectionInter
   if (!result) return null;
   const norm = (order: 0 | 1 | 2) => {
     const x = (
-      typeof input.phase === 'number' ? result.outX.derivatives : (result.outX.follow ?? zeros)
+      typeof input.phase === 'number' && !input.planeTransition
+        ? result.outX.derivatives
+        : (result.outX.follow ?? zeros)
     )[order];
     const y = (
-      typeof input.phase === 'number' ? result.outY.derivatives : (result.outY.follow ?? zeros)
+      typeof input.phase === 'number' && !input.planeTransition
+        ? result.outY.derivatives
+        : (result.outY.follow ?? zeros)
     )[order];
     return Math.hypot(
       Math.max(Math.abs(x[0]), Math.abs(x[1])),

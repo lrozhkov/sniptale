@@ -662,7 +662,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 34, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 35, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -702,7 +702,7 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 34 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 35 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });
 
@@ -749,7 +749,7 @@ it('admits complete source cursor observations only at schema33 without changing
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 33; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 34 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 35 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
   for (const invalid of [
     null,
@@ -809,4 +809,34 @@ it('admits complete source cursor observations only at schema33 without changing
       cursorTrack: { ...track, sourceObservations: [group, group] },
     })
   ).toBe(false);
+});
+
+it('fences and validates converted motion area directions at the project boundary', () => {
+  const project = createEmptyVideoProject('Area directions');
+  const focusArea = {
+    x: -20,
+    y: 30,
+    width: 100,
+    height: 80,
+    axes: { x: { x: 1, y: 0 }, y: { x: 0.6, y: 0.8 } },
+  };
+  const motionRegions = [{ ...createVideoProjectMotionRegion(project, 0), focusArea }];
+  const changed = applyVideoProjectMutationPatch(project, { motionRegions });
+  expect(changed.version).toBe(34);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
+  expect(isExportReadyVideoProject(changed)).toBe(true);
+  expect(isHydratableVideoProject({ ...changed, version: 33 })).toBe(false);
+  for (const axes of [
+    null,
+    {},
+    { x: { x: 1, y: 0 }, y: { x: 1, y: 0 } },
+    { x: { x: Infinity, y: 0 }, y: { x: 0, y: 1 } },
+    { x: { x: 2, y: 0 }, y: { x: 0, y: 1 } },
+  ])
+    expect(
+      isHydratableVideoProject({
+        ...changed,
+        motionRegions: [{ ...motionRegions[0], focusArea: { ...focusArea, axes } }],
+      })
+    ).toBe(false);
 });

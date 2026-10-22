@@ -13,6 +13,7 @@ import {
   type VideoProject,
   type VideoProjectMotionArea,
   type VideoProjectMotionRegion,
+  type VideoProjectVideoClip,
 } from '../types/index';
 import {
   clampFocusAreaOrigin,
@@ -20,6 +21,8 @@ import {
   clampNumber,
   getProjectCenter,
   normalizeMotionFocusArea,
+  motionFocusAreaPoint,
+  MAX_MOTION_AREA_COORDINATE,
 } from './focus-area';
 import {
   resolveMotionBlurAmount,
@@ -48,7 +51,7 @@ function normalizeMotionConnection(value: unknown): VideoProjectMotionRegion['in
 
 /** Resolves a connection against current neighbours, never a second persisted timeline. */
 export function resolveMotionConnectionSource(
-  project: Pick<VideoProject, 'motionRegions'>,
+  project: Pick<VideoProject, 'motionRegions' | 'clips'>,
   destination: VideoProjectMotionRegion
 ): VideoProjectMotionRegion | null {
   if (!destination.incomingConnection) return null;
@@ -66,14 +69,14 @@ export function resolveMotionConnectionSource(
 
 /** Nearest compatible held state; the UI can offer it before a connection is authored. */
 export function resolveMotionConnectionCandidate(
-  project: Pick<VideoProject, 'motionRegions'>,
+  project: Pick<VideoProject, 'motionRegions' | 'clips'>,
   destination: VideoProjectMotionRegion
 ): VideoProjectMotionRegion | null {
   if (destination.duration <= 0 || !isConnectableMotionState(destination)) return null;
   let previous: VideoProjectMotionRegion | null = null;
   for (const region of project.motionRegions ?? []) {
     if (
-      !hasSameMotionConnectionTarget(region, destination) ||
+      !hasSameMotionConnectionTarget(project, region, destination) ||
       region.duration <= 0 ||
       region.id === destination.id ||
       region.startTime > destination.startTime
@@ -89,6 +92,7 @@ export function resolveMotionConnectionCandidate(
 }
 
 function hasSameMotionConnectionTarget(
+  project: Pick<VideoProject, 'clips'>,
   source: VideoProjectMotionRegion,
   destination: VideoProjectMotionRegion
 ): boolean {
@@ -96,11 +100,117 @@ function hasSameMotionConnectionTarget(
     return (
       source.spotlightTarget === destination.spotlightTarget &&
       (source.spotlightTarget === 'viewport' ||
-        (source.sourceBinding !== undefined &&
-          source.sourceBinding.clipId === destination.sourceBinding?.clipId))
+        (source.sourceBinding?.coordinateSpace === 'source-window' ||
+        destination.sourceBinding?.coordinateSpace === 'source-window'
+          ? motionWindowConnectionClips(project, source, destination) !== null
+          : source.sourceBinding !== undefined &&
+            source.sourceBinding.clipId === destination.sourceBinding?.clipId))
     );
   }
-  return isCameraMotionRegion(source) && isCameraMotionRegion(destination);
+  if (!isCameraMotionRegion(source) || !isCameraMotionRegion(destination)) return false;
+  const sourceWindow = source.sourceBinding?.coordinateSpace === 'source-window';
+  const targetWindow = destination.sourceBinding?.coordinateSpace === 'source-window';
+  return sourceWindow || targetWindow
+    ? sourceWindow &&
+        targetWindow &&
+        motionWindowConnectionClips(project, source, destination) !== null
+    : true;
+}
+
+/** Split authoring parts share only their own compatible incoming and outgoing connections. */
+export function resolveMotionConnectionEdges(
+  project: Pick<VideoProject, 'clips' | 'motionRegions'>,
+  region: VideoProjectMotionRegion
+) {
+  const group = region.sourceBinding?.animationGroupId;
+  const sameKind = (item: VideoProjectMotionRegion) =>
+    region.spotlight
+      ? item.spotlight !== undefined && item.spotlightTarget === region.spotlightTarget
+      : isCameraMotionRegion(item);
+  const parts = group
+    ? (project.motionRegions ?? [])
+        .filter(sameKind)
+        .filter((item) => item.duration > 0 && item.sourceBinding?.animationGroupId === group)
+        .toSorted((a, b) => (a.animation?.start ?? 0) - (b.animation?.start ?? 0))
+    : [region];
+  const first = parts[0] ?? region,
+    last = parts.at(-1) ?? region;
+  return {
+    connectedIn: resolveMotionConnectionSource(project, first) !== null,
+    connectedOut: (project.motionRegions ?? [])
+      .filter(sameKind)
+      .some((item) => resolveMotionConnectionSource(project, item)?.id === last.id),
+  };
+}
+
+/** Resolve the visible clip without crossing an independent instance, timeline gap, overlap, or layout change. */
+export function resolveMotionConnectionVideo(
+  project: Pick<VideoProject, 'clips'>,
+  source: VideoProjectMotionRegion,
+  destination: VideoProjectMotionRegion,
+  time: number
+): VideoProjectVideoClip | null {
+  return (
+    motionWindowConnectionClips(project, source, destination)?.find(
+      (clip) => time >= clip.startTime && time < clip.startTime + clip.duration
+    ) ?? null
+  );
+}
+
+function motionWindowConnectionClips(
+  project: Pick<VideoProject, 'clips'>,
+  source: VideoProjectMotionRegion,
+  destination: VideoProjectMotionRegion
+): VideoProjectVideoClip[] | null {
+  if (
+    source.sourceBinding?.coordinateSpace !== 'source-window' ||
+    destination.sourceBinding?.coordinateSpace !== 'source-window'
+  )
+    return null;
+  const first = project.clips.find((clip) => clip.id === source.sourceBinding?.clipId);
+  const last = project.clips.find((clip) => clip.id === destination.sourceBinding?.clipId);
+  if (first?.type !== 'VIDEO' || last?.type !== 'VIDEO') return null;
+  if (first.id === last.id) return [first];
+  if (
+    !first.sourceInstanceId ||
+    first.sourceInstanceId !== last.sourceInstanceId ||
+    first.trackId !== last.trackId ||
+    first.assetId !== last.assetId
+  )
+    return null;
+  const geometry = (clip: VideoProjectVideoClip) =>
+    JSON.stringify({
+      transform: clip.transform,
+      crop: clip.sourceCrop,
+      fit: clip.fitMode,
+      header: clip.windowHeader,
+      corner: clip.windowCornerRadius,
+    });
+  const expected = geometry(first);
+  const chain = project.clips
+    .filter(
+      (clip): clip is VideoProjectVideoClip =>
+        clip.type === 'VIDEO' &&
+        clip.duration > 0 &&
+        clip.trackId === first.trackId &&
+        clip.assetId === first.assetId &&
+        clip.sourceInstanceId === first.sourceInstanceId &&
+        clip.startTime < last.startTime + last.duration &&
+        clip.startTime + clip.duration > first.startTime
+    )
+    .toSorted((a, b) => a.startTime - b.startTime);
+  if (
+    chain[0]?.id !== first.id ||
+    chain.at(-1)?.id !== last.id ||
+    chain.some((clip) => geometry(clip) !== expected)
+  )
+    return null;
+  for (let index = 1; index < chain.length; index++) {
+    const previous = chain[index - 1]!,
+      current = chain[index]!;
+    if (Math.abs(previous.startTime + previous.duration - current.startTime) > 1e-6) return null;
+  }
+  return chain;
 }
 
 function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
@@ -109,7 +219,9 @@ function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
     (isCameraMotionRegion(region) &&
       (region.focusMode === VideoMotionFocusMode.MANUAL ||
         region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
-        region.focusMode === VideoMotionFocusMode.ACTION))
+        region.focusMode === VideoMotionFocusMode.ACTION ||
+        (region.focusMode === VideoMotionFocusMode.CURSOR &&
+          region.sourceBinding?.coordinateSpace === 'source-window')))
   );
 }
 
@@ -138,10 +250,7 @@ export function createMotionFocusAreaFromPointScale(
 }
 
 export function getMotionFocusAreaCenter(area: VideoProjectMotionArea) {
-  return {
-    x: area.x + area.width / 2,
-    y: area.y + area.height / 2,
-  };
+  return motionFocusAreaPoint(area, 0.5, 0.5);
 }
 
 function resolveMotionDuration(project: Pick<VideoProject, 'duration'>, duration: number): number {
@@ -160,8 +269,16 @@ function resolveMotionFocusPoint(
     Number.isFinite(region.focusPoint.x) &&
     Number.isFinite(region.focusPoint.y)
     ? {
-        x: clampNumber(region.focusPoint.x, 0, project.width),
-        y: clampNumber(region.focusPoint.y, 0, project.height),
+        x: clampNumber(
+          region.focusPoint.x,
+          region.focusArea?.axes ? -MAX_MOTION_AREA_COORDINATE : 0,
+          region.focusArea?.axes ? MAX_MOTION_AREA_COORDINATE : project.width
+        ),
+        y: clampNumber(
+          region.focusPoint.y,
+          region.focusArea?.axes ? -MAX_MOTION_AREA_COORDINATE : 0,
+          region.focusArea?.axes ? MAX_MOTION_AREA_COORDINATE : project.height
+        ),
       }
     : getProjectCenter(project);
 }
@@ -252,8 +369,11 @@ export function normalizeVideoProjectMotionRegion(
   const phaseRegion = phaseTransitions ? { ...region, phaseTransitions } : region;
   const enter = motionTransitionSettings(phaseRegion, 'enter');
   const exit = motionTransitionSettings(phaseRegion, 'exit');
-  const enterDuration = enter.type === 'none' ? region.zoomInDuration : enter.duration;
-  const exitDuration = exit.type === 'none' ? region.zoomOutDuration : exit.duration;
+  const retainedPhases = sourceBinding?.coordinateSpace === 'source-window';
+  const enterDuration =
+    retainedPhases || enter.type === 'none' ? region.zoomInDuration : enter.duration;
+  const exitDuration =
+    retainedPhases || exit.type === 'none' ? region.zoomOutDuration : exit.duration;
 
   return projectMotionSourceBinding(project, {
     ...(border && (borderTarget === 'viewport' || (borderTarget === 'window' && sourceBinding))
@@ -291,12 +411,16 @@ export function normalizeVideoProjectMotionRegion(
     zoomInDuration: clampNumber(
       Number.isFinite(enterDuration) ? enterDuration : 0,
       0,
-      enter.type === 'none' ? 60 : animationDuration
+      enter.type === 'none' || (retainedPhases && phaseTransitions?.enter !== undefined)
+        ? 60
+        : animationDuration
     ),
     zoomOutDuration: clampNumber(
       Number.isFinite(exitDuration) ? exitDuration : 0,
       0,
-      exit.type === 'none' ? 60 : animationDuration
+      exit.type === 'none' || (retainedPhases && phaseTransitions?.exit !== undefined)
+        ? 60
+        : animationDuration
     ),
   });
 }

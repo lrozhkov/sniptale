@@ -20,3 +20,22 @@ it('renders motion area bounds through shared numeric fields', () => {
   expect(markup).toContain('videoEditor.sidebar.motionAreaHeightLabel');
   expect(markup).toContain('value="160"');
 });
+
+it('shows retained off-canvas coordinates and small converted edge lengths', () => {
+  const markup = renderToStaticMarkup(
+    <MotionAreaBoundsFields
+      area={{
+        x: -20,
+        y: -30,
+        width: 20,
+        height: 10,
+        axes: { x: { x: 0, y: 1 }, y: { x: -1, y: 0 } },
+      }}
+      onUpdateArea={vi.fn()}
+      panel={{ project: { width: 1280, height: 720 } } as never}
+    />
+  );
+  expect(markup).toContain('value="-20"');
+  expect(markup).toContain('value="-30"');
+  expect(markup).toContain('value="10"');
+});

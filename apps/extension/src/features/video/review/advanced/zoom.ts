@@ -174,6 +174,12 @@ export function updateQuickEditZoomRegion(
   return updated.map((region) => {
     if (!region.linkTo) return region;
     const target = updated.find((item) => item.id === region.linkTo);
+    // An unrelated edit must not erase a reference whose target was already absent.
+    if (
+      !target &&
+      regions.some((previous) => previous.id === region.id && previous.linkTo === region.linkTo)
+    )
+      return region;
     if (
       target &&
       quickEditFocusType(region) !== 'border' &&

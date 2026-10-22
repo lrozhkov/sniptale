@@ -1,3 +1,6 @@
+import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
+import { resolveSourceWindowCamera, resolveMotionSourceWindow } from './source-window';
+import { projectMotionSourcePhases } from '../../project/motion/source-binding';
 import { evaluateMotionSpatial, motionCameraProjection } from './spatial';
 import { invertQuickEditProjection, projectQuickEditPoint } from './spatial-geometry';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
@@ -6,11 +9,15 @@ import { regionMotionBlurAmount } from './blur';
 import { motionBlurPhaseSetting } from '../../project/motion/blur';
 import { resolveActiveMotionRegion, resolveConnectingMotionRegions } from './camera-interval';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
-import { resolveProjectFollowingCamera, resolveProjectCameraEdges } from './project-follow';
-import { resolveVideoProjectActionOccurrences } from '../../project/action-occurrences';
-import { resolveVideoCompositionActionSourceMapping } from '../timeline/frame/actions';
-import { mapSourceNormalizedPointToVisualLayer } from '../draw/fitted-media';
-import { getMotionFocusAreaCenter, resolveMotionOverlayZoomMode } from '../../project/motion/index';
+import {
+  resolveProjectFollowingCamera,
+  resolveProjectCameraEdges,
+  resolveProjectWindowCameraEndpoint,
+} from './project-follow';
+import {
+  resolveMotionOverlayZoomMode,
+  resolveMotionConnectionVideo,
+} from '../../project/motion/index';
 import { getMotionAnimationTime } from '../../project/motion/timing';
 import {
   VideoMotionFocusMode,
@@ -19,8 +26,8 @@ import {
   type VideoProjectMotionRegion,
 } from '../../project/types/index';
 import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
-import { createDefaultCameraState, getDefaultFocusPoint } from './defaults';
-import { applyTemporalEasing, lerpNumber, lerpPoint } from './math';
+import { createDefaultCameraState } from './defaults';
+import { applyTemporalEasing, motionConnectionProgress, lerpNumber, lerpPoint } from './math';
 
 import { resolveCameraViewportFrame } from './viewport';
 import type { VideoCompositionActionState, VideoCompositionCameraState } from '../types';
@@ -58,32 +65,6 @@ function resolveMotionProgress(
   return 1;
 }
 
-function resolveActionFocusPoint(
-  project: VideoProject,
-  region: VideoProjectMotionRegion,
-  currentTime: number
-) {
-  const target = region.targetAction;
-  const occurrence =
-    target &&
-    resolveVideoProjectActionOccurrences(project).find(
-      (item) => item.eventId === target.eventId && item.clipId === target.clipId
-    );
-  if (!occurrence) return region.focusPoint ?? getDefaultFocusPoint(project);
-  const point = occurrence.event.presentation?.point ?? occurrence.event.point;
-  if (!point) return region.focusPoint ?? getDefaultFocusPoint(project);
-  if (occurrence.clipId === null) return point;
-  const clip = project.clips.find((item) => item.id === occurrence.clipId);
-  if (project.tracks.find((track) => track.id === clip?.trackId)?.role === 'CAMERA')
-    return region.focusPoint ?? getDefaultFocusPoint(project);
-  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, currentTime);
-  return (
-    (mapping && mapSourceNormalizedPointToVisualLayer({ ...mapping, point })) ??
-    region.focusPoint ??
-    getDefaultFocusPoint(project)
-  );
-}
-
 function resolveMotionFocusPoint(
   project: VideoProject,
   region: VideoProjectMotionRegion,
@@ -91,38 +72,9 @@ function resolveMotionFocusPoint(
   currentTime: number,
   output?: CameraOutputViewport
 ) {
-  switch (region.focusMode) {
-    case VideoMotionFocusMode.MANUAL:
-      return region.focusPoint ?? getDefaultFocusPoint(project);
-    case VideoMotionFocusMode.MANUAL_AREA:
-      return region.focusArea
-        ? getMotionFocusAreaCenter(region.focusArea)
-        : (region.focusPoint ?? getDefaultFocusPoint(project));
-    case VideoMotionFocusMode.CURSOR:
-      return resolveProjectFollowingCamera(project, region, currentTime, output).focusPoint;
-    case VideoMotionFocusMode.ACTION:
-      return resolveActionFocusPoint(project, region, currentTime);
-  }
-}
-
-function resolveMotionTargetScale(
-  project: VideoProject,
-  activeRegion: VideoProjectMotionRegion
-): number {
-  if (activeRegion.focusMode !== VideoMotionFocusMode.MANUAL_AREA || !activeRegion.focusArea) {
-    return activeRegion.scale;
-  }
-
-  return Math.min(
-    4,
-    Math.max(
-      1,
-      Math.min(
-        project.width / Math.max(1, activeRegion.focusArea.width),
-        project.height / Math.max(1, activeRegion.focusArea.height)
-      )
-    )
-  );
+  return region.focusMode === VideoMotionFocusMode.CURSOR
+    ? resolveProjectFollowingCamera(project, region, currentTime, output).focusPoint
+    : resolveManualMotionFocusPoint(project, region, currentTime);
 }
 
 export function resolveVideoCompositionCamera(params: {
@@ -132,6 +84,7 @@ export function resolveVideoCompositionCamera(params: {
   project: VideoProject;
   cameraViewport?: CameraOutputViewport;
 }): VideoCompositionCameraState {
+  params = { ...params, project: projectMotionSourcePhases(params.project) };
   if (!isVideoProjectUtilityLaneVisible(params.project, 'camera')) {
     return createDefaultCameraState(params.project);
   }
@@ -171,6 +124,29 @@ export function resolveVideoCompositionCamera(params: {
       params.currentTime,
       params.cameraViewport
     );
+  {
+    const windowCamera = resolveSourceWindowCamera(
+      params.project,
+      activeRegion,
+      params.currentTime,
+      focusPoint,
+      targetScale,
+      progress,
+      following
+        ? {
+            x: following.pan.x / following.geometry.window.width,
+            y: following.pan.y / following.geometry.window.height,
+          }
+        : undefined
+    );
+    if (windowCamera)
+      return {
+        ...windowCamera,
+        regionId: activeRegion.id,
+        motionBlurAmount,
+        overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
+      };
+  }
   if (following)
     return {
       focusPoint,
@@ -214,10 +190,90 @@ function resolveConnectingCamera(
   if (connection) {
     const { source, destination } = connection;
     const start = source.startTime + source.duration;
-    const progress = applyTemporalEasing(
-      (params.currentTime - start) / (destination.startTime - start),
-      destination.incomingConnection!.easing
+    const progress = motionConnectionProgress(
+      destination,
+      (params.currentTime - start) / (destination.startTime - start)
     );
+    if (destination.sourceBinding?.coordinateSpace === 'source-window') {
+      const clip = resolveMotionConnectionVideo(
+        params.project,
+        source,
+        destination,
+        params.currentTime
+      );
+      if (!clip) return null;
+      const currentTarget = {
+        ...destination,
+        sourceBinding: { ...destination.sourceBinding, clipId: clip.id },
+      };
+      const geometry = resolveMotionSourceWindow(params.project, currentTarget, params.currentTime);
+      if (!geometry) return null;
+      const endpoint = (region: VideoProjectMotionRegion, time: number) => {
+        const target = resolveProjectWindowCameraEndpoint(
+          params.project,
+          region,
+          time,
+          params.cameraViewport
+        );
+        return target
+          ? resolveSourceWindowCamera(
+              params.project,
+              { ...region, sourceBinding: { ...destination.sourceBinding!, clipId: clip.id } },
+              params.currentTime,
+              region.focusPoint ?? { x: params.project.width / 2, y: params.project.height / 2 },
+              target.scale,
+              1,
+              target.pan
+            )
+          : null;
+      };
+      const from = endpoint(source, start);
+      const to = endpoint(destination, destination.startTime);
+      if (!from || !to) return null;
+      const scale = lerpNumber(from.scale, to.scale, progress);
+      const spatialReference = {
+        x: geometry.window.x / params.project.width,
+        y: geometry.window.y / params.project.height,
+        width: geometry.window.width / params.project.width,
+        height: geometry.window.height / params.project.height,
+      };
+      const spatial = evaluateMotionSpatial(
+        params.project,
+        { ...source, spatialReference },
+        { ...destination, spatialReference },
+        progress
+      );
+      return {
+        sourceClipId: geometry.clipId,
+        scale,
+        focusPoint: lerpPoint(from.focusPoint, to.focusPoint, progress),
+        viewportX:
+          lerpNumber(from.viewportX * from.scale, to.viewportX * to.scale, progress) / scale,
+        viewportY:
+          lerpNumber(from.viewportY * from.scale, to.viewportY * to.scale, progress) / scale,
+        viewportWidth: params.project.width / scale,
+        viewportHeight: params.project.height / scale,
+        ...(spatial
+          ? {
+              spatial: {
+                ...spatial,
+                ...(geometry.planeTransform ? { planeTransform: geometry.planeTransform } : {}),
+              },
+            }
+          : {}),
+        regionId: destination.id,
+        motionBlurAmount: ['INSTANT', 'instant', 'none'].includes(
+          destination.incomingConnection!.easing
+        )
+          ? 0
+          : source.motionBlur === undefined
+            ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
+            : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
+              ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
+              : 0,
+        overlayZoomMode: resolveMotionOverlayZoomMode(destination.overlayZoomMode),
+      };
+    }
     const focusPoint = lerpPoint(
       resolveMotionFocusPoint(params.project, source, null, start, params.cameraViewport),
       resolveMotionFocusPoint(
@@ -241,14 +297,15 @@ function resolveConnectingCamera(
       ...(spatial ? { spatial } : {}),
       ...resolveCameraViewportFrame(params.project, focusPoint, scale),
       regionId: destination.id,
-      motionBlurAmount:
-        destination.incomingConnection!.easing === 'INSTANT'
-          ? 0
-          : source.motionBlur === undefined
-            ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
-            : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
-              ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
-              : 0,
+      motionBlurAmount: ['INSTANT', 'instant', 'none'].includes(
+        destination.incomingConnection!.easing
+      )
+        ? 0
+        : source.motionBlur === undefined
+          ? lerpNumber(source.motionBlurAmount ?? 0, destination.motionBlurAmount ?? 0, progress)
+          : motionBlurPhaseSetting(source.motionBlur, 'link').enabled
+            ? motionBlurPhaseSetting(source.motionBlur, 'link').strength
+            : 0,
       overlayZoomMode: resolveMotionOverlayZoomMode(destination.overlayZoomMode),
     };
   }

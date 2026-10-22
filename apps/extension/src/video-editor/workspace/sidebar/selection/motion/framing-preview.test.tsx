@@ -400,3 +400,205 @@ it('uses the presented spatial region for the thumbnail without authoring its ac
   expect(selected.perspective).toBeUndefined();
   expect(panel.onUpdateMotionRegion).not.toHaveBeenCalled();
 });
+
+it.each(['available', 'outside', 'missing'] as const)(
+  'keeps source-window framing edits safe for target: %s',
+  async (target) => {
+    const { createVideoProjectFromRecording } =
+      await import('../../../../../features/video/project/factories/creation');
+    const next = createVideoProjectFromRecording({
+      recordingId: 'window',
+      filename: 'Window.webm',
+      width: 800,
+      height: 600,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+    });
+    const clip = next.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    clip.transform = { x: 200, y: 150, width: 400, height: 300, opacity: 1, rotation: 0 };
+    clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+    const selected = {
+      ...createVideoProjectMotionRegion(next, 0),
+      duration: 4,
+      scale: 2,
+      focusPoint: { x: 300, y: 250 },
+      sourceBinding: {
+        clipId: target === 'missing' ? 'missing' : clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 4,
+        animation: { start: 0, end: 4, duration: 4 },
+      },
+    };
+    next.motionRegions = [selected];
+    if (target === 'outside') clip.startTime = 5;
+    const before = structuredClone(next);
+    render(false, next, selected);
+    await ready();
+    setupBounds();
+    if (target !== 'available') {
+      pointer('pointerdown', 180, 150);
+      pointer('pointerup', 190, 150);
+      act(() =>
+        button().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      );
+      expect(commit).not.toHaveBeenCalled();
+      expect(commitArea).not.toHaveBeenCalled();
+      expect(next).toEqual(before);
+      return;
+    }
+    pointer('pointerdown', 180, 150);
+    pointer('pointermove', 190, 150);
+    expect(commit).not.toHaveBeenCalled();
+    pointer('pointerup', 190, 150);
+    expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 332, y: 250 });
+    commit.mockClear();
+    pointer('pointerdown', 180, 150);
+    pointer('pointermove', 200, 170);
+    pointer('pointercancel', 200, 170);
+    pointer('pointerup', 200, 170);
+    expect(commit).not.toHaveBeenCalled();
+    expect(next).toEqual(before);
+  }
+);
+
+it('shows and resizes the actual rotated source-window area without changing the opposite corner', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../../features/video/project/factories/creation');
+  const next = createVideoProjectFromRecording({
+    recordingId: 'rotated-area',
+    filename: 'Area.webm',
+    width: 800,
+    height: 600,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+  });
+  const clip = next.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.transform = { x: 200, y: 150, width: 400, height: 300, opacity: 1, rotation: 90 };
+  const selected = {
+    ...createVideoProjectMotionRegion(next, 0),
+    duration: 4,
+    focusMode: VideoMotionFocusMode.MANUAL_AREA,
+    focusArea: { x: 200, y: 150, width: 400, height: 300 },
+    sourceBinding: {
+      clipId: clip.id,
+      coordinateSpace: 'source-window' as const,
+      sourceStart: 0,
+      sourceEnd: 4,
+      animation: { start: 0, end: 4, duration: 4 },
+    },
+  };
+  next.motionRegions = [selected];
+  const before = structuredClone(next);
+  render(false, next, selected);
+  await ready();
+  setupBounds();
+  const nw = host.querySelector<HTMLElement>('[data-framing-corner="nw"]')!;
+  const se = host.querySelector<HTMLElement>('[data-framing-corner="se"]')!;
+  expect(parseFloat(nw.style.left)).toBeCloseTo(59.375, 8);
+  expect(parseFloat(nw.style.top)).toBeCloseTo(33.3333333333, 8);
+  expect(parseFloat(se.style.left)).toBeCloseTo(40.625, 8);
+  expect(parseFloat(se.style.top)).toBeCloseTo(66.6666666667, 8);
+  pointer('pointerdown', 162.5, 200, se);
+  pointer('pointermove', 150, 225);
+  expect(commitArea).not.toHaveBeenCalled();
+  pointer('pointerup', 150, 225);
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 200, y: 150, width: 500, height: 350 });
+  expect(commit).not.toHaveBeenCalled();
+  expect(next).toEqual(before);
+});
+
+it('fits every rotated area handle and freezes the overview while a corner follows the pointer', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../../features/video/project/factories/creation');
+  const next = createVideoProjectFromRecording({
+    recordingId: 'area-clearance',
+    filename: 'Area.webm',
+    width: 800,
+    height: 600,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+  });
+  const clip = next.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.transform = { x: 40, y: 30, width: 720, height: 540, rotation: 30, opacity: 1 };
+  const selected = {
+    ...createVideoProjectMotionRegion(next, 0),
+    duration: 4,
+    focusMode: VideoMotionFocusMode.MANUAL_AREA,
+    focusArea: { x: 0, y: 0, width: 800, height: 600 },
+    sourceBinding: {
+      clipId: clip.id,
+      coordinateSpace: 'source-window' as const,
+      sourceStart: 0,
+      sourceEnd: 4,
+      animation: { start: 0, end: 4, duration: 4 },
+    },
+  };
+  next.motionRegions = [selected];
+  const before = structuredClone(next);
+  render(false, next, selected);
+  await ready();
+  setupBounds();
+  for (const corner of host.querySelectorAll<HTMLElement>('[data-framing-corner]')) {
+    expect(parseFloat(corner.style.left)).toBeGreaterThan(2);
+    expect(parseFloat(corner.style.left)).toBeLessThan(98);
+    expect(parseFloat(corner.style.top)).toBeGreaterThan(2);
+    expect(parseFloat(corner.style.top)).toBeLessThan(98);
+  }
+  const corner = host.querySelector<HTMLElement>('[data-framing-corner="nw"]')!;
+  const left = parseFloat(corner.style.left),
+    top = parseFloat(corner.style.top);
+  pointer('pointerdown', left * 4, top * 3, corner);
+  pointer('pointermove', left * 4 + 4, top * 3 + 8);
+  await act(async () => {});
+  const moved = host.querySelector<HTMLElement>('[data-framing-corner="nw"]')!;
+  expect(parseFloat(moved.style.left)).toBeCloseTo(left + 1, 8);
+  expect(parseFloat(moved.style.top)).toBeCloseTo(top + 8 / 3, 8);
+  expect(commitArea).not.toHaveBeenCalled();
+  expect(pending).toHaveLength(1);
+  pointer('pointercancel', left * 4 + 4, top * 3 + 8);
+  pointer('pointerup', left * 4 + 4, top * 3 + 8);
+  expect(commitArea).not.toHaveBeenCalled();
+  expect(next).toEqual(before);
+});
+
+it('resizes a converted scene area along its retained edges with one commit', async () => {
+  const next = createEmptyVideoProject('Converted scene area', 800, 600);
+  const axes = { x: { x: Math.sqrt(3) / 2, y: 0.5 }, y: { x: -0.5, y: Math.sqrt(3) / 2 } };
+  const area = { x: 300, y: 150, width: 200, height: 160, axes };
+  const selected = {
+    ...createVideoProjectMotionRegion(next, 0),
+    duration: 2,
+    focusMode: VideoMotionFocusMode.MANUAL_AREA,
+    focusArea: area,
+  };
+  next.motionRegions = [selected];
+  const before = structuredClone(next);
+  render(false, next, selected);
+  await ready();
+  setupBounds();
+  const corner = host.querySelector<HTMLElement>('[data-framing-corner="se"]')!;
+  const x = parseFloat(corner.style.left) * 4,
+    y = parseFloat(corner.style.top) * 3;
+  const dx = (40 * axes.x.x + 20 * axes.y.x) / 2,
+    dy = (40 * axes.x.y + 20 * axes.y.y) / 2;
+  pointer('pointerdown', x, y, corner);
+  pointer('pointermove', x + dx, y + dy);
+  expect(commitArea).not.toHaveBeenCalled();
+  pointer('pointerup', x + dx, y + dy);
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({
+    ...area,
+    width: expect.closeTo(240, 8),
+    height: expect.closeTo(180, 8),
+  });
+  expect(next).toEqual(before);
+});

@@ -1,3 +1,4 @@
+import { mapCompositionPointThroughCamera, resolveVideoCompositionCamera } from './index';
 import { isValidVideoProject } from '../../project/validation/root';
 import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
@@ -266,41 +267,45 @@ it('retains both source-owned sides at a cut without interpolating across source
   expect(project).toEqual(before);
 });
 
-it('coordinates adjacent retained portions of the same nominal animation clock', () => {
-  const { project, region } = fixture();
-  project.version = 4;
-  project.cameraFollowDefaults = createCameraFollowSettings('fast');
-  project.cursorTrack!.samples[0] = {
-    ...project.cursorTrack!.samples[0]!,
-    x: 400,
-    recordingPoint: { x: 0.4, y: 0.5 },
-  };
-  const left = {
-    ...region,
-    id: 'clock-left',
-    scale: 2,
-    duration: 1.5,
-    zoomInDuration: 0.6,
-    zoomOutDuration: 0.6,
-    easing: VideoTemporalEasing.EASE_IN_OUT,
-    animation: { start: 0, end: 1.5, duration: 3 },
-  };
-  const right = {
-    ...left,
-    id: 'clock-right',
-    startTime: 1.5,
-    animation: { start: 1.5, end: 3, duration: 3 },
-  };
-  project.motionRegions = [left, right];
-  expect(isValidVideoProject(project)).toBe(true);
-  const before = structuredClone(project);
-  const end = resolveProjectFollowingCamera(project, left, 1.5);
-  const start = resolveProjectFollowingCamera(project, right, 1.5);
-  expect(end.plan.status).toBe('ready');
-  expect(start.plan.status).toBe('ready');
-  expect(start.pan.x).toBeCloseTo(end.pan.x, 8);
-  expect(project).toEqual(before);
-});
+it.each([false, true])(
+  'coordinates adjacent retained portions of the same nominal animation clock with remembered link=%s',
+  (remembered) => {
+    const { project, region } = fixture();
+    project.version = remembered ? 34 : 4;
+    project.cameraFollowDefaults = createCameraFollowSettings('fast');
+    project.cursorTrack!.samples[0] = {
+      ...project.cursorTrack!.samples[0]!,
+      x: 400,
+      recordingPoint: { x: 0.4, y: 0.5 },
+    };
+    const left = {
+      ...region,
+      id: 'clock-left',
+      scale: 2,
+      duration: 1.5,
+      zoomInDuration: 0.6,
+      zoomOutDuration: 0.6,
+      easing: VideoTemporalEasing.EASE_IN_OUT,
+      animation: { start: 0, end: 1.5, duration: 3 },
+    };
+    const right = {
+      ...left,
+      id: 'clock-right',
+      startTime: 1.5,
+      animation: { start: 1.5, end: 3, duration: 3 },
+    };
+    if (remembered) left.phaseTransitions = { link: VideoTemporalEasing.LINEAR };
+    project.motionRegions = [left, right];
+    expect(isValidVideoProject(project)).toBe(true);
+    const before = structuredClone(project);
+    const end = resolveProjectFollowingCamera(project, left, 1.5);
+    const start = resolveProjectFollowingCamera(project, right, 1.5);
+    expect(end.plan.status).toBe('ready');
+    expect(start.plan.status).toBe('ready');
+    expect(start.pan.x).toBeCloseTo(end.pan.x, 8);
+    expect(project).toEqual(before);
+  }
+);
 
 it('projects a cropped source cursor once during camera containment and preserves native observations', async () => {
   const { resolveVideoCompositionCursor } = await import('../timeline/frame/cursor');
@@ -395,5 +400,87 @@ it.each(['instant', 'smooth', 'shrink'] as const)(
     project.motionRegions = [cameraRegion];
     const camera = resolveProjectFollowingCamera(project, cameraRegion, 2);
     expect(camera.plan.status).toBe('ready');
+  }
+);
+
+it.each([
+  [0, 0.99, 'ready'],
+  [45, 0.99, 'conflict'],
+  [90, 0.99, 'ready'],
+  [-135, 0.99, 'conflict'],
+  [45, 0.5, 'ready'],
+] as const)(
+  'admits the physical rotated window cursor: rotation=%s position=%s',
+  (rotation, position, status) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'rotated-admission',
+      filename: 'window.webm',
+      width: 400,
+      height: 400,
+      duration: 3,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [0, 3].map((time) => ({
+          id: `cursor:${time}`,
+          time,
+          x: position * 400,
+          y: position * 400,
+          visible: true,
+          observation: 'observed' as const,
+          recordingPoint: { x: position, y: position },
+          captureSegment: 0,
+        })),
+      },
+    });
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Missing video');
+    clip.transform.rotation = rotation;
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0, { enter: 'none', exit: 'none' }),
+      duration: 3,
+      scale: 2,
+      focusMode: VideoMotionFocusMode.CURSOR,
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+      sourceBinding: {
+        clipId: clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 3,
+        animation: { start: 0, end: 3, duration: 3 },
+      },
+    };
+    project.motionRegions = [region];
+    const before = structuredClone(project);
+    const plan = resolveProjectCursorCameraPlan(project, region);
+    expect(plan.status).toBe(status);
+    if (status === 'conflict') expect(plan).toMatchObject({ reason: 'viewport' });
+    for (const output of [undefined, { width: 320, height: 180 }]) {
+      expect(resolveProjectCursorCameraPlan(project, region, output).status).toBe(status);
+    }
+    if (status === 'ready') {
+      const angle = (rotation * Math.PI) / 180;
+      const dx = position * project.width - project.width / 2;
+      const dy = position * project.height - project.height / 2;
+      const physical = {
+        x: 200 + dx * Math.cos(angle) - dy * Math.sin(angle),
+        y: 200 + dx * Math.sin(angle) + dy * Math.cos(angle),
+      };
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: 1.5,
+        actions: [],
+        cursorSample: null,
+      });
+      const pixel = mapCompositionPointThroughCamera(physical, camera)!;
+      expect(pixel.x).toBeGreaterThanOrEqual(-1e-6);
+      expect(pixel.y).toBeGreaterThanOrEqual(-1e-6);
+      expect(pixel.x).toBeLessThanOrEqual(project.width + 1e-6);
+      expect(pixel.y).toBeLessThanOrEqual(project.height + 1e-6);
+    }
+    expect(project).toEqual(before);
   }
 );

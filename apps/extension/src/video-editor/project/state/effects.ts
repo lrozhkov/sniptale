@@ -1,3 +1,9 @@
+import { isMotionFocusArea } from '../../../features/video/project/motion/focus-area';
+import {
+  motionWindowFocusToComposition,
+  motionWindowAreaToComposition,
+  resolveMotionSourceWindow,
+} from '../../../features/video/composition/motion/source-window';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -27,7 +33,10 @@ import {
   isVideoProjectActionPresentation,
   isVideoProjectActionPresentationOverride,
 } from '../../../features/video/project/validation/interaction';
-import { normalizeVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import {
+  normalizeVideoProjectMotionRegion,
+  resolveMotionConnectionSource,
+} from '../../../features/video/project/motion';
 import {
   bindMotionRegionToClip,
   getMotionBindingCandidates,
@@ -379,6 +388,7 @@ function applyCurrentMotionRegionPatch(
   patch: MotionRegionPatch
 ): VideoProject {
   if (isVideoProjectUtilityLaneLocked(project, 'camera')) return project;
+  if (patch.focusArea?.axes !== undefined && !isMotionFocusArea(patch.focusArea)) return project;
   const target = project.motionRegions?.find((region) => region.id === motionRegionId);
   const edits = prepareMotionPatch(target, patch);
   if (!edits) return project;
@@ -399,13 +409,64 @@ function applyCurrentMotionRegionPatch(
     focusRefused = result.refused;
     return result.region;
   });
-  if (
-    patch.focusEdit !== undefined &&
-    (focusRefused ||
-      motionRegions.every((region, index) => region === project.motionRegions?.[index]))
-  )
-    return project;
-  return applyVideoProjectMutationPatch(project, { motionRegions });
+  if (focusRefused) return project;
+  const retained =
+    patch.incomingConnection !== undefined
+      ? rememberMotionConnectionPreferences(project, motionRegions, target)
+      : motionRegions;
+  if (retained.every((region, index) => region === project.motionRegions?.[index])) return project;
+  return applyVideoProjectMutationPatch(project, { motionRegions: retained });
+}
+
+/** Connection edits keep one source-owned preference without changing camera phase curves. */
+function rememberMotionConnectionPreferences(
+  project: VideoProject,
+  regions: VideoProjectMotionRegion[],
+  previous: VideoProjectMotionRegion | undefined
+) {
+  const destination = regions.find((region) => region.id === previous?.id);
+  const accepted = destination?.incomingConnection;
+  const replacePassive =
+    destination &&
+    accepted &&
+    resolveMotionConnectionSource({ ...project, motionRegions: regions }, destination);
+  const updates = new Map<
+    string,
+    {
+      easing: NonNullable<VideoProjectMotionRegion['incomingConnection']>['easing'];
+      replacePassive: boolean;
+    }
+  >();
+  for (const connection of [previous?.incomingConnection, accepted]) {
+    if (!connection) continue;
+    const source = regions.find((region) => region.id === connection.fromRegionId);
+    if (!source) continue;
+    const group = source.sourceBinding?.animationGroupId;
+    for (const region of regions) {
+      if (region.id === source.id || (group && region.sourceBinding?.animationGroupId === group))
+        updates.set(region.id, {
+          easing: connection.easing,
+          replacePassive: connection === accepted && !!replacePassive,
+        });
+    }
+  }
+  return regions.map((region) => {
+    const update = updates.get(region.id);
+    if (!update) return region;
+    const binding = region.sourceBinding;
+    const clearPassive = update.replacePassive && binding?.unresolvedLinkTo !== undefined;
+    if (region.phaseTransitions?.link === update.easing && !clearPassive) return region;
+    let sourceBinding = binding;
+    if (clearPassive && binding) {
+      const { unresolvedLinkTo: _passive, ...retainedBinding } = binding;
+      sourceBinding = retainedBinding;
+    }
+    return {
+      ...region,
+      phaseTransitions: { ...region.phaseTransitions, link: update.easing },
+      ...(clearPassive && sourceBinding ? { sourceBinding } : {}),
+    };
+  });
 }
 
 function prepareMotionPatch(
@@ -413,6 +474,17 @@ function prepareMotionPatch(
   patch: MotionRegionPatch
 ) {
   if (patch.focusEdit !== undefined && !target) return null;
+  if (
+    patch.cameraTarget !== undefined &&
+    (!target ||
+      target.border ||
+      target.spotlight ||
+      (patch.cameraTarget !== 'scene' && patch.cameraTarget !== 'window') ||
+      (Object.keys(patch).length === 1 &&
+        (target.sourceBinding?.coordinateSpace === 'source-window') ===
+          (patch.cameraTarget === 'window')))
+  )
+    return null;
   const spatial =
     patch.spatialEdit === undefined
       ? undefined
@@ -451,6 +523,7 @@ function mergeMotionRegionProperties(
   const { spatial, transition, phases } = edits;
   const {
     sourceClipId: _sourceClipId,
+    cameraTarget: _cameraTarget,
     focusEdit: _focusEdit,
     cameraFollow,
     motionBlurPhase: _phase,
@@ -479,6 +552,37 @@ function mergeMotionRegionProperties(
   return updated;
 }
 
+function changeMotionCoordinateSpace(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  target: 'scene' | 'window'
+): VideoProjectMotionRegion | null {
+  if ((region.sourceBinding?.coordinateSpace === 'source-window') === (target === 'window'))
+    return region;
+  const binding = region.sourceBinding;
+  if (!binding) return null;
+  const windowRegion = {
+    ...region,
+    sourceBinding: { ...binding, coordinateSpace: 'source-window' as const },
+  };
+  const time = region.startTime + region.duration / 2;
+  if (!resolveMotionSourceWindow(project, windowRegion, time)) return null;
+  const inverse = target === 'window';
+  const { coordinateSpace: _space, ...sceneBinding } = binding;
+  const focusArea = region.focusArea
+    ? motionWindowAreaToComposition(project, windowRegion, region.focusArea, time, inverse)
+    : region.focusArea;
+  if (region.focusArea && !focusArea) return null;
+  return {
+    ...region,
+    sourceBinding: inverse ? windowRegion.sourceBinding : sceneBinding,
+    focusPoint: region.focusPoint
+      ? motionWindowFocusToComposition(project, windowRegion, region.focusPoint, time, inverse)
+      : null,
+    ...(focusArea ? { focusArea } : {}),
+  };
+}
+
 function updateMotionRegionSource(
   project: VideoProject,
   region: VideoProjectMotionRegion,
@@ -487,7 +591,9 @@ function updateMotionRegionSource(
 ): VideoProjectMotionRegion | null {
   const { sourceClipId, focusEdit } = patch;
   if (sourceClipId === null) {
-    const { sourceBinding: _binding, ...sceneRegion } = updated;
+    const detached = changeMotionCoordinateSpace(project, updated, 'scene');
+    if (!detached) return null;
+    const { sourceBinding: _binding, ...sceneRegion } = detached;
     updated = {
       ...sceneRegion,
       ...(sceneRegion.border ? { borderTarget: 'viewport' as const } : {}),
@@ -505,6 +611,11 @@ function updateMotionRegionSource(
     );
     if (!source) return null;
     updated = bindMotionRegionToClip(updated, source);
+  }
+  if (patch.cameraTarget !== undefined) {
+    const scoped = changeMotionCoordinateSpace(project, updated, patch.cameraTarget);
+    if (!scoped) return null;
+    updated = scoped;
   }
   const clip = project.clips.find((item) => item.id === updated.sourceBinding?.clipId);
   if (patch.duration !== undefined || patch.startTime !== undefined) {

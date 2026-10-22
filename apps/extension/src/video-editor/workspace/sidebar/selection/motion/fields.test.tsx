@@ -1,3 +1,4 @@
+import { MotionBehaviorFields, MotionCameraFields } from './content';
 import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -128,4 +129,25 @@ describe('workspace-sidebar/selection/motion-fields', () => {
     expect(markup).toContain('videoEditor.sidebar.motionOverlayZoomFollowCamera');
     expect(markup).toContain('aria-pressed="true"');
   });
+});
+
+it('shows explicit camera coverage and omits ineffective overlay controls for source windows', () => {
+  const panel = createPanelProps();
+  const region = {
+    ...createVideoProjectMotionRegion(panel.project, 0),
+    sourceBinding: {
+      clipId: 'source',
+      coordinateSpace: 'source-window' as const,
+      sourceStart: 0,
+      sourceEnd: 2,
+      animation: { start: 0, end: 2, duration: 2 },
+    },
+  };
+  const camera = renderToStaticMarkup(<MotionCameraFields panel={panel} motionRegion={region} />);
+  expect(camera).toContain('videoEditor.sidebar.motionCoverage');
+  expect(camera).toContain('videoEditor.sidebar.spotlightCoverageWindow');
+  const behavior = renderToStaticMarkup(
+    <MotionBehaviorFields panel={panel} motionRegion={region} />
+  );
+  expect(behavior).not.toContain('videoEditor.sidebar.motionOverlayZoomLabel');
 });

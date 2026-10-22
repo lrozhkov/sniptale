@@ -296,7 +296,12 @@ export function createWorkspaceTimelineSelectionActions(
       const incomingConnection = { fromRegionId, easing: VideoTemporalEasing.EASE_IN_OUT };
       const source = resolveMotionConnectionSource(project, { ...destination, incomingConnection });
       if (!source) return;
-      store.updateMotionRegion(motionRegionId, { incomingConnection });
+      store.updateMotionRegion(motionRegionId, {
+        incomingConnection: {
+          ...incomingConnection,
+          easing: source.phaseTransitions?.link ?? incomingConnection.easing,
+        },
+      });
       selectWithInspector(store.selectMotionRegion)(motionRegionId, 'connection');
       seekOutsideRange((source.startTime + source.duration + destination.startTime) / 2);
     },

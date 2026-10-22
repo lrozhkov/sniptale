@@ -106,8 +106,8 @@ export async function encodedNativeVideoSamples(
           video.onerror = () => reject(new Error('Decode failed'));
         });
         const canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 360;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         const context = canvas.getContext('2d')!;
         const samples = [];
         for (const time of [...new Set(points.map((point) => point.time))]) {

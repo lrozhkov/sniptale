@@ -50,7 +50,7 @@ it('retains off-canvas ink after rotation nonuniform scale and the existing medi
       ...args,
       layers: [{ ...layer, clip: { ...layer.clip, shadowIntensity: 100, shadowMode: 'BACKDROP' } }],
     })
-  ).toEqual({ x: -122, y: -12, width: 322, height: 112 });
+  ).toEqual({ x: expect.closeTo(-196, 9), y: -30.5, width: 396, height: 130.5 });
   expect(resolveCompositionPaintBounds({ ...args, layers: [{ ...layer, opacity: 0 }] })).toEqual({
     x: 0,
     y: 0,

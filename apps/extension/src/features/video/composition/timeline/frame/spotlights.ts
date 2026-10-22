@@ -1,13 +1,19 @@
+import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
 import { isVideoProjectUtilityLaneVisible } from '../../../project/utility-lanes';
 import { getMotionAnimationTime, motionTransitionSettings } from '../../../project/motion/timing';
 import { cameraTransitionProgress } from '../../../project/motion/transitions';
-import { resolveMotionConnectionSource } from '../../../project/motion';
+import {
+  resolveMotionConnectionSource,
+  resolveMotionConnectionEdges,
+  resolveMotionConnectionVideo,
+} from '../../../project/motion';
 import type { VideoProject, VideoProjectMotionRegion } from '../../../project/types';
-import { applyTemporalEasing } from '../../motion/math';
+import { motionConnectionProgress } from '../../motion/math';
 import type { VideoCompositionSpotlightState } from '../../types';
 
 /** Resolve Native clocks and compatible morphs before attachment geometry is known. */
 export function resolveVideoCompositionSpotlights(project: VideoProject, time: number) {
+  project = projectMotionSourcePhases(project);
   const scene: VideoCompositionSpotlightState[] = [];
   const windows = new Map<string, VideoCompositionSpotlightState[]>();
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return { scene, windows };
@@ -24,32 +30,38 @@ export function resolveVideoCompositionSpotlights(project: VideoProject, time: n
     .toSorted((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id));
   for (const region of regions) {
     const incoming = resolveMotionConnectionSource(project, region);
+    const edges = resolveMotionConnectionEdges(project, region);
     const inGap =
       incoming && time >= incoming.startTime + incoming.duration && time < region.startTime;
     if (!inGap && (time < region.startTime || time >= region.startTime + region.duration)) continue;
-    const state: VideoCompositionSpotlightState = inGap
+    const sampled: VideoCompositionSpotlightState = inGap
       ? {
           id: region.id,
           spotlight: region.spotlight!,
           phase: 'enter',
-          progress: applyTemporalEasing(
+          progress: motionConnectionProgress(
+            region,
             (time - incoming.startTime - incoming.duration) /
-              (region.startTime - incoming.startTime - incoming.duration),
-            region.incomingConnection!.easing
+              (region.startTime - incoming.startTime - incoming.duration)
           ),
           from: incoming.spotlight!,
         }
       : {
           id: region.id,
           spotlight: region.spotlight!,
-          ...sampleSpotlightPhase(
-            region,
-            time,
-            incoming !== null,
-            regions.some((next) => resolveMotionConnectionSource(project, next)?.id === region.id)
-          ),
+          ...sampleSpotlightPhase(region, time, edges.connectedIn, edges.connectedOut),
         };
-    const clipId = region.sourceBinding?.clipId;
+    const state = {
+      ...sampled,
+      ...(region.sourceBinding?.coordinateSpace
+        ? { coordinateSpace: region.sourceBinding.coordinateSpace }
+        : {}),
+    };
+    const clipId =
+      inGap && region.sourceBinding?.coordinateSpace === 'source-window'
+        ? resolveMotionConnectionVideo(project, incoming, region, time)?.id
+        : region.sourceBinding?.clipId;
+    if (region.sourceBinding?.coordinateSpace === 'source-window' && !clipId) continue;
     if (region.spotlightTarget === 'window' && clipId) {
       const states = windows.get(clipId) ?? [];
       states.push(state);

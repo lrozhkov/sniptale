@@ -378,3 +378,104 @@ it('bounds a scene source interval outside its independent reference across phas
     boundCameraPlaneProjection({ ...input, phase: 1, source: { x: [0, 10000], y: [0, 10000] } })
   ).toBeNull();
 });
+
+it.each([0, 0.25, 0.75, 1])(
+  'bounds the actual affine window projection at phase %s',
+  (progress) => {
+    const radians = Math.PI / 6;
+    const c = Math.cos(radians),
+      s = Math.sin(radians);
+    const plane = [c, -s, 110, s, c, -75, 0, 0, 1] as const;
+    const input = { ...base, phase: progress, planeTransform: plane };
+    const spatial = interpolateQuickEditSpatial(
+      null,
+      { perspective: { enabled: true, ...base.perspective } },
+      progress
+    );
+    const scale = 1 + (base.targetScale - 1) * progress;
+    const local = projectQuickEditPoint(
+      quickEditPlaneProjection(
+        base.window,
+        {
+          x: base.window.x - base.pan.minX * progress,
+          y: base.window.y - base.pan.minY * progress,
+          width: base.window.width * scale,
+          height: base.window.height * scale,
+        },
+        spatial
+      ),
+      {
+        x: base.video.x + base.actual!.from.x * base.video.width,
+        y: base.video.y + base.actual!.from.y * base.video.height,
+      }
+    )!;
+    const world = { x: c * local.x - s * local.y + 110, y: s * local.x + c * local.y - 75 };
+    const clearance = Math.min(
+      world.x,
+      world.y,
+      base.output.width - world.x,
+      base.output.height - world.y
+    );
+    const proof = boundQuickEditCameraProjection(input)!;
+    expect(proof.viewport!.low).toBeLessThanOrEqual(clearance + 1e-6);
+    expect(proof.viewport!.high).toBeGreaterThanOrEqual(clearance - 1e-6);
+    expect(proof.viewport!.high - proof.viewport!.low).toBeLessThan(1e-6);
+    expect(proof.raster).toEqual(
+      boundQuickEditCameraProjection({ ...base, phase: progress })!.raster
+    );
+  }
+);
+
+it('refuses an invalid transient plane without admitting partial geometry', () => {
+  for (const planeTransform of [
+    [1, 0, NaN, 0, 1, 0, 0, 0, 1],
+    [1, 2, 0, 2, 4, 0, 0, 0, 1],
+    [1, 0, 0, 0, 1, 0, 0.1, 0, 1],
+  ] as const) {
+    expect(boundQuickEditCameraProjection({ ...base, planeTransform })).toBeNull();
+  }
+});
+
+it('excludes authored source movement while bounding its mixed derivatives with follow', () => {
+  const sourcePhase = createCameraTrajectory({
+    start: 0,
+    end: 1,
+    from: { x: 0, y: 0 },
+    to: { x: 1, y: 0 },
+    fromVelocity: { x: 1, y: 0 },
+    toVelocity: { x: 1, y: 0 },
+  });
+  const from = { x: 100, y: 60 },
+    to = { x: 130, y: 80 };
+  const trajectory = createCameraTrajectory({ start: 0, end: 1, from, to });
+  const time = 0.4;
+  const planeTransition = {
+    from: [1, 0, 0, 0, 1, 0, 0, 0, 1] as const,
+    to: [1.2, 0, 100, 0, 1.2, 40, 0, 0, 1] as const,
+    phase: sourcePhase,
+  };
+  const input = {
+    ...base,
+    start: time,
+    end: time,
+    perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 },
+    planeTransition,
+    trajectory,
+  };
+  const held = createCameraTrajectory({ start: 0, end: 1, from, to: from });
+  const heldBounds = boundQuickEditCameraMotion({ ...input, trajectory: held })!;
+  for (const key of ['speed', 'acceleration', 'jerk'] as const)
+    expect(heldBounds[key]).toBeLessThan(1e-6);
+  const bounds = boundQuickEditCameraMotion(input)!;
+  const first = evaluateCameraTrajectoryDerivative(trajectory, time, 1);
+  const second = evaluateCameraTrajectoryDerivative(trajectory, time, 2);
+  const third = evaluateCameraTrajectoryDerivative(trajectory, time, 3);
+  const scale = 1 + 0.2 * time;
+  const expected = {
+    speed: Math.hypot(scale * first.x, scale * first.y),
+    acceleration: Math.hypot(scale * second.x + 0.4 * first.x, scale * second.y + 0.4 * first.y),
+    jerk: Math.hypot(scale * third.x + 0.6 * second.x, scale * third.y + 0.6 * second.y),
+  };
+  for (const key of ['speed', 'acceleration', 'jerk'] as const)
+    expect(bounds[key]).toBeCloseTo(expected[key], 5);
+});

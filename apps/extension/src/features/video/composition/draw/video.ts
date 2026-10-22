@@ -10,6 +10,7 @@ import {
   drawFittedMediaLayer,
   drawCameraMediaSource,
   getFittedMediaWindowFrame,
+  getFittedMediaOriginalWindowFrame,
 } from './fitted-media';
 import {
   isVideoCompositionFrameSource,
@@ -178,7 +179,16 @@ function drawVideoWindowBorders(
             window.height,
             (layer.clip.windowCornerRadius ?? 0) * displayScale
           );
-    drawCompositionBorders(context, layer.borders, window, displayScale, radius);
+    if (layer.borders.some((state) => state.coordinateSpace === 'source-window'))
+      drawCompositionBorders(
+        context,
+        layer.borders,
+        window,
+        displayScale,
+        radius,
+        getFittedMediaOriginalWindowFrame({ ...media, frame })
+      );
+    else drawCompositionBorders(context, layer.borders, window, displayScale, radius);
   } finally {
     context.restore();
   }
@@ -349,7 +359,10 @@ function drawIsolatedVideoWindow(
     const layers = layer.spotlights!.map((state) =>
       sampleCompositionSpotlightLayer({
         state,
-        window,
+        window:
+          state.coordinateSpace === 'source-window'
+            ? getFittedMediaOriginalWindowFrame({ ...media, frame })
+            : window,
         extent: window,
         scale: displayScale * density,
         projection,

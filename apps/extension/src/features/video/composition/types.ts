@@ -1,3 +1,4 @@
+import type { QuickEditHomography } from './motion/spatial-geometry';
 import type { QuickEditBorder, QuickEditSpotlight } from '../project/scene/focus-appearance';
 import type { SceneBorderClock } from './scene-border';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../project/motion/spatial';
@@ -78,6 +79,7 @@ export interface VideoCompositionResolvedAnnotationClip {
 
 /** Disposable authored appearance and retained phase clock, before output geometry is known. */
 export interface VideoCompositionBorderState {
+  coordinateSpace?: 'source-window';
   id: string;
   border: QuickEditBorder;
   clock: SceneBorderClock;
@@ -85,6 +87,7 @@ export interface VideoCompositionBorderState {
 
 /** Evaluated Native source phase; an optional concrete clip anchors scene-wide coverage. */
 export interface VideoCompositionSpotlightState {
+  coordinateSpace?: 'source-window';
   id: string;
   spotlight: QuickEditSpotlight;
   phase: 'enter' | 'hold' | 'exit';
@@ -141,8 +144,14 @@ export interface VideoCompositionActionState {
 }
 
 export interface VideoCompositionCameraState {
+  /** A source-window camera leaves all other visual layers outside its exposure passes. */
+  sourceClipId?: string;
   /** Disposable pose and absolute project-plane reference, never persisted. */
-  spatial?: CameraSpatialFrame & { reference: CameraSpatialRect };
+  spatial?: CameraSpatialFrame & {
+    reference: CameraSpatialRect;
+    /** The bound media affine placement; local perspective/depth remain in the original plane. */
+    planeTransform?: QuickEditHomography;
+  };
   focusPoint: { x: number; y: number };
   motionBlurAmount: number;
   overlayZoomMode?: VideoMotionOverlayZoomMode;

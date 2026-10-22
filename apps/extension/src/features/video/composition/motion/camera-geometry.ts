@@ -1,7 +1,16 @@
-import { boundCameraPlaneProjection } from './spatial-projection-bounds';
+import { createWindowCameraGeometry } from './window-camera-geometry';
+import { resolveMotionSourceWindow } from './source-window';
+import {
+  boundCameraPlaneProjection,
+  type QuickEditCameraProjectionInterval,
+} from './spatial-projection-bounds';
 import { hasCameraPerspective } from '../../project/motion/spatial';
 import { evaluateMotionSpatial } from './spatial';
-import { projectQuickEditPoint, quickEditPlaneProjection } from './spatial-geometry';
+import {
+  type QuickEditHomography,
+  projectQuickEditPoint,
+  quickEditPlaneProjection,
+} from './spatial-geometry';
 import { cameraTransitionDerivative } from '../../project/motion/transitions';
 import type { CameraTransitionType } from '../../project/motion/transitions';
 import { motionTransitionSettings } from '../../project/motion/timing';
@@ -16,7 +25,10 @@ import { cameraFollowMotionLimits } from '../../project/camera/cursor-policy';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { buildProjectTransitionSegments } from '../../project/transition/project';
 import { getTransitionProgress } from '../../project/transition/runtime';
-import { resolveTransitionVisualStateForRole } from '../../project/transition/visual-resolvers';
+import {
+  resolveTransitionVisualStateForRole,
+  transitionVisualAffineBreaks,
+} from '../../project/transition/visual-resolvers';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
 import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from '../draw/fitted-media';
 import {
@@ -366,6 +378,120 @@ function sourceCursorIntervalBounds(
   return { nativeX, nativeY };
 }
 
+/** Supply the rendered source affine and its existing transition clock to window admission. */
+export function createProjectWindowPlaneProjection(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  output?: CameraOutputViewport
+) {
+  const clip = project.clips.find((item) => item.id === region.sourceBinding?.clipId);
+  if (clip?.type !== 'VIDEO') return {};
+  const transform = resolveProjectOutputTransform(
+    project,
+    output ?? { width: project.width, height: project.height }
+  );
+  const center = {
+    x: clip.transform.x + clip.transform.width / 2,
+    y: clip.transform.y + clip.transform.height / 2,
+  };
+  const angle = (clip.transform.rotation * Math.PI) / 180;
+  const c = Math.cos(angle),
+    s = Math.sin(angle);
+  const matrix = (
+    state: Pick<
+      typeof IDENTITY_TRANSITION_VISUAL_STATE,
+      'translateX' | 'translateY' | 'scaleX' | 'scaleY'
+    >
+  ): QuickEditHomography => {
+    const a = state.scaleX * c,
+      b = -state.scaleX * s,
+      d = state.scaleY * s,
+      e = state.scaleY * c;
+    const x = center.x + state.translateX - a * center.x - b * center.y;
+    const y = center.y + state.translateY - d * center.x - e * center.y;
+    return [
+      a,
+      b,
+      transform.scale * x + transform.offsetX - a * transform.offsetX - b * transform.offsetY,
+      d,
+      e,
+      transform.scale * y + transform.offsetY - d * transform.offsetX - e * transform.offsetY,
+      0,
+      0,
+      1,
+    ];
+  };
+  const transitions = buildProjectTransitionSegments(project).filter(
+    (item) => item.leadingClipId === clip.id || item.trailingClipId === clip.id
+  );
+  const pieces = transitions.map((segment) => {
+    const phase = easingPieces(
+      segment.start,
+      segment.end,
+      segment.transition.easing === 'LINEAR'
+        ? VideoTemporalEasing.LINEAR
+        : VideoTemporalEasing.EASE_IN_OUT,
+      true
+    );
+    const knots = transitionVisualAffineBreaks(segment);
+    const inverseProgress = (value: number) =>
+      segment.transition.easing === 'LINEAR'
+        ? value
+        : value <= 0.5
+          ? Math.cbrt(value / 4)
+          : 1 - Math.cbrt((1 - value) / 4);
+    return {
+      segment,
+      phase,
+      knots,
+      breaks: knots.map(
+        (value) => segment.start + inverseProgress(value) * (segment.end - segment.start)
+      ),
+    };
+  });
+  const planeBreaks = pieces.flatMap((item) => [
+    ...item.breaks,
+    ...item.phase.flatMap((phase) => [phase.start, phase.end]),
+  ]);
+  const intervalPlane = (
+    start: number,
+    end: number
+  ): Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null => {
+    if (planeBreaks.some((time) => start < time && time < end)) return null;
+    const time = (start + end) / 2;
+    const piece = pieces.find((item) => time >= item.segment.start && time < item.segment.end);
+    if (!piece) return { planeTransform: matrix(IDENTITY_TRANSITION_VISUAL_STATE) };
+    const { segment } = piece;
+    const progress = getTransitionProgress(segment, time);
+    if (progress === null) return null;
+    const index = Math.max(
+      0,
+      piece.knots.findLastIndex((value) => value <= progress)
+    );
+    const low = piece.knots[Math.min(index, piece.knots.length - 2)]!,
+      high = piece.knots[Math.min(index + 1, piece.knots.length - 1)]!;
+    const role = segment.leadingClipId === clip.id ? 'leading' : 'trailing';
+    const a = matrix(resolveTransitionVisualStateForRole(clip, role, segment, low));
+    const b = matrix(resolveTransitionVisualStateForRole(clip, role, segment, high));
+    const value = (index: number, at: number) =>
+      a[index]! + ((b[index]! - a[index]!) * (at - low)) / (high - low);
+    const endpoint = (at: number): QuickEditHomography => [
+      value(0, at),
+      value(1, at),
+      value(2, at),
+      value(3, at),
+      value(4, at),
+      value(5, at),
+      0,
+      0,
+      1,
+    ];
+    const phase = piece.phase.find((phase) => time >= phase.start && time <= phase.end);
+    return phase ? { planeTransition: { from: endpoint(0), to: endpoint(1), phase } } : null;
+  };
+  return { planeBreaks, intervalPlane };
+}
+
 /** Bind native source coordinates, actual clip fitting, and authored phase clocks to camera admission. */
 export function createProjectWorkingZoneCameraGeometry(input: {
   project: VideoProject;
@@ -386,6 +512,45 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     width: project.width * transform.scale,
     height: project.height * transform.scale,
   };
+  const bound = project.clips.find((clip) => clip.id === input.region.sourceBinding?.clipId);
+  const sourceWindow = resolveMotionSourceWindow(
+    project,
+    input.region,
+    Math.max(input.region.startTime, bound?.startTime ?? input.region.startTime)
+  );
+  if (sourceWindow) {
+    const mapRect = (rect: typeof sourceWindow.window) => ({
+      x: rect.x * transform.scale + transform.offsetX,
+      y: rect.y * transform.scale + transform.offsetY,
+      width: rect.width * transform.scale,
+      height: rect.height * transform.scale,
+    });
+    const region = input.region;
+    const clock = region.animation;
+    const clockScale = clock ? region.duration / (clock.end - clock.start) : 1;
+    const start = region.startTime - (clock?.start ?? 0) * clockScale;
+    const enter = motionTransitionSettings(region, 'enter');
+    const exit = motionTransitionSettings(region, 'exit');
+    const clip = project.clips.find((item) => item.id === sourceWindow.clipId);
+    return createWindowCameraGeometry({
+      output,
+      window: mapRect(sourceWindow.window),
+      ...createProjectWindowPlaneProjection(project, region, size),
+      video: mapRect(sourceWindow.video),
+      cornerRadius: clip?.type === 'VIDEO' ? (clip.windowCornerRadius ?? 0) * transform.scale : 0,
+      windowWeight: 'window',
+      region: {
+        ...region,
+        start,
+        end: start + (clock?.duration ?? region.duration) * clockScale,
+        enter: { ...enter, duration: enter.duration * clockScale },
+        exit: { ...exit, duration: exit.duration * clockScale },
+      },
+      connectedIn: input.connectedIn,
+      connectedOut: input.connectedOut,
+      policy: input.policy,
+    });
+  }
   const phase = nominalPhase(input.region, input.connectedIn, input.connectedOut);
   const perspective = hasCameraPerspective(input.region.perspective)
     ? input.region.perspective

@@ -1,3 +1,4 @@
+import { motionFocusAreaPoint } from '../../../../../features/video/project/motion/focus-area';
 import { createMotionFocusAreaFromPointScale } from '../../../../../features/video/project/motion/index';
 import type { VideoProjectMotionArea } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -10,10 +11,7 @@ export function getProjectCenter(panel: WorkspaceSidebarSelectionPanelProps) {
 }
 
 export function getAreaCenter(area: VideoProjectMotionArea) {
-  return {
-    x: area.x + area.width / 2,
-    y: area.y + area.height / 2,
-  };
+  return motionFocusAreaPoint(area, 0.5, 0.5);
 }
 
 function getRegionFocusPoint(panel: WorkspaceSidebarSelectionPanelProps) {

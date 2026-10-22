@@ -1,3 +1,5 @@
+import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
+import { normalizeVideoProjectCursorSkin } from '../../../../apps/extension/src/features/video/project/cursor';
 import { resolveProjectCursorCameraPlan } from '../../../../apps/extension/src/features/video/composition/motion/project-follow';
 import { resolveVideoCompositionCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { createHash } from 'node:crypto';
@@ -48,6 +50,10 @@ async function openFixture(
     overlays?: boolean;
     effectRegion?: boolean;
     cursorFollow?: boolean;
+    sourceActionFocus?: boolean;
+    sourceWindowFollow?: boolean;
+    sourceWindowFollowTransition?: boolean;
+    sourceWindowArea?: boolean;
     crossfade?: boolean;
     effectTransition?: boolean;
     sourceFx?: 'clip' | 'track' | 'video-group';
@@ -62,6 +68,34 @@ async function openFixture(
     duration: 12,
     mimeType: 'video/webm',
     size: bytes.length,
+    ...(options.sourceWindowFollow ||
+    options.sourceWindowFollowTransition ||
+    options.sourceWindowArea
+      ? {
+          cursorTrack: {
+            captureMode: 'separate' as const,
+            skin: normalizeVideoProjectCursorSkin({
+              preset: 'DOT',
+              color: '#00ff00',
+              shadow: false,
+            }),
+            samples: [0, 12].map((time) => ({
+              id: `rotated-cursor:${time}`,
+              time,
+              x: options.sourceWindowArea ? 104 : options.sourceWindowFollowTransition ? 80 : 158.4,
+              y: options.sourceWindowArea ? 36 : options.sourceWindowFollowTransition ? 45 : 89.1,
+              visible: true,
+              observation: 'observed' as const,
+              captureSegment: 0,
+              recordingPoint: options.sourceWindowArea
+                ? { x: 0.65, y: 0.4 }
+                : options.sourceWindowFollowTransition
+                  ? { x: 0.5, y: 0.5 }
+                  : { x: 0.99, y: 0.99 },
+            })),
+          },
+        }
+      : {}),
   });
   project.width = 320;
   project.height = 180;
@@ -280,6 +314,99 @@ async function openFixture(
         startTime: options.effectTransition ? 0.4 : 0,
         duration: options.effectTransition ? 0.4 : 1.2,
         playbackRate: document.duration / (options.effectTransition ? 0.4 : image.duration),
+      },
+    ];
+  }
+  if (options.sourceActionFocus) {
+    if (!video.sourceInstanceId) throw new Error('Missing source action identity');
+    video.transform.rotation = 30;
+    project.version = 34;
+    project.actionEvents = [
+      {
+        id: 'window-action',
+        kind: 'CLICK',
+        label: 'Click',
+        data: {},
+        point: { x: 0.35, y: 0.6 },
+        anchor: {
+          kind: 'recording-source',
+          recordingId: 'beta-v1-recording',
+          sourceInstanceId: video.sourceInstanceId,
+          sourceEventId: 'window-click',
+          sourceTime: 0,
+        },
+        presentation: { enabled: false },
+      },
+    ];
+    Object.assign(project.motionRegions[0]!, {
+      scale: 1.6,
+      focusMode: 'ACTION',
+      targetAction: { eventId: 'window-action', clipId: video.id },
+      perspective: { enabled: false, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 },
+      sourceBinding: {
+        clipId: video.id,
+        coordinateSpace: 'source-window',
+        sourceStart: 0,
+        sourceEnd: 1.2,
+        animation: { start: 0, end: 1.2, duration: 1.2 },
+      },
+    });
+  }
+  if (
+    options.sourceWindowFollow ||
+    options.sourceWindowFollowTransition ||
+    options.sourceWindowArea
+  ) {
+    project.width = 400;
+    project.height = 400;
+    project.version = 34;
+    video.transform = {
+      ...video.transform,
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 400,
+      rotation: options.sourceWindowFollow ? 45 : 30,
+      opacity: 1,
+    };
+    delete video.windowHeader;
+    delete video.sourceCrop;
+    Object.assign(project.motionRegions[0]!, {
+      scale: 2,
+      focusMode: options.sourceWindowArea ? 'MANUAL_AREA' : 'CURSOR',
+      ...(options.sourceWindowArea
+        ? { focusArea: { x: 100, y: 100, width: 200, height: 200 } }
+        : {}),
+      focusPoint: { x: 200, y: 200 },
+      perspective: { enabled: false, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 },
+      sourceBinding: {
+        clipId: video.id,
+        coordinateSpace: 'source-window',
+        sourceStart: 0,
+        sourceEnd: 1.2,
+        animation: { start: 0, end: 1.2, duration: 1.2 },
+      },
+    });
+  }
+  if (options.sourceWindowFollowTransition) {
+    project.duration = 1.8;
+    project.clips.push({
+      ...video,
+      id: 'moving-next-video',
+      sourceInstanceId: 'moving-next-instance',
+      startTime: 0.6,
+      groupId: null,
+    });
+    project.transitions = [
+      {
+        id: 'moving-source-transition',
+        leadingClipId: video.id,
+        trailingClipId: 'moving-next-video',
+        kind: 'PUSH',
+        duration: 0.6,
+        easing: 'EASE_IN_OUT',
+        direction: 'RIGHT',
+        intensity: 'BOLD',
       },
     ];
   }
@@ -1780,6 +1907,592 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath('spatial-context-recovered.png'),
         fullPage: false,
       });
+      expect(errors).toEqual([]);
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`source ACTION focus survives inspector trim and reopen ${viewport.size.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const locale = index === 0 ? 'en' : 'ru',
+      theme = index === 0 ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      const { video, image } = await openFixture(page, host.origin, locale, theme, {
+        sourceActionFocus: true,
+      });
+      const before = (await readNativeVideoProject(page))!;
+      const camera = (project: typeof before) =>
+        resolveVideoCompositionCamera({
+          project,
+          currentTime: 0.4,
+          actions: [],
+          cursorSample: null,
+        });
+      const expected = camera(before);
+      await page.locator(`[data-project-timeline-clip="${video.id}"]`).click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupTiming'),
+          exact: true,
+        })
+        .click();
+      await page
+        .locator('[data-ui="video-editor.inspector.disclosure"]')
+        .filter({
+          has: page.getByRole('heading', {
+            name: label('videoEditor.sidebar.inspectorSourceBounds'),
+            exact: true,
+          }),
+        })
+        .locator('summary')
+        .click();
+      const sourceIn = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.sourceIn'),
+        exact: true,
+      });
+      await sourceIn.fill('0.2');
+      await sourceIn.press('Tab');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+              ?.sourceStart
+        )
+        .toBe(0.2);
+      await checkInspectorPaintedFont(page, sourceIn, 'source-action-trim');
+      const after = (await readNativeVideoProject(page))!;
+      expect(after.motionRegions![0]!.focusMode).toBe('MANUAL');
+      expect(after.motionRegions![0]!.targetAction).toBeNull();
+      expect(after.actionEvents).toEqual(before.actionEvents);
+      expect(after.clips.find((clip) => clip.id === image.id)).toEqual(
+        before.clips.find((clip) => clip.id === image.id)
+      );
+      const assertFocus = (project: typeof before) => {
+        const actual = camera(project);
+        for (const axis of ['x', 'y'] as const)
+          expect(actual.focusPoint[axis]).toBeCloseTo(expected.focusPoint[axis], 7);
+        expect(actual.viewportX).toBeCloseTo(expected.viewportX, 7);
+        expect(actual.viewportY).toBeCloseTo(expected.viewportY, 7);
+      };
+      assertFocus(after);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions)
+        .toEqual(before.motionRegions);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions)
+        .toEqual(after.motionRegions);
+      await page.reload();
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      const reopened = (await readNativeVideoProject(page))!;
+      expect(reopened.motionRegions).toEqual(after.motionRegions);
+      assertFocus(reopened);
+      const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await playhead.press('Home');
+      for (let frame = 0; frame < Math.round(reopened.fps * 0.4); frame++)
+        await playhead.press('ArrowRight');
+      await page
+        .locator('[data-timeline-effect-segment="spatial-camera"]')
+        .getByRole('button', {
+          name: label('videoEditor.timeline.motionSegment') + ' · 1.60x',
+          exact: true,
+        })
+        .click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupFraming'),
+          exact: true,
+        })
+        .click();
+      const focus = page.getByRole('group', {
+        name: label('videoEditor.sidebar.motionFocusLabel'),
+        exact: true,
+      });
+      if (await focus.count()) {
+        const manual = focus.getByRole('button', {
+          name: label('videoEditor.sidebar.motionFocusManual'),
+          exact: true,
+        });
+        await expect(manual).toHaveAttribute('aria-pressed', 'true');
+        await manual.scrollIntoViewIfNeeded();
+      } else {
+        const manual = page.getByRole('button', {
+          name: label('videoEditor.sidebar.motionFocusLabel'),
+          exact: true,
+        });
+        await expect(manual).toContainText(label('videoEditor.sidebar.motionFocusManual'));
+        await manual.scrollIntoViewIfNeeded();
+      }
+      await page.screenshot({
+        path: info.outputPath('source-action-trim-reopened.png'),
+        fullPage: false,
+      });
+      expect(errors).toEqual([]);
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`rotated source-window follow recovers through clip inspector ${viewport.size.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const locale = index === 0 ? 'en' : 'ru',
+      theme = index === 0 ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      const { video } = await openFixture(page, host.origin, locale, theme, {
+        sourceWindowFollow: true,
+      });
+      const before = (await readNativeVideoProject(page))!;
+      expect(resolveProjectCursorCameraPlan(before, before.motionRegions![0]!).status).toBe(
+        'conflict'
+      );
+      const selectMotion = async () => {
+        await page
+          .locator('[data-timeline-effect-segment="spatial-camera"]')
+          .getByRole('button', {
+            name: label('videoEditor.timeline.motionSegment') + ' · 2.00x',
+            exact: true,
+          })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupFraming'),
+            exact: true,
+          })
+          .click();
+      };
+      await selectMotion();
+      const warning = page.getByText(label('videoEditor.app.exportCameraConflict'), {
+        exact: true,
+      });
+      await expect(warning).toBeVisible();
+      await warning.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('rotated-follow-conflict.png'),
+        fullPage: false,
+      });
+      await page.locator(`[data-project-timeline-clip="${video.id}"]`).click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupTransform'),
+          exact: true,
+        })
+        .click();
+      const rotation = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.rotationLabel'),
+        exact: true,
+      });
+      await rotation.fill('90');
+      await rotation.press('Tab');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+              ?.transform.rotation
+        )
+        .toBe(90);
+      await checkInspectorPaintedFont(page, rotation, 'follow-source-rotation');
+      const accepted = (await readNativeVideoProject(page))!;
+      expect(accepted.cursorTrack).toEqual(before.cursorTrack);
+      expect(resolveProjectCursorCameraPlan(accepted, accepted.motionRegions![0]!).status).toBe(
+        'ready'
+      );
+      await page.reload();
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      const reopened = (await readNativeVideoProject(page))!;
+      expect(reopened).toEqual(accepted);
+      await selectMotion();
+      await expect(warning).toHaveCount(0);
+      const camera = resolveVideoCompositionCamera({
+        project: reopened,
+        currentTime: 0,
+        actions: [],
+        cursorSample: null,
+      });
+      const expected = {
+        x: (4 - camera.viewportX) * camera.scale,
+        y: (396 - camera.viewportY) * camera.scale,
+      };
+      const sample = () =>
+        page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement, point) => {
+          const scale = Math.min(node.width / 400, node.height / 400);
+          const x = (node.width - 400 * scale) / 2 + point.x * scale;
+          const y = (node.height - 400 * scale) / 2 + point.y * scale;
+          return Array.from(
+            node.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
+          );
+        }, expected);
+      await expect.poll(async () => (await sample())[1]).toBeGreaterThan(240);
+      const pixel = await sample();
+      expect(pixel[0]).toBeLessThan(8);
+      expect(pixel[2]).toBeLessThan(8);
+      await page.screenshot({
+        path: info.outputPath('rotated-follow-recovered.png'),
+        fullPage: false,
+      });
+      const format = index === 0 ? 'WEBM' : 'MP4';
+      const encoded = await encodedNativeVideoSamples(page, host.origin, reopened, format, [
+        {
+          time: 0.4,
+          x: Math.round(expected.x),
+          y: Math.round(expected.y),
+          expected: [0, 255, 0],
+        },
+      ]);
+      expect(encoded.width).toBe(400);
+      expect(encoded.height).toBe(400);
+      expect(encoded.size).toBeGreaterThan(0);
+      expect(encoded.samples[0]!.error).toBeLessThan(12);
+      await writeFile(
+        info.outputPath('rotated-follow-encoded.json'),
+        JSON.stringify(encoded, null, 2)
+      );
+      expect(errors).toEqual([]);
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`moving transition retains explicit follow policy through reopen and export ${viewport.size.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const locale = index === 0 ? 'en' : 'ru',
+      theme = index === 0 ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      await openFixture(page, host.origin, locale, theme, { sourceWindowFollowTransition: true });
+      const before = (await readNativeVideoProject(page))!;
+      expect(resolveProjectCursorCameraPlan(before, before.motionRegions![0]!).status).toBe(
+        'conflict'
+      );
+      const select = async () => {
+        await page
+          .locator('[data-timeline-effect-segment="spatial-camera"]')
+          .getByRole('button', {
+            name: label('videoEditor.timeline.motionSegment') + ' · 2.00x',
+            exact: true,
+          })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupFraming'),
+            exact: true,
+          })
+          .click();
+      };
+      await select();
+      const warning = page.getByText(label('videoEditor.app.exportCameraConflict'), {
+        exact: true,
+      });
+      await expect(warning).toBeVisible();
+      await warning.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('moving-source-follow-conflict.png'),
+        fullPage: false,
+      });
+      const settings = page.locator('[data-ui="cameraFollow.settings"]');
+      const fine = settings.locator('details').first();
+      if (!(await fine.evaluate((node: HTMLDetailsElement) => node.open)))
+        await fine.locator('summary').click();
+      const preserve = settings.getByRole('switch', {
+        name: label('videoEditor.sidebar.cameraPreservePointer'),
+        exact: true,
+      });
+      await expect(preserve).toHaveAttribute('aria-checked', 'true');
+      await preserve.click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions![0]!.cameraFollow?.preservePointer
+        )
+        .toBe(false);
+      const accepted = (await readNativeVideoProject(page))!;
+      expect(resolveProjectCursorCameraPlan(accepted, accepted.motionRegions![0]!).status).toBe(
+        'ready'
+      );
+      expect(accepted.transitions).toEqual(before.transitions);
+      expect(accepted.clips).toEqual(before.clips);
+      expect(accepted.cursorTrack).toEqual(before.cursorTrack);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions)
+        .toEqual(before.motionRegions);
+      await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions)
+        .toEqual(accepted.motionRegions);
+      const restored = (await readNativeVideoProject(page))!;
+      expect({ ...restored, updatedAt: accepted.updatedAt }).toEqual(accepted);
+      await page.reload();
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      expect(await readNativeVideoProject(page)).toEqual(restored);
+      await select();
+      await expect(warning).toHaveCount(0);
+      if (!(await fine.evaluate((node: HTMLDetailsElement) => node.open)))
+        await fine.locator('summary').click();
+      const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await playhead.press('Home');
+      for (let frame = 0; frame < Math.round(accepted.fps * 0.9); frame++)
+        await playhead.press('ArrowRight');
+      await expect(preserve).toHaveAttribute('aria-checked', 'false');
+      await checkInspectorPaintedFont(
+        page,
+        settings.getByText(label('videoEditor.sidebar.cameraPreservePointer'), { exact: true }),
+        'source-transition-policy'
+      );
+      await preserve.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('moving-source-follow-policy-reopened.png'),
+        fullPage: false,
+      });
+      const camera = resolveVideoCompositionCamera({
+        project: restored,
+        currentTime: 0.2,
+        actions: [],
+        cursorSample: null,
+      });
+      const point = {
+        x: Math.round((200 - camera.viewportX) * camera.scale),
+        y: Math.round((200 - camera.viewportY) * camera.scale),
+      };
+      const encoded = await encodedNativeVideoSamples(
+        page,
+        host.origin,
+        restored,
+        index === 0 ? 'WEBM' : 'MP4',
+        [{ time: 0.2, ...point, expected: [0, 255, 0] }]
+      );
+      expect(encoded.width).toBe(400);
+      expect(encoded.height).toBe(400);
+      expect(encoded.samples[0]!.error).toBeLessThan(12);
+      await writeFile(
+        info.outputPath('moving-source-follow-encoded.json'),
+        JSON.stringify(encoded, null, 2)
+      );
+      expect(errors).toEqual([]);
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`saved rotated area remains editable and matches encoded perspective ${viewport.size.width}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const locale = index === 0 ? 'en' : 'ru',
+      theme = index === 0 ? 'dark' : 'light';
+    await page.emulateMedia({ colorScheme: theme });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      const { video } = await openFixture(page, host.origin, locale, theme, {
+        sourceWindowArea: true,
+      });
+      const before = (await readNativeVideoProject(page))!;
+      const select = async () => {
+        await page
+          .locator('[data-timeline-effect-segment="spatial-camera"]')
+          .getByRole('button', {
+            name:
+              label('videoEditor.timeline.motionSegment') +
+              ((await readNativeVideoProject(page))?.motionRegions![0]!.sourceBinding
+                ?.coordinateSpace === 'source-window'
+                ? ' · 2.00x'
+                : ' · 1.38x'),
+            exact: true,
+          })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupFraming'),
+            exact: true,
+          })
+          .click();
+      };
+      await select();
+      await chooseInspectorValue(
+        page,
+        page.locator('[data-ui="video-editor.inspector.categories"]'),
+        label('videoEditor.sidebar.motionCoverage'),
+        label('videoEditor.sidebar.spotlightCoverageScene')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page))?.motionRegions![0]!.sourceBinding?.coordinateSpace
+        )
+        .not.toBe('source-window');
+      await expect(
+        page.locator('[data-timeline-effect-segment="spatial-camera"]').getByRole('button', {
+          name: label('videoEditor.timeline.motionSegment') + ' · 1.46x',
+          exact: true,
+        })
+      ).toBeVisible();
+      const exact = page.locator('[data-ui="video-editor.inspector.disclosure"]').filter({
+        has: page.getByRole('heading', {
+          name: label('videoEditor.sidebar.inspectorExactPlacement'),
+          exact: true,
+        }),
+      });
+      if (!(await exact.evaluate((node: HTMLDetailsElement) => node.open)))
+        await exact.locator('summary').click();
+      const width = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.motionAreaWidthLabel'),
+        exact: true,
+      });
+      await width.fill('220');
+      await width.press('Tab');
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions![0]!.focusArea?.width)
+        .toBeCloseTo(220, 6);
+      await checkInspectorPaintedFont(page, width, 'persisted-area-width');
+      const radians = Math.PI / 6,
+        c = Math.cos(radians),
+        s = Math.sin(radians);
+      const origin = { x: 200 - 100 * c + 100 * s, y: 200 - 100 * s - 100 * c };
+      const assertArea = (project: typeof before) => {
+        const area = project.motionRegions![0]!.focusArea!;
+        expect(area.axes).toBeDefined();
+        expect(area.width).toBeCloseTo(220, 6);
+        expect(area.height).toBeCloseTo(200, 6);
+        for (const [x, y] of [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+        ]) {
+          const actual = {
+            x: area.x + x! * area.width * area.axes!.x.x + y! * area.height * area.axes!.y.x,
+            y: area.y + x! * area.width * area.axes!.x.y + y! * area.height * area.axes!.y.y,
+          };
+          expect(actual.x).toBeCloseTo(origin.x + x! * 220 * c - y! * 200 * s, 6);
+          expect(actual.y).toBeCloseTo(origin.y + x! * 220 * s + y! * 200 * c, 6);
+        }
+        expect(project.clips).toEqual(before.clips);
+        expect(project.cursorTrack).toEqual(before.cursorTrack);
+        expect(project.motionRegions![0]!.sourceBinding?.clipId).toBe(video.id);
+      };
+      assertArea((await readNativeVideoProject(page))!);
+      await page
+        .locator('nav')
+        .getByRole('button', { name: label('gallery.videoReview.perspective'), exact: true })
+        .click();
+      const perspective = page.locator('[data-ui="video-editor.motion.perspective"]');
+      await perspective
+        .getByRole('switch', { name: label('gallery.videoReview.spatialEnabled'), exact: true })
+        .click();
+      for (const [key, value] of [
+        ['gallery.videoReview.perspectiveY', '20'],
+        ['gallery.videoReview.perspectiveStrength', '50'],
+      ] as const) {
+        const field = perspective.getByRole('textbox', { name: label(key), exact: true });
+        await field.fill(value);
+        await field.press('Tab');
+      }
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.motionRegions![0]!.perspective)
+        .toEqual({ enabled: true, rotateX: 0, rotateY: 20, rotateZ: 0, strength: 0.5 });
+      const accepted = (await readNativeVideoProject(page))!;
+      assertArea(accepted);
+      await page.reload();
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      const restored = (await readNativeVideoProject(page))!;
+      expect(restored).toEqual(accepted);
+      assertArea(restored);
+      await select();
+      await expect(page.locator('polygon[data-preview-stage-area-body="true"]')).toBeVisible();
+      const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await playhead.press('Home');
+      for (let frame = 0; frame < Math.round(restored.fps * 0.4); frame++)
+        await playhead.press('ArrowRight');
+      const boundsSize = Math.max(220 * c + 200 * s, 220 * s + 200 * c);
+      const scale = 400 / boundsSize;
+      const center = { x: 200 + 10 * c, y: 200 + 10 * s };
+      const pan = { x: center.x - boundsSize / 2, y: center.y - boundsSize / 2 };
+      const dx = 60 * c + 40 * s,
+        dy = 60 * s - 40 * c;
+      const tilt = (20 * Math.PI) / 180;
+      const denominator = 1 + (0.7 * 0.5 * Math.sin(tilt) * dx) / Math.hypot(320, 320);
+      const expected = {
+        x: scale * (200 + (Math.cos(tilt) * dx) / denominator - pan.x),
+        y: scale * (200 + dy / denominator - pan.y),
+      };
+      const sample = () =>
+        page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement, point) => {
+          const scale = Math.min(node.width / 400, node.height / 400);
+          return Array.from(
+            node
+              .getContext('2d')!
+              .getImageData(
+                Math.round((node.width - 400 * scale) / 2 + point.x * scale),
+                Math.round((node.height - 400 * scale) / 2 + point.y * scale),
+                1,
+                1
+              ).data
+          );
+        }, expected);
+      await expect.poll(async () => (await sample())[1]).toBeGreaterThan(240);
+      const pixel = await sample();
+      expect(pixel[0]).toBeLessThan(8);
+      expect(pixel[2]).toBeLessThan(8);
+      await page.screenshot({
+        path: info.outputPath('saved-rotated-area-perspective.png'),
+        fullPage: false,
+      });
+      const encoded = await encodedNativeVideoSamples(
+        page,
+        host.origin,
+        restored,
+        index === 0 ? 'WEBM' : 'MP4',
+        [{ time: 0.4, x: Math.round(expected.x), y: Math.round(expected.y), expected: [0, 255, 0] }]
+      );
+      expect(encoded.width).toBe(400);
+      expect(encoded.height).toBe(400);
+      expect(encoded.samples[0]!.error).toBeLessThan(12);
+      await writeFile(
+        info.outputPath('saved-rotated-area-encoded.json'),
+        JSON.stringify({ expected, area: restored.motionRegions![0]!.focusArea, encoded }, null, 2)
+      );
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();

@@ -596,3 +596,26 @@ it.each([
     }
   }
 );
+
+it.each([0, 90, -35])(
+  'inverts original decorated window coordinates after crop and rotation %s',
+  (rotation) => {
+    const mapping: VisualLayerSourcePointMapping = {
+      coordinateSpace: 'source-window',
+      point: { x: 0.2, y: 0.3 },
+      frame: { x: 40, y: 30, width: 200, height: 120, rotation },
+      renderState: { scaleX: 0.8, scaleY: 1.2, translateX: 7, translateY: -9 },
+      fitMode: 'STRETCH',
+      sourceWidth: 640,
+      sourceHeight: 360,
+      sourceCrop: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 },
+      windowHeader: DEFAULT_WINDOW_HEADER,
+    };
+    const displayed = mapWindowNormalizedPointToVisualLayer(mapping)!;
+    const restored = mapVisualLayerPointToWindowNormalized({ ...mapping, point: displayed })!;
+    expect(restored.x).toBeCloseTo(mapping.point.x, 9);
+    expect(restored.y).toBeCloseTo(mapping.point.y, 9);
+    const { coordinateSpace: _coordinateSpace, ...visible } = mapping;
+    expect(mapWindowNormalizedPointToVisualLayer(visible)).not.toEqual(displayed);
+  }
+);

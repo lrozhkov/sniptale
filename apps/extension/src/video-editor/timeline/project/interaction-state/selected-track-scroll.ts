@@ -20,9 +20,16 @@ export function useTimelineSelectedTrackAutoScroll(params: {
       : params.selection.kind === 'clip-group'
         ? params.selection.anchorClipId
         : null;
+  const motionSelection =
+    params.selection.kind === 'motion-region' || params.selection.kind === 'motion-connection';
   const lastSelection = useRef({ trackId: params.selectedTrackId, effectId, clipId });
 
   useLayoutEffect(() => {
+    // A motion press retains its media-track context; revealing that track would move the pressed utility row.
+    if (motionSelection) {
+      lastSelection.current = { trackId: null, effectId: null, clipId: null };
+      return;
+    }
     const selectedTrackId = params.selectedTrackId;
 
     if (!selectedTrackId) {
@@ -85,6 +92,7 @@ export function useTimelineSelectedTrackAutoScroll(params: {
     });
     lastSelection.current = { trackId: selectedTrackId, effectId, clipId };
   }, [
+    motionSelection,
     clipId,
     effectId,
     params.selectedTrackId,

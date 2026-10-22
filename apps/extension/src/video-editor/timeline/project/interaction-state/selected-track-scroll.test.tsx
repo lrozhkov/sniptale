@@ -178,3 +178,31 @@ it('keeps a visible pressed clip stable before the canvas scroll reaches the tra
     fixture.dispose();
   }
 });
+
+it.each(['motion-region', 'motion-connection'] as const)(
+  'keeps a browser-revealed %s press stable instead of revealing the retained clip track',
+  (kind) => {
+    const fixture = mount();
+    const { params, trackId, timeline, trackList, render } = fixture;
+    try {
+      const clip = document.createElement('div');
+      clip.dataset['projectTimelineClip'] = 'primary';
+      clip.getBoundingClientRect = () => new DOMRect(0, 80, 500, 30);
+      timeline.append(clip);
+      params.selectedTrackId = trackId;
+      params.selection = { kind: 'clip', clipId: 'primary' };
+      render();
+      timeline.scrollTop = trackList.scrollTop = 310;
+      params.selection = { kind, motionRegionId: 'focus' };
+      render();
+      expect(timeline.scrollTop).toBe(310);
+      expect(trackList.scrollTop).toBe(310);
+      params.selection = { kind: 'track', trackId };
+      render();
+      expect(timeline.scrollTop).toBe(17);
+      expect(trackList.scrollTop).toBe(17);
+    } finally {
+      fixture.dispose();
+    }
+  }
+);

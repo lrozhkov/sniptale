@@ -1,3 +1,4 @@
+import { projectSourceFocusPhases } from '../project/motion/source-phase-projection';
 import { fitQuickEditZoomTransitions } from './advanced/zoom';
 import type { QuickEditZoomRegion } from './advanced/types';
 import { buildReviewTimeMap, type ReviewTimeSegment } from './timeline';
@@ -104,39 +105,27 @@ export function projectReviewFocus(
     .filter((region) => !region.dormant)
     .map((region) => fitQuickEditZoomTransitions(region));
   if (!map) return active;
-  const resultDuration = (start: number, end: number) =>
-    map.reduce(
-      (duration, part) =>
-        duration +
-        (part.kind === 'cut'
-          ? 0
-          : Math.max(0, Math.min(end, part.sourceEnd) - Math.max(start, part.sourceStart)) /
-            part.rate),
-      0
-    );
+  const sourceSpans = map.flatMap((part) =>
+    part.kind === 'cut'
+      ? []
+      : [
+          {
+            sourceStart: part.sourceStart,
+            sourceEnd: part.sourceEnd,
+            start: part.resultStart,
+            end: part.resultEnd,
+            rate: part.rate,
+          },
+        ]
+  );
   const visible = active.map((region) => {
     const anchor = region.sourceAnchor;
     if (!anchor) return [region];
-    const spans: {
-      start: number;
-      end: number;
-      sourceStart: number;
-      sourceEnd: number;
-      rate: number;
-    }[] = [];
-    for (const part of map) {
-      if (part.kind === 'cut') continue;
-      const sourceStart = Math.max(anchor.start, part.sourceStart);
-      const sourceEnd = Math.min(anchor.end, part.sourceEnd);
-      if (sourceEnd <= sourceStart) continue;
-      const start = part.resultStart + (sourceStart - part.sourceStart) / part.rate;
-      const end = part.resultStart + (sourceEnd - part.sourceStart) / part.rate;
-      const previous = spans.at(-1);
-      if (!region.border && previous && Math.abs(previous.sourceEnd - sourceStart) < 0.000001) {
-        previous.end = end;
-        previous.sourceEnd = sourceEnd;
-      } else spans.push({ start, end, sourceStart, sourceEnd, rate: part.rate });
-    }
+    const spans = projectSourceFocusPhases(
+      { sourceStart: anchor.start, sourceEnd: anchor.end, enter: region.enter, exit: region.exit },
+      sourceSpans,
+      { splitAtRates: !!region.border }
+    );
     return spans.map((span, index) => {
       const { linkTo: _linkTo, linkEasing: _linkEasing, ...withoutLink } = region;
       return {
@@ -161,26 +150,8 @@ export function projectReviewFocus(
         id: index === 0 ? region.id : `${region.id}:slice:${index}`,
         start: span.start,
         end: span.end,
-        enter:
-          span.sourceStart > anchor.start
-            ? { type: 'none' as const, duration: 0 }
-            : {
-                ...region.enter,
-                duration: resultDuration(
-                  anchor.start,
-                  Math.min(span.sourceEnd, anchor.start + region.enter.duration)
-                ),
-              },
-        exit:
-          span.sourceEnd < anchor.end
-            ? { type: 'none' as const, duration: 0 }
-            : {
-                ...region.exit,
-                duration: resultDuration(
-                  Math.max(span.sourceStart, anchor.end - region.exit.duration),
-                  anchor.end
-                ),
-              },
+        enter: span.enter,
+        exit: span.exit,
       };
     });
   });

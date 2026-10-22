@@ -124,9 +124,9 @@ it('draws media shadows before fitted video frames', () => {
   );
 
   expect(context.fillRect).not.toHaveBeenCalled();
-  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(50, 50, 160, 100);
+  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(77, 77, 160, 100);
   expect(context.__maskContext.globalCompositeOperation).toBe('destination-out');
-  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.28)');
+  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.5)');
   expect(context.__maskContext.shadowOffsetY).toBe(0);
   expect(context.shadowBlur).toBe(0);
   expect(context.drawImage).toHaveBeenCalledTimes(2);
@@ -190,9 +190,9 @@ it('draws media shadows before fitted image frames', () => {
   );
 
   expect(context.fillRect).not.toHaveBeenCalled();
-  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(50, 50, 120, 80);
+  expect(context.__maskContext.fillRect).toHaveBeenCalledWith(77, 77, 120, 80);
   expect(context.__maskContext.globalCompositeOperation).toBe('destination-out');
-  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.28)');
+  expect(context.__maskContext.shadowColor).toBe('rgba(0, 0, 0, 0.5)');
   expect(context.__maskContext.shadowOffsetY).toBe(0);
   expect(context.shadowBlur).toBe(0);
   expect(context.drawImage).toHaveBeenCalledTimes(2);
@@ -404,3 +404,41 @@ it.each([false, true])(
     expect(context.arc).toHaveBeenCalled();
   }
 );
+
+it('paints original-window border coordinates while clipping to the retained visible crop', () => {
+  const context = createContext();
+  const layer = createCapturedVideoLayer();
+  layer.actions = [];
+  layer.clip.fitMode = 'STRETCH';
+  layer.clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+  layer.borders = [
+    {
+      id: 'source-border',
+      coordinateSpace: 'source-window',
+      border: createQuickEditBorder(),
+      clock: {
+        time: 1,
+        duration: 3,
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    },
+  ];
+  vi.mocked(drawCompositionBorders).mockClear();
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement]])
+  );
+  expect(drawCompositionBorders).toHaveBeenCalledExactlyOnceWith(
+    context,
+    layer.borders,
+    { x: 10, y: 20, width: 100, height: 100 },
+    1,
+    0,
+    { x: -2.5, y: 7.5, width: 125, height: 125 }
+  );
+});

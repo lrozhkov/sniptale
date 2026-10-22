@@ -124,8 +124,22 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 33) &&
+    isBoundedNumber(version, 2, 34) &&
     Number.isInteger(version) &&
+    (version >= 34 ||
+      !Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) =>
+          !isRecord(region) ||
+          ((!isRecord(region['focusArea']) || region['focusArea']['axes'] === undefined) &&
+            (!isRecord(region['sourceBinding']) ||
+              (region['sourceBinding']['unresolvedLinkTo'] === undefined &&
+                region['sourceBinding']['dormant'] === undefined &&
+                region['sourceBinding']['phaseProjection'] === undefined &&
+                region['sourceBinding']['coordinateSpace'] === undefined)) &&
+            (!isRecord(region['phaseTransitions']) ||
+              region['phaseTransitions']['link'] === undefined))
+      )) &&
     (version >= 33 ||
       !isRecord(value['cursorTrack']) ||
       value['cursorTrack']['sourceObservations'] === undefined) &&
@@ -289,7 +303,8 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
       (region) =>
         ((region.borderTarget !== 'window' &&
           region.spotlightTarget !== 'window' &&
-          region.spotlightTarget !== 'scene') ||
+          region.spotlightTarget !== 'scene' &&
+          region.sourceBinding?.coordinateSpace !== 'source-window') ||
           project.clips.some(
             (clip) => clip.type === 'VIDEO' && clip.id === region.sourceBinding?.clipId
           )) &&

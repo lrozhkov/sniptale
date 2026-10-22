@@ -503,3 +503,54 @@ it.each(['window', 'scene'] as const)(
     expect(container?.textContent).not.toContain('videoEditor.sidebar.framingBinding');
   }
 );
+
+it('keeps scene-plane controls out of the window camera inspector', () => {
+  const props = createMotionPanelProps({
+    sourceBinding: {
+      clipId: 'window',
+      coordinateSpace: 'source-window',
+      sourceStart: 0,
+      sourceEnd: 2,
+      animation: { start: 0, end: 2, duration: 2 },
+    },
+  });
+  renderPanel(props);
+  expect(
+    container!.querySelector('[aria-label="videoEditor.sidebar.inspectorGroupSpatialReference"]')
+  ).toBeNull();
+  const region = props.selectedMotionRegion!;
+  const { sourceBinding: _binding, ...scene } = region;
+  props.selectedMotionRegion = scene;
+  props.project.motionRegions = [scene];
+  renderPanel(props);
+  expect(
+    container!.querySelector('[aria-label="videoEditor.sidebar.inspectorGroupSpatialReference"]')
+  ).not.toBeNull();
+});
+
+it('shows and edits link curves through compact choices', () => {
+  const props = createMotionPanelProps();
+  props.onUpdateMotionRegion = vi.fn();
+  const first = { ...props.selectedMotionRegion!, id: 'from', startTime: 0, duration: 1 };
+  const second = {
+    ...first,
+    id: 'to',
+    startTime: 3,
+    incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.EASE_IN_OUT },
+  };
+  props.project.motionRegions = [first, second];
+  props.selection = { kind: 'motion-connection', motionRegionId: second.id };
+  act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
+  const choices = [...container!.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')];
+  expect(choices.find((item) => item.getAttribute('aria-pressed') === 'true')?.textContent).toBe(
+    'videoEditor.sidebar.temporalEasingEaseInOut'
+  );
+  const none = choices.find(
+    (item) => item.textContent === 'videoEditor.sidebar.temporalEasingLinear'
+  )!;
+  expect(none).toBeDefined();
+  act(() => none.click());
+  expect(props.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(second.id, {
+    incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
+  });
+});

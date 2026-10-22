@@ -430,3 +430,36 @@ it('opens note selection in the inspector and routes Delete to the accepted note
   });
   expect(clipActions.deleteSelectedClip).not.toHaveBeenCalled();
 });
+
+it.each(['LINEAR', 'EASE_OUT', 'EASE_IN_OUT', 'INSTANT'] as const)(
+  'reconnects with remembered %s from the source',
+  (link) => {
+    const project = createEmptyVideoProject();
+    project.duration = 8;
+    const source = {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'source',
+      duration: 1,
+      phaseTransitions: { link },
+    };
+    const destination = {
+      ...createVideoProjectMotionRegion(project, 3),
+      id: 'destination',
+      duration: 1,
+    };
+    project.motionRegions = [source, destination];
+    const store = createStore(project);
+    store.updateMotionRegion = vi.fn();
+    store.selectMotionRegion = vi.fn();
+    const runtime = { seekTo: vi.fn() } as unknown as VideoEditorRuntimeController;
+    const workspace = createWorkspace();
+    createWorkspaceTimelineSelectionActions(store, runtime, workspace).onConnectMotionRegions(
+      source.id,
+      destination.id
+    );
+    expect(store.updateMotionRegion).toHaveBeenCalledWith(destination.id, {
+      incomingConnection: { fromRegionId: source.id, easing: link },
+    });
+    expect(store.selectMotionRegion).toHaveBeenCalledWith(destination.id, 'connection');
+  }
+);

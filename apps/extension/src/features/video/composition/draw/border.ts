@@ -158,10 +158,17 @@ export function drawCompositionBorders(
   states: readonly VideoCompositionBorderState[] | undefined,
   window: QuickEditBorder['area'],
   scale: number,
-  radius = 0
+  radius = 0,
+  originalWindow?: QuickEditBorder['area']
 ): void {
   if (!states?.length || window.width <= 0 || window.height <= 0) return;
-  const frames = states.flatMap((state) => sampleSceneBorder({ ...state, window, scale }));
+  const frames = states.flatMap((state) =>
+    sampleSceneBorder({
+      ...state,
+      window: state.coordinateSpace === 'source-window' ? (originalWindow ?? window) : window,
+      scale,
+    })
+  );
   const ownerDocument = context.canvas.ownerDocument ?? document;
   drawSceneBorders(
     context,

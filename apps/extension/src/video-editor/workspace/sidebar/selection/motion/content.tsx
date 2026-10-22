@@ -1,3 +1,4 @@
+import { OptionButtonsField } from '../shared/option-buttons';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import { InspectCameraFollowSettings } from '../inspection/cursor-path';
@@ -29,6 +30,23 @@ export function MotionCameraFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
+      {props.motionRegion.sourceBinding ? (
+        <OptionButtonsField<'scene' | 'window'>
+          label={translate('videoEditor.sidebar.motionCoverage')}
+          value={
+            props.motionRegion.sourceBinding.coordinateSpace === 'source-window'
+              ? 'window'
+              : 'scene'
+          }
+          options={[
+            { value: 'scene', label: translate('videoEditor.sidebar.spotlightCoverageScene') },
+            { value: 'window', label: translate('videoEditor.sidebar.spotlightCoverageWindow') },
+          ]}
+          onChange={(cameraTarget) =>
+            props.panel.onUpdateMotionRegion(props.motionRegion.id, { cameraTarget })
+          }
+        />
+      ) : null}
       {props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL ||
       props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
       props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
@@ -124,16 +142,18 @@ export function MotionBehaviorFields(props: {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
       <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
-      <InspectorDetails
-        preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
-        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
-      >
-        <MotionOverlayZoomField
-          motionRegionId={props.motionRegion.id}
-          panel={props.panel}
-          value={props.motionRegion.overlayZoomMode}
-        />
-      </InspectorDetails>
+      {props.motionRegion.sourceBinding?.coordinateSpace === 'source-window' ? null : (
+        <InspectorDetails
+          preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
+          label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+        >
+          <MotionOverlayZoomField
+            motionRegionId={props.motionRegion.id}
+            panel={props.panel}
+            value={props.motionRegion.overlayZoomMode}
+          />
+        </InspectorDetails>
+      )}
     </div>
   );
 }
@@ -198,8 +218,8 @@ function MotionZoomFields(props: {
           phase === 'enter' ? 'exit' : 'enter'
         );
         const duration =
-          props.motionRegion.animation?.duration ??
           props.motionRegion.sourceBinding?.animation.duration ??
+          props.motionRegion.animation?.duration ??
           props.motionRegion.duration;
         return (
           <InspectorDetails

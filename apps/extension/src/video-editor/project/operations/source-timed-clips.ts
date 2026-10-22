@@ -1,3 +1,4 @@
+import { motionWindowFocusToComposition } from '../../../features/video/composition/motion/source-window';
 import { materializeVideoProjectCursorSourceObservations } from '../../../features/video/project/cursor-source-observations';
 import { resolveVideoCompositionActionSourceMapping } from '../../../features/video/composition/timeline/frame/actions';
 import { mapSourceNormalizedPointToVisualLayer } from '../../../features/video/composition/draw/fitted-media';
@@ -323,7 +324,16 @@ function reconcileMotionRegions(
       ...region,
       targetAction: null,
       focusMode: 'MANUAL' as const,
-      focusPoint: frozenPoint ?? previous?.focusPoint ?? region.focusPoint,
+      focusPoint:
+        frozenPoint && previousOccurrence
+          ? motionWindowFocusToComposition(
+              previousProject,
+              previous ?? region,
+              frozenPoint,
+              previousOccurrence.time,
+              true
+            )
+          : (previous?.focusPoint ?? region.focusPoint),
     };
   });
   return nextRegions?.every((region, index) => region === regions?.[index]) ? regions : nextRegions;

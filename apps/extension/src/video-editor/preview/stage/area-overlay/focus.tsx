@@ -265,6 +265,8 @@ function focusTargetMapping(params: AreaOverlayParams, stage: HTMLDivElement) {
     );
     if (!layer || layer.kind !== 'video') return null;
     mapping = focusWindowMapping(project, layer);
+    if (region.sourceBinding?.coordinateSpace)
+      mapping.coordinateSpace = region.sourceBinding.coordinateSpace;
     lock = shouldLockPreviewClipToViewport(layer.clip, params.camera, project);
   }
   return {

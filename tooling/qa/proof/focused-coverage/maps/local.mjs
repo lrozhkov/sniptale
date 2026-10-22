@@ -45,6 +45,8 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/review/project-conversion.cursor.test.ts',
       'apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts',
       'apps/extension/src/composition/persistence/projects/index.stale-save.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.references.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/reorder-history.test.ts',
     ],
   },
   {

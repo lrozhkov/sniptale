@@ -1,3 +1,4 @@
+import { projectMotionSourcePhases } from '../../project/motion/source-binding';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { resolveMotionConnectionSource } from '../../project/motion';
 import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
@@ -45,7 +46,11 @@ function cameraSpan(project: VideoProject, time: number): CameraSpan | null {
 
 function phaseKey(project: VideoProject, span: CameraSpan, time: number) {
   const owner = span.kind === 'region' ? span.region : span.source;
-  if (span.kind === 'link' && span.destination.incomingConnection?.easing === 'INSTANT')
+  if (
+    span.kind === 'link' &&
+    span.destination.incomingConnection &&
+    span.destination.incomingConnection.easing === 'INSTANT'
+  )
     return 'instant-link';
   if (owner.motionBlur === undefined) {
     if (span.kind === 'link') return 'legacy';
@@ -169,6 +174,7 @@ function cameraBoundaries(project: VideoProject) {
 
 /** Clamp exposure at ownership and phase jumps; contiguous retained split parts remain one animation. */
 export function motionBlurSampleBounds(project: VideoProject, time: number, strength: number) {
+  project = projectMotionSourcePhases(project);
   let start = 0,
     end = Math.max(project.duration, time);
   const exposure = Math.max(0, Math.min(1, strength)) / 60;

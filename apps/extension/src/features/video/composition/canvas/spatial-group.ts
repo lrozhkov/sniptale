@@ -1,6 +1,7 @@
 import type { CameraSpatialRect } from '../../project/motion/spatial';
 import type { VideoCompositionCameraState } from '../types';
-import { motionCameraProjection } from '../motion/spatial';
+import { motionCameraProjection, motionCameraPlaneTransform } from '../motion/spatial';
+import { invertQuickEditProjection } from '../motion/spatial-geometry';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
 
 /** Capture one contiguous scene group without applying an affine viewport clip first. */
@@ -42,6 +43,9 @@ export function drawSpatialCameraGroup(args: {
   const projection = motionCameraProjection(args.camera, scale);
   if (!projection || !projection.every(Number.isFinite))
     throw new Error('Perspective reference is unavailable.');
+  const plane = motionCameraPlaneTransform(args.camera, scale);
+  const planeInverse = plane ? invertQuickEditProjection(plane) : null;
+  if (plane && !planeInverse) throw new Error('Perspective reference is unavailable.');
   args.renderer.validateSizes(sourceRect, args.output);
   // Both hardware checks precede allocation and painting. The session owns and reuses these named surfaces.
   const output = args.renderer.surface('exposure', args.output.width, args.output.height);
@@ -79,6 +83,8 @@ export function drawSpatialCameraGroup(args: {
       height: base.height * args.camera.scale * scale,
     },
     frame: spatial,
+    projection,
+    ...(planeInverse ? { planeInverse } : {}),
     ...(args.sharp === undefined ? {} : { sharp: args.sharp }),
   });
   // Publish only a completed GPU draw. The runtime controls the larger frame transaction.

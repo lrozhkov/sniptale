@@ -36,25 +36,32 @@ export function getMotionAnimationTime(region: VideoProjectMotionRegion, offset:
     : offset;
 }
 
+/** Map the retained Native scalar name to the common camera curve for new window controls. */
+export function motionTransitionTypeForEasing(
+  easing: VideoProjectMotionRegion['easing']
+): CameraTransitionType {
+  return easing === 'LINEAR'
+    ? 'linear'
+    : easing === 'EASE_OUT'
+      ? 'ease-out'
+      : easing === 'INSTANT'
+        ? 'instant'
+        : 'ease-in-out';
+}
+
 function phaseType(
   region: VideoProjectMotionRegion,
   phase: CameraTransitionPhase
 ): CameraTransitionType {
-  return (
-    region.phaseTransitions?.[phase] ??
-    (region.easing === 'LINEAR'
-      ? 'linear'
-      : region.easing === 'EASE_OUT'
-        ? 'ease-out'
-        : region.easing === 'INSTANT'
-          ? 'instant'
-          : 'ease-in-out')
-  );
+  return region.phaseTransitions?.[phase] ?? motionTransitionTypeForEasing(region.easing);
 }
 
 function phaseDurations(region: VideoProjectMotionRegion) {
   const duration =
-    region.animation?.duration ?? region.sourceBinding?.animation.duration ?? region.duration;
+    (region.sourceBinding?.phaseProjection ? region.sourceBinding.animation.duration : undefined) ??
+    region.animation?.duration ??
+    region.sourceBinding?.animation.duration ??
+    region.duration;
   const enter = { type: phaseType(region, 'enter'), duration: region.zoomInDuration };
   const exit = { type: phaseType(region, 'exit'), duration: region.zoomOutDuration };
   const a = region.phaseTransitions?.enter !== undefined;
@@ -75,7 +82,7 @@ function phaseDurations(region: VideoProjectMotionRegion) {
   return { enter: enter.duration, exit: exit.duration };
 }
 
-/** Explicit phases use the shared curve; an omitted phase keeps the legacy scalar curve. */
+/** Window cameras use the shared curve; omitted scene phases keep the legacy scalar curve. */
 export function motionTransitionSettings(
   region: VideoProjectMotionRegion,
   phase: CameraTransitionPhase
@@ -84,7 +91,9 @@ export function motionTransitionSettings(
   return {
     type,
     duration: phaseDurations(region)[phase],
-    explicit: region.phaseTransitions?.[phase] !== undefined,
+    explicit:
+      region.sourceBinding?.coordinateSpace === 'source-window' ||
+      region.phaseTransitions?.[phase] !== undefined,
     instant: type === 'instant',
   };
 }
@@ -107,7 +116,10 @@ export function editMotionTransitionPhase(
   if (!authorSmooth && type === current.type && requested === unchangedDuration) return region;
   const other = motionTransitionSettings(region, edit.phase === 'enter' ? 'exit' : 'enter');
   const duration =
-    region.animation?.duration ?? region.sourceBinding?.animation.duration ?? region.duration;
+    (region.sourceBinding?.phaseProjection ? region.sourceBinding.animation.duration : undefined) ??
+    region.animation?.duration ??
+    region.sourceBinding?.animation.duration ??
+    region.duration;
   const next =
     type === 'none'
       ? Math.min(60, Math.max(0, requested))

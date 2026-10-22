@@ -1,3 +1,4 @@
+import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
 import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionBorders } from './borders';
 import type { CameraOutputViewport } from '../../../project/export/output-dimensions';
@@ -30,6 +31,7 @@ export function resolveVideoCompositionFrame(
     cameraViewport?: CameraOutputViewport;
   } = {}
 ): VideoCompositionFrame {
+  project = projectMotionSourcePhases(project);
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const actions = resolveVideoCompositionActions(project, currentTime);
   const cursorSample = resolveCursorSample(project, currentTime);

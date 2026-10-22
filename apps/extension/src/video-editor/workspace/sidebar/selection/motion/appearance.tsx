@@ -234,8 +234,8 @@ function MotionFocusPhaseFields(
   const clock = motionTransitionSettings(motionRegion, phase);
   const other = motionTransitionSettings(motionRegion, phase === 'enter' ? 'exit' : 'enter');
   const duration =
-    motionRegion.animation?.duration ??
     motionRegion.sourceBinding?.animation.duration ??
+    motionRegion.animation?.duration ??
     motionRegion.duration;
   const key = phase === 'enter' ? 'reveal' : 'exitReveal';
   const unchanged: MotionFocusEdit = { kind };

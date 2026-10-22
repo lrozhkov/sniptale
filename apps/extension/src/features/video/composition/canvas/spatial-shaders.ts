@@ -16,6 +16,7 @@ uniform highp sampler2D surface5;
 uniform highp sampler2D surface6;
 uniform highp sampler2D surface7;
 uniform mat3 inverseProjection;
+uniform mat3 inversePlane;
 uniform vec2 levelSize[8];
 uniform vec2 outputSize;
 uniform vec4 sourceRect;
@@ -28,7 +29,8 @@ uniform vec2 modes;
 vec2 uv;
 vec2 scenePoint;
 float blurAmount(vec4 focus, float softness, float mode) {
-  vec2 point = (scenePoint - windowRect.xy) / windowRect.zw;
+  vec3 local = inversePlane * vec3(scenePoint, 1.0);
+  vec2 point = (local.xy / local.z - windowRect.xy) / windowRect.zw;
   vec2 delta = (point - focus.xy) * windowRect.zw / length(windowRect.zw);
   float distance = mode < 0.5 ? length(delta) : abs(dot(delta, depthAxis));
   return smoothstep(focus.z * 0.5, focus.z * 0.5 + max(0.005, softness), distance) * focus.w;

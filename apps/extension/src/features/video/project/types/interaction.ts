@@ -365,6 +365,8 @@ export interface VideoProjectMotionPoint {
 }
 
 export interface VideoProjectMotionArea {
+  /** Unit edge directions retain a converted area without replacing it by an axis-aligned box. */
+  axes?: { x: VideoProjectMotionPoint; y: VideoProjectMotionPoint };
   height: number;
   width: number;
   x: number;
@@ -385,6 +387,14 @@ export interface VideoProjectMotionRegion {
   /** Authored interval tied to one source clip, retained while its visible part is trimmed. */
   sourceBinding?: {
     animationGroupId?: string;
+    /** Retained inactive authoring never gains a visible span during clip reprojection. */
+    dormant?: boolean;
+    /** Unresolved Gallery edge is retained as passive provenance, never a runtime connection. */
+    unresolvedLinkTo?: string;
+    /** Recompute Gallery phases from retained clips while preserving authored source clocks. */
+    phaseProjection?: 'retained-result';
+    /** Project-sized focus coordinates refer to the original decorated source window. */
+    coordinateSpace?: 'source-window';
     clipId: string;
     sourceStart: number;
     sourceEnd: number;

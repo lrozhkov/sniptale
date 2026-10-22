@@ -311,3 +311,74 @@ it('keeps camera connections independent of intervening spotlight intervals', as
   project.motionRegions = [first, spotlight, second];
   expect(resolveMotionConnectionSource(project, second)).toBe(first);
 });
+
+it.each([
+  'same-clip',
+  'contiguous-source',
+  'mixed-scope',
+  'independent-instance',
+  'source-gap',
+  'timeline-gap',
+  'different-layout',
+  'missing-target',
+] as const)(
+  'admits window links only across a continuous concrete source: %s',
+  async (scenario) => {
+    const { createVideoProjectFromRecording } = await import('../factories/creation');
+    const project = createVideoProjectFromRecording({
+      recordingId: 'window',
+      filename: 'Window.webm',
+      width: 640,
+      height: 360,
+      duration: 8,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+    });
+    const video = project.clips[0]!;
+    if (video.type !== 'VIDEO') throw new Error('Expected video');
+    video.duration = 4;
+    video.sourceDuration = 4;
+    const tail = { ...video, id: 'tail', startTime: 4, sourceStart: 4 };
+    project.clips.push(tail);
+    const source = {
+      ...createVideoProjectMotionRegion(project, 0),
+      id: 'from',
+      duration: 1,
+      sourceBinding: {
+        clipId: video.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 1,
+        animation: { start: 0, end: 1, duration: 1 },
+      },
+    };
+    const destination = {
+      ...source,
+      id: 'to',
+      startTime: scenario === 'same-clip' ? 3 : 6,
+      sourceBinding: {
+        ...source.sourceBinding,
+        clipId: scenario === 'same-clip' ? video.id : tail.id,
+      },
+      incomingConnection: { fromRegionId: source.id, easing: VideoTemporalEasing.LINEAR },
+    };
+    if (scenario === 'mixed-scope')
+      delete (destination.sourceBinding as Partial<typeof destination.sourceBinding>)
+        .coordinateSpace;
+    if (scenario === 'independent-instance') tail.sourceInstanceId = 'other';
+    if (scenario === 'source-gap') tail.sourceStart = 5;
+    if (scenario === 'timeline-gap') tail.startTime = 5;
+    if (scenario === 'different-layout')
+      tail.transform = { ...tail.transform, x: tail.transform.x + 1 };
+    if (scenario === 'missing-target') destination.sourceBinding.clipId = 'absent';
+    project.motionRegions = [source, destination];
+    const before = structuredClone(project);
+    expect(resolveMotionConnectionSource(project, destination)).toBe(
+      scenario === 'same-clip' || scenario === 'contiguous-source' || scenario === 'source-gap'
+        ? source
+        : null
+    );
+    expect(project).toEqual(before);
+  }
+);

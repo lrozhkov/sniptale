@@ -471,3 +471,74 @@ it('keeps camera appearance through a partial rate-two split and independent dup
   expect(project.clips.find((clip) => clip.id === screen.id)).toBe(screen);
   expect('cameraMirrored' in camera).toBe(false);
 });
+
+it('keeps dormant source framing inactive and independent through public split and duplicate commands', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'dormant',
+    filename: 'Dormant.webm',
+    width: 640,
+    height: 360,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source video');
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 1), duration: 6 },
+    clip
+  );
+  region.sourceBinding = { ...region.sourceBinding!, dormant: true };
+  const authored = applyVideoProjectMutationPatch(project, {
+    motionRegions: [projectMotionSourceBinding(project, region)],
+  });
+  expect(authored.version).toBe(34);
+  const before = structuredClone(authored);
+  const createEditor = () =>
+    createStore<VideoEditorProjectState>()((set, get) => ({
+      project: authored,
+      currentTime: 4,
+      placementMode: null,
+      selection: { kind: 'clip', clipId: clip.id },
+      selectedTrackId: clip.trackId,
+      projectHistory: resetVideoEditorProjectHistory(authored.id),
+      ...createVideoEditorProjectActions(set, get),
+    }));
+  const splitEditor = createEditor();
+  splitEditor.getState().splitClipAt(clip.id, 4);
+  const split = splitEditor.getState().project!;
+  const splitVideos = split.clips.filter((clip) => clip.type === 'VIDEO');
+  expect(splitVideos).toHaveLength(2);
+  expect(split.motionRegions).toHaveLength(2);
+  expect(new Set(split.motionRegions!.map((region) => region.sourceBinding?.clipId))).toEqual(
+    new Set(splitVideos.map((clip) => clip.id))
+  );
+  const duplicateEditor = createEditor();
+  duplicateEditor.getState().duplicateClip(clip.id);
+  const duplicated = duplicateEditor.getState().project!;
+  expect(duplicated.motionRegions).toHaveLength(2);
+  const copy = duplicated.motionRegions!.find((retained) => retained.id !== region.id)!;
+  expect(copy.sourceBinding!.clipId).not.toBe(clip.id);
+  expect(copy.sourceBinding?.dormant).toBe(true);
+  for (const candidate of [split, duplicated]) {
+    const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(candidate)));
+    expect(isExportReadyVideoProject(reopened)).toBe(true);
+    for (const retained of reopened.motionRegions!) {
+      expect(retained.duration).toBe(0);
+      expect(retained.sourceBinding).toMatchObject({ dormant: true, sourceStart: 1, sourceEnd: 7 });
+    }
+    for (const time of [0, 2, 4, 6, 9])
+      expect(resolveVideoCompositionFrame(reopened, time).camera.scale).toBe(1);
+  }
+  expect(authored).toEqual(before);
+});
+
+import {
+  bindMotionRegionToClip,
+  projectMotionSourceBinding,
+} from '../../../../features/video/project/motion/source-binding';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
+import { isExportReadyVideoProject } from '../../../../features/video/project/validation/root';
+import { hydrateVideoProject } from '../../../../features/video/project/hydration';
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';

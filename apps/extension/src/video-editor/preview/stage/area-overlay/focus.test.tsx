@@ -230,9 +230,13 @@ it.each(['border', 'spotlight'] as const)(
   }
 );
 
-it.each(['border', 'window', 'scene'] as const)(
-  'uses the concrete %s video attachment and never substitutes a source',
-  (target) => {
+it.each(
+  [false, true].flatMap((original) =>
+    (['border', 'window', 'scene'] as const).map((target) => [target, original] as const)
+  )
+)(
+  'uses the concrete %s attachment with original=%s and never substitutes a source',
+  (target, original) => {
     const clip = createVideoClip({
       id: 'bound',
       fitMode: 'STRETCH',
@@ -251,6 +255,10 @@ it.each(['border', 'window', 'scene'] as const)(
       },
       clip
     );
+    if (original) {
+      clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+      region.sourceBinding!.coordinateSpace = 'source-window';
+    }
     project.motionRegions = [region];
     params = {
       ...params,
@@ -268,13 +276,13 @@ it.each(['border', 'window', 'scene'] as const)(
     };
     if (target !== 'border') useSpotlight(target);
     render();
-    expect(handle().style.left).toBe('62.5%');
-    expect(handle().style.top).toBe('62.5%');
+    expect(handle().style.left).toBe(original ? '65.625%' : '62.5%');
+    expect(handle().style.top).toBe(original ? '65.625%' : '62.5%');
     pointer(body(), 'pointerdown', 100, 50);
     pointer(window, 'pointerup', 110, 55);
     const area = commit.mock.lastCall?.[1].focusEdit.settings.area;
-    expect(area.x).toBeCloseTo(0.35, 7);
-    expect(area.y).toBeCloseTo(0.35, 7);
+    expect(area.x).toBeCloseTo(original ? 0.33 : 0.35, 7);
+    expect(area.y).toBeCloseTo(original ? 0.33 : 0.35, 7);
     expect(area.width).toBe(0.5);
     expect(area.height).toBe(0.5);
     params = { ...params, project: { ...project, clips: [{ ...clip, id: 'other' }] } };

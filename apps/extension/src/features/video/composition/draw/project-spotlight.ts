@@ -21,6 +21,7 @@ import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/prese
 import { admittedVisualWindowHeader } from './window-header';
 import {
   getFittedMediaWindowFrame,
+  getFittedMediaOriginalWindowFrame,
   mapWindowNormalizedPointToVisualLayer,
   type VisualLayerSourcePointMapping,
 } from './fitted-media';
@@ -112,7 +113,7 @@ function resolveBoundSceneSpotlight(
     (item) => item.kind === 'video' && item.clipId === state.clipId
   );
   if (!layer || layer.kind !== 'video' || layer.opacity <= 0) return null;
-  const attachment = spotlightWindowAttachment(args, layer);
+  const attachment = spotlightWindowAttachment(args, layer, state.coordinateSpace);
   if (!attachment) return null;
   const camera = shouldLockVisualLayerToViewport(layer, args.frame.camera)
     ? IDENTITY_PROJECTION
@@ -208,7 +209,8 @@ const IDENTITY_PROJECTION: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 function spotlightWindowAttachment(
   args: CompositionSpotlightGeometry,
-  layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>
+  layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }>,
+  coordinateSpace?: 'source-window'
 ) {
   const metadata = args.project.assets.find((asset) => asset.id === layer.clip.assetId)?.metadata;
   if (!metadata || metadata.width <= 0 || metadata.height <= 0) return null;
@@ -226,6 +228,7 @@ function spotlightWindowAttachment(
   };
   const mapping: VisualLayerSourcePointMapping = {
     point: { x: 0, y: 0 },
+    ...(coordinateSpace ? { coordinateSpace } : {}),
     frame,
     renderState: layer.renderState ?? IDENTITY_TRANSITION_VISUAL_STATE,
     fitMode: layer.clip.fitMode,
@@ -235,9 +238,13 @@ function spotlightWindowAttachment(
     ...(header.windowHeader ? { windowHeader: header.windowHeader } : {}),
     ...(camera ? { cameraAppearance: camera } : {}),
   };
-  const window = camera
+  const visibleWindow = camera
     ? cameraWindowFrame(frame, camera.shape)
     : getFittedMediaWindowFrame(mapping);
+  const window =
+    !camera && coordinateSpace === 'source-window'
+      ? getFittedMediaOriginalWindowFrame(mapping)
+      : visibleWindow;
   if (window.width <= 0 || window.height <= 0) return null;
   const origin = mapWindowNormalizedPointToVisualLayer(mapping);
   const right = mapWindowNormalizedPointToVisualLayer({ ...mapping, point: { x: 1, y: 0 } });
@@ -259,10 +266,14 @@ function spotlightWindowAttachment(
     1,
   ];
   const radius = camera
-    ? (Math.min(window.width, window.height) * camera.roundness) / 200
-    : roundedWindowRadius(window.width, window.height, layer.clip.windowCornerRadius ?? 0);
+    ? (Math.min(visibleWindow.width, visibleWindow.height) * camera.roundness) / 200
+    : roundedWindowRadius(
+        visibleWindow.width,
+        visibleWindow.height,
+        layer.clip.windowCornerRadius ?? 0
+      );
   const clip: SceneSpotlightClip = {
-    rect: window,
+    rect: visibleWindow,
     radius,
     ...(camera && camera.shape !== 'rounded'
       ? {

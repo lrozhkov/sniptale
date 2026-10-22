@@ -1,4 +1,9 @@
-import { quickEditPlaneProjection } from './spatial-geometry';
+import {
+  quickEditPlaneProjection,
+  invertQuickEditProjection,
+  multiplyQuickEditProjections,
+  type QuickEditHomography,
+} from './spatial-geometry';
 import { hasCameraPerspective, interpolateCameraSpatial } from '../../project/motion/spatial';
 import type { MotionSpatialSettings, CameraSpatialRect } from '../../project/motion/spatial';
 import type { VideoCompositionCameraState } from '../types';
@@ -43,6 +48,28 @@ export function motionCameraProjection(camera: VideoCompositionCameraState, rast
     width: reference.width * rasterScale,
     height: reference.height * rasterScale,
   };
+  const plane = motionCameraPlaneTransform(camera, rasterScale);
+  if (plane) {
+    const inverse = invertQuickEditProjection(plane);
+    if (!inverse) return null;
+    const local = quickEditPlaneProjection(base, base, spatial);
+    const deformation = multiplyQuickEditProjections(
+      plane,
+      multiplyQuickEditProjections(local, inverse)
+    );
+    const zoom: QuickEditHomography = [
+      camera.scale,
+      0,
+      -camera.viewportX * camera.scale * rasterScale,
+      0,
+      camera.scale,
+      -camera.viewportY * camera.scale * rasterScale,
+      0,
+      0,
+      1,
+    ];
+    return multiplyQuickEditProjections(zoom, deformation);
+  }
   return quickEditPlaneProjection(
     base,
     {
@@ -53,4 +80,25 @@ export function motionCameraProjection(camera: VideoCompositionCameraState, rast
     },
     spatial
   );
+}
+
+/** Express the source plane placement in the consuming raster without changing its logical pose. */
+export function motionCameraPlaneTransform(
+  camera: VideoCompositionCameraState,
+  rasterScale = 1
+): QuickEditHomography | null {
+  const m = camera.spatial?.planeTransform;
+  return m
+    ? [
+        m[0],
+        m[1],
+        m[2] * rasterScale,
+        m[3],
+        m[4],
+        m[5] * rasterScale,
+        m[6] / rasterScale,
+        m[7] / rasterScale,
+        m[8],
+      ]
+    : null;
 }

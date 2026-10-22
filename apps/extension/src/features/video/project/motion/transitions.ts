@@ -1,3 +1,4 @@
+import { VideoTemporalEasing } from '../types/interaction';
 import { isRecord, isBoundedNumber } from '../validation/primitives';
 
 const TYPES = ['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const;
@@ -7,7 +8,12 @@ export interface CameraTransition<T extends CameraTransitionType = CameraTransit
   type: T;
   duration: number;
 }
-export type MotionPhaseTransitions = Partial<Record<CameraTransitionPhase, CameraTransitionType>>;
+export type MotionPhaseTransitions = Partial<
+  Record<CameraTransitionPhase, CameraTransitionType>
+> & {
+  /** Source-owned preference remains after its outgoing connection is removed. */
+  link?: VideoTemporalEasing;
+};
 export interface MotionTransitionPhaseEdit {
   phase: CameraTransitionPhase;
   type?: CameraTransitionType;
@@ -35,6 +41,11 @@ export function parseMotionPhaseTransitions(
     if (type === undefined) continue;
     if (!isCameraTransitionType(type)) return null;
     result[phase] = type;
+  }
+  if (value['link'] !== undefined) {
+    const link = Object.values(VideoTemporalEasing).find((curve) => curve === value['link']);
+    if (!link) return null;
+    result.link = link;
   }
   return result;
 }

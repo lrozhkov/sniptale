@@ -1,3 +1,4 @@
+import { planReviewProjectMotion } from './project-motion';
 import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
 import { planReviewProjectCursor } from './project-cursor';
 import { applyRecordingReviewInteractions } from './standalone-interactions';
@@ -308,6 +309,13 @@ export function planReviewProjectConversion(args: {
     const { actionsEnabled: _enabled, ...content } = document.advancedContent;
     project = applyRecordingReviewInteractions(project, recordingId, content);
   }
+  const motion = planReviewProjectMotion(
+    project,
+    document.advancedContent,
+    application.zoomApplied
+  );
+  if (!motion) return blocked({ kind: 'unmapped-content', field: 'zoom' });
+  project = motion;
   if (!isExportReadyVideoProject(project)) return blocked({ kind: 'native-admission' });
   return { status: 'prepared', project, timeline };
 }
@@ -476,7 +484,7 @@ function pendingContent(content: QuickEditAdvancedContent): ReviewProjectConvers
     text: false,
     captions: false,
     actionsEnabled: false,
-    zoom: content.zoom.regions.length > 0,
+    zoom: false,
     background: false,
     audio: false,
     canvas: false,

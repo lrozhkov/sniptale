@@ -1,3 +1,15 @@
+import {
+  motionFocusAreaPoint,
+  motionFocusAreaDelta,
+  motionFocusAreaScale,
+  resizeOrientedMotionArea,
+} from '../../../../../features/video/project/motion/focus-area';
+import {
+  motionWindowFocusToComposition,
+  motionWindowAreaPoints,
+  resolveSourceWindowCamera,
+  resolveMotionSourceWindow,
+} from '../../../../../features/video/composition/motion/source-window';
 import { evaluateMotionSpatial } from '../../../../../features/video/composition/motion/spatial';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -31,6 +43,9 @@ export interface FramingPreviewProps {
 
 export function useFramingInteraction(props: FramingPreviewProps, overview = true) {
   const { project, region, assetUrls } = props;
+  const targetAvailable =
+    region.sourceBinding?.coordinateSpace !== 'source-window' ||
+    resolveMotionSourceWindow(project, region, region.startTime + region.duration / 2) !== null;
   const gesture = useRef<{
     pointer: number | null;
     grabOffset: Point;
@@ -44,7 +59,8 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     region,
     draft,
     areaDraft,
-    overview
+    overview,
+    gesture.current.world
   );
 
   useEffect(() => {
@@ -56,22 +72,29 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     setAreaDraft(null);
   }, [assetUrls, project, region.startTime, region.duration]);
 
-  const clamp = (point: Point): Point => ({
-    x: Math.min(project.width, Math.max(0, point.x)),
-    y: Math.min(project.height, Math.max(0, point.y)),
-  });
+  const clamp = (point: Point): Point =>
+    area?.axes
+      ? point
+      : {
+          x: Math.min(project.width, Math.max(0, point.x)),
+          y: Math.min(project.height, Math.max(0, point.y)),
+        };
   const pointAt = (event: React.PointerEvent<HTMLButtonElement>): Point => {
     const bounds = event.currentTarget.getBoundingClientRect();
     const world = gesture.current.world ?? { left, top, width, height };
+    const point = motionWindowFocusToComposition(
+      project,
+      region,
+      {
+        x: world.left + ((event.clientX - bounds.left) / bounds.width) * world.width,
+        y: world.top + ((event.clientY - bounds.top) / bounds.height) * world.height,
+      },
+      region.startTime + region.duration / 2,
+      true
+    );
     return clamp({
-      x:
-        world.left +
-        ((event.clientX - bounds.left) / bounds.width) * world.width +
-        gesture.current.grabOffset.x,
-      y:
-        world.top +
-        ((event.clientY - bounds.top) / bounds.height) * world.height +
-        gesture.current.grabOffset.y,
+      x: point.x + gesture.current.grabOffset.x,
+      y: point.y + gesture.current.grabOffset.y,
     });
   };
   const areaAt = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -91,7 +114,9 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
   const spatial = overview ? undefined : evaluateMotionSpatial(project, null, region, 1);
   return {
     areaMode,
-    area,
+    areaPoints: area
+      ? motionWindowAreaPoints(project, region, area, region.startTime + region.duration / 2)
+      : null,
     camera: {
       ...(spatial ? { spatial } : {}),
       viewportX: left,
@@ -103,6 +128,7 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
       regionId: region.id,
       motionBlurAmount: 0,
       overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
+      ...(!overview && region.sourceBinding?.coordinateSpace === 'source-window' ? viewport : {}),
     },
     viewport,
     left,
@@ -112,6 +138,7 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     handlers: {
       onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
         if (
+          !targetAvailable ||
           !overview ||
           region.focusMode === VideoMotionFocusMode.CURSOR ||
           event.button !== 0 ||
@@ -131,11 +158,17 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
           setAreaDraft(initial.area);
           return;
         }
+        const worldPoint = motionWindowFocusToComposition(
+          project,
+          region,
+          point,
+          region.startTime + region.duration / 2
+        );
         if (
-          point.x >= viewport.viewportX &&
-          point.x <= viewport.viewportX + viewport.viewportWidth &&
-          point.y >= viewport.viewportY &&
-          point.y <= viewport.viewportY + viewport.viewportHeight
+          worldPoint.x >= viewport.viewportX &&
+          worldPoint.x <= viewport.viewportX + viewport.viewportWidth &&
+          worldPoint.y >= viewport.viewportY &&
+          worldPoint.y <= viewport.viewportY + viewport.viewportHeight
         ) {
           gesture.current.grabOffset = { x: focus.x - point.x, y: focus.y - point.y };
         }
@@ -160,6 +193,7 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
       onPointerCancel: cancel,
       onLostPointerCapture: cancel,
       onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) =>
+        targetAvailable &&
         nudgeFramingSelection(event, {
           project,
           area,
@@ -177,11 +211,14 @@ function resizeFramingArea(project: VideoProject, gesture: AreaGesture, point: P
   const dy = point.y - gesture.start.y;
   const initial = gesture.area;
   if (!gesture.corner)
-    return normalizeMotionFocusArea(project, {
-      ...initial,
-      x: initial.x + dx,
-      y: initial.y + dy,
-    });
+    return (
+      normalizeMotionFocusArea(project, {
+        ...initial,
+        x: initial.x + dx,
+        y: initial.y + dy,
+      }) ?? initial
+    );
+  if (initial.axes) return resizeOrientedMotionArea(initial, gesture.corner, { x: dx, y: dy });
   const west = gesture.corner === 'nw' || gesture.corner === 'sw';
   const north = gesture.corner === 'nw' || gesture.corner === 'ne';
   const minWidth = clampFocusAreaSize(project.width, 0);
@@ -212,18 +249,16 @@ function beginFramingAreaGesture(
     cornerValue === 'nw' || cornerValue === 'ne' || cornerValue === 'sw' || cornerValue === 'se'
       ? cornerValue
       : null;
-  const inside =
-    point.x >= area.x &&
-    point.x <= area.x + area.width &&
-    point.y >= area.y &&
-    point.y <= area.y + area.height;
+  const local = motionFocusAreaDelta(area, { x: point.x - area.x, y: point.y - area.y });
+  const inside = local.x >= 0 && local.x <= area.width && local.y >= 0 && local.y <= area.height;
+  const center = motionFocusAreaPoint(area, 0.5, 0.5);
   const initial =
     inside || corner
       ? area
       : normalizeMotionFocusArea(project, {
           ...area,
-          x: point.x - area.width / 2,
-          y: point.y - area.height / 2,
+          x: point.x - (center.x - area.x),
+          y: point.y - (center.y - area.y),
         })!;
   return { area: initial, start: point, corner };
 }
@@ -284,7 +319,8 @@ function resolveFramingView(
   region: VideoProjectMotionRegion,
   draft: Point | null,
   areaDraft: VideoProjectMotionArea | null,
-  overview: boolean
+  overview: boolean,
+  fixedWorld: { left: number; top: number; width: number; height: number } | null
 ) {
   if (region.focusMode === VideoMotionFocusMode.CURSOR) {
     const viewport = resolveVideoCompositionCamera({
@@ -317,17 +353,38 @@ function resolveFramingView(
       ))
     : null;
   const focus = area
-    ? { x: area.x + area.width / 2, y: area.y + area.height / 2 }
+    ? motionFocusAreaPoint(area, 0.5, 0.5)
     : (draft ?? region.focusPoint ?? { x: project.width / 2, y: project.height / 2 });
-  const scale = area
-    ? Math.min(4, Math.max(1, Math.min(project.width / area.width, project.height / area.height)))
-    : region.scale;
-  const viewport = resolveCameraViewportFrame(project, focus, scale);
+  const scale = area ? motionFocusAreaScale(project, area) : region.scale;
+  const viewport =
+    resolveSourceWindowCamera(
+      project,
+      region,
+      region.startTime + region.duration / 2,
+      focus,
+      scale,
+      1
+    ) ?? resolveCameraViewportFrame(project, focus, scale);
   const overviewScale = Math.min(1, region.scale);
-  const width = overview ? project.width / overviewScale : viewport.viewportWidth;
-  const height = overview ? project.height / overviewScale : viewport.viewportHeight;
-  const left = overview ? (project.width - width) / 2 : viewport.viewportX;
-  const top = overview ? (project.height - height) / 2 : viewport.viewportY;
+  let width = overview ? project.width / overviewScale : viewport.viewportWidth;
+  let height = overview ? project.height / overviewScale : viewport.viewportHeight;
+  let left = overview ? (project.width - width) / 2 : viewport.viewportX;
+  let top = overview ? (project.height - height) / 2 : viewport.viewportY;
+  if (overview && area) {
+    const points = Object.values(
+      motionWindowAreaPoints(project, region, area, region.startTime + region.duration / 2)
+    );
+    const clearance = Math.max(project.width, project.height) * 0.06;
+    const minX = Math.min(left, ...points.map((point) => point.x - clearance));
+    const minY = Math.min(top, ...points.map((point) => point.y - clearance));
+    const maxX = Math.max(left + width, ...points.map((point) => point.x + clearance));
+    const maxY = Math.max(top + height, ...points.map((point) => point.y + clearance));
+    width = Math.max(maxX - minX, ((maxY - minY) * project.width) / project.height);
+    height = (width * project.height) / project.width;
+    left = (minX + maxX - width) / 2;
+    top = (minY + maxY - height) / 2;
+  }
+  if (overview && fixedWorld) ({ left, top, width, height } = fixedWorld);
 
   return { areaMode, area, focus, viewport, left, top, width, height };
 }

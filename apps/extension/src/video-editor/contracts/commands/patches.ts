@@ -66,6 +66,7 @@ export type VideoEditorMotionRegionPatch = Partial<
   >
 > & {
   sourceClipId?: string | null;
+  cameraTarget?: 'scene' | 'window';
   focusEdit?: MotionFocusEdit;
   motionBlurPhase?: MotionBlurPhaseEdit;
   spatialEdit?: MotionSpatialEdit;

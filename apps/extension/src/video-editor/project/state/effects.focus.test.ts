@@ -1,3 +1,7 @@
+import { fixture } from '../../../features/video/review/project-conversion.test-support';
+import { planReviewProjectConversion } from '../../../features/video/review/project-conversion';
+import { resolveVideoCompositionCamera } from '../../../features/video/composition/motion';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { resolveVideoCompositionBorders } from '../../../features/video/composition/timeline/frame/borders';
 import { expect, it } from 'vitest';
 import {
@@ -449,3 +453,456 @@ it('retains spotlight source phases through split, rate and duplicate with indep
       ?.blur
   ).toBe(9);
 });
+
+it('switches camera scope and detaches the source without changing the original focus point meaning', () => {
+  const { store, region, clip } = setup();
+  const base = store.getState().project!;
+  const focused = {
+    ...region,
+    focusPoint: { x: 400, y: 250 },
+    focusArea: { x: 300, y: 200, width: 400, height: 200 },
+  };
+  store.getState().setProject({
+    ...base,
+    clips: [
+      {
+        ...clip,
+        transform: { ...clip.transform, x: 100, y: 50, width: 800, height: 450 },
+        sourceCrop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+      },
+    ],
+    motionRegions: [focused, base.motionRegions![1]!],
+  });
+  const before = store.getState();
+  store.getState().updateMotionRegion(region.id, { cameraTarget: 'window' });
+  const window = store.getState();
+  const camera = window.project!.motionRegions![0]!;
+  expect(camera.sourceBinding?.coordinateSpace).toBe('source-window');
+  expect(camera.focusPoint).toEqual({ x: 512, y: 328 });
+  expect(camera.focusArea).toMatchObject({ x: 384, y: 264, width: 512, height: 256 });
+  expect(camera.sourceBinding?.animation).toEqual(region.sourceBinding!.animation);
+  expect(window.project!.motionRegions![1]).toBe(before.project!.motionRegions![1]);
+  expect(isHydratableVideoProject(JSON.parse(JSON.stringify(window.project)))).toBe(true);
+  const undo = undoVideoEditorProjectHistory(window.projectHistory, window.project!);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.motionRegions![0]!.focusPoint).toEqual(focused.focusPoint);
+  expect(undo.project.motionRegions![0]!.sourceBinding?.coordinateSpace).toBeUndefined();
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.motionRegions![0]!.focusPoint).toEqual(camera.focusPoint);
+  store.getState().updateMotionRegion(region.id, { cameraTarget: 'window' });
+  expect(store.getState().project).toBe(window.project);
+  expect(store.getState().projectHistory).toBe(window.projectHistory);
+  store.getState().updateMotionRegion(region.id, { sourceClipId: null });
+  expect(store.getState().project!.motionRegions![0]!.focusPoint).toEqual(focused.focusPoint);
+  for (const key of ['x', 'y', 'width', 'height'] as const)
+    expect(store.getState().project!.motionRegions![0]!.focusArea![key]).toBeCloseTo(
+      focused.focusArea[key],
+      9
+    );
+  expect(store.getState().project!.motionRegions![0]!.sourceBinding).toBeUndefined();
+});
+
+it('refuses camera scope changes without a concrete visible source and preserves history', () => {
+  const { store, region } = setup();
+  const project = store.getState().project!;
+  store.getState().setProject({ ...project, clips: [] });
+  const before = store.getState();
+  store.getState().updateMotionRegion(region.id, { cameraTarget: 'window' });
+  expect(store.getState().project).toBe(before.project);
+  expect(store.getState().projectHistory).toBe(before.projectHistory);
+});
+
+it('remembers outgoing curves on the source without changing its own legacy curve or incoming connection', () => {
+  const { store, clip } = setup();
+  const project = store.getState().project!;
+  const a = { ...createVideoProjectMotionRegion(project, 0), id: 'a', duration: 1 };
+  const b = {
+    ...createVideoProjectMotionRegion(project, 2),
+    id: 'b',
+    duration: 1,
+    easing: VideoTemporalEasing.EASE_OUT,
+    incomingConnection: { fromRegionId: a.id, easing: VideoTemporalEasing.EASE_IN_OUT },
+  };
+  const c = { ...createVideoProjectMotionRegion(project, 4), id: 'c', duration: 1 };
+  store.setState({ project: { ...project, motionRegions: [a, b, c] } });
+  store.getState().updateMotionRegion(c.id, {
+    incomingConnection: { fromRegionId: b.id, easing: VideoTemporalEasing.LINEAR },
+  });
+  const linked = store.getState().project!;
+  const source = linked.motionRegions!.find((region) => region.id === b.id)!;
+  expect(source.phaseTransitions?.link).toBe('LINEAR');
+  expect(source.easing).toBe('EASE_OUT');
+  expect(source.incomingConnection).toEqual(b.incomingConnection);
+  const { phaseTransitions: _preference, ...legacy } = source;
+  for (const time of [2.02, 2.15, 2.5, 2.85, 2.98]) {
+    const camera = (region: typeof source) =>
+      resolveVideoCompositionFrame(
+        { ...linked, motionRegions: [{ ...region, incomingConnection: null }] },
+        time
+      ).camera;
+    expect(camera(source)).toEqual(camera(legacy));
+  }
+  store.getState().updateMotionRegion(c.id, { incomingConnection: null });
+  const removed = store.getState().project!;
+  expect(
+    removed.motionRegions!.find((region) => region.id === c.id)?.incomingConnection
+  ).toBeUndefined();
+  expect(removed.motionRegions!.find((region) => region.id === b.id)?.phaseTransitions?.link).toBe(
+    'LINEAR'
+  );
+  const reopened = hydrateVideoProject(JSON.parse(JSON.stringify(removed)));
+  expect(reopened.motionRegions!.find((region) => region.id === b.id)?.phaseTransitions?.link).toBe(
+    'LINEAR'
+  );
+  expect(isHydratableVideoProject(reopened)).toBe(true);
+  const history = undoVideoEditorProjectHistory(store.getState().projectHistory, removed);
+  if (history?.status !== 'applied') throw new Error('Undo refused');
+  expect(
+    history.project.motionRegions!.find((region) => region.id === c.id)?.incomingConnection?.easing
+  ).toBe('LINEAR');
+  expect(removed.clips.find((item) => item.id === clip.id)).toEqual(
+    project.clips.find((item) => item.id === clip.id)
+  );
+});
+
+import { VideoTemporalEasing } from '../../../features/video/project/types';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
+import { hydrateVideoProject } from '../../../features/video/project/hydration';
+
+it('remembers the legacy curve when an existing connection is removed', () => {
+  const { store } = setup();
+  const project = store.getState().project!;
+  const source = { ...createVideoProjectMotionRegion(project, 0), id: 'source', duration: 1 };
+  const target = {
+    ...createVideoProjectMotionRegion(project, 3),
+    id: 'target',
+    duration: 1,
+    incomingConnection: { fromRegionId: source.id, easing: VideoTemporalEasing.EASE_OUT },
+  };
+  store.setState({ project: { ...project, motionRegions: [source, target] } });
+  store.getState().updateMotionRegion(target.id, { incomingConnection: null });
+  expect(store.getState().project!.motionRegions![0]!.phaseTransitions?.link).toBe('EASE_OUT');
+  expect(store.getState().project!.motionRegions![0]!.easing).toBe(source.easing);
+});
+
+it('shares source preference across split parts and replaces passive provenance only on explicit connection', () => {
+  const { store, clip } = setup();
+  const project = store.getState().project!;
+  const source = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 1), id: 'source', duration: 6 },
+    clip
+  );
+  source.sourceBinding = {
+    ...source.sourceBinding!,
+    coordinateSpace: 'source-window',
+    animationGroupId: 'source-group',
+    unresolvedLinkTo: 'deleted-gallery-target',
+  };
+  source.phaseTransitions = { link: VideoTemporalEasing.EASE_OUT };
+  const target = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 7.25), id: 'target', duration: 0.5 },
+    clip
+  );
+  target.sourceBinding = {
+    ...target.sourceBinding!,
+    coordinateSpace: 'source-window',
+    animationGroupId: 'target-group',
+  };
+  store.getState().setProject({ ...project, version: 34, motionRegions: [source, target] });
+  store.getState().splitClipAt(clip.id, 4);
+  const split = store.getState().project!;
+  const sources = split.motionRegions!.filter(
+    (region) => region.sourceBinding?.animationGroupId === 'source-group'
+  );
+  expect(sources).toHaveLength(2);
+  expect(
+    sources.every((region) => region.sourceBinding?.unresolvedLinkTo === 'deleted-gallery-target')
+  ).toBe(true);
+  const copyStore = createVideoEditorProjectTestStore();
+  copyStore.getState().setProject(split);
+  const trailingSourceClipId = sources.toSorted((a, b) => a.startTime - b.startTime).at(-1)!
+    .sourceBinding!.clipId;
+  copyStore.getState().duplicateClip(trailingSourceClipId);
+  const copiedState = copyStore.getState();
+  if (copiedState.selection.kind !== 'clip') throw new Error('Copy did not select its clip');
+  const copiedClipId = copiedState.selection.clipId;
+  const copied = copiedState.project!.motionRegions!.find(
+    (region) =>
+      region.sourceBinding?.clipId === copiedClipId &&
+      region.sourceBinding.unresolvedLinkTo === 'deleted-gallery-target'
+  )!;
+  expect(copied.phaseTransitions?.link).toBe('EASE_OUT');
+  expect(copied.sourceBinding?.animationGroupId).not.toBe('source-group');
+  const last = sources.toSorted((a, b) => a.startTime - b.startTime).at(-1)!;
+  const destination = split.motionRegions!.find(
+    (region) => region.sourceBinding?.animationGroupId === 'target-group' && region.duration > 0
+  )!;
+  store.getState().updateMotionRegion(destination.id, {
+    incomingConnection: { fromRegionId: last.id, easing: VideoTemporalEasing.LINEAR },
+  });
+  const accepted = store.getState().project!;
+  for (const part of accepted.motionRegions!.filter(
+    (region) => region.sourceBinding?.animationGroupId === 'source-group'
+  )) {
+    expect(part.phaseTransitions?.link).toBe('LINEAR');
+    expect(part.sourceBinding?.unresolvedLinkTo).toBeUndefined();
+  }
+  store.setState({
+    project: {
+      ...accepted,
+      utilityLanes: { ...accepted.utilityLanes!, camera: { visible: true, locked: true } },
+    },
+  });
+  const locked = store.getState();
+  store.getState().updateMotionRegion(destination.id, { incomingConnection: null });
+  expect(store.getState().project).toBe(locked.project);
+  expect(store.getState().projectHistory).toBe(locked.projectHistory);
+});
+
+it.each([0, 30, 90, -135])(
+  'retains all four area corners through scope changes, reopen and detach at %s degrees',
+  async (rotation) => {
+    const { motionWindowAreaPoints, motionWindowFocusToComposition } =
+      await import('../../../features/video/composition/motion/source-window');
+    const { store, region, clip } = setup();
+    const base = store.getState().project!;
+    const focused = {
+      ...region,
+      focusMode: 'MANUAL_AREA' as const,
+      focusPoint: { x: 0, y: 0 },
+      focusArea: {
+        x: base.width * 0.25,
+        y: base.height * 0.25,
+        width: base.width * 0.4,
+        height: base.height * 0.3,
+      },
+      sourceBinding: { ...region.sourceBinding!, coordinateSpace: 'source-window' as const },
+    };
+    store.getState().setProject({
+      ...base,
+      version: 34,
+      clips: [
+        {
+          ...clip,
+          transform: { ...clip.transform, x: 200, y: 100, width: 600, height: 300, rotation },
+        },
+      ],
+      motionRegions: [focused],
+    });
+    const before = store.getState().project!;
+    const expected = motionWindowAreaPoints(
+      before,
+      before.motionRegions![0]!,
+      focused.focusArea,
+      3
+    );
+    const expectedPoint = motionWindowFocusToComposition(
+      before,
+      before.motionRegions![0]!,
+      focused.focusPoint,
+      3
+    );
+    const assertCorners = () => {
+      const project = store.getState().project!;
+      const current = project.motionRegions![0]!;
+      const actual = motionWindowAreaPoints(project, current, current.focusArea!, 3);
+      const point = motionWindowFocusToComposition(project, current, current.focusPoint!, 3);
+      expect(point.x).toBeCloseTo(expectedPoint.x, 6);
+      expect(point.y).toBeCloseTo(expectedPoint.y, 6);
+      for (const corner of ['nw', 'ne', 'se', 'sw'] as const) {
+        expect(actual[corner].x, corner).toBeCloseTo(expected[corner].x, 6);
+        expect(actual[corner].y, corner).toBeCloseTo(expected[corner].y, 6);
+      }
+      expect(isHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toBe(true);
+    };
+    store.getState().updateMotionRegion(region.id, { cameraTarget: 'scene' });
+    assertCorners();
+    const saved = JSON.parse(JSON.stringify(store.getState().project));
+    store.getState().setProject(saved);
+    assertCorners();
+    store.getState().updateMotionRegion(region.id, { cameraTarget: 'window' });
+    assertCorners();
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(store.getState().project!.motionRegions![0]!.focusArea![key]).toBeCloseTo(
+        focused.focusArea[key],
+        6
+      );
+    store.getState().updateMotionRegion(region.id, { sourceClipId: null });
+    assertCorners();
+    expect(store.getState().project!.motionRegions![0]!.sourceBinding).toBeUndefined();
+    const state = store.getState();
+    const undo = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.motionRegions![0]!.sourceBinding?.coordinateSpace).toBe('source-window');
+    expect(undo.project.clips).toEqual(before.clips);
+  }
+);
+
+it('refuses invalid converted area directions without changing accepted data or history', () => {
+  const { store, region } = setup();
+  const before = store.getState();
+  for (const axes of [
+    { x: { x: 1, y: 0 }, y: { x: 1, y: 0 } },
+    { x: { x: NaN, y: 0 }, y: { x: 0, y: 1 } },
+  ])
+    store
+      .getState()
+      .updateMotionRegion(region.id, { focusArea: { x: 20, y: 30, width: 100, height: 80, axes } });
+  expect(store.getState().project).toBe(before.project);
+  expect(store.getState().projectHistory).toBe(before.projectHistory);
+});
+
+it.each([0, 30, 90, -135])(
+  'targets the concrete source ACTION on a window rotated %s degrees',
+  (rotation) => {
+    const input = fixture();
+    input.document.edits = [];
+    const converted = planReviewProjectConversion(input);
+    if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+    const project = converted.project;
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO' || !clip.sourceInstanceId)
+      throw new Error('Expected source instance');
+    clip.transform = { ...clip.transform, x: 80, y: 45, width: 400, height: 225, rotation };
+    clip.sourceCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+    project.actionEvents = [
+      {
+        id: 'captured-target',
+        kind: 'CLICK',
+        label: 'Click',
+        data: {},
+        point: { x: 0.25, y: 0.75 },
+        anchor: {
+          kind: 'recording-source',
+          recordingId: 'recording',
+          sourceInstanceId: clip.sourceInstanceId,
+          sourceEventId: 'source-click',
+          sourceTime: 1,
+        },
+        presentation: { enabled: false, point: { x: 0.35, y: 0.6 } },
+      },
+    ];
+    const region = {
+      ...createVideoProjectMotionRegion(project, 0, { enter: 'linear', exit: 'linear' }),
+      duration: 2,
+      scale: 2.5,
+      focusMode: 'ACTION' as const,
+      focusPoint: { x: project.width * 0.5, y: project.height * 0.5 },
+      targetAction: { eventId: 'captured-target', clipId: clip.id },
+      zoomInDuration: 0.5,
+      zoomOutDuration: 0.5,
+      sourceBinding: {
+        clipId: clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: 0,
+        sourceEnd: 2,
+        animation: { start: 0, end: 2, duration: 2 },
+      },
+    };
+    project.motionRegions = [region];
+    const manual = structuredClone(project);
+    manual.motionRegions = [
+      {
+        ...region,
+        focusMode: 'MANUAL',
+        focusPoint: { x: project.width * 0.35, y: project.height * 0.6 },
+      },
+    ];
+    const before = structuredClone(project);
+    for (const currentTime of [0.125, 0.375, 1, 1.625, 1.875]) {
+      const actual = resolveVideoCompositionCamera({
+        project,
+        currentTime,
+        actions: [],
+        cursorSample: null,
+      });
+      const expected = resolveVideoCompositionCamera({
+        project: manual,
+        currentTime,
+        actions: [],
+        cursorSample: null,
+      });
+      expect(actual.viewportX).toBeCloseTo(expected.viewportX, 7);
+      expect(actual.viewportY).toBeCloseTo(expected.viewportY, 7);
+      expect(actual.focusPoint.x).toBeCloseTo(expected.focusPoint.x, 7);
+      expect(actual.focusPoint.y).toBeCloseTo(expected.focusPoint.y, 7);
+    }
+    expect(project).toEqual(before);
+    const missing = { ...project, actionEvents: [] };
+    const fallback = { ...manual, motionRegions: [{ ...region, focusMode: 'MANUAL' as const }] };
+    const resolve = (candidate: typeof project) =>
+      resolveVideoCompositionCamera({
+        project: candidate,
+        currentTime: 1,
+        actions: [],
+        cursorSample: null,
+      });
+    expect(resolve(missing)).toEqual(resolve(fallback));
+
+    const store = createVideoEditorProjectTestStore();
+    store.getState().setProject(project);
+    store.getState().splitClipAt(clip.id, 0.5);
+    const split = store.getState().project!;
+    const tail = split.clips.find(
+      (item) =>
+        item.type === 'VIDEO' &&
+        item.sourceInstanceId === clip.sourceInstanceId &&
+        item.sourceStart === 0.5
+    )!;
+    expect(tail).toBeDefined();
+    const tailRegion = split.motionRegions!.find((item) => item.sourceBinding?.clipId === tail.id)!;
+    expect(tailRegion.targetAction).toEqual({ eventId: 'captured-target', clipId: tail.id });
+    store.getState().updateClipPlaybackRate(tail.id, 2);
+    const sped = store.getState().project!;
+    const camera = (candidate: typeof project, time: number) =>
+      resolveVideoCompositionCamera({
+        project: candidate,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    const originalFrame = camera(project, 1);
+    const editedFrame = camera(sped, tail.startTime + 0.25);
+    expect(editedFrame.focusPoint.x).toBeCloseTo(originalFrame.focusPoint.x, 7);
+    expect(editedFrame.focusPoint.y).toBeCloseTo(originalFrame.focusPoint.y, 7);
+    expect(editedFrame.viewportX).toBeCloseTo(originalFrame.viewportX, 7);
+    expect(editedFrame.viewportY).toBeCloseTo(originalFrame.viewportY, 7);
+    store.getState().duplicateClip(tail.id);
+    const duplicated = store.getState().project!;
+    const copy = duplicated.clips.find(
+      (item) => !sped.clips.some((prior) => prior.id === item.id) && item.type === 'VIDEO'
+    )!;
+    const copyRegion = duplicated.motionRegions!.find(
+      (item) => item.sourceBinding?.clipId === copy.id
+    )!;
+    expect(copyRegion.targetAction?.clipId).toBe(copy.id);
+    expect(copyRegion.targetAction?.eventId).not.toBe('captured-target');
+    expect(camera(duplicated, copy.startTime + 0.25).focusPoint).toEqual(editedFrame.focusPoint);
+    expect(isExportReadyVideoProject(duplicated)).toBe(true);
+    store.getState().setProject(JSON.parse(JSON.stringify(duplicated)));
+    expect(camera(store.getState().project!, copy.startTime + 0.25).focusPoint).toEqual(
+      editedFrame.focusPoint
+    );
+    const accepted = store.getState().project!;
+    store.getState().trimClipEnd(tail.id, tail.startTime + 0.1);
+    const trimmed = store.getState().project!;
+    const frozen = trimmed.motionRegions!.find((item) => item.id === tailRegion.id)!;
+    expect(frozen.targetAction).toBeNull();
+    expect(frozen.focusMode).toBe('MANUAL');
+    expect(frozen.focusPoint!.x).toBeCloseTo(project.width * 0.35, 7);
+    expect(frozen.focusPoint!.y).toBeCloseTo(project.height * 0.6, 7);
+    expect(trimmed.motionRegions!.find((item) => item.id === copyRegion.id)).toEqual(
+      accepted.motionRegions!.find((item) => item.id === copyRegion.id)
+    );
+    expect(trimmed.actionEvents.find((event) => event.id === 'captured-target')).toEqual(
+      project.actionEvents[0]
+    );
+    expect(isExportReadyVideoProject(trimmed)).toBe(true);
+    const undone = undoVideoEditorProjectHistory(store.getState().projectHistory, trimmed);
+    expect(undone?.status).toBe('applied');
+    if (undone?.status === 'applied')
+      expect(undone.project.motionRegions).toEqual(accepted.motionRegions);
+    expect(project).toEqual(before);
+  }
+);

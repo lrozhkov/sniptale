@@ -1,3 +1,4 @@
+import { isMotionFocusArea } from '../motion/focus-area';
 import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
 import {
   parseCameraPerspective,
@@ -38,7 +39,6 @@ import {
   isPoint,
   isPrimitiveRecord,
   isRecord,
-  isRect,
   isScale,
   isString,
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
@@ -284,6 +284,9 @@ export function isMotionRegion(value: unknown): boolean {
   const phaseTransitions = parseMotionPhaseTransitions(value['phaseTransitions']);
   return (
     phaseTransitions !== null &&
+    (!isRecord(value['sourceBinding']) ||
+      value['sourceBinding']['dormant'] !== true ||
+      value['duration'] === 0) &&
     (value['border'] === undefined
       ? value['borderTarget'] === undefined
       : parseQuickEditBorder(value['border']) !== null &&
@@ -312,7 +315,7 @@ export function isMotionRegion(value: unknown): boolean {
     isEnumValue(value['easing'], VideoTemporalEasing) &&
     isEnumValue(value['focusMode'], VideoMotionFocusMode) &&
     isNullable(value['focusPoint'], isPoint) &&
-    (value['focusArea'] === undefined || isNullable(value['focusArea'], isRect)) &&
+    (value['focusArea'] === undefined || isNullable(value['focusArea'], isMotionFocusArea)) &&
     isBoundedNumber(value['scale'], 0.1, 4) &&
     isNullable(
       value['targetAction'],

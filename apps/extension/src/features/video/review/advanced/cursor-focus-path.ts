@@ -1,3 +1,4 @@
+import { cropWindowCameraObservations as cropCameraObservations } from '../../composition/motion/window-camera-geometry';
 import { resolveAuthoredCursorFocusPath } from '../../project/cursor-focus-path/authoring';
 import {
   deriveRecordedCursorFocusPath as deriveReviewCursorFocusPath,
@@ -17,7 +18,7 @@ import {
   type WorkingZoneCameraBoundaries,
 } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import type { QuickEditCameraTransform, QuickEditZoomRegion, QuickEditRect } from './types';
+import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
 import { fitQuickEditSourceCrop } from './canvas';
 
 export type ReviewCursorFacts = RecordedCursorFacts;
@@ -127,57 +128,6 @@ export function reviewCameraPlanObservations(region: QuickEditZoomRegion): Follo
   return crop && scene
     ? cropCameraObservations(frames, fitQuickEditSourceCrop(scene.source, scene.canvas!, crop))
     : frames;
-}
-
-/** Clip native linear observations without joining separate visible visits across discarded pixels. */
-function cropCameraObservations(frames: readonly FollowCursorFrame[], crop: QuickEditRect) {
-  const result: FollowCursorFrame[] = [];
-  let visit = 0;
-  let previousEnd = -Infinity;
-  let previousSegment = '';
-  for (let index = 0; index < frames.length; index++) {
-    const a = frames[index]!;
-    const next = frames[index + 1];
-    const b = next?.segmentId === a.segmentId ? next : a;
-    const from = a.actual ?? a;
-    const to = b.actual ?? b;
-    let low = 0,
-      high = 1;
-    for (const axis of ['x', 'y'] as const) {
-      const start = crop[axis];
-      const end = start + (axis === 'x' ? crop.width : crop.height);
-      const delta = to[axis] - from[axis];
-      if (delta === 0) {
-        if (from[axis] < start || from[axis] > end) high = -1;
-      } else {
-        const left = (start - from[axis]) / delta;
-        const right = (end - from[axis]) / delta;
-        low = Math.max(low, Math.min(left, right));
-        high = Math.min(high, Math.max(left, right));
-      }
-    }
-    if (low > high) continue;
-    const startTime = a.time + (b.time - a.time) * low;
-    if (previousSegment !== a.segmentId || Math.abs(previousEnd - startTime) > 1e-9) visit++;
-    const segmentId = `${a.segmentId}:crop:${visit}`;
-    for (const fraction of [low, high]) {
-      const mix = (left: number, right: number) => left + (right - left) * fraction;
-      const time = mix(a.time, b.time);
-      if (result.at(-1)?.time === time && result.at(-1)?.segmentId === segmentId) continue;
-      const { actual: _actual, ...base } = a;
-      result.push({
-        ...base,
-        time,
-        segmentId,
-        x: mix(a.x, b.x),
-        y: mix(a.y, b.y),
-        ...(a.actual && b.actual ? { actual: { x: mix(from.x, to.x), y: mix(from.y, to.y) } } : {}),
-      });
-    }
-    previousEnd = a.time + (b.time - a.time) * high;
-    previousSegment = a.segmentId;
-  }
-  return result;
 }
 
 /** Admit native facts and sparse authoring against the exact consuming renderer geometry. */

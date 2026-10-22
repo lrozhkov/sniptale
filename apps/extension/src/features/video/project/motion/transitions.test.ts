@@ -179,3 +179,26 @@ it('reserves duration only when a remembered phase is enabled again', async () =
   expect.soft(shortened.zoomInDuration).toBe(3);
   expect(motionTransitionSettings(shortened, 'enter').duration).toBe(0);
 });
+
+it.each(['LINEAR', 'EASE_OUT', 'EASE_IN_OUT', 'INSTANT'] as const)(
+  'retains outgoing %s independently of entrance and exit',
+  (link) => {
+    const phases = { enter: 'linear' as const, exit: 'instant' as const, link };
+    expect(parseMotionPhaseTransitions(phases)).toEqual(phases);
+    const project = createEmptyVideoProject();
+    const region = { ...createVideoProjectMotionRegion(project, 0), phaseTransitions: phases };
+    const saved = applyVideoProjectMutationPatch(project, { motionRegions: [region] });
+    expect(saved.version).toBe(34);
+    expect(isHydratableVideoProject(saved)).toBe(true);
+    expect(isHydratableVideoProject({ ...saved, version: 33 })).toBe(false);
+    expect(
+      hydrateVideoProject(JSON.parse(JSON.stringify(saved))).motionRegions![0]!.phaseTransitions
+    ).toEqual(phases);
+  }
+);
+it.each(['linear', 'none', null, 1, {}, false])(
+  'refuses malformed remembered link curve %j',
+  (link) => {
+    expect(parseMotionPhaseTransitions({ link })).toBeNull();
+  }
+);

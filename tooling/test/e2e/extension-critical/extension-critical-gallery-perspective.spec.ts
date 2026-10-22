@@ -1,3 +1,4 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
@@ -49,12 +50,12 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     await history
       .getByRole('button', { name: label('gallery.videoReview.historyConfigure'), exact: true })
       .click();
-    await history
-      .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.click_ripple'), exact: true })
-      .click();
+    await chooseInspectorValue(
+      page,
+      history,
+      label('gallery.videoReview.clickEffect'),
+      label('gallery.videoReview.click_ripple')
+    );
     await button('gallery.videoReview.scene').click();
     await button('gallery.videoReview.backgroundSolid').click();
     await button('gallery.videoReview.backgroundZoomWindow').click();
@@ -377,12 +378,12 @@ test('projected click near the window edge retains its raster before tilt', asyn
     await history
       .getByRole('button', { name: label('gallery.videoReview.historyConfigure'), exact: true })
       .click();
-    await history
-      .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
-      .click();
-    await page
-      .getByRole('option', { name: label('gallery.videoReview.click_ripple'), exact: true })
-      .click();
+    await chooseInspectorValue(
+      page,
+      history,
+      label('gallery.videoReview.clickEffect'),
+      label('gallery.videoReview.click_ripple')
+    );
     const radius = dialog.getByRole('textbox', {
       name: label('gallery.videoReview.clickRadius'),
       exact: true,

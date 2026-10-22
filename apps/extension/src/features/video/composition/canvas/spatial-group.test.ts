@@ -1,3 +1,4 @@
+import { projectQuickEditPoint } from '../motion/spatial-geometry';
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
 import { drawSpatialCameraGroup } from './spatial-group';
@@ -145,4 +146,29 @@ it('uses a separate sharp source surface and retains the same projection for ove
     expect.anything(),
     expect.objectContaining({ sharp: true, frame: args.camera.spatial })
   );
+});
+
+it('passes the composed window projection and local depth coordinates to the GPU owner', () => {
+  const { args, renderer } = setup();
+  args.camera.spatial = {
+    ...args.camera.spatial!,
+    rotation: [0, 0, Math.sin(Math.PI / 12), Math.cos(Math.PI / 12)],
+    planeTransform: [0, -1, 800, 1, 0, 0, 0, 0, 1],
+  };
+  drawSpatialCameraGroup(args);
+  const request = renderer.draw.mock.calls[0]![1];
+  const center = projectQuickEditPoint(request.projection, { x: 575 * 0.5, y: 360 * 0.5 })!;
+  expect(center.x).toBeCloseTo(525, 8);
+  expect(center.y).toBeCloseTo(335, 8);
+  expect(request.planeInverse).toEqual(
+    [0, 1, 0, -1, 0, 400, 0, 0, 1].map((value) => expect.closeTo(value, 10))
+  );
+});
+
+it('does not allocate or publish a source plane with singular affine placement', () => {
+  const { args, renderer, context } = setup();
+  args.camera.spatial = { ...args.camera.spatial!, planeTransform: [1, 0, 0, 0, 0, 0, 0, 0, 1] };
+  expect(() => drawSpatialCameraGroup(args)).toThrow('reference');
+  expect(renderer.surface).not.toHaveBeenCalled();
+  expect(context.drawImage).not.toHaveBeenCalled();
 });
