@@ -171,6 +171,90 @@ async function drawingCanvasHasInk(canvas: Locator) {
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`recording click effects exclude extension UI ${name} ${orientation}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size });
+      try {
+        const worker =
+          launched.context.serviceWorkers()[0] ??
+          (await launched.context.waitForEvent('serviceworker'));
+        await worker.evaluate(
+          async (theme) => {
+            await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+          },
+          size.width === 1920 ? 'dark' : 'light'
+        );
+        const { page } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        if (orientation === 'vertical') {
+          await openRecordingToolbarSettings(page);
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+          await page.keyboard.press('Escape');
+        }
+        await page.locator('[data-ui="content.toolbar.video-recording.spotlight"]').click();
+        await page.locator('[data-ui="content.toolbar.video-recording.spotlight-click"]').click();
+        await page.keyboard.press('Escape');
+        const animation = page.locator('[data-ui="content.video-recording.spotlight-click"]');
+        await expect(animation).toHaveCount(0);
+        const surface = page.locator('[data-ui="content.video-recording.spotlight"]');
+        await surface.evaluate((element) => {
+          element.setAttribute('data-test-click-count', '0');
+          new MutationObserver((records) => {
+            const added = records
+              .flatMap((record) => [...record.addedNodes])
+              .filter(
+                (node) =>
+                  node instanceof Element &&
+                  node.matches('[data-ui="content.video-recording.spotlight-click"]')
+              ).length;
+            if (added)
+              element.setAttribute(
+                'data-test-click-count',
+                String(Number(element.getAttribute('data-test-click-count')) + added)
+              );
+          }).observe(element, { childList: true });
+        });
+        const panel = page.locator('[data-ui="content.toolbar.video-recording.cursor-panel"]');
+        for (const [effect, label] of [
+          ['press', /^(Press|Нажатие)$/u],
+          ['glow', /^(Glow|Свечение)$/u],
+          ['ripple', /^(Ripple|Расходящееся кольцо)$/u],
+        ] as const) {
+          await page.locator('[data-ui="content.toolbar.video-recording.cursor-settings"]').click();
+          await panel.locator('nav button').first().click();
+          await panel.getByRole('button', { name: /^(Effect|Эффект)$/u }).click();
+          await page.getByRole('option', { name: label, exact: true }).click();
+          await page.screenshot({
+            path: info.outputPath(`ui-no-click-${effect}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+          await openRecordingToolbarSettings(page);
+          await page.keyboard.press('Escape');
+          await expect(surface).toHaveAttribute('data-test-click-count', '0');
+          await page.getByRole('button', { name: 'Host action', exact: true }).click();
+          await expect(animation).toHaveAttribute('data-effect', effect);
+          await expect(surface).toHaveAttribute('data-test-click-count', '1');
+          await expect(animation).toHaveCount(0);
+          await surface.evaluate((element) => element.setAttribute('data-test-click-count', '0'));
+        }
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+
     test(`recording eraser cursor and Escape ${name} ${orientation}`, async ({}, info) => {
       const host = await startHostServer();
       const launched = await launchExtensionBrowser({ viewport: size });

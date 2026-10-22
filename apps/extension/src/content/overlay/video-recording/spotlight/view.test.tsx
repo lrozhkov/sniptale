@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoRecordingSpotlight } from './view';
 import { DEFAULT_VIDEO_CURSOR_EFFECTS } from '@sniptale/runtime-contracts/video/types/types';
+import { initializeContentUiRoots } from '../../../platform/dom-host';
 
 let root: ReturnType<typeof createRoot> | null = null;
 
@@ -44,6 +45,45 @@ function deliver(type: string, clientX = 0, detail = 1) {
 }
 
 const RIPPLE = '[data-ui="content.video-recording.spotlight-click"]';
+
+it.each(['ripple', 'press', 'glow'] as const)(
+  'excludes owned toolbar and portal clicks from %s without excluding page controls',
+  (clickEffect) => {
+    const host = mountClickFeedback();
+    act(() =>
+      root?.render(
+        <VideoRecordingSpotlight
+          cursorHaloEnabled={false}
+          cursorDimmingEnabled={false}
+          clickAnimationEnabled
+          cursorEffects={{ ...DEFAULT_VIDEO_CURSOR_EFFECTS, clickEffect }}
+        />
+      )
+    );
+    const contentHost = document.createElement('div');
+    document.body.append(contentHost);
+    const contentRoot = contentHost.attachShadow({ mode: 'open' });
+    const { appContainer, overlayRoot } = initializeContentUiRoots(contentRoot);
+    for (const container of [appContainer, overlayRoot]) {
+      const button = document.createElement('button');
+      const icon = document.createElement('span');
+      button.append(icon);
+      container.append(button);
+      const observer = vi.fn();
+      button.addEventListener('click', observer);
+      act(() => icon.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true })));
+      expect(host.querySelector(RIPPLE)).toBeNull();
+      expect(observer).toHaveBeenCalledOnce();
+    }
+    const pageHost = document.createElement('div');
+    pageHost.className = 'sniptale-app';
+    document.body.append(pageHost);
+    const pageButton = document.createElement('button');
+    pageHost.attachShadow({ mode: 'open' }).append(pageButton);
+    act(() => pageButton.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true })));
+    expect(host.querySelector(RIPPLE)).not.toBeNull();
+  }
+);
 
 it.each(['ripple', 'press', 'glow'] as const)(
   'renders the live %s style and cleans up after the final pulse',

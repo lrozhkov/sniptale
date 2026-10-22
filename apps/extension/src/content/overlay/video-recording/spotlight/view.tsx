@@ -3,6 +3,7 @@ import {
   DEFAULT_VIDEO_CURSOR_EFFECTS,
   type VideoCursorEffectSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { isContentOwnedEvent } from '../../../platform/dom-host';
 
 type SpotlightClick = { x: number; y: number; key: number } | null;
 const CLICK_DRAG_THRESHOLD_CSS_PX = 4;
@@ -147,11 +148,7 @@ export function VideoRecordingSpotlight(props: {
       if (frame === 0) frame = requestAnimationFrame(paint);
     };
     const click = (event: MouseEvent) => {
-      const target = event.target;
-      if (
-        props.clickAnimationEnabled &&
-        !(target instanceof Element && target.closest('.sniptale-app'))
-      ) {
+      if (props.clickAnimationEnabled && !isContentOwnedEvent(event)) {
         setClickPoint({ x: event.clientX, y: event.clientY, key: Date.now() });
       }
     };
