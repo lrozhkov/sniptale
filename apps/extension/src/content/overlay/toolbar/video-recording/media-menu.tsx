@@ -6,6 +6,7 @@ import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { RecordingCameraControls } from '../../../../ui/recording-camera-controls';
+import type { WebcamPresentationPatch } from '../../../../features/video/recording/webcam-presentation';
 import { NumericRow } from '../../../../ui/compact-inspector-controls';
 import { InspectorSurface } from '../../../../ui/compact-inspector-controls/layout';
 import {
@@ -41,7 +42,8 @@ type RecordingMediaSplitControlProps = {
   cameraPlacement?: {
     mode: WebcamPresentationMode;
     presentation: WebcamPresentationSettings;
-    onAppearanceChange: (patch: Partial<WebcamPresentationSettings>) => Promise<void> | void;
+    onAppearanceChange: (patch: WebcamPresentationPatch) => Promise<void> | void;
+    onPreview?: (patch: WebcamPresentationPatch | null) => void;
     locked: boolean;
     onChange: (mode: WebcamPresentationMode) => Promise<void> | void;
   };
@@ -52,6 +54,25 @@ function notifyRecordingMediaFailure() {
   showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
 }
 
+function useCameraAppearanceQueue(change: (patch: WebcamPresentationPatch) => Promise<boolean>) {
+  const queue = useRef(Promise.resolve());
+  const lifetime = useRef(0);
+  useEffect(
+    () => () => {
+      lifetime.current += 1;
+    },
+    []
+  );
+  return (patch: WebcamPresentationPatch) => {
+    const generation = lifetime.current;
+    const next = queue.current.then(() =>
+      generation === lifetime.current ? change(patch) : false
+    );
+    queue.current = next.then(() => undefined);
+    return next;
+  };
+}
+
 function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const { kind, menuType, onLoadDevices, toolbarMenuState } = props;
   const [localOpen, setLocalOpen] = useState(false);
@@ -59,6 +80,12 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const open =
     toolbarMenuState && menuType ? toolbarMenuState.activeMenuType === menuType : localOpen;
+  const previewCallback = useRef(props.cameraPlacement?.onPreview);
+  previewCallback.current = props.cameraPlacement?.onPreview;
+  useEffect(() => {
+    if (!open) return;
+    return () => previewCallback.current?.(null);
+  }, [open]);
   const closeMenu = useCallback(() => {
     if (toolbarMenuState && menuType) toolbarMenuState.closeMenu(menuType);
     else setLocalOpen(false);
@@ -86,6 +113,9 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     }
   };
   const runToggle = () => changeMedia(props.onToggle);
+  const selectAppearance = useCameraAppearanceQueue((patch) =>
+    changeMedia(() => props.cameraPlacement?.onAppearanceChange(patch))
+  );
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -181,8 +211,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
         setGainFailureRevision((revision) => revision + 1);
       }
     },
-    selectAppearance: (patch: Partial<WebcamPresentationSettings>) =>
-      changeMedia(() => props.cameraPlacement?.onAppearanceChange(patch)),
+    selectAppearance,
     switching,
     toggleMenu,
     triggerRef,
@@ -293,6 +322,7 @@ function RecordingMediaDeviceMenu(props: {
                 <RecordingCameraControls
                   presentation={props.cameraPlacement.presentation}
                   onChange={(patch) => void control.selectAppearance(patch)}
+                  onPreview={(patch) => props.cameraPlacement?.onPreview?.(patch)}
                 />
               </div>
             ) : null}

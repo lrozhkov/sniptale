@@ -25,8 +25,7 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { RecordingDrawingControls, type RecordingDrawingInteractionMode } from './drawing-controls';
 import { RecordingMediaSplitControl } from './media-menu';
-import { constrainEmbeddedCameraGeometry } from '../../video-recording/camera/geometry';
-import { resolveToolbarDockViewport } from '../shell/docking';
+import { applyWebcamPresentationPatch } from '../../../../features/video/recording/webcam-presentation';
 import { RecordingSpotlightMenu } from './spotlight-menu';
 import { ToolbarSettingsMenu } from '../capture/settings';
 import type { ToolbarMenuState } from '../state/menu';
@@ -294,14 +293,16 @@ function MediaControls(props: {
                 cameraPlacement: {
                   mode: props.recording.state.webcamPresentation.mode,
                   presentation: props.recording.state.webcamPresentation,
-                  onAppearanceChange: (patch) =>
-                    props.recording.onCameraGeometryChange({
-                      ...constrainEmbeddedCameraGeometry(
-                        props.recording.state.webcamPresentation,
-                        resolveToolbarDockViewport(1)
-                      ),
-                      ...patch,
-                    }),
+                  onPreview: (patch) =>
+                    props.recording.onCameraGeometryPreview?.(
+                      patch
+                        ? applyWebcamPresentationPatch(
+                            props.recording.state.webcamPresentation,
+                            patch
+                          )
+                        : null
+                    ),
+                  onAppearanceChange: (patch) => props.recording.onCameraGeometryChange(patch),
                   locked:
                     props.recording.state.phase !== 'idle' &&
                     props.recording.state.phase !== 'error',

@@ -354,7 +354,8 @@ export function EmbeddedRecordingCamera(props: {
   const viewport = cameraViewport();
   const shortSide = Math.min(viewport.width, viewport.height);
   const width = geometry.sizeFraction * shortSide;
-  const height = geometry.shape === 'circle' ? width : width * (9 / 16);
+  const height =
+    geometry.shape === 'circle' || geometry.shape === 'square' ? width : width * (9 / 16);
   return (
     <>
       <div
@@ -391,7 +392,10 @@ export function EmbeddedRecordingCamera(props: {
             ...webcamFrameStyle(geometry),
             filter: undefined,
             background: 'var(--sniptale-color-surface-elevated, #18181b)',
-            border: '2px solid color-mix(in srgb, white 75%, transparent)',
+            border:
+              geometry.shape === 'soft'
+                ? 'none'
+                : '2px solid color-mix(in srgb, white 75%, transparent)',
             boxSizing: 'border-box',
           }}
         >

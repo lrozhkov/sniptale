@@ -107,7 +107,9 @@ it('shows embedded presentation controls when explicitly selected for tab record
   });
 
   expect(container?.textContent).toContain('popup.video.webcamPresentationEmbedded');
-  expect(container?.textContent).toContain('popup.video.webcamPresentationCircle');
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationCircle"]')
+  ).not.toBeNull();
   const freePlacement = container?.querySelector<HTMLButtonElement>(
     '[aria-label="popup.video.webcamFreePlacement"]'
   );
@@ -117,8 +119,12 @@ it('shows embedded presentation controls when explicitly selected for tab record
     webcamPresentation: expect.objectContaining({ freePlacement: true }),
   });
   expect(freePlacement?.className).toContain('sniptale-glass-switch');
-  expect(container?.textContent).toContain('popup.video.webcamPresentationSoft');
-  expect(container?.textContent).toContain('popup.video.webcamPresentationEllipse');
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationSoft"]')
+  ).not.toBeNull();
+  expect(
+    container?.querySelector('[aria-label="popup.video.webcamPresentationEllipse"]')
+  ).not.toBeNull();
   expect(container?.textContent).toContain('popup.video.webcamPresentationZoom');
 
   await act(async () => {

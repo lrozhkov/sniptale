@@ -25,7 +25,7 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
-  it.each(['circle', 'rectangle', 'soft', 'ellipse'])(
+  it.each(['circle', 'rectangle', 'soft', 'ellipse', 'square'])(
     'round-trips %s page camera appearance',
     (shape) => {
       const webcamPresentation = {

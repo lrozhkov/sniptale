@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { translate, type AppLocale } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -9,12 +9,62 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 test.setTimeout(90000);
 
 async function chooseShape(surface: Locator, name: string, label: string) {
-  const segment = surface.getByRole('button', { name, exact: true });
-  if (await segment.isVisible()) await segment.click();
-  else {
-    await surface.getByRole('button', { name: label, exact: true }).click();
-    await surface.page().getByRole('option', { name, exact: true }).click();
-  }
+  const group = surface.getByRole('group', { name: label, exact: true });
+  await expect(group.locator('button svg')).toHaveCount(5);
+  await group.getByRole('button', { name, exact: true }).click();
+}
+
+async function verifyShadowEditing(controls: Locator, camera: Locator, label: string) {
+  const row = controls.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
+  await expect(row).toHaveAttribute('data-layout', 'inline');
+  await row.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
+  const input = row.getByRole('textbox', { name: label, exact: true });
+  await input.fill('#123456');
+  await row.getByText(label, { exact: true }).click();
+  await expect(controls).toBeVisible();
+  await expect(row.locator('[data-ui="shared.ui.color-selector.value-trigger"]')).toHaveText(
+    '#123456'
+  );
+  await expect(camera).toHaveCSS('filter', /0px 0px 14px/u);
+  await row.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+  await expect(controls.page().locator('[data-floating-ui-root]')).toBeVisible();
+  await controls.page().keyboard.press('Escape');
+  await expect(controls).toBeVisible();
+}
+
+async function verifyLiveZoom(controls: Locator, video: Locator, popup: Page, label: string) {
+  const slider = controls.getByRole('slider', { name: `${label} range`, exact: true });
+  await controls.getByRole('textbox', { name: label, exact: true }).hover();
+  await slider.scrollIntoViewIfNeeded();
+  const bounds = (await slider.boundingBox())!;
+  const before = await video.evaluate((element) => getComputedStyle(element).transform);
+  const storedBefore = await popup.evaluate(
+    async () =>
+      (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+        .webcamPresentation.appearance.zoom
+  );
+  const mouse = controls.page().mouse;
+  await mouse.move(bounds.x + 3, bounds.y + bounds.height / 2);
+  await mouse.down();
+  await mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height / 2, { steps: 6 });
+  await expect(video).not.toHaveCSS('transform', before);
+  expect(
+    await popup.evaluate(
+      async () =>
+        (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+          .webcamPresentation.appearance.zoom
+    )
+  ).toBe(storedBefore);
+  await mouse.up();
+  await expect
+    .poll(() =>
+      popup.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale_video_settings')).sniptale_video_settings
+            .webcamPresentation.appearance.zoom
+      )
+    )
+    .not.toBe(storedBefore);
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -125,6 +175,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
         const controls = page.locator('[data-ui="recording.camera.appearance"]');
         await expect(controls).toBeVisible();
+        const insets = await controls.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return [parseFloat(style.paddingLeft), parseFloat(style.paddingRight)];
+        });
+        expect(Math.abs(insets[0]! - insets[1]!)).toBeLessThanOrEqual(1);
         expect(
           await controls.evaluate((element) => {
             const list = element.closest('.sniptale-toolbar-menu-list')!;
@@ -142,7 +197,22 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         });
         await roundness.fill('60');
         await roundness.press('Enter');
-        await expect(camera.locator(':scope > div')).toHaveCSS('border-radius', '30%');
+        await expect(camera.locator(':scope > div')).toHaveCSS('border-radius', '60px');
+        await chooseShape(
+          controls,
+          text('popup.video.webcamPresentationSquare'),
+          text('popup.video.webcamPresentationShapeLabel')
+        );
+        await expect
+          .poll(async () => {
+            const square = (await camera.boundingBox())!;
+            return Math.abs(square.width - square.height);
+          })
+          .toBeLessThanOrEqual(1);
+        await roundness.fill('12');
+        await roundness.press('Enter');
+        await expect(camera.locator(':scope > div')).toHaveCSS('border-radius', '12px');
+        await page.screenshot({ path: info.outputPath('square-camera.png'), fullPage: false });
         await chooseShape(
           controls,
           text('popup.video.webcamPresentationCircle'),
@@ -155,6 +225,23 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           text('popup.video.webcamPresentationShapeLabel')
         );
         await expect(camera.locator(':scope > div')).toHaveCSS('clip-path', /^polygon\(/);
+        await expect(camera.locator(':scope > div')).toHaveCSS('border-style', 'none');
+        await verifyShadowEditing(
+          controls,
+          camera,
+          text('popup.video.webcamPresentationShadowColor')
+        );
+        await page.screenshot({
+          path: info.outputPath('toolbar-shadow-color.png'),
+          fullPage: false,
+        });
+        await verifyLiveZoom(controls, video, popup, text('popup.video.webcamPresentationZoom'));
+        const resetZoom = controls.getByRole('textbox', {
+          name: text('popup.video.webcamPresentationZoom'),
+          exact: true,
+        });
+        await resetZoom.fill('100');
+        await resetZoom.press('Enter');
         await controls
           .getByRole('switch', { name: text('popup.video.webcamPresentationMirror'), exact: true })
           .click();
@@ -224,6 +311,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           path: info.outputPath('popup-camera-appearance.png'),
           fullPage: false,
         });
+        await verifyLiveZoom(
+          popupControls,
+          popup.locator('[data-ui="popup.video.webcam-preview-mask"] video'),
+          popup,
+          text('popup.video.webcamPresentationZoom')
+        );
         await page.bringToFront();
         await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
         await expect(camera.locator(':scope > div')).toHaveCSS('clip-path', 'none');
@@ -248,7 +341,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(hex).toHaveCount(0);
         await expect(
           shadowColor.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
-        ).toHaveText('#000000');
+        ).toHaveText('#123456');
         await expect(popupControls).toBeVisible();
         await popup.keyboard.press('Escape');
         await expect(popupControls).toHaveCount(0);

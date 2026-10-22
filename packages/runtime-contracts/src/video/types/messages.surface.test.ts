@@ -52,7 +52,7 @@ it.each([0, 1, 2, -0.01, 2.01, NaN, Infinity, '1', null])('bounds microphone gai
   ).toBe(false);
 });
 
-it.each(['circle', 'rectangle', 'soft', 'ellipse'])(
+it.each(['circle', 'rectangle', 'soft', 'ellipse', 'square'])(
   'admits bounded %s appearance in camera commands',
   (shape) => {
     const presentation = {

@@ -1,9 +1,14 @@
 import {
+  applyWebcamPresentationPatch,
+  type WebcamPresentationPatch,
+} from '../../../../features/video/recording/webcam-presentation';
+import {
   useCallback,
   useEffect,
   useMemo,
   useReducer,
   useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
 } from 'react';
@@ -19,7 +24,8 @@ import {
   type VideoRecordingToolbarState,
   type VideoRecordingToolbarStateAction,
 } from './state';
-import { pickEmbeddedCameraGeometry } from '../camera/geometry';
+import { constrainEmbeddedCameraGeometry, pickEmbeddedCameraGeometry } from '../camera/geometry';
+import { resolveToolbarDockViewport } from '../../toolbar/shell/docking';
 import {
   activateVideoRecordingSurface,
   releaseVideoRecordingSurface,
@@ -387,13 +393,16 @@ function useVideoRecordingSurfaceState(args: VideoRecordingSurfaceControllerArgs
   const toolbarRequestedCallbackRef = useRef(args.onToolbarRequested);
   modeRequestedRef.current = args.onModeRequested;
   toolbarRequestedCallbackRef.current = args.onToolbarRequested;
-  const [state, dispatch] = useReducer(
+  const [state, dispatchReducer] = useReducer(
     reduceVideoRecordingToolbarState,
     INITIAL_VIDEO_RECORDING_TOOLBAR_STATE
   );
   const identityRef = useRef<SurfaceIdentity | null>(null);
   const stateRef = useRef(state);
-  stateRef.current = state;
+  const dispatch = useCallback((action: VideoRecordingToolbarStateAction) => {
+    stateRef.current = reduceVideoRecordingToolbarState(stateRef.current, action);
+    dispatchReducer(action);
+  }, []);
   const toolbarRequestedRef = useRef(false);
   const releasedSurfaceSessionIdRef = useRef<string | null>(null);
   const drawingOwner = useMemo(() => createRecordingDrawingOwner(), []);
@@ -421,7 +430,7 @@ function useVideoRecordingSurfaceState(args: VideoRecordingSurfaceControllerArgs
         toolbarRequestedCallbackRef.current();
       }
     },
-    [drawingOwner]
+    [dispatch, drawingOwner]
   );
 
   return {
@@ -476,6 +485,7 @@ function useVideoRecordingSurfaceDeactivation(args: {
 }
 
 type SurfaceControllerProjectionArgs = {
+  stateRef: MutableRefObject<VideoRecordingToolbarState>;
   activate: ReturnType<typeof useSurfaceActivation>;
   cameraOffer: ReturnType<typeof useCameraPeerActions>['cameraOffer'];
   cameraPeerClose: ReturnType<typeof useCameraPeerActions>['cameraPeerClose'];
@@ -535,12 +545,60 @@ function createSurfaceDrawingActions(args: SurfaceControllerProjectionArgs) {
 }
 
 function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
-  return useMemo(
-    () => ({
+  const [cameraPreview, setCameraPreview] = useState<{
+    sessionId: string | null;
+    geometry: EmbeddedCameraGeometry;
+  } | null>(null);
+  const previewRevision = useRef(0);
+  const onCameraGeometryPreview = useCallback(
+    (geometry: EmbeddedCameraGeometry | null) => {
+      previewRevision.current += 1;
+      setCameraPreview(
+        geometry
+          ? {
+              sessionId: args.state.surfaceSessionId,
+              geometry: pickEmbeddedCameraGeometry(geometry),
+            }
+          : null
+      );
+    },
+    [args.state.surfaceSessionId]
+  );
+  return useMemo(() => {
+    const media = createSurfaceMediaActions(args);
+    const preview = cameraPreview?.sessionId === args.state.surfaceSessionId ? cameraPreview : null;
+    return {
       drawingOwner: args.drawingOwner,
-      state: args.state,
+      state: preview
+        ? {
+            ...args.state,
+            webcamPresentation: { ...args.state.webcamPresentation, ...preview.geometry },
+          }
+        : args.state,
       ...createSurfaceDrawingActions(args),
-      ...createSurfaceMediaActions(args),
+      ...media,
+      onCameraGeometryPreview,
+      onCameraGeometryChange: async (patch: Omit<WebcamPresentationPatch, 'mode'>) => {
+        const revision = previewRevision.current;
+        try {
+          await media.onCameraGeometryChange(
+            pickEmbeddedCameraGeometry(
+              applyWebcamPresentationPatch(
+                {
+                  ...args.stateRef.current.webcamPresentation,
+                  ...constrainEmbeddedCameraGeometry(
+                    args.stateRef.current.webcamPresentation,
+                    resolveToolbarDockViewport(1)
+                  ),
+                },
+                patch
+              )
+            )
+          );
+        } finally {
+          if (revision === previewRevision.current) setCameraPreview(null);
+        }
+      },
       onActivate: args.activate,
       onCancelStart: async () => {
         await args.command({ kind: 'cancel-start' });
@@ -551,9 +609,8 @@ function useSurfaceControllerProjection(args: SurfaceControllerProjectionArgs) {
       onResume: () => args.command({ kind: 'resume' }),
       onStart: args.start,
       onStop: () => args.command({ kind: 'stop' }),
-    }),
-    [args]
-  );
+    };
+  }, [args, cameraPreview, onCameraGeometryPreview]);
 }
 
 export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceControllerArgs) {
@@ -670,6 +727,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       start,
       startAttemptRef,
       state,
+      stateRef,
     }),
     [
       activate,
@@ -684,6 +742,7 @@ export function useVideoRecordingSurfaceController(args: VideoRecordingSurfaceCo
       start,
       startAttemptRef,
       state,
+      stateRef,
     ]
   );
   return useSurfaceControllerProjection(projectionArgs);

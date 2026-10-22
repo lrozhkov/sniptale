@@ -82,6 +82,69 @@ it('edits microphone gain without closing the menu and reports refusal with retr
   expect(onChange).toHaveBeenLastCalledWith(1.25);
 });
 
+it.each([false, true])('serializes camera appearance commits with unmount %s', async (unmount) => {
+  let finish!: () => void;
+  const onAppearanceChange = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    )
+    .mockResolvedValue(undefined);
+  const onPreview = vi.fn();
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active
+        activeIcon={Camera}
+        inactiveIcon={CameraOff}
+        disabled={false}
+        kind="videoinput"
+        dataUi="test.camera"
+        displayMode="horizontal"
+        label="Camera"
+        selectedDeviceId={null}
+        onToggle={vi.fn()}
+        cameraPlacement={{
+          mode: 'embedded',
+          locked: false,
+          onChange: vi.fn(),
+          presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+          onAppearanceChange,
+          onPreview,
+        }}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  const choose = (label: string) =>
+    host
+      .querySelector<HTMLButtonElement>(`[aria-label="popup.video.webcamPresentation${label}"]`)!
+      .click();
+  await act(async () => choose('Square'));
+  await act(async () => choose('Ellipse'));
+  expect(onAppearanceChange).toHaveBeenCalledTimes(1);
+  if (unmount) act(() => root.unmount());
+  await act(async () => finish());
+  if (unmount) {
+    expect(onAppearanceChange).toHaveBeenCalledTimes(1);
+    return;
+  }
+  expect(onAppearanceChange).toHaveBeenCalledTimes(2);
+  expect(onAppearanceChange).toHaveBeenLastCalledWith({ shape: 'ellipse' });
+  expect(host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+});
+
 it.each([false, true])(
   'exposes controlled free placement with selected state %s',
   async (freePlacement) => {

@@ -152,8 +152,9 @@ export function WebcamPreview({
 }) {
   const embedded = presentation?.mode === PresentationMode.EMBEDDED;
   const previewClassName = embedded
-    ? presentation.shape === PresentationShape.CIRCLE
-      ? 'h-[132px] w-[132px] overflow-hidden rounded-full'
+    ? presentation.shape === PresentationShape.CIRCLE ||
+      presentation.shape === PresentationShape.SQUARE
+      ? 'h-[132px] w-[132px] overflow-hidden'
       : 'aspect-video w-full overflow-hidden rounded-[10px]'
     : 'h-full w-full overflow-hidden rounded-[10px]';
   const videoStyle = presentation && embedded ? webcamVideoStyle(presentation) : undefined;

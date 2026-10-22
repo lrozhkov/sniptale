@@ -127,7 +127,8 @@ export function getEmbeddedCameraDockMarker(
     64,
     clamp(geometry.sizeFraction, 0.12, 0.55) * Math.min(viewport.width, viewport.height)
   );
-  const height = geometry.shape === 'circle' ? width : (width * 9) / 16;
+  const height =
+    geometry.shape === 'circle' || geometry.shape === 'square' ? width : (width * 9) / 16;
   return { width, height, center: dockCenter(position, viewport, { width, height }) };
 }
 
@@ -140,7 +141,8 @@ export function constrainEmbeddedCameraGeometry(
   const shortSide = Math.max(1, Math.min(viewport.width, viewport.height));
   const sizeFraction = clamp(geometry.sizeFraction, 0.12, 0.55);
   const width = sizeFraction * shortSide;
-  const height = geometry.shape === 'circle' ? width : width * (9 / 16);
+  const height =
+    geometry.shape === 'circle' || geometry.shape === 'square' ? width : width * (9 / 16);
   const xMargin = width / Math.max(1, viewport.width) / 2;
   const yMargin = height / Math.max(1, viewport.height) / 2;
   const anchored = dock && !geometry.freePlacement;

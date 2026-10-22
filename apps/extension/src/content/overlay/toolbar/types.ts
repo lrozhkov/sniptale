@@ -20,6 +20,7 @@ import type {
   RecordingDrawingOwner,
 } from './video-recording/drawing-session';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { WebcamPresentationPatch } from '../../../features/video/recording/webcam-presentation';
 
 export interface ToolbarVideoRecordingProps {
   drawingOwner: RecordingDrawingOwner;
@@ -32,11 +33,11 @@ export interface ToolbarVideoRecordingProps {
     mode: ToolbarVideoRecordingProps['state']['webcamPresentation']['mode']
   ) => Promise<void> | void;
   onCameraGeometryChange: (
-    appearance: Pick<
-      ToolbarVideoRecordingProps['state']['webcamPresentation'],
-      'shape' | 'center' | 'sizeFraction' | 'cropOffset' | 'freePlacement' | 'dockPosition'
-    >
+    appearance: Omit<WebcamPresentationPatch, 'mode'>
   ) => Promise<void> | void;
+  onCameraGeometryPreview?: (
+    appearance: Omit<ToolbarVideoRecordingProps['state']['webcamPresentation'], 'mode'> | null
+  ) => void;
   onCameraOffer: (sdp: string) => Promise<string>;
   onCameraPeerClose: () => Promise<void> | void;
   onDeactivate: () => Promise<boolean> | boolean;

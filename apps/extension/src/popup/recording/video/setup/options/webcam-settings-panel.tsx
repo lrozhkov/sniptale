@@ -15,6 +15,12 @@ import {
 } from './webcam-quality-controls';
 import { WebcamPreview, useWebcamPreview } from './webcam-preview';
 import { RecordingCameraControls } from '../../../../../ui/recording-camera-controls';
+import { useState } from 'react';
+import type { WebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  applyWebcamPresentationPatch,
+  type WebcamPresentationPatch,
+} from '../../../../../features/video/recording/webcam-presentation';
 
 type WebcamSettingsPanelProps = {
   captureMode: CaptureMode;
@@ -37,17 +43,21 @@ export function WebcamSettingsPanel({
   const updateQuality = (patch: Partial<WebcamQualitySettings>) => {
     onSettingsChange({ webcamQuality: { ...quality, ...patch } });
   };
-  const presentation = settings.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation;
+  const acceptedPresentation =
+    settings.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation;
+  const [preview, setPreview] = useState<WebcamPresentationSettings | null>(null);
+  const presentation = preview ?? acceptedPresentation;
   const embeddedPresentationAvailable =
     captureMode === CaptureMode.TAB || captureMode === CaptureMode.TAB_CROP;
 
-  const updatePresentation = (
-    patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>
-  ) => {
+  const updatePresentation = (patch: WebcamPresentationPatch) => {
     if (!presentation) {
       return;
     }
-    onSettingsChange({ webcamPresentation: { ...presentation, ...patch } });
+    setPreview(null);
+    onSettingsChange({
+      webcamPresentation: applyWebcamPresentationPatch(acceptedPresentation!, patch),
+    });
   };
 
   return (
@@ -60,7 +70,11 @@ export function WebcamSettingsPanel({
         state={previewState}
       />
       {embeddedPresentationAvailable && presentation?.mode === WebcamPresentationMode.EMBEDDED ? (
-        <RecordingCameraControls presentation={presentation} onChange={updatePresentation} />
+        <RecordingCameraControls
+          presentation={presentation}
+          onChange={updatePresentation}
+          onPreview={(patch) => setPreview(applyWebcamPresentationPatch(presentation, patch))}
+        />
       ) : null}
       <div className="text-[11px] font-normal text-[var(--sniptale-color-text-secondary)]">
         {formatActualSettings(previewState.settings)}

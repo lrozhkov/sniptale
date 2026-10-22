@@ -137,6 +137,7 @@ export type WebcamPresentationMode =
 
 export const WebcamPresentationShape = {
   CIRCLE: 'circle',
+  SQUARE: 'square',
   RECTANGLE: 'rectangle',
   SOFT: 'soft',
   ELLIPSE: 'ellipse',

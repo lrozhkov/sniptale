@@ -8,6 +8,33 @@ export const DEFAULT_WEBCAM_APPEARANCE: NonNullable<WebcamPresentationSettings['
   shadowColor: '#000000',
 };
 
+/** Camera controls send changed fields, not snapshots of unrelated parameters. */
+export type WebcamPresentationPatch = Omit<
+  Partial<WebcamPresentationSettings>,
+  'appearance' | 'cropOffset' | 'center'
+> & {
+  appearance?: Partial<NonNullable<WebcamPresentationSettings['appearance']>>;
+  cropOffset?: Partial<WebcamPresentationSettings['cropOffset']>;
+  center?: Partial<WebcamPresentationSettings['center']>;
+};
+
+/** Applies one field intent to the current accepted or disposable presentation. */
+export function applyWebcamPresentationPatch(
+  current: WebcamPresentationSettings,
+  patch: WebcamPresentationPatch
+): WebcamPresentationSettings {
+  const { appearance, cropOffset, center, ...fields } = patch;
+  return {
+    ...current,
+    ...fields,
+    ...(appearance
+      ? { appearance: { ...DEFAULT_WEBCAM_APPEARANCE, ...current.appearance, ...appearance } }
+      : {}),
+    ...(cropOffset ? { cropOffset: { ...current.cropOffset, ...cropOffset } } : {}),
+    ...(center ? { center: { ...current.center, ...center } } : {}),
+  };
+}
+
 /** Resolves the camera silhouette without changing its normalized placement. */
 export function webcamFrameStyle(
   presentation: Pick<WebcamPresentationSettings, 'shape' | 'appearance'>
@@ -29,13 +56,9 @@ export function webcamFrameStyle(
       }).join(',')
     : null;
   return {
-    borderRadius: rounded
-      ? '50%'
-      : presentation.appearance
-        ? `${appearance.roundness / 2}%`
-        : '12px',
+    borderRadius: rounded ? '50%' : soft ? '0' : `${appearance.roundness}px`,
     clipPath: points ? `polygon(${points})` : undefined,
-    filter: appearance.shadow ? `drop-shadow(0 8px 14px ${appearance.shadowColor}66)` : undefined,
+    filter: appearance.shadow ? `drop-shadow(0 0 14px ${appearance.shadowColor}66)` : undefined,
   };
 }
 

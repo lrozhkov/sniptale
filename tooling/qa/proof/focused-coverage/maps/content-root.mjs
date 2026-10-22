@@ -1,5 +1,17 @@
 export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
+    owner: 'compact-inspector-color-and-choice-controls',
+    productionFile: 'apps/extension/src/ui/compact-inspector-controls/controls.tsx',
+    reason:
+      'Shared color and selection geometry has direct inspector interaction and layout proof.',
+    testFiles: [
+      'apps/extension/src/ui/compact-inspector-controls/color-field.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/controls.coverage.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/index.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/parameter-layout.test.tsx',
+    ],
+  },
+  {
     owner: 'content-platform-dom-host',
     productionPrefix: 'apps/extension/src/content/platform/dom-host/',
     reason: [

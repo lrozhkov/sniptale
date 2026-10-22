@@ -113,7 +113,7 @@ export function ColorField({
     return (
       <InspectorParameterRow
         label={props.label}
-        valueMinimum={140}
+        valueMinimum={props.triggerVariant === 'swatch' ? 100 : 140}
         stacked={layout === 'stacked'}
         dataUi="shared.ui.compact-inspector.color-field"
         className={className}

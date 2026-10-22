@@ -15,7 +15,7 @@ describe('embedded recording camera geometry', () => {
   it.each(WEBCAM_DOCK_POSITIONS)(
     'retains explicit anchor %s for both camera shapes',
     (dockPosition) => {
-      for (const shape of ['circle', 'rectangle'] as const) {
+      for (const shape of ['circle', 'rectangle', 'square'] as const) {
         for (const viewport of [
           { width: 1280, height: 560 },
           { width: 1920, height: 900 },
@@ -41,7 +41,7 @@ describe('embedded recording camera geometry', () => {
               ? 0.75
               : 0.5;
           const width = geometry.sizeFraction * Math.min(viewport.width, viewport.height);
-          const height = shape === 'circle' ? width : (width * 9) / 16;
+          const height = shape === 'circle' || shape === 'square' ? width : (width * 9) / 16;
           const horizontal = dockPosition.includes('w')
             ? 12 + width / 2
             : dockPosition.includes('e')

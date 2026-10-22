@@ -109,7 +109,8 @@ it('previews the embedded shape and crop offsets used by the page camera', async
   );
 
   expect(
-    container.querySelector('[data-ui="popup.video.webcam-preview-mask"]')?.className
-  ).toContain('rounded-full');
+    container.querySelector<HTMLElement>('[data-ui="popup.video.webcam-preview-mask"]')?.style
+      .borderRadius
+  ).toBe('50%');
   expect(container.querySelector('video')?.style.objectPosition).toBe('75% 25%');
 });
