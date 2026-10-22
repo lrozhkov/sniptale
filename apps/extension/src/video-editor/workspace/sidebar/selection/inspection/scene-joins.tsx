@@ -1,6 +1,7 @@
+import { DetailList, DetailItem } from '../shared/panel';
 import { useLayoutEffect, useState } from 'react';
 import { ArrowRightLeft, LogIn, LogOut, LocateFixed } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { InspectorActionButton } from '../shared/actions';
 import type { CompositionJoinSettings } from '../../../../../features/video/project/scene/composition-join';
 import { parseVideoProjectCompositionJoins } from '../../../../../features/video/project/scene/joins';
 import type { VideoProjectCompositionJoin } from '../../../../../features/video/project/scene/joins-types';
@@ -49,36 +50,63 @@ export function SceneJoinFields(props: {
       initiallyOpen
     >
       {[...boundaries]
-        .sort((a, b) => seam(a) - seam(b))
+        .sort((a, b) => {
+          if (!!a.clipId !== !!b.clipId) return a.clipId ? -1 : 1;
+          return a.clipId
+            ? seam(a) - seam(b)
+            : (a.sourceRange?.start ?? 0) - (b.sourceRange?.start ?? 0);
+        })
         .map((boundary) => {
           const clip = props.project.clips.find((item) => item.id === boundary.clipId);
-          if (!clip || (clip.type !== 'VIDEO' && clip.type !== 'IMAGE')) return null;
-          const asset = props.project.assets.find((item) => item.id === clip.assetId);
+          if (clip && clip.type !== 'VIDEO' && clip.type !== 'IMAGE') return null;
+          const assetId = clip?.assetId ?? boundary.sourceRange?.assetId;
+          const asset = props.project.assets.find((item) => item.id === assetId);
           return (
             <InspectorDetails
               key={boundary.id}
               level="group"
               label={asset?.name ?? translate('videoEditor.sidebar.originalAudioMissingSource')}
-              icon={boundary.edge === 'end' ? LogIn : LogOut}
+              icon={clip ? (boundary.edge === 'end' ? LogIn : LogOut) : ArrowRightLeft}
               preferenceId={`scene.compositionJoins.${boundary.id}`}
               initiallyOpen
             >
-              <ContentToolbarButton
-                type="button"
-                size="compact"
-                tone="utility"
-                className="flex max-w-full items-center gap-1.5 tabular-nums"
-                aria-label={translate('videoEditor.sidebar.compositionJoinSeek')}
-                title={translate('videoEditor.sidebar.compositionJoinSeek')}
-                onClick={() => {
-                  playback.stop(false);
-                  playback.seek(seam(boundary));
-                }}
-              >
-                <LocateFixed size={14} aria-hidden="true" />
-                {formatNumber(seam(boundary), { maximumFractionDigits: 3 }, locale)}
-                <span>{translate('videoEditor.sidebar.typingSeconds')}</span>
-              </ContentToolbarButton>
+              {clip ? (
+                <InspectorActionButton
+                  type="button"
+                  className="flex max-w-full items-center gap-1.5 tabular-nums"
+                  aria-label={translate('videoEditor.sidebar.compositionJoinSeek')}
+                  title={translate('videoEditor.sidebar.compositionJoinSeek')}
+                  onClick={() => {
+                    playback.stop(false);
+                    playback.seek(seam(boundary));
+                  }}
+                >
+                  <LocateFixed size={14} aria-hidden="true" />
+                  {formatNumber(seam(boundary), { maximumFractionDigits: 3 }, locale)}
+                  <span>{translate('videoEditor.sidebar.typingSeconds')}</span>
+                </InspectorActionButton>
+              ) : boundary.sourceRange ? (
+                <DetailList>
+                  <DetailItem
+                    label={translate('videoEditor.sidebar.sourceIn')}
+                    value={[
+                      formatNumber(
+                        boundary.sourceRange.start,
+                        { maximumFractionDigits: 3 },
+                        locale
+                      ),
+                      translate('videoEditor.sidebar.typingSeconds'),
+                    ].join(' ')}
+                  />
+                  <DetailItem
+                    label={translate('videoEditor.sidebar.sourceOut')}
+                    value={[
+                      formatNumber(boundary.sourceRange.end, { maximumFractionDigits: 3 }, locale),
+                      translate('videoEditor.sidebar.typingSeconds'),
+                    ].join(' ')}
+                  />
+                </DetailList>
+              ) : null}
               <PresentationJoinFields
                 label={translate('videoEditor.sidebar.compositionJoin')}
                 value={boundary.transition}

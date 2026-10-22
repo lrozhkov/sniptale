@@ -372,3 +372,17 @@ it('paints watermark without captions and publishes only a completed overlay fra
   await renderPreviewScene({ ...job, watermarkRenderer });
   expect(watermarkRenderer.clear).toHaveBeenCalledTimes(1);
 });
+
+it('paints borrowed decoded cut frames while the unused live video is seeking', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'seeking', { value: true });
+  Object.defineProperty(video, 'readyState', { value: 1 });
+  const source = { sourceWidth: 1280, sourceHeight: 720, draw: vi.fn() };
+  const clipId = job.project.clips[0]!.id;
+  const decodedVideoFrames = new Map([[clipId, source]]);
+  await renderPreviewScene({ ...job, decodedVideoFrames });
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+  expect(vi.mocked(drawPreviewVisualPasses).mock.calls[0]![0].clipMediaElements.get(clipId)).toBe(
+    source
+  );
+});

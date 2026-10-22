@@ -133,11 +133,19 @@ export async function writeReviewFrames(
     await reviewExportPhase(args.signal, 'encode', () => output?.start());
     const frameSink = main
       ? null
-      : createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
+      : createReviewDecodedSampleSink(
+          new VideoSampleSink(source.video),
+          args.signal,
+          await source.video.getDecoderConfig()
+        );
     const transitions = planReviewCutTransitions(args.index.duration, args.edits);
     if (!main && transitions.length)
       transitionFrames = createReviewTransitionFrames(
-        createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal),
+        createReviewDecodedSampleSink(
+          new VideoSampleSink(source.video),
+          args.signal,
+          await source.video.getDecoderConfig()
+        ),
         args.signal
       );
     const sourceTimeResolution = await source.video.getTimeResolution();

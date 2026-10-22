@@ -363,6 +363,7 @@ function MaterialRow(props: {
           use.kind === 'scene' ||
           use.kind === 'watermark' ||
           use.kind === 'bookend-preset' ||
+          use.kind === 'composition-join' ||
           use.kind === 'source-audio' ||
           use.kind === 'source-voiceover'
       ) && (
@@ -386,6 +387,7 @@ function MaterialRow(props: {
                   use.kind === 'scene' ||
                   use.kind === 'watermark' ||
                   use.kind === 'bookend-preset' ||
+                  use.kind === 'composition-join' ||
                   use.kind === 'source-audio' ||
                   use.kind === 'source-voiceover')
               )
@@ -397,10 +399,25 @@ function MaterialRow(props: {
                 use.kind !== 'scene' &&
                 use.kind !== 'watermark' &&
                 use.kind !== 'bookend-preset' &&
+                use.kind !== 'composition-join' &&
                 use.kind !== 'source-audio' &&
                 use.kind !== 'source-voiceover'
               )
                 return [];
+              if (use.kind === 'composition-join') {
+                const range = props.project.compositionJoins?.find(
+                  (join) => join.id === use.joinId
+                )?.sourceRange;
+                const interval = range
+                  ? ` · ${formatPreciseTime(range.start)} – ${formatPreciseTime(range.end)}`
+                  : '';
+                return [
+                  {
+                    value: String(index),
+                    label: `${translate('videoEditor.sidebar.compositionJoins')}${interval}`,
+                  },
+                ];
+              }
               if (use.kind === 'source-voiceover')
                 return [
                   { value: String(index), label: translate('gallery.videoReview.audioVoiceover') },

@@ -134,7 +134,11 @@ export async function createReviewPresentationMedia(args: {
       const { track, audio, resolution: admittedResolution } = admitted;
       resolution = admittedResolution;
       assertLive();
-      sink = createReviewDecodedSampleSink(new VideoSampleSink(track), signal);
+      sink = createReviewDecodedSampleSink(
+        new VideoSampleSink(track),
+        signal,
+        await track.getDecoderConfig()
+      );
       audioTrack = audio[0] ?? null;
     }
   } catch (error) {

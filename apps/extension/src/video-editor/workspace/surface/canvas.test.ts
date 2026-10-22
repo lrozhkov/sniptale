@@ -145,3 +145,26 @@ it('retains clip navigation as a distinct typed destination', () => {
   expect(preview.transport.onSeek).toHaveBeenCalledExactlyOnceWith(source.startTime);
   expect(reveal).toHaveBeenCalledExactlyOnceWith({ kind: 'clip', clipId: source.id });
 });
+
+it('opens retained cut settings without a fabricated seek and navigates an existing edge exactly', () => {
+  const { preview, reveal, source } = fixture();
+  const sourceRange = { assetId: source.assetId, sourceInstanceId: 'instance', start: 1, end: 2 };
+  preview.project.compositionJoins = [{ id: 'retained-cut', sampling: 'cut', sourceRange }];
+  const use = {
+    kind: 'composition-join' as const,
+    assetId: source.assetId,
+    joinId: 'retained-cut',
+  };
+  revealWorkspaceMaterial(use, preview, reveal, 22);
+  expect(preview.selection.onSelectScene).toHaveBeenCalledOnce();
+  expect(preview.transport.onSeek).not.toHaveBeenCalled();
+  expect(reveal).not.toHaveBeenCalled();
+  preview.project.compositionJoins = [
+    { id: 'retained-cut', sampling: 'cut', sourceRange, clipId: source.id, edge: 'end' },
+  ];
+  revealWorkspaceMaterial(use, preview, reveal, 22);
+  expect(preview.transport.onSeek).toHaveBeenCalledExactlyOnceWith(
+    source.startTime + source.duration
+  );
+  expect(reveal).toHaveBeenCalledExactlyOnceWith({ kind: 'clip', clipId: source.id });
+});

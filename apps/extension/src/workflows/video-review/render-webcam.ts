@@ -145,7 +145,11 @@ export async function createReviewWebcamRenderer(
     )
       throw new QuickEditExportUnavailable(['asset-missing']);
     signal.throwIfAborted();
-    const sink = createReviewDecodedSampleSink(new VideoSampleSink(track), signal);
+    const sink = createReviewDecodedSampleSink(
+      new VideoSampleSink(track),
+      signal,
+      await track.getDecoderConfig()
+    );
     async function* sourceFrames(
       sourceTimes: readonly number[]
     ): AsyncGenerator<ReviewWebcamSourceFrame | null> {

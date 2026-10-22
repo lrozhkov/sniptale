@@ -1,3 +1,4 @@
+import type { VideoProjectCompositionJoin } from '../project/scene/joins-types';
 import { planReviewProjectAnnotations } from './project-annotations';
 import type { VideoProjectEffectSnapshot } from '../project/effect-instance/types';
 import { planReviewProjectMotion } from './project-motion';
@@ -123,8 +124,6 @@ export function planReviewProjectConversion(args: {
     )
   )
     pending.push({ kind: 'interaction-source', field: 'cursorFocusPath' });
-  if (document.edits.some((edit) => edit.kind === 'cut' && edit.transition !== undefined))
-    pending.push({ kind: 'source-transition' });
   if (pending.length) return blocked(...pending);
   if (scene.status !== 'prepared') return blocked({ kind: 'native-admission' });
   let timeline: ReviewProjectTimelinePlan;
@@ -144,6 +143,24 @@ export function planReviewProjectConversion(args: {
       });
     throw error;
   }
+  const authoredCutTransitions = timeline.cuts.filter((cut) => cut.edit.transition !== undefined);
+  const compositionJoins: VideoProjectCompositionJoin[] = authoredCutTransitions.length
+    ? timeline.cuts.map((cut) => {
+        const clipId = cut.incomingClipId && cut.outgoingClipId ? cut.incomingClipId : undefined;
+        const recipe = {
+          id: `${args.seed.id}:cut:${cut.edit.id}`,
+          sampling: 'cut' as const,
+          sourceRange: {
+            assetId: asset.id,
+            sourceInstanceId: timeline.sourceInstanceId,
+            start: cut.edit.start,
+            end: cut.edit.end,
+          },
+          ...(cut.edit.transition ? { transition: structuredClone(cut.edit.transition) } : {}),
+        };
+        return clipId ? { ...recipe, clipId, edge: 'start' as const } : recipe;
+      })
+    : [];
   if (timeline.videoClips.some((clip) => !isPlaybackRate(clip.playbackRate)))
     return blocked({ kind: 'native-rate' });
   const cursor = source.cursorTrack;
@@ -242,41 +259,44 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || original.muted || !application.originalAudioApplied,
   });
-  const minimumVersion = annotations.clips.length
-    ? 38
-    : scene.scene.sceneBackground?.zoomBehavior !== undefined
-      ? 37
-      : scene.video.rememberedWindowLayout ||
-          scene.scene.watermarkEnabled === false ||
-          scene.scene.sceneBackground?.enabled !== undefined ||
-          scene.scene.sceneBackground?.rememberedBlur !== undefined
-        ? 36
-        : scene.video.rememberedWindowHeader ||
-            scene.video.rememberedSourceCrop ||
-            scene.scene.rememberedCanvas
-          ? 35
-          : cursor?.sourceObservations
-            ? 33
-            : camera.clips.length
-              ? 32
-              : externalAudio.sourceVoiceoverDocuments.length ||
-                  externalAudio.originalSpeech !== undefined
-                ? 31
-                : externalAudio.clips.length
-                  ? 30
-                  : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-                    ? 29
-                    : original.ranges?.length || sourceMutes.length
-                      ? 28
-                      : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                        ? 27
-                        : 26;
+  const minimumVersion = compositionJoins.length
+    ? 40
+    : annotations.clips.length
+      ? 38
+      : scene.scene.sceneBackground?.zoomBehavior !== undefined
+        ? 37
+        : scene.video.rememberedWindowLayout ||
+            scene.scene.watermarkEnabled === false ||
+            scene.scene.sceneBackground?.enabled !== undefined ||
+            scene.scene.sceneBackground?.rememberedBlur !== undefined
+          ? 36
+          : scene.video.rememberedWindowHeader ||
+              scene.video.rememberedSourceCrop ||
+              scene.scene.rememberedCanvas
+            ? 35
+            : cursor?.sourceObservations
+              ? 33
+              : camera.clips.length
+                ? 32
+                : externalAudio.sourceVoiceoverDocuments.length ||
+                    externalAudio.originalSpeech !== undefined
+                  ? 31
+                  : externalAudio.clips.length
+                    ? 30
+                    : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                      ? 29
+                      : original.ranges?.length || sourceMutes.length
+                        ? 28
+                        : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                          ? 27
+                          : 26;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,
     name: args.name,
     cursorTrack: cursor,
     duration: timeline.duration,
+    ...(compositionJoins.length ? { compositionJoins } : {}),
     backgroundColor: '#00000000',
     ...scene.scene,
     ...projectPresentation(document.advancedContent.presentation, application.presentationApplied),

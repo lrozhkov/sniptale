@@ -320,3 +320,38 @@ it('holds every passive original speech replacement even without clips or enable
   ]);
   expect(project).toEqual(before);
 });
+
+it('keeps an unplaced cut source in use through its retained recipe', () => {
+  const project = createEmptyVideoProject();
+  const asset = createVideoProjectAsset(
+    'Retained source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'cut-source' },
+    {
+      width: 160,
+      height: 90,
+      duration: 6,
+      mimeType: 'video/webm',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  project.assets = [asset];
+  project.version = 40;
+  project.compositionJoins = [4, 0, 2].map((start) => ({
+    id: `retained-cut-${start}`,
+    sampling: 'cut',
+    sourceRange: { assetId: asset.id, sourceInstanceId: 'original', start, end: start + 1 },
+  }));
+  const before = structuredClone(project);
+  expect(getProjectAssetUses(project)).toEqual(
+    [0, 2, 4].map((start) => ({
+      assetId: asset.id,
+      kind: 'composition-join',
+      joinId: `retained-cut-${start}`,
+    }))
+  );
+  expect(getProjectAssetUseCounts(project).get(asset.id)).toBe(3);
+  expect(project).toEqual(before);
+});

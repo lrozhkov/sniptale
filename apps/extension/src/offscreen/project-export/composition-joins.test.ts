@@ -10,10 +10,19 @@ import { VideoExportFormat, VideoExportQualityPreset } from '../../features/vide
 import { renderProjectCompositionFrame } from './composition-joins';
 import type { ProjectCompositionSceneInput } from './composition-scene';
 const owners = vi.hoisted(() => ({
+  cutSample: vi.fn(),
+  cutRelease: vi.fn(),
+  cutDispose: vi.fn(),
   scene: vi.fn(),
   sync: vi.fn(),
   ready: vi.fn(),
   dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video-review/decoded-video-sample', () => ({
+  createCompositionCutSampleSource: () => ({
+    sample: owners.cutSample,
+    dispose: owners.cutDispose,
+  }),
 }));
 vi.mock('./composition-scene', () => ({ renderProjectCompositionScene: owners.scene }));
 vi.mock('./media-playback/frame', () => ({ syncVideoClipFrame: owners.sync }));
@@ -23,6 +32,7 @@ vi.mock('./effect-runtime', () => ({
 }));
 beforeEach(() => {
   vi.clearAllMocks();
+  owners.cutSample.mockResolvedValue({ media: new Map(), release: owners.cutRelease });
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   owners.sync.mockResolvedValue(undefined);
@@ -194,4 +204,30 @@ it('mixes the complete region when its outgoing anchor is a short split descenda
   for (const [index, expected] of [191, 0, 64, 255].entries())
     expect(Math.abs(center[index]! - expected)).toBeLessThanOrEqual(1);
   args.job.compositionJoinRenderer!.dispose();
+});
+
+it('samples moving cut sides at their own clocks and keeps the held join contract unchanged', async () => {
+  const args = input();
+  args.project.compositionJoins![0]!.sampling = 'cut';
+  args.project.version = 40;
+  await renderProjectCompositionFrame({ ...args, currentTime: 0.85 });
+  expect(owners.scene.mock.calls.map(([sample]) => sample.currentTime)).toEqual([0.85, 1]);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.captionSampleTime)).toEqual([0.85, 1]);
+  owners.scene.mockClear();
+  await renderProjectCompositionFrame({ ...args, currentTime: 1.1 });
+  const clocks = owners.scene.mock.calls.map(([sample]) => sample.currentTime);
+  expect(clocks[0]).toBeLessThan(1);
+  expect(1 - clocks[0]).toBeLessThanOrEqual(Number.EPSILON);
+  expect(clocks[1]).toBe(1.1);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.captionSampleTime)).toEqual(clocks);
+  expect(owners.cutSample.mock.calls.map(([time, _signal, fallback]) => [time, fallback])).toEqual([
+    [0.85, 'last'],
+    [1, 'first'],
+    [clocks[0], 'last'],
+    [1.1, 'first'],
+  ]);
+  expect(owners.cutRelease).toHaveBeenCalledTimes(4);
+  expect(args.project.duration).toBe(2);
+  args.job.compositionJoinRenderer!.dispose();
+  expect(owners.cutDispose).toHaveBeenCalledOnce();
 });

@@ -1,13 +1,21 @@
 import type { CompositionJoinSettings } from './composition-join';
 
-/** A whole-frame boundary follows one ordinary media clip edge, never a neighbour search. */
-export interface VideoProjectCompositionJoin {
-  id: string;
-  clipId: string;
-  edge: 'start' | 'end';
-  /** Omission retains an unprocessed boundary and its limits for adjacent joins. */
-  transition?: CompositionJoinSettings;
+interface JoinSourceRange {
+  assetId: string;
+  sourceInstanceId: string;
+  start: number;
+  end: number;
 }
+
+/** Clip edges own active timing. Source ranges retain original cut intent without an anchor. */
+export type VideoProjectCompositionJoin = {
+  id: string;
+  transition?: CompositionJoinSettings;
+} & (
+  | { clipId: string; edge: 'start' | 'end'; sampling?: never; sourceRange?: never }
+  | { clipId: string; edge: 'start' | 'end'; sampling: 'cut'; sourceRange?: JoinSourceRange }
+  | { clipId?: never; edge?: never; sampling: 'cut'; sourceRange: JoinSourceRange }
+);
 
 /** Derived project-clock regions; output cadence belongs to the sample adapter. */
 export interface VideoProjectCompositionJoinPlan {

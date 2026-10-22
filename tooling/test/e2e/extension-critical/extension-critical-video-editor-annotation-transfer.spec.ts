@@ -1,3 +1,4 @@
+import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { mapCompositionPointThroughCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { resolveEffectSourceProjection } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { projectQuickEditPoint } from '../../../../apps/extension/src/features/video/composition/motion/spatial-geometry';
@@ -52,6 +53,7 @@ const baseCase = {
   groupFx: false,
   spotlight: false,
   spotlightEffect: 'dim',
+  galleryCut: 'none',
 } as const;
 
 for (const {
@@ -66,6 +68,7 @@ for (const {
   groupFx,
   spotlight,
   spotlightEffect,
+  galleryCut,
 } of [
   { ...baseCase, nativeFx: true },
   {
@@ -123,8 +126,20 @@ for (const {
     spotlight: true,
     nativeFx: true,
   },
+  { ...baseCase, crop: true, nativeFx: true, galleryCut: 'dissolve' },
+  {
+    ...baseCase,
+    viewport: PRIMARY_BROWSER_VIEWPORTS[1]!,
+    format: 'MP4',
+    locale: 'ru',
+    theme: 'dark',
+    crop: true,
+    spatial: true,
+    nativeFx: true,
+    galleryCut: 'fade-black',
+  },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -372,6 +387,24 @@ for (const {
         steps: 8,
       });
       await page.mouse.up();
+      if (galleryCut !== 'none') {
+        const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
+        if (!(await settings.isVisible()))
+          await dialog
+            .locator('summary')
+            .filter({ hasText: label('gallery.videoReview.cutTransition') })
+            .click();
+        await chooseInspectorValue(
+          page,
+          settings,
+          label('gallery.videoReview.zoomTransitionType'),
+          label(
+            galleryCut === 'dissolve'
+              ? 'gallery.videoReview.cutDissolve'
+              : 'gallery.videoReview.cutFadeColor'
+          )
+        );
+      }
       await expect
         .poll(
           async () => (await readNativeReviewWorkspace(page, aggregate))?.effectSnapshots?.length
@@ -401,6 +434,89 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      if (galleryCut !== 'none') {
+        expect(
+          native.compositionJoins?.some(
+            (join) => join.sampling === 'cut' && join.transition?.type === galleryCut
+          )
+        ).toBe(true);
+        expect(native.version).toBeGreaterThanOrEqual(40);
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+          .click();
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneEdges'), exact: true })
+          .click();
+        const joinFields = page
+          .locator(
+            '[data-ui="video-editor.scene-edges.inspector"] [data-ui="shared.ui.presentation-join-fields"]'
+          )
+          .first();
+        const other = galleryCut === 'dissolve' ? 'fade-black' : 'dissolve';
+        await chooseInspectorValue(
+          page,
+          joinFields,
+          label('videoEditor.sidebar.compositionJoin'),
+          label(
+            other === 'dissolve'
+              ? 'gallery.videoReview.cutDissolve'
+              : 'gallery.videoReview.cutFadeColor'
+          )
+        );
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.compositionJoins?.[0]?.transition?.type
+          )
+          .toBe(other);
+        await chooseInspectorValue(
+          page,
+          joinFields,
+          label('videoEditor.sidebar.compositionJoin'),
+          label(
+            galleryCut === 'dissolve'
+              ? 'gallery.videoReview.cutDissolve'
+              : 'gallery.videoReview.cutFadeColor'
+          )
+        );
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.compositionJoins)
+          .toEqual(native.compositionJoins);
+        expect((await readNativeVideoProject(page))!.clips).toEqual(
+          hydrateVideoProject(native).clips
+        );
+        const seek = page
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.compositionJoinSeek'),
+            exact: true,
+          })
+          .first();
+        const geometry = await seek.evaluate((button) => {
+          const bounds = button.getBoundingClientRect(),
+            icon = button.querySelector('svg')!.getBoundingClientRect();
+          return {
+            width: bounds.width,
+            clientWidth: button.clientWidth,
+            scrollWidth: button.scrollWidth,
+            left: bounds.left,
+            iconLeft: icon.left,
+            iconRight: icon.right,
+            right: bounds.right,
+          };
+        });
+        await writeFile(
+          info.outputPath('native-cut-seek-geometry.json'),
+          JSON.stringify(geometry, null, 2)
+        );
+        expect(geometry.scrollWidth - geometry.clientWidth).toBeLessThanOrEqual(1);
+        expect(geometry.iconLeft).toBeGreaterThanOrEqual(geometry.left - 1);
+        expect(geometry.iconRight).toBeLessThanOrEqual(geometry.right + 1);
+        await checkInspectorPaintedFont(page, joinFields, 'transferred-cut-join');
+        await page.screenshot({
+          path: info.outputPath('native-gallery-cut-inspector.png'),
+          fullPage: false,
+        });
+      }
       if (crop) {
         const source = native.clips.find((clip) => clip.type === 'VIDEO');
         expect(source?.type === 'VIDEO' && source.sourceCrop?.width).toBeCloseTo(0.8, 6);
@@ -520,9 +636,19 @@ for (const {
       const dragTimelineClip = async (id: string, delta: number) => {
         const node = page.locator(`[data-project-timeline-clip="${id}"]`);
         await node.scrollIntoViewIfNeeded();
+        await node.evaluate((item) => item.scrollIntoView({ block: 'center', inline: 'nearest' }));
         const box = (await node.boundingBox())!;
         const x = box.x + Math.min(box.width / 2, 60),
           y = box.y + box.height / 2;
+        const hit = await page.evaluate(
+          ({ x, y }) =>
+            document
+              .elementFromPoint(x, y)
+              ?.closest('[data-project-timeline-clip]')
+              ?.getAttribute('data-project-timeline-clip'),
+          { x, y }
+        );
+        expect(hit).toBe(id);
         await page.mouse.move(x, y);
         await page.mouse.down();
         await page.mouse.move(x + delta, y, { steps: 8 });

@@ -128,8 +128,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 39) &&
+    isBoundedNumber(version, 2, 40) &&
     Number.isInteger(version) &&
+    (version >= 40 ||
+      !Array.isArray(value['compositionJoins']) ||
+      value['compositionJoins'].every(
+        (join: unknown) => !isRecord(join) || join['sampling'] === undefined
+      )) &&
     (version >= 39 ||
       !Array.isArray(value['motionRegions']) ||
       value['motionRegions'].every(

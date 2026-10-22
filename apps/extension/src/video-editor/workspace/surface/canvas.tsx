@@ -199,7 +199,8 @@ function VideoEditorWorkspaceUpper(
               setSelectedAssetId(null);
               revealWorkspaceMaterial(use, preview, props.onRevealTarget, pausedTime);
               if (use.kind === 'watermark') props.onRevealWatermark();
-              if (use.kind === 'bookend-preset') props.onRevealBookends();
+              if (use.kind === 'bookend-preset' || use.kind === 'composition-join')
+                props.onRevealBookends();
             }}
             onRename={renameAsset}
             onRemoveUnused={removeUnusedAssets}
@@ -408,9 +409,21 @@ export function revealWorkspaceMaterial(
     use.kind === 'scene' ||
     use.kind === 'watermark' ||
     use.kind === 'bookend-preset' ||
+    use.kind === 'composition-join' ||
     use.kind === 'source-audio'
   )
     preview.selection.onSelectScene();
+  if (use.kind === 'composition-join') {
+    const join = preview.project.compositionJoins?.find((item) => item.id === use.joinId);
+    const clip = join?.clipId
+      ? preview.project.clips.find((item) => item.id === join.clipId)
+      : undefined;
+    if (clip && join) {
+      preview.transport.onSeek(clip.startTime + (join.edge === 'end' ? clip.duration : 0));
+      onRevealTarget({ kind: 'clip', clipId: clip.id });
+    }
+    return;
+  }
   if (use.kind === 'source-voiceover') {
     const document = preview.project.sourceVoiceoverDocuments?.find(
       (item) => item.id === use.documentId

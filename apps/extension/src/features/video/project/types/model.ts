@@ -357,7 +357,8 @@ export interface VideoProject {
     | 36
     | 37
     | 38
-    | 39;
+    | 39
+    | 40;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

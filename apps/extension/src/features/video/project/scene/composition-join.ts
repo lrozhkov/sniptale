@@ -45,3 +45,11 @@ export function evaluateCompositionJoin(time: number, seam: number, before: numb
   const black = beforeSeam ? 1 - (seam - time) / before : 1 - (time - seam) / after;
   return { incoming, beforeSeam, black: Math.max(0, Math.min(1, black)) };
 }
+
+/** Fits two authored cut portions to one shared retained island. */
+export function fitCompositionJoinPortions(outgoing: number, incoming: number, available: number) {
+  const requested = outgoing + incoming;
+  return requested > available
+    ? { outgoing: (outgoing * available) / requested, incoming: (incoming * available) / requested }
+    : { outgoing, incoming };
+}

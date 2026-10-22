@@ -55,7 +55,13 @@ export function createCompositionJoinEndpoints(params: {
     },
     async draw(
       context: CanvasRenderingContext2D,
-      request: { key: object; outgoingTime: number; incomingTime: number; incomingWeight: number },
+      request: {
+        key: object;
+        outgoingTime: number;
+        incomingTime: number;
+        incomingWeight: number;
+        sampling?: 'cut';
+      },
       signal: AbortSignal
     ) {
       signal.throwIfAborted();
@@ -94,10 +100,10 @@ export function createCompositionJoinEndpoints(params: {
           context.shadowBlur = 0;
           context.shadowOffsetX = context.shadowOffsetY = 0;
           context.globalCompositeOperation = 'source-over';
-          context.globalAlpha = 1 - incomingWeight;
+          context.globalAlpha = request.sampling === 'cut' ? 1 : 1 - incomingWeight;
           context.drawImage(pair.outgoing.canvas, 0, 0);
-          // Add premultiplied contributions so transparent corners dissolve away too.
-          context.globalCompositeOperation = 'lighter';
+          // Gallery cuts retain source-over decoration. Bookends mix premultiplied contributions.
+          context.globalCompositeOperation = request.sampling === 'cut' ? 'source-over' : 'lighter';
           context.globalAlpha = incomingWeight;
           context.drawImage(pair.incoming.canvas, 0, 0);
         } finally {

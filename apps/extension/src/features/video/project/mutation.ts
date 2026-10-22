@@ -135,6 +135,12 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (
+    (patch.compositionJoins ?? project.compositionJoins)?.some(
+      (join) => join.sampling !== undefined
+    )
+  )
+    return 40;
   const sceneBackground = patch.sceneBackground ?? project.sceneBackground;
   if (sceneBackground?.zoomBehavior !== undefined) return 37;
   if (

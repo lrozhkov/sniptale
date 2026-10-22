@@ -1,3 +1,6 @@
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
+import { resolveVideoProjectCompositionJoinPlans } from '../../../features/video/project/scene/joins';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createImageClip,
@@ -33,12 +36,13 @@ function setup() {
   return { store, project, joins };
 }
 
-it('accepts one independent join history step and restores it through Undo and Redo without changing clips', () => {
+it.each([false, true])('restores held and moving joins through one history step (%s)', (moving) => {
   const { store, project, joins } = setup();
+  const proposal = moving ? joins.map((join) => ({ ...join, sampling: 'cut' as const })) : joins;
   const before = store.getState();
-  expect(before.updateCompositionJoins(joins, project)).toEqual({ status: 'updated' });
+  expect(before.updateCompositionJoins(proposal, project)).toEqual({ status: 'updated' });
   const after = store.getState();
-  expect(after.project!.version).toBe(26);
+  expect(after.project!.version).toBe(moving ? 40 : 26);
   expect(after.project!.clips).toEqual(project.clips);
   expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
   const undo = undoVideoEditorProjectHistory(after.projectHistory, after.project!, after.selection);
@@ -46,8 +50,8 @@ it('accepts one independent join history step and restores it through Undo and R
   expect(undo.project.compositionJoins).toBeUndefined();
   const redo = redoVideoEditorProjectHistory(undo.history, undo.project, undo.selection);
   if (redo?.status !== 'applied') throw new Error('Redo was refused');
-  expect(redo.project.compositionJoins).toEqual(joins);
-  expect(after.updateCompositionJoins(joins, after.project!)).toEqual({ status: 'unchanged' });
+  expect(redo.project.compositionJoins).toEqual(proposal);
+  expect(after.updateCompositionJoins(proposal, after.project!)).toEqual({ status: 'unchanged' });
   expect(store.getState()).toBe(after);
 });
 
@@ -138,4 +142,115 @@ it('refuses an inspector command after its project closes without changing the e
     reason: 'no-project',
   });
   expect(store.getState()).toBe(before);
+});
+
+function cutSetup() {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'cut-source',
+    filename: 'Source.webm',
+    width: 160,
+    height: 90,
+    duration: 8,
+    mimeType: 'video/webm',
+    size: 1,
+    hasAudio: false,
+  });
+  const original = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (original.type !== 'VIDEO') throw new Error('Missing source');
+  const left = { ...original, sourceInstanceId: 'original', duration: 2, sourceDuration: 2 };
+  const right = {
+    ...original,
+    id: 'right',
+    sourceInstanceId: 'original',
+    startTime: 2,
+    sourceStart: 4,
+    duration: 4,
+    sourceDuration: 4,
+  };
+  project.clips = [left, right];
+  project.duration = 6;
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(project);
+  const join = {
+    id: 'cut',
+    sampling: 'cut' as const,
+    clipId: right.id,
+    edge: 'start' as const,
+    transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+    sourceRange: { assetId: original.assetId, sourceInstanceId: 'original', start: 2, end: 4 },
+  };
+  expect(store.getState().updateCompositionJoins([join], store.getState().project!).status).toBe(
+    'updated'
+  );
+  return { store, left, right, join, original };
+}
+
+it('retains a cut after deleting its source placements and restores the exact association through Undo', () => {
+  const { store, left, right, join, original } = cutSetup();
+  expect(resolveVideoProjectCompositionJoinPlans(store.getState().project!)).toHaveLength(1);
+  store.getState().deleteClip(right.id);
+  const retained = {
+    id: join.id,
+    sampling: 'cut',
+    transition: join.transition,
+    sourceRange: join.sourceRange,
+  };
+  expect(store.getState().project!.compositionJoins).toEqual([retained]);
+  store.getState().deleteClip(left.id);
+  const deleted = store.getState();
+  expect(deleted.project!.clips.filter((clip) => clip.type === 'VIDEO')).toEqual([]);
+  expect(deleted.project!.compositionJoins).toEqual([retained]);
+  expect(getProjectAssetUseCounts(deleted.project!).get(original.assetId)).toBe(1);
+  const undo = undoVideoEditorProjectHistory(
+    deleted.projectHistory,
+    deleted.project!,
+    deleted.selection
+  );
+  if (undo?.status !== 'applied') throw new Error('Undo refused');
+  const restored = undoVideoEditorProjectHistory(undo.history, undo.project, undo.selection);
+  if (restored?.status !== 'applied') throw new Error('Second Undo refused');
+  expect(restored.project.compositionJoins).toEqual([join]);
+  expect(resolveVideoProjectCompositionJoinPlans(restored.project)).toHaveLength(1);
+});
+
+it('keeps source cut association through split rate gap closure trim and JSON reopen', async () => {
+  const { store, left, right, join } = cutSetup();
+  store.getState().splitClipAt(left.id, 1);
+  const tail = store
+    .getState()
+    .project!.clips.find(
+      (clip) => clip.type === 'VIDEO' && clip.id !== left.id && clip.id !== right.id
+    );
+  if (tail?.type !== 'VIDEO') throw new Error('Missing split source');
+  expect(resolveVideoProjectCompositionJoinPlans(store.getState().project!)[0]?.seam).toBe(2);
+  store.getState().updateClipPlaybackRate(tail.id, 2);
+  expect(resolveVideoProjectCompositionJoinPlans(store.getState().project!)).toEqual([]);
+  expect(store.getState().project!.compositionJoins).toEqual([join]);
+  store.getState().closeTrackGap(right.trackId, 1.5, 2);
+  expect(resolveVideoProjectCompositionJoinPlans(store.getState().project!)[0]?.seam).toBe(1.5);
+  store.getState().trimClipStart(right.id, 1.75);
+  expect(resolveVideoProjectCompositionJoinPlans(store.getState().project!)).toEqual([]);
+  store.getState().closeTrackGap(right.trackId, 1.5, 1.75);
+  const edited = store.getState().project!;
+  expect(resolveVideoProjectCompositionJoinPlans(edited)[0]?.seam).toBe(1.5);
+  expect(edited.compositionJoins).toEqual([join]);
+  const { hydrateVideoProject } = await import('../../../features/video/project/hydration');
+  expect(
+    resolveVideoProjectCompositionJoinPlans(
+      hydrateVideoProject(JSON.parse(JSON.stringify(edited)))
+    )[0]?.seam
+  ).toBe(1.5);
+});
+
+it('does not substitute another source instance when the outgoing source placement is deleted', () => {
+  const { store, left, join } = cutSetup();
+  store.getState().deleteClip(left.id);
+  const project = store.getState().project!;
+  expect(project.compositionJoins).toEqual([join]);
+  expect(
+    resolveVideoProjectCompositionJoinPlans({
+      ...project,
+      clips: [...project.clips, { ...left, id: 'foreign', sourceInstanceId: 'foreign' }],
+    })
+  ).toEqual([]);
 });

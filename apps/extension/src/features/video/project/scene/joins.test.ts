@@ -74,7 +74,10 @@ it('refuses malformed or duplicate anchors while retaining shape-only recovery f
   ]) {
     expect(parseVideoProjectCompositionJoins(value)).toBeNull();
   }
-  const missing = { ...project, compositionJoins: [{ ...entry, clipId: 'missing' }] };
+  const missing = {
+    ...project,
+    compositionJoins: [{ ...entry, clipId: 'missing', edge: 'end' as const }],
+  };
   expect(isHydratableVideoProject(missing)).toBe(true);
   expect(isExportReadyVideoProject(missing)).toBe(false);
   expect(() => resolveVideoProjectCompositionJoinPlans(missing)).toThrow(
@@ -329,4 +332,126 @@ it('represents a Gallery cut across several speed clips without shortening eithe
     incomingEnd: project.duration,
   });
   expect(project).toEqual(before);
+});
+
+it('admits moving cut sampling separately from held bookend endpoints', () => {
+  const project = fixture();
+  const original = project.compositionJoins![0]!;
+  const plan = resolveVideoProjectCompositionJoinPlans(project)[0]!;
+  const held = resolveVideoProjectCompositionJoinEndpoints(plan, 10);
+  // Gallery keeps one side moving. A pair of held output ticks cannot encode that policy.
+  expect(held).toEqual({ outgoingTime: 0.9, incomingTime: 1 });
+  expect(held.outgoingTime).not.toBe(0.8);
+  expect(held.incomingTime).not.toBe(1.1);
+  const moving = { ...original, sampling: 'cut' };
+  expect(parseVideoProjectCompositionJoins([moving])).toEqual([moving]);
+});
+
+it('moves only the current cut side without rounding its camera clock to output cadence', () => {
+  const initial = fixture();
+  const project = applyVideoProjectMutationPatch(initial, {
+    compositionJoins: initial.compositionJoins!.map((join) => ({ ...join, sampling: 'cut' })),
+  });
+  const before = structuredClone(project);
+  const plan = resolveVideoProjectCompositionJoinPlans(project)[0]!;
+  for (const fps of [1, 23.976, 30, 60]) {
+    expect(resolveVideoProjectCompositionJoinEndpoints(plan, fps, 0.8)).toEqual({
+      outgoingTime: 0.8,
+      incomingTime: 1,
+    });
+    const after = resolveVideoProjectCompositionJoinEndpoints(plan, fps, 1.05);
+    expect(after.incomingTime).toBe(1.05);
+    expect(after.outgoingTime).toBeLessThan(1);
+    expect(1 - after.outgoingTime).toBeLessThanOrEqual(Number.EPSILON);
+    expect(resolveVideoProjectCompositionJoinEndpoints(plan, fps, 1).outgoingTime).toBe(
+      after.outgoingTime
+    );
+  }
+  expect(project).toEqual(before);
+  expect(project.version).toBe(40);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(hydrateVideoProject(JSON.parse(JSON.stringify(project))).compositionJoins).toEqual(
+    project.compositionJoins
+  );
+  expect(isHydratableVideoProject({ ...project, version: 39 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 41 })).toBe(false);
+  for (const time of [undefined, NaN, -1, 1.2])
+    expect(() => resolveVideoProjectCompositionJoinEndpoints(plan, 30, time)).toThrow(
+      'Invalid moving composition join time'
+    );
+  expect(
+    parseVideoProjectCompositionJoins([{ ...project.compositionJoins![0]!, sampling: 'other' }])
+  ).toBeNull();
+});
+
+it('admits retained cut source intent without an anchor and rejects malformed ranges', () => {
+  const initial = fixture(),
+    video = initial.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (video.type !== 'VIDEO') throw new Error('Missing video');
+  const sourceRange = {
+    assetId: video.assetId,
+    sourceInstanceId: video.sourceInstanceId ?? video.id,
+    start: 0.1,
+    end: 0.8,
+  };
+  const join = {
+    id: 'retained-cut',
+    sampling: 'cut' as const,
+    sourceRange,
+    transition: { type: 'fade-black' as const, before: 0.4, after: 0.2, color: '#123456' },
+  };
+  const project = applyVideoProjectMutationPatch(initial, { compositionJoins: [join] });
+  const before = structuredClone(project);
+  expect(project.version).toBe(40);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(resolveVideoProjectCompositionJoinPlans(project)).toEqual([]);
+  expect(hydrateVideoProject(JSON.parse(JSON.stringify(project))).compositionJoins).toEqual([join]);
+  expect(isHydratableVideoProject({ ...project, version: 39 })).toBe(false);
+  for (const invalid of [
+    { ...join, sampling: undefined },
+    { ...join, sourceRange: undefined },
+    { ...join, clipId: 'missing' },
+    { ...join, edge: 'start' },
+    { ...join, sourceRange: { ...sourceRange, end: 0 } },
+    { ...join, sourceRange: { ...sourceRange, start: NaN } },
+    { ...join, sourceRange: { ...sourceRange, sourceInstanceId: '' } },
+    { ...join, sourceRange: { ...sourceRange, extra: true } },
+  ])
+    expect(parseVideoProjectCompositionJoins([invalid])).toBeNull();
+  const removed = removeVideoProjectLibrarySources(project, [
+    project.assets.find((asset) => asset.id === video.assetId)!.source,
+  ]);
+  expect(removed.compositionJoins).toEqual([]);
+  expect(project).toEqual(before);
+});
+
+it('retains a cut recipe after ordinary anchor deletion and never redirects it to another placement', () => {
+  const initial = fixture(),
+    video = initial.clips.find((clip) => clip.type === 'VIDEO')!;
+  if (video.type !== 'VIDEO') throw new Error('Missing video');
+  const sourceRange = {
+    assetId: video.assetId,
+    sourceInstanceId: video.sourceInstanceId ?? video.id,
+    start: 0.1,
+    end: 0.8,
+  };
+  const join = {
+    id: 'bound-cut',
+    clipId: video.id,
+    edge: 'start' as const,
+    sampling: 'cut' as const,
+    sourceRange,
+    transition,
+  };
+  const project = applyVideoProjectMutationPatch(initial, { compositionJoins: [join] });
+  const next = reconcileVideoProjectCompositionJoins({
+    ...project,
+    clips: project.clips.filter((clip) => clip.id !== video.id),
+  });
+  expect(next.compositionJoins).toEqual([
+    { id: join.id, sampling: 'cut', sourceRange, transition },
+  ]);
+  expect(resolveVideoProjectCompositionJoinPlans(next)).toEqual([]);
+  expect(isExportReadyVideoProject(next)).toBe(true);
+  expect(project.compositionJoins).toEqual([join]);
 });

@@ -182,3 +182,15 @@ it('does not adopt copied endpoints when a queued cancellation occurs just befor
   expect(f.target.canvas.pixel).toEqual([0, 0, 0, 0]);
   f.owner.dispose();
 });
+
+it('preserves Gallery source-over cut compositing at transparent endpoint pixels', async () => {
+  const f = fixture();
+  f.sample.mockImplementation(async (time) => {
+    f.source.canvas.pixel = time === 1 ? [1, 0, 0, 1] : [0, 0, 0, 0];
+    return { canvas: f.source.canvas as unknown as HTMLCanvasElement, release: f.release };
+  });
+  const cut = { ...f.request, sampling: 'cut' as const };
+  await f.owner.draw(f.target.context, cut, f.signal);
+  expect(f.target.canvas.pixel).toEqual([1, 0, 0, 1]);
+  f.owner.dispose();
+});

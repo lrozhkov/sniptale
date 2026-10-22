@@ -1,3 +1,4 @@
+import type { VideoCompositionMediaSource } from '../../../../features/video/composition/draw/media-source';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
@@ -37,7 +38,7 @@ function drawLockedPreviewLayer(
   prepared: PreparedPreviewSceneCanvas,
   layer: ReturnType<typeof mapVisualLayerToViewportSpace>,
   params: {
-    clipMediaElements: Map<string, HTMLMediaElement>;
+    clipMediaElements: Map<string, VideoCompositionMediaSource>;
     imageBank: Record<string, HTMLImageElement>;
     pass: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'][number];
     effectRuntimeFrames: EffectRuntimeRenderedFrameMap | undefined;
@@ -72,7 +73,7 @@ function drawLockedPreviewLayer(
 }
 
 function drawPreparedPreviewVisualPass(params: {
-  clipMediaElements: Map<string, HTMLMediaElement>;
+  clipMediaElements: Map<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;
   layers: ReturnType<typeof mapVisualLayerToViewportSpace>[];
   pass: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'][number];
@@ -150,7 +151,7 @@ export function drawPreviewVisualPasses(params: {
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
-  clipMediaElements: Map<string, HTMLMediaElement>;
+  clipMediaElements: Map<string, VideoCompositionMediaSource>;
   currentTime?: number;
   imageBank: Record<string, HTMLImageElement>;
   overlayFrame: ReturnType<typeof resolveVideoCompositionRenderPasses>['overlayFrame'];
@@ -200,7 +201,7 @@ export function drawPreviewVisualPasses(params: {
 function drawPreviewOrderedVisualLayers(params: {
   project: VideoProject;
   canvas: HTMLCanvasElement;
-  clipMediaElements: Map<string, HTMLMediaElement>;
+  clipMediaElements: Map<string, VideoCompositionMediaSource>;
   frame: ReturnType<typeof resolveVideoCompositionRenderPasses>['overlayFrame'];
   imageBank: Record<string, HTMLImageElement>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
@@ -273,7 +274,7 @@ function drawPreviewOrderedVisualLayers(params: {
 
 function drawPreviewUnlockedLayerGroup(params: {
   canvas: HTMLCanvasElement;
-  clipMediaElements: Map<string, HTMLMediaElement>;
+  clipMediaElements: Map<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   effectRuntimeStates: Map<number, EffectRuntimeDrawState>;

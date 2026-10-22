@@ -1,7 +1,46 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
-import { createReviewDecodedSampleSink } from './decoded-video-sample';
+import {
+  createReviewDecodedSampleSink,
+  createCompositionCutSampleSource,
+} from './decoded-video-sample';
+import {
+  createProject,
+  createVideoClip,
+} from '../../features/video/project/timeline/project-meta.test.helpers';
+
+const cutDecode = vi.hoisted(() => ({
+  getSample: vi.fn(),
+  samples: vi.fn(),
+  canDecode: vi.fn(),
+  dispose: vi.fn(),
+  open: vi.fn(),
+}));
+vi.mock('mediabunny', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('mediabunny')>();
+  return {
+    ...actual,
+    UrlSource: class {
+      constructor(url: string) {
+        cutDecode.open(url);
+      }
+    },
+    Input: class {
+      dispose = cutDecode.dispose;
+      async getPrimaryVideoTrack() {
+        return {
+          canDecode: cutDecode.canDecode,
+          getDecoderConfig: async () => ({ codec: 'vp09.00.10.08' }),
+        };
+      }
+    },
+    VideoSampleSink: class {
+      getSample = cutDecode.getSample;
+      samples = cutDecode.samples;
+    },
+  };
+});
 
 const frames: TestFrame[] = [];
 let copy = vi.fn(async () => [
@@ -17,7 +56,12 @@ class TestFrame {
   visibleRect: DOMRect;
   timestamp: number;
   duration: number;
-  colorSpace = { primaries: 'bt709', transfer: 'bt709', matrix: 'bt709', fullRange: false };
+  colorSpace: VideoColorSpaceInit = {
+    primaries: 'bt709',
+    transfer: 'bt709',
+    matrix: 'bt709',
+    fullRange: false,
+  };
   close = vi.fn();
   allocationSize = () => 240;
   copyTo = () => copy();
@@ -38,10 +82,15 @@ class TestFrame {
     this.displayHeight = source?.displayHeight ?? init.displayHeight ?? this.visibleRect.height;
     this.timestamp = init.timestamp ?? source?.timestamp ?? 0;
     this.duration = init.duration ?? source?.duration ?? 0;
+    if (init.colorSpace) this.colorSpace = { ...this.colorSpace, ...init.colorSpace };
     frames.push(this);
   }
 }
 beforeEach(() => {
+  vi.clearAllMocks();
+  cutDecode.canDecode.mockResolvedValue(true);
+  cutDecode.getSample.mockReset();
+  cutDecode.samples.mockReset();
   frames.length = 0;
   copy = vi.fn(async () => [
     { offset: 0, stride: 16 },
@@ -51,7 +100,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function setup(format: VideoPixelFormat = 'NV12', height = 16) {
+function setup(format: VideoPixelFormat = 'NV12', height = 16, config?: VideoDecoderConfig) {
   const sample = new VideoSample(
     new VideoFrame(new Uint8Array(384), {
       format,
@@ -76,7 +125,8 @@ function setup(format: VideoPixelFormat = 'NV12', height = 16) {
         yield sample;
       },
     },
-    controller.signal
+    controller.signal,
+    config
   );
   return { sample, controller, sink };
 }
@@ -136,6 +186,30 @@ it.each(['failure', 'abort'] as const)(
   }
 );
 
+it('uses the VP8 default matrix without converting or retiming native planes', async () => {
+  const { sink, sample } = setup('I420', 16, { codec: 'vp8' });
+  const prepared = await sink.getSample(1);
+  expect(prepared!.colorSpace.matrix).toBe('smpte170m');
+  expect(prepared!.timestamp).toBe(sample.timestamp);
+  expect(prepared!.duration).toBe(sample.duration);
+  expect(prepared!.rotation).toBe(sample.rotation);
+  expect(prepared!.format).toBe('I420');
+  expect(copy).toHaveBeenCalledOnce();
+  prepared!.close();
+});
+
+it('preserves an explicit VP8 matrix and other codec metadata without copying', async () => {
+  for (const config of [
+    { codec: 'vp8', colorSpace: { matrix: 'bt709' } },
+    { codec: 'vp09.00.10.08' },
+  ] as const) {
+    const { sink, sample } = setup('I420', 16, config);
+    expect(await sink.getSample(1)).toBe(sample);
+    expect(copy).not.toHaveBeenCalled();
+    sample.close();
+  }
+});
+
 it('releases a sample acquired after cancellation without reading its pixels', async () => {
   const { controller, sink } = setup();
   controller.abort();
@@ -188,3 +262,114 @@ it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
     await expect(operation).rejects.toMatchObject({ stage: 'decode', cause });
   }
 );
+
+function cutFrame(timestamp: number) {
+  return new VideoSample(
+    new VideoFrame(new Uint8Array(16 * 16 * 4), {
+      format: 'RGBA',
+      codedWidth: 16,
+      codedHeight: 16,
+      timestamp: Math.round(timestamp * 1_000_000),
+    }),
+    { timestamp }
+  );
+}
+function cutSource() {
+  const clip = createVideoClip({
+    id: 'cut-side',
+    startTime: 0,
+    duration: 0.1,
+    sourceStart: 2.9,
+    sourceDuration: 0.1,
+  });
+  const project = createProject([clip]);
+  return createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:accepted-cut-source' });
+}
+
+it('rejects decoded cut pixels and retains only frames inside the source range after clock rounding', async () => {
+  const excluded = cutFrame(3),
+    preceding = cutFrame(2.8),
+    retained = cutFrame(2.95),
+    end = cutFrame(3);
+  const close = [excluded, preceding, retained, end].map((sample) => vi.spyOn(sample, 'close'));
+  cutDecode.getSample.mockResolvedValue(excluded);
+  cutDecode.samples.mockImplementation(async function* () {
+    yield preceding;
+    yield retained;
+    yield end;
+  });
+  const source = cutSource();
+  const lease = await source.sample(0.09999999999999999, new AbortController().signal, 'last');
+  expect(cutDecode.getSample).toHaveBeenCalledWith(3);
+  expect(lease.media.get('cut-side')).toMatchObject({ sourceWidth: 16, sourceHeight: 16 });
+  expect(close.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 0, 1]);
+  lease.release();
+  lease.release();
+  expect(close.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+  source.dispose();
+  source.dispose();
+  expect(cutDecode.dispose).toHaveBeenCalledOnce();
+});
+
+it('refuses an empty retained range and permits a fresh sampling retry', async () => {
+  const source = cutSource();
+  const excluded = cutFrame(2.8);
+  const close = vi.spyOn(excluded, 'close');
+  cutDecode.getSample.mockResolvedValueOnce(excluded).mockResolvedValueOnce(cutFrame(2.95));
+  cutDecode.samples.mockImplementation(async function* () {});
+  await expect(source.sample(0.05, new AbortController().signal, 'first')).rejects.toThrow(
+    'no retained video frame'
+  );
+  expect(close).toHaveBeenCalledOnce();
+  const lease = await source.sample(0.05, new AbortController().signal, 'first');
+  expect(lease.media.size).toBe(1);
+  lease.release();
+  source.dispose();
+  expect(cutDecode.open).toHaveBeenCalledOnce();
+});
+
+it.each(['dispose', 'request'] as const)(
+  'closes late frames after %s cancellation without publishing them',
+  async (cancel) => {
+    let finish: (sample: VideoSample) => void = () => {
+      throw new Error('Sample was not requested');
+    };
+    const waiting = new Promise<VideoSample>((resolve) => {
+      finish = resolve;
+    });
+    let started: () => void = () => {};
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    cutDecode.getSample.mockImplementation(() => {
+      started();
+      return waiting;
+    });
+    const source = cutSource();
+    const request = new AbortController();
+    const pending = source.sample(0.05, request.signal, 'first');
+    await reading;
+    if (cancel === 'dispose') source.dispose();
+    else request.abort();
+    expect(cutDecode.dispose).toHaveBeenCalledOnce();
+    const late = cutFrame(2.95),
+      close = vi.spyOn(late, 'close');
+    finish(late);
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(close).toHaveBeenCalledOnce();
+    expect(cutDecode.dispose).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not require hidden cut media that the composition will not paint', async () => {
+  const project = createProject([
+    createVideoClip({ id: 'hidden', duration: 1, sourceDuration: 1 }),
+  ]);
+  project.tracks = project.tracks.map((track) => ({ ...track, visible: false }));
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => undefined });
+  const lease = await source.sample(0.5, new AbortController().signal, 'first');
+  expect(lease.media.size).toBe(0);
+  expect(cutDecode.open).not.toHaveBeenCalled();
+  lease.release();
+  source.dispose();
+});

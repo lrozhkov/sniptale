@@ -1,4 +1,7 @@
-import { evaluateCompositionJoin } from '../project/scene/composition-join';
+import {
+  evaluateCompositionJoin,
+  fitCompositionJoinPortions,
+} from '../project/scene/composition-join';
 import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
 import type { ReviewAnchor, ReviewEdit } from './types';
@@ -172,8 +175,9 @@ export function planReviewCutTransitions(
     const incoming = cuts.find((cut) => cut.id === current.id)!.transition!.before;
     const requested = outgoing + incoming;
     if (requested > available) {
-      previous.after = (outgoing * available) / requested;
-      current.before = (incoming * available) / requested;
+      const fitted = fitCompositionJoinPortions(outgoing, incoming, available);
+      previous.after = fitted.outgoing;
+      current.before = fitted.incoming;
     }
   }
   return plans;

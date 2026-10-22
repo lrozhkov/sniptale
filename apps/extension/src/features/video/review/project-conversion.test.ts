@@ -1,3 +1,5 @@
+import { resolveVideoProjectCompositionJoinPlans } from '../project/scene/joins';
+import { planReviewCutTransitions } from './cuts';
 import { expect, it, vi } from 'vitest';
 import { createShapeClip } from '../project/timeline/project-meta.test.helpers';
 import { getMediaClipSourceTime } from '../project/timeline/rate';
@@ -95,7 +97,7 @@ it.each(['recording', 'project-asset', 'library-asset'] as const)(
   }
 );
 
-it('blocks unsupported source transitions before exposing a partial project', () => {
+it('converts moving source transitions without shifting any retained montage content', () => {
   const input = fixture();
   input.document.advancedContent.presentation = createNeutralPresentationSettings();
   input.document.advancedContent.background = {
@@ -108,10 +110,32 @@ it('blocks unsupported source transitions before exposing a partial project', ()
     transition: { type: 'dissolve', before: 0.2, after: 0.2 },
   };
   const before = structuredClone(input);
-  expect(planReviewProjectConversion(input)).toEqual({
-    status: 'blocked',
-    issues: [{ kind: 'source-transition' }],
-  });
+  const hardInput = structuredClone(input);
+  for (const edit of hardInput.document.edits) if (edit.kind === 'cut') delete edit.transition;
+  const hard = planReviewProjectConversion(hardInput),
+    converted = planReviewProjectConversion(input);
+  if (hard.status !== 'prepared' || converted.status !== 'prepared')
+    throw new Error(JSON.stringify({ hard, converted }));
+  expect(converted.project.clips).toEqual(hard.project.clips);
+  expect(converted.project.duration).toBe(hard.project.duration);
+  expect(converted.project.textDocuments).toEqual(hard.project.textDocuments);
+  expect(converted.project.version).toBe(40);
+  expect(converted.project.compositionJoins).toEqual([
+    {
+      id: `${input.seed.id}:cut:cut`,
+      clipId: converted.timeline.cuts[0]!.incomingClipId,
+      edge: 'start',
+      sampling: 'cut',
+      sourceRange: {
+        assetId: converted.timeline.videoClips[0]!.assetId,
+        sourceInstanceId: converted.timeline.sourceInstanceId,
+        start: 3,
+        end: 4,
+      },
+      transition: { type: 'dissolve', before: 0.2, after: 0.2 },
+    },
+  ]);
+  expect(isExportReadyVideoProject(converted.project)).toBe(true);
   expect(input).toEqual(before);
 });
 
@@ -587,3 +611,105 @@ it(
     expect(applied.project.textDocuments![0]!.captions!.enabled).toBe(true);
   }
 );
+
+it('keeps Gallery allocation between neighboring cut transitions when one requested side exceeds the island', () => {
+  const input = fixture();
+  input.document.edits = [
+    {
+      id: 'left',
+      kind: 'cut',
+      start: 1,
+      end: 2,
+      requestedStart: 1,
+      requestedEnd: 2,
+      transition: { type: 'dissolve', before: 0.2, after: 0.1 },
+    },
+    {
+      id: 'right',
+      kind: 'cut',
+      start: 3,
+      end: 4,
+      requestedStart: 3,
+      requestedEnd: 4,
+      transition: { type: 'dissolve', before: 2, after: 0.2 },
+    },
+  ];
+  const before = structuredClone(input);
+  const converted = planReviewProjectConversion(input);
+  if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+  const reference = planReviewCutTransitions(input.source.duration, input.document.edits);
+  const native = resolveVideoProjectCompositionJoinPlans(converted.project);
+  expect(native.map(({ seam, before, after }) => ({ seam, before, after }))).toEqual(
+    reference.map(({ seam, before, after }) => ({ seam, before, after }))
+  );
+  expect(converted.project.duration).toBe(6);
+  expect(input).toEqual(before);
+});
+
+it('retains edge and adjacent cut transition recipes without inventing media placements', () => {
+  const input = fixture();
+  input.document.edits = [
+    {
+      id: 'edge',
+      kind: 'cut',
+      start: 0,
+      end: 0.3,
+      requestedStart: 0,
+      requestedEnd: 0.3,
+      transition: { type: 'dissolve', before: 0.2, after: 0.4 },
+    },
+    {
+      id: 'adjacent-left',
+      kind: 'cut',
+      start: 2.1,
+      end: 3,
+      requestedStart: 2.1,
+      requestedEnd: 3,
+      transition: { type: 'fade-black', before: 0.5, after: 0.2, color: '#123456' },
+    },
+    {
+      id: 'adjacent-right',
+      kind: 'cut',
+      start: 3,
+      end: 4.2,
+      requestedStart: 3,
+      requestedEnd: 4.2,
+      transition: { type: 'dissolve', before: 0.1, after: 0.6 },
+    },
+  ];
+  const before = structuredClone(input),
+    converted = planReviewProjectConversion(input);
+  if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+  expect(converted.project.compositionJoins).toHaveLength(3);
+  expect(converted.project.compositionJoins!.map((join) => join.clipId)).toEqual([
+    undefined,
+    undefined,
+    undefined,
+  ]);
+  for (const edit of input.document.edits) {
+    if (edit.kind !== 'cut') continue;
+    expect(
+      converted.project.compositionJoins!.find(
+        (join) => join.id === `${input.seed.id}:cut:${edit.id}`
+      )
+    ).toEqual({
+      id: `${input.seed.id}:cut:${edit.id}`,
+      sampling: 'cut',
+      transition: edit.transition,
+      sourceRange: {
+        assetId: converted.timeline.videoClips[0]!.assetId,
+        sourceInstanceId: converted.timeline.sourceInstanceId,
+        start: edit.start,
+        end: edit.end,
+      },
+    });
+  }
+  expect(resolveVideoProjectCompositionJoinPlans(converted.project)).toEqual([]);
+  expect(converted.project.clips.filter((clip) => clip.type === 'VIDEO')).toHaveLength(2);
+  expect(converted.project.duration).toBeCloseTo(input.source.duration - 2.4, 12);
+  expect(isExportReadyVideoProject(converted.project)).toBe(true);
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(converted.project)))?.compositionJoins
+  ).toEqual(converted.project.compositionJoins);
+  expect(input).toEqual(before);
+});

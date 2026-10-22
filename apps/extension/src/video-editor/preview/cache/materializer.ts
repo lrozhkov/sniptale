@@ -1,3 +1,5 @@
+import { createCompositionCutSampleSource } from '../../../workflows/video-review/decoded-video-sample';
+import type { VideoCompositionFrameSource } from '../../../features/video/composition/draw/media-source';
 import { hasCameraMediaAt } from '../../../features/video/project/camera/animation';
 import { createCompositionJoinEndpoints } from '../../../features/video/composition/canvas/join-endpoints';
 import {
@@ -235,13 +237,13 @@ function createMaterializedJoinPresentation(
     maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 8,
     createCanvas: () => params.ownerDocument.createElement('canvas'),
   });
+  let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
+  let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
   let cameraOverride: VideoCompositionCameraState | undefined;
   let busy = false;
-  const endpoints = createCompositionJoinEndpoints({
-    resources,
-    size: params.rasterSize,
-    renderSample: async (time, signal) => ({
-      canvas: await renderMaterializedFrame(
+  const renderSample = async (time: number, signal: AbortSignal) => {
+    if (!cutPlan)
+      return renderMaterializedFrame(
         params,
         state,
         canvas,
@@ -250,13 +252,47 @@ function createMaterializedJoinPresentation(
         signal,
         cameraOverride,
         'omit'
-      ),
+      );
+    cutSampler ??= createCompositionCutSampleSource({
+      project: params.project,
+      sourceUrl: (clip) => params.assetUrls[clip.assetId],
+    });
+    const source = cutSampler;
+    try {
+      const frames = await source.sample(time, signal, time < cutPlan.seam ? 'last' : 'first');
+      try {
+        return await renderMaterializedFrame(
+          params,
+          state,
+          canvas,
+          stage,
+          time,
+          signal,
+          cameraOverride,
+          'omit',
+          frames.media
+        );
+      } finally {
+        frames.release();
+      }
+    } catch (error) {
+      if (cutSampler === source) cutSampler = undefined;
+      source.dispose();
+      throw error;
+    }
+  };
+  const endpoints = createCompositionJoinEndpoints({
+    resources,
+    size: params.rasterSize,
+    renderSample: async (time, signal) => ({
+      canvas: await renderSample(time, signal),
       release() {},
     }),
   });
   return {
     dispose() {
       endpoints.dispose();
+      cutSampler?.dispose();
       resources.dispose();
     },
     async renderFrame(time: number, signal: AbortSignal, nextCamera?: VideoCompositionCameraState) {
@@ -270,6 +306,11 @@ function createMaterializedJoinPresentation(
         const plan = plans.find((item) =>
           evaluateCompositionJoin(time, item.seam, item.before, item.after)
         );
+        cutPlan = plan?.boundary.sampling === 'cut' ? plan : undefined;
+        if (!cutPlan) {
+          cutSampler?.dispose();
+          cutSampler = undefined;
+        }
         if (!plan) {
           endpoints.clear();
           return await renderMaterializedFrame(
@@ -288,12 +329,14 @@ function createMaterializedJoinPresentation(
         if (plan.boundary.transition?.type === 'dissolve') {
           const samples = resolveVideoProjectCompositionJoinEndpoints(
             plan,
-            params.sampleFps ?? params.project.fps
+            params.sampleFps ?? params.project.fps,
+            time
           );
           await endpoints.draw(
             context,
             {
               key: plan,
+              ...(cutPlan ? { sampling: 'cut' as const } : {}),
               ...samples,
               incomingWeight: blend.incoming,
             },
@@ -301,16 +344,7 @@ function createMaterializedJoinPresentation(
           );
         } else {
           endpoints.clear();
-          await renderMaterializedFrame(
-            params,
-            state,
-            canvas,
-            stage,
-            time,
-            signal,
-            cameraOverride,
-            'omit'
-          );
+          await renderSample(time, signal);
           drawCompositionColorOverlay(
             context,
             blend.black,
@@ -408,7 +442,8 @@ async function renderMaterializedFrame(
   time: number,
   signal: AbortSignal,
   cameraOverride?: VideoCompositionCameraState,
-  sceneEdges: 'apply' | 'omit' = 'apply'
+  sceneEdges: 'apply' | 'omit' = 'apply',
+  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>
 ): Promise<HTMLCanvasElement> {
   const assertActive = () => {
     throwIfAborted(signal);
@@ -417,7 +452,8 @@ async function renderMaterializedFrame(
   assertActive();
   await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
   assertActive();
-  await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
+  if (!decodedVideoFrames)
+    await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
   assertActive();
   const drawn = await renderPreviewScene({
     ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
@@ -455,6 +491,7 @@ async function renderMaterializedFrame(
     signal,
     stage,
     videoRefs: { current: state.videoRefs },
+    ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
   });
   assertActive();
   if (drawn === false) throw new Error('Preview frame is unavailable.');

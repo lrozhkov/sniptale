@@ -1313,6 +1313,7 @@ export const LOCAL_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/project/scene/background-settings.test.ts',
       'apps/extension/src/features/video/project/comments/validation.test.ts',
       'apps/extension/src/features/video/project/timeline/original-audio.test.ts',
+      'apps/extension/src/features/video/project/source-voiceover.test.ts',
       'apps/extension/src/features/video/project/validation/root.test.ts',
       'apps/extension/src/offscreen/project-export/service/root.test.ts',
       'apps/extension/src/contracts/messaging/video/validators.project-export.test.ts',

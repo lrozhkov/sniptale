@@ -1,3 +1,4 @@
+import { createCompositionCutSampleSource } from '../../workflows/video-review/decoded-video-sample';
 import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
 import {
   drawCompositionColorOverlay,
@@ -48,7 +49,7 @@ export async function renderProjectCompositionFrame(args: Input): Promise<void> 
   if (!plan) {
     args.job.compositionJoinRenderer?.clear();
     await renderProjectCompositionScene(args);
-  } else if (plan.boundary.transition?.type === 'fade-black') {
+  } else if (plan.boundary.transition?.type === 'fade-black' && plan.boundary.sampling !== 'cut') {
     args.job.compositionJoinRenderer?.clear();
     await renderProjectCompositionScene(args);
     const blend = evaluateCompositionJoin(args.currentTime, plan.seam, plan.before, plan.after)!;
@@ -97,10 +98,10 @@ function createProjectExportCompositionJoinRenderer(
   const videos = new Map<string, HTMLMediaElement>();
   const effectRuntime = createOffscreenProjectEffectRuntime({ ownerDocument });
   let disposed = false;
-  const endpoints = createCompositionJoinEndpoints({
-    resources,
-    size,
-    async renderSample(time, signal) {
+  let cutPlan: VideoProjectCompositionJoinPlan | undefined;
+  let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
+  const renderSample = async (time: number, signal: AbortSignal) => {
+    if (!cutPlan)
       for (const clip of args.project.clips) {
         signal.throwIfAborted();
         if (clip.type !== 'VIDEO' || !isClipActiveAtTime(clip, time)) continue;
@@ -122,37 +123,57 @@ function createProjectExportCompositionJoinRenderer(
         await waitForMediaElementReady(video, { signal });
         signal.throwIfAborted();
       }
+    if (!cutPlan)
       await syncVideoClipFrame({ clipMediaElements: videos }, args.project, time, signal);
+    signal.throwIfAborted();
+    if (cutPlan)
+      cutSampler ??= createCompositionCutSampleSource({
+        project: args.project,
+        sourceUrl: (clip) => {
+          const source = args.job.clipMediaElements.get(clip.id);
+          return source?.currentSrc || source?.src;
+        },
+      });
+    const frames = cutPlan
+      ? await cutSampler!.sample(time, signal, time < cutPlan.seam ? 'last' : 'first')
+      : undefined;
+    let sample: ReturnType<typeof resources.canvas> | undefined;
+    try {
+      sample = resources.canvas('export-composition-sample', size);
+      await renderProjectCompositionScene({
+        ...args,
+        context: sample.context,
+        currentTime: time,
+        captionSampleTime: time,
+        clipMediaElements: frames?.media ?? videos,
+        ownerDocument,
+        effectRuntime,
+        signal,
+      });
       signal.throwIfAborted();
-      const sample = resources.canvas('export-composition-sample', size);
-      try {
-        await renderProjectCompositionScene({
-          ...args,
-          context: sample.context,
-          currentTime: time,
-          captionSampleTime: time,
-          clipMediaElements: videos,
-          ownerDocument,
-          effectRuntime,
-          signal,
-        });
-        signal.throwIfAborted();
-        return sample;
-      } catch (error) {
-        sample.release();
-        throw error;
-      }
-    },
-  });
+      return sample;
+    } catch (error) {
+      sample?.release();
+      throw error;
+    } finally {
+      frames?.release();
+    }
+  };
+  const endpoints = createCompositionJoinEndpoints({ resources, size, renderSample });
   return {
     project: args.project,
     settings: args.settings,
-    clear: endpoints.clear,
+    clear() {
+      endpoints.clear();
+      cutSampler?.dispose();
+      cutSampler = undefined;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       controller.abort();
       endpoints.dispose();
+      cutSampler?.dispose();
       effectRuntime.dispose();
       resources.dispose();
       for (const video of videos.values()) {
@@ -165,11 +186,37 @@ function createProjectExportCompositionJoinRenderer(
     },
     async draw(context, plan, time, signal) {
       if (disposed) throw new Error('Composition export sampler is disposed.');
-      const samples = resolveVideoProjectCompositionJoinEndpoints(plan, args.settings.fps);
+      cutPlan = plan.boundary.sampling === 'cut' ? plan : undefined;
+      if (!cutPlan) {
+        cutSampler?.dispose();
+        cutSampler = undefined;
+      }
+      if (cutPlan && plan.boundary.transition?.type === 'fade-black') {
+        const sample = await renderSample(time, signal);
+        try {
+          context.clearRect(0, 0, size.width, size.height);
+          context.drawImage(sample.canvas, 0, 0);
+          const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+          drawCompositionColorOverlay(
+            context,
+            blend.black,
+            plan.boundary.transition.color ?? '#000000'
+          );
+        } finally {
+          sample.release();
+        }
+        return;
+      }
+      const samples = resolveVideoProjectCompositionJoinEndpoints(plan, args.settings.fps, time);
       const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
       await endpoints.draw(
         context,
-        { key: plan.boundary, ...samples, incomingWeight: blend.incoming },
+        {
+          key: plan.boundary,
+          ...(cutPlan ? { sampling: 'cut' as const } : {}),
+          ...samples,
+          incomingWeight: blend.incoming,
+        },
         AbortSignal.any([signal, controller.signal])
       );
     },

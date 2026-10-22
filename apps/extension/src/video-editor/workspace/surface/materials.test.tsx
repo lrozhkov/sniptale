@@ -680,3 +680,52 @@ it('reveals the exact disabled dormant voice document from its retained source m
   });
   expect(onRemoveUnused).not.toHaveBeenCalled();
 });
+
+it('protects a retained cut source from unused cleanup and exposes its settings destination', async () => {
+  const f = renderMaterials(),
+    onShowUse = vi.fn();
+  f.project.version = 40;
+  f.project.compositionJoins = [
+    {
+      id: 'retained-cut',
+      sampling: 'cut',
+      sourceRange: { assetId: f.asset.id, sourceInstanceId: 'original', start: 0, end: 1 },
+    },
+  ];
+  document.body.append(container);
+  await act(async () =>
+    root.render(
+      <VideoEditorMaterials
+        project={f.project}
+        onImport={f.onImport}
+        onSelect={f.onSelect}
+        onRename={f.onRename}
+        onRemoveUnused={f.onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={onShowUse}
+        selectedAssetId={null}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.show-use"] button')!
+      .click()
+  );
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+    option.textContent?.startsWith(translate('videoEditor.sidebar.compositionJoins'))
+  );
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onShowUse).toHaveBeenCalledExactlyOnceWith({
+    assetId: f.asset.id,
+    kind: 'composition-join',
+    joinId: 'retained-cut',
+  });
+  expect(f.onRemoveUnused).not.toHaveBeenCalled();
+});

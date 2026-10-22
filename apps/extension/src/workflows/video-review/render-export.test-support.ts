@@ -71,6 +71,7 @@ vi.mock('mediabunny', async (importOriginal) => {
     async getPrimaryVideoTrack() {
       return {
         codec: 'vp9',
+        getDecoderConfig: async () => ({ codec: 'vp09.00.10.08' }),
         getTimeResolution: async () => 1000,
         canDecode: async () => true,
         getDisplayWidth: async () => state.sourceWidth,

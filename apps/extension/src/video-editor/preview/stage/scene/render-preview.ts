@@ -1,3 +1,8 @@
+import {
+  isVideoCompositionFrameSource,
+  type VideoCompositionMediaSource,
+  type VideoCompositionFrameSource,
+} from '../../../../features/video/composition/draw/media-source';
 import { publishCompletedPreviewFrame } from './canvas';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
@@ -39,14 +44,16 @@ type PreviewEffectRuntimeExecutorInput =
   | (() => EffectRuntimeSandboxExecutor);
 
 function createPreviewSceneMediaMap(
-  videoRefs: PreviewStageVideoRefs
-): Map<string, HTMLMediaElement> {
-  const mediaMap = new Map<string, HTMLMediaElement>();
+  videoRefs: PreviewStageVideoRefs,
+  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>
+): Map<string, VideoCompositionMediaSource> {
+  const mediaMap = new Map<string, VideoCompositionMediaSource>();
   for (const [clipId, video] of Object.entries(videoRefs.current)) {
     if (video) {
       mediaMap.set(clipId, video);
     }
   }
+  for (const [clipId, frame] of decodedVideoFrames ?? []) mediaMap.set(clipId, frame);
   return mediaMap;
 }
 
@@ -143,6 +150,8 @@ type PreviewSceneParams = {
   signal?: AbortSignal;
   stage: HTMLDivElement | null;
   videoRefs: PreviewStageVideoRefs;
+  /** Borrowed immutable decoded frames for bounded cut sampling. */
+  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>;
 };
 
 export async function renderPreviewScene(params: PreviewSceneParams): Promise<void | false> {
@@ -170,7 +179,7 @@ async function renderPreparedPreviewScene(
     renderPasses.overlayFrame.camera = params.cameraOverride;
     for (const pass of renderPasses.visualPasses) pass.frame.camera = params.cameraOverride;
   }
-  const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs);
+  const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs, params.decodedVideoFrames);
   // Effects rasterize their inputs asynchronously; never start with an unavailable frame.
   if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
   const videos = [...clipMediaElements]
@@ -179,7 +188,8 @@ async function renderPreparedPreviewScene(
         (frame) => frame.visualLayers.some((layer) => layer.clipId === id)
       )
     )
-    .map(([, video]) => video);
+    .map(([, video]) => video)
+    .filter((video): video is HTMLMediaElement => video instanceof HTMLMediaElement);
   let mediaChanged = false;
   const invalidate = () => {
     mediaChanged = true;
@@ -230,7 +240,7 @@ async function renderPreparedPreviewScene(
 
 function arePreviewSceneVideosReady(
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
-  media: ReadonlyMap<string, HTMLMediaElement>
+  media: ReadonlyMap<string, VideoCompositionMediaSource>
 ): boolean {
   const frames = [
     renderPasses.overlayFrame,
@@ -240,7 +250,10 @@ function arePreviewSceneVideosReady(
     frame.visualLayers.every((layer) => {
       if (layer.kind !== 'video' || layer.opacity <= 0) return true;
       const video = media.get(layer.clipId);
-      return !!video && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+      return (
+        isVideoCompositionFrameSource(video) ||
+        (!!video && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
+      );
     })
   );
 }
@@ -248,7 +261,7 @@ function arePreviewSceneVideosReady(
 type ResolvedPreviewSceneArgs = {
   watermark: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>> | undefined;
   captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
-  clipMediaElements: Map<string, HTMLMediaElement>;
+  clipMediaElements: Map<string, VideoCompositionMediaSource>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
@@ -365,7 +378,7 @@ function drawResolvedPreviewSceneContent(
 async function resolvePreviewEffectRuntimeFrames(
   params: Parameters<typeof renderPreviewScene>[0],
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
-  clipMediaElements: ReadonlyMap<string, HTMLMediaElement>
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>
 ): Promise<EffectRuntimeRenderedComposition | undefined> {
   const hasPlans =
     (renderPasses.overlayFrame.effectRuntimePlans ?? []).length > 0 ||

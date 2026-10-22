@@ -56,24 +56,36 @@ function click(label: string) {
   if (!button) throw new Error(`Missing ${label}`);
   act(() => button.click());
 }
-it('edits the exact instance in one history step, keeps None as a boundary and leaves its recipe unchanged', () => {
-  render();
-  const before = useVideoEditorStore.getState();
-  click('gallery.videoReview.cutDissolve');
-  const after = useVideoEditorStore.getState();
-  expect(after.project!.compositionJoins![0]).toMatchObject({
-    id: 'join',
-    transition: { type: 'dissolve', before: 0.2, after: 0.2 },
-  });
-  expect(after.project!.clips).toEqual(before.project!.clips);
-  expect(after.project!.bookendPresets).toEqual(before.project!.bookendPresets);
-  expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
-  click('gallery.videoReview.transitionNone');
-  expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
-    before.project!.compositionJoins
-  );
-  expect(preview).toHaveBeenLastCalledWith(null);
-});
+it.each([false, true])(
+  'edits held and moving join settings without changing their recipe (%s)',
+  (moving) => {
+    if (moving) {
+      const project = useVideoEditorStore.getState().project!;
+      useVideoEditorStore.getState().setProject({
+        ...project,
+        version: 40,
+        compositionJoins: project.compositionJoins!.map((join) => ({ ...join, sampling: 'cut' })),
+      });
+    }
+    render();
+    const before = useVideoEditorStore.getState();
+    click('gallery.videoReview.cutDissolve');
+    const after = useVideoEditorStore.getState();
+    expect(after.project!.compositionJoins![0]).toMatchObject({
+      id: 'join',
+      transition: { type: 'dissolve', before: 0.2, after: 0.2 },
+    });
+    expect(after.project!.compositionJoins![0]!.sampling).toBe(moving ? 'cut' : undefined);
+    expect(after.project!.clips).toEqual(before.project!.clips);
+    expect(after.project!.bookendPresets).toEqual(before.project!.bookendPresets);
+    expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
+    click('gallery.videoReview.transitionNone');
+    expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
+      before.project!.compositionJoins
+    );
+    expect(preview).toHaveBeenLastCalledWith(null);
+  }
+);
 it('seeks the actual clip edge after a move without changing selection or history', () => {
   render();
   const before = useVideoEditorStore.getState();
@@ -119,4 +131,28 @@ it('clears the disposable preview on project replacement and panel unmount', () 
   preview.mockClear();
   act(() => root.render(null));
   expect(preview).toHaveBeenLastCalledWith(null);
+});
+
+it('edits retained cut settings as source metadata without inventing a seek position', () => {
+  const project = useVideoEditorStore.getState().project!,
+    source = project.assets[0]!;
+  const sourceRange = {
+    assetId: source.id,
+    sourceInstanceId: 'retained-instance',
+    start: 0,
+    end: 2,
+  };
+  const join = { id: 'retained', sampling: 'cut' as const, sourceRange };
+  useVideoEditorStore.getState().setProject({ ...project, version: 40, compositionJoins: [join] });
+  render();
+  expect(host.querySelector('[aria-label="videoEditor.sidebar.compositionJoinSeek"]')).toBeNull();
+  expect(host.textContent).toContain('videoEditor.sidebar.sourceIn');
+  expect(host.textContent).toContain('videoEditor.sidebar.sourceOut');
+  click('gallery.videoReview.cutDissolve');
+  expect(useVideoEditorStore.getState().project!.compositionJoins![0]).toEqual({
+    ...join,
+    transition: { type: 'dissolve', before: 0.2, after: 0.2 },
+  });
+  click('gallery.videoReview.transitionNone');
+  expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual([join]);
 });

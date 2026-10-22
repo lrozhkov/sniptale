@@ -19,6 +19,10 @@ type PreviewSceneInput = Parameters<
 const renderPreviewScene = vi.hoisted(() =>
   vi.fn<(args: PreviewSceneInput) => Promise<void | false>>(async () => {})
 );
+const cut = vi.hoisted(() => ({ sample: vi.fn(), release: vi.fn(), dispose: vi.fn() }));
+vi.mock('../../../workflows/video-review/decoded-video-sample', () => ({
+  createCompositionCutSampleSource: () => ({ sample: cut.sample, dispose: cut.dispose }),
+}));
 const spatial = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: spatial.create,
@@ -30,6 +34,10 @@ import { createVideoPreviewFrameMaterializer } from './materializer';
 
 beforeEach(() => {
   renderPreviewScene.mockClear();
+  cut.sample.mockClear();
+  cut.release.mockClear();
+  cut.dispose.mockClear();
+  cut.sample.mockResolvedValue({ media: new Map(), release: cut.release });
   spatial.create.mockReset();
 });
 
@@ -542,4 +550,33 @@ it('samples the complete region across a short split tail at the project cadence
   } finally {
     f.owner.dispose();
   }
+});
+
+it('materializes the moving cut side without rounding scene clocks to preview cadence', async () => {
+  const f = compositionFixture();
+  f.project.compositionJoins![0]!.sampling = 'cut';
+  f.project.version = 40;
+  await f.owner.renderFrame(0.85, new AbortController().signal);
+  expect(renderPreviewScene.mock.calls.map(([input]) => input.currentTime)).toEqual([0.85, 1]);
+  renderPreviewScene.mockClear();
+  await f.owner.renderFrame(1.1, new AbortController().signal);
+  const clocks = renderPreviewScene.mock.calls.map(([input]) => input.currentTime);
+  const outgoing = clocks[0];
+  if (outgoing === undefined) throw new Error('Missing outgoing cut frame');
+  expect(outgoing).toBeLessThan(1);
+  expect(1 - outgoing).toBeLessThanOrEqual(Number.EPSILON);
+  expect(clocks[1]).toBe(1.1);
+  expect(cut.sample.mock.calls.map(([time, _signal, fallback]) => [time, fallback])).toEqual([
+    [0.85, 'last'],
+    [1, 'first'],
+    [outgoing, 'last'],
+    [1.1, 'first'],
+  ]);
+  expect(cut.release).toHaveBeenCalledTimes(4);
+  expect(
+    renderPreviewScene.mock.calls.every(([input]) => input.decodedVideoFrames instanceof Map)
+  ).toBe(true);
+  expect(f.project.duration).toBe(2);
+  f.owner.dispose();
+  expect(cut.dispose).toHaveBeenCalledOnce();
 });

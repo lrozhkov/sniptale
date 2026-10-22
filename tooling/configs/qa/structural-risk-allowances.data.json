@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "review:conversion",
-      "reason": "tool-noise: This existing admission workflow builds one Native conversion candidate. Annotation planning delegates to its bounded domain owner. Timing, assets and documents share one final admission decision. It adds no writer or new lifetime. Its existing branches describe the same conversion transaction.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This existing admission operation builds one detached Native candidate. Cut settings use its accepted timeline and final root validation. It adds no writer, resource lifetime or recovery authority. The unchanged score reflects branches within this single conversion contract. A separate owner would divide the same admission decision.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "a842a50a66c2d01284e0a565aadfd2b4875891cf5e7ecf0f6af7be98d5c9c70f",
+      "astHash": "b553a63c8e674373cd62a38f818f7b2a5f202c5f9ff6b97e456e998c634652bd",
       "signatureHash": "93bd2d4f6608cce3759f15c9d32a3008214d46490e5e857c090009fb4366d437"
     },
     {
@@ -1810,10 +1810,10 @@
       "file": "apps/extension/src/video-editor/workspace/surface/canvas.tsx",
       "symbol": "VideoEditorWorkspaceUpper",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: This existing view coordinates one source viewer and material selection. The candidate delegates source voice navigation to an existing pure resolver. It adds no state receiver, resource lifetime, writer, or recovery. Its unchanged score reflects existing UI wiring. One additional signature line exceeds the view line budget. A forwarding component would not isolate another authority.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, independent result, resource lifetime, or recovery. Remove when the analyzer models this cohesive operation. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-21",
-      "astHash": "c2b08d01c13e5f791964aa8c6a8fe963e8f62c3e5267d47e5bf9418492e786df",
+      "reason": "tool-noise: This existing view coordinates one source viewer and material selection. The candidate routes retained cut uses to the existing scene inspector. It adds no state receiver, resource lifetime, writer or recovery. Its structural score remains unchanged. A forwarding component would not isolate another authority.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "d354012870f1cb8041bc6b1b57cda5941b7e9038bde180dbc24d22499056e968",
       "signatureHash": "fef3b232c7fdd60cfe6a04bd98e9a1cb6af50c7c9b3d38387f5668b79ec744c9"
     },
     {
@@ -2233,6 +2233,39 @@
       "reviewDate": "2026-10-22",
       "astHash": "6fbe9573c43c9ea317ecf2f4987bf535031923d495f368d944c0896235d760fc",
       "signatureHash": "2fd32e793052d46c0fba9f498b4402fdd73a31cc3e50b203470582cfe39f0def"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
+      "symbol": "createProjectExportCompositionJoinRenderer.renderSample",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: This operation prepares borrowed media, renders one composition sample and transfers its canvas lease. Held and cut branches share the same render and cancellation authority. Local maps and leases do not create another state owner. Success, failure and abort tests prove cleanup. A forwarding helper would distribute this one sample transaction.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "5e2504d8f1afaa82405d7cc47dd4974c1820e187fc3b026aa5d193f277d7c967",
+      "signatureHash": "71f7c078ce51931df6cd667851770c93b20ffbfa2eed1886a1a308e61f8bbbc2"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/surface/materials.tsx",
+      "symbol": "MaterialRow",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: This existing row renders one material and its use menu. The candidate adds a retained cut interval and its existing navigation callback. Project data remains borrowed and commands remain outside this row. The structural score remains unchanged. Extracting the passive label would not isolate another owner.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "0e1d08ba7e49440351c6e7d7cdc0bb0c060af5e76d0dd6ec4aba655d2c91c5c2",
+      "signatureHash": "6f59e703b7e56b6f4e9ae6e444a997847e9a709607992ac7c49371647c780536"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/workspace/surface/materials.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: This existing file implements one material-library UI. Its filters, rows, import menu and rename drafts delegate project commands through props. The candidate adds a retained cut use and its interval label. It adds no persistence, resource or recovery authority. The unchanged score exceeds the line budget after readable formatting. Splitting these local views would not isolate another owner.",
+      "removalCondition": "Remove when this exact file AST or signature changes. Reassess any new authority, resource lifetime, writer or recovery. Remove when analysis models this UI owner. Independent architecture review must assess this exact classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "84290317dc0afc7346173d5c3c6ae56ae40a28dc7f9522e506be3011856d98e3",
+      "signatureHash": "9363d88940764326f650e04a20c1097cbe0cd2a8980d51588308f2481e321c63"
     }
   ]
 }

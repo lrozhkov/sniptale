@@ -667,7 +667,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 40, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 41, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -707,7 +707,7 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 41 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });
 
@@ -754,7 +754,7 @@ it('admits complete source cursor observations only at schema33 without changing
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 33; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 41 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
   for (const invalid of [
     null,
@@ -917,7 +917,7 @@ it('fences explicit effect attachment at schema38 and retains dormant source pla
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 38; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 40 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 41 })).toBe(false);
   expect(isHydratableVideoProject({ ...changed, clips: [host] })).toBe(true);
   for (const attachment of [
     null,

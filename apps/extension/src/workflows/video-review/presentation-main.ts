@@ -188,8 +188,16 @@ class PresentationMain {
           }
         : {}),
     };
-    this.sink = createReviewDecodedSampleSink(new VideoSampleSink(video), signal);
-    this.transitionSink = createReviewDecodedSampleSink(new VideoSampleSink(video), signal);
+    this.sink = createReviewDecodedSampleSink(
+      new VideoSampleSink(video),
+      signal,
+      await video.getDecoderConfig()
+    );
+    this.transitionSink = createReviewDecodedSampleSink(
+      new VideoSampleSink(video),
+      signal,
+      await video.getDecoderConfig()
+    );
     if (effective.webcam) {
       const camera = await createReviewWebcamRenderer(
         effective.webcam,

@@ -7,6 +7,7 @@ import { VideoProjectClipType, VideoSceneBackgroundKind } from './types';
 export type ProjectAssetUse = { assetId: string } & (
   | { kind: 'clip'; clipId: string }
   | { kind: 'scene' }
+  | { kind: 'composition-join'; joinId: string }
   | { kind: 'watermark' }
   | { kind: 'bookend-preset'; side: 'intro' | 'outro'; variant: 'image' | 'video' }
   | { kind: 'analysis'; objectTrackId: string }
@@ -24,6 +25,13 @@ export function getProjectAssetUses(project: VideoProject): ProjectAssetUse[] {
     if (clip.type === VideoProjectClipType.SHAPE && clip.embeddedAsset) {
       uses.push({ assetId: clip.embeddedAsset.assetId, kind: 'clip', clipId: clip.id });
     }
+  }
+  const joins = [...(project.compositionJoins ?? [])].sort(
+    (a, b) => (a.sourceRange?.start ?? 0) - (b.sourceRange?.start ?? 0)
+  );
+  for (const join of joins) {
+    if (join.sourceRange)
+      uses.push({ assetId: join.sourceRange.assetId, kind: 'composition-join', joinId: join.id });
   }
   if (project.sceneBackground?.kind === VideoSceneBackgroundKind.IMAGE) {
     uses.push({ assetId: project.sceneBackground.assetId, kind: 'scene' });
