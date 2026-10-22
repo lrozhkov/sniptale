@@ -406,6 +406,35 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.down();
       await page.mouse.move(660, 320, { steps: 8 });
       await page.mouse.up();
+      await expect.poll(visiblePixels).toBe(0);
+      await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+      for (const kind of ['rectangle', 'ellipse']) {
+        await page
+          .locator(`[data-ui="content.toolbar.drawing-options.shape.kind-${kind}"]`)
+          .click();
+        const beforeShape = await pixels(ink);
+        await page.mouse.move(900, 260);
+        await page.mouse.down();
+        await page.mouse.move(1080, 360, { steps: 8 });
+        await page.mouse.up();
+        await expect.poll(() => pixels(ink)).not.toBe(beforeShape);
+        await expect.poll(visiblePixels).toBe(0);
+        await page.screenshot({
+          path: info.outputPath(`recording-${kind}-without-handles.png`),
+          fullPage: false,
+        });
+      }
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(990, 260);
+      await expect.poll(visiblePixels).toBeGreaterThan(0);
+      const beforeResize = await pixels(ink);
+      await page.mouse.move(1080, 360);
+      await page.mouse.down();
+      await page.mouse.move(1120, 400, { steps: 8 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeResize);
+      await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+      await expect.poll(visiblePixels).toBe(0);
       await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
       await page.mouse.click(900, 440);
       await expect.poll(visiblePixels).toBe(0);

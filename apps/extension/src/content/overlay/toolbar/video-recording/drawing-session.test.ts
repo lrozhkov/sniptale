@@ -12,6 +12,35 @@ function commitBox(owner: ReturnType<typeof createRecordingDrawingOwner>, id: st
 afterEach(() => vi.useRealTimers());
 
 describe('recording drawing owner', () => {
+  it.each(['rectangle', 'ellipse'] as const)(
+    'keeps a new %s unselected until the cursor selects it',
+    (kind) => {
+      const owner = createRecordingDrawingOwner();
+      const session = owner.controller.session;
+      session.setActiveTool('shape');
+      const object = {
+        id: 'shape',
+        kind,
+        bounds: { x: 10, y: 20, width: 100, height: 80 },
+        color: '#ff0000',
+        width: 4,
+      };
+      session.commitObject(object, { select: true });
+      expect(session.getSnapshot()).toMatchObject({
+        activeTool: 'shape',
+        selectedObjectIds: [],
+        document: { objects: [object] },
+      });
+      session.setActiveTool('select');
+      session.select(object.id);
+      session.replaceObject({ ...object, bounds: { ...object.bounds, x: 40, width: 120 } });
+      expect(session.getSnapshot().selectedObjectIds).toEqual([object.id]);
+      session.setActiveTool('shape');
+      expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+      owner.dispose();
+    }
+  );
+
   it('counts auto-hide in recording time and freezes the remaining duration while paused', () => {
     vi.useFakeTimers();
     const owner = createRecordingDrawingOwner({ initialAutoHideDelay: 3 });
