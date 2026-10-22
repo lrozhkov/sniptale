@@ -5,14 +5,13 @@ import {
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
   VideoResolutionPreset,
-  WebcamPresentationMode,
-  WebcamPresentationShape,
   type CaptureMode as CaptureModeValue,
   type VideoRecordingLiveMediaState,
   type VideoMicrophoneActivity,
   type VideoRecordingRuntimeState,
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { isWebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type {
   VideoProject,
   VideoProjectExportSettings,
@@ -137,35 +136,6 @@ function isVideoRecordingSurfaceSettings(value: unknown): boolean {
     hasOptionalField(value, 'cursorDimmingEnabled', isBoolean) &&
     hasOptionalField(value, 'cursorClickAnimationEnabled', isBoolean) &&
     hasOptionalField(value, 'cursorEffects', isVideoCursorEffectSettings)
-  );
-}
-
-function isNormalizedPoint(value: unknown, minimum: number, maximum: number): boolean {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 2 &&
-    isNumber(value['x']) &&
-    value['x'] >= minimum &&
-    value['x'] <= maximum &&
-    isNumber(value['y']) &&
-    value['y'] >= minimum &&
-    value['y'] <= maximum
-  );
-}
-
-function isWebcamPresentationSettings(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    Object.keys(value).length === 5 &&
-    (value['mode'] === WebcamPresentationMode.EMBEDDED ||
-      value['mode'] === WebcamPresentationMode.SEPARATE_TRACK) &&
-    (value['shape'] === WebcamPresentationShape.CIRCLE ||
-      value['shape'] === WebcamPresentationShape.RECTANGLE) &&
-    isNormalizedPoint(value['center'], 0, 1) &&
-    isNumber(value['sizeFraction']) &&
-    value['sizeFraction'] > 0 &&
-    value['sizeFraction'] <= 1 &&
-    isNormalizedPoint(value['cropOffset'], -1, 1)
   );
 }
 

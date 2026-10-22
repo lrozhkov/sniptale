@@ -549,6 +549,34 @@ it('reconciles a committed result with a lost response before accepting the next
   );
 });
 
+it('acknowledges confirmed startup cleanup only for its exact source binding', async () => {
+  const { RecordingStartCleanupConfirmedError } = await import('./start/error-reporting');
+  startRecordingImplMock.mockRejectedValueOnce(
+    new RecordingStartCleanupConfirmedError(new Error('source failed'), sourceBinding)
+  );
+  await expect(controller.startRecording(createStartParams())).rejects.toThrow('source failed');
+  await expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
+    result: 'stopped',
+  });
+  await expect(
+    controller.stopRecording({ ...sourceBinding, streamInstanceId: 'other-source' }, true)
+  ).rejects.toThrow('Recording source binding is unavailable');
+});
+
+it('does not acknowledge another source cleanup receipt', async () => {
+  const { RecordingStartCleanupConfirmedError } = await import('./start/error-reporting');
+  startRecordingImplMock.mockRejectedValueOnce(
+    new RecordingStartCleanupConfirmedError(new Error('source failed'), {
+      ...sourceBinding,
+      streamInstanceId: 'other-source',
+    })
+  );
+  await expect(controller.startRecording(createStartParams())).rejects.toThrow('source failed');
+  await expect(controller.stopRecording(sourceBinding, true)).rejects.toThrow(
+    'Recording source binding is unavailable'
+  );
+});
+
 it('does not resurrect a retired previous binding when the next start fails', async () => {
   const { recorder } = createActiveRecorderFixture();
   startRecordingImplMock.mockImplementationOnce(async () => {

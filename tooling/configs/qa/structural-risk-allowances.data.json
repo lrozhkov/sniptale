@@ -523,11 +523,11 @@
       "file": "apps/extension/src/offscreen/recording/controller.start-stop.test.ts",
       "symbol": "<file>",
       "owner": "extension:offscreen:recording",
-      "reason": "tool-noise: This fixture tests one recording controller lifecycle. Each test now imports a fresh worker to isolate retained terminal outcomes. The added assertions use the existing recorder, staging, identity and publication fixtures. The file exceeds the line limit with unchanged structural score and full cohesion. An independent reader confirmed that a split would duplicate mocks or add a fixture-only boundary. Final architecture review must confirm this classification.",
+      "reason": "tool-noise: This fixture tests one recording controller lifecycle. The candidate adds exact-source startup-cleanup receipts and rejects a receipt for another source. These assertions use the existing fresh controller, start mock and source-binding fixture. No independent fixture or effect lifetime is added. The structural score remains two and cohesion remains one. A split would duplicate the lifecycle fixture. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent fixture, state receiver, effect lifetime or owner boundary. Remove when the analyzer models this cohesive test fixture.",
-      "reviewDate": "2026-10-14",
-      "astHash": "1c732babe2cef22dde6f31ff3cfb77c31d01dc5591660cad5e5fa00f3bc9c316",
-      "signatureHash": "a284d9bc5865640ee67c5b7e5bd1a2a64a6d3fd56ea21767753951d9c612e42b"
+      "reviewDate": "2026-10-22",
+      "astHash": "4c722b4a2c6a9ccbf31b056596f4a476c987483712821e6d5b5adda94b4c29e1",
+      "signatureHash": "1a9083a5a593151bd37798d0233e3f2d9d4eb7769510c709bf92cf51a6331355"
     },
     {
       "rule": "structural-file-risk",
@@ -545,10 +545,10 @@
       "file": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file owns one recording completion operation. It decides Stop admission, outcomes, retry, startup cancellation and IDLE. Its new read-only projection derives from the same lease and Stop admission. It grants no new authority and introduces no state owner. The score remains ten and cohesion increases to 0.97. Existing architecture review checked the boundary. Final review must check this projection.",
+      "reason": "tool-noise: This file owns one recording completion operation. The candidate prevents a startup-error notification from declaring pending Stop cleanup failed. The existing Stop acknowledgement still decides the outcome. The guard uses the existing lease and Stop state without adding a writer, state owner or effect. The score remains ten and cohesion remains 0.97. Moving this guard would distribute the same transition authority. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-14",
-      "astHash": "b0336c47ef6b6b8979842027acd061c8086454a6b59d0a38f163966d80c53c9f",
+      "reviewDate": "2026-10-22",
+      "astHash": "0cab017f2f9bb35de68dc5b1b0864423ab9871468e2ab10e6970ab024bd59ac7",
       "signatureHash": "e60420bdb9852442df8c6e72c3543983d04808fa3e4ec324db2dde8a932041f6"
     },
     {
@@ -556,10 +556,10 @@
       "file": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file uses one storage fixture to test recording authority across completion, lease, runtime and lifecycle consumers. Added cases restore the same terminal outcomes into the runtime projection after worker memory loss. The score remains two and cohesion remains one. The line limit causes this finding. Existing architecture review checked this fixture boundary. Final review must check the added cases.",
+      "reason": "tool-noise: This file tests one recording completion lease with one reset fixture. The candidate adds controlled-order startup-error delivery during Stop dispatch and intent persistence. It uses the existing in-memory storage, requestStop and deferred fixtures. No independent fixture or authority is added. The score remains two and cohesion remains one. A split would duplicate the same terminal-recovery fixture. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-14",
-      "astHash": "027483aa394dded96010f899829a0efecc3748824a1cc46de34eb2c338e276c0",
+      "reviewDate": "2026-10-22",
+      "astHash": "62997a7ec4382a450ffd2ac33380919e1ea5ffa2d5a9e1bf49dbe7920e9ad312",
       "signatureHash": "d20553052c92f825c5d86b199747dc39e36550dd32e40a3cdcd57efa7ec23938"
     },
     {

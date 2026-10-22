@@ -22,7 +22,17 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
 )) {
   test(`recording disabled camera selection ${name} ${orientation}`, async ({}, info) => {
     const host = await startHostServer();
-    const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+    const launched = await launchExtensionBrowser({
+      viewport: size,
+      fakeMediaDevices: true,
+      autoGrantMediaPermissions: false,
+    });
+    await launched.context.grantPermissions(['camera']);
+    const diagnostics: string[] = [];
+    launched.context.on('console', (message) => {
+      if (message.type() === 'error' || message.type() === 'warning')
+        diagnostics.push(message.text());
+    });
     try {
       const { page, popup } = await openDesignReview(
         launched.context,
@@ -30,18 +40,37 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
         host.origin,
         size
       );
-      await popup.evaluate(async (defaults) => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach((track) => track.stop());
-        await chrome.storage.local.set({
-          sniptale_video_settings: {
-            ...defaults,
-            webcamEnabled: false,
-            webcamDeviceId: null,
-            webcamPresentation: { ...defaults.webcamPresentation, mode: 'embedded' },
+      await popup.evaluate(
+        async (defaults) => {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach((track) => track.stop());
+          await chrome.storage.local.set({
+            sniptale_video_settings: {
+              ...defaults,
+              webcamEnabled: false,
+              webcamDeviceId: null,
+              warnWithoutMicrophone: false,
+              countdownSeconds: 0,
+              systemAudioEnabled: false,
+              qualityProfileId: null,
+              outputProfile: defaults.outputProfile,
+              webcamPresentation: {
+                ...defaults.webcamPresentation,
+                mode: 'embedded',
+                freePlacement: false,
+                dockPosition: 'se',
+              },
+            },
+          });
+        },
+        {
+          ...DEFAULT_VIDEO_SETTINGS,
+          outputProfile: {
+            ...DEFAULT_VIDEO_SETTINGS.outputProfile,
+            resolution: VideoResolutionPreset.P240,
           },
-        });
-      }, DEFAULT_VIDEO_SETTINGS);
+        }
+      );
       await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
       await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
       if (orientation === 'vertical') {
@@ -92,7 +121,105 @@ for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((vie
         path: info.outputPath('selected-camera-enabled.png'),
         fullPage: false,
       });
+      const action = await triggerExtensionAction(launched.context, launched.extensionId, page);
+      await evaluateInTarget(launched.context, action, 'window.close()').catch(() => undefined);
+      await page.bringToFront();
+      const browser = launched.context.browser()!;
+      const session = await browser.newBrowserCDPSession();
+      const targets = await session.send('Target.getTargets');
+      const offscreen = targets.targetInfos.find((target) => target.url.includes('/offscreen/'))!;
+      await session.detach();
+      await evaluateInTarget(
+        launched.context,
+        offscreen.targetId,
+        `(() => {
+        const acquire = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        let refuseTabOnce = true;
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+          if (refuseTabOnce && constraints.video?.mandatory?.chromeMediaSource === 'tab') {
+            refuseTabOnce = false;
+            globalThis.__recordingRejectedStart = true;
+            throw new DOMException('Test source unavailable', 'NotFoundError');
+          }
+          return acquire(constraints);
+        };
+      })()`
+      );
+      await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+      await expect
+        .poll(() =>
+          evaluateInTarget(
+            launched.context,
+            offscreen.targetId,
+            'globalThis.__recordingRejectedStart === true'
+          )
+        )
+        .toBe(true);
+      await expect
+        .poll(async () => {
+          const result = parseRuntimeResponseForMessage(
+            VideoMessageType.GET_RECORDING_STATE,
+            await sendRuntimeMessage(popup, { type: VideoMessageType.GET_RECORDING_STATE })
+          );
+          return result.state?.status;
+        })
+        .toBe('IDLE');
+      await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible();
+      await expect(
+        page.locator('[data-ui="content.toolbar.video-recording.stopping"]')
+      ).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('failed-start-recovered.png'),
+        fullPage: false,
+      });
+      await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+      await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeVisible({
+        timeout: 30000,
+      });
+      await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeEnabled();
+      await expect(page.locator('.sniptale-video-recording-duration')).not.toHaveText('0:00');
+      await expect
+        .poll(() =>
+          video.evaluate(
+            (element) => element instanceof HTMLVideoElement && element.readyState >= 2
+          )
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('docked-camera-recording.png'),
+        fullPage: false,
+      });
+      await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
+      await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible({
+        timeout: 30000,
+      });
+      await expect
+        .poll(async () => {
+          const result = parseRuntimeResponseForMessage(
+            VideoMessageType.GET_RECORDING_STATE,
+            await sendRuntimeMessage(popup, { type: VideoMessageType.GET_RECORDING_STATE })
+          );
+          return result.postRecordResult?.recordingId ?? null;
+        })
+        .not.toBeNull();
     } finally {
+      const worker = launched.context.serviceWorkers()[0];
+      if (worker) {
+        const state = await worker.evaluate(async () => {
+          const stored = await chrome.storage.session.get('video-active-recording-lease');
+          const lease = stored['video-active-recording-lease'];
+          const recording = await chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' });
+          return { phase: lease?.phase, terminal: lease?.terminal, state: recording?.state };
+        });
+        await info.attach('camera-session', {
+          body: JSON.stringify(state),
+          contentType: 'text/plain',
+        });
+      }
+      await info.attach('camera-diagnostics', {
+        body: diagnostics.join('\n'),
+        contentType: 'text/plain',
+      });
       await closeExtensionBrowser(launched);
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

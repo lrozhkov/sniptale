@@ -49,9 +49,11 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { recordingContext } from '../context';
 import { cleanupResources } from './cleanup';
+import { createRecordingStagingCoordinatorTestDouble } from '../encoding/artifact-session.test-support';
 import { handleRecordingStartError, initializeRecordingSession } from './session';
 import {
   isRecordingStartErrorReported,
+  RecordingStartCleanupConfirmedError,
   unwrapRecordingStartReportedError,
 } from './error-reporting';
 import {
@@ -133,6 +135,58 @@ it('disposes microphone observation before a cancelled preparation is retried', 
   expect(replacement.dispose).toHaveBeenCalledOnce();
   expect(previous.dispose).toHaveBeenCalledOnce();
   expect(recordingContext.currentRecordingId).toBeNull();
+});
+
+it('confirms startup cleanup only after retiring the owned source binding', () => {
+  const binding = {
+    recordingId: 'recording-owned',
+    generation: 2,
+    streamInstanceId: 'source-owned',
+  };
+  recordingContext.beginRecordingSession(binding.recordingId, binding.generation);
+  recordingContext.bindStreamInstance(binding);
+  const reported = handleRecordingStartError(
+    new Error('source failed'),
+    binding.recordingId,
+    binding
+  );
+  expect(reported).toBeInstanceOf(RecordingStartCleanupConfirmedError);
+  expect(recordingContext.currentRecordingId).toBeNull();
+  expect(isRecordingStartErrorReported(reported)).toBe(true);
+});
+
+it('does not confirm asynchronous artifact retirement as completed source cleanup', () => {
+  const binding = {
+    recordingId: 'recording-owned',
+    generation: 2,
+    streamInstanceId: 'source-owned',
+  };
+  recordingContext.beginRecordingSession(binding.recordingId, binding.generation);
+  recordingContext.bindStreamInstance(binding);
+  recordingContext.bindStagingCoordinator(createRecordingStagingCoordinatorTestDouble());
+  const reported = handleRecordingStartError(
+    new Error('encoding failed'),
+    binding.recordingId,
+    binding
+  );
+  expect(reported).not.toBeInstanceOf(RecordingStartCleanupConfirmedError);
+});
+
+it('does not confirm startup cleanup when resource retirement throws', () => {
+  const binding = {
+    recordingId: 'recording-owned',
+    generation: 2,
+    streamInstanceId: 'source-owned',
+  };
+  recordingContext.beginRecordingSession(binding.recordingId, binding.generation);
+  recordingContext.bindStreamInstance(binding);
+  detachCachedPreviewMock.mockImplementationOnce(() => {
+    throw new Error('cleanup refused');
+  });
+  expect(() =>
+    handleRecordingStartError(new Error('source failed'), binding.recordingId, binding)
+  ).toThrow('cleanup refused');
+  expect(recordingContext.currentRecordingId).toBe(binding.recordingId);
 });
 
 it.each([new Error('early preparation failed'), 'early preparation refused'])(

@@ -13,6 +13,7 @@ import { createRuntimeMessagingTransport } from '../../platform/runtime-messagin
 import { recordingContext, type RecordingStopOutcome } from './context';
 import { cleanupResources } from './start/cleanup';
 import { startRecording as startRecordingImpl } from './start/index';
+import { RecordingStartCleanupConfirmedError } from './start/error-reporting';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../platform/i18n';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -168,6 +169,15 @@ async function startRecordingAfterPendingPublication(
   } catch (error) {
     if (prepareData) cancelRecordingBegin();
     if (!pendingRecordingStop && matchesActiveRecordingBinding(binding)) {
+      if (
+        error instanceof RecordingStartCleanupConfirmedError &&
+        matchesRecordingFrameClockBinding(error.binding, binding) &&
+        !hasActiveRecordingSession() &&
+        recordingContext.currentRecordingId === null &&
+        (!terminalRecording ||
+          !matchesRecordingFrameClockBinding(terminalRecording.binding, binding))
+      )
+        terminalRecording = { binding: { ...binding }, outcome: { result: 'stopped' } };
       activeRecordingBinding = previousBindingRetired ? null : previousBinding;
     }
     throw error;

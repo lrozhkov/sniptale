@@ -613,12 +613,21 @@ export function canPublishLiveRecordingState(recordingId: string | undefined): b
   );
 }
 
-async function retainFailedRecordingCompletion(recordingId: string): Promise<void> {
+async function retainFailedRecordingCompletion(
+  recordingId: string,
+  phase?: 'start' | 'stop' | 'runtime' | 'export'
+): Promise<void> {
   const lease = await ensureActiveVideoRecordingLeaseHydrated();
   if (!isCurrentVideoRecordingId(recordingId)) return;
   if (lease?.recordingId !== recordingId || !lease.surfaceBinding) {
     throw new Error('Recording terminal source binding is unavailable.');
   }
+  if (
+    phase === 'start' &&
+    (isVideoRecordingStopInProgress() ||
+      (lease.phase === 'terminal' && lease.terminal.outcome === 'unknown'))
+  )
+    return;
   const terminal = await updateVideoRecordingTerminal(
     {
       recordingId,
@@ -661,7 +670,7 @@ export async function handleRecordingFailure(message: {
       message.recordingId &&
       (message.phase === 'stop' || hasTerminalRecordingAuthority(message.recordingId))
     ) {
-      await retainFailedRecordingCompletion(message.recordingId);
+      await retainFailedRecordingCompletion(message.recordingId, message.phase);
       return;
     }
 
@@ -676,7 +685,7 @@ export async function handleRecordingFailure(message: {
       }
     }
     if (message.recordingId && hasTerminalRecordingAuthority(message.recordingId)) {
-      await retainFailedRecordingCompletion(message.recordingId);
+      await retainFailedRecordingCompletion(message.recordingId, message.phase);
       return;
     }
     await notifyRecordingStartFailed(
@@ -684,7 +693,7 @@ export async function handleRecordingFailure(message: {
       message.recordingId ? { recordingId: message.recordingId } : undefined
     );
     if (message.recordingId && hasTerminalRecordingAuthority(message.recordingId)) {
-      await retainFailedRecordingCompletion(message.recordingId);
+      await retainFailedRecordingCompletion(message.recordingId, message.phase);
       return;
     }
     await clearActiveVideoRecordingLease(message.recordingId);

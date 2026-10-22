@@ -278,7 +278,11 @@ it('routes setup errors through the shared start-error path', async () => {
       messaging
     )
   ).rejects.toThrow('stream failed');
-  expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(expect.any(Error), 'recording-error');
+  expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(expect.any(Error), 'recording-error', {
+    generation: 1,
+    recordingId: 'recording-error',
+    streamInstanceId: 'stream-instance-error',
+  });
 });
 
 it('settles explicit cancellation before the pending Stop changes the starting lifecycle', async () => {

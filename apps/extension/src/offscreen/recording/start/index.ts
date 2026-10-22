@@ -36,7 +36,11 @@ export async function startRecording(
   try {
     await startRecordingInternal(params, messaging);
   } catch (error) {
-    throw handleRecordingStartError(error, params.recordingId);
+    throw handleRecordingStartError(error, params.recordingId, {
+      generation: params.generation,
+      recordingId: params.recordingId,
+      streamInstanceId: params.streamInstanceId,
+    });
   }
 }
 

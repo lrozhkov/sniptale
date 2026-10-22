@@ -4,7 +4,11 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
 import { cleanupResources } from './cleanup';
-import { markRecordingStartErrorReported } from './error-reporting';
+import {
+  markRecordingStartErrorReported,
+  RecordingStartCleanupConfirmedError,
+} from './error-reporting';
+import type { RecordingFrameClockBinding } from '../../../contracts/video/recording-frame-clock';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingStart' });
 
@@ -40,7 +44,14 @@ export function initializeRecordingSession(params: {
   return resolvedRecordingId;
 }
 
-export function handleRecordingStartError(error: unknown, recordingId?: string) {
+export function handleRecordingStartError(
+  error: unknown,
+  recordingId?: string,
+  binding?: RecordingFrameClockBinding
+) {
+  const ownsBinding = binding !== undefined && recordingContext.matchesSourceBinding(binding);
+  const hasPendingArtifacts =
+    recordingContext.artifactSession !== null || recordingContext.stagingCoordinator !== null;
   const scopedRecordingId = recordingId ?? recordingContext.currentRecordingId ?? undefined;
   const payload =
     scopedRecordingId === undefined
@@ -66,5 +77,9 @@ export function handleRecordingStartError(error: unknown, recordingId?: string) 
     payload,
   });
   cleanupResources();
-  return markRecordingStartErrorReported(error);
+  return markRecordingStartErrorReported(
+    ownsBinding && binding && !hasPendingArtifacts
+      ? new RecordingStartCleanupConfirmedError(error, binding)
+      : error
+  );
 }

@@ -1,7 +1,9 @@
 import { expect, it } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-
+import { runtimeVideoSessionMessageContracts } from '../contracts/runtime/video/session';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { runtimeVideoOffscreenViewportMessageContracts } from '../contracts/runtime/video/offscreen/viewport';
 import {
   isVideoExportCapabilities,
   isRecordingStateHealth,
@@ -12,6 +14,62 @@ import {
   isViewportInfo,
   isViewportRegion,
 } from './validators';
+
+it.each([false, true])(
+  'admits camera offers with persisted docking and freePlacement=%s',
+  (freePlacement) => {
+    const settings = {
+      ...DEFAULT_VIDEO_SETTINGS,
+      webcamPresentation: {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+        freePlacement,
+        dockPosition: 'e25' as const,
+      },
+    };
+    expect(isVideoRecordingSettings(settings)).toBe(true);
+    const message = {
+      type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
+      capabilityToken: 'offscreen-capability',
+      peerId: 'surface:0:0',
+      sdp: 'offer',
+      source: { kind: 'surface', settings },
+    };
+    expect(
+      runtimeVideoSessionMessageContracts[
+        VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER
+      ].parseRequest(message)
+    ).toEqual(message);
+    const start = {
+      type: VideoMessageType.OFFSCREEN_START_RECORDING,
+      capabilityToken: 'offscreen-capability',
+      streamId: 'tab-stream',
+      generation: 0,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-1',
+      settings,
+    };
+    expect(
+      runtimeVideoOffscreenViewportMessageContracts[
+        VideoMessageType.OFFSCREEN_START_RECORDING
+      ].parseRequest(start)
+    ).toEqual(start);
+  }
+);
+
+it.each([{ freePlacement: 'yes' }, { dockPosition: 'center' }, { unexpected: true }])(
+  'rejects malformed camera placement %j',
+  (patch) => {
+    expect(
+      isVideoRecordingSettings({
+        ...DEFAULT_VIDEO_SETTINGS,
+        webcamPresentation: {
+          ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+          ...patch,
+        },
+      })
+    ).toBe(false);
+  }
+);
 
 it('accepts absent or boolean microphone warnings and rejects malformed preferences', () => {
   expect(DEFAULT_VIDEO_SETTINGS.warnWithoutMicrophone).toBe(true);

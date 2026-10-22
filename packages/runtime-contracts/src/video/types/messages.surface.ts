@@ -241,7 +241,8 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
-function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
+/** Validates the complete recording camera presentation at runtime and storage boundaries. */
+export function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
   return (
     isRecord(value) &&
     hasExactKeys(value, [
