@@ -191,6 +191,7 @@ export const contentToolbarModesMessages = defineMessageSource({
   videoRecordingStopping: { ru: 'Завершение записи', en: 'Finishing recording' },
   videoRecordingMicrophone: { ru: 'Микрофон', en: 'Microphone' },
   videoRecordingCamera: { ru: 'Камера', en: 'Camera' },
+  videoRecordingCameraResize: { ru: 'Изменить размер камеры', en: 'Resize camera' },
   videoRecordingCameraPreviewUnavailable: {
     ru: 'Предпросмотр камеры недоступен',
     en: 'Camera preview is unavailable',

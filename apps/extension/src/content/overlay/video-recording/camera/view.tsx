@@ -5,7 +5,8 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Video } from 'lucide-react';
+import { MoveDiagonal2, Video } from 'lucide-react';
+import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls/controls';
 import {
   constrainEmbeddedCameraGeometry,
   DEFAULT_EMBEDDED_CAMERA_GEOMETRY,
@@ -57,16 +58,17 @@ function useEmbeddedCameraGeometry(
     void Promise.resolve(onGeometryChange(geometryRef.current)).catch(() => update(drag.origin));
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!interactive) return;
+    if (!interactive || event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    const target = event.target as HTMLElement;
+    const resizing =
+      event.target instanceof Element && event.target.closest('[data-resize="true"]') !== null;
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       origin: geometry,
-      resizing: target.dataset['resize'] === 'true',
-      resizeCorner: (target.dataset['corner'] as CameraDrag['resizeCorner'] | undefined) ?? null,
+      resizing,
+      resizeCorner: resizing ? 'se' : null,
     };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -142,29 +144,38 @@ function CameraMedia(props: {
   );
 }
 
-function CameraResizeHandles() {
-  return (['nw', 'ne', 'se', 'sw'] as const).map((corner) => (
-    <button
+function CameraResizeHandle(props: { shape: EmbeddedCameraGeometry['shape'] }) {
+  const inset = props.shape === 'circle' ? 'max(0px, calc(14.65% - 12px))' : '4px';
+  return (
+    <ProductGlassIconButton
       type="button"
-      aria-label={translate('content.toolbar.videoRecordingCamera')}
-      key={corner}
+      aria-label={translate('content.toolbar.videoRecordingCameraResize')}
+      title={translate('content.toolbar.videoRecordingCameraResize')}
       data-resize="true"
-      data-corner={corner}
+      data-corner="se"
       style={{
         position: 'absolute',
-        width: 12,
-        height: 12,
-        background: 'white',
-        borderRadius: 6,
-        border: 0,
-        cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
+        width: 24,
+        height: 24,
+        minWidth: 24,
+        padding: 0,
+        background: 'var(--sniptale-color-surface-canvas)',
+        border: '1px solid var(--sniptale-color-border-strong)',
+        cursor: 'nwse-resize',
+        outlineStyle: 'solid',
         transition: 'opacity 120ms ease',
-        ...(corner.includes('n') ? { top: 4 } : { bottom: 4 }),
-        ...(corner.includes('w') ? { left: 4 } : { right: 4 }),
+        bottom: inset,
+        right: inset,
       }}
-      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-    />
-  ));
+      className={[
+        'opacity-0 outline-2 outline-offset-2 outline-transparent',
+        'group-hover:opacity-100 group-focus-within:opacity-100',
+        'focus-visible:outline-[var(--sniptale-color-accent)]',
+      ].join(' ')}
+    >
+      <MoveDiagonal2 size={16} strokeWidth={1.75} />
+    </ProductGlassIconButton>
+  );
 }
 
 export function EmbeddedRecordingCamera(props: {
@@ -224,7 +235,6 @@ export function EmbeddedRecordingCamera(props: {
         height,
         transform: 'translate(-50%, -50%)',
         borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
-        overflow: 'hidden',
         pointerEvents: props.interactive ? 'auto' : 'none',
         cursor: props.interactive ? (interaction.dragging ? 'grabbing' : 'grab') : 'default',
         background: 'var(--sniptale-color-surface-elevated, #18181b)',
@@ -237,13 +247,15 @@ export function EmbeddedRecordingCamera(props: {
       onPointerUp={interaction.finish}
       onPointerCancel={interaction.finish}
     >
-      <CameraMedia
-        cropOffset={geometry.cropOffset}
-        error={peerError}
-        stream={stream}
-        width={width}
-      />
-      <CameraResizeHandles />
+      <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
+        <CameraMedia
+          cropOffset={geometry.cropOffset}
+          error={peerError}
+          stream={stream}
+          width={width}
+        />
+      </div>
+      {props.interactive && <CameraResizeHandle shape={geometry.shape} />}
     </div>
   );
 }

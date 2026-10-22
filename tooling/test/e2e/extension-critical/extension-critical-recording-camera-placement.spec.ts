@@ -8,7 +8,10 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 test.setTimeout(90000);
 test.use({ actionTimeout: 10000 });
 
-for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+for (const { name, size } of [
+  ...PRIMARY_BROWSER_VIEWPORTS,
+  { name: '960x560', size: { width: 960, height: 560 } },
+]) {
   for (const orientation of ['horizontal', 'vertical'] as const) {
     test(`camera placement sync ${name} ${orientation}`, async ({}, info) => {
       const host = await startHostServer();
@@ -26,7 +29,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             cameraDiagnostics.push(message.text());
         });
         await popup.evaluate(
-          async ({ settings, dark }) => {
+          async ({ settings, dark, shape }) => {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             const deviceId = stream.getVideoTracks()[0]!.getSettings().deviceId;
             stream.getTracks().forEach((track) => track.stop());
@@ -36,14 +39,18 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 microphoneEnabled: false,
                 webcamEnabled: true,
                 webcamDeviceId: deviceId,
-                webcamPresentation: { ...settings.webcamPresentation!, mode: 'embedded' },
+                webcamPresentation: { ...settings.webcamPresentation!, mode: 'embedded', shape },
                 countdownSeconds: 0,
               },
               'sniptale-theme-preference': dark ? 'dark' : 'light',
               'sniptale-locale-preference': dark ? 'ru' : 'en',
             });
           },
-          { settings: DEFAULT_VIDEO_SETTINGS, dark: size.width === 1920 }
+          {
+            settings: DEFAULT_VIDEO_SETTINGS,
+            dark: size.width === 1920,
+            shape: orientation === 'vertical' ? 'circle' : 'rectangle',
+          }
         );
         await page.bringToFront();
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
@@ -150,6 +157,83 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           .poll(() => preview.evaluate((video: HTMLVideoElement) => video.readyState))
           .toBeGreaterThanOrEqual(2);
         await page.keyboard.press('Escape');
+        const camera = page.locator('[data-ui="content.video-recording.embedded-camera"]');
+        const resize = camera.locator('[data-resize="true"]');
+        await expect(resize).toHaveCount(1);
+        await expect(resize).toHaveCSS('opacity', '0');
+        await camera.focus();
+        await page.keyboard.press('Tab');
+        await expect(resize).toBeFocused();
+        await expect(resize).toHaveCSS('opacity', '1');
+        await expect(resize).toHaveCSS('outline-style', 'solid');
+        expect(await resize.evaluate((button) => getComputedStyle(button).outlineColor)).not.toBe(
+          'rgba(0, 0, 0, 0)'
+        );
+        await page.getByRole('button', { name: 'Host action', exact: true }).click();
+        await expect(resize).toHaveCSS('opacity', '0');
+        await camera.hover();
+        await expect(resize).toHaveCSS('opacity', '1');
+        expect(
+          await resize.evaluate((button) => getComputedStyle(button).backgroundColor)
+        ).not.toBe('rgba(0, 0, 0, 0)');
+        const grip = (await resize.boundingBox())!;
+        const before = (await camera.boundingBox())!;
+        expect(grip.x).toBeGreaterThanOrEqual(0);
+        expect(grip.y + grip.height).toBeLessThanOrEqual(size.height + 1);
+        expect(
+          await resize.evaluate((button) => {
+            const rect = button.getBoundingClientRect();
+            const root = button.getRootNode();
+            return (
+              root instanceof ShadowRoot &&
+              button.contains(
+                root.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+              )
+            );
+          })
+        ).toBe(true);
+        const streamId = await preview.evaluate((video: HTMLVideoElement) =>
+          video.srcObject instanceof MediaStream ? video.srcObject.id : null
+        );
+        expect(streamId).not.toBeNull();
+        await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(grip.x + grip.width / 2 + 28, grip.y + grip.height / 2 + 28, {
+          steps: 5,
+        });
+        await page.mouse.up();
+        await expect(resize).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+        await expect
+          .poll(async () => (await camera.boundingBox())!.width)
+          .toBeGreaterThan(before.width + 10);
+        const after = (await camera.boundingBox())!;
+        expect(after.x).toBeGreaterThanOrEqual(-1);
+        expect(after.y).toBeGreaterThanOrEqual(-1);
+        expect(after.x + after.width).toBeLessThanOrEqual(size.width + 1);
+        expect(after.y + after.height).toBeLessThanOrEqual(size.height + 1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          size.width
+        );
+        expect(after.width / after.height).toBeCloseTo(before.width / before.height, 1);
+        expect(
+          await preview.evaluate((video: HTMLVideoElement) =>
+            video.srcObject instanceof MediaStream ? video.srcObject.id : null
+          )
+        ).toBe(streamId);
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.local.get('sniptale_video_settings'))[
+                  'sniptale_video_settings'
+                ].webcamPresentation.sizeFraction
+            )
+          )
+          .toBeGreaterThan(DEFAULT_VIDEO_SETTINGS.webcamPresentation!.sizeFraction);
+        await page.screenshot({
+          path: info.outputPath('embedded-camera-resize.png'),
+          fullPage: false,
+        });
         await trigger.click();
         await expect(embedded).toHaveAttribute('aria-pressed', 'true');
       } finally {

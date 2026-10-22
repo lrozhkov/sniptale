@@ -37,6 +37,31 @@ it('does not render while disabled', () => {
   expect(host.firstElementChild).toBeNull();
 });
 
+it.each(['circle', 'rectangle'] as const)(
+  'exposes one unclipped resize control for %s',
+  (shape) => {
+    act(() =>
+      root.render(
+        <EmbeddedRecordingCamera
+          enabled={true}
+          interactive={true}
+          geometry={{ ...DEFAULT_EMBEDDED_CAMERA_GEOMETRY, shape }}
+        />
+      )
+    );
+    const camera = host.firstElementChild as HTMLElement;
+    expect(camera.querySelectorAll('[data-resize="true"]')).toHaveLength(1);
+    expect(camera.style.overflow).not.toBe('hidden');
+    expect((camera.firstElementChild as HTMLElement).style.overflow).toBe('hidden');
+    expect(camera.querySelector('button')?.getAttribute('aria-label')).not.toBe('Camera');
+  }
+);
+
+it('does not expose resize controls when camera interaction is disabled', () => {
+  act(() => root.render(<EmbeddedRecordingCamera enabled={true} interactive={false} />));
+  expect(host.querySelector('button')).toBeNull();
+});
+
 it('keeps peer callbacks stable across preview and geometry rerenders', () => {
   const onOffer = vi.fn(async () => 'answer');
   const onPeerClose = vi.fn();
@@ -114,7 +139,9 @@ it('resizes from a corner with a locked aspect ratio and disables page interacti
   const camera = host.firstElementChild as HTMLElement;
   const handle = camera.querySelector<HTMLElement>('[data-corner="se"]')!;
   act(() => {
-    handle.dispatchEvent(pointer('pointerdown', { clientX: 700, clientY: 500 }));
+    handle
+      .querySelector('svg')!
+      .dispatchEvent(pointer('pointerdown', { clientX: 700, clientY: 500 }));
     camera.dispatchEvent(pointer('pointermove', { clientX: 780, clientY: 580 }));
     camera.dispatchEvent(pointer('pointercancel', { clientX: 780, clientY: 580 }));
   });
@@ -128,4 +155,32 @@ it('resizes from a corner with a locked aspect ratio and disables page interacti
     )
   );
   expect((host.firstElementChild as HTMLElement).style.pointerEvents).toBe('none');
+});
+
+it('restores camera geometry if the resize command fails', async () => {
+  const onGeometryChange = vi.fn(async () => {
+    throw new Error('Resize refused');
+  });
+  act(() =>
+    root.render(
+      <EmbeddedRecordingCamera
+        enabled={true}
+        interactive={true}
+        onGeometryChange={onGeometryChange}
+      />
+    )
+  );
+  const camera = host.firstElementChild as HTMLElement;
+  const width = camera.style.width;
+  const handle = camera.querySelector('[data-resize="true"] svg')!;
+  act(() => {
+    handle.dispatchEvent(pointer('pointerdown', { clientX: 700, clientY: 500 }));
+    camera.dispatchEvent(pointer('pointermove', { clientX: 780, clientY: 580 }));
+  });
+  expect(camera.style.width).not.toBe(width);
+  await act(async () => {
+    camera.dispatchEvent(pointer('pointerup', { clientX: 780, clientY: 580 }));
+  });
+  expect(onGeometryChange).toHaveBeenCalledOnce();
+  expect(camera.style.width).toBe(width);
 });
