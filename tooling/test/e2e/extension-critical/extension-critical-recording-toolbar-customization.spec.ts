@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { RECORDING_TOOLBAR_CONTROLS } from '../../../../apps/extension/src/contracts/settings';
@@ -12,9 +12,80 @@ import {
 } from '../support/recording-action';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import { parseRuntimeResponseForMessage } from '../../../../apps/extension/src/contracts/messaging/parsers/boundary';
 
 test.setTimeout(120000);
 test.use({ actionTimeout: 10000 });
+
+async function expectRecordingControlOrder(
+  page: Page,
+  orientation: 'horizontal' | 'vertical',
+  phase: 'idle' | 'recording' | 'paused',
+  compact = false
+) {
+  const recordingPrefix = 'content.toolbar.video-recording.';
+  const tools = ['select', 'pencil', 'marker', 'text', 'shape', 'arrow', 'blur'].map(
+    (tool) => `content.toolbar.drawing.${tool}`
+  );
+  const lifecycle =
+    phase === 'idle' ? ['start'] : [phase === 'paused' ? 'resume' : 'pause', 'stop'];
+  const expected = [
+    ...(phase === 'idle'
+      ? [
+          'content.toolbar.mode-selector-button',
+          'content.toolbar.settings-button',
+          `${recordingPrefix}customize`,
+        ]
+      : []),
+    `${recordingPrefix}navigation`,
+    ...(!compact
+      ? [
+          ...tools,
+          ...(phase === 'idle' ? [`${recordingPrefix}auto-hide`] : []),
+          ...[
+            'eraser',
+            'clear',
+            'spotlight',
+            'microphone.toggle',
+            'microphone.menu',
+            'camera.toggle',
+            'camera.menu',
+          ].map((control) => `${recordingPrefix}${control}`),
+        ]
+      : []),
+    ...lifecycle.map((control) => `${recordingPrefix}${control}`),
+  ];
+  const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+  await expect
+    .poll(() =>
+      toolbar
+        .locator('button[data-ui]')
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('data-ui')))
+    )
+    .toEqual(expected);
+  const landmarks = compact
+    ? [`${recordingPrefix}navigation`, `${recordingPrefix}lifecycle`]
+    : [
+        `${recordingPrefix}navigation`,
+        'content.toolbar.drawing.blur',
+        `${recordingPrefix}spotlight`,
+        `${recordingPrefix}camera.toggle`,
+        `${recordingPrefix}lifecycle`,
+      ];
+  const boxes = [];
+  for (const landmark of landmarks) {
+    const bounds = await toolbar.locator(`[data-ui="${landmark}"]`).boundingBox();
+    expect(bounds).not.toBeNull();
+    boxes.push(bounds!);
+  }
+  for (let index = 1; index < boxes.length; index += 1) {
+    const previous = boxes[index - 1]!;
+    const current = boxes[index]!;
+    expect(
+      orientation === 'vertical' ? previous.y + previous.height : previous.x + previous.width
+    ).toBeLessThanOrEqual((orientation === 'vertical' ? current.y : current.x) + 1);
+  }
+}
 
 for (const { name, size } of [
   ...PRIMARY_BROWSER_VIEWPORTS,
@@ -90,6 +161,7 @@ for (const { name, size } of [
           .click();
         await page.keyboard.press('Escape');
         await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
+        await expectRecordingControlOrder(page, orientation, 'idle');
         const bounds = await toolbar.boundingBox();
         expect(bounds).not.toBeNull();
         expect(bounds!.x).toBeGreaterThanOrEqual(-1);
@@ -101,6 +173,43 @@ for (const { name, size } of [
         ).toBe(true);
         const customize = page.locator('[data-ui="content.toolbar.video-recording.customize"]');
         await expect(customize).toBeEnabled();
+        await page.locator('[data-ui="content.toolbar.video-recording.start"]').click();
+        await expect(page.locator('[data-ui="content.toolbar.video-recording.pause"]')).toBeVisible(
+          { timeout: 30000 }
+        );
+        await expectRecordingControlOrder(page, orientation, 'recording');
+        await page.screenshot({
+          path: info.outputPath('full-recording-controls.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="content.toolbar.video-recording.pause"]').click();
+        await expectRecordingControlOrder(page, orientation, 'paused');
+        await page.locator('[data-ui="content.toolbar.video-recording.resume"]').click();
+        await expectRecordingControlOrder(page, orientation, 'recording');
+        await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
+        await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible(
+          { timeout: 30000 }
+        );
+        await expectRecordingControlOrder(page, orientation, 'idle');
+        const readResult = async () =>
+          parseRuntimeResponseForMessage(
+            VideoMessageType.GET_RECORDING_STATE,
+            await sendRuntimeMessage(popup, { type: VideoMessageType.GET_RECORDING_STATE })
+          );
+        await expect
+          .poll(async () => (await readResult()).postRecordResult?.recordingId ?? null)
+          .not.toBeNull();
+        const previousResult = (await readResult()).postRecordResult;
+        if (!previousResult) throw new Error('Saved recording result is unavailable');
+        expect(
+          parseRuntimeResponseForMessage(
+            VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+            await sendRuntimeMessage(popup, {
+              type: VideoMessageType.ACKNOWLEDGE_POST_RECORD_RESULT,
+              recordingId: previousResult.recordingId,
+            })
+          )
+        ).toMatchObject({ success: true, result: 'acknowledged' });
         await customize.click();
         await expect(customize).toHaveAttribute('aria-pressed', 'true');
         await expect(
@@ -153,6 +262,7 @@ for (const { name, size } of [
           throw error;
         }
         await expect(customize).toHaveCount(0);
+        await expectRecordingControlOrder(page, orientation, 'recording', true);
         await expect(page.locator('[data-ui="content.toolbar.mode-selector-button"]')).toHaveCount(
           0
         );
@@ -177,6 +287,7 @@ for (const { name, size } of [
         await pause.click();
         const resume = page.locator('[data-ui="content.toolbar.video-recording.resume"]');
         await expect(resume).toBeVisible();
+        await expectRecordingControlOrder(page, orientation, 'paused', true);
         await resume.click();
         await expect(pause).toBeVisible();
         await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
@@ -184,6 +295,7 @@ for (const { name, size } of [
           { timeout: 30000 }
         );
         await expect(customize).toBeVisible();
+        await expectRecordingControlOrder(page, orientation, 'idle');
         await expect(page.locator('[data-ui="content.toolbar.drawing.pencil"]')).toBeVisible();
         await expect(page.locator('[data-ui="content.toolbar.settings-button"]')).toBeVisible();
         await page.screenshot({

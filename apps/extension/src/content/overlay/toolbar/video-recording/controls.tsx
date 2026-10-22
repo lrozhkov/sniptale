@@ -383,20 +383,6 @@ export function ToolbarVideoRecordingControls(props: {
           <ContentToolbarDivider />
         </>
       ) : null}
-      {props.displayMode === 'vertical' ? (
-        <ContentToolbarGroup
-          aria-label={translate('content.toolbar.videoRecordingActions')}
-          className="sniptale-video-recording-lifecycle"
-          dataUi="content.toolbar.video-recording.lifecycle"
-        >
-          <RecordingStatus state={props.recording.state} />
-          <RecordingLifecycleControl
-            recording={props.recording}
-            displayMode={props.displayMode}
-            toolbarMenuState={props.toolbarMenuState}
-          />
-        </ContentToolbarGroup>
-      ) : null}
       <RecordingDrawingControls
         actionTail={
           <RecordingControlVisibility
@@ -440,20 +426,18 @@ export function ToolbarVideoRecordingControls(props: {
         recording={props.recording}
         toolbarMenuState={props.toolbarMenuState}
       />
-      {props.displayMode === 'horizontal' ? (
-        <ContentToolbarGroup
-          aria-label={translate('content.toolbar.videoRecordingActions')}
-          className="sniptale-video-recording-lifecycle"
-          dataUi="content.toolbar.video-recording.lifecycle"
-        >
-          <RecordingStatus state={props.recording.state} />
-          <RecordingLifecycleControl
-            recording={props.recording}
-            displayMode={props.displayMode}
-            toolbarMenuState={props.toolbarMenuState}
-          />
-        </ContentToolbarGroup>
-      ) : null}
+      <ContentToolbarGroup
+        aria-label={translate('content.toolbar.videoRecordingActions')}
+        className="sniptale-video-recording-lifecycle"
+        dataUi="content.toolbar.video-recording.lifecycle"
+      >
+        <RecordingStatus state={props.recording.state} />
+        <RecordingLifecycleControl
+          recording={props.recording}
+          displayMode={props.displayMode}
+          toolbarMenuState={props.toolbarMenuState}
+        />
+      </ContentToolbarGroup>
     </>
   );
 }

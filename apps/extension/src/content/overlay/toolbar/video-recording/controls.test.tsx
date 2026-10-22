@@ -11,6 +11,7 @@ import {
   type VideoRecordingToolbarState,
 } from '../../video-recording/session/state';
 import type { ToolbarVideoRecordingProps } from '../types';
+import { RECORDING_TOOLBAR_CONTROLS } from '../../../../contracts/settings';
 import {
   RecordingToolbarControlsContext,
   type useRecordingToolbarControls,
@@ -132,6 +133,48 @@ function visibilityState(
     ...overrides,
   };
 }
+
+for (const preset of [
+  { name: 'default', controls: {} },
+  { name: 'partial', controls: { pencil: false, camera: false } },
+  {
+    name: 'compact',
+    controls: Object.fromEntries(RECORDING_TOOLBAR_CONTROLS.map((control) => [control, false])),
+  },
+]) {
+  it.each(['idle', 'starting', 'recording', 'paused', 'stopping', 'error'] as const)(
+    `keeps the lifecycle slot trailing in both orientations with ${preset.name} controls during %s`,
+    (phase) => {
+      const visibility = visibilityState({
+        active: phase !== 'idle' && phase !== 'error',
+        controls: preset.controls,
+      });
+      renderPhase(phase, 'horizontal', null, visibility);
+      const horizontal = [...host.querySelectorAll('button[data-ui]')].map((button) =>
+        button.getAttribute('data-ui')
+      );
+      renderPhase(phase, 'vertical', null, visibility);
+      const vertical = [...host.querySelectorAll('button[data-ui]')].map((button) =>
+        button.getAttribute('data-ui')
+      );
+      expect(vertical).toEqual(horizontal);
+      expect(
+        host.querySelector('[data-ui="content.toolbar.video-recording.lifecycle"]')
+          ?.nextElementSibling
+      ).toBeNull();
+    }
+  );
+}
+
+it('retains the focused lifecycle button when orientation changes', () => {
+  const visibility = visibilityState({ active: true });
+  renderPhase('recording', 'horizontal', null, visibility);
+  const pause = queryButton('content.toolbar.video-recording.pause');
+  act(() => pause?.focus());
+  renderPhase('recording', 'vertical', null, visibility);
+  expect(queryButton('content.toolbar.video-recording.pause')).toBe(pause);
+  expect(document.activeElement).toBe(pause);
+});
 
 it('customizes icons without activating their tools or media controls', () => {
   const visibility = visibilityState({ editing: true, controls: { pencil: false } });
