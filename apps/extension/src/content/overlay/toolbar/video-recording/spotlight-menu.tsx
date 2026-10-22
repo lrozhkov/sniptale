@@ -198,6 +198,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
       ref={state.triggerGroupRef}
       role="group"
       aria-label={label}
+      aria-busy={state.updating}
     >
       <ContentToolbarButton
         ref={state.triggerRef}
@@ -279,7 +280,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
               />
             ) : (
               <SpotlightOptionItems
-                disabled={state.updating}
+                disabled={props.disabled}
                 settings={state.draftSettings}
                 update={(key) => void state.update(key)}
               />

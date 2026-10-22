@@ -239,6 +239,64 @@ it('rolls an optimistic spotlight selection back when the command fails', async 
   act(() => root.unmount());
 });
 
+it('keeps quick cursor choices visually stable while admitting only one pending change', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let finish!: () => void;
+  const onChange = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <RecordingSpotlightMenu
+        compact={false}
+        disabled={false}
+        displayMode="horizontal"
+        settings={{
+          cursorHaloEnabled: false,
+          cursorDimmingEnabled: false,
+          clickAnimationEnabled: false,
+        }}
+        onChange={onChange}
+      />
+    )
+  );
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.spotlight"]')!
+      .click()
+  );
+  const menu = host.querySelector('[data-ui="content.toolbar.video-recording.spotlight-menu"]');
+  const choices = [...host.querySelectorAll<HTMLButtonElement>('.sniptale-toolbar-menu-item')];
+  act(() => {
+    choices[0]!.click();
+    choices[1]!.click();
+  });
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(choices[0]!.getAttribute('aria-pressed')).toBe('true');
+  for (const choice of choices) {
+    expect(choice.disabled).toBe(false);
+    expect(choice.classList.contains('cursor-not-allowed')).toBe(false);
+    expect(choice.classList.contains('opacity-50')).toBe(false);
+  }
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.spotlight-menu"]')).toBe(
+    menu
+  );
+  await act(async () => {
+    finish();
+  });
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.spotlight-menu"]')).toBe(
+    menu
+  );
+  expect([...host.querySelectorAll('.sniptale-toolbar-menu-item')]).toEqual(choices);
+  act(() => root.unmount());
+});
+
 it('admits only one pending cursor change from repeated activation', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let finish!: () => void;

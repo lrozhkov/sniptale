@@ -35,6 +35,69 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
     page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]')
   ).toBeVisible();
   await expect(panel).toHaveCount(0);
+  await open();
+  expect(
+    await popup.evaluate(async () => {
+      const stored = await chrome.storage.local.get('sniptale_video_settings');
+      return stored.sniptale_video_settings.recordingSurface?.cursorEffects ?? null;
+    })
+  ).toBeNull();
+  await quick.click();
+  await expect(panel).toHaveCount(0);
+  const quickMenu = page.locator('[data-ui="content.toolbar.video-recording.spotlight-menu"]');
+  for (const effect of ['halo', 'dimming', 'click']) {
+    const choice = quickMenu.locator(
+      `[data-ui="content.toolbar.video-recording.spotlight-${effect}"]`
+    );
+    const previous = await choice.getAttribute('aria-pressed');
+    await quickMenu.evaluate((menu) => {
+      menu.setAttribute('data-stability-result', 'pending');
+      const group = menu.parentElement!;
+      const choices = [...menu.querySelectorAll('button')];
+      const violations: string[] = [];
+      let pending = false;
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.attributeName === 'disabled') violations.push('disabled');
+          if (
+            record.attributeName === 'class' &&
+            /opacity-50|cursor-not-allowed/u.test(record.oldValue ?? '')
+          )
+            violations.push('disabled-style');
+          if (record.attributeName === 'aria-busy' && record.oldValue === 'false') pending = true;
+        }
+        if (!menu.isConnected || choices.some((choice) => !menu.contains(choice)))
+          violations.push('remounted');
+        if (
+          choices.some(
+            (choice) =>
+              choice.disabled ||
+              getComputedStyle(choice).cursor === 'not-allowed' ||
+              Number(getComputedStyle(choice).opacity) < 1
+          )
+        )
+          violations.push('dimmed-or-forbidden');
+        if (pending && group.getAttribute('aria-busy') === 'false') {
+          observer.disconnect();
+          menu.setAttribute('data-stability-result', JSON.stringify(violations));
+        }
+      });
+      observer.observe(group, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeOldValue: true,
+        attributeFilter: ['class', 'disabled', 'aria-busy'],
+      });
+    });
+    await choice.click();
+    await expect(choice).toHaveAttribute('aria-pressed', previous === 'true' ? 'false' : 'true');
+    await expect(quickMenu).toHaveAttribute('data-stability-result', '[]');
+    await choice.click();
+    await expect(choice).toHaveAttribute('aria-pressed', previous!);
+    await expect(quick.locator('..')).toHaveAttribute('aria-busy', 'false');
+  }
+  await page.screenshot({ path: info.outputPath('stable-cursor-quick-menu.png'), fullPage: false });
   const cursorChevron = (await trigger.boundingBox())!;
   const mediaChevron = (await page
     .locator('[data-ui="content.toolbar.video-recording.camera.menu"]')
@@ -43,12 +106,6 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   expect(cursorChevron.height).toBeCloseTo(mediaChevron.height, 1);
   await open();
   await expect(panel.locator('nav button')).toHaveCount(4);
-  expect(
-    await popup.evaluate(async () => {
-      const stored = await chrome.storage.local.get('sniptale_video_settings');
-      return stored.sniptale_video_settings.recordingSurface?.cursorEffects ?? null;
-    })
-  ).toBeNull();
   await expect(page.locator('[data-ui="content.toolbar.video-recording.start"]')).toBeVisible();
   expect(await trigger.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
   const viewport = page.viewportSize()!;
