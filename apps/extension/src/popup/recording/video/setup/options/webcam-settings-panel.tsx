@@ -4,7 +4,6 @@ import {
   type VideoRecordingSettings,
   type WebcamQualitySettings,
   WebcamPresentationMode,
-  WebcamPresentationShape,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { resolveWebcamQualitySettings } from '@sniptale/runtime-contracts/video/types/webcam-quality';
@@ -15,7 +14,7 @@ import {
   useWebcamResolutionOptions,
 } from './webcam-quality-controls';
 import { WebcamPreview, useWebcamPreview } from './webcam-preview';
-import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
+import { RecordingCameraControls } from '../../../../../ui/recording-camera-controls';
 
 type WebcamSettingsPanelProps = {
   captureMode: CaptureMode;
@@ -61,10 +60,7 @@ export function WebcamSettingsPanel({
         state={previewState}
       />
       {embeddedPresentationAvailable && presentation?.mode === WebcamPresentationMode.EMBEDDED ? (
-        <WebcamEmbeddedPresentationControls
-          presentation={presentation}
-          onChange={updatePresentation}
-        />
+        <RecordingCameraControls presentation={presentation} onChange={updatePresentation} />
       ) : null}
       <div className="text-[11px] font-normal text-[var(--sniptale-color-text-secondary)]">
         {formatActualSettings(previewState.settings)}
@@ -110,103 +106,5 @@ function WebcamPlacementControl({
         ]}
       />
     </div>
-  );
-}
-
-function WebcamEmbeddedPresentationControls({
-  presentation,
-  onChange,
-}: {
-  presentation: NonNullable<VideoRecordingSettings['webcamPresentation']>;
-  onChange: (patch: Partial<NonNullable<VideoRecordingSettings['webcamPresentation']>>) => void;
-}) {
-  return (
-    <div className="grid gap-2 border-b border-[var(--sniptale-color-border-soft)] pb-2">
-      <label className="flex items-center justify-between gap-3 text-xs text-[var(--sniptale-color-text-secondary)]">
-        <span>{translate('popup.video.webcamFreePlacement')}</span>
-        <ProductToggle
-          size="sm"
-          checked={presentation.freePlacement === true}
-          aria-label={translate('popup.video.webcamFreePlacement')}
-          onClick={() => onChange({ freePlacement: !presentation.freePlacement })}
-        />
-      </label>
-      <WebcamQualityOptionGroup
-        activeValue={presentation.shape}
-        labelKey="popup.video.webcamPresentationShapeLabel"
-        onChange={(shape) => onChange({ shape })}
-        options={[
-          {
-            label: translate('popup.video.webcamPresentationCircle'),
-            value: WebcamPresentationShape.CIRCLE,
-          },
-          {
-            label: translate('popup.video.webcamPresentationRectangle'),
-            value: WebcamPresentationShape.RECTANGLE,
-          },
-        ]}
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationSize')}
-        min={12}
-        max={55}
-        value={Math.round(presentation.sizeFraction * 100)}
-        onChange={(value) => onChange({ sizeFraction: value / 100 })}
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationCropHorizontal')}
-        min={-100}
-        max={100}
-        value={Math.round(presentation.cropOffset.x * 100)}
-        onChange={(value) =>
-          onChange({ cropOffset: { ...presentation.cropOffset, x: value / 100 } })
-        }
-      />
-      <WebcamPresentationRange
-        label={translate('popup.video.webcamPresentationCropVertical')}
-        min={-100}
-        max={100}
-        value={Math.round(presentation.cropOffset.y * 100)}
-        onChange={(value) =>
-          onChange({ cropOffset: { ...presentation.cropOffset, y: value / 100 } })
-        }
-      />
-    </div>
-  );
-}
-
-function WebcamPresentationRange(props: {
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  value: number;
-}) {
-  return (
-    <label className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-x-3">
-      <span
-        className={[
-          'col-span-2 text-xs font-normal leading-4',
-          'text-[var(--sniptale-color-text-secondary)]',
-        ].join(' ')}
-      >
-        {props.label}
-      </span>
-      <ProductRange
-        className={[
-          '[--sniptale-range-shell-height:28px]! [--sniptale-range-track-height:3px]!',
-          '[--sniptale-range-thumb-size:14px]!',
-        ].join(' ')}
-        min={String(props.min)}
-        max={String(props.max)}
-        step="1"
-        value={props.value}
-        aria-label={props.label}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-      />
-      <span className="text-right text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
-        {props.value}%
-      </span>
-    </label>
   );
 }

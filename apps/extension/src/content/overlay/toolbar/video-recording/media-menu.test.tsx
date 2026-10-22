@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { Camera, CameraOff } from 'lucide-react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RecordingMediaSplitControl } from './media-menu';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 
 const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: showToastMock }));
@@ -53,8 +54,12 @@ it.each([false, true])(
             mode: 'embedded',
             locked: false,
             onChange: vi.fn(),
-            freePlacement,
-            onFreePlacementChange,
+            presentation: {
+              ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+              mode: 'embedded',
+              freePlacement,
+            },
+            onAppearanceChange: onFreePlacementChange,
           }}
         />
       )
@@ -63,13 +68,21 @@ it.each([false, true])(
       host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
     );
     const option = host.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.video-recording.camera.free-placement"]'
+      '[role="switch"][aria-label="popup.video.webcamFreePlacement"]'
     )!;
-    expect(option.getAttribute('aria-pressed')).toBe(String(freePlacement));
-    expect(Boolean(option.querySelector('svg.lucide-check'))).toBe(freePlacement);
+    expect(option.getAttribute('aria-checked')).toBe(String(freePlacement));
+    expect(option.className).toContain('sniptale-glass-switch');
     await act(async () => option.click());
-    expect(onFreePlacementChange).toHaveBeenCalledExactlyOnceWith(!freePlacement);
+    expect(onFreePlacementChange).toHaveBeenCalledExactlyOnceWith({
+      freePlacement: !freePlacement,
+    });
     expect(option.disabled).toBe(false);
+    onFreePlacementChange.mockRejectedValueOnce(new Error('storage failed'));
+    await act(async () => option.click());
+    expect(showToastMock).toHaveBeenLastCalledWith(expect.any(String), 'error');
+    expect(option.getAttribute('aria-checked')).toBe(String(freePlacement));
+    await act(async () => option.click());
+    expect(onFreePlacementChange).toHaveBeenCalledTimes(3);
   }
 );
 
@@ -132,7 +145,13 @@ it('keeps camera placement and toolbar controls stable during a pending change',
           onLoadDevices={async () => [
             { deviceId: 'camera-1', kind: 'videoinput', label: 'Camera' },
           ]}
-          cameraPlacement={{ mode: 'embedded', locked, onChange }}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked,
+            onChange,
+            presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+            onAppearanceChange: vi.fn(),
+          }}
         />
       )
     );
@@ -287,7 +306,13 @@ it.each(['toggle', 'catalog', 'placement'])(
           selectedDeviceId={null}
           onLoadDevices={onLoadDevices}
           onToggle={onToggle}
-          cameraPlacement={{ mode: 'embedded', locked: false, onChange: onPlacement }}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked: false,
+            onChange: onPlacement,
+            presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+            onAppearanceChange: vi.fn(),
+          }}
         />
       )
     );

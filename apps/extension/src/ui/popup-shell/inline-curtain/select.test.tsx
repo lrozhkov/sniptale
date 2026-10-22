@@ -5,10 +5,95 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { InlineCurtainSelect } from './select';
 import { PopupSelect } from '../select';
+import { CompactSelect } from '../../compact-inspector-controls';
+import { CompactColorSelector } from '../../color-selector';
 
 function TestOptionIcon({ className }: { className?: string }) {
   return <svg className={className} data-testid="option-icon" />;
 }
+
+it('dismisses color picker and inline editing before the camera curtain', async () => {
+  const onChange = vi.fn();
+  renderSelectWithCustomOptionsPanel(
+    vi.fn(),
+    <CompactColorSelector
+      label="Shadow color"
+      title="Shadow color"
+      value="#123456"
+      onChange={onChange}
+    />
+  );
+  await act(async () =>
+    container?.querySelector<HTMLButtonElement>('[aria-label="Quality"]')?.click()
+  );
+  const swatch = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.picker-trigger"]'
+  );
+  await act(async () => swatch?.click());
+  expect(document.body.querySelector('[data-floating-ui-root]')).not.toBeNull();
+  await act(async () =>
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.body.querySelector('[data-floating-ui-root]')).toBeNull();
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).not.toBeNull();
+  await act(async () =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.value-trigger"]')
+      ?.click()
+  );
+  const input = container?.querySelector<HTMLInputElement>('input[aria-label="Shadow color"]');
+  expect(input).not.toBeNull();
+  await act(async () =>
+    input?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(container?.querySelector('input[aria-label="Shadow color"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).not.toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  await act(async () =>
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).toBeNull();
+});
+
+it('keeps a curtain open while selecting from its owned inspector listbox', async () => {
+  const onChange = vi.fn();
+  renderSelectWithCustomOptionsPanel(
+    vi.fn(),
+    <CompactSelect
+      aria-label="Camera shape"
+      value="circle"
+      options={[
+        { value: 'circle', label: 'Circle' },
+        { value: 'soft', label: 'Soft' },
+      ]}
+      onChange={onChange}
+    />
+  );
+  await act(async () =>
+    container?.querySelector<HTMLButtonElement>('[aria-label="Quality"]')?.click()
+  );
+  await act(async () =>
+    container?.querySelector<HTMLButtonElement>('[aria-label="Camera shape"]')?.click()
+  );
+  const option =
+    document.body.querySelector<HTMLButtonElement>('[role="option"][data-value="soft"]') ??
+    [...document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((item) =>
+      item.textContent?.includes('Soft')
+    );
+  expect(option).toBeDefined();
+  await act(async () => {
+    option?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    option?.click();
+  });
+  expect(onChange).toHaveBeenCalledWith('soft');
+  expect(container?.querySelector('[data-ui="popup.inline-curtain.header"]')).not.toBeNull();
+});
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

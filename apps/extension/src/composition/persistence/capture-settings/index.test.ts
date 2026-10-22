@@ -154,6 +154,7 @@ describe('camera placement persistence', () => {
       webcamPresentation: {
         ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
         freePlacement: true,
+        appearance: { roundness: 55, zoom: 2, mirror: true, shadow: false, shadowColor: '#123456' },
       },
     });
     await started;
@@ -163,10 +164,81 @@ describe('camera placement persistence', () => {
     await Promise.all([placement, microphone]);
     await expect(loadVideoSettings()).resolves.toMatchObject({
       microphoneEnabled: true,
-      webcamPresentation: { freePlacement: true },
+      webcamPresentation: {
+        freePlacement: true,
+        appearance: { roundness: 55, zoom: 2, mirror: true },
+      },
     });
   });
 });
+
+async function verifyVideoSettingsErasure() {
+  let stored = { ...DEFAULT_VIDEO_SETTINGS };
+  let releaseWrite!: () => void;
+  let markWriteStarted!: () => void;
+  const writeStarted = new Promise<void>((resolve) => {
+    markWriteStarted = resolve;
+  });
+  const writeReleased = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+  browserStorageLocalGetMock.mockImplementation(async () => ({
+    sniptale_video_settings: stored,
+  }));
+  browserStorageLocalSetMock.mockImplementation(async (items) => {
+    markWriteStarted();
+    await writeReleased;
+    stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
+  });
+  const remember = patchVideoSettings({
+    warnWithoutMicrophone: false,
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      freePlacement: true,
+      appearance: { roundness: 40, zoom: 2, mirror: true, shadow: false, shadowColor: '#123456' },
+    },
+    recordingSurface: {
+      toolbarEnabled: true,
+      cursorSpotlightEnabled: true,
+      cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66, haloColor: '#2563eb80' },
+    },
+  });
+  await writeStarted;
+  const erase = vi.fn(async () => {
+    stored = { ...DEFAULT_VIDEO_SETTINGS };
+  });
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+  releaseWrite();
+  await remember;
+  await erasure;
+  expect(erase).toHaveBeenCalledOnce();
+  await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: true });
+  expect((await loadVideoSettings()).recordingSurface?.cursorEffects).toBeUndefined();
+  expect((await loadVideoSettings()).webcamPresentation?.freePlacement).toBeUndefined();
+  expect((await loadVideoSettings()).webcamPresentation?.appearance).toBeUndefined();
+  await patchVideoSettings({
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      appearance: { roundness: 20, zoom: 1, mirror: false, shadow: true, shadowColor: '#ffffff' },
+    },
+  });
+  expect((await loadVideoSettings()).webcamPresentation?.appearance).toMatchObject({
+    roundness: 20,
+    zoom: 1,
+    mirror: false,
+  });
+  await mutateVideoSettings((current) => ({
+    ...current,
+    recordingSurface: {
+      toolbarEnabled: true,
+      cursorSpotlightEnabled: true,
+      cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 77 },
+    },
+  }));
+  expect((await loadVideoSettings()).recordingSurface?.cursorEffects?.haloSize).toBe(77);
+}
 
 describe('video', () => {
   beforeEach(resetVideoStorageMocks);
@@ -265,58 +337,10 @@ describe('video', () => {
     expect(browserStorageLocalSetMock).not.toHaveBeenCalled();
   });
 
-  it('drains a remembered microphone choice before erasure removes that preference', async () => {
-    let stored = { ...DEFAULT_VIDEO_SETTINGS };
-    let releaseWrite!: () => void;
-    let markWriteStarted!: () => void;
-    const writeStarted = new Promise<void>((resolve) => {
-      markWriteStarted = resolve;
-    });
-    const writeReleased = new Promise<void>((resolve) => {
-      releaseWrite = resolve;
-    });
-    browserStorageLocalGetMock.mockImplementation(async () => ({
-      sniptale_video_settings: stored,
-    }));
-    browserStorageLocalSetMock.mockImplementation(async (items) => {
-      markWriteStarted();
-      await writeReleased;
-      stored = items.sniptale_video_settings as typeof DEFAULT_VIDEO_SETTINGS;
-    });
-    const remember = patchVideoSettings({
-      warnWithoutMicrophone: false,
-      webcamPresentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, freePlacement: true },
-      recordingSurface: {
-        toolbarEnabled: true,
-        cursorSpotlightEnabled: true,
-        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66, haloColor: '#2563eb80' },
-      },
-    });
-    await writeStarted;
-    const erase = vi.fn(async () => {
-      stored = { ...DEFAULT_VIDEO_SETTINGS };
-    });
-    const erasure = runWithPersistentDataErasureBarrier(erase);
-    await Promise.resolve();
-    expect(erase).not.toHaveBeenCalled();
-    releaseWrite();
-    await remember;
-    await erasure;
-    expect(erase).toHaveBeenCalledOnce();
-    await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: true });
-    expect((await loadVideoSettings()).recordingSurface?.cursorEffects).toBeUndefined();
-    expect((await loadVideoSettings()).webcamPresentation?.freePlacement).toBeUndefined();
-    await mutateVideoSettings((current) => ({
-      ...current,
-      recordingSurface: {
-        toolbarEnabled: true,
-        cursorSpotlightEnabled: true,
-        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 77 },
-      },
-    }));
-    expect((await loadVideoSettings()).recordingSurface?.cursorEffects?.haloSize).toBe(77);
-  });
-
+  it(
+    'drains a remembered microphone choice before erasure removes that preference',
+    verifyVideoSettingsErasure
+  );
   it('serializes concurrent field and profile mutations without stale overwrites', async () => {
     let stored = DEFAULT_VIDEO_SETTINGS;
     let writeCount = 0;

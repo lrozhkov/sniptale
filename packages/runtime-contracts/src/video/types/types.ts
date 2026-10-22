@@ -138,6 +138,8 @@ export type WebcamPresentationMode =
 export const WebcamPresentationShape = {
   CIRCLE: 'circle',
   RECTANGLE: 'rectangle',
+  SOFT: 'soft',
+  ELLIPSE: 'ellipse',
 } as const;
 
 export type WebcamPresentationShape =
@@ -289,6 +291,14 @@ export interface WebcamPresentationSettings {
   center: { x: number; y: number };
   sizeFraction: number;
   cropOffset: { x: number; y: number };
+  /** Optional page-local appearance; absent fields retain the legacy camera rendering. */
+  appearance?: {
+    roundness: number;
+    zoom: number;
+    mirror: boolean;
+    shadow: boolean;
+    shadowColor: string;
+  };
 }
 
 export interface VideoRecordingSettings {

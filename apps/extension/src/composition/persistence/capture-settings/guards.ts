@@ -2,13 +2,10 @@ import {
   CaptureMode,
   isVideoOutputProfile,
   isVideoCursorEffectSettings,
-  isWebcamDockPosition,
   normalizeVideoSourceCount,
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
   WebcamFrameRatePreset,
-  WebcamPresentationMode,
-  WebcamPresentationShape,
   WebcamResolutionPreset,
   type VideoAutoFadeDelay,
   type VideoRecordingSettings,
@@ -17,6 +14,7 @@ import {
   type WebcamPresentationSettings,
   type WebcamQualitySettings,
 } from '@sniptale/runtime-contracts/video/types/types';
+import { isWebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import {
   MICROPHONE_GAIN_MAX,
   MICROPHONE_GAIN_MIN,
@@ -45,8 +43,6 @@ const webcamResolutionPresets = new Set<WebcamQualitySettings['resolution']>(
   Object.values(WebcamResolutionPreset)
 );
 const videoAutoFadeDelays = new Set<number>(VIDEO_AUTO_FADE_DELAYS);
-const webcamPresentationModes = new Set(Object.values(WebcamPresentationMode));
-const webcamPresentationShapes = new Set(Object.values(WebcamPresentationShape));
 function isCaptureMode(value: unknown): value is VideoRecordingUiState['captureMode'] {
   return isString(value) && captureModes.has(value as VideoRecordingUiState['captureMode']);
 }
@@ -83,15 +79,6 @@ function parseOptionalVideoAutoFadeDelay(value: unknown): ParsedFieldValue<Video
   return isNumber(value) && videoAutoFadeDelays.has(value)
     ? (value as VideoAutoFadeDelay)
     : INVALID_FIELD;
-}
-
-function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  const actualKeys = Object.keys(value);
-  return actualKeys.length === keys.length && keys.every((key) => actualKeys.includes(key));
-}
-
-function isBoundedNumber(value: unknown, minimum: number, maximum: number): value is number {
-  return isNumber(value) && value >= minimum && value <= maximum;
 }
 
 function parseOptionalRecordingSurface(
@@ -142,47 +129,19 @@ function parseOptionalWebcamPresentation(
     return undefined;
   }
 
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, [
-      'mode',
-      'shape',
-      'center',
-      'sizeFraction',
-      'cropOffset',
-      ...('freePlacement' in value ? ['freePlacement'] : []),
-      ...('dockPosition' in value ? ['dockPosition'] : []),
-    ]) ||
-    (value['freePlacement'] !== undefined && typeof value['freePlacement'] !== 'boolean') ||
-    (value['dockPosition'] !== undefined && !isWebcamDockPosition(value['dockPosition'])) ||
-    !isString(value['mode']) ||
-    !webcamPresentationModes.has(value['mode'] as WebcamPresentationMode) ||
-    !isString(value['shape']) ||
-    !webcamPresentationShapes.has(value['shape'] as WebcamPresentationShape) ||
-    !isRecord(value['center']) ||
-    !hasExactKeys(value['center'], ['x', 'y']) ||
-    !isBoundedNumber(value['center']['x'], 0, 1) ||
-    !isBoundedNumber(value['center']['y'], 0, 1) ||
-    !isBoundedNumber(value['sizeFraction'], 0, 1) ||
-    value['sizeFraction'] === 0 ||
-    !isRecord(value['cropOffset']) ||
-    !hasExactKeys(value['cropOffset'], ['x', 'y']) ||
-    !isBoundedNumber(value['cropOffset']['x'], -1, 1) ||
-    !isBoundedNumber(value['cropOffset']['y'], -1, 1)
-  ) {
-    return INVALID_FIELD;
-  }
+  if (!isWebcamPresentationSettings(value)) return INVALID_FIELD;
 
   return {
-    mode: value['mode'] as WebcamPresentationMode,
-    shape: value['shape'] as WebcamPresentationShape,
+    mode: value.mode,
+    shape: value.shape,
     center: { x: value['center']['x'], y: value['center']['y'] },
     sizeFraction: value['sizeFraction'],
     cropOffset: { x: value['cropOffset']['x'], y: value['cropOffset']['y'] },
     ...(typeof value['freePlacement'] === 'boolean'
       ? { freePlacement: value['freePlacement'] }
       : {}),
-    ...(isWebcamDockPosition(value['dockPosition']) ? { dockPosition: value['dockPosition'] } : {}),
+    ...(value.dockPosition ? { dockPosition: value.dockPosition } : {}),
+    ...(value.appearance ? { appearance: { ...value.appearance } } : {}),
   };
 }
 

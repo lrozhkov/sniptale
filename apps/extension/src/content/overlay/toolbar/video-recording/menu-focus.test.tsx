@@ -8,10 +8,14 @@ import { RecordingMediaSplitControl } from './media-menu';
 import { RecordingSpotlightMenu } from './spotlight-menu';
 import { RecordingDrawingControls } from './drawing-controls';
 import { createRecordingDrawingOwner } from './drawing-session';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: showToastMock }));
 
 it.each([false, true])(
   'keeps the camera placement choice authoritative with recording locked=%s',
   async (locked) => {
+    showToastMock.mockClear();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const host = document.createElement('div');
     document.body.append(host);
@@ -36,7 +40,13 @@ it.each([false, true])(
             selectedDeviceId={null}
             onToggle={onToggle}
             onLoadDevices={onLoadDevices}
-            cameraPlacement={{ mode: 'embedded', locked, onChange }}
+            cameraPlacement={{
+              mode: 'embedded',
+              locked,
+              onChange,
+              presentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, mode: 'embedded' },
+              onAppearanceChange: vi.fn(),
+            }}
           />
         )
       );
@@ -60,7 +70,7 @@ it.each([false, true])(
       if (locked) expect(onChange).not.toHaveBeenCalled();
       else {
         expect(onChange).toHaveBeenCalledWith('separate-track');
-        expect(host.querySelector('[role="alert"]')).not.toBeNull();
+        expect(showToastMock).toHaveBeenCalledWith(expect.any(String), 'error');
         expect(buttons[1]!.disabled).toBe(false);
       }
     } finally {

@@ -1,16 +1,10 @@
 import {
   WEBCAM_DOCK_POSITIONS,
   type WebcamDockPosition,
+  type WebcamPresentationSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 
-export type EmbeddedCameraGeometry = {
-  freePlacement?: boolean;
-  dockPosition?: WebcamDockPosition;
-  center: { x: number; y: number };
-  cropOffset: { x: number; y: number };
-  shape: 'circle' | 'rectangle';
-  sizeFraction: number;
-};
+export type EmbeddedCameraGeometry = Omit<WebcamPresentationSettings, 'mode'>;
 
 const EMBEDDED_CAMERA_INSET = 12;
 
@@ -88,6 +82,7 @@ export function pickEmbeddedCameraGeometry(
     sizeFraction: geometry.sizeFraction,
     ...(geometry.freePlacement === undefined ? {} : { freePlacement: geometry.freePlacement }),
     ...(geometry.dockPosition === undefined ? {} : { dockPosition: geometry.dockPosition }),
+    ...(geometry.appearance ? { appearance: { ...geometry.appearance } } : {}),
   };
 }
 
@@ -150,6 +145,7 @@ export function constrainEmbeddedCameraGeometry(
   const yMargin = height / Math.max(1, viewport.height) / 2;
   const anchored = dock && !geometry.freePlacement;
   return {
+    ...pickEmbeddedCameraGeometry(geometry),
     ...(geometry.freePlacement === undefined ? {} : { freePlacement: geometry.freePlacement }),
     ...(geometry.dockPosition === undefined ? {} : { dockPosition: geometry.dockPosition }),
     shape: geometry.shape,

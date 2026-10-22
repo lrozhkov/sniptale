@@ -37,6 +37,43 @@ it('does not render while disabled', () => {
   expect(host.firstElementChild).toBeNull();
 });
 
+it('keeps a docked camera clear of both classic scrollbars', () => {
+  Object.defineProperty(document.documentElement, 'clientWidth', {
+    configurable: true,
+    value: 983,
+  });
+  Object.defineProperty(document.documentElement, 'clientHeight', {
+    configurable: true,
+    value: 783,
+  });
+  try {
+    act(() =>
+      root.render(
+        <EmbeddedRecordingCamera
+          enabled
+          interactive
+          geometry={{
+            ...DEFAULT_EMBEDDED_CAMERA_GEOMETRY,
+            dockPosition: 'se',
+          }}
+        />
+      )
+    );
+    const camera = host.firstElementChild as HTMLElement;
+    expect(parseFloat(camera.style.left) + parseFloat(camera.style.width) / 2).toBeCloseTo(971);
+    expect(parseFloat(camera.style.top) + parseFloat(camera.style.height) / 2).toBeCloseTo(771);
+  } finally {
+    Object.defineProperty(document.documentElement, 'clientWidth', {
+      configurable: true,
+      value: 0,
+    });
+    Object.defineProperty(document.documentElement, 'clientHeight', {
+      configurable: true,
+      value: 0,
+    });
+  }
+});
+
 it.each(['circle', 'rectangle'] as const)(
   'exposes one unclipped resize control for %s',
   (shape) => {

@@ -277,6 +277,13 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Круг',
     en: 'Circle',
   },
+  webcamPresentationSoft: { ru: 'Мягкая форма', en: 'Soft shape' },
+  webcamPresentationEllipse: { ru: 'Овал', en: 'Ellipse' },
+  webcamPresentationRoundness: { ru: 'Скругление', en: 'Roundness' },
+  webcamPresentationMirror: { ru: 'Отражение', en: 'Mirror' },
+  webcamPresentationShadow: { ru: 'Тень', en: 'Shadow' },
+  webcamPresentationShadowColor: { ru: 'Цвет тени', en: 'Shadow color' },
+  webcamPresentationZoom: { ru: 'Приближение', en: 'Zoom' },
   webcamPresentationRectangle: {
     ru: 'Прямоугольник 16:9',
     en: '16:9 rectangle',

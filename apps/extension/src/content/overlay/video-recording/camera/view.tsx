@@ -20,8 +20,22 @@ import {
 } from './geometry';
 import { useEmbeddedCameraPeer } from './peer';
 import { translate } from '../../../../platform/i18n';
+import {
+  webcamFrameStyle,
+  webcamVideoStyle,
+} from '../../../../features/video/recording/webcam-presentation';
 
 const DRAG_THRESHOLD = 4;
+
+function cameraViewport() {
+  return {
+    width: Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth),
+    height: Math.min(
+      window.innerHeight,
+      document.documentElement.clientHeight || window.innerHeight
+    ),
+  };
+}
 
 type CameraDrag = {
   pointerId: number;
@@ -49,7 +63,7 @@ function useEmbeddedCameraGeometry(
   }, [configuredGeometry]);
 
   const update = (next: EmbeddedCameraGeometry) => {
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const viewport = cameraViewport();
     const moving = dragRef.current && !dragRef.current.resizing;
     const positioned =
       moving && !next.freePlacement
@@ -87,10 +101,7 @@ function useEmbeddedCameraGeometry(
     const resizing =
       event.target instanceof Element && event.target.closest('[data-resize="true"]') !== null;
     setDragging(true);
-    const origin = constrainEmbeddedCameraGeometry(geometry, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const origin = constrainEmbeddedCameraGeometry(geometry, cameraViewport());
     geometryRef.current = origin;
     setGeometry(origin);
     dragRef.current = {
@@ -114,7 +125,7 @@ function useEmbeddedCameraGeometry(
           drag.origin,
           drag.resizeCorner ?? 'se',
           { x: dx, y: dy },
-          { width: window.innerWidth, height: window.innerHeight }
+          cameraViewport()
         )
       );
       return;
@@ -123,8 +134,8 @@ function useEmbeddedCameraGeometry(
     update({
       ...drag.origin,
       center: {
-        x: drag.origin.center.x + dx / window.innerWidth,
-        y: drag.origin.center.y + dy / window.innerHeight,
+        x: drag.origin.center.x + dx / cameraViewport().width,
+        y: drag.origin.center.y + dy / cameraViewport().height,
       },
     });
   };
@@ -140,7 +151,7 @@ function useEmbeddedCameraGeometry(
 }
 
 function CameraMedia(props: {
-  cropOffset: EmbeddedCameraGeometry['cropOffset'];
+  geometry: EmbeddedCameraGeometry;
   error: boolean;
   stream: MediaStream | null;
   width: number;
@@ -177,7 +188,7 @@ function CameraMedia(props: {
         width: '100%',
         height: '100%',
         objectFit: 'cover',
-        objectPosition: `${50 + props.cropOffset.x * 50}% ${50 + props.cropOffset.y * 50}%`,
+        ...webcamVideoStyle(props.geometry),
       }}
     />
   );
@@ -190,7 +201,7 @@ function CameraResizeHandle(props: {
 }) {
   const { shape } = props.geometry;
   const corner = getEmbeddedCameraResizeCorner(props.geometry);
-  const inset = shape === 'circle' ? 'max(0px, calc(14.65% - 12px))' : '4px';
+  const inset = shape === 'circle' || shape === 'ellipse' ? 'max(0px, calc(14.65% - 12px))' : '4px';
   return (
     <ProductGlassIconButton
       type="button"
@@ -233,7 +244,7 @@ function CameraResizeHandle(props: {
 }
 
 function CameraDockingGuides({ geometry }: { geometry: EmbeddedCameraGeometry }) {
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const viewport = cameraViewport();
   const contrast = 'var(--sniptale-color-surface-contrast)';
   return (
     <div
@@ -258,7 +269,8 @@ function CameraDockingGuides({ geometry }: { geometry: EmbeddedCameraGeometry })
               transform: 'translate(-50%, -50%)',
               width: target.width,
               height: target.height,
-              borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
+              ...webcamFrameStyle(geometry),
+              filter: undefined,
               border: `${active ? 2 : 1}px ${active ? 'solid' : 'dashed'} ${borderColor}`,
               outline: `1px solid color-mix(in srgb, ${contrast} 24%, transparent)`,
               background: `color-mix(in srgb, ${contrast} ${active ? 10 : 4}%, transparent)`,
@@ -310,9 +322,13 @@ export function EmbeddedRecordingCamera(props: {
     const updateViewport = () => setViewportRevision((revision) => revision + 1);
     window.addEventListener('resize', updateViewport);
     window.visualViewport?.addEventListener('resize', updateViewport);
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateViewport);
+    observer?.observe(document.documentElement);
     return () => {
       window.removeEventListener('resize', updateViewport);
       window.visualViewport?.removeEventListener('resize', updateViewport);
+      observer?.disconnect();
     };
   }, []);
   useEffect(() => setPeerError(false), [enabled, onOffer]);
@@ -323,10 +339,7 @@ export function EmbeddedRecordingCamera(props: {
   );
   const geometry = constrainEmbeddedCameraGeometry(
     interaction.geometry,
-    {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    },
+    cameraViewport(),
     !interaction.moving
   );
   const handlePeerError = useCallback(() => setPeerError(true), []);
@@ -338,7 +351,8 @@ export function EmbeddedRecordingCamera(props: {
     ...(onPeerClose ? { onPeerClose } : {}),
   });
   if (!enabled) return null;
-  const shortSide = Math.min(window.innerWidth, window.innerHeight);
+  const viewport = cameraViewport();
+  const shortSide = Math.min(viewport.width, viewport.height);
   const width = geometry.sizeFraction * shortSide;
   const height = geometry.shape === 'circle' ? width : width * (9 / 16);
   return (
@@ -352,17 +366,15 @@ export function EmbeddedRecordingCamera(props: {
           position: 'fixed',
           boxSizing: 'border-box',
           zIndex: 2147483640,
-          left: geometry.center.x * window.innerWidth,
-          top: geometry.center.y * window.innerHeight,
+          left: geometry.center.x * viewport.width,
+          top: geometry.center.y * viewport.height,
           width,
           height,
           transform: 'translate(-50%, -50%)',
-          borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
+          borderRadius: webcamFrameStyle(geometry).borderRadius,
           pointerEvents: props.interactive ? 'auto' : 'none',
           cursor: props.interactive ? (interaction.dragging ? 'grabbing' : 'grab') : 'default',
-          background: 'var(--sniptale-color-surface-elevated, #18181b)',
-          border: '2px solid color-mix(in srgb, white 75%, transparent)',
-          boxShadow: '0 8px 28px rgba(0,0,0,.3)',
+          filter: webcamFrameStyle(geometry).filter,
           touchAction: 'none',
         }}
         onPointerDown={interaction.onPointerDown}
@@ -371,13 +383,19 @@ export function EmbeddedRecordingCamera(props: {
         onPointerCancel={interaction.cancel}
         onLostPointerCapture={interaction.cancel}
       >
-        <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
-          <CameraMedia
-            cropOffset={geometry.cropOffset}
-            error={peerError}
-            stream={stream}
-            width={width}
-          />
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            ...webcamFrameStyle(geometry),
+            filter: undefined,
+            background: 'var(--sniptale-color-surface-elevated, #18181b)',
+            border: '2px solid color-mix(in srgb, white 75%, transparent)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <CameraMedia geometry={geometry} error={peerError} stream={stream} width={width} />
         </div>
         {props.interactive && (
           <CameraResizeHandle

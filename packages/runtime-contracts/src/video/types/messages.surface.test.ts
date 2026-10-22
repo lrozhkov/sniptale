@@ -13,6 +13,7 @@ import {
   isRecordingMediaPermissionBootstrap,
   isRecordingMediaPermissionResult,
   isRecordingMediaPermissionCancellation,
+  isWebcamPresentationSettings,
 } from './messages.surface';
 import {
   VideoRecordingStatus,
@@ -30,6 +31,54 @@ const identity = {
 };
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
+
+it.each(['circle', 'rectangle', 'soft', 'ellipse'])(
+  'admits bounded %s appearance in camera commands',
+  (shape) => {
+    const presentation = {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      shape,
+      appearance: { roundness: 80, zoom: 3, mirror: true, shadow: true, shadowColor: '#abcdef' },
+    };
+    expect(isWebcamPresentationSettings(presentation)).toBe(true);
+    const { mode: _mode, ...geometry } = presentation;
+    const message = {
+      type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+      surfaceSessionId: identity.surfaceSessionId,
+      surfaceToken: identity.surfaceToken,
+      documentGeneration: 2,
+      capabilityEpoch: 4,
+      recordingId: null,
+      command: { kind: 'update-embedded-camera', appearance: geometry },
+    };
+    expect(isVideoRecordingSurfaceCommandMessage(message)).toBe(true);
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { ...message.command, appearance: { ...geometry, mode: 'embedded' } },
+      })
+    ).toBe(false);
+    for (const invalid of [
+      { zoom: NaN },
+      { zoom: 0 },
+      { roundness: 101 },
+      { mirror: 'yes' },
+      { shadow: null },
+      { shadowColor: '#fff' },
+      { shadowColor: 'url(https://example.com)' },
+      { extra: true },
+    ]) {
+      const appearance = { ...presentation.appearance, ...invalid };
+      expect(isWebcamPresentationSettings({ ...presentation, appearance })).toBe(false);
+      expect(
+        isVideoRecordingSurfaceCommandMessage({
+          ...message,
+          command: { ...message.command, appearance: { ...geometry, appearance } },
+        })
+      ).toBe(false);
+    }
+  }
+);
 
 it('validates old and new embedded camera placement commands', () => {
   const presentation = DEFAULT_VIDEO_SETTINGS.webcamPresentation!;

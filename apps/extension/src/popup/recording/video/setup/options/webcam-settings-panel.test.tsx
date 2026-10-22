@@ -16,6 +16,10 @@ vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
   translate: (key: string) => key,
 }));
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -112,31 +116,10 @@ it('shows embedded presentation controls when explicitly selected for tab record
   expect(onSettingsChange).toHaveBeenCalledWith({
     webcamPresentation: expect.objectContaining({ freePlacement: true }),
   });
-  const sliders = container?.querySelectorAll<HTMLInputElement>('input[type="range"]');
-  expect(sliders).toHaveLength(3);
-  for (const slider of sliders ?? []) {
-    expect(slider.className).toContain('[--sniptale-range-track-height:3px]!');
-  }
-  for (const [index, value] of ['35', '-100', '100'].entries()) {
-    await act(async () => {
-      const slider = sliders?.item(index);
-      if (!slider) throw new Error('Expected embedded camera slider');
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
-        slider,
-        value
-      );
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  }
-  expect(onSettingsChange).toHaveBeenCalledWith({
-    webcamPresentation: expect.objectContaining({ sizeFraction: 0.35 }),
-  });
-  expect(onSettingsChange).toHaveBeenCalledWith({
-    webcamPresentation: expect.objectContaining({ cropOffset: { x: -1, y: 0 } }),
-  });
-  expect(onSettingsChange).toHaveBeenCalledWith({
-    webcamPresentation: expect.objectContaining({ cropOffset: { x: 0, y: 1 } }),
-  });
+  expect(freePlacement?.className).toContain('sniptale-glass-switch');
+  expect(container?.textContent).toContain('popup.video.webcamPresentationSoft');
+  expect(container?.textContent).toContain('popup.video.webcamPresentationEllipse');
+  expect(container?.textContent).toContain('popup.video.webcamPresentationZoom');
 
   await act(async () => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])

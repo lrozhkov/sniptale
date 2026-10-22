@@ -24,6 +24,14 @@ it.each([false, true])(
         ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
         freePlacement,
         dockPosition: 'e25' as const,
+        shape: 'soft' as const,
+        appearance: {
+          roundness: 45,
+          zoom: 1.5,
+          mirror: true,
+          shadow: false,
+          shadowColor: '#123456',
+        },
       },
     };
     expect(isVideoRecordingSettings(settings)).toBe(true);

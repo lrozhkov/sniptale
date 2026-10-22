@@ -128,7 +128,13 @@ export type VideoRecordingSurfaceCommand =
       kind: 'update-embedded-camera';
       appearance: Pick<
         WebcamPresentationSettings,
-        'shape' | 'center' | 'sizeFraction' | 'cropOffset' | 'freePlacement' | 'dockPosition'
+        | 'shape'
+        | 'center'
+        | 'sizeFraction'
+        | 'cropOffset'
+        | 'freePlacement'
+        | 'dockPosition'
+        | 'appearance'
       >;
     };
 
@@ -241,6 +247,26 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
+function isWebcamAppearance(value: unknown): boolean {
+  if (value === undefined) return true;
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['roundness', 'zoom', 'mirror', 'shadow', 'shadowColor']) &&
+    typeof value['roundness'] === 'number' &&
+    Number.isFinite(value['roundness']) &&
+    value['roundness'] >= 0 &&
+    value['roundness'] <= 100 &&
+    typeof value['zoom'] === 'number' &&
+    Number.isFinite(value['zoom']) &&
+    value['zoom'] >= 1 &&
+    value['zoom'] <= 4 &&
+    typeof value['mirror'] === 'boolean' &&
+    typeof value['shadow'] === 'boolean' &&
+    typeof value['shadowColor'] === 'string' &&
+    /^#[0-9a-f]{6}$/i.test(value['shadowColor'])
+  );
+}
+
 /** Validates the complete recording camera presentation at runtime and storage boundaries. */
 export function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
   return (
@@ -253,12 +279,13 @@ export function isWebcamPresentationSettings(value: unknown): value is WebcamPre
       'cropOffset',
       ...('freePlacement' in value ? ['freePlacement'] : []),
       ...('dockPosition' in value ? ['dockPosition'] : []),
+      ...('appearance' in value ? ['appearance'] : []),
     ]) &&
     (value['freePlacement'] === undefined || typeof value['freePlacement'] === 'boolean') &&
     (value['dockPosition'] === undefined || isWebcamDockPosition(value['dockPosition'])) &&
     (value['mode'] === 'embedded' || value['mode'] === 'separate-track') &&
-    (value['shape'] === WebcamPresentationShape.CIRCLE ||
-      value['shape'] === WebcamPresentationShape.RECTANGLE) &&
+    Object.values(WebcamPresentationShape).some((shape) => shape === value['shape']) &&
+    isWebcamAppearance(value['appearance']) &&
     isNormalizedPoint(value['center'], 0, 1) &&
     typeof value['sizeFraction'] === 'number' &&
     Number.isFinite(value['sizeFraction']) &&
@@ -483,33 +510,12 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
     value['kind'] !== 'update-embedded-camera' ||
     !hasExactKeys(value, ['kind', 'appearance']) ||
     !isRecord(value['appearance']) ||
-    !hasExactKeys(value['appearance'], [
-      'shape',
-      'center',
-      'sizeFraction',
-      'cropOffset',
-      ...('freePlacement' in value['appearance'] ? ['freePlacement'] : []),
-      ...('dockPosition' in value['appearance'] ? ['dockPosition'] : []),
-    ])
+    Object.hasOwn(value['appearance'], 'mode')
   ) {
     return false;
   }
 
-  const appearance = value['appearance'];
-  return (
-    (appearance['freePlacement'] === undefined ||
-      typeof appearance['freePlacement'] === 'boolean') &&
-    (appearance['dockPosition'] === undefined ||
-      isWebcamDockPosition(appearance['dockPosition'])) &&
-    (appearance['shape'] === WebcamPresentationShape.CIRCLE ||
-      appearance['shape'] === WebcamPresentationShape.RECTANGLE) &&
-    isNormalizedPoint(appearance['center'], 0, 1) &&
-    typeof appearance['sizeFraction'] === 'number' &&
-    Number.isFinite(appearance['sizeFraction']) &&
-    appearance['sizeFraction'] > 0 &&
-    appearance['sizeFraction'] <= 1 &&
-    isNormalizedPoint(appearance['cropOffset'], -1, 1)
-  );
+  return isWebcamPresentationSettings({ ...value['appearance'], mode: 'embedded' });
 }
 
 export function isVideoRecordingSurfaceCommandMessage(

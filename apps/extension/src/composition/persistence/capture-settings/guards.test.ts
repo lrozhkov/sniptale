@@ -25,6 +25,35 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it.each(['circle', 'rectangle', 'soft', 'ellipse'])(
+    'round-trips %s page camera appearance',
+    (shape) => {
+      const webcamPresentation = {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+        shape,
+        appearance: { roundness: 35, zoom: 2, mirror: true, shadow: false, shadowColor: '#123abc' },
+      };
+      expect(parseCurrentVideoSettings({ webcamPresentation }).value.webcamPresentation).toEqual(
+        webcamPresentation
+      );
+      for (const invalid of [
+        { zoom: 5 },
+        { mirror: 1 },
+        { shadowColor: 'url(x)' },
+        { roundness: -1 },
+        { extra: true },
+      ]) {
+        const result = parseCurrentVideoSettings({
+          webcamPresentation: {
+            ...webcamPresentation,
+            appearance: { ...webcamPresentation.appearance, ...invalid },
+          },
+        });
+        expect(result.value.webcamPresentation).toBeUndefined();
+        expect(result.invalidFieldCount).toBe(1);
+      }
+    }
+  );
   it('keeps old camera settings and admits only boolean free-placement preferences', () => {
     const presentation = DEFAULT_VIDEO_SETTINGS.webcamPresentation!;
     for (const freePlacement of [undefined, false, true]) {
