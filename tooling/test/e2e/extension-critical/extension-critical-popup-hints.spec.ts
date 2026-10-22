@@ -43,6 +43,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         }, variant);
         await popup.reload();
         await popup.locator('[data-ui="popup.app.tabs"]').waitFor();
+        const languageToggle = popup.locator('button[data-locale-preference]');
+        const languageHint = variant.locale === 'ru' ? 'Русский → English' : 'English → Russian';
+        const switchedHint = variant.locale === 'ru' ? 'English → Russian' : 'Русский → English';
+        await languageToggle.hover();
+        await expect(languageToggle).toHaveAttribute('title', languageHint);
+        await expect(languageToggle).toHaveAccessibleName(/\S/);
+        await languageToggle.click();
+        await expect(languageToggle).toHaveAttribute('data-popup-hint', switchedHint);
+        await languageToggle.hover();
+        await expect(languageToggle).toHaveAttribute('title', switchedHint);
+        await languageToggle.click();
+        await expect(languageToggle).toHaveAttribute('data-popup-hint', languageHint);
         for (const page of ['menu', 'screenshots', 'video', 'tools', 'export']) {
           await popup.locator(`[data-ui="popup.app.tabs"] button[data-page="${page}"]`).click();
           await expect(popup.locator('[data-ui="popup.app.content"]')).not.toHaveAttribute(
@@ -51,9 +63,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           );
           await expect(popup.locator('[data-ui="popup.app.content"] button').first()).toBeVisible();
           await expect(popup.getByRole('tooltip')).toHaveCount(0);
-          for (const button of await popup.getByRole('button').all()) {
-            await expect(button).toHaveAccessibleName(/\S/);
-          }
+          await expect(async () => {
+            for (const button of await popup.getByRole('button').all()) {
+              await expect(button).toHaveAccessibleName(/\S/, { timeout: 100 });
+            }
+          }).toPass();
           await popup.screenshot({
             path: info.outputPath(`${page}.png`),
             fullPage: false,

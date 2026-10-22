@@ -2,6 +2,7 @@ import {
   DEFAULT_LOCALE,
   FALLBACK_LOCALE,
   SUPPORTED_LOCALES,
+  localeLanguageMessages,
   type AppLocale,
 } from '@sniptale/platform/i18n/config';
 import { commonMessages } from './messages/common';
@@ -21,7 +22,7 @@ import type { Translate, TranslationKey } from './types';
 
 const popupTranslationMessages = defineMessageSource({
   background: backgroundMessages,
-  common: commonMessages,
+  common: defineMessageSource({ ...commonMessages, languages: localeLanguageMessages }),
   content: defineMessageSource({
     runtime: contentRuntimeMessages,
     toolbar: contentToolbarMessages,
