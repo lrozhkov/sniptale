@@ -54,6 +54,22 @@ it('admits bounded cursor appearance only inside the existing spotlight command'
     },
   };
   expect(isVideoRecordingSurfaceCommandMessage(message)).toBe(true);
+  for (const haloColor of ['#2563eb80', '#2563eb00']) {
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { ...message.command, cursorEffects: { ...cursorEffects, haloColor } },
+      })
+    ).toBe(true);
+  }
+  for (const haloColor of ['#12345', '#1234567', '#123456789', 'rgba(1,2,3,0.5)', 'url(x)']) {
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { ...message.command, cursorEffects: { ...cursorEffects, haloColor } },
+      })
+    ).toBe(false);
+  }
   for (const invalid of [null, {}, [], { ...cursorEffects, clickDuration: 1201 }]) {
     expect(
       isVideoRecordingSurfaceCommandMessage({

@@ -51,6 +51,7 @@ export function usePickerColorState(color: string) {
     alphaRef,
     applyPickerDraft,
     draftHsvColor: draftState.hsvColor,
+    draftResolvedColor: draftState.resolvedColor,
   });
 
   return {
@@ -72,6 +73,7 @@ function usePickerDraftActions(args: {
     options?: { rememberHue?: boolean; resolvedColor?: string }
   ) => string;
   draftHsvColor: HsvColor;
+  draftResolvedColor: string;
 }) {
   const { applyPickerDraft, draftHsvColor } = args;
 
@@ -103,9 +105,10 @@ function usePickerDraftActions(args: {
         const parsed = Number.parseFloat(nextAlpha);
         if (!Number.isFinite(parsed)) return null;
         args.alphaRef.current = Math.max(0, Math.min(100, parsed)) / 100;
-        return applyPickerDraft(draftHsvColor);
+        const resolvedColor = setColorAlpha(args.draftResolvedColor, args.alphaRef.current);
+        return resolvedColor ? applyPickerDraft(draftHsvColor, { resolvedColor }) : null;
       },
-      [applyPickerDraft, args.alphaRef, draftHsvColor]
+      [applyPickerDraft, args.alphaRef, args.draftResolvedColor, draftHsvColor]
     ),
     handleHueChange: useCallback(
       (nextHue: string) => {

@@ -249,7 +249,7 @@ describe('video', () => {
       recordingSurface: {
         toolbarEnabled: true,
         cursorSpotlightEnabled: true,
-        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66, haloColor: '#2563eb80' },
       },
     });
     await writeStarted;
@@ -313,7 +313,7 @@ describe('video', () => {
       recordingSurface: {
         toolbarEnabled: true,
         cursorSpotlightEnabled: true,
-        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66 },
+        cursorEffects: { ...DEFAULT_VIDEO_CURSOR_EFFECTS, haloSize: 66, haloColor: '#2563eb80' },
       },
     });
     await firstWriteStarted;
@@ -328,8 +328,9 @@ describe('video', () => {
     expect(stored.warnWithoutMicrophone).toBe(false);
     expect(stored.qualityProfiles).toEqual([profile]);
     expect(stored.recordingSurface?.cursorEffects?.haloSize).toBe(66);
+    expect(stored.recordingSurface?.cursorEffects?.haloColor).toBe('#2563eb80');
     await expect(loadVideoSettings()).resolves.toMatchObject({
-      recordingSurface: { cursorEffects: { haloSize: 66 } },
+      recordingSurface: { cursorEffects: { haloSize: 66, haloColor: '#2563eb80' } },
     });
     await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: false });
   });

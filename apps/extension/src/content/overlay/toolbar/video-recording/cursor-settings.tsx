@@ -1,5 +1,6 @@
 import { CircleDot, MousePointer2, MousePointerClick, SunDim } from 'lucide-react';
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
+import { multiplyColorAlpha } from '@sniptale/foundation/color';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { resolvePickerColor } from '@sniptale/ui/color-selector/helpers';
 import { useResolvedPortalTheme } from '@sniptale/ui/theme/safe-portal';
@@ -24,10 +25,7 @@ type CursorSection = 'halo' | 'dimming' | 'click' | 'cursor';
 type EffectKey = keyof typeof VIDEO_CURSOR_EFFECT_LIMITS;
 
 const EFFECT_FIELDS = {
-  halo: [
-    ['haloSize', 'content.toolbar.cursorEffectSize', 'px'],
-    ['haloOpacity', 'content.toolbar.cursorEffectOpacity', '%'],
-  ],
+  halo: [['haloSize', 'content.toolbar.cursorEffectSize', 'px']],
   dimming: [
     ['dimmingRadius', 'content.toolbar.cursorEffectRadius', 'px'],
     ['dimmingOpacity', 'content.toolbar.cursorEffectDimming', '%'],
@@ -55,7 +53,6 @@ export function RecordingCursorSettingsPanel(props: {
 }) {
   const effects = props.settings.cursorEffects ?? DEFAULT_VIDEO_CURSOR_EFFECTS;
   const [surface, setSurface] = useState<HTMLDivElement | null>(null);
-  const boundaryRef = useMemo(() => ({ current: surface }), [surface]);
   const theme = useResolvedPortalTheme(surface);
   const [accent, setAccent] = useState(() => resolvePickerColor(''));
   useLayoutEffect(() => {
@@ -123,17 +120,25 @@ export function RecordingCursorSettingsPanel(props: {
               <ColorField
                 label={translate('content.toolbar.cursorEffectColor')}
                 title={translate('content.toolbar.cursorEffectColor')}
-                value={effects[COLOR_KEYS[section]] ?? (section === 'dimming' ? '#000000' : accent)}
+                value={
+                  section === 'halo'
+                    ? (multiplyColorAlpha(effects.haloColor ?? accent, effects.haloOpacity / 100) ??
+                      accent)
+                    : (effects[COLOR_KEYS[section]] ?? (section === 'dimming' ? '#000000' : accent))
+                }
                 disabled={props.disabled}
-                allowAlpha={false}
+                allowAlpha={section === 'halo'}
                 allowTransparent={false}
                 triggerVariant="swatch"
-                floatingPlacement="side"
-                floatingBoundaryRef={boundaryRef}
+                floatingPlacement="auto"
                 onChange={(color) =>
                   props.onChange({
                     ...props.settings,
-                    cursorEffects: { ...effects, [COLOR_KEYS[section]]: color },
+                    cursorEffects: {
+                      ...effects,
+                      [COLOR_KEYS[section]]: color,
+                      ...(section === 'halo' ? { haloOpacity: 100 } : {}),
+                    },
                   })
                 }
               />

@@ -181,7 +181,7 @@ function isCursorEffectNumber(value: unknown, bounds: readonly [number, number])
 }
 
 function isCursorEffectColor(value: unknown): boolean {
-  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+  return typeof value === 'string' && /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
 }
 
 /** Reject incomplete, unknown, or out-of-range appearance values at data boundaries. */

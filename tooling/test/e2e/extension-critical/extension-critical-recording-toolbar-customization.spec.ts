@@ -72,7 +72,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       };
     })
   );
-  expect(rows).toHaveLength(4);
+  expect(rows).toHaveLength(3);
   for (const row of rows) {
     expect(row.centerDifference).toBeLessThanOrEqual(1);
     expect(row.height).toBeCloseTo(40, 0);
@@ -119,8 +119,8 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   const choices = [
     {
       section: 0,
-      fields: ['haloSize', 'haloOpacity'],
-      values: ['66', '70'],
+      fields: ['haloSize'],
+      values: ['66'],
       colorKey: 'haloColor',
       color: '#2563eb',
     },
@@ -160,14 +160,8 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       expect(pickerBounds.x + pickerBounds.width).toBeLessThanOrEqual(viewport.width + 1);
       expect(pickerBounds.y + pickerBounds.height).toBeLessThanOrEqual(viewport.height + 1);
       const panelBounds = (await panel.boundingBox())!;
-      const hasSideRoom =
-        Math.max(panelBounds.x, viewport.width - panelBounds.x - panelBounds.width) >=
-        pickerBounds.width + 16;
-      if (hasSideRoom)
-        expect(
-          pickerBounds.x >= panelBounds.x + panelBounds.width + 7 ||
-            pickerBounds.x + pickerBounds.width <= panelBounds.x - 7
-        ).toBe(true);
+      expect(pickerBounds.x).toBeLessThan(panelBounds.x + panelBounds.width);
+      expect(pickerBounds.x + pickerBounds.width).toBeGreaterThan(panelBounds.x);
       await page.screenshot({ path: info.outputPath('cursor-color-picker.png'), fullPage: false });
       await page.keyboard.press('Escape');
       await expect(picker).toHaveCount(0);
@@ -177,6 +171,11 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       ).toHaveAttribute('title', accent);
       await colorField.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
       await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill(choice.color);
+      const alpha = picker
+        .locator('[data-ui="shared.ui.color-selector.opacity"]')
+        .getByRole('textbox');
+      await alpha.fill('70');
+      await alpha.press('Enter');
       await picker.getByRole('button', { name: /^(Apply|Применить)$/u }).click();
     } else {
       await colorField.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
@@ -192,7 +191,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
           return stored.sniptale_video_settings.recordingSurface.cursorEffects?.[key];
         }, choice.colorKey)
       )
-      .toBe(choice.color);
+      .toBe(choice.section === 0 ? '#2563ebb3' : choice.color);
     await open();
     await panel.locator('nav button').nth(choice.section).click();
     await expect(panel.locator('nav button').nth(choice.section)).toHaveCSS(
@@ -233,8 +232,8 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
   await page.mouse.move(viewport.width - 80, viewport.height - 80);
   const halo = page.locator('[data-ui="content.video-recording.spotlight-halo"]');
   await expect(halo).toHaveCSS('width', '66px');
-  await expect(halo).toHaveCSS('opacity', '0.7');
-  await expect(halo).toHaveCSS('border-top-color', 'rgb(37, 99, 235)');
+  await expect(halo).toHaveCSS('opacity', '1');
+  await expect(halo).toHaveCSS('border-top-color', 'rgba(37, 99, 235, 0.7)');
   const dimming = page.locator('[data-ui="content.video-recording.spotlight-dimming"]');
   await expect(dimming).toHaveCSS('opacity', '0.45');
   await expect(dimming).toHaveCSS('background-color', 'rgb(17, 34, 51)');

@@ -44,6 +44,12 @@ describe('video guards roots', () => {
     expect(parseCurrentVideoSettings({ recordingSurface }).value).toMatchObject({
       recordingSurface: { cursorEffects },
     });
+    const rgbaEffects = { ...cursorEffects, haloColor: '#2563eb80', clickColor: '#ff000000' };
+    expect(
+      parseCurrentVideoSettings({
+        recordingSurface: { ...recordingSurface, cursorEffects: rgbaEffects },
+      }).value
+    ).toMatchObject({ recordingSurface: { cursorEffects: rgbaEffects } });
     for (const invalid of [
       null,
       [],
@@ -58,7 +64,7 @@ describe('video guards roots', () => {
       { ...cursorEffects, clickDuration: 149 },
       { ...cursorEffects, haloColor: 'url(https://example.com/cursor.svg)' },
       { ...cursorEffects, dimmingColor: '#12345g' },
-      { ...cursorEffects, clickColor: '#ff000080' },
+      { ...cursorEffects, clickColor: '#ff0000800' },
     ]) {
       expect(
         parseCurrentVideoSettings({
