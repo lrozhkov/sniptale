@@ -330,6 +330,33 @@ async function verifiesSidebarOwnerSurvivesToolbarCollapse() {
 describe('ContentAppLayout', () => {
   useContentAppLayoutTestScope();
 
+  it('temporarily hides scenario chrome in video mode without changing the scenario owner', async () => {
+    const props = createProps();
+    props.scenario.state.captureAction = 'scenario';
+    props.scenario.state.scenarioEnabled = true;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: false, scenario: props.scenario })
+    );
+    props.toolbar.modes.videoRecordingMode = true;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: true, scenario: props.scenario })
+    );
+    props.toolbar.modes.videoRecordingMode = false;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: false, scenario: props.scenario })
+    );
+    expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();
+    props.scenario.state.scenarioEnabled = false;
+    for (const videoMode of [true, false]) {
+      props.toolbar.modes.videoRecordingMode = videoMode;
+      await renderLayout(props);
+      expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).toBeNull();
+    }
+  });
+
   it(
     'composes the split toolbar, sidebar, and dialog stacks with the grouped layout props',
     verifiesLayoutComposition

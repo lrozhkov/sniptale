@@ -135,7 +135,9 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         <DesignReviewSurface controller={designReview} showChrome={!isCaptureUiHidden} />
       ) : null}
       <ContentScenarioRecorderSidebarSlot
-        isCompletelyHidden={props.toolbar.isCompletelyHidden}
+        isCompletelyHidden={
+          props.toolbar.isCompletelyHidden || props.toolbar.modes.videoRecordingMode === true
+        }
         isToolbarVisible={props.toolbar.isToolbarVisible}
         byClickDisabled={isScenarioByClickBlocked(props.toolbar.modes)}
         handleTakeScreenshot={props.toolbar.handleTakeScreenshot}

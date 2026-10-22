@@ -135,6 +135,21 @@ it('hides during countdown, capture and inactive modes without losing the commit
   expect(dock().dataset['corner']).toBe('bottom-left');
 });
 
+it('suspends only scenario restore during video mode and restores the collapsed state on exit', () => {
+  const props = createProps();
+  render(props);
+  expect(container.querySelector('[data-ui="content.scenario.sidebar.restore"]')).not.toBeNull();
+  props.toolbar.modes.videoRecordingMode = true;
+  render(props);
+  expect(container.querySelector('[data-ui="content.scenario.sidebar.restore"]')).toBeNull();
+  expect(container.querySelector('#sniptale-show-toolbar-btn')).not.toBeNull();
+  props.toolbar.modes.videoRecordingMode = false;
+  render(props);
+  expect(container.querySelector('[data-ui="content.scenario.sidebar.restore"]')).not.toBeNull();
+  expect(props.scenario.state.sidebarVisible).toBe(false);
+  expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();
+});
+
 it('captures a thresholded drag, clamps it, shows four guides, and docks without activating actions', () => {
   const props = createProps();
   render(props);

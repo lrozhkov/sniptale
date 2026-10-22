@@ -56,7 +56,26 @@ for (const theme of ['light', 'dark'] as const) {
           );
         };
         await expect(sidebar).toBeVisible();
+        const switchMode = async (mode: 'cursor' | 'video-recording') => {
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        };
+        await switchMode('video-recording');
+        await expect(sidebar).toHaveCount(0);
+        await expect(restoreScenario).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('scenario-suspended-video.png'),
+          fullPage: false,
+        });
+        await switchMode('cursor');
+        await expect(sidebar).toBeVisible();
         await collapseSidebar.click();
+        await expect(restoreButtons).toHaveCount(1);
+        await switchMode('video-recording');
+        await expect(sidebar).toHaveCount(0);
+        await expect(restoreScenario).toHaveCount(0);
+        await switchMode('cursor');
+        await expect(sidebar).toHaveCount(0);
         await expect(restoreButtons).toHaveCount(1);
         await page.screenshot({ path: info.outputPath('scenario-only.png'), fullPage: false });
         await collapseToolbar.focus();
