@@ -8,11 +8,12 @@ import {
   Pause,
   Play,
   Square,
-  SlidersHorizontal,
   Video,
   VideoOff,
   X,
 } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import eyeCogIcon from '@iconify-icons/tabler/eye-cog';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -377,7 +378,17 @@ export function ToolbarVideoRecordingControls(props: {
                 else void visibility?.reload();
               }}
             >
-              {visibility?.editing ? <Check size={18} /> : <SlidersHorizontal size={18} />}
+              {visibility?.editing ? (
+                <Check size={18} />
+              ) : (
+                <Icon
+                  icon={eyeCogIcon}
+                  width={18}
+                  height={18}
+                  className="tabler-eye-cog"
+                  aria-hidden="true"
+                />
+              )}
             </ContentToolbarButton>
           </ContentToolbarGroup>
           <ContentToolbarDivider />

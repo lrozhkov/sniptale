@@ -181,6 +181,9 @@ it('retains the focused lifecycle button when orientation changes', () => {
 it('customizes icons without activating their tools or media controls', () => {
   const visibility = visibilityState({ editing: true, controls: { pencil: false } });
   const actions = renderPhase('idle', 'horizontal', null, visibility);
+  expect(
+    queryButton('content.toolbar.video-recording.customize')?.querySelector('.lucide-check')
+  ).not.toBeNull();
   const previousTool = drawingOwner.controller.session.getSnapshot().activeTool;
   const pencil = queryButton('content.toolbar.video-recording.visibility.pencil')!;
   expect(pencil.getAttribute('aria-pressed')).toBe('false');
@@ -237,6 +240,9 @@ it('restores hidden tools outside recording without changing their saved visibil
   const visibility = visibilityState({ controls: { pencil: false, camera: false } });
   renderPhase('idle', 'horizontal', null, visibility);
   expect(queryButton('content.toolbar.drawing.pencil')).not.toBeNull();
+  expect(
+    queryButton('content.toolbar.video-recording.customize')?.querySelector('.tabler-eye-cog')
+  ).not.toBeNull();
   expect(queryButton('content.toolbar.video-recording.camera.toggle')).not.toBeNull();
   act(() => queryButton('content.toolbar.video-recording.customize')?.click());
   expect(visibility.toggleEditing).toHaveBeenCalledOnce();

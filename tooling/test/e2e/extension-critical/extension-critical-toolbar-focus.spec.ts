@@ -178,6 +178,10 @@ for (const appearance of [
     for (const mode of ['cursor', 'video-recording']) {
       await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
       await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+      if (mode === 'video-recording')
+        await expect(
+          page.locator('[data-ui="content.toolbar.video-recording.customize"] .tabler-eye-cog')
+        ).toBeVisible();
       for (const orientation of ['horizontal', 'vertical']) {
         await trigger.click();
         const direction = page.getByRole('button', {
