@@ -34,7 +34,7 @@ export interface ToolbarVideoRecordingProps {
   onCameraGeometryChange: (
     appearance: Pick<
       ToolbarVideoRecordingProps['state']['webcamPresentation'],
-      'shape' | 'center' | 'sizeFraction' | 'cropOffset'
+      'shape' | 'center' | 'sizeFraction' | 'cropOffset' | 'freePlacement' | 'dockPosition'
     >
   ) => Promise<void> | void;
   onCameraOffer: (sdp: string) => Promise<string>;

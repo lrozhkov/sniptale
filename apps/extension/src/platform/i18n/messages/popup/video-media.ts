@@ -257,6 +257,10 @@ export const popupVideoMediaMessages = defineMessageSource({
     ru: 'Размещение',
     en: 'Placement',
   },
+  webcamFreePlacement: {
+    ru: 'Свободное размещение камеры',
+    en: 'Free camera placement',
+  },
   webcamPresentationEmbedded: {
     ru: 'На странице',
     en: 'On page',

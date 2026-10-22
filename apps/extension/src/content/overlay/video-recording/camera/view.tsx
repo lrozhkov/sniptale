@@ -10,6 +10,11 @@ import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls/cont
 import {
   constrainEmbeddedCameraGeometry,
   DEFAULT_EMBEDDED_CAMERA_GEOMETRY,
+  findEmbeddedCameraDockPosition,
+  getEmbeddedCameraDockPosition,
+  getEmbeddedCameraDockPositions,
+  getEmbeddedCameraDockMarker,
+  getEmbeddedCameraResizeCorner,
   resizeEmbeddedCameraGeometry,
   type EmbeddedCameraGeometry,
 } from './geometry';
@@ -36,6 +41,7 @@ function useEmbeddedCameraGeometry(
   const [dragging, setDragging] = useState(false);
   const geometryRef = useRef(geometry);
   const dragRef = useRef<CameraDrag | null>(null);
+  const revisionRef = useRef(0);
   useEffect(() => {
     if (!configuredGeometry || dragRef.current) return;
     geometryRef.current = configuredGeometry;
@@ -43,10 +49,17 @@ function useEmbeddedCameraGeometry(
   }, [configuredGeometry]);
 
   const update = (next: EmbeddedCameraGeometry) => {
-    const constrained = constrainEmbeddedCameraGeometry(next, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const moving = dragRef.current && !dragRef.current.resizing;
+    const positioned =
+      moving && !next.freePlacement
+        ? { ...next, dockPosition: findEmbeddedCameraDockPosition(next, viewport) }
+        : next;
+    const constrained = constrainEmbeddedCameraGeometry(
+      positioned,
+      viewport,
+      !dragRef.current || dragRef.current.resizing
+    );
     geometryRef.current = constrained;
     setGeometry(constrained);
   };
@@ -55,21 +68,38 @@ function useEmbeddedCameraGeometry(
     dragRef.current = null;
     setDragging(false);
     if (!drag || !onGeometryChange) return;
-    void Promise.resolve(onGeometryChange(geometryRef.current)).catch(() => update(drag.origin));
+    update(geometryRef.current);
+    const revision = revisionRef.current;
+    void Promise.resolve(onGeometryChange(geometryRef.current)).catch(() => {
+      if (revisionRef.current === revision) update(drag.origin);
+    });
+  };
+  const cancel = () => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    if (drag) update(drag.origin);
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!interactive || event.button !== 0) return;
+    revisionRef.current += 1;
     event.currentTarget.setPointerCapture(event.pointerId);
     const resizing =
       event.target instanceof Element && event.target.closest('[data-resize="true"]') !== null;
-    if (resizing) setDragging(true);
+    setDragging(true);
+    const origin = constrainEmbeddedCameraGeometry(geometry, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    geometryRef.current = origin;
+    setGeometry(origin);
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      origin: geometry,
+      origin,
       resizing,
-      resizeCorner: resizing ? 'se' : null,
+      resizeCorner: resizing ? getEmbeddedCameraResizeCorner(origin) : null,
     };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -98,7 +128,15 @@ function useEmbeddedCameraGeometry(
       },
     });
   };
-  return { dragging, finish, geometry, onPointerDown, onPointerMove };
+  return {
+    dragging,
+    moving: dragging && !dragRef.current?.resizing,
+    cancel,
+    finish,
+    geometry,
+    onPointerDown,
+    onPointerMove,
+  };
 }
 
 function CameraMedia(props: {
@@ -145,15 +183,21 @@ function CameraMedia(props: {
   );
 }
 
-function CameraResizeHandle(props: { dragging: boolean; shape: EmbeddedCameraGeometry['shape'] }) {
-  const inset = props.shape === 'circle' ? 'max(0px, calc(14.65% - 12px))' : '4px';
+function CameraResizeHandle(props: {
+  dragging: boolean;
+  hovered: boolean;
+  geometry: EmbeddedCameraGeometry;
+}) {
+  const { shape } = props.geometry;
+  const corner = getEmbeddedCameraResizeCorner(props.geometry);
+  const inset = shape === 'circle' ? 'max(0px, calc(14.65% - 12px))' : '4px';
   return (
     <ProductGlassIconButton
       type="button"
       aria-label={translate('content.toolbar.videoRecordingCameraResize')}
       title={translate('content.toolbar.videoRecordingCameraResize')}
       data-resize="true"
-      data-corner="se"
+      data-corner={corner}
       style={{
         position: 'absolute',
         width: 24,
@@ -165,11 +209,11 @@ function CameraResizeHandle(props: { dragging: boolean; shape: EmbeddedCameraGeo
         cursor: props.dragging ? 'grabbing' : 'grab',
         outlineStyle: 'solid',
         transition: 'opacity 120ms ease',
-        bottom: inset,
-        right: inset,
+        [corner.includes('n') ? 'top' : 'bottom']: inset,
+        [corner.includes('w') ? 'left' : 'right']: inset,
       }}
       className={[
-        props.dragging ? 'opacity-100' : 'opacity-0',
+        props.dragging || props.hovered ? 'opacity-100' : 'opacity-0',
         'outline-2 outline-offset-2 outline-transparent',
         'group-hover:opacity-100 focus-visible:opacity-100',
         'focus-visible:outline-[var(--sniptale-color-accent)]',
@@ -178,9 +222,51 @@ function CameraResizeHandle(props: { dragging: boolean; shape: EmbeddedCameraGeo
       <MoveDiagonal2
         size={16}
         strokeWidth={1.75}
-        style={{ cursor: 'inherit', pointerEvents: 'none' }}
+        style={{
+          cursor: 'inherit',
+          pointerEvents: 'none',
+          transform: corner === 'ne' || corner === 'sw' ? 'rotate(90deg)' : undefined,
+        }}
       />
     </ProductGlassIconButton>
+  );
+}
+
+function CameraDockingGuides({ geometry }: { geometry: EmbeddedCameraGeometry }) {
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const contrast = 'var(--sniptale-color-surface-contrast)';
+  return (
+    <div
+      aria-hidden
+      data-ui="content.video-recording.camera-dock-guides"
+      data-floating-ui-capture-transient="true"
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2147483641 }}
+    >
+      {getEmbeddedCameraDockPositions(viewport).map((position) => {
+        const active = getEmbeddedCameraDockPosition(geometry) === position;
+        const target = getEmbeddedCameraDockMarker(geometry, position, viewport);
+        const borderColor = `color-mix(in srgb, ${contrast} ${active ? 40 : 65}%, var(--sniptale-color-text-inverse))`;
+        return (
+          <div
+            key={position}
+            data-ui={`content.video-recording.camera-dock.${position}`}
+            data-active={active}
+            style={{
+              position: 'absolute',
+              left: target.center.x * viewport.width,
+              top: target.center.y * viewport.height,
+              transform: 'translate(-50%, -50%)',
+              width: target.width,
+              height: target.height,
+              borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
+              border: `${active ? 2 : 1}px ${active ? 'solid' : 'dashed'} ${borderColor}`,
+              outline: `1px solid color-mix(in srgb, ${contrast} 24%, transparent)`,
+              background: `color-mix(in srgb, ${contrast} ${active ? 10 : 4}%, transparent)`,
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -195,6 +281,30 @@ export function EmbeddedRecordingCamera(props: {
 }) {
   const { enabled, geometry: configuredGeometry, onOffer, onPeerClose } = props;
   const [peerError, setPeerError] = useState(false);
+  const cameraRef = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState(false);
+  useEffect(() => {
+    if (!enabled || !props.interactive) return;
+    const move = (event: PointerEvent) => {
+      const bounds = cameraRef.current?.getBoundingClientRect();
+      setHovered(
+        Boolean(
+          bounds &&
+          event.clientX >= bounds.left - 12 &&
+          event.clientX <= bounds.right + 12 &&
+          event.clientY >= bounds.top - 12 &&
+          event.clientY <= bounds.bottom + 12
+        )
+      );
+    };
+    const leave = () => setHovered(false);
+    document.addEventListener('pointermove', move, true);
+    window.addEventListener('blur', leave);
+    return () => {
+      document.removeEventListener('pointermove', move, true);
+      window.removeEventListener('blur', leave);
+    };
+  }, [enabled, props.interactive]);
   const [, setViewportRevision] = useState(0);
   useEffect(() => {
     const updateViewport = () => setViewportRevision((revision) => revision + 1);
@@ -211,10 +321,14 @@ export function EmbeddedRecordingCamera(props: {
     props.interactive,
     props.onGeometryChange
   );
-  const geometry = constrainEmbeddedCameraGeometry(interaction.geometry, {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+  const geometry = constrainEmbeddedCameraGeometry(
+    interaction.geometry,
+    {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+    !interaction.moving
+  );
   const handlePeerError = useCallback(() => setPeerError(true), []);
   const stream = useEmbeddedCameraPeer({
     enabled,
@@ -228,42 +342,54 @@ export function EmbeddedRecordingCamera(props: {
   const width = geometry.sizeFraction * shortSide;
   const height = geometry.shape === 'circle' ? width : width * (9 / 16);
   return (
-    <div
-      className="group"
-      data-ui="content.video-recording.embedded-camera"
-      tabIndex={props.interactive ? 0 : -1}
-      style={{
-        position: 'fixed',
-        zIndex: 2147483640,
-        left: geometry.center.x * window.innerWidth,
-        top: geometry.center.y * window.innerHeight,
-        width,
-        height,
-        transform: 'translate(-50%, -50%)',
-        borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
-        pointerEvents: props.interactive ? 'auto' : 'none',
-        cursor: props.interactive ? (interaction.dragging ? 'grabbing' : 'grab') : 'default',
-        background: 'var(--sniptale-color-surface-elevated, #18181b)',
-        border: '2px solid color-mix(in srgb, white 75%, transparent)',
-        boxShadow: '0 8px 28px rgba(0,0,0,.3)',
-        touchAction: 'none',
-      }}
-      onPointerDown={interaction.onPointerDown}
-      onPointerMove={interaction.onPointerMove}
-      onPointerUp={interaction.finish}
-      onPointerCancel={interaction.finish}
-    >
-      <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
-        <CameraMedia
-          cropOffset={geometry.cropOffset}
-          error={peerError}
-          stream={stream}
-          width={width}
-        />
+    <>
+      <div
+        ref={cameraRef}
+        className="group"
+        data-ui="content.video-recording.embedded-camera"
+        tabIndex={props.interactive ? 0 : -1}
+        style={{
+          position: 'fixed',
+          boxSizing: 'border-box',
+          zIndex: 2147483640,
+          left: geometry.center.x * window.innerWidth,
+          top: geometry.center.y * window.innerHeight,
+          width,
+          height,
+          transform: 'translate(-50%, -50%)',
+          borderRadius: geometry.shape === 'circle' ? '999px' : '12px',
+          pointerEvents: props.interactive ? 'auto' : 'none',
+          cursor: props.interactive ? (interaction.dragging ? 'grabbing' : 'grab') : 'default',
+          background: 'var(--sniptale-color-surface-elevated, #18181b)',
+          border: '2px solid color-mix(in srgb, white 75%, transparent)',
+          boxShadow: '0 8px 28px rgba(0,0,0,.3)',
+          touchAction: 'none',
+        }}
+        onPointerDown={interaction.onPointerDown}
+        onPointerMove={interaction.onPointerMove}
+        onPointerUp={interaction.finish}
+        onPointerCancel={interaction.cancel}
+        onLostPointerCapture={interaction.cancel}
+      >
+        <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
+          <CameraMedia
+            cropOffset={geometry.cropOffset}
+            error={peerError}
+            stream={stream}
+            width={width}
+          />
+        </div>
+        {props.interactive && (
+          <CameraResizeHandle
+            dragging={interaction.dragging}
+            hovered={hovered}
+            geometry={geometry}
+          />
+        )}
       </div>
-      {props.interactive && (
-        <CameraResizeHandle dragging={interaction.dragging} shape={geometry.shape} />
-      )}
-    </div>
+      {interaction.moving && !geometry.freePlacement ? (
+        <CameraDockingGuides geometry={geometry} />
+      ) : null}
+    </>
   );
 }

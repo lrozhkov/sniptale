@@ -7,6 +7,7 @@ import {
   WebcamPresentationShape,
   VIDEO_AUTO_FADE_DELAYS,
   isVideoCursorEffectSettings,
+  isWebcamDockPosition,
   type VideoCursorEffectSettings,
   type VideoAutoFadeDelay,
   type WebcamPresentationSettings,
@@ -127,7 +128,7 @@ export type VideoRecordingSurfaceCommand =
       kind: 'update-embedded-camera';
       appearance: Pick<
         WebcamPresentationSettings,
-        'shape' | 'center' | 'sizeFraction' | 'cropOffset'
+        'shape' | 'center' | 'sizeFraction' | 'cropOffset' | 'freePlacement' | 'dockPosition'
       >;
     };
 
@@ -243,7 +244,17 @@ function isNullableString(value: unknown): value is string | null {
 function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['mode', 'shape', 'center', 'sizeFraction', 'cropOffset']) &&
+    hasExactKeys(value, [
+      'mode',
+      'shape',
+      'center',
+      'sizeFraction',
+      'cropOffset',
+      ...('freePlacement' in value ? ['freePlacement'] : []),
+      ...('dockPosition' in value ? ['dockPosition'] : []),
+    ]) &&
+    (value['freePlacement'] === undefined || typeof value['freePlacement'] === 'boolean') &&
+    (value['dockPosition'] === undefined || isWebcamDockPosition(value['dockPosition'])) &&
     (value['mode'] === 'embedded' || value['mode'] === 'separate-track') &&
     (value['shape'] === WebcamPresentationShape.CIRCLE ||
       value['shape'] === WebcamPresentationShape.RECTANGLE) &&
@@ -471,13 +482,24 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
     value['kind'] !== 'update-embedded-camera' ||
     !hasExactKeys(value, ['kind', 'appearance']) ||
     !isRecord(value['appearance']) ||
-    !hasExactKeys(value['appearance'], ['shape', 'center', 'sizeFraction', 'cropOffset'])
+    !hasExactKeys(value['appearance'], [
+      'shape',
+      'center',
+      'sizeFraction',
+      'cropOffset',
+      ...('freePlacement' in value['appearance'] ? ['freePlacement'] : []),
+      ...('dockPosition' in value['appearance'] ? ['dockPosition'] : []),
+    ])
   ) {
     return false;
   }
 
   const appearance = value['appearance'];
   return (
+    (appearance['freePlacement'] === undefined ||
+      typeof appearance['freePlacement'] === 'boolean') &&
+    (appearance['dockPosition'] === undefined ||
+      isWebcamDockPosition(appearance['dockPosition'])) &&
     (appearance['shape'] === WebcamPresentationShape.CIRCLE ||
       appearance['shape'] === WebcamPresentationShape.RECTANGLE) &&
     isNormalizedPoint(appearance['center'], 0, 1) &&

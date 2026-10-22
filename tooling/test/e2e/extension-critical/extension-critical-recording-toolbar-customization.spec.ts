@@ -171,6 +171,207 @@ async function drawingCanvasHasInk(canvas: Locator) {
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`embedded camera corner docking ${name} ${orientation}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+      try {
+        const worker =
+          launched.context.serviceWorkers()[0] ??
+          (await launched.context.waitForEvent('serviceworker'));
+        await worker.evaluate(
+          async ({ defaults, theme, shape }) => {
+            await chrome.storage.local.set({
+              'sniptale-theme-preference': theme,
+              sniptale_video_settings: {
+                ...defaults,
+                webcamEnabled: true,
+                webcamPresentation: { ...defaults.webcamPresentation!, mode: 'embedded', shape },
+              },
+            });
+          },
+          {
+            defaults: DEFAULT_VIDEO_SETTINGS,
+            theme: size.width === 1920 ? 'dark' : 'light',
+            shape: orientation === 'vertical' ? 'rectangle' : 'circle',
+          }
+        );
+        const { page } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        if (orientation === 'vertical') {
+          await openRecordingToolbarSettings(page);
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+          await page.keyboard.press('Escape');
+        }
+        const camera = page.locator('[data-ui="content.video-recording.embedded-camera"]');
+        await expect(camera).toBeVisible();
+        await expect
+          .poll(() =>
+            camera
+              .locator('video')
+              .evaluate((video) => video instanceof HTMLVideoElement && video.readyState >= 2)
+          )
+          .toBe(true);
+        const guides = page.locator('[data-ui="content.video-recording.camera-dock-guides"]');
+        const bounds = async () => (await camera.boundingBox())!;
+        for (const corner of [
+          'nw',
+          'n25',
+          'n',
+          'n75',
+          'ne',
+          'e',
+          'sw',
+          's25',
+          's',
+          's75',
+          'w',
+          'se',
+        ]) {
+          const along = corner.endsWith('25') ? 0.25 : corner.endsWith('75') ? 0.75 : 0.5;
+          const before = await bounds();
+          await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+          await page.mouse.down();
+          await expect(guides).toBeVisible();
+          const held = await bounds();
+          expect(Math.abs(held.x - before.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(held.y - before.y)).toBeLessThanOrEqual(1);
+          await page.mouse.move(
+            corner.includes('w') ? 80 : corner.includes('e') ? size.width - 80 : size.width * along,
+            corner.includes('n')
+              ? 80
+              : corner.includes('s')
+                ? size.height - 80
+                : size.height * along,
+            { steps: 4 }
+          );
+          await expect(
+            page.locator(`[data-ui="content.video-recording.camera-dock.${corner}"]`)
+          ).toHaveAttribute('data-active', 'true');
+          await page.screenshot({
+            path: info.outputPath(`camera-docking-${corner}.png`),
+            fullPage: false,
+          });
+          await page.mouse.up();
+          await expect(guides).toHaveCount(0);
+          await expect
+            .poll(async () => {
+              const box = await bounds();
+              const horizontal = corner.includes('w')
+                ? box.x - 12
+                : corner.includes('e')
+                  ? size.width - box.x - box.width - 12
+                  : box.x + box.width / 2 - size.width * along;
+              const vertical = corner.includes('n')
+                ? box.y - 12
+                : corner.includes('s')
+                  ? size.height - box.y - box.height - 12
+                  : box.y + box.height / 2 - size.height * along;
+              return Math.max(Math.abs(horizontal), Math.abs(vertical));
+            })
+            .toBeLessThanOrEqual(1);
+        }
+        await page.setViewportSize({ width: size.width - 100, height: size.height - 40 });
+        await expect
+          .poll(async () => {
+            const box = await bounds();
+            return Math.max(
+              Math.abs(size.width - 100 - box.x - box.width - 12),
+              Math.abs(size.height - 40 - box.y - box.height - 12)
+            );
+          })
+          .toBeLessThanOrEqual(1);
+        const beforeResize = await bounds();
+        await page.mouse.move(
+          beforeResize.x + beforeResize.width / 2,
+          beforeResize.y + beforeResize.height / 2
+        );
+        const handle = camera.locator('[data-resize="true"]');
+        await expect(handle).toHaveAttribute('data-corner', 'nw');
+        const handleBounds = (await handle.boundingBox())!;
+        await page.mouse.move(handleBounds.x + 12, handleBounds.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(handleBounds.x - 28, handleBounds.y - 28, { steps: 4 });
+        await page.mouse.up();
+        await expect
+          .poll(async () => (await bounds()).width)
+          .toBeGreaterThan(beforeResize.width + 20);
+        const resized = await bounds();
+        expect(Math.abs(size.width - 100 - resized.x - resized.width - 12)).toBeLessThanOrEqual(1);
+        expect(Math.abs(size.height - 40 - resized.y - resized.height - 12)).toBeLessThanOrEqual(1);
+        await page.mouse.move(resized.x - 10, resized.y + resized.height / 2);
+        await expect(handle).toHaveCSS('opacity', '1');
+        await page.mouse.move(resized.x - 20, resized.y + resized.height / 2);
+        await expect(handle).toHaveCSS('opacity', '0');
+        await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
+        const free = page.locator(
+          '[data-ui="content.toolbar.video-recording.camera.free-placement"]'
+        );
+        await expect(free).toHaveAttribute('aria-pressed', 'false');
+        await free.click();
+        await expect(free).toHaveAttribute('aria-pressed', 'true');
+        await page.keyboard.press('Escape');
+        const beforeFree = await bounds();
+        await page.mouse.move(
+          beforeFree.x + beforeFree.width / 2,
+          beforeFree.y + beforeFree.height / 2
+        );
+        await page.mouse.down();
+        await expect(guides).toHaveCount(0);
+        await page.mouse.move(size.width / 2, size.height / 2, { steps: 4 });
+        await page.mouse.up();
+        await expect.poll(async () => (await bounds()).x).toBeLessThan(beforeFree.x - 100);
+        await expect
+          .poll(() =>
+            camera
+              .locator('video')
+              .evaluate((video) => video instanceof HTMLVideoElement && video.readyState >= 2)
+          )
+          .toBe(true);
+        await page.screenshot({
+          path: info.outputPath('camera-free-placement.png'),
+          fullPage: false,
+        });
+        await page.locator('[data-ui="content.toolbar.video-recording.camera.menu"]').click();
+        await free.click();
+        await expect(free).toHaveAttribute('aria-pressed', 'false');
+        await page.keyboard.press('Escape');
+        await page.setViewportSize({ width: 480, height: 900 });
+        const portrait = await bounds();
+        await page.mouse.move(portrait.x + portrait.width / 2, portrait.y + portrait.height / 2);
+        await page.mouse.down();
+        await expect(
+          guides.locator('[data-ui^="content.video-recording.camera-dock."]')
+        ).toHaveCount(12);
+        await expect(
+          guides.locator('[data-ui="content.video-recording.camera-dock.n25"]')
+        ).toHaveCount(0);
+        await page.mouse.move(80, 225, { steps: 4 });
+        await expect(
+          guides.locator('[data-ui="content.video-recording.camera-dock.w25"]')
+        ).toHaveAttribute('data-active', 'true');
+        await page.screenshot({
+          path: info.outputPath('camera-portrait-quarter-guides.png'),
+          fullPage: false,
+        });
+        await page.mouse.up();
+        await expect.poll(async () => Math.abs((await bounds()).x - 12)).toBeLessThanOrEqual(1);
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+
     test(`recording click effects exclude extension UI ${name} ${orientation}`, async ({}, info) => {
       const host = await startHostServer();
       const launched = await launchExtensionBrowser({ viewport: size });

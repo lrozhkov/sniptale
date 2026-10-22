@@ -35,6 +35,8 @@ type RecordingMediaSplitControlProps = {
   onDeviceChange?: (deviceId: string) => Promise<void> | void;
   cameraPlacement?: {
     mode: WebcamPresentationMode;
+    freePlacement?: boolean;
+    onFreePlacementChange?: (value: boolean) => Promise<void> | void;
     locked: boolean;
     onChange: (mode: WebcamPresentationMode) => Promise<void> | void;
   };
@@ -124,7 +126,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
       anchorRef: triggerRef,
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-      menuHeight: Math.max(96, devices.length * 48 + 48) + (props.cameraPlacement ? 72 : 0),
+      menuHeight: Math.max(96, devices.length * 48 + 48) + (props.cameraPlacement ? 112 : 0),
       menuWidth: props.cameraPlacement ? 280 : 260,
       preferredAlign: 'end',
     });
@@ -151,6 +153,15 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     if (!placement || placement.locked || mode === placement.mode) return;
     return changeMedia(() => placement.onChange(mode));
   };
+  const selectFreePlacement = async () => {
+    const placement = props.cameraPlacement;
+    if (!placement?.onFreePlacementChange) return;
+    try {
+      await placement.onFreePlacementChange(!placement.freePlacement);
+    } catch {
+      notifyRecordingMediaFailure();
+    }
+  };
   return {
     closeMenu,
     devices,
@@ -163,6 +174,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     runToggle,
     selectDevice,
     selectPlacement,
+    selectFreePlacement,
     switching,
     toggleMenu,
     triggerRef,
@@ -246,6 +258,20 @@ function RecordingMediaDeviceMenu(props: {
                 onChange={(mode) => void control.selectPlacement(mode)}
               />
             </div>
+            {props.cameraPlacement.mode === WebcamPresentationMode.EMBEDDED &&
+            props.cameraPlacement.onFreePlacementChange ? (
+              <ProductToolbarMenuItem
+                dataUi="content.toolbar.video-recording.camera.free-placement"
+                ariaPressed={props.cameraPlacement.freePlacement === true}
+                selected={props.cameraPlacement.freePlacement === true}
+                onClick={() => void control.selectFreePlacement()}
+              >
+                <ProductToolbarMenuItemCopy label={translate('popup.video.webcamFreePlacement')} />
+                {props.cameraPlacement.freePlacement ? (
+                  <Check aria-hidden className="h-4 w-4 text-[var(--sniptale-color-accent)]" />
+                ) : null}
+              </ProductToolbarMenuItem>
+            ) : null}
           </>
         ) : null}
       </ProductToolbarMenu>

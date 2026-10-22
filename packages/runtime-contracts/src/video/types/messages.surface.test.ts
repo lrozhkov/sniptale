@@ -18,6 +18,7 @@ import {
   VideoRecordingStatus,
   DEFAULT_VIDEO_CURSOR_EFFECTS,
   isVideoCursorEffectSettings,
+  WEBCAM_DOCK_POSITIONS,
 } from './types';
 import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
@@ -29,6 +30,40 @@ const identity = {
 };
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
+
+it('validates old and new embedded camera placement commands', () => {
+  const presentation = DEFAULT_VIDEO_SETTINGS.webcamPresentation!;
+  const geometry = {
+    shape: presentation.shape,
+    center: presentation.center,
+    sizeFraction: presentation.sizeFraction,
+    cropOffset: presentation.cropOffset,
+  };
+  const command = (freePlacement: unknown, dockPosition?: unknown) => ({
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    surfaceSessionId: identity.surfaceSessionId,
+    surfaceToken: identity.surfaceToken,
+    documentGeneration: identity.documentGeneration,
+    capabilityEpoch: 4,
+    recordingId: null,
+    command: {
+      kind: 'update-embedded-camera',
+      appearance: {
+        ...geometry,
+        ...(freePlacement === undefined ? {} : { freePlacement }),
+        ...(dockPosition === undefined ? {} : { dockPosition }),
+      },
+    },
+  });
+  for (const value of [undefined, false, true])
+    expect(isVideoRecordingSurfaceCommandMessage(command(value))).toBe(true);
+  for (const value of [null, 'true', 1])
+    expect(isVideoRecordingSurfaceCommandMessage(command(value))).toBe(false);
+  for (const dockPosition of WEBCAM_DOCK_POSITIONS)
+    expect(isVideoRecordingSurfaceCommandMessage(command(false, dockPosition))).toBe(true);
+  for (const dockPosition of [null, 'center', 1])
+    expect(isVideoRecordingSurfaceCommandMessage(command(false, dockPosition))).toBe(false);
+});
 
 it('validates additive live click modes and contour fields without accepting unbounded styles', () => {
   for (const clickEffect of ['ripple', 'press', 'glow']) {
@@ -249,6 +284,17 @@ it('validates release, snapshot, and command authority fields narrowly', () => {
       snapshot,
     })
   ).toBe(true);
+  for (const freePlacement of [true, false, 'true', null]) {
+    expect(
+      isVideoRecordingSurfaceSnapshotMessage({
+        type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+        snapshot: {
+          ...snapshot,
+          webcamPresentation: { ...snapshot.webcamPresentation, freePlacement },
+        },
+      })
+    ).toBe(typeof freePlacement === 'boolean');
+  }
   expect(
     isVideoRecordingSurfaceActivation({
       surfaceSessionId: identity.surfaceSessionId,

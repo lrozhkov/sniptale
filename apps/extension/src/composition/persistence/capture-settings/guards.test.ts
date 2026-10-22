@@ -7,6 +7,7 @@ import {
   VideoFrameRate,
   VideoQuality,
   VideoResolutionPreset,
+  WEBCAM_DOCK_POSITIONS,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 
@@ -24,6 +25,36 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it('keeps old camera settings and admits only boolean free-placement preferences', () => {
+    const presentation = DEFAULT_VIDEO_SETTINGS.webcamPresentation!;
+    for (const freePlacement of [undefined, false, true]) {
+      const webcamPresentation = {
+        ...presentation,
+        ...(freePlacement === undefined ? {} : { freePlacement }),
+      };
+      expect(parseCurrentVideoSettings({ webcamPresentation }).value.webcamPresentation).toEqual(
+        webcamPresentation
+      );
+    }
+    for (const freePlacement of ['true', null, 1]) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, freePlacement } }).value
+          .webcamPresentation
+      ).toBeUndefined();
+    }
+    for (const dockPosition of WEBCAM_DOCK_POSITIONS) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, dockPosition } }).value
+          .webcamPresentation?.dockPosition
+      ).toBe(dockPosition);
+    }
+    for (const dockPosition of ['center', null, 1]) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, dockPosition } }).value
+          .webcamPresentation
+      ).toBeUndefined();
+    }
+  });
   it('preserves bounded cursor effects and refuses malformed appearance objects', () => {
     const cursorEffects = {
       haloSize: 48,

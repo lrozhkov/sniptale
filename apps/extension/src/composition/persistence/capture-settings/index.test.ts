@@ -129,6 +129,45 @@ async function verifyVideoUiStateContracts() {
   });
 }
 
+describe('camera placement persistence', () => {
+  beforeEach(resetVideoStorageMocks);
+
+  it('serializes camera placement with a parallel disjoint settings patch', async () => {
+    let stored = { ...DEFAULT_VIDEO_SETTINGS };
+    let releaseWrite!: () => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    browserStorageLocalGetMock.mockImplementation(async () => ({
+      sniptale_video_settings: stored,
+    }));
+    browserStorageLocalSetMock.mockImplementation(async (items) => {
+      markStarted();
+      await released;
+      stored = items.sniptale_video_settings;
+    });
+    const placement = patchVideoSettings({
+      webcamPresentation: {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+        freePlacement: true,
+      },
+    });
+    await started;
+    const microphone = patchVideoSettings({ microphoneEnabled: true });
+    expect(browserStorageLocalSetMock).toHaveBeenCalledOnce();
+    releaseWrite();
+    await Promise.all([placement, microphone]);
+    await expect(loadVideoSettings()).resolves.toMatchObject({
+      microphoneEnabled: true,
+      webcamPresentation: { freePlacement: true },
+    });
+  });
+});
+
 describe('video', () => {
   beforeEach(resetVideoStorageMocks);
 
@@ -246,6 +285,7 @@ describe('video', () => {
     });
     const remember = patchVideoSettings({
       warnWithoutMicrophone: false,
+      webcamPresentation: { ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!, freePlacement: true },
       recordingSurface: {
         toolbarEnabled: true,
         cursorSpotlightEnabled: true,
@@ -265,6 +305,7 @@ describe('video', () => {
     expect(erase).toHaveBeenCalledOnce();
     await expect(loadVideoSettings()).resolves.toMatchObject({ warnWithoutMicrophone: true });
     expect((await loadVideoSettings()).recordingSurface?.cursorEffects).toBeUndefined();
+    expect((await loadVideoSettings()).webcamPresentation?.freePlacement).toBeUndefined();
     await mutateVideoSettings((current) => ({
       ...current,
       recordingSurface: {

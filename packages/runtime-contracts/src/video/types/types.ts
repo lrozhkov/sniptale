@@ -254,8 +254,37 @@ export interface VideoRecordingSurfaceSettings {
   cursorEffects?: VideoCursorEffectSettings;
 }
 
+export const WEBCAM_DOCK_POSITIONS = [
+  'nw',
+  'n',
+  'ne',
+  'w',
+  'e',
+  'sw',
+  's',
+  'se',
+  'n25',
+  'n75',
+  's25',
+  's75',
+  'w25',
+  'w75',
+  'e25',
+  'e75',
+] as const;
+export type WebcamDockPosition = (typeof WEBCAM_DOCK_POSITIONS)[number];
+
+/** Admits only supported camera edge and corner anchors. */
+export function isWebcamDockPosition(value: unknown): value is WebcamDockPosition {
+  return WEBCAM_DOCK_POSITIONS.some((position) => position === value);
+}
+
 export interface WebcamPresentationSettings {
   mode: WebcamPresentationMode;
+  /** Missing or false enables anchored placement. */
+  freePlacement?: boolean;
+  /** Controls anchored geometry. Missing values preserve the legacy center quadrant. */
+  dockPosition?: WebcamDockPosition;
   shape: WebcamPresentationShape;
   center: { x: number; y: number };
   sizeFraction: number;

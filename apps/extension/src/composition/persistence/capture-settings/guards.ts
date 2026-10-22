@@ -2,6 +2,7 @@ import {
   CaptureMode,
   isVideoOutputProfile,
   isVideoCursorEffectSettings,
+  isWebcamDockPosition,
   normalizeVideoSourceCount,
   parseVideoRecordingProfiles,
   VIDEO_AUTO_FADE_DELAYS,
@@ -143,7 +144,17 @@ function parseOptionalWebcamPresentation(
 
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['mode', 'shape', 'center', 'sizeFraction', 'cropOffset']) ||
+    !hasExactKeys(value, [
+      'mode',
+      'shape',
+      'center',
+      'sizeFraction',
+      'cropOffset',
+      ...('freePlacement' in value ? ['freePlacement'] : []),
+      ...('dockPosition' in value ? ['dockPosition'] : []),
+    ]) ||
+    (value['freePlacement'] !== undefined && typeof value['freePlacement'] !== 'boolean') ||
+    (value['dockPosition'] !== undefined && !isWebcamDockPosition(value['dockPosition'])) ||
     !isString(value['mode']) ||
     !webcamPresentationModes.has(value['mode'] as WebcamPresentationMode) ||
     !isString(value['shape']) ||
@@ -168,6 +179,10 @@ function parseOptionalWebcamPresentation(
     center: { x: value['center']['x'], y: value['center']['y'] },
     sizeFraction: value['sizeFraction'],
     cropOffset: { x: value['cropOffset']['x'], y: value['cropOffset']['y'] },
+    ...(typeof value['freePlacement'] === 'boolean'
+      ? { freePlacement: value['freePlacement'] }
+      : {}),
+    ...(isWebcamDockPosition(value['dockPosition']) ? { dockPosition: value['dockPosition'] } : {}),
   };
 }
 

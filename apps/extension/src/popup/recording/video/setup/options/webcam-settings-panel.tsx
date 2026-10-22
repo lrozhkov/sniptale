@@ -15,7 +15,7 @@ import {
   useWebcamResolutionOptions,
 } from './webcam-quality-controls';
 import { WebcamPreview, useWebcamPreview } from './webcam-preview';
-import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
 
 type WebcamSettingsPanelProps = {
   captureMode: CaptureMode;
@@ -122,6 +122,15 @@ function WebcamEmbeddedPresentationControls({
 }) {
   return (
     <div className="grid gap-2 border-b border-[var(--sniptale-color-border-soft)] pb-2">
+      <label className="flex items-center justify-between gap-3 text-xs text-[var(--sniptale-color-text-secondary)]">
+        <span>{translate('popup.video.webcamFreePlacement')}</span>
+        <ProductToggle
+          size="sm"
+          checked={presentation.freePlacement === true}
+          aria-label={translate('popup.video.webcamFreePlacement')}
+          onClick={() => onChange({ freePlacement: !presentation.freePlacement })}
+        />
+      </label>
       <WebcamQualityOptionGroup
         activeValue={presentation.shape}
         labelKey="popup.video.webcamPresentationShapeLabel"

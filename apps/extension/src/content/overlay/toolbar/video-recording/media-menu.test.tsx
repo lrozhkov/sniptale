@@ -32,6 +32,47 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it.each([false, true])(
+  'exposes controlled free placement with selected state %s',
+  async (freePlacement) => {
+    const onFreePlacementChange = vi.fn();
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId={null}
+          onToggle={vi.fn()}
+          cameraPlacement={{
+            mode: 'embedded',
+            locked: false,
+            onChange: vi.fn(),
+            freePlacement,
+            onFreePlacementChange,
+          }}
+        />
+      )
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+    );
+    const option = host.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.video-recording.camera.free-placement"]'
+    )!;
+    expect(option.getAttribute('aria-pressed')).toBe(String(freePlacement));
+    expect(Boolean(option.querySelector('svg.lucide-check'))).toBe(freePlacement);
+    await act(async () => option.click());
+    expect(onFreePlacementChange).toHaveBeenCalledExactlyOnceWith(!freePlacement);
+    expect(option.disabled).toBe(false);
+  }
+);
+
 it.each(['audioinput', 'videoinput'] as const)(
   'marks only the selected %s device with a check',
   async (kind) => {

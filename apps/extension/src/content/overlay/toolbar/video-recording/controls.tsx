@@ -25,6 +25,7 @@ import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { RecordingDrawingControls, type RecordingDrawingInteractionMode } from './drawing-controls';
 import { RecordingMediaSplitControl } from './media-menu';
+import { constrainEmbeddedCameraGeometry } from '../../video-recording/camera/geometry';
 import { RecordingSpotlightMenu } from './spotlight-menu';
 import { ToolbarSettingsMenu } from '../capture/settings';
 import type { ToolbarMenuState } from '../state/menu';
@@ -288,6 +289,15 @@ function MediaControls(props: {
             ? {
                 cameraPlacement: {
                   mode: props.recording.state.webcamPresentation.mode,
+                  freePlacement: props.recording.state.webcamPresentation.freePlacement ?? false,
+                  onFreePlacementChange: (freePlacement: boolean) =>
+                    props.recording.onCameraGeometryChange({
+                      ...constrainEmbeddedCameraGeometry(props.recording.state.webcamPresentation, {
+                        width: window.innerWidth,
+                        height: window.innerHeight,
+                      }),
+                      freePlacement,
+                    }),
                   locked:
                     props.recording.state.phase !== 'idle' &&
                     props.recording.state.phase !== 'error',

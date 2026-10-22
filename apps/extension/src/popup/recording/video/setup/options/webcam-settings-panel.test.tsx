@@ -104,6 +104,14 @@ it('shows embedded presentation controls when explicitly selected for tab record
 
   expect(container?.textContent).toContain('popup.video.webcamPresentationEmbedded');
   expect(container?.textContent).toContain('popup.video.webcamPresentationCircle');
+  const freePlacement = container?.querySelector<HTMLButtonElement>(
+    '[aria-label="popup.video.webcamFreePlacement"]'
+  );
+  expect(freePlacement?.getAttribute('aria-checked')).toBe('false');
+  await act(async () => freePlacement?.click());
+  expect(onSettingsChange).toHaveBeenCalledWith({
+    webcamPresentation: expect.objectContaining({ freePlacement: true }),
+  });
   const sliders = container?.querySelectorAll<HTMLInputElement>('input[type="range"]');
   expect(sliders).toHaveLength(3);
   for (const slider of sliders ?? []) {
