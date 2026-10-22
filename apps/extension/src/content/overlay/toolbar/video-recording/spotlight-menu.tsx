@@ -1,4 +1,11 @@
-import { ChevronDown, CircleDot, MousePointer2, MousePointerClick, SunDim } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  CircleDot,
+  MousePointer2,
+  MousePointerClick,
+  SunDim,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_VIDEO_CURSOR_EFFECTS } from '@sniptale/runtime-contracts/video/types/types';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -62,6 +69,9 @@ function SpotlightOptionItems(props: {
     >
       <Icon size={18} />
       <ProductToolbarMenuItemCopy label={translate(labelKey)} />
+      {props.settings[key] ? (
+        <Check aria-hidden="true" className="h-4 w-4 text-[var(--sniptale-color-accent)]" />
+      ) : null}
     </ProductToolbarMenuItem>
   ));
 }
@@ -272,7 +282,7 @@ export function RecordingSpotlightMenu(props: RecordingSpotlightMenuProps) {
           >
             {state.advanced ? (
               <RecordingCursorSettingsPanel
-                disabled={props.disabled || state.updating}
+                disabled={props.disabled}
                 settings={state.draftSettings}
                 onChange={(next) => void state.save(next)}
                 onPreview={state.setDraftSettings}

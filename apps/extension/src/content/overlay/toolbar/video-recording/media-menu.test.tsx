@@ -32,6 +32,100 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it.each(['audioinput', 'videoinput'] as const)(
+  'marks only the selected %s device with a check',
+  async (kind) => {
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind={kind}
+          dataUi="test.media"
+          displayMode="horizontal"
+          label="Device"
+          selectedDeviceId="selected"
+          onToggle={vi.fn()}
+          onLoadDevices={async () => [
+            { deviceId: 'selected', kind, label: 'Selected device' },
+            { deviceId: 'other', kind, label: 'Other device' },
+          ]}
+        />
+      )
+    );
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[data-ui="test.media.menu"]')!.click()
+    );
+    const choices = host.querySelectorAll('.sniptale-popover-item');
+    expect(choices).toHaveLength(2);
+    expect(choices[0]!.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(choices[1]!.querySelector('svg.lucide-check')).toBeNull();
+  }
+);
+
+it('keeps camera placement and toolbar controls stable during a pending change', async () => {
+  let finish!: () => void;
+  const onToggle = vi.fn();
+  const onChange = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const render = (locked = false) =>
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          inactiveIcon={CameraOff}
+          disabled={false}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId="camera-1"
+          onToggle={onToggle}
+          onLoadDevices={async () => [
+            { deviceId: 'camera-1', kind: 'videoinput', label: 'Camera' },
+          ]}
+          cameraPlacement={{ mode: 'embedded', locked, onChange }}
+        />
+      )
+    );
+  render();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.menu"]')!.click()
+  );
+  const placement = host.querySelector(
+    '[data-ui="content.toolbar.video-recording.camera.placement"]'
+  )!;
+  const next = placement.querySelector<HTMLButtonElement>('button[aria-pressed="false"]')!;
+  act(() => {
+    next.click();
+    next.click();
+    host.querySelector<HTMLButtonElement>('[data-ui="test.camera.toggle"]')!.click();
+    host.querySelector<HTMLButtonElement>('.sniptale-popover-item')!.click();
+  });
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(onToggle).not.toHaveBeenCalled();
+  for (const control of host.querySelectorAll('button')) expect(control.disabled).toBe(false);
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
+  await act(async () => {
+    finish();
+  });
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.camera.placement"]')).toBe(
+    placement
+  );
+  expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
+  await act(async () => render(true));
+  expect(next.disabled).toBe(true);
+  act(() => next.click());
+  expect(onChange).toHaveBeenCalledOnce();
+});
+
 it('awaits device switching and keeps the menu open when the owner rejects it', async () => {
   const onDeviceChange = vi.fn().mockRejectedValue(new Error('Camera switch failed'));
   Object.defineProperty(navigator, 'mediaDevices', {

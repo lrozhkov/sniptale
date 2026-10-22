@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { RECORDING_TOOLBAR_CONTROLS } from '../../../../apps/extension/src/contracts/settings';
@@ -17,9 +17,149 @@ import { parseRuntimeResponseForMessage } from '../../../../apps/extension/src/c
 test.setTimeout(120000);
 test.use({ actionTimeout: 10000 });
 
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`recording media selection feedback ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
+    const diagnostics: string[] = [];
+    launched.context.on('console', (message) => {
+      if (message.type() === 'warning' || message.type() === 'error')
+        diagnostics.push(message.text());
+    });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      await popup.evaluate(
+        async ({ defaults, theme }) => {
+          await chrome.storage.local.set({
+            sniptale_video_settings: {
+              ...defaults,
+              microphoneEnabled: false,
+              webcamEnabled: false,
+              warnWithoutMicrophone: false,
+              webcamPresentation: { ...defaults.webcamPresentation!, mode: 'embedded' },
+            },
+            'sniptale-theme-preference': theme,
+          });
+        },
+        { defaults: DEFAULT_VIDEO_SETTINGS, theme: size.width === 1920 ? 'dark' : 'light' }
+      );
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+      const action = await triggerExtensionAction(launched.context, launched.extensionId, page);
+      await evaluateInTarget(launched.context, action, 'window.close()').catch(() => undefined);
+      await page.bringToFront();
+      for (const kind of ['microphone', 'camera']) {
+        if (kind === 'camera') {
+          const toggle = page.locator('[data-ui="content.toolbar.video-recording.camera.toggle"]');
+          await toggle.click();
+          await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+          const video = page.locator('[data-ui="content.video-recording.embedded-camera"] video');
+          await expect
+            .poll(() =>
+              video.evaluate(
+                (element) => element instanceof HTMLVideoElement && element.readyState >= 2
+              )
+            )
+            .toBe(true);
+        }
+        const trigger = page.locator(`[data-ui="content.toolbar.video-recording.${kind}.menu"]`);
+        const menu = page.locator(`[data-ui="content.toolbar.video-recording.${kind}.dropdown"]`);
+        await trigger.click();
+        const device = menu.locator('.sniptale-toolbar-menu-item:not([disabled])').first();
+        await expect(device).toBeVisible();
+        const label = await device.innerText();
+        await device.click();
+        await expect(menu).toHaveCount(0);
+        await trigger.click();
+        const selected = menu.getByRole('button', { name: label, exact: true });
+        await expect(selected.locator('svg.lucide-check')).toHaveCount(1);
+        await expect(menu.locator('svg.lucide-check')).toHaveCount(1);
+        if (kind === 'camera') {
+          const placement = menu.locator(
+            '[data-ui="content.toolbar.video-recording.camera.placement"]'
+          );
+          for (let change = 0; change < 2; change++) {
+            await observeStablePendingControls(menu);
+            const next = placement.locator('button[aria-pressed="false"]');
+            const nextLabel = await next.innerText();
+            await next.click();
+            await expect(
+              placement.getByRole('button', { name: nextLabel, exact: true })
+            ).toHaveAttribute('aria-pressed', 'true');
+            await expect(menu).toHaveAttribute('data-stability-result', '[]');
+          }
+        }
+        await page.screenshot({
+          path: info.outputPath(`${kind}-selected-check.png`),
+          fullPage: false,
+        });
+        await trigger.click();
+      }
+    } finally {
+      await info.attach('media-diagnostics.json', {
+        body: JSON.stringify(diagnostics),
+        contentType: 'application/json',
+      });
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
 async function openRecordingToolbarSettings(page: Page) {
   const trigger = page.locator('[data-ui="content.toolbar.settings-button"]');
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+}
+
+async function observeStablePendingControls(surface: Locator) {
+  await surface.evaluate((element) => {
+    element.setAttribute('data-stability-result', 'pending');
+    const group = element.closest('.sniptale-recording-media-control')!;
+    const controls = [...group.querySelectorAll('button, input')];
+    const opacity = controls.map((control) => getComputedStyle(control).opacity);
+    const violations: string[] = [];
+    let pending = false;
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.attributeName === 'disabled') violations.push('disabled');
+        if (
+          record.attributeName === 'class' &&
+          /opacity-50|cursor-not-allowed/u.test(record.oldValue ?? '')
+        )
+          violations.push('disabled-style');
+        if (record.attributeName === 'aria-busy' && record.oldValue === 'false') pending = true;
+      }
+      if (!element.isConnected || controls.some((control) => !group.contains(control)))
+        violations.push('remounted');
+      if (
+        controls.some(
+          (control, index) =>
+            control.matches(':disabled') ||
+            getComputedStyle(control).cursor === 'not-allowed' ||
+            getComputedStyle(control).opacity !== opacity[index]
+        )
+      )
+        violations.push('dimmed-or-forbidden');
+      if (pending && group.getAttribute('aria-busy') === 'false') {
+        observer.disconnect();
+        element.setAttribute('data-stability-result', JSON.stringify(violations));
+      }
+    });
+    observer.observe(group, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeOldValue: true,
+      attributeFilter: ['class', 'disabled', 'aria-busy'],
+    });
+  });
 }
 
 async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
@@ -92,9 +232,11 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
     });
     await choice.click();
     await expect(choice).toHaveAttribute('aria-pressed', previous === 'true' ? 'false' : 'true');
+    await expect(choice.locator('svg.lucide-check')).toHaveCount(previous === 'true' ? 0 : 1);
     await expect(quickMenu).toHaveAttribute('data-stability-result', '[]');
     await choice.click();
     await expect(choice).toHaveAttribute('aria-pressed', previous!);
+    await expect(choice.locator('svg.lucide-check')).toHaveCount(previous === 'true' ? 1 : 0);
     await expect(quick.locator('..')).toHaveAttribute('aria-busy', 'false');
   }
   await page.screenshot({ path: info.outputPath('stable-cursor-quick-menu.png'), fullPage: false });
@@ -277,7 +419,12 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
         return Math.abs(label.y + label.height / 2 - control.y - control.height / 2);
       })
     ).toBeLessThanOrEqual(1);
-    if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+    for (const enabled of [true, false, true]) {
+      await observeStablePendingControls(panel);
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-checked', String(enabled));
+      await expect(panel).toHaveAttribute('data-stability-result', '[]');
+    }
     if (choice.section === 0) {
       await toggle.focus();
       await page.keyboard.press('Space');
@@ -292,7 +439,9 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       await panel.locator('nav button').nth(choice.section).click();
       const input = panel.locator('input[type="text"]').nth(index);
       await input.fill(choice.values[index]!);
+      await observeStablePendingControls(panel);
       await input.press('Enter');
+      await expect(panel).toHaveAttribute('data-stability-result', '[]');
       const expected = Number(choice.values[index]) * (field === 'clickDuration' ? 1000 : 1);
       await expect
         .poll(() =>
@@ -547,6 +696,26 @@ for (const { name, size } of [
         await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
         await expectRecordingControlOrder(page, orientation, 'idle');
         await expectCursorSettings(page, popup, info);
+        for (const delay of [0, 3, 0]) {
+          const trigger = page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]');
+          const menu = page.locator('[data-ui="content.toolbar.video-recording.auto-hide-menu"]');
+          await trigger.click();
+          const choice = menu.locator(
+            `[data-ui="content.toolbar.video-recording.auto-hide-${delay}"]`
+          );
+          if ((await choice.locator('svg.lucide-check').count()) === 0) {
+            await choice.click();
+            await trigger.click();
+          }
+          await expect(choice.locator('svg.lucide-check')).toHaveCount(1);
+          await expect(menu.locator('svg.lucide-check')).toHaveCount(1);
+          if (delay === 3)
+            await page.screenshot({
+              path: info.outputPath('auto-hide-selected-check.png'),
+              fullPage: false,
+            });
+          await trigger.click();
+        }
         const bounds = await toolbar.boundingBox();
         expect(bounds).not.toBeNull();
         expect(bounds!.x).toBeGreaterThanOrEqual(-1);

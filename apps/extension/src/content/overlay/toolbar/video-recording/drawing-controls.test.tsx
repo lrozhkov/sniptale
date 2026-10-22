@@ -126,6 +126,49 @@ it('keeps the page-preparation drawing toolbar free of separate clear actions', 
   owner.dispose();
 });
 
+it('marks only the selected drawing auto-hide delay including off', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const owner = createRecordingDrawingOwner();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  for (const delay of [0, 3, 30] as const) {
+    owner.setAutoHideDelay(delay);
+    act(() =>
+      root.render(
+        <RecordingDrawingControls
+          compactMenus={false}
+          displayMode="horizontal"
+          interactionMode="navigation"
+          owner={owner}
+          onInteractionModeChange={vi.fn()}
+        />
+      )
+    );
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!
+        .click()
+    );
+    const selected = host.querySelector(
+      `[data-ui="content.toolbar.video-recording.auto-hide-${delay}"]`
+    )!;
+    expect(selected.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(
+      host.querySelectorAll(
+        '[data-ui="content.toolbar.video-recording.auto-hide-menu"] svg.lucide-check'
+      )
+    ).toHaveLength(1);
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!
+        .click()
+    );
+  }
+  act(() => root.unmount());
+  owner.dispose();
+});
+
 it('keeps recording tool options collapsed across tool switches until explicitly reopened', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const owner = createRecordingDrawingOwner();

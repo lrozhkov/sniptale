@@ -1,4 +1,4 @@
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { Check, ChevronDown, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
@@ -61,16 +61,21 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const [loading, setLoading] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
-  const runToggle = async () => {
+  const pendingRef = useRef(false);
+  const changeMedia = async (change: () => Promise<void> | void) => {
+    if (pendingRef.current || props.disabled) return;
+    pendingRef.current = true;
     setSwitching(true);
     try {
-      await props.onToggle();
+      await change();
     } catch {
       notifyRecordingMediaFailure();
     } finally {
+      pendingRef.current = false;
       setSwitching(false);
     }
   };
+  const runToggle = () => changeMedia(props.onToggle);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -136,33 +141,15 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
       setLocalOpen(true);
     }
   };
-  const selectDevice = async (deviceId: string) => {
-    setSwitching(true);
-    try {
+  const selectDevice = (deviceId: string) =>
+    changeMedia(async () => {
       await props.onDeviceChange?.(deviceId);
       closeMenu();
-    } catch {
-      notifyRecordingMediaFailure();
-    } finally {
-      setSwitching(false);
-    }
-  };
-  const selectPlacement = async (mode: WebcamPresentationMode) => {
-    if (
-      !props.cameraPlacement ||
-      props.cameraPlacement.locked ||
-      switching ||
-      mode === props.cameraPlacement.mode
-    )
-      return;
-    setSwitching(true);
-    try {
-      await props.cameraPlacement.onChange(mode);
-    } catch {
-      notifyRecordingMediaFailure();
-    } finally {
-      setSwitching(false);
-    }
+    });
+  const selectPlacement = (mode: WebcamPresentationMode) => {
+    const placement = props.cameraPlacement;
+    if (!placement || placement.locked || mode === placement.mode) return;
+    return changeMedia(() => placement.onChange(mode));
   };
   return {
     closeMenu,
@@ -226,6 +213,9 @@ function RecordingMediaDeviceMenu(props: {
             onClick={() => void control.selectDevice(device.deviceId)}
           >
             <ProductToolbarMenuItemCopy label={device.label} />
+            {device.deviceId === props.selectedDeviceId ? (
+              <Check aria-hidden="true" className="h-4 w-4 text-[var(--sniptale-color-accent)]" />
+            ) : null}
           </ProductToolbarMenuItem>
         ))}
         {props.cameraPlacement ? (
@@ -245,12 +235,12 @@ function RecordingMediaDeviceMenu(props: {
                   {
                     id: WebcamPresentationMode.EMBEDDED,
                     label: translate('popup.video.webcamPresentationEmbedded'),
-                    disabled: props.cameraPlacement.locked || control.switching,
+                    disabled: props.cameraPlacement.locked,
                   },
                   {
                     id: WebcamPresentationMode.SEPARATE_TRACK,
                     label: translate('popup.video.webcamPresentationSeparateTrack'),
-                    disabled: props.cameraPlacement.locked || control.switching,
+                    disabled: props.cameraPlacement.locked,
                   },
                 ]}
                 onChange={(mode) => void control.selectPlacement(mode)}
@@ -267,14 +257,17 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
   const control = useRecordingMediaControl(props);
   const Icon = props.active ? props.activeIcon : props.inactiveIcon;
   return (
-    <div className="sniptale-split-action sniptale-full-page-wrapper sniptale-recording-media-control">
+    <div
+      className="sniptale-split-action sniptale-full-page-wrapper sniptale-recording-media-control"
+      aria-busy={control.switching}
+    >
       <ContentToolbarButton
         type="button"
         tone="property"
         className="sniptale-split-action-start sniptale-full-page-primary"
         active={props.active}
         aria-pressed={props.active}
-        disabled={props.disabled || control.switching}
+        disabled={props.disabled}
         title={props.label}
         dataUi={`${props.dataUi}.toggle`}
         onClick={() => void control.runToggle()}
@@ -286,7 +279,7 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         tone="property"
         ref={control.triggerRef}
         className="sniptale-split-action-end sniptale-full-page-chevron"
-        disabled={props.disabled || control.switching}
+        disabled={props.disabled}
         aria-expanded={control.open}
         aria-haspopup="menu"
         title={props.label}

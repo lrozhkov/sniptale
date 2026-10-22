@@ -279,6 +279,8 @@ it('keeps quick cursor choices visually stable while admitting only one pending 
   });
   expect(onChange).toHaveBeenCalledOnce();
   expect(choices[0]!.getAttribute('aria-pressed')).toBe('true');
+  expect(choices[0]!.querySelector('svg.lucide-check')).not.toBeNull();
+  expect(choices[1]!.querySelector('svg.lucide-check')).toBeNull();
   for (const choice of choices) {
     expect(choice.disabled).toBe(false);
     expect(choice.classList.contains('cursor-not-allowed')).toBe(false);
@@ -297,7 +299,7 @@ it('keeps quick cursor choices visually stable while admitting only one pending 
   act(() => root.unmount());
 });
 
-it('admits only one pending cursor change from repeated activation', async () => {
+it('keeps advanced controls stable while admitting only one pending cursor change', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let finish!: () => void;
   const pending = new Promise<void>((resolve) => {
@@ -330,16 +332,26 @@ it('admits only one pending cursor change from repeated activation', async () =>
       ?.click()
   );
   const toggle = host.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  const panel = host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]');
+  const controls = [...panel!.querySelectorAll('input, button')];
   act(() => {
     toggle.click();
     toggle.click();
   });
   expect(onChange).toHaveBeenCalledOnce();
-  expect(toggle.disabled).toBe(true);
+  expect(toggle.disabled).toBe(false);
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  for (const control of controls) expect(control.hasAttribute('disabled')).toBe(false);
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
   await act(async () => {
     finish();
     await pending;
   });
   expect(toggle.disabled).toBe(false);
+  expect(host.querySelector('[data-ui="content.toolbar.video-recording.cursor-panel"]')).toBe(
+    panel
+  );
+  expect([...panel!.querySelectorAll('input, button')]).toEqual(controls);
+  expect(host.querySelector('[aria-busy="false"]')).not.toBeNull();
   act(() => root.unmount());
 });

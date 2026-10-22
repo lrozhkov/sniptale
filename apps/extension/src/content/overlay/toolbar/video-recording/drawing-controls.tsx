@@ -1,4 +1,4 @@
-import { BrushCleaning, Clock3, Eraser, Touchpad, type LucideIcon } from 'lucide-react';
+import { BrushCleaning, Check, Clock3, Eraser, Touchpad, type LucideIcon } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -158,6 +158,12 @@ function AutoHideControl(props: {
                       : `${delay} ${translate('content.toolbar.recordingDrawingAutoHideSeconds')}`
                   }
                 />
+                {props.delay === delay ? (
+                  <Check
+                    aria-hidden="true"
+                    className="h-4 w-4 text-[var(--sniptale-color-accent)]"
+                  />
+                ) : null}
               </ProductToolbarMenuItem>
             ))}
           </ProductToolbarMenu>
