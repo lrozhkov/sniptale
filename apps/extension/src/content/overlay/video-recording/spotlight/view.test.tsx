@@ -11,6 +11,139 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.replaceChildren();
+  vi.unstubAllGlobals();
+});
+
+function mountClickFeedback() {
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn(() => 1)
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  act(() =>
+    root?.render(
+      <VideoRecordingSpotlight
+        cursorHaloEnabled={false}
+        cursorDimmingEnabled={false}
+        clickAnimationEnabled
+      />
+    )
+  );
+  return host;
+}
+
+function deliver(type: string, clientX = 0, detail = 1) {
+  const event = new MouseEvent(type, { bubbles: true, clientX, clientY: 20, detail });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  act(() => document.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(false);
+}
+
+const RIPPLE = '[data-ui="content.video-recording.spotlight-click"]';
+
+it.each(['selection-drag', 'return-to-origin', 'cancel', 'native-drag', 'blur'])(
+  'does not animate %s completion and accepts the next click',
+  (gesture) => {
+    const host = mountClickFeedback();
+    deliver('pointerdown');
+    if (gesture === 'selection-drag' || gesture === 'return-to-origin') deliver('pointermove', 30);
+    if (gesture === 'cancel') deliver('pointercancel');
+    if (gesture === 'native-drag') deliver('dragstart');
+    if (gesture === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+    const end = gesture === 'selection-drag' ? 30 : 0;
+    deliver('pointerup', end);
+    deliver('click', end);
+    expect(host.querySelector(RIPPLE)).toBeNull();
+    deliver('pointerdown', 50);
+    deliver('pointerup', 50);
+    deliver('click', 50);
+    expect(host.querySelector(RIPPLE)).not.toBeNull();
+  }
+);
+
+it.each([0, 3, 4])('preserves a click with %s CSS px of pointer jitter', (distance) => {
+  const host = mountClickFeedback();
+  deliver('pointerdown');
+  deliver('pointermove', distance);
+  deliver('pointerup', distance);
+  deliver('click', distance);
+  expect(host.querySelector(RIPPLE)).not.toBeNull();
+});
+
+it('suppresses a new short text selection without suppressing a click beside an existing selection', () => {
+  const host = mountClickFeedback();
+  const text = document.createTextNode('Select this text');
+  document.body.append(text);
+  deliver('pointerdown');
+  const range = document.createRange();
+  range.setStart(text, 0);
+  range.setEnd(text, 1);
+  document.getSelection()!.addRange(range);
+  deliver('pointerup', 1);
+  deliver('click', 1);
+  expect(host.querySelector(RIPPLE)).toBeNull();
+  deliver('pointerdown', 50);
+  deliver('pointerup', 50);
+  deliver('click', 50);
+  expect(host.querySelector(RIPPLE)).not.toBeNull();
+});
+
+it('does not carry drag suppression into a virtual click', () => {
+  const host = mountClickFeedback();
+  deliver('pointerdown');
+  deliver('pointermove', 30);
+  deliver('pointerup', 30);
+  deliver('click', 30, 0);
+  expect(host.querySelector(RIPPLE)).not.toBeNull();
+});
+
+it('preserves double-click feedback when the browser selects a word', () => {
+  const host = mountClickFeedback();
+  const text = document.createTextNode('word');
+  document.body.append(text);
+  deliver('pointerdown');
+  const range = document.createRange();
+  range.selectNodeContents(text);
+  document.getSelection()!.addRange(range);
+  deliver('pointerup');
+  deliver('click', 0, 2);
+  expect(host.querySelector(RIPPLE)).not.toBeNull();
+});
+
+it('does not cancel an ordinary click when focus moves between page controls', () => {
+  const host = mountClickFeedback();
+  const button = document.createElement('button');
+  document.body.append(button);
+  deliver('pointerdown');
+  act(() => button.dispatchEvent(new Event('blur')));
+  deliver('pointerup');
+  deliver('click');
+  expect(host.querySelector(RIPPLE)).not.toBeNull();
+});
+
+it('removes gesture tracking when click feedback is disabled but halo stays enabled', () => {
+  mountClickFeedback();
+  deliver('pointerdown');
+  const remove = vi.spyOn(document, 'removeEventListener');
+  const removeWindow = vi.spyOn(window, 'removeEventListener');
+  act(() =>
+    root?.render(
+      <VideoRecordingSpotlight
+        cursorHaloEnabled
+        cursorDimmingEnabled={false}
+        clickAnimationEnabled={false}
+      />
+    )
+  );
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'dragstart', 'click']) {
+    expect(remove).toHaveBeenCalledWith(type, expect.any(Function), true);
+  }
+  expect(removeWindow).toHaveBeenCalledWith('blur', expect.any(Function), true);
+  remove.mockRestore();
+  removeWindow.mockRestore();
 });
 
 it('does not subscribe to page pointer events while every effect is disabled', () => {
