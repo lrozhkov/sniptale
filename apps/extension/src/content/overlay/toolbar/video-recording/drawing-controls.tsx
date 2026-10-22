@@ -7,7 +7,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ContentToolbarButton, ContentToolbarDelayIndicator } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -133,18 +133,12 @@ function AutoHideControl(props: {
           else setLocalOpen(true);
         }}
       >
-        {props.delay > 0 ? (
-          <span
-            aria-hidden="true"
-            className="sniptale-timer-badge"
-            data-ui="content.toolbar.video-recording.auto-hide-value"
-            style={{ color: 'var(--sniptale-color-text-secondary)' }}
-          >
-            {props.delay}
-          </span>
-        ) : (
+        <ContentToolbarDelayIndicator
+          value={props.delay}
+          dataUi="content.toolbar.video-recording.auto-hide-value"
+        >
           <BroomSparkles size={18} />
-        )}
+        </ContentToolbarDelayIndicator>
       </ContentToolbarButton>
       {open && dropdown.style ? (
         <ToolbarMenuDropdown

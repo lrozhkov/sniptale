@@ -1,5 +1,47 @@
 import { expect, test } from '../support/extension-fixture';
+import type { Page, TestInfo } from '@playwright/test';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+
+async function expectScreenshotDelayIndicator(page: Page, info: TestInfo, orientation: string) {
+  const trigger = page.locator('[data-ui="content.toolbar.timer-button"]');
+  for (const [index, delay] of [
+    [1, 3],
+    [2, 5],
+    [3, 10],
+    [0, 0],
+  ] as const) {
+    await trigger.click();
+    await page
+      .locator('[data-ui="content.toolbar.timer-menu"] .sniptale-toolbar-menu-item')
+      .nth(index)
+      .click();
+    const value = trigger.locator('[data-ui="content.toolbar.timer-value"]');
+    if (delay === 0) {
+      await expect(value).toHaveCount(0);
+      await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
+      continue;
+    }
+    await expect(value).toHaveText(String(delay));
+    await expect(trigger).not.toHaveAttribute('data-menu-indicator');
+    for (const size of [29, 30, 31]) {
+      await trigger.evaluate(
+        (node, size) => node.style.setProperty('--sniptale-toolbar-button-size', `${size}px`),
+        size
+      );
+      const icon = trigger.locator('.sniptale-toolbar-delay-icon');
+      if (size < 30) await expect(icon).toBeHidden();
+      else await expect(icon).toBeVisible();
+      await expect(value).toHaveCSS('position', size < 30 ? 'static' : 'absolute');
+      await expect(value).toHaveCSS('font-size', size < 30 ? '13px' : '9px');
+      if (delay === 10)
+        await page.screenshot({
+          path: info.outputPath(`timer-${orientation}-${size}.png`),
+          fullPage: false,
+        });
+    }
+    await trigger.evaluate((node) => node.style.removeProperty('--sniptale-toolbar-button-size'));
+  }
+}
 function readFocusPaint(element: Element) {
   const style = getComputedStyle(element);
   return {
@@ -173,6 +215,7 @@ for (const appearance of [
         await expect(trigger).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
         await page.keyboard.press('Escape');
         await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        if (mode === 'cursor') await expectScreenshotDelayIndicator(page, info, orientation);
       }
     }
   });

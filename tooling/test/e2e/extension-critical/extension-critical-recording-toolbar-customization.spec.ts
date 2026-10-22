@@ -773,17 +773,21 @@ async function expectRecordingControlOrder(
 async function expectAutoHideValue(trigger: Locator, delay: number) {
   const icon = trigger.locator('svg.lucide-broom-sparkles');
   const value = trigger.locator('[data-ui="content.toolbar.video-recording.auto-hide-value"]');
+  const compressed = await trigger
+    .locator('.sniptale-toolbar-delay')
+    .evaluate((node) => node.clientWidth < 28 || node.clientHeight < 28);
   if (delay === 0) {
     await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
     await expect(value).toHaveCount(0);
     await expect(icon).toBeVisible();
   } else {
-    await expect(icon).toHaveCount(0);
+    if (compressed) await expect(icon).toBeHidden();
+    else await expect(icon).toBeVisible();
     await expect(value).toHaveText(String(delay));
-    await expect(value).toHaveCSS('font-size', '13px');
+    await expect(value).toHaveCSS('font-size', compressed ? '13px' : '9px');
     await expect(trigger).not.toHaveAttribute('data-menu-indicator');
   }
-  const center = await (delay === 0 ? icon : value).evaluate((node) => {
+  const center = await (delay === 0 || !compressed ? icon : value).evaluate((node) => {
     const icon = node.getBoundingClientRect();
     const button = node.closest('button')!.getBoundingClientRect();
     const content = node.closest('.sniptale-command-content');
@@ -840,6 +844,16 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             .click();
           await expectAutoHideValue(trigger, delay);
           await page.screenshot({ path: info.outputPath(`delay-${delay}.png`), fullPage: false });
+        }
+        await trigger.click();
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide-30"]').click();
+        for (const size of [29, 30, 31]) {
+          await trigger.evaluate(
+            (node, size) => node.style.setProperty('--sniptale-toolbar-button-size', `${size}px`),
+            size
+          );
+          await expectAutoHideValue(trigger, 30);
+          await page.screenshot({ path: info.outputPath(`button-${size}.png`), fullPage: false });
         }
       } finally {
         await closeExtensionBrowser(launched);
