@@ -95,12 +95,42 @@ for (const theme of ['light', 'dark']) {
         await expect(panel.locator('.sniptale-selection-size-confirm-button')).toHaveAccessibleName(
           /Start recording|Начать запись/
         );
+        const confirm = panel.locator('.sniptale-selection-size-confirm-button');
+        await page.mouse.move(viewport.size.width - 4, viewport.size.height - 4);
+        const idleColor = await confirm.evaluate((element) => getComputedStyle(element).color);
+        const idleBounds = (await confirm.boundingBox())!;
+        await confirm.hover();
+        await expect(confirm).not.toHaveCSS('color', idleColor);
+        await confirm.evaluate(async (element) => {
+          await Promise.all(element.getAnimations().map((animation) => animation.finished));
+        });
+        const hoverColor = await confirm.evaluate((element) => getComputedStyle(element).color);
+        const hoverBounds = (await confirm.boundingBox())!;
+        expect(Math.abs(idleBounds.width - hoverBounds.width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(idleBounds.height - hoverBounds.height)).toBeLessThanOrEqual(1);
         const chooseRatio = async (value: string) => {
           await ratio.click();
           await expect(ratio).toHaveAttribute('aria-expanded', 'true');
           await expect(ratio.locator('svg')).toHaveClass(/rotate-180/);
           const menu = page.getByRole('listbox');
           await expect(menu).toBeVisible();
+          const menuMetrics = await menu.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return {
+              scrollHeight: element.scrollHeight,
+              clientHeight: element.clientHeight,
+              availableHeight:
+                getComputedStyle(element).transform === 'none'
+                  ? innerHeight - bounds.top - 8
+                  : bounds.bottom - 8,
+            };
+          });
+          if (menuMetrics.availableHeight >= menuMetrics.scrollHeight) {
+            expect(menuMetrics.scrollHeight - menuMetrics.clientHeight).toBeLessThanOrEqual(1);
+          } else {
+            await expect(menu).toHaveCSS('overflow-y', 'auto');
+            expect(menuMetrics.clientHeight).toBeLessThanOrEqual(menuMetrics.availableHeight + 1);
+          }
           await expect(menu.getByRole('option').first()).toHaveCSS('font-weight', '400');
           expect(await menu.evaluate((element) => getComputedStyle(element).fontFamily)).toContain(
             'Sniptale Interface'
@@ -181,10 +211,32 @@ for (const theme of ['light', 'dark']) {
         await ratio.click();
         await overlayMessage(false);
         await expect(page.getByRole('listbox')).toHaveCount(0);
+        await page.setViewportSize({ width: viewport.size.width, height: 220 });
+        await overlayMessage(true);
+        await ratio.click();
+        const constrainedMenu = page.getByRole('listbox');
+        expect(
+          await constrainedMenu.evaluate((element) => element.scrollHeight - element.clientHeight)
+        ).toBeGreaterThan(1);
+        await constrainedMenu.getByRole('option').last().scrollIntoViewIfNeeded();
+        expect(await constrainedMenu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+        await page.screenshot({
+          path: info.outputPath('region-ratio-constrained.png'),
+          fullPage: false,
+        });
+        await constrainedMenu.getByRole('option').last().click();
+        await expect(ratio).toHaveText('9:16');
+        await overlayMessage(false);
+        await page.setViewportSize(viewport.size);
         await selectCrop(page, { x: 300, y: 100, width: 321, height: 181 });
         await page.locator('[data-ui="content.crop.mode.resize"]').click();
         const frame = page.locator('.sniptale-selection-final-frame');
         const cropPanel = page.locator('.sniptale-selection-toolbar');
+        const cropConfirm = cropPanel.locator('.sniptale-selection-size-confirm-button');
+        await page.mouse.move(viewport.size.width - 4, viewport.size.height - 4);
+        await expect(cropConfirm).toHaveCSS('color', idleColor);
+        await cropConfirm.hover();
+        await expect(cropConfirm).toHaveCSS('color', hoverColor);
         expect((await frame.boundingBox())!.width).toBe(321);
         const corner = (await frame.locator('[data-direction="se"]').boundingBox())!;
         await page.mouse.move(corner.x + corner.width / 2, corner.y + corner.height / 2);
