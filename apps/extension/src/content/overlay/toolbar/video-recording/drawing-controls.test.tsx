@@ -234,6 +234,7 @@ it('keeps recording tool options collapsed across tool switches until explicitly
 it('does not let the recording eraser capture toolbar or popover pointer gestures', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const owner = createRecordingDrawingOwner();
+  const erasePath = vi.spyOn(owner, 'erasePath');
   const host = document.createElement('div');
   host.className = 'sniptale-app';
   document.body.append(host);
@@ -253,6 +254,9 @@ it('does not let the recording eraser capture toolbar or popover pointer gesture
   const toolbarButton = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.video-recording.auto-hide"]'
   )!;
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')?.textContent
+  ).toContain('.sniptale-drawing-canvas[tabindex="0"]');
   const toolbarPointerDown = new MouseEvent('pointerdown', {
     bubbles: true,
     cancelable: true,
@@ -274,6 +278,41 @@ it('does not let the recording eraser capture toolbar or popover pointer gesture
   });
   Object.defineProperty(pagePointerDown, 'pointerId', { value: 2 });
   expect(pageTarget.dispatchEvent(pagePointerDown)).toBe(false);
+
+  act(() =>
+    root.render(
+      <RecordingDrawingControls
+        compactMenus={false}
+        displayMode="horizontal"
+        interactionMode="navigation"
+        owner={owner}
+        onInteractionModeChange={vi.fn()}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')
+  ).toBeNull();
+  const lateUp = new MouseEvent('pointerup', { bubbles: true, cancelable: true, composed: true });
+  Object.defineProperty(lateUp, 'pointerId', { value: 2 });
+  expect(pageTarget.dispatchEvent(lateUp)).toBe(true);
+  expect(erasePath).not.toHaveBeenCalled();
+
+  act(() =>
+    root.render(
+      <RecordingDrawingControls
+        compactMenus={false}
+        disabled
+        displayMode="horizontal"
+        interactionMode="eraser"
+        owner={owner}
+        onInteractionModeChange={vi.fn()}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')
+  ).toBeNull();
 
   act(() => root.unmount());
   owner.dispose();

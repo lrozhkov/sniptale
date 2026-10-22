@@ -82,14 +82,26 @@ function isDrawingEditableKeyboardTarget(event: KeyboardEvent): boolean {
 function isDrawingKeyboardSurface(event: KeyboardEvent): boolean {
   const contentRoot = resolveContentShadowRoot();
   if (!contentRoot) return false;
-  return event
-    .composedPath()
-    .some(
-      (target) =>
-        target instanceof Element &&
-        target.getRootNode() === contentRoot &&
-        Boolean(target.closest('.sniptale-drawing-canvas, [data-ui="shared.ui.content-toolbar"]'))
+  return event.composedPath().some((target) => {
+    if (!(target instanceof Element) || target.getRootNode() !== contentRoot) return false;
+    const positioner = target.closest('.sniptale-toolbar-positioner');
+    if (
+      positioner &&
+      (positioner.matches('[data-dragging="true"]') ||
+        positioner.querySelector('[data-ui="content.toolbar.root"][inert]'))
+    )
+      return false;
+    return Boolean(
+      target.closest(
+        [
+          '.sniptale-drawing-canvas',
+          '[data-ui="shared.ui.content-toolbar"]',
+          '[data-ui="content.toolbar.root"]',
+          '.sniptale-toolbar-positioner',
+        ].join(', ')
+      )
     );
+  });
 }
 
 function hasHigherContentKeyboardLayer(event: KeyboardEvent): boolean {
@@ -147,6 +159,9 @@ export function useDrawingEscapeOwnership(args: {
         args.cancelText();
         args.session.select(null);
         args.session.setActiveTool('select');
+        const focused = resolveContentShadowRoot()?.activeElement;
+        if (focused instanceof HTMLElement && focused.matches('.sniptale-toolbar-positioner'))
+          focused.blur();
         args.onExit?.();
         return;
       }

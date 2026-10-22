@@ -159,6 +159,109 @@ async function expectStableSplitFill(group: Locator, destination: Locator) {
   );
 }
 
+async function drawingCanvasHasInk(canvas: Locator) {
+  return canvas.evaluate((node) => {
+    if (!(node instanceof HTMLCanvasElement)) throw new Error('Expected drawing canvas');
+    const context = node.getContext('2d')!;
+    const pixels = context.getImageData(0, 0, node.width, node.height).data;
+    for (let index = 3; index < pixels.length; index += 4) if (pixels[index]! > 0) return true;
+    return false;
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`recording eraser cursor and Escape ${name} ${orientation}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size });
+      try {
+        const worker =
+          launched.context.serviceWorkers()[0] ??
+          (await launched.context.waitForEvent('serviceworker'));
+        await worker.evaluate(
+          async (theme) => {
+            await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+          },
+          size.width === 1920 ? 'dark' : 'light'
+        );
+        const { page } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        if (orientation === 'vertical') {
+          await openRecordingToolbarSettings(page);
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+          await page.keyboard.press('Escape');
+        }
+        const canvas = page.locator('.sniptale-drawing-canvas').first();
+        const eraser = page.locator('[data-ui="content.toolbar.video-recording.eraser"]');
+        const navigation = page.locator('[data-ui="content.toolbar.video-recording.navigation"]');
+        let pencilCursor = '';
+        for (const tool of ['pencil', 'text', 'arrow']) {
+          await page.locator(`[data-ui="content.toolbar.drawing.${tool}"]`).click();
+          await expect(canvas).toHaveCSS('pointer-events', 'auto');
+          const previousCursor = await canvas.evaluate((node) => getComputedStyle(node).cursor);
+          if (tool === 'pencil') pencilCursor = previousCursor;
+          await eraser.click();
+          await expect(canvas).not.toHaveCSS('cursor', previousCursor);
+          await expect(eraser).toHaveAttribute('data-active', 'true');
+          await page.screenshot({
+            path: info.outputPath(`eraser-after-${tool}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+          await expect(navigation).toHaveAttribute('data-active', 'true');
+          await expect(canvas).toHaveCSS('pointer-events', 'none');
+          await expect(page.locator('.sniptale-toolbar-positioner')).not.toBeFocused();
+        }
+        await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+        await page.mouse.move(500, 300);
+        await page.mouse.down();
+        await page.mouse.move(560, 320, { steps: 6 });
+        await page.mouse.up();
+        await expect.poll(() => drawingCanvasHasInk(canvas)).toBe(true);
+        await eraser.click();
+        await page.mouse.move(500, 300);
+        await page.mouse.down();
+        await page.keyboard.press('Escape');
+        await page.mouse.up();
+        await expect(navigation).toHaveAttribute('data-active', 'true');
+        await expect.poll(() => drawingCanvasHasInk(canvas)).toBe(true);
+        await eraser.click();
+        await page.mouse.move(500, 300);
+        await page.mouse.down();
+        await page.mouse.move(560, 320, { steps: 6 });
+        await page.mouse.up();
+        await expect.poll(() => drawingCanvasHasInk(canvas)).toBe(false);
+        await page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]').click();
+        await page.keyboard.press('Escape');
+        await expect(eraser).toHaveAttribute('data-active', 'true');
+        await page.keyboard.press('Escape');
+        await expect(navigation).toHaveAttribute('data-active', 'true');
+        await page.screenshot({ path: info.outputPath('eraser-navigation.png'), fullPage: false });
+        await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+        await expect(canvas).toHaveCSS('cursor', pencilCursor);
+        await page.screenshot({
+          path: info.outputPath('pencil-cursor-restored.png'),
+          fullPage: false,
+        });
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+  }
+}
+
 async function expectRecordingSplitChrome(
   page: Page,
   info: TestInfo,

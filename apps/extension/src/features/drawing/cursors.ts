@@ -20,7 +20,15 @@ function arrowGlyph(path: string, stroke = '#172033'): string {
 }
 
 // The shared contact mark leaves the gesture origin visible; tool art sits away from it.
-const art: Record<'pencil' | 'marker' | 'arrow' | 'arrowFromTip' | 'blur', CursorArt> = {
+const art: Record<'pencil' | 'marker' | 'eraser' | 'arrow' | 'arrowFromTip' | 'blur', CursorArt> = {
+  eraser: {
+    svg: [
+      `<path d="m4 15 10-10a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3L11 22H8l-4-4a2 2 0 0 1 0-3Z" ${outline}/>`,
+      '<path d="m10 9 7 7M8 22h8" fill="none" stroke="#172033" stroke-width="1.3"/>',
+    ].join(''),
+    x: 4,
+    y: 18,
+  },
   pencil: {
     svg: `<path d="M4 20l3.8-1.1L20 6.7 17.3 4 5.1 16.2 4 20Z" ${outline}/><path d="m15.7 5.6 2.7 2.7M5.1 16.2l2.7 2.7" fill="none" stroke="#172033" stroke-width="1.3"/>`,
     x: 4,
@@ -64,6 +72,7 @@ function svgCursor(cursorArt: CursorArt): string {
 }
 
 const cursors = {
+  eraser: svgCursor(art.eraser),
   pencil: svgCursor(art.pencil),
   marker: svgCursor(art.marker),
   arrow: svgCursor(art.arrow),
@@ -71,8 +80,14 @@ const cursors = {
   blur: svgCursor(art.blur),
 };
 
-export function resolveDrawingToolCursor(tool: DrawingTool, arrowDrawFromTip = false): string {
+/** Eraser is a cursor presentation kind, not a persistent DrawingTool. */
+export function resolveDrawingToolCursor(
+  tool: DrawingTool | 'eraser',
+  arrowDrawFromTip = false
+): string {
   switch (tool) {
+    case 'eraser':
+      return cursors.eraser;
     case 'pencil':
       return cursors.pencil;
     case 'marker':

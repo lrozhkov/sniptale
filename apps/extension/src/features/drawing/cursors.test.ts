@@ -1,6 +1,16 @@
 import { expect, it } from 'vitest';
 import { resolveDrawingToolCursor } from './cursors';
 
+it('uses distinct outlined eraser art with a contact hotspot', () => {
+  const cursor = resolveDrawingToolCursor('eraser');
+  expect(cursor).toContain(') 4 18, crosshair');
+  expect(decodeURIComponent(cursor)).toContain('viewBox="0 0 24 24"');
+  expect(decodeURIComponent(cursor)).toContain('m4 15 10-10');
+  expect(decodeURIComponent(cursor)).toContain('fill="white"');
+  for (const tool of ['pencil', 'marker', 'arrow', 'blur', 'text', 'shape', 'select'] as const)
+    expect(cursor).not.toBe(resolveDrawingToolCursor(tool));
+});
+
 it('keeps the gesture origin clear while showing arrow direction and the blur region', () => {
   for (const [tool, fromTip] of [
     ['arrow', false],

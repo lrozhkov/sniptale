@@ -13,7 +13,11 @@ import {
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
-import type { DrawingSessionSnapshot, DrawingTool } from '../../../../features/drawing/public';
+import {
+  resolveDrawingToolCursor,
+  type DrawingSessionSnapshot,
+  type DrawingTool,
+} from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
 import { ToolbarDrawingControls, type ToolbarDrawingControlsOwner } from '../controls/drawing';
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
@@ -344,6 +348,11 @@ export function RecordingDrawingControls(props: {
   };
   return (
     <fieldset disabled={props.disabled} className="contents">
+      {!props.disabled && props.interactionMode === 'eraser' ? (
+        <style data-ui="content.toolbar.video-recording.eraser-cursor">
+          {`.sniptale-drawing-canvas[tabindex="0"] { cursor: ${resolveDrawingToolCursor('eraser')} !important; }`}
+        </style>
+      ) : null}
       <ToolbarDrawingControls
         controller={props.owner.controller}
         displayMode={props.displayMode}
