@@ -126,7 +126,7 @@ function AutoHideControl(props: {
         title={triggerLabel}
         dataUi="content.toolbar.video-recording.auto-hide"
         style={{ padding: 0 }}
-        menuIndicator
+        menuIndicator={props.delay === 0}
         onClick={() => {
           if (open) closeMenu();
           else if (props.toolbarMenuState) props.toolbarMenuState.toggleMenu('recording-auto-hide');
@@ -137,22 +137,24 @@ function AutoHideControl(props: {
           style={{
             position: 'relative',
             display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             flexShrink: 0,
             width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
             height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
           }}
         >
-          <BroomSparkles size={18} style={{ position: 'absolute', left: 4, top: 4 }} />
+          <BroomSparkles size={18} />
           {props.delay > 0 && (
             <span
               aria-hidden="true"
               data-ui="content.toolbar.video-recording.auto-hide-value"
               style={{
                 position: 'absolute',
-                right: 4,
+                right: 1,
                 bottom: 1,
                 color: 'var(--sniptale-color-text-secondary)',
-                fontSize: 10,
+                fontSize: 9,
                 fontWeight: 500,
                 lineHeight: 1,
                 fontVariantNumeric: 'tabular-nums',

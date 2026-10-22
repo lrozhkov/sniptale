@@ -774,12 +774,27 @@ async function expectAutoHideValue(trigger: Locator, delay: number) {
   const icon = trigger.locator('svg.lucide-broom-sparkles');
   await expect(icon).toBeVisible();
   await expect(icon).toHaveAttribute('width', '18');
+  const center = await icon.evaluate((node) => {
+    const icon = node.getBoundingClientRect();
+    const button = node.closest('button')!.getBoundingClientRect();
+    const content = node.closest('.sniptale-command-content');
+    const transform = content ? getComputedStyle(content).transform : 'none';
+    const press = new DOMMatrixReadOnly(transform === 'none' ? undefined : transform);
+    return {
+      x: icon.x + icon.width / 2 - (button.x + button.width / 2) - press.m41,
+      y: icon.y + icon.height / 2 - (button.y + button.height / 2) - press.m42,
+    };
+  });
+  expect(Math.abs(center.x)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(center.y)).toBeLessThanOrEqual(0.5);
   const value = trigger.locator('[data-ui="content.toolbar.video-recording.auto-hide-value"]');
   if (delay === 0) {
+    await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
     await expect(value).toHaveCount(0);
     return null;
   }
   await expect(value).toHaveText(String(delay));
+  await expect(trigger).not.toHaveAttribute('data-menu-indicator');
   const appearance = await value.evaluate((node) => {
     const button = node.closest('button')!;
     const icon = button.querySelector('svg')!.getBoundingClientRect();

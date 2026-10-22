@@ -151,12 +151,17 @@ it('marks only the selected drawing auto-hide delay including off', () => {
     const trigger = host.querySelector<HTMLButtonElement>(
       '[data-ui="content.toolbar.video-recording.auto-hide"]'
     )!;
-    expect(trigger.querySelector('svg.lucide-broom-sparkles')).not.toBeNull();
+    const icon = trigger.querySelector<SVGElement>('svg.lucide-broom-sparkles');
+    expect(icon).not.toBeNull();
+    expect(icon?.parentElement?.style.alignItems).toBe('center');
+    expect(icon?.parentElement?.style.justifyContent).toBe('center');
+    expect(icon?.style.position).toBe('');
     expect(trigger.querySelectorAll('svg')).toHaveLength(1);
     const value = trigger.querySelector<HTMLElement>(
       '[data-ui="content.toolbar.video-recording.auto-hide-value"]'
     );
     if (delay > 0) {
+      expect(trigger.getAttribute('data-menu-indicator')).toBeNull();
       expect(value?.textContent).toBe(String(delay));
       expect(value?.style.color).toBe('var(--sniptale-color-text-secondary)');
       expect(value?.getAttribute('aria-hidden')).toBe('true');
@@ -164,7 +169,10 @@ it('marks only the selected drawing auto-hide delay including off', () => {
       expect(trigger.getAttribute('aria-label')).toContain(
         `${delay} content.toolbar.recordingDrawingAutoHideSeconds`
       );
-    } else expect(value).toBeNull();
+    } else {
+      expect(value).toBeNull();
+      expect(trigger.getAttribute('data-menu-indicator')).toBe('true');
+    }
     act(() =>
       host
         .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!
