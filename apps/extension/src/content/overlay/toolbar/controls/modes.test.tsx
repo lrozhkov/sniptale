@@ -367,7 +367,10 @@ it('uses direct-edit and AI glyphs that describe their distinct actions', () => 
   );
   const aiIcon = document.querySelector('[data-ui="content.toolbar.page-editing-mode.ai"] svg');
 
-  expect(directTextIcon?.getAttribute('class')).toContain('lucide-text-cursor');
+  expect(directTextIcon?.getAttribute('class')).toContain('tabler-cursor-text');
+  expect(directTextIcon?.getAttribute('aria-hidden')).toBe('true');
+  expect(directTextIcon?.getAttribute('width')).toBe('18');
+  expect(directTextIcon?.querySelector('path')?.getAttribute('stroke')).toBe('currentColor');
   expect(aiIcon?.getAttribute('class')).toContain('lucide-bot');
 });
 

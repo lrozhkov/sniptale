@@ -1,5 +1,7 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useRef } from 'react';
+import { Icon } from '@iconify/react';
+import cursorTextIcon from '@iconify-icons/tabler/cursor-text';
 import {
   Bot,
   Check,
@@ -7,7 +9,6 @@ import {
   MousePointerClick,
   Pencil,
   SwatchBook,
-  TextCursor,
   TextCursorInput,
   Touchpad,
   Video,
@@ -315,7 +316,15 @@ function getPageEditingModeCopy(mode: ToolbarPageEditingMode) {
 function getPageEditingModeIcon(mode: ToolbarPageEditingMode) {
   switch (mode) {
     case 'direct-text':
-      return <TextCursor size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return (
+        <Icon
+          icon={cursorTextIcon}
+          width={18}
+          height={18}
+          className={`${MODE_ICON_CLASS_NAME} tabler-cursor-text`}
+          aria-hidden="true"
+        />
+      );
     case 'ai':
       return <Bot size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'block-selection':

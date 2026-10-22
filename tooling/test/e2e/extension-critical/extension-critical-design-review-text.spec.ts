@@ -104,6 +104,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     }, info) => {
       const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
       try {
+        await popup.evaluate(
+          async (theme) => {
+            await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+          },
+          size.width === 1920 ? 'dark' : 'light'
+        );
         await page.evaluate(() => {
           const target = document.createElement('p');
           target.id = 'content-edit-selection';
@@ -116,6 +122,17 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.locator('[data-ui="content.toolbar.mode-option.quick-edit"]').click();
         const modeButton = page.locator(`[data-ui="content.toolbar.page-editing-mode.${mode}"]`);
         await modeButton.click();
+        if (mode === 'direct-text') {
+          const icon = modeButton.locator('svg.tabler-cursor-text');
+          await expect(icon).toBeVisible();
+          await expect(icon).toHaveAttribute('aria-hidden', 'true');
+          const iconBounds = (await icon.boundingBox())!;
+          const adjacent = (await page
+            .locator('[data-ui="content.toolbar.page-editing-mode.ai"] svg')
+            .boundingBox())!;
+          expect(iconBounds.width).toBeCloseTo(adjacent.width, 1);
+          expect(iconBounds.height).toBeCloseTo(adjacent.height, 1);
+        }
         const target = page.locator('#content-edit-selection');
         const targetBounds = (await target.boundingBox())!;
         await page.mouse.click(targetBounds.x + 14, targetBounds.y + 16);
