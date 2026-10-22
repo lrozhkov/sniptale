@@ -499,6 +499,9 @@ function createSurfaceMediaActions(args: SurfaceControllerProjectionArgs) {
     onCameraPeerClose: args.cameraPeerClose,
     onCameraDeviceChange: (deviceId: string) =>
       args.command({ kind: 'select-webcam-device', deviceId }, false),
+    onCameraPresentationModeChange: (
+      mode: VideoRecordingToolbarState['webcamPresentation']['mode']
+    ) => args.command({ kind: 'set-webcam-presentation-mode', mode }, false),
     onCameraGeometryChange: (appearance: EmbeddedCameraGeometry) =>
       args.command({
         kind: 'update-embedded-camera',

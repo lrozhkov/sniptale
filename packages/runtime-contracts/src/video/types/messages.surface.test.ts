@@ -101,6 +101,32 @@ it('validates trusted start and activation intents without accepting extra paylo
   ).toBe(true);
 });
 
+it('admits only the two camera placement modes with an exact command shape', () => {
+  const message = {
+    surfaceSessionId: identity.surfaceSessionId,
+    surfaceToken: identity.surfaceToken,
+    documentGeneration: identity.documentGeneration,
+    capabilityEpoch: 4,
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    recordingId: null,
+  };
+  for (const mode of ['embedded', 'separate-track']) {
+    expect(
+      isVideoRecordingSurfaceCommandMessage({
+        ...message,
+        command: { kind: 'set-webcam-presentation-mode', mode },
+      })
+    ).toBe(true);
+  }
+  for (const command of [
+    { kind: 'set-webcam-presentation-mode', mode: 'screen' },
+    { kind: 'set-webcam-presentation-mode', mode: null },
+    { kind: 'set-webcam-presentation-mode', mode: 'embedded', enabled: true },
+    { kind: 'set-webcam-presentation-mode' },
+  ])
+    expect(isVideoRecordingSurfaceCommandMessage({ ...message, command })).toBe(false);
+});
+
 it('validates release, snapshot, and command authority fields narrowly', () => {
   expect(
     isReleaseVideoRecordingSurfaceMessage({

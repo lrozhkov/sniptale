@@ -28,6 +28,9 @@ export interface ToolbarVideoRecordingProps {
   onCancelStart: () => Promise<void> | void;
   onCameraEnabledChange: (enabled: boolean) => Promise<void> | void;
   onCameraDeviceChange?: (deviceId: string) => Promise<void> | void;
+  onCameraPresentationModeChange?: (
+    mode: ToolbarVideoRecordingProps['state']['webcamPresentation']['mode']
+  ) => Promise<void> | void;
   onCameraGeometryChange: (
     appearance: Pick<
       ToolbarVideoRecordingProps['state']['webcamPresentation'],

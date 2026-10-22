@@ -3,6 +3,7 @@ import { isContentPrivilegedActionCapability } from '../../protocol/content-priv
 import { VideoMessageType } from '../messages';
 import {
   VideoRecordingStatus,
+  WebcamPresentationMode,
   WebcamPresentationShape,
   VIDEO_AUTO_FADE_DELAYS,
   type VideoAutoFadeDelay,
@@ -117,6 +118,7 @@ export type VideoRecordingSurfaceCommand =
     }
   | { kind: 'set-microphone-enabled' | 'set-webcam-enabled'; enabled: boolean }
   | { kind: 'select-microphone-device' | 'select-webcam-device'; deviceId: string | null }
+  | { kind: 'set-webcam-presentation-mode'; mode: WebcamPresentationMode }
   | {
       kind: 'update-embedded-camera';
       appearance: Pick<
@@ -449,6 +451,13 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   }
   if (value['kind'] === 'select-microphone-device' || value['kind'] === 'select-webcam-device') {
     return hasExactKeys(value, ['kind', 'deviceId']) && isNullableString(value['deviceId']);
+  }
+  if (value['kind'] === 'set-webcam-presentation-mode') {
+    return (
+      hasExactKeys(value, ['kind', 'mode']) &&
+      (value['mode'] === WebcamPresentationMode.EMBEDDED ||
+        value['mode'] === WebcamPresentationMode.SEPARATE_TRACK)
+    );
   }
   if (
     value['kind'] !== 'update-embedded-camera' ||

@@ -36,6 +36,11 @@ const PREVIOUS_RECORDING_ERROR = 'Resolve the previous recording before starting
 const logger = createLogger({ namespace: 'VideoRecordingContentSurfaceStart' });
 const pendingSavedStarts = new Map<number, { cancelled: boolean }>();
 
+/** Reports a pending saved-tab start before the runtime reaches PREPARING. */
+export function isSavedTabVideoRecordingStartPending(tabId: number): boolean {
+  return pendingSavedStarts.has(tabId);
+}
+
 export function cancelSavedTabVideoRecordingStart(tabId: number): void {
   const attempt = pendingSavedStarts.get(tabId);
   if (attempt) attempt.cancelled = true;

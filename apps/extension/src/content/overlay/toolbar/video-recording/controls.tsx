@@ -263,6 +263,16 @@ function MediaControls(props: {
         selectedDeviceId={props.recording.state.webcamDeviceId}
         menuType="recording-camera"
         toolbarMenuState={props.toolbarMenuState}
+        {...(props.recording.onCameraPresentationModeChange
+          ? {
+              cameraPlacement: {
+                mode: props.recording.state.webcamPresentation.mode,
+                locked:
+                  props.recording.state.phase !== 'idle' && props.recording.state.phase !== 'error',
+                onChange: props.recording.onCameraPresentationModeChange,
+              },
+            }
+          : {})}
         {...(onLoadMediaDevices ? { onLoadDevices: loadCameras } : {})}
         onToggle={() => props.recording.onCameraEnabledChange(!props.recording.state.cameraEnabled)}
         {...(props.recording.onCameraDeviceChange

@@ -60,7 +60,11 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: vi.fn() }),
 }));
 
-import { cancelSavedTabVideoRecordingStart, startSavedTabVideoRecording } from './start';
+import {
+  cancelSavedTabVideoRecordingStart,
+  startSavedTabVideoRecording,
+  isSavedTabVideoRecordingStartPending,
+} from './start';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,6 +76,24 @@ beforeEach(() => {
   mocks.startRecording.mockResolvedValue({ result: 'accepted', recordingId: 'recording-1' });
   mocks.ensurePageAccess.mockResolvedValue(undefined);
   mocks.ensureHeadroom.mockResolvedValue(undefined);
+});
+
+it('owns pending-start admission before reading settings and clears it on completion', async () => {
+  let release!: (settings: typeof DEFAULT_VIDEO_SETTINGS) => void;
+  const gate = new Promise<typeof DEFAULT_VIDEO_SETTINGS>((resolve) => {
+    release = resolve;
+  });
+  mocks.loadVideoSettings.mockReturnValueOnce(gate);
+  expect(isSavedTabVideoRecordingStartPending(12)).toBe(false);
+  const pending = startSavedTabVideoRecording(12, 'https://example.test/page', 'doc-12', {
+    confirmedWithoutMicrophone: true,
+  });
+  expect(isSavedTabVideoRecordingStartPending(12)).toBe(true);
+  expect(isSavedTabVideoRecordingStartPending(13)).toBe(false);
+  expect(mocks.startRecording).not.toHaveBeenCalled();
+  release(DEFAULT_VIDEO_SETTINGS);
+  await pending;
+  expect(isSavedTabVideoRecordingStartPending(12)).toBe(false);
 });
 
 it('requires confirmation before page access, storage admission, or recording acquisition', async () => {

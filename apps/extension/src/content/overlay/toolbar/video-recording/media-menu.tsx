@@ -1,10 +1,14 @@
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
+  ProductToolbarMenuDivider,
+  ProductToolbarMenuGroupLabel,
 } from '@sniptale/ui/product-menus/toolbar';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
@@ -28,6 +32,11 @@ type RecordingMediaSplitControlProps = {
   toolbarMenuState?: ToolbarMenuState;
   onLoadDevices?: (requestPermission?: boolean) => Promise<VideoRecordingMediaDevice[]>;
   onDeviceChange?: (deviceId: string) => Promise<void> | void;
+  cameraPlacement?: {
+    mode: WebcamPresentationMode;
+    locked: boolean;
+    onChange: (mode: WebcamPresentationMode) => Promise<void> | void;
+  };
   onToggle(): Promise<void> | void;
 };
 
@@ -108,8 +117,8 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
       anchorRef: triggerRef,
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-      menuHeight: Math.max(96, devices.length * 48 + 48),
-      menuWidth: 260,
+      menuHeight: Math.max(96, devices.length * 48 + 48) + (props.cameraPlacement ? 72 : 0),
+      menuWidth: props.cameraPlacement ? 280 : 260,
       preferredAlign: 'end',
     });
     return { placement: dropdown.menuPlacement, style: dropdown.style };
@@ -137,6 +146,24 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
       setSwitching(false);
     }
   };
+  const selectPlacement = async (mode: WebcamPresentationMode) => {
+    if (
+      !props.cameraPlacement ||
+      props.cameraPlacement.locked ||
+      switching ||
+      mode === props.cameraPlacement.mode
+    )
+      return;
+    setSwitching(true);
+    setError(null);
+    try {
+      await props.cameraPlacement.onChange(mode);
+    } catch {
+      setError(translate('content.toolbar.videoRecordingActionFailed'));
+    } finally {
+      setSwitching(false);
+    }
+  };
   return {
     closeMenu,
     devices,
@@ -149,6 +176,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     open,
     runToggle,
     selectDevice,
+    selectPlacement,
     switching,
     toggleMenu,
     triggerRef,
@@ -160,6 +188,7 @@ function RecordingMediaDeviceMenu(props: {
   dataUi: string;
   label: string;
   selectedDeviceId: string | null;
+  cameraPlacement?: RecordingMediaSplitControlProps['cameraPlacement'];
 }) {
   const { control } = props;
   if (!control.open || !control.dropdown.style) return null;
@@ -167,6 +196,7 @@ function RecordingMediaDeviceMenu(props: {
     <ToolbarMenuDropdown dataUi={`${props.dataUi}.dropdown`} menuRef={control.menuRef}>
       <ProductToolbarMenu
         className="sniptale-content-menu-adopted"
+        variant={props.cameraPlacement ? 'capture' : 'default'}
         compact
         title={props.label}
         placement={control.dropdown.placement}
@@ -199,6 +229,36 @@ function RecordingMediaDeviceMenu(props: {
             <ProductToolbarMenuItemCopy label={device.label} />
           </ProductToolbarMenuItem>
         ))}
+        {props.cameraPlacement ? (
+          <>
+            <ProductToolbarMenuDivider />
+            <ProductToolbarMenuGroupLabel>
+              {translate('popup.video.webcamPresentationModeLabel')}
+            </ProductToolbarMenuGroupLabel>
+            <div className="px-1 pb-1" onMouseDown={(event) => event.preventDefault()}>
+              <SegmentedSwitch
+                activeId={props.cameraPlacement.mode}
+                appearance="neutral"
+                density="compact"
+                ariaLabel={translate('popup.video.webcamPresentationModeLabel')}
+                dataAttribute={{ 'data-ui': 'content.toolbar.video-recording.camera.placement' }}
+                options={[
+                  {
+                    id: WebcamPresentationMode.EMBEDDED,
+                    label: translate('popup.video.webcamPresentationEmbedded'),
+                    disabled: props.cameraPlacement.locked || control.switching,
+                  },
+                  {
+                    id: WebcamPresentationMode.SEPARATE_TRACK,
+                    label: translate('popup.video.webcamPresentationSeparateTrack'),
+                    disabled: props.cameraPlacement.locked || control.switching,
+                  },
+                ]}
+                onChange={(mode) => void control.selectPlacement(mode)}
+              />
+            </div>
+          </>
+        ) : null}
       </ProductToolbarMenu>
     </ToolbarMenuDropdown>
   );
@@ -246,6 +306,7 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         dataUi={props.dataUi}
         label={props.label}
         selectedDeviceId={props.selectedDeviceId}
+        {...(props.cameraPlacement ? { cameraPlacement: props.cameraPlacement } : {})}
       />
       {control.error ? (
         <div
