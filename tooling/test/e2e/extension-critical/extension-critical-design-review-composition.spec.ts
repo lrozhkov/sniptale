@@ -1,6 +1,175 @@
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import { evaluateInTarget } from '../support/recording-action';
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`design review export compact controls ${theme} ${viewport.name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      test.setTimeout(90000);
+      const { page, popup } = await openDesignReview(
+        context,
+        extensionId,
+        hostOrigin,
+        viewport.size
+      );
+      try {
+        const trigger = page.locator('[data-ui="content.toolbar.annotation-export-button"]');
+        const menu = page.locator(
+          '[data-ui="content.toolbar.annotation-export-menu"] .sniptale-toolbar-menu'
+        );
+        const configure = page.locator(
+          '[data-ui="content.toolbar.annotation-export.configure-export"]'
+        );
+        for (const locale of ['ru', 'en']) {
+          await popup.evaluate(
+            async ({ theme, locale }) => {
+              await chrome.storage.local.set({
+                'sniptale-theme-preference': theme,
+                'sniptale-locale-preference': locale,
+              });
+            },
+            { theme, locale }
+          );
+          for (const displayMode of ['horizontal', 'vertical'] as const) {
+            for (const compactMenus of [false, true]) {
+              await popup.evaluate(
+                async ({ displayMode, compactMenus }) => {
+                  const current = (await chrome.storage.sync.get('sniptale_settings'))[
+                    'sniptale_settings'
+                  ];
+                  await chrome.storage.sync.set({
+                    sniptale_settings: {
+                      ...current,
+                      contentToolbar: {
+                        ...current?.contentToolbar,
+                        displayMode,
+                        compactMenus,
+                        freePlacement: false,
+                        position: null,
+                        dockEdge: displayMode === 'horizontal' ? 'bottom' : 'right-bottom',
+                      },
+                    },
+                  });
+                },
+                { displayMode, compactMenus }
+              );
+              await page.reload();
+              await popup.evaluate(async (origin) => {
+                const tab = (await chrome.tabs.query({})).find(
+                  (candidate) => candidate.url === `${origin}/`
+                );
+                if (tab?.id === undefined) throw new Error('Host tab not found');
+                await chrome.runtime.sendMessage({
+                  type: 'PAGE_ACCESS',
+                  operation: 'register-granted-site',
+                  tabId: tab.id,
+                  __sniptaleRuntimeFreshness: {
+                    issuedAtEpochMs: Date.now(),
+                    nonce: crypto.randomUUID(),
+                  },
+                });
+                await chrome.tabs.sendMessage(tab.id, {
+                  type: 'ENABLE_SCREENSHOT_MODE',
+                  workingMode: 'design-review',
+                });
+              }, hostOrigin);
+              await page.bringToFront();
+              await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+                'data-display-mode',
+                displayMode
+              );
+              await trigger.click();
+              await expect(menu).toBeVisible();
+              await expect(menu).toHaveClass(
+                compactMenus ? /sniptale-toolbar-menu--compact/ : /sniptale-toolbar-menu/
+              );
+              const bounds = (await menu.boundingBox())!;
+              expect(Math.abs(bounds.width - 240)).toBeLessThanOrEqual(1);
+              expect(bounds.x).toBeGreaterThanOrEqual(0);
+              expect(bounds.y).toBeGreaterThanOrEqual(0);
+              expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.size.width);
+              expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.size.height);
+              const target = (await configure.boundingBox())!;
+              expect(Math.abs(target.width - 28)).toBeLessThanOrEqual(1);
+              expect(Math.abs(target.height - 28)).toBeLessThanOrEqual(1);
+              const row = (await configure.locator('..').boundingBox())!;
+              expect(
+                Math.abs(target.y + target.height / 2 - row.y - row.height / 2)
+              ).toBeLessThanOrEqual(1);
+              await configure.hover();
+              await expect(configure).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+              await expect(configure).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+              expect(await configure.evaluate((node) => node.matches(':focus-visible'))).toBe(
+                false
+              );
+              expect(
+                await menu
+                  .locator('.sniptale-toolbar-menu-item-label')
+                  .evaluateAll((nodes) =>
+                    nodes.every((node) => node.scrollWidth <= node.clientWidth)
+                  )
+              ).toBe(true);
+              await page.screenshot({
+                path: info.outputPath(`export-${locale}-${displayMode}-${compactMenus}.png`),
+                fullPage: false,
+                animations: 'disabled',
+              });
+              await page.keyboard.press('Escape');
+              await expect(menu).toBeHidden();
+              await expect(trigger).toBeFocused();
+            }
+          }
+        }
+        await page.setViewportSize({ width: 960, height: 560 });
+        await trigger.click();
+        await expect(menu).toBeVisible();
+        const narrow = (await menu.boundingBox())!;
+        expect(narrow.x + narrow.width).toBeLessThanOrEqual(960);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        );
+        const session = await context.browser()!.newBrowserCDPSession();
+        try {
+          const before = new Set(
+            (await session.send('Target.getTargets')).targetInfos.map((target) => target.targetId)
+          );
+          await configure.click();
+          await expect(menu).toBeHidden();
+          let popupTarget: string | undefined;
+          await expect
+            .poll(async () => {
+              popupTarget = (await session.send('Target.getTargets')).targetInfos.find(
+                (target) =>
+                  !before.has(target.targetId) &&
+                  target.url.includes(`${extensionId}/apps/extension/src/popup/index.html`)
+              )?.targetId;
+              return popupTarget;
+            })
+            .toBeTruthy();
+          await expect
+            .poll(() =>
+              evaluateInTarget(
+                context,
+                popupTarget!,
+                `Boolean(document.querySelector('[data-ui="popup.export.export-button"]'))`
+              )
+            )
+            .toBe(true);
+        } finally {
+          await session.detach();
+        }
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}
 
 for (const theme of ['light', 'dark'] as const) {
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
@@ -75,6 +244,16 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(
           page.locator('[data-ui="content.toolbar.annotation-export-menu"] .sniptale-toolbar-menu')
         ).toBeVisible();
+        const exportMenu = page.locator(
+          '[data-ui="content.toolbar.annotation-export-menu"] .sniptale-toolbar-menu'
+        );
+        expect((await exportMenu.boundingBox())!.width).toBeLessThanOrEqual(241);
+        const configureExport = page.locator(
+          '[data-ui="content.toolbar.annotation-export.configure-export"]'
+        );
+        const configureBounds = (await configureExport.boundingBox())!;
+        expect(configureBounds.width).toBeLessThanOrEqual(29);
+        expect(configureBounds.height).toBeLessThanOrEqual(29);
         await page.screenshot({
           path: info.outputPath('export-menu.png'),
           fullPage: false,
