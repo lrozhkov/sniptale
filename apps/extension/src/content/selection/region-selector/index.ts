@@ -162,6 +162,15 @@ function createRegionSelectorPublicController(args: {
   surfaceActions: ReturnType<typeof createRegionSelectorSurfaceActions>;
 }): RegionSelectorController {
   return {
+    isRegionSelectorActive: (binding) => {
+      const active = args.state.activeRequestBinding;
+      return (
+        args.state.regionSelectorContainer?.isConnected === true &&
+        active?.regionSelectionCapabilityToken === binding.regionSelectionCapabilityToken &&
+        active.regionSelectionRequestGeneration === binding.regionSelectionRequestGeneration &&
+        active.regionSelectionRequestId === binding.regionSelectionRequestId
+      );
+    },
     clearSelectedRegion() {
       args.state.selectedRegion = null;
     },

@@ -44,6 +44,7 @@ export type RegionSelectorControllerDeps = {
 };
 
 export type RegionSelectorController = {
+  isRegionSelectorActive: (binding: RegionSelectorRequestBinding) => boolean;
   clearSelectedRegion: () => void;
   dispose: () => void;
   getSelectedRegion: () => RegionSelectorBounds | null;

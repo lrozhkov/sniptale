@@ -45,6 +45,12 @@ export type TabVideoRequestByType = {
     type: typeof VideoMessageType.HIDE_REGION_SELECTOR;
     regionSelectionRequestId?: string;
   };
+  [VideoMessageType.GET_REGION_SELECTOR_STATE]: {
+    type: typeof VideoMessageType.GET_REGION_SELECTOR_STATE;
+    regionSelectionCapabilityToken: string;
+    regionSelectionRequestGeneration: string;
+    regionSelectionRequestId: string;
+  };
   [VideoMessageType.REGION_SELECTED]: RuntimeRequestByType[typeof VideoMessageType.REGION_SELECTED];
   [VideoMessageType.REGION_SELECTION_CANCELLED]: {
     type: typeof VideoMessageType.REGION_SELECTION_CANCELLED;
@@ -84,6 +90,7 @@ export type TabVideoResponseByType = {
   [VideoMessageType.GET_VIEWPORT_COORDS]: ViewportCoordsResponse;
   [VideoMessageType.SHOW_REGION_SELECTOR]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.HIDE_REGION_SELECTOR]: RuntimeMessageResponse<Record<string, never>>;
+  [VideoMessageType.GET_REGION_SELECTOR_STATE]: RuntimeMessageResponse<{ active: boolean }>;
   [VideoMessageType.REGION_SELECTED]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.REGION_SELECTION_CANCELLED]: RuntimeMessageResponse<Record<string, never>>;
   [VideoMessageType.SHOW_RECORDING_OVERLAY]: RuntimeMessageResponse<Record<string, never>>;

@@ -15,6 +15,7 @@ import {
   createRegionSelectionRequestBinding,
   isRegionSelectionResultForRequest,
   isRegionSelectionSenderForRequest,
+  REGION_SELECTION_REQUEST_TTL_MS,
   type RegionSelectionRequestBinding,
   toShowRegionSelectorMessage,
 } from './region-selection.request-binding';
@@ -32,7 +33,7 @@ type MessageSubscription = typeof browserRuntime.subscribeToMessages;
 
 type RegionSelectionRequestDeps = {
   createRequestBinding?: typeof createRegionSelectionRequestBinding;
-  keepAlive?: () => Promise<unknown>;
+  probeRegionSelector?: (binding: RegionSelectionRequestBinding) => Promise<boolean>;
   logger: VideoManagerUiLogger;
   sendTabMessage: RuntimeMessagingTransport['sendTabMessage'];
   showRecordingOverlay: typeof showRecordingOverlay;
@@ -41,7 +42,15 @@ type RegionSelectionRequestDeps = {
 
 const defaultRegionSelectionRequestDeps: RegionSelectionRequestDeps = {
   createRequestBinding: createRegionSelectionRequestBinding,
-  keepAlive: () => browserRuntime.getPlatformInfo(),
+  probeRegionSelector: async (binding) => {
+    const response = await getBackgroundRuntimeMessaging().sendTabMessage(binding.tabId, {
+      type: VideoMessageType.GET_REGION_SELECTOR_STATE,
+      regionSelectionCapabilityToken: binding.regionSelectionCapabilityToken,
+      regionSelectionRequestGeneration: binding.regionSelectionRequestGeneration,
+      regionSelectionRequestId: binding.regionSelectionRequestId,
+    });
+    return response.success === true && response.active === true;
+  },
   logger: createLogger({ namespace: 'BackgroundVideoUi:RegionSelection' }),
   sendTabMessage: (tabId, message) =>
     getBackgroundRuntimeMessaging().sendTabMessage(tabId, message),
@@ -200,6 +209,36 @@ function createRegionSelectionListener(props: {
   };
 }
 
+function startRegionSelectionHeartbeat(args: {
+  binding: RegionSelectionRequestBinding;
+  logger: VideoManagerUiLogger;
+  probe: NonNullable<RegionSelectionRequestDeps['probeRegionSelector']>;
+  renewTimeout: (timeoutMs?: number) => void;
+}) {
+  let inFlight = false;
+  return setInterval(() => {
+    if (inFlight || !isActiveRegionSelectionRequest(args.binding)) return;
+    inFlight = true;
+    void args
+      .probe(args.binding)
+      .then((active) => {
+        if (!isActiveRegionSelectionRequest(args.binding)) return;
+        if (!active || Date.now() > args.binding.expiresAtMs) {
+          cancelActiveRegionSelectionRequest(args.binding.tabId);
+          return;
+        }
+        args.binding.expiresAtMs = Date.now() + REGION_SELECTION_REQUEST_TTL_MS;
+        args.renewTimeout(REGION_SELECTION_REQUEST_TTL_MS);
+      })
+      .catch((error: unknown) => {
+        args.logger.warn('[VideoManager] Region selector state probe failed:', error);
+      })
+      .finally(() => {
+        inFlight = false;
+      });
+  }, 20000);
+}
+
 /**
  * Requests a crop region from the target tab and restores the recording overlay on success.
  */
@@ -218,23 +257,26 @@ export function requestRegionSelection(
       return null;
     }
 
-    const keepAliveInterval = deps.keepAlive
-      ? setInterval(() => {
-          void deps.keepAlive?.().catch((error: unknown) => {
-            deps.logger.warn('[VideoManager] Region selection keepalive failed:', error);
-          });
-        }, 20000)
-      : null;
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
     return runRequestWorkflow<RecordingRegionSelection | null>({
-      createListener: (finish) =>
-        createRegionSelectionListener({
+      createListener: (finish, renewTimeout) => {
+        const listener = createRegionSelectionListener({
           finish,
           binding,
           logger: deps.logger,
           owner,
           showRecordingOverlay: deps.showRecordingOverlay,
           tabId,
-        }),
+        });
+        if (deps.probeRegionSelector)
+          heartbeatInterval = startRegionSelectionHeartbeat({
+            binding,
+            logger: deps.logger,
+            probe: deps.probeRegionSelector,
+            renewTimeout,
+          });
+        return listener;
+      },
       onRequestError: (error, finish) => {
         clearActiveRegionSelectionRequest(tabId, owner);
         deps.logger.error('[VideoManager] Failed to show region selector:', error);
@@ -263,7 +305,7 @@ export function requestRegionSelection(
         return selection;
       })
       .finally(() => {
-        if (keepAliveInterval !== null) clearInterval(keepAliveInterval);
+        if (heartbeatInterval !== null) clearInterval(heartbeatInterval);
       });
   });
 }

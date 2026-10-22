@@ -85,6 +85,7 @@ export const contentTabTypes = new Set<TabMessageType>([
   VideoMessageType.HIDE_COUNTDOWN,
   VideoMessageType.GET_VIEWPORT_COORDS,
   VideoMessageType.SHOW_REGION_SELECTOR,
+  VideoMessageType.GET_REGION_SELECTOR_STATE,
   VideoMessageType.HIDE_REGION_SELECTOR,
   VideoMessageType.REGION_SELECTED,
   VideoMessageType.REGION_SELECTION_CANCELLED,

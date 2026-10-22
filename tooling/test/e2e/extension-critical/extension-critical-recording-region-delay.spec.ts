@@ -47,9 +47,9 @@ async function readWorkerTargets(endpoint: string) {
   }
 }
 
-for (const delaySeconds of [35, 65]) {
+for (const delaySeconds of [35, 325]) {
   test(`region recording starts after ${delaySeconds}s without popup traffic`, async ({}, info) => {
-    test.setTimeout(140000);
+    test.setTimeout(410000);
     const viewport =
       delaySeconds === 35 ? { width: 1280, height: 560 } : { width: 1920, height: 900 };
     const host = await startHostServer();
@@ -134,6 +134,10 @@ for (const delaySeconds of [35, 65]) {
         false
       );
       await target.locator('#sniptale-region-selector-root').waitFor();
+      await target.locator('#sniptale-width-input').fill('400');
+      await target.locator('#sniptale-width-input').press('Enter');
+      await target.locator('#sniptale-height-input').fill('240');
+      await target.locator('#sniptale-height-input').press('Enter');
       await popup.close();
       const session = await browser.newBrowserCDPSession();
       await session.send('Target.closeTarget', { targetId: actionTarget }).catch(() => undefined);
@@ -165,6 +169,8 @@ for (const delaySeconds of [35, 65]) {
       const resumedContext = browser.contexts()[0]!;
       const resumedTarget = resumedContext.pages().find((page) => page.url() === targetUrl)!;
       await resumedTarget.setViewportSize(viewport);
+      await expect(resumedTarget.locator('#sniptale-width-input')).toHaveValue('400');
+      await expect(resumedTarget.locator('#sniptale-height-input')).toHaveValue('240');
       resumedTarget.on('console', (message) => {
         if (message.text().includes('Failed to notify selected region'))
           errors.push(message.text());

@@ -92,6 +92,8 @@ declare module './index' {
     type DISABLE_DIAGNOSTIC_LOGGER =
       typeof import('./index').VideoMessageType.DISABLE_DIAGNOSTIC_LOGGER;
     type SHOW_REGION_SELECTOR = typeof import('./index').VideoMessageType.SHOW_REGION_SELECTOR;
+    type GET_REGION_SELECTOR_STATE =
+      typeof import('./index').VideoMessageType.GET_REGION_SELECTOR_STATE;
     type HIDE_REGION_SELECTOR = typeof import('./index').VideoMessageType.HIDE_REGION_SELECTOR;
     type REGION_SELECTED = typeof import('./index').VideoMessageType.REGION_SELECTED;
     type REGION_SELECTION_CANCELLED =

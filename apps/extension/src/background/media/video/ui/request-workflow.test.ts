@@ -108,6 +108,36 @@ async function verifySynchronousSettlementDuringSubscription() {
 }
 
 describe('runRequestWorkflow', () => {
+  it('renews only a pending workflow and does not resurrect it after settlement', async () => {
+    vi.useFakeTimers();
+    const harness = createWorkflowHarness();
+    let renew: (timeoutMs?: number) => void = () => undefined;
+    const onTimeout = vi.fn((finish) => finish(null));
+    const result = runRequestWorkflow<string | null>({
+      createListener: (finish, renewTimeout) => {
+        renew = renewTimeout;
+        return () => finish('selected');
+      },
+      onRequestError: vi.fn(),
+      onTimeout,
+      request: async () => undefined,
+      subscribeToMessages: harness.subscribeToMessages,
+      timeoutMs: 1000,
+    });
+    for (let count = 0; count < 10; count += 1) {
+      await vi.advanceTimersByTimeAsync(900);
+      renew(1000);
+    }
+    expect(onTimeout).not.toHaveBeenCalled();
+    harness.emit('select');
+    await expect(result).resolves.toBe('selected');
+    renew();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(onTimeout).not.toHaveBeenCalled();
+    expect(harness.unsubscribe).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
   it(
     'settles only once when a request failure arrives after a successful listener result',
     verifySingleSettlementAfterRequestFailure

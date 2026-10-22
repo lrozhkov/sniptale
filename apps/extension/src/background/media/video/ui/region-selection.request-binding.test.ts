@@ -32,7 +32,7 @@ function createBinding(
     regionSelectionCapabilityToken: TOKEN,
     regionSelectionRequestGeneration: GENERATION,
     regionSelectionRequestId: REQUEST_ID,
-    expiresAtMs: 1700000240000,
+    expiresAtMs: 1700000060000,
     frameId: 0,
     senderUrl: 'https://example.com/page',
     tabId: 42,
@@ -71,7 +71,7 @@ it('falls back to token-only binding when tab URL lookup fails', async () => {
     regionSelectionCapabilityToken: TOKEN,
     regionSelectionRequestGeneration: GENERATION,
     regionSelectionRequestId: REQUEST_ID,
-    expiresAtMs: 1700000240000,
+    expiresAtMs: 1700000060000,
     frameId: 0,
     tabId: 42,
   });
@@ -92,8 +92,8 @@ it('matches result bindings, expiry, and exact senders', () => {
     url: 'https://example.com/page',
   } as chrome.runtime.MessageSender;
 
-  expect(isRegionSelectionResultForRequest(message, binding, 1700000240000)).toBe(true);
-  expect(isRegionSelectionResultForRequest(message, binding, 1700000240001)).toBe(false);
+  expect(isRegionSelectionResultForRequest(message, binding, 1700000060000)).toBe(true);
+  expect(isRegionSelectionResultForRequest(message, binding, 1700000060001)).toBe(false);
   expect(isRegionSelectionSenderForRequest(sender, binding)).toBe(true);
   expect(isRegionSelectionSenderForRequest({ ...sender, documentId: 'doc-2' }, binding)).toBe(
     false
