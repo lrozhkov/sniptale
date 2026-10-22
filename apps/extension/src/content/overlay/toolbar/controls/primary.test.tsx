@@ -270,7 +270,7 @@ describe('ToolbarPrimaryControls', () => {
     ) as HTMLButtonElement | null;
 
     expect(activeModeButton?.getAttribute('data-active')).toBeNull();
-    expect(activeModeButton?.getAttribute('title')).toBe('Редактирование контента');
+    expect(activeModeButton?.getAttribute('title')).toBe('Правка текста');
   });
 
   it('keeps scenario controls out of the primary group', async () => {
@@ -332,7 +332,7 @@ describe('ToolbarPrimaryControls pending mode', () => {
     const modeButton = queryModeSelectorButton();
 
     expect(modeButton?.getAttribute('data-active')).toBeNull();
-    expect(modeButton?.getAttribute('title')).toBe('Редактирование контента');
+    expect(modeButton?.getAttribute('title')).toBe('Правка текста');
   });
 });
 

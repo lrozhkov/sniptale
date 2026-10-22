@@ -71,27 +71,27 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
   },
   'content.toolbar.cursorLabel': {
     ru: 'Навигация',
-    en: 'Navigate',
+    en: 'Navigation',
   },
   'content.toolbar.cursorDefault': {
     ru: 'Обычная работа со страницей',
     en: 'Interact with the page normally',
   },
   'content.toolbar.cursorDescription': {
-    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
-    en: 'Interact with the page normally',
+    ru: 'Пользуйтесь страницей как обычно: переходите по ссылкам, нажимайте кнопки и прокручивайте',
+    en: 'Use the page normally: follow links, click buttons, and scroll',
   },
   'content.toolbar.aiEnable': {
     ru: 'Выберите элемент на странице и опишите изменение',
     en: 'Select a page element and describe the change',
   },
   'content.toolbar.quickEditLabel': {
-    ru: 'Редактирование контента',
-    en: 'Content editing',
+    ru: 'Правка текста',
+    en: 'Text editing',
   },
   'content.toolbar.quickEditEnable': {
-    ru: 'Выбирайте блоки, редактируйте текст напрямую или используйте ИИ',
-    en: 'Select blocks, edit text directly, or use AI',
+    ru: 'Меняйте текст прямо на странице — вручную или с помощью ИИ',
+    en: 'Change text directly on the page, manually or with AI',
   },
   'content.toolbar.quickEditBlockSelectionLabel': {
     ru: 'Выбор блоков',
@@ -102,8 +102,29 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Select blocks to edit',
   },
   'content.toolbar.highlighterEnable': {
-    ru: 'Добавляйте рамки, маски, размытие и комментарии',
-    en: 'Add frames, masks, blur, and comments',
+    ru: 'Выбирайте элементы страницы и добавляйте к ним рамки, выноски и номера',
+    en: 'Select page elements and add frames, callouts, and numbers to them',
+  },
+  'content.toolbar.drawingLabel': { ru: 'Рисование', en: 'Drawing' },
+  'content.toolbar.drawingEnable': {
+    ru: 'Рисуйте в любом месте поверх страницы: добавляйте линии, фигуры, стрелки и текст',
+    en: 'Draw anywhere over the page with lines, shapes, arrows, and text',
+  },
+  'content.toolbar.highlighterLabel': { ru: 'Аннотации', en: 'Annotations' },
+  'content.toolbar.designReviewLabel': { ru: 'Дизайн-ревью', en: 'Design review' },
+  'content.toolbar.designReviewEnable': {
+    ru: 'Проверяйте размеры и отступы, меняйте оформление элементов и оставляйте замечания',
+    en: 'Check dimensions and spacing, adjust element styles, and leave feedback',
+  },
+  'content.toolbar.videoRecordingLabel': { ru: 'Запись вкладки', en: 'Tab recording' },
+  'content.toolbar.videoRecordingEnable': {
+    ru: 'Записывайте вкладку или её область со звуком, камерой и пометками',
+    en: 'Record the tab or a selected area with audio, camera, and markup',
+  },
+  'popup.home.toolsOpenLabel': { ru: 'Навигация', en: 'Navigation' },
+  'popup.home.toolsOpenHint': {
+    ru: 'Пользуйтесь страницей как обычно: переходите по ссылкам, нажимайте кнопки и прокручивайте',
+    en: 'Use the page normally: follow links, click buttons, and scroll',
   },
   'content.toolbar.autoBlur': {
     ru: 'Размытие данных',

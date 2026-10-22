@@ -183,11 +183,11 @@ export const contentToolbarModesMessages = defineMessageSource({
   },
   cursorLabel: {
     ru: 'Навигация',
-    en: 'Navigate',
+    en: 'Navigation',
   },
   cursorDescription: {
-    ru: 'Переходите по ссылкам, прокручивайте страницу и взаимодействуйте с её элементами',
-    en: 'Interact with the page normally',
+    ru: 'Пользуйтесь страницей как обычно: переходите по ссылкам, нажимайте кнопки и прокручивайте',
+    en: 'Use the page normally: follow links, click buttons, and scroll',
   },
   cursorEnable: {
     ru: 'Вернуться к обычной работе со страницей',
@@ -195,13 +195,13 @@ export const contentToolbarModesMessages = defineMessageSource({
   },
   drawingLabel: { ru: 'Рисование', en: 'Drawing' },
   drawingEnable: {
-    ru: 'Рисуйте и добавляйте быстрые пометки поверх страницы',
-    en: 'Draw and add quick markup over the page',
+    ru: 'Рисуйте в любом месте поверх страницы: добавляйте линии, фигуры, стрелки и текст',
+    en: 'Draw anywhere over the page with lines, shapes, arrows, and text',
   },
-  videoRecordingLabel: { ru: 'Запись видео', en: 'Video recording' },
+  videoRecordingLabel: { ru: 'Запись вкладки', en: 'Tab recording' },
   videoRecordingEnable: {
-    ru: 'Записывайте вкладку, рисуйте и управляйте камерой прямо на странице',
-    en: 'Record the tab, draw, and control the camera directly on the page',
+    ru: 'Записывайте вкладку или её область со звуком, камерой и пометками',
+    en: 'Record the tab or a selected area with audio, camera, and markup',
   },
   videoRecordingPinned: {
     ru: 'Панель закреплена, пока выбран режим записи видео',
@@ -342,16 +342,16 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Select a page element and describe the change',
   },
   quickEditLabel: {
-    ru: 'Редактирование контента',
-    en: 'Content editing',
+    ru: 'Правка текста',
+    en: 'Text editing',
   },
   quickEditDisable: {
     ru: 'Отключить редактирование контента',
     en: 'Disable content editing',
   },
   quickEditEnable: {
-    ru: 'Выбирайте блоки, редактируйте текст напрямую или используйте ИИ',
-    en: 'Select blocks, edit text directly, or use AI',
+    ru: 'Меняйте текст прямо на странице — вручную или с помощью ИИ',
+    en: 'Change text directly on the page, manually or with AI',
   },
   quickEditBlockSelectionLabel: {
     ru: 'Выбор блоков',
@@ -366,8 +366,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Design review',
   },
   designReviewEnable: {
-    ru: 'Выбирайте любые элементы, оставляйте замечания и проверяйте стили',
-    en: 'Select any element, leave feedback, and inspect its styles',
+    ru: 'Проверяйте размеры и отступы, меняйте оформление элементов и оставляйте замечания',
+    en: 'Check dimensions and spacing, adjust element styles, and leave feedback',
   },
   quickEditDocumentModeLabel: {
     ru: 'Редактирование текста',
@@ -390,8 +390,8 @@ export const contentToolbarModesMessages = defineMessageSource({
     en: 'Disable annotations',
   },
   highlighterEnable: {
-    ru: 'Добавляйте рамки, маски, размытие и комментарии',
-    en: 'Add frames, masks, blur, and comments',
+    ru: 'Выбирайте элементы страницы и добавляйте к ним рамки, выноски и номера',
+    en: 'Select page elements and add frames, callouts, and numbers to them',
   },
   clearPagePreparation: {
     ru: 'Сбросить всё',
