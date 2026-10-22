@@ -221,3 +221,34 @@ it('admits bounded common blur only at schema sixteen and keeps absent legacy va
     expect(getProjectSceneBackground(legacy)).not.toHaveProperty('blur');
   }
 });
+
+it('keeps disabled scene paint offline and restores its exact active variant explicitly', () => {
+  const inactive = {
+    kind: 'solid' as const,
+    color: '#123456ff',
+    blur: 7,
+    enabled: false as const,
+    remembered: {
+      image: { kind: 'image' as const, assetId: 'retained-image', imageFit: 'contain' as const },
+    },
+  };
+  const parsed = parseSceneBackgroundSettings(inactive);
+  expect(parsed).toEqual(inactive);
+  expect(syncProjectSceneBackground({ backgroundColor: '#111111' }, inactive).backgroundColor).toBe(
+    '#00000000'
+  );
+  expect(resolveSceneBackgroundKind(inactive, 'solid')).toEqual({
+    kind: 'solid',
+    color: '#123456ff',
+    blur: 7,
+    remembered: inactive.remembered,
+  });
+  const image = resolveSceneBackgroundKind(inactive, 'image');
+  expect(image).toEqual({ kind: 'image', assetId: 'retained-image', imageFit: 'contain', blur: 7 });
+  const active = syncProjectSceneBackground(
+    { backgroundColor: '#00000000', sceneBackground: inactive },
+    image!
+  );
+  expect(active.sceneBackground.remembered?.solid).toEqual({ kind: 'solid', color: '#123456ff' });
+  expect(parseSceneBackgroundSettings(active.sceneBackground)).toEqual(active.sceneBackground);
+});

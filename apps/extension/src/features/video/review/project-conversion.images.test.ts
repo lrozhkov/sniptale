@@ -124,7 +124,8 @@ it.each(['text', 'none'] as const)(
     if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
     expect(result.project.sceneBackground).toEqual({
       kind: 'solid',
-      color: '#00000000',
+      color: '#123456aa',
+      enabled: false,
       remembered: {
         solid: { kind: 'solid', color: '#123456aa' },
         image: { kind: 'image', assetId: 'native-background', imageFit: 'cover' },
@@ -206,7 +207,7 @@ it.each([
 });
 
 it.each(['text', 'image'] as const)(
-  'refuses suppressed authored %s watermark rather than enabling it',
+  'retains suppressed authored %s watermark without enabling it',
   (mode) => {
     const input = imagesFixture();
     input.ui.mode = 'basic';
@@ -214,7 +215,13 @@ it.each(['text', 'image'] as const)(
     input.document.advancedContent.watermark!.mode = mode;
     input.imageAssets.splice(0, 1);
     const before = structuredClone(input);
-    expect(scene(input)).toEqual({ status: 'blocked', fields: ['watermark'] });
+    const converted = planReviewProjectConversion(input);
+    if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+    expect(converted.project.version).toBe(36);
+    expect(converted.project.watermarkEnabled).toBe(false);
+    expect(converted.project.watermark).toMatchObject({ mode });
+    expect(converted.project.assets).toContainEqual(input.imageAssets[0]!.asset);
+    expect(isExportReadyVideoProject(converted.project)).toBe(true);
     expect(input).toEqual(before);
   }
 );

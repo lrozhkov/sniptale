@@ -315,3 +315,21 @@ it('forwards picker cancellation without publishing an error or keeping the insp
   expect(props().error).toBeNull();
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
 });
+
+it('keeps basic watermark inactive until explicit mode selection', async () => {
+  const previous = useVideoEditorStore.getState().project!;
+  useVideoEditorStore.getState().setProject({ ...previous, version: 36, watermarkEnabled: false });
+  await mount();
+  expect(props().settings?.mode).toBe('none');
+  expect(host.querySelector('textarea')).toBeNull();
+  const before = useVideoEditorStore.getState().project!;
+  await act(async () => props().onChange({ ...before.watermark!, mode: 'text' }));
+  const active = useVideoEditorStore.getState().project!;
+  expect(active.watermark).toEqual(before.watermark);
+  expect(active).not.toHaveProperty('watermarkEnabled');
+  await act(async () => props().onChange({ ...active.watermark!, mode: 'none' }));
+  const disabled = useVideoEditorStore.getState().project!;
+  expect(disabled.watermark).toEqual(active.watermark);
+  expect(disabled.watermarkEnabled).toBe(false);
+  expect(props().settings?.mode).toBe('none');
+});

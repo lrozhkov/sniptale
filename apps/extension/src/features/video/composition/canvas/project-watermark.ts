@@ -80,10 +80,11 @@ export function createVideoProjectWatermarkRenderer(
   return {
     async prepare(project: VideoProject, output: Output, signal?: AbortSignal): Promise<Prepared> {
       signal?.throwIfAborted();
-      const asset = getVideoProjectWatermarkAsset(project);
+      const settings = project.watermarkEnabled === false ? undefined : project.watermark;
+      const asset = settings ? getVideoProjectWatermarkAsset(project) : undefined;
       const key = JSON.stringify([
         project.id,
-        project.watermark,
+        settings,
         output.width,
         output.height,
         asset?.id,
@@ -99,7 +100,7 @@ export function createVideoProjectWatermarkRenderer(
         if (active && active !== desired) cancel(active);
         desired = {
           key,
-          settings: project.watermark ? structuredClone(project.watermark) : undefined,
+          settings: settings ? structuredClone(settings) : undefined,
           asset: asset ? structuredClone(asset) : undefined,
           output: { ...output },
           controller: new AbortController(),

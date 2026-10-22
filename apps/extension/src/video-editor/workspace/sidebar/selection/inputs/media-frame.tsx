@@ -1,3 +1,4 @@
+import { RotateCcw } from 'lucide-react';
 import { getFittedMediaWindowFrame } from '../../../../../features/video/composition/draw/fitted-media';
 import { mediaWindowPadding } from '../../../../../features/video/project/window-geometry';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
@@ -79,6 +80,10 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   }
 
   const windowCornerRadius = props.clip.windowCornerRadius ?? 0;
+  const retainedLayout = props.clip.rememberedWindowLayout;
+  const layoutFits =
+    !retainedLayout ||
+    retainedLayout.padding <= maximumMediaPadding(props.project.width, props.project.height);
   return (
     <div className="sniptale-parameter-stack space-y-1">
       <MediaFramingPresets {...props} />
@@ -143,6 +148,19 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           onUpdateMediaClipShadowIntensity={props.onUpdateMediaClipShadowIntensity}
           onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
         />
+        {retainedLayout && (
+          <InspectorActionButton
+            separated
+            disabled={props.locked || !props.onEditMediaClip}
+            title={!layoutFits ? translate('gallery.videoReview.windowLayoutFitCanvas') : undefined}
+            onClick={() =>
+              props.onEditMediaClip?.(props.clip.id, { kind: 'window-layout-restore' })
+            }
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            {translate('gallery.videoReview.windowLayoutRestore')}
+          </InspectorActionButton>
+        )}
       </InspectorDetails>
       <WindowHeaderSettings
         key={props.clip.id}

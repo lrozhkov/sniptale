@@ -8,6 +8,7 @@ import {
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
+  VideoMediaShadowMode,
   VideoProjectClipType,
   isVideoProjectDurationMode,
   VideoProjectShapeType,
@@ -106,8 +107,22 @@ function hasCameraPositions(value: unknown): boolean {
   });
 }
 
+function isRememberedWindowLayout(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isBoundedNumber(value['padding'], 0, 4096) &&
+    isBoundedNumber(value['windowCornerRadius'], 0, 4096) &&
+    (value['shadowIntensity'] === undefined || isBoundedNumber(value['shadowIntensity'], 0, 100)) &&
+    (value['shadowColor'] === undefined ||
+      (isColorString(value['shadowColor']) && parseColor(value['shadowColor']) !== null)) &&
+    (value['shadowMode'] === undefined || isEnumValue(value['shadowMode'], VideoMediaShadowMode))
+  );
+}
+
 function hasMediaVisualFields(value: Record<string, unknown>): boolean {
   return (
+    (value['rememberedWindowLayout'] === undefined ||
+      isRememberedWindowLayout(value['rememberedWindowLayout'])) &&
     (value['windowHeader'] === undefined || parseWindowHeader(value['windowHeader']) !== null) &&
     (value['rememberedWindowHeader'] === undefined ||
       parseWindowHeader(value['rememberedWindowHeader']) !== null) &&

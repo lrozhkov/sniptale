@@ -2347,6 +2347,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   test(`basic Gallery appearance remains editable after transfer ${viewport.name}`, async ({
     page,
   }, info) => {
+    test.setTimeout(120000);
     await page.setViewportSize({ ...viewport.size });
     const locale = index === 0 ? 'en' : 'ru',
       theme = index === 0 ? 'dark' : 'light';
@@ -2377,10 +2378,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
-      const canvasCategory = inspector
-        .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
-        .getByRole('button', { name: label('gallery.videoReview.canvas'), exact: true });
-      if (await canvasCategory.count()) await canvasCategory.click();
+      const galleryGroup = async (key: Parameters<typeof translate>[0]) => {
+        const category = inspector
+          .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
+          .getByRole('button', { name: label(key), exact: true });
+        if (await category.count()) await category.click();
+      };
+      await galleryGroup('gallery.videoReview.canvas');
       await chooseInspectorValue(
         page,
         inspector,
@@ -2393,10 +2397,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         label('gallery.videoReview.sourceCropMode'),
         label('gallery.videoReview.sourceCropEnable')
       );
-      const category = inspector
-        .locator('[data-ui="gallery.videoReview.inspectorCategories"] nav')
-        .getByRole('button', { name: label('gallery.videoReview.windowHeader'), exact: true });
-      if (await category.count()) await category.click();
+      await galleryGroup('gallery.videoReview.windowHeader');
       const galleryHeader = inspector.locator('[data-ui="window-header-settings"]');
       await chooseInspectorValue(
         page,
@@ -2423,6 +2424,69 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       });
       await galleryTitle.fill(authoredTitle);
       await galleryTitle.press('Tab');
+      await galleryGroup('gallery.videoReview.background');
+      await chooseInspectorValue(
+        page,
+        inspector,
+        label('gallery.videoReview.backgroundZoom'),
+        label('gallery.videoReview.backgroundZoomWindow')
+      );
+      await chooseInspectorValue(
+        page,
+        inspector.locator('.review-background-kinds'),
+        label('gallery.videoReview.background'),
+        label('gallery.videoReview.backgroundSolid')
+      );
+      for (const [key, value] of [
+        ['gallery.videoReview.backgroundPadding', '8'],
+        ['gallery.videoReview.backgroundCornerRadius', '6'],
+        ['gallery.videoReview.backgroundShadow', '60'],
+      ] as const) {
+        const field = inspector.getByRole('textbox', { name: label(key), exact: true });
+        await field.fill(value);
+        await field.press('Enter');
+      }
+      await chooseInspectorValue(
+        page,
+        inspector.locator('.review-background-kinds'),
+        label('gallery.videoReview.background'),
+        label('gallery.videoReview.backgroundImage')
+      );
+      await inspector
+        .locator('[data-ui="gallery.videoReview.backgroundInspector"] input[type="file"]')
+        .setInputFiles(await solidImageUpload(page, 'Retained background.png', '#2050a0', 32, 32));
+      const backgroundBlur = inspector.getByRole('textbox', {
+        name: label('editor.scene.backgroundBlurAmount'),
+        exact: true,
+      });
+      await backgroundBlur.fill('2');
+      await backgroundBlur.press('Enter');
+      if (index === 1)
+        await chooseInspectorValue(
+          page,
+          inspector.locator('.review-background-kinds'),
+          label('gallery.videoReview.background'),
+          label('gallery.videoReview.backgroundNone')
+        );
+      await galleryGroup('gallery.videoReview.watermark');
+      const galleryWatermark = inspector.locator(
+        '[data-ui="gallery.videoReview.watermarkInspector"]'
+      );
+      await chooseInspectorValue(
+        page,
+        galleryWatermark,
+        label('gallery.videoReview.watermark'),
+        label('gallery.videoReview.watermarkImage')
+      );
+      await galleryWatermark
+        .locator('input[type="file"]')
+        .setInputFiles(await solidImageUpload(page, 'Retained watermark.png', '#e02030', 32, 16));
+      const logoSize = galleryWatermark.getByRole('textbox', {
+        name: label('gallery.videoReview.watermarkSize'),
+        exact: true,
+      });
+      await logoSize.fill('30');
+      await logoSize.press('Enter');
       await advanced.click();
       await expect(advanced).toHaveAttribute('aria-pressed', 'false');
       await page.locator('[data-ui="gallery.videoReview.openVideoEditor"]').click();
@@ -2455,10 +2519,19 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       const project = (await readNativeVideoProject(page))!;
       expect(project.id).not.toBe(source.aggregateId);
-      expect(project.version).toBe(35);
+      expect(project.version).toBe(36);
       const video = project.clips.find((clip) => clip.type === 'VIDEO')!;
       expect(video).toMatchObject({ rememberedWindowHeader: header, rememberedSourceCrop: crop });
       expect(video).not.toHaveProperty('sourceCrop');
+      expect(video).toMatchObject({
+        rememberedWindowLayout: { padding: 8, windowCornerRadius: 6, shadowIntensity: 60 },
+      });
+      expect(video.shadowIntensity ?? 0).toBe(0);
+      expect(project.sceneBackground).toMatchObject({ enabled: false, blur: 2 });
+      expect(project.watermarkEnabled).toBe(false);
+      expect(project.watermark).toMatchObject({ mode: 'image', image: { size: 0.3 } });
+      expect(project.assets.filter((asset) => asset.type === 'IMAGE')).toHaveLength(2);
+
       expect(project.rememberedCanvas).toEqual({ width: canvas.width, height: canvas.height });
       expect(video).not.toHaveProperty('windowHeader');
       expect({ width: project.width, height: project.height }).toEqual({
@@ -2592,6 +2665,22 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           return fitted?.transform;
         })
         .not.toEqual(video.transform);
+      const restoreLayout = page.getByRole('button', {
+        name: label('gallery.videoReview.windowLayoutRestore'),
+        exact: true,
+      });
+      if (!(await restoreLayout.isVisible()))
+        await page
+          .locator('summary')
+          .filter({ hasText: label('videoEditor.sidebar.inspectorGroupAppearance') })
+          .click();
+      await checkInspectorPaintedFont(page, restoreLayout, 'appearance-restore');
+      await restoreLayout.click();
+      await expect
+        .poll(async () =>
+          (await readNativeVideoProject(page))?.clips.find((clip) => clip.id === video.id)
+        )
+        .toMatchObject({ windowCornerRadius: 6, shadowIntensity: 60 });
       const cropped = (await readNativeVideoProject(page))!;
       await page.reload();
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
@@ -2618,6 +2707,119 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(frame.y).toBeGreaterThanOrEqual(-0.001);
       expect(frame.x + frame.width).toBeLessThanOrEqual(cropped.width + 0.001);
       expect(frame.y + frame.height).toBeLessThanOrEqual(cropped.height + 0.001);
+      const nativeScene = async (key: Parameters<typeof translate>[0]) => {
+        await page
+          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', { name: label(key), exact: true })
+          .click();
+      };
+      const background = page.locator('[data-ui="video-editor.scene-background"]');
+      const watermark = page.locator('[data-ui="video-editor.watermark.inspector"]');
+      const paintCounts = () =>
+        page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement) => {
+          const data = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
+          let blue = 0,
+            red = 0,
+            opaque = 0;
+          for (let offset = 0; offset < data.length; offset += 4) {
+            if (data[offset + 3]! < 250) continue;
+            opaque++;
+            if (
+              data[offset]! <= 120 &&
+              data[offset + 1]! >= 40 &&
+              data[offset + 1]! <= 130 &&
+              data[offset + 2]! >= 100 &&
+              data[offset + 2]! - data[offset]! >= 30
+            )
+              blue++;
+            if (
+              Math.abs(data[offset]! - 224) <= 2 &&
+              Math.abs(data[offset + 1]! - 32) <= 2 &&
+              Math.abs(data[offset + 2]! - 48) <= 2
+            )
+              red++;
+          }
+          return { blue, red, opaque };
+        });
+      let backgroundBaseline = 0;
+      const activateSceneAppearance = async () => {
+        await nativeScene('videoEditor.sidebar.inspectorGroupBackground');
+        await chooseInspectorValue(
+          page,
+          background,
+          label('videoEditor.sidebar.sceneBackgroundTypeLabel'),
+          label('videoEditor.sidebar.sceneBackgroundImage')
+        );
+        await expect
+          .poll(async () => (await paintCounts()).blue)
+          .toBeGreaterThan(backgroundBaseline + 20);
+        await nativeScene('gallery.videoReview.watermark');
+        await chooseInspectorValue(
+          page,
+          watermark,
+          label('gallery.videoReview.watermark'),
+          label('gallery.videoReview.watermarkImage')
+        );
+        await expect.poll(async () => (await paintCounts()).red).toBeGreaterThan(20);
+      };
+      await nativeScene('videoEditor.sidebar.inspectorGroupBackground');
+      await expect(background.getByRole('textbox')).toHaveCount(0);
+      await expect.poll(async () => (await paintCounts()).opaque).toBeGreaterThan(100);
+      backgroundBaseline = (await paintCounts()).blue;
+      await expect.poll(async () => (await paintCounts()).red).toBe(0);
+      await page.screenshot({
+        path: info.outputPath('retained-scene-disabled.png'),
+        fullPage: false,
+      });
+      await activateSceneAppearance();
+      const nativeLogoSize = watermark.getByRole('textbox', {
+        name: label('gallery.videoReview.watermarkSize'),
+        exact: true,
+      });
+      await expect(nativeLogoSize).toHaveValue('30');
+      await nativeLogoSize.fill('35');
+      await nativeLogoSize.press('Enter');
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.watermark?.image?.size)
+        .toBeCloseTo(0.35, 8);
+      await page.screenshot({
+        path: info.outputPath('retained-scene-enabled.png'),
+        fullPage: false,
+      });
+      await chooseInspectorValue(
+        page,
+        watermark,
+        label('gallery.videoReview.watermark'),
+        label('gallery.videoReview.watermarkNone')
+      );
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.watermarkEnabled)
+        .toBe(false);
+      await expect.poll(async () => (await paintCounts()).red).toBe(0);
+      await nativeScene('videoEditor.sidebar.inspectorGroupBackground');
+      await chooseInspectorValue(
+        page,
+        background,
+        label('videoEditor.sidebar.sceneBackgroundTypeLabel'),
+        label('gallery.videoReview.backgroundNone')
+      );
+      await expect.poll(async () => (await paintCounts()).blue).toBe(backgroundBaseline);
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.enabled)
+        .toBe(false);
+      const disabledScene = (await readNativeVideoProject(page))!;
+      expect(disabledScene.watermark).toMatchObject({ mode: 'image', image: { size: 0.35 } });
+      expect(disabledScene.sceneBackground).toMatchObject({
+        kind: 'image',
+        enabled: false,
+        blur: 2,
+      });
+      await page.reload();
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      expect(await readNativeVideoProject(page)).toEqual(disabledScene);
       const unchanged = (await readNativeReviewWorkspace(page, source.aggregateId))!;
       const original = replayReviewHistory(
         unchanged.history,
@@ -2627,6 +2829,47 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       );
       expect(original.advancedContent.windowHeader).toEqual(header);
       expect(original.advancedContent.canvas).toEqual(canvas);
+      expect(original.advancedContent).toEqual(document.advancedContent);
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+      await page
+        .locator('[data-gallery-folder="video-project"]')
+        .getByRole('button')
+        .first()
+        .click();
+      await page
+        .locator(`[data-gallery-keyboard-id="quick-edit-project:${source.aggregateId}"]`)
+        .getByRole('button', { name: source.project!.name, exact: true })
+        .first()
+        .click();
+      await page
+        .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+        .getByRole('button', { name: label('common.actions.delete'), exact: true })
+        .click();
+      const deletion = page.locator('[data-ui="gallery.deletion.menu"]');
+      await deletion
+        .getByRole('menuitem', { name: label('gallery.app.permanentDelete'), exact: true })
+        .click();
+      await deletion
+        .getByRole('menuitem', { name: label('gallery.app.confirmPermanentDelete'), exact: true })
+        .click();
+      await expect.poll(() => readNativeReviewWorkspace(page, source.aggregateId)).toBeNull();
+      await page.goto(
+        `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(disabledScene.id)}`
+      );
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      expect(await readNativeVideoProject(page)).toEqual(disabledScene);
+      await activateSceneAppearance();
+      await expect(
+        watermark.getByRole('textbox', {
+          name: label('gallery.videoReview.watermarkSize'),
+          exact: true,
+        })
+      ).toHaveValue('35');
+      await page.screenshot({
+        path: info.outputPath('retained-scene-after-source-deletion.png'),
+        fullPage: false,
+      });
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();

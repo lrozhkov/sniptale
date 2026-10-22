@@ -103,7 +103,7 @@ it.each([-2, 0, 2, 20, -20])(
     const before = structuredClone(input);
     const plan = prepared(input);
     expect(input).toEqual(before);
-    expect(plan.project.version).toBe(32);
+    expect(plan.project.version).toBe(36);
     expect(isExportReadyVideoProject(plan.project)).toBe(true);
     const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(plan.project)));
     expect(reopened).not.toBeNull();

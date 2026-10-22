@@ -187,4 +187,11 @@ export type VideoProjectSceneBackground = (
   | VideoProjectSolidBackground
   | VideoProjectGradientBackground
   | VideoProjectImageBackground
-) & { blur?: number; remembered?: VideoProjectBackgroundVariants };
+) & {
+  /** Disabled paint retains its authored variants without entering composition. */
+  enabled?: false;
+  blur?: number;
+  /** Passive legacy layout blur when a distinct active layout also exists. */
+  rememberedBlur?: number;
+  remembered?: VideoProjectBackgroundVariants;
+};

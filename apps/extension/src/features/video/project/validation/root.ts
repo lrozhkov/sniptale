@@ -94,6 +94,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['rememberedWindowLayout'] !== undefined) return 36;
   if (value['rememberedWindowHeader'] !== undefined || value['rememberedSourceCrop'] !== undefined)
     return 35;
   if (value['cameraTiming'] !== undefined) return 32;
@@ -126,8 +127,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 35) &&
+    isBoundedNumber(version, 2, 36) &&
     Number.isInteger(version) &&
+    (version >= 36 ||
+      (value['watermarkEnabled'] === undefined &&
+        (!isRecord(value['sceneBackground']) ||
+          (value['sceneBackground']['enabled'] === undefined &&
+            value['sceneBackground']['rememberedBlur'] === undefined)))) &&
     (version >= 35 || value['rememberedCanvas'] === undefined) &&
     (version >= 34 ||
       !Array.isArray(value['motionRegions']) ||
@@ -274,6 +280,7 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['actionEvents'], isActionEvent) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
+    (value['watermarkEnabled'] === undefined || value['watermarkEnabled'] === false) &&
     (value['watermark'] === undefined || parseQuickEditWatermark(value['watermark']) !== null) &&
     (value['bookendPresets'] === undefined ||
       parseVideoProjectBookendPresets(value['bookendPresets']) !== null) &&

@@ -158,8 +158,9 @@ async function attachImportedWatermark(
       });
       if (!watermark || asset.type !== VideoProjectAssetType.IMAGE) return current;
       accepted = true;
+      const { watermarkEnabled: _disabled, ...active } = current;
       return {
-        ...current,
+        ...active,
         assets: [...current.assets.filter((item) => item.id !== asset.id), asset],
         watermark,
       };

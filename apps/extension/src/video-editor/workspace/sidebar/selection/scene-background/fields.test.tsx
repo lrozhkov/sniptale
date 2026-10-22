@@ -94,6 +94,7 @@ function createProps(): SceneBackgroundFieldProps {
 
 it('builds canonical background kind options for the shared select surface', () => {
   expect(getSceneBackgroundKindOptions(createProps().imageAssets)).toEqual([
+    { value: 'none', label: 'gallery.videoReview.backgroundNone' },
     {
       value: VideoSceneBackgroundKind.SOLID,
       label: 'videoEditor.sidebar.sceneBackgroundSolid',
@@ -274,4 +275,29 @@ it('shows the shared blur control for image and gradient, hides it on solid and 
   expect(
     container?.querySelector('input[aria-label="editor.scene.backgroundBlurAmount"]')
   ).toBeNull();
+});
+
+it('keeps disabled paint hidden until explicit activation and preserves its settings on None', async () => {
+  const props = createProps();
+  const retained = {
+    kind: 'solid' as const,
+    color: '#123456ff',
+    blur: 3,
+    enabled: false as const,
+    remembered: {
+      image: { kind: 'image' as const, assetId: 'asset-2', imageFit: 'contain' as const },
+    },
+  };
+  renderBackgroundHarness({ ...props, sceneBackground: retained });
+  expect(getKindOption('gallery.videoReview.backgroundNone')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  expect(container?.querySelector('input')).toBeNull();
+  expect(props.onSetSceneBackground).not.toHaveBeenCalled();
+  await clickBackgroundKind('videoEditor.sidebar.sceneBackgroundSolid');
+  const { enabled: _disabled, ...active } = retained;
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(active);
+  await clickBackgroundKind('gallery.videoReview.backgroundNone');
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(retained);
+  expect(container?.querySelector('input')).toBeNull();
 });

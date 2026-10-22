@@ -1,3 +1,4 @@
+import { getSceneBackgroundLegacyColor } from './scene/background';
 import { materializeVideoProjectCursorSourceObservations } from './cursor-source-observations';
 import { reconcileVideoProjectCompositionJoins } from './scene/joins';
 import { removeVideoProjectBookendSources } from './scene/bookend-presets';
@@ -210,13 +211,20 @@ function removeSourceBackground(
   const next = removedActive
     ? (remembered?.solid ?? { kind: 'solid' as const, color: project.backgroundColor })
     : active;
+  const sceneBackground = {
+    ...next,
+    ...(background.enabled === false ? { enabled: false as const } : {}),
+    ...(background.blur !== undefined ? { blur: background.blur } : {}),
+    ...(background.rememberedBlur !== undefined
+      ? { rememberedBlur: background.rememberedBlur }
+      : {}),
+    ...(remembered !== undefined ? { remembered } : {}),
+  };
   return {
-    sceneBackground: {
-      ...next,
-      ...(background.blur !== undefined ? { blur: background.blur } : {}),
-      ...(remembered !== undefined ? { remembered } : {}),
-    },
-    ...(removedActive && next.kind === 'solid' ? { backgroundColor: next.color } : {}),
+    sceneBackground,
+    ...(removedActive && next.kind === 'solid'
+      ? { backgroundColor: getSceneBackgroundLegacyColor(sceneBackground) }
+      : {}),
   };
 }
 

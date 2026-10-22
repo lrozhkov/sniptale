@@ -86,7 +86,7 @@ export function planReviewProjectScene(args: {
       status: 'prepared';
       assets: VideoProjectAsset[];
       scene: Pick<VideoProject, 'width' | 'height' | 'sceneBackground'> &
-        Partial<Pick<VideoProject, 'watermark' | 'rememberedCanvas'>>;
+        Partial<Pick<VideoProject, 'watermark' | 'watermarkEnabled' | 'rememberedCanvas'>>;
       video: Pick<VideoProjectVideoClip, 'transform' | 'fitMode'> &
         Partial<
           Pick<
@@ -95,6 +95,7 @@ export function planReviewProjectScene(args: {
             | 'rememberedSourceCrop'
             | 'windowHeader'
             | 'rememberedWindowHeader'
+            | 'rememberedWindowLayout'
             | 'windowCornerRadius'
             | 'shadowIntensity'
             | 'shadowColor'
@@ -104,22 +105,16 @@ export function planReviewProjectScene(args: {
     } {
   const { content, ui, source } = args;
   const background = content.background;
-  const fields: SceneField[] = [];
-  if (ui.mode === 'basic') {
-    if (content.watermark && content.watermark.mode !== 'none') fields.push('watermark');
-  }
-  if (
-    (background.enabled && ui.mode === 'basic') ||
-    background.rememberedLayout ||
-    (background.zoomBehavior !== undefined && background.zoomBehavior !== 'window')
-  )
-    fields.push('background');
-  if (fields.length) return { status: 'blocked', fields };
+  if (background.zoomBehavior !== undefined && background.zoomBehavior !== 'window')
+    return { status: 'blocked', fields: ['background'] };
+  const enabled = ui.mode === 'advanced' && background.enabled;
+  const inactiveLayout =
+    ui.mode === 'basic' && background.enabled ? background.layout : background.rememberedLayout;
   const images = planSceneImages(content, args.imageAssets ?? []);
   if (!images) return { status: 'blocked', fields: ['scene-assets'] };
   const input = {
     source,
-    background,
+    background: enabled ? background : { enabled: false as const },
     ...(ui.mode === 'advanced' && content.canvas ? { canvas: content.canvas } : {}),
     ...(ui.mode === 'advanced' && content.windowHeader
       ? { windowHeader: content.windowHeader }
@@ -156,8 +151,12 @@ export function planReviewProjectScene(args: {
         : {
             kind: 'solid' as const,
             color:
-              background.enabled && background.type === 'solid' ? background.color : '#00000000',
+              background.enabled && background.type === 'solid' ? background.color : '#000000ff',
           };
+  const retainedFill =
+    !background.enabled && background.rememberedPaint
+      ? structuredClone(background.rememberedPaint)
+      : fill;
   return {
     status: 'prepared',
     assets: [...images.values()],
@@ -166,6 +165,9 @@ export function planReviewProjectScene(args: {
       height: size.height,
       ...(ui.mode === 'basic' && content.canvas
         ? { rememberedCanvas: { width: content.canvas.width, height: content.canvas.height } }
+        : {}),
+      ...(ui.mode === 'basic' && content.watermark && content.watermark.mode !== 'none'
+        ? { watermarkEnabled: false as const }
         : {}),
       ...(content.watermark
         ? {
@@ -183,9 +185,15 @@ export function planReviewProjectScene(args: {
           }
         : {}),
       sceneBackground: {
-        ...fill,
+        ...retainedFill,
+        ...(!enabled ? { enabled: false as const } : {}),
         ...(background.enabled && background.layout.blur !== undefined
           ? { blur: background.layout.blur }
+          : inactiveLayout?.blur !== undefined
+            ? { blur: inactiveLayout.blur }
+            : {}),
+        ...(background.enabled && background.rememberedLayout?.blur !== undefined
+          ? { rememberedBlur: background.rememberedLayout.blur }
           : {}),
         ...(Object.keys(remembered).length ? { remembered } : {}),
       },
@@ -193,6 +201,21 @@ export function planReviewProjectScene(args: {
     video: {
       transform: { ...layout.windowRect, rotation: 0, opacity: 1 },
       fitMode: VideoMediaFitMode.CONTAIN,
+      ...(inactiveLayout
+        ? {
+            rememberedWindowLayout: {
+              padding: inactiveLayout.padding,
+              windowCornerRadius: inactiveLayout.cornerRadius,
+              ...(inactiveLayout.shadow
+                ? {
+                    shadowIntensity: inactiveLayout.shadow.intensity,
+                    shadowColor: inactiveLayout.shadow.color,
+                    shadowMode: 'BACKDROP' as const,
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(layout.sourceCrop ? { sourceCrop: layout.sourceCrop } : {}),
       ...(ui.mode === 'basic' && content.canvas?.crop
         ? {
@@ -208,7 +231,7 @@ export function planReviewProjectScene(args: {
           ? { windowHeader: structuredClone(content.windowHeader) }
           : { rememberedWindowHeader: structuredClone(content.windowHeader) }
         : {}),
-      ...(background.enabled
+      ...(enabled && background.enabled
         ? {
             windowCornerRadius: background.layout.cornerRadius,
             ...(background.layout.shadow

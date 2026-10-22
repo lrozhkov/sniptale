@@ -78,6 +78,8 @@ export function resolveSceneBackgroundFrame(params: {
   sceneBackground: VideoProjectSceneBackground;
   time?: number | undefined;
 }) {
+  if (params.sceneBackground.enabled === false)
+    return { kind: VideoSceneBackgroundKind.SOLID, color: '#00000000' };
   if (params.sceneBackground.kind !== VideoSceneBackgroundKind.GRADIENT) {
     return params.sceneBackground;
   }
@@ -91,6 +93,7 @@ export function resolveSceneBackgroundFrame(params: {
 export function getSceneBackgroundLegacyColor(
   sceneBackground: VideoProjectSceneBackground
 ): string {
+  if (sceneBackground.enabled === false) return '#00000000';
   switch (sceneBackground.kind) {
     case VideoSceneBackgroundKind.SOLID:
       return sceneBackground.color;
@@ -123,7 +126,10 @@ export function getProjectSceneBackgroundImageAssetId(
   project: VideoProjectSceneBackgroundSource
 ): string | null {
   const sceneBackground = getProjectSceneBackground(project);
-  return sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? sceneBackground.assetId : null;
+  return sceneBackground.enabled !== false &&
+    sceneBackground.kind === VideoSceneBackgroundKind.IMAGE
+    ? sceneBackground.assetId
+    : null;
 }
 
 interface SceneBackgroundDraw {
@@ -215,6 +221,14 @@ function staticRasterKey(
 
 /** Filter only the scene paint; foreground layers keep their own rendering semantics. */
 export function drawSceneBackground(params: SceneBackgroundDraw) {
+  if (params.sceneBackground.enabled === false) {
+    const previous = backgroundRasters.get(params.context);
+    if (previous) {
+      releaseBackgroundRaster(previous);
+      backgroundRasters.delete(params.context);
+    }
+    return;
+  }
   const radius = (params.sceneBackground.blur ?? 0) * (params.projectScale ?? 1);
   const image =
     params.sceneBackground.kind === 'image'

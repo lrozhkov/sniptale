@@ -66,6 +66,14 @@ function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['vers
     clips.some(
       (clip) =>
         (clip.type === 'VIDEO' || clip.type === 'IMAGE') &&
+        clip.rememberedWindowLayout !== undefined
+    )
+  )
+    return 36;
+  if (
+    clips.some(
+      (clip) =>
+        (clip.type === 'VIDEO' || clip.type === 'IMAGE') &&
         (clip.rememberedWindowHeader !== undefined || clip.rememberedSourceCrop !== undefined)
     )
   )
@@ -119,6 +127,14 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  const sceneBackground = patch.sceneBackground ?? project.sceneBackground;
+  if (
+    project.watermarkEnabled !== undefined ||
+    patch.watermarkEnabled !== undefined ||
+    sceneBackground?.enabled !== undefined ||
+    sceneBackground?.rememberedBlur !== undefined
+  )
+    return 36;
   if ((patch.rememberedCanvas ?? project.rememberedCanvas) !== undefined) return 35;
   if ((patch.cursorTrack ?? project.cursorTrack)?.sourceObservations !== undefined) return 33;
   if (

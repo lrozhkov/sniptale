@@ -1,3 +1,5 @@
+import { createQuickEditWatermark } from '../project/scene/watermark';
+import { updateQuickEditBackground } from './advanced/background';
 import { expect, it } from 'vitest';
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import {
@@ -124,16 +126,10 @@ it('retains gradient paint and remembered solid paint in existing scene variants
   });
 });
 
-it.each(['basic', 'disabled-layout', 'image', 'remembered-image'] as const)(
+it.each(['image', 'remembered-image'] as const)(
   'refuses unsupported %s scene data without mutating the source',
   (variant) => {
     const input = styledFixture();
-    if (variant === 'basic') input.ui.mode = 'basic';
-    if (variant === 'disabled-layout')
-      input.document.advancedContent.background = {
-        enabled: false,
-        rememberedLayout: { padding: 17, cornerRadius: 18 },
-      };
     if (variant === 'image')
       input.document.advancedContent.background = {
         enabled: true,
@@ -192,7 +188,7 @@ it('keeps a basic Gallery window header dormant through independent conversion a
   const result = planReviewProjectConversion(input);
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
   const restored = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
-  expect(restored.version).toBe(35);
+  expect(restored.version).toBe(36);
   expect(restored.utilityLanes?.camera?.visible).toBe(false);
   expect(restored.motionRegions?.length).toBeGreaterThan(0);
   expect(isExportReadyVideoProject(restored)).toBe(true);
@@ -220,7 +216,7 @@ it('retains a basic-mode canvas and crop without changing the visible source', (
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
   const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
   expect(project).toMatchObject({
-    version: 35,
+    version: 36,
     width: input.source.width,
     height: input.source.height,
     rememberedCanvas: { width: 320, height: 360 },
@@ -244,4 +240,87 @@ it('retains a basic-mode canvas and crop without changing the visible source', (
     isExportReadyVideoProject({ ...project, rememberedCanvas: { width: -1, height: 360 } })
   ).toBe(false);
   expect(input).toEqual(before);
+});
+
+it('transfers basic scene appearance without enabling paint, watermark or window styling', () => {
+  const input = styledFixture();
+  input.ui.mode = 'basic';
+  const watermark = { ...createQuickEditWatermark('Retained mark'), mode: 'text' as const };
+  input.document.advancedContent.watermark = watermark;
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project).toMatchObject({
+    version: 36,
+    width: input.source.width,
+    height: input.source.height,
+    sceneBackground: { kind: 'solid', color: '#123456ff', blur: 3, enabled: false },
+    watermark,
+    watermarkEnabled: false,
+  });
+  for (const clip of result.project.clips) {
+    if (clip.type !== 'VIDEO') continue;
+    expect(clip).toMatchObject({
+      rememberedWindowLayout: {
+        padding: 17.25,
+        windowCornerRadius: 18,
+        shadowIntensity: 35.5,
+        shadowColor: '#090a0bcc',
+        shadowMode: 'BACKDROP',
+      },
+      transform: { x: 0, y: 0, width: input.source.width, height: input.source.height },
+    });
+    expect(clip).not.toHaveProperty('windowCornerRadius');
+    expect(clip.shadowIntensity ?? 0).toBe(0);
+  }
+  expect(isExportReadyVideoProject(result.project)).toBe(true);
+  expect(hydrateVideoProject(JSON.parse(JSON.stringify(result.project)))).toMatchObject({
+    watermark,
+    watermarkEnabled: false,
+  });
+  expect(isExportReadyVideoProject({ ...result.project, version: 35 })).toBe(false);
+  expect(input).toEqual(before);
+});
+
+it('retains an explicitly disabled background layout and paint without suppressing unrelated advanced settings', () => {
+  const input = styledFixture();
+  input.document.advancedContent.background = updateQuickEditBackground(
+    input.document.advancedContent.background,
+    { enabled: false }
+  );
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.sceneBackground).toMatchObject({
+    enabled: false,
+    kind: 'solid',
+    color: '#123456ff',
+    blur: 3,
+  });
+  for (const clip of result.project.clips) {
+    if (clip.type !== 'VIDEO') continue;
+    expect(clip).toMatchObject({
+      rememberedWindowLayout: { padding: 17.25, windowCornerRadius: 18 },
+      windowHeader: input.document.advancedContent.windowHeader,
+    });
+    expect(clip).not.toHaveProperty('windowCornerRadius');
+  }
+});
+
+it('keeps a distinct passive layout without replacing the active layout blur or clip style', () => {
+  const input = styledFixture();
+  input.document.advancedContent.background.rememberedLayout = {
+    padding: 7,
+    cornerRadius: 8,
+    blur: 9,
+  };
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.sceneBackground).toMatchObject({ blur: 3, rememberedBlur: 9 });
+  for (const clip of result.project.clips) {
+    if (clip.type !== 'VIDEO') continue;
+    expect(clip).toMatchObject({
+      windowCornerRadius: 18,
+      rememberedWindowLayout: { padding: 7, windowCornerRadius: 8 },
+    });
+  }
 });

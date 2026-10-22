@@ -343,7 +343,8 @@ export interface VideoProject {
     | 32
     | 33
     | 34
-    | 35;
+    | 35
+    | 36;
   sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
@@ -362,6 +363,8 @@ export interface VideoProject {
   sceneBackground?: VideoProjectSceneBackground;
   /** Final-canvas watermark; image references name a declared project material. */
   watermark?: import('../scene/watermark-types').QuickEditWatermarkSettings;
+  /** Suppress the authored watermark without rewriting its selected mode. */
+  watermarkEnabled?: false;
   /** Project-clock presentation after the complete visual and audio composition. */
   sceneEdges?: import('../scene/edge-fades').VideoProjectSceneEdges;
   /** Authored insertion recipes; existing timeline instances remain independent. */

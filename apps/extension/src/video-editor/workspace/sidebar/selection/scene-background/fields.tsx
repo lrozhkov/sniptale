@@ -20,7 +20,13 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
     <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
       <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
-        value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
+        value={
+          imageRequested
+            ? VideoSceneBackgroundKind.IMAGE
+            : props.sceneBackground.enabled === false
+              ? 'none'
+              : props.sceneBackground.kind
+        }
         onChange={(value) => {
           setImageRequested(
             value === VideoSceneBackgroundKind.IMAGE && props.imageAssets.length === 0
@@ -29,28 +35,31 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
         }}
         options={getSceneBackgroundKindOptions(props.imageAssets)}
       />
-      {imageRequested || props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? (
-        <ImageBackgroundEditor {...props} />
-      ) : (
-        <SceneBackgroundEditor {...props} />
-      )}
-      {!imageRequested && props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID && (
-        <NumericRow
-          label={translate('editor.scene.backgroundBlurAmount')}
-          value={blur}
-          min={0}
-          max={25}
-          step={1}
-          precision={2}
-          unit="px"
-          normalizeValue={(value) => (value === Number(blur.toFixed(2)) ? blur : value)}
-          onPreviewValue={() => undefined}
-          onCommitValue={(value) => {
-            props.onSetSceneBackground({ blur: value });
-            props.onResetSceneBackgroundPreview();
-          }}
-        />
-      )}
+      {(imageRequested || props.sceneBackground.enabled !== false) &&
+        (imageRequested || props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? (
+          <ImageBackgroundEditor {...props} />
+        ) : (
+          <SceneBackgroundEditor {...props} />
+        ))}
+      {props.sceneBackground.enabled !== false &&
+        !imageRequested &&
+        props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID && (
+          <NumericRow
+            label={translate('editor.scene.backgroundBlurAmount')}
+            value={blur}
+            min={0}
+            max={25}
+            step={1}
+            precision={2}
+            unit="px"
+            normalizeValue={(value) => (value === Number(blur.toFixed(2)) ? blur : value)}
+            onPreviewValue={() => undefined}
+            onCommitValue={(value) => {
+              props.onSetSceneBackground({ blur: value });
+              props.onResetSceneBackgroundPreview();
+            }}
+          />
+        )}
     </div>
   );
 }
@@ -119,9 +128,14 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
 }
 
 function handleSceneBackgroundKindChange(
-  nextKind: SceneBackground['kind'],
+  nextKind: SceneBackground['kind'] | 'none',
   props: SceneBackgroundFieldProps
 ) {
+  if (nextKind === 'none') {
+    props.onSetSceneBackground({ ...props.sceneBackground, enabled: false });
+    props.onResetSceneBackgroundPreview();
+    return;
+  }
   const next = resolveSceneBackgroundKind(
     props.sceneBackground,
     nextKind,
@@ -154,6 +168,7 @@ export function getSceneBackgroundKindOptions(
   _imageAssets: SceneBackgroundFieldProps['imageAssets'] = []
 ) {
   return [
+    { value: 'none' as const, label: translate('gallery.videoReview.backgroundNone') },
     {
       value: VideoSceneBackgroundKind.SOLID,
       label: translate('videoEditor.sidebar.sceneBackgroundSolid'),

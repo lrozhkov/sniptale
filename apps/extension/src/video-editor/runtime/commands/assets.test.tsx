@@ -663,60 +663,71 @@ function pendingWatermarkImport() {
   return { promise, resolve };
 }
 
-it('attaches a private watermark atomically and preserves concurrent edits and history', async () => {
-  const { createQuickEditWatermark } =
-    await import('../../../features/video/project/scene/watermark');
-  const f = watermarkImportFixture();
-  const read = pendingWatermarkImport();
-  importProjectAssetMock.mockReturnValueOnce(read.promise);
-  const pending = latestHandlers!.handleImportImage(f.file, {
-    destination: 'watermark',
-    signal: new AbortController().signal,
-    watermarkOriginMediaId: 'library-logo',
-  });
-  const watermark = {
-    ...createQuickEditWatermark('Concurrent text'),
-    mode: 'text' as const,
-    layout: 'tiled' as const,
-    tile: { spacing: 0.2, rotation: 45 },
-  };
-  f.store
-    .getState()
-    .updateProject((current) => ({ ...current, name: 'Parallel rename', watermark }));
-  await act(async () => {
-    read.resolve(f.logo);
-    await pending;
-  });
-  const after = f.store.getState().project!;
-  expect(after.name).toBe('Parallel rename');
-  expect(after.version).toBe(20);
-  expect(after.assets).toEqual([f.logo]);
-  expect(after.clips).toEqual([]);
-  expect(after.watermark).toMatchObject({
-    ...watermark,
-    mode: 'image',
-    image: { assetId: `project-asset:${f.logo.id}`, width: 400, height: 200 },
-  });
-  expect(after.watermark?.image?.assetId).not.toBe('project-asset:private-logo-bytes');
-  expect(f.params.updateProject).toHaveBeenCalledOnce();
-  expect(f.params.upsertAsset).not.toHaveBeenCalled();
-  expect(f.params.addAssetClip).not.toHaveBeenCalled();
-  expect(importProjectAssetMock).toHaveBeenCalledWith(f.file, 'IMAGE', {
-    publishToLibrary: false,
-    originMediaId: 'library-logo',
-  });
-  expect(f.store.getState().projectHistory.past).toHaveLength(2);
-  const { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } =
-    await import('../../project/history');
-  const undo = undoVideoEditorProjectHistory(f.store.getState().projectHistory, after);
-  if (undo?.status !== 'applied') throw new Error('Expected undo');
-  expect(undo.project.assets).toEqual([]);
-  expect(undo.project.watermark).toEqual(watermark);
-  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
-  if (redo?.status !== 'applied') throw new Error('Expected redo');
-  expect(redo.project.watermark).toEqual(after.watermark);
-  expect(redo.project.assets).toEqual(after.assets);
-});
+it.each([false, true])(
+  'attaches a private watermark atomically with retainedDisabled=%s and preserves concurrent edits and history',
+  async (retainedDisabled) => {
+    const { createQuickEditWatermark } =
+      await import('../../../features/video/project/scene/watermark');
+    const f = watermarkImportFixture();
+    if (retainedDisabled)
+      f.store.getState().updateProject((current) => ({
+        ...current,
+        watermark: { ...createQuickEditWatermark('Saved text'), mode: 'text' },
+        watermarkEnabled: false,
+      }));
+    const read = pendingWatermarkImport();
+    importProjectAssetMock.mockReturnValueOnce(read.promise);
+    const pending = latestHandlers!.handleImportImage(f.file, {
+      destination: 'watermark',
+      signal: new AbortController().signal,
+      watermarkOriginMediaId: 'library-logo',
+    });
+    const watermark = {
+      ...createQuickEditWatermark('Concurrent text'),
+      mode: 'text' as const,
+      layout: 'tiled' as const,
+      tile: { spacing: 0.2, rotation: 45 },
+    };
+    f.store
+      .getState()
+      .updateProject((current) => ({ ...current, name: 'Parallel rename', watermark }));
+    await act(async () => {
+      read.resolve(f.logo);
+      await pending;
+    });
+    const after = f.store.getState().project!;
+    expect(after.name).toBe('Parallel rename');
+    expect(after.version).toBe(retainedDisabled ? 36 : 20);
+    expect(after).not.toHaveProperty('watermarkEnabled');
+    expect(after.assets).toEqual([f.logo]);
+    expect(after.clips).toEqual([]);
+    expect(after.watermark).toMatchObject({
+      ...watermark,
+      mode: 'image',
+      image: { assetId: `project-asset:${f.logo.id}`, width: 400, height: 200 },
+    });
+    expect(after.watermark?.image?.assetId).not.toBe('project-asset:private-logo-bytes');
+    expect(f.params.updateProject).toHaveBeenCalledOnce();
+    expect(f.params.upsertAsset).not.toHaveBeenCalled();
+    expect(f.params.addAssetClip).not.toHaveBeenCalled();
+    expect(importProjectAssetMock).toHaveBeenCalledWith(f.file, 'IMAGE', {
+      publishToLibrary: false,
+      originMediaId: 'library-logo',
+    });
+    expect(f.store.getState().projectHistory.past).toHaveLength(retainedDisabled ? 3 : 2);
+    const { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } =
+      await import('../../project/history');
+    const undo = undoVideoEditorProjectHistory(f.store.getState().projectHistory, after);
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.assets).toEqual([]);
+    expect(undo.project.watermark).toEqual(watermark);
+    expect(undo.project.watermarkEnabled).toBe(retainedDisabled ? false : undefined);
+    const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+    if (redo?.status !== 'applied') throw new Error('Expected redo');
+    expect(redo.project.watermark).toEqual(after.watermark);
+    expect(redo.project.assets).toEqual(after.assets);
+  }
+);
 
 it('refuses a canceled late logo even after recreation of the same project identity', async () => {
   const f = watermarkImportFixture();

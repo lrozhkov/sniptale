@@ -95,7 +95,7 @@ it.each(['recording', 'project-asset', 'library-asset'] as const)(
   }
 );
 
-it('blocks unmapped active and remembered scene settings before exposing a partial project', () => {
+it('blocks unsupported source transitions before exposing a partial project', () => {
   const input = fixture();
   input.document.advancedContent.presentation = createNeutralPresentationSettings();
   input.document.advancedContent.background = {
@@ -110,7 +110,7 @@ it('blocks unmapped active and remembered scene settings before exposing a parti
   const before = structuredClone(input);
   expect(planReviewProjectConversion(input)).toEqual({
     status: 'blocked',
-    issues: [{ kind: 'unmapped-content', field: 'background' }, { kind: 'source-transition' }],
+    issues: [{ kind: 'source-transition' }],
   });
   expect(input).toEqual(before);
 });
@@ -136,7 +136,11 @@ it.each(['basic', 'advanced'] as const)(
       introTransition: settings.introTransition,
       outroTransition: settings.outroTransition,
     });
-    expect(result.project.sceneBackground).toEqual({ kind: 'solid', color: '#00000000' });
+    expect(result.project.sceneBackground).toEqual({
+      kind: 'solid',
+      color: '#000000ff',
+      enabled: false,
+    });
     expect(result.project.duration).toBe(7);
     const gallery = planReviewPresentationSequence({
       settings,
@@ -276,7 +280,7 @@ it('blocks malformed inputs but retains an editable result-time tail without ext
   const result = planReviewProjectConversion(input);
   expect(result.status).toBe('prepared');
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result.issues));
-  expect(result.project.version).toBe(29);
+  expect(result.project.version).toBe(36);
   const retained = result.project.textDocuments!.find((entry) => entry.binding.kind === 'project')!;
   expect(retained.durationMode).toBe('project');
   expect(retained.document.fragments[0]!.end).toBe(9);
@@ -341,7 +345,7 @@ it('preserves all authored source gain and static mute intent across cuts and Na
   const result = planReviewProjectConversion(input);
   expect(result.status).toBe('prepared');
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result.issues));
-  expect(result.project.version).toBe(28);
+  expect(result.project.version).toBe(36);
   const document = result.project.sourceAudioDocuments![0]!;
   expect(document.ranges).toEqual(input.document.advancedContent.audio.original.ranges);
   expect(document.mutes).toEqual([{ id: 'static', start: 2.5, end: 6, volume: 0.25 }]);
@@ -365,7 +369,7 @@ it('retains an admitted neutral schema28 seed instead of lowering its schema bel
   const result = planReviewProjectConversion(input);
   expect(result.status).toBe('prepared');
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result.issues));
-  expect(result.project.version).toBe(28);
+  expect(result.project.version).toBe(36);
   expect(result.project.sourceAudioDocuments).toEqual([]);
   expect(isExportReadyVideoProject(result.project)).toBe(true);
 });
@@ -423,7 +427,7 @@ it('converts retained audio tails without extending the montage', async () => {
   const result = planReviewProjectConversion(input);
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result.issues));
   const { syncProjectDuration } = await import('../project/timeline/basics');
-  expect(result.project.version).toBe(30);
+  expect(result.project.version).toBe(36);
   expect(syncProjectDuration(result.project).duration).toBe(7);
   expect(result.project.clips.find((clip) => clip.trackId === 'music-track')).toMatchObject({
     durationMode: 'project',

@@ -1,3 +1,4 @@
+import { translate } from '../../../../../platform/i18n';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -347,3 +348,29 @@ it('offers scalar padding and preserves unchanged rounded geometry', async () =>
   });
   expect(onEditMediaClip).toHaveBeenLastCalledWith(clip.id, { kind: 'padding', padding: 40 });
 });
+
+it.each([
+  { locked: false, padding: 40 },
+  { locked: true, padding: 40 },
+  { locked: false, padding: 4096 },
+])(
+  'exposes a quiet explicit restore action for retained framing %j',
+  async ({ locked, padding }) => {
+    const onEditMediaClip = vi.fn();
+    const clip = { ...createClip(), rememberedWindowLayout: { padding, windowCornerRadius: 18 } };
+    await renderHarness({ onEditMediaClip }, locked, clip);
+    const restore = [...container!.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes(translate('gallery.videoReview.windowLayoutRestore'))
+    )!;
+    expect(restore).toBeDefined();
+    expect(restore.disabled).toBe(locked);
+    await act(async () => restore.click());
+    if (restore.disabled) expect(onEditMediaClip).not.toHaveBeenCalled();
+    else
+      expect(onEditMediaClip).toHaveBeenCalledExactlyOnceWith(clip.id, {
+        kind: 'window-layout-restore',
+      });
+    if (padding === 4096)
+      expect(restore.title).toBe(translate('gallery.videoReview.windowLayoutFitCanvas'));
+  }
+);

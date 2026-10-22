@@ -39,6 +39,11 @@ export interface VideoProjectMediaVisualFields extends VideoProjectMediaShadowFi
   windowHeader?: WindowHeader;
   /** Last accepted header retained while the decoration is disabled. */
   rememberedWindowHeader?: WindowHeader;
+  /** Inactive authored framing restored by one explicit media command. */
+  rememberedWindowLayout?: VideoProjectMediaShadowFields & {
+    padding: number;
+    windowCornerRadius: number;
+  };
   fitMode: VideoMediaFitMode;
   fitScalePercent?: number;
 }

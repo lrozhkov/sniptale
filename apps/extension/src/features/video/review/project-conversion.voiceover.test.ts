@@ -86,7 +86,7 @@ it.each([0.25, 1, 4])(
     const project = result.project;
     const document = project.sourceVoiceoverDocuments![0]!;
     const raw = input.document.advancedContent.audio.voiceover[0]!;
-    expect(project.version).toBe(31);
+    expect(project.version).toBe(36);
     expect(isExportReadyVideoProject(project)).toBe(true);
     expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
     expect(document.binding).toEqual({
@@ -365,7 +365,7 @@ it.each([false, true])(
     const before = structuredClone(input);
     const result = planReviewProjectConversion(input);
     if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
-    expect(result.project.version).toBe(31);
+    expect(result.project.version).toBe(36);
     expect(isExportReadyVideoProject(result.project)).toBe(true);
     expect(result.project.sourceAudioDocuments).toHaveLength(1);
     const document = result.project.sourceAudioDocuments![0]!;

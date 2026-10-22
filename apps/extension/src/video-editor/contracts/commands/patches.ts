@@ -91,4 +91,5 @@ export type VideoProjectEffectInstancePatch = {
 export type VideoEditorMediaClipEdit =
   | { kind: 'padding'; padding: number }
   | { kind: 'source-crop'; crop: MediaSourceCrop | null }
-  | { kind: 'window-corner-radius'; radius: number | null };
+  | { kind: 'window-corner-radius'; radius: number | null }
+  | { kind: 'window-layout-restore' };

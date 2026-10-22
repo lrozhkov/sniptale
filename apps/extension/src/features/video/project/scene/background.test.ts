@@ -350,3 +350,24 @@ it.each([0, 1, 2])('releases all leases when surface %s has no 2d compositor', (
   for (const surface of surfaces) expect(surface.release).toHaveBeenCalledOnce();
   expect(context.drawImage).not.toHaveBeenCalled();
 });
+
+it('does not paint or request a disabled background image and leaves retained bytes referenced', () => {
+  const context = createContext();
+  const sceneBackground = {
+    kind: 'image' as const,
+    assetId: 'retained',
+    blur: 5,
+    enabled: false as const,
+  };
+  drawSceneBackground({ context, sceneBackground, width: 200, height: 100 });
+  expect(context.fillRect).not.toHaveBeenCalled();
+  expect(context.drawImage).not.toHaveBeenCalled();
+  expect(acquireVideoCompositionBuffer).not.toHaveBeenCalled();
+  expect(
+    getProjectSceneBackgroundImageAssetId({ backgroundColor: '#00000000', sceneBackground })
+  ).toBeNull();
+  expect(getSceneBackgroundLegacyColor(sceneBackground)).toBe('#00000000');
+  expect(getProjectSceneBackground({ backgroundColor: '#00000000', sceneBackground })).toEqual(
+    sceneBackground
+  );
+});

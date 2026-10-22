@@ -650,3 +650,41 @@ it.each(['source', 'replacement'] as const)(
     expect(project).toEqual(before);
   }
 );
+
+it.each([true, false])('keeps a purged background inactive with retained solid %s', (hasSolid) => {
+  const source = { kind: 'project-asset' as const, projectAssetId: 'source' };
+  const { project, removed, kept } = fixture(source);
+  project.version = 36;
+  project.clips = [];
+  project.backgroundColor = '#00000000';
+  const image = {
+    ...removed,
+    type: 'IMAGE' as const,
+    metadata: { ...removed.metadata, duration: null, hasAudio: false, mimeType: 'image/png' },
+  };
+  const solid = { kind: 'solid' as const, color: '#abcdef' };
+  project.assets = [image, kept];
+  project.sceneBackground = {
+    kind: 'image',
+    assetId: image.id,
+    enabled: false,
+    blur: 2,
+    rememberedBlur: 9,
+    ...(hasSolid ? { remembered: { solid } } : {}),
+  };
+  const before = structuredClone(project);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  const result = removeVideoProjectLibrarySources(project, [source]);
+  expect(result.sceneBackground).toMatchObject({
+    kind: 'solid',
+    color: hasSolid ? solid.color : '#00000000',
+    enabled: false,
+    blur: 2,
+    rememberedBlur: 9,
+  });
+  expect(result.backgroundColor).toBe('#00000000');
+  expect(result.assets).toEqual([kept]);
+  expect(isExportReadyVideoProject(result)).toBe(true);
+  expect(project).toEqual(before);
+  expect(removeVideoProjectLibrarySources(result, [source])).toBe(result);
+});

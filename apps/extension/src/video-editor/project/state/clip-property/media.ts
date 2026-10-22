@@ -1,4 +1,7 @@
-import { resolveMediaPaddingLayout } from '../../../../features/video/project/factories/framing-presets';
+import {
+  resolveMediaPaddingLayout,
+  maximumMediaPadding,
+} from '../../../../features/video/project/factories/framing-presets';
 import { parseMediaSourceCrop } from '../../../../features/video/project/media-crop';
 import { parseColor } from '@sniptale/foundation/color';
 import {
@@ -53,6 +56,10 @@ export function createClipMediaStyleActions(
           const clip = project.clips.find((item) => item.id === clipId);
           if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) return project;
           if (edit.kind === 'padding') return updateMediaPadding(project, clip, edit.padding);
+          if (edit.kind === 'window-layout-restore') {
+            const layout = clip.rememberedWindowLayout;
+            return layout ? updateMediaPadding(project, clip, layout.padding, true) : project;
+          }
           if (edit.kind === 'window-corner-radius') {
             if (edit.radius !== null && !isBoundedNumber(edit.radius, 0, 4096)) return project;
             const radius = edit.radius === null ? undefined : edit.radius;
@@ -376,7 +383,13 @@ function copyMediaWindowRadius<T extends { windowCornerRadius?: number }>(
   return copy;
 }
 
-function updateMediaPadding(project: VideoProject, clip: MediaClip, padding: number) {
+function updateMediaPadding(
+  project: VideoProject,
+  clip: MediaClip,
+  padding: number,
+  restoreWindowLayout = false
+) {
+  const remembered = restoreWindowLayout ? clip.rememberedWindowLayout : undefined;
   if (
     clip.type === 'VIDEO' &&
     project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
@@ -384,18 +397,28 @@ function updateMediaPadding(project: VideoProject, clip: MediaClip, padding: num
     return project;
   const asset = getAssetById(project, clip.assetId);
   if (!asset) return project;
+  const effectivePadding = remembered
+    ? Math.min(padding, maximumMediaPadding(project.width, project.height))
+    : padding;
+  const keepRecipe = remembered !== undefined && effectivePadding !== padding;
   const layout = resolveMediaPaddingLayout(
     asset.metadata.width * (clip.sourceCrop?.width ?? 1),
     asset.metadata.height * (clip.sourceCrop?.height ?? 1),
     project.width,
     project.height,
-    padding,
+    effectivePadding,
     clip.windowHeader,
     { width: asset.metadata.width, height: asset.metadata.height }
   );
   if (!layout) return project;
   const transform = { ...layout.transform, opacity: clip.transform.opacity };
   if (
+    (!remembered ||
+      (keepRecipe &&
+        clip.windowCornerRadius === remembered.windowCornerRadius &&
+        clip.shadowIntensity === remembered.shadowIntensity &&
+        clip.shadowColor === remembered.shadowColor &&
+        clip.shadowMode === remembered.shadowMode)) &&
     clip.fitMode === layout.fitMode &&
     clip.fitScalePercent === layout.fitScalePercent &&
     (['x', 'y', 'width', 'height', 'rotation', 'opacity'] as const).every(
@@ -403,9 +426,28 @@ function updateMediaPadding(project: VideoProject, clip: MediaClip, padding: num
     )
   )
     return project;
+  let updated = { ...clip, ...layout, transform };
+  if (remembered) {
+    const {
+      rememberedWindowLayout: _memory,
+      windowCornerRadius: _radius,
+      shadowIntensity: _intensity,
+      shadowColor: _color,
+      shadowMode: _mode,
+      ...rest
+    } = updated;
+    updated = {
+      ...rest,
+      windowCornerRadius: remembered.windowCornerRadius,
+      ...(remembered.shadowIntensity !== undefined
+        ? { shadowIntensity: remembered.shadowIntensity }
+        : {}),
+      ...(remembered.shadowColor !== undefined ? { shadowColor: remembered.shadowColor } : {}),
+      ...(remembered.shadowMode !== undefined ? { shadowMode: remembered.shadowMode } : {}),
+      ...(keepRecipe ? { rememberedWindowLayout: remembered } : {}),
+    };
+  }
   return applyVideoProjectMutationPatch(project, {
-    clips: project.clips.map((item) =>
-      item.id === clip.id ? { ...clip, ...layout, transform } : item
-    ),
+    clips: project.clips.map((item) => (item.id === clip.id ? updated : item)),
   });
 }

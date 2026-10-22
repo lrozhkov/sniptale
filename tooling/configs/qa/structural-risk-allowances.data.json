@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "review:conversion",
-      "reason": "tool-noise: This planner returns one unpublished destination or one typed refusal. The candidate raises its minimum schema for inactive canvas and media fields. Acquisition and guarded publication remain outside this function. Score 11 and delta 0 are unchanged. Local maps and cloned records do not add a writer or session authority. A mechanical split would distribute the same admission decision. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource or recovery lifetime. Remove when the analyzer models this cohesive conversion. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This planner returns one unpublished destination or one typed refusal. The candidate raises its minimum schema for retained inactive scene fields. Acquisition and guarded publication stay outside this function. Score 11 and delta 0 are unchanged. Local maps and cloned records add no writer or session authority. A mechanical split would distribute the same admission decision. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "bb90a4fe5f6972665634f743e2981ccda7cc432cae28f9df6555b86c587f2de7",
+      "astHash": "eeb15a6e659ac73cb76f973f8e2a7d402dd7061b9f00edfb59535365f595ae76",
       "signatureHash": "4723efd60b994dfbbad28fa1cfb6e50a6a8faeb21d3ab9bd0c06f17c43462415"
     },
     {
@@ -1865,11 +1865,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: The file contains two independent acceptance scenarios. Each scenario owns its local data. Existing helpers own encoding. There is no shared mutable fixture authority. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-10-21",
-      "astHash": "c06e7adf5eb19f9bf52e1e554b732bae45ac38ac96fe1b88ec48ca32dfdddb8b",
-      "signatureHash": "3814c13aa76db84153db5f3bd107073b598bef134c25e1a7714356426b972ecd"
+      "reason": "tool-noise: This file contains three acceptance scenarios with local data and existing encoding helpers. The candidate extends the retained appearance scenario through explicit activation, suppression, reopen and source deletion. There is no shared mutable fixture authority. Score 5 and delta 0 are unchanged. Cohesion is 1.00. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "e68fedda1ff28cbfbbcce207a683365491b3d0a92e903fa474d713e37632f080",
+      "signatureHash": "0bc5f11a49481348618da8cbf6cb3ae99cabe1f54e745a1c796a6a7f2126a7ea"
     },
     {
       "rule": "structural-function-risk",
@@ -2107,11 +2107,33 @@
       "file": "apps/extension/src/features/video/review/project-scene.ts",
       "symbol": "planReviewProjectScene",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure adapter maps one Gallery scene into the existing Native scene and media fields. Its guards return one refusal before conversion. It owns no state, effects, acquisition, writer or recovery. The analyzer reports one owner and cohesion 1.00. The branches preserve active and inactive values in that same mapping. A mechanical split would distribute this decision across forwarding helpers. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource or recovery lifetime. Remove when the analyzer models this cohesive conversion. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This pure adapter maps one Gallery scene into the existing Native scene and media fields. It owns no state, effects, acquisition, writer or recovery. The analyzer reports one owner, cohesion 1.00, score 5 and delta 0. Its branches preserve active and inactive values in the same mapping. A mechanical split would distribute this decision across forwarding helpers. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "318d651336f0ebcb003e395b6eeb232f9ff39d6b48a94d01f4fc174c1040ef4f",
-      "signatureHash": "eb1e16a7d6ca49c559c18b468011a501b1f7cde9d999247fb54e5e33c8efce96"
+      "astHash": "8001d4df784f702d1e14ae12f4affa7acda07b1c6a2aab9e52fd9c4ef8a196e2",
+      "signatureHash": "126fee864af84248405c8ceabed19ef87386fa24beab5db3959393abb0d4e328"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/runtime/commands/assets.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This suite proves the existing asset intake transaction. The candidate adds a disabled watermark variant to the same controlled preparation, commit, Undo and Redo test. Mocks represent dependencies of one receiver. The suite adds no production state authority. Score 4 and delta 0 are unchanged. Cohesion is 1.00. Splitting the fixture would distribute its controlled ordering. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "a8f83c72fcfbd1b9faf6a1d7357c7affd30632d087c2adc0f3e09b3320a87a57",
+      "signatureHash": "a89e62e3299cef3ba81fda423d2c1f99cd3cdd76af8310ccc2ee744323172742"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
+      "symbol": "test callback#3",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: This callback proves one continuous Gallery transfer, retained appearance edits, reopen and source deletion. Splitting its phases into seeded tests would lose proof that the same destination retains the authored image bytes. The existing host cleanup stays in one finally block. Score 4 and delta 0 are unchanged. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "39079e0808f7bcc2b154b9fdb64ffdf95edf66c59d1c2f05a2cf2a65d15a9538",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]
 }

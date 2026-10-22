@@ -10,7 +10,13 @@ type Background = VideoProjectSceneBackground;
 type Kind = Background['kind'];
 
 function parseVariant(value: unknown): Background | null {
-  if (!isRecord(value) || value['remembered'] !== undefined || value['blur'] !== undefined)
+  if (
+    !isRecord(value) ||
+    value['remembered'] !== undefined ||
+    value['blur'] !== undefined ||
+    value['enabled'] !== undefined ||
+    value['rememberedBlur'] !== undefined
+  )
     return null;
   if (value['kind'] !== 'image' && value['imageFit'] !== undefined) return null;
   if (value['kind'] === 'solid' && isColorString(value['color']))
@@ -57,11 +63,18 @@ function parseVariant(value: unknown): Background | null {
 /** Admit a bounded scene background and at most one retained variant of each kind. */
 export function parseSceneBackgroundSettings(value: unknown): Background | null {
   if (!isRecord(value)) return null;
-  const { blur, remembered, ...active } = value;
+  const { enabled, blur, rememberedBlur, remembered, ...active } = value;
+  if (enabled !== undefined && enabled !== false) return null;
+  if (rememberedBlur !== undefined && !isBoundedNumber(rememberedBlur, 0, 25)) return null;
   if (blur !== undefined && !isBoundedNumber(blur, 0, 25)) return null;
   const parsed = parseVariant(active);
   if (!parsed) return null;
-  const background = { ...parsed, ...(blur !== undefined ? { blur } : {}) };
+  const background = {
+    ...parsed,
+    ...(enabled === false ? { enabled: false as const } : {}),
+    ...(blur !== undefined ? { blur } : {}),
+    ...(rememberedBlur !== undefined ? { rememberedBlur } : {}),
+  };
   if (remembered === undefined) return background;
   if (
     !isRecord(remembered) ||
@@ -87,7 +100,11 @@ export function resolveSceneBackgroundKind(
   kind: Kind,
   fallbackImageId?: string
 ): Background | null {
-  if (background.kind === kind) return background;
+  if (background.kind === kind) {
+    if (background.enabled !== false) return background;
+    const { enabled: _disabled, ...active } = background;
+    return active;
+  }
   let next: Background | null = background.remembered?.[kind] ?? null;
   if (!next && kind === 'solid') next = { kind, color: '#111111' };
   if (!next && kind === 'gradient') next = createSceneGradientBackground();
@@ -99,14 +116,30 @@ export function resolveSceneBackgroundKind(
 
 /** Retain the outgoing authored variant under the current project authority. */
 export function retainSceneBackgroundVariants(previous: Background, next: Background): Background {
-  const { remembered: _nextMemory, blur: nextBlur, ...paint } = next;
+  const {
+    remembered: _nextMemory,
+    blur: nextBlur,
+    rememberedBlur: nextMemoryBlur,
+    ...paint
+  } = next;
   const blur = nextBlur ?? previous.blur;
-  const active = { ...paint, ...(blur !== undefined ? { blur } : {}) };
+  const rememberedBlur = nextMemoryBlur ?? previous.rememberedBlur;
+  const active = {
+    ...paint,
+    ...(blur !== undefined ? { blur } : {}),
+    ...(rememberedBlur !== undefined ? { rememberedBlur } : {}),
+  };
   if (previous.kind === next.kind)
     return {
       ...active,
       ...(previous.remembered !== undefined ? { remembered: previous.remembered } : {}),
     };
-  const { remembered, blur: _previousBlur, ...outgoing } = previous;
+  const {
+    remembered,
+    blur: _previousBlur,
+    enabled: _disabled,
+    rememberedBlur: _memoryBlur,
+    ...outgoing
+  } = previous;
   return { ...active, remembered: { ...remembered, [previous.kind]: outgoing } };
 }

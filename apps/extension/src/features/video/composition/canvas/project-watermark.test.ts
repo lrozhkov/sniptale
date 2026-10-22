@@ -180,3 +180,19 @@ it('permits a fresh retry after preparation failure and refuses an already abort
   expect(painter).toHaveBeenCalledTimes(2);
   owner.clear();
 });
+
+it('prepares an empty watermark while disabled and uses retained settings only after activation', async () => {
+  painter.mockImplementation(async () => renderer());
+  const read = vi.fn();
+  const owner = createVideoProjectWatermarkRenderer(read);
+  const value = { ...project(), watermarkEnabled: false as const };
+  const before = structuredClone(value.watermark);
+  await owner.prepare(value, output);
+  expect(painter.mock.calls[0]![0]).toBeUndefined();
+  const { watermarkEnabled: _disabled, ...enabled } = value;
+  await owner.prepare(enabled, output);
+  expect(painter.mock.calls[1]![0]).toEqual(before);
+  expect(value.watermark).toEqual(before);
+  expect(read).not.toHaveBeenCalled();
+  owner.clear();
+});

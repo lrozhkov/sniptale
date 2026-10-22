@@ -61,16 +61,23 @@ export function SceneWatermarkFields(props: {
         if (
           !current() ||
           project.id !== props.project.id ||
-          project.watermark !== props.project.watermark
+          project.watermark !== props.project.watermark ||
+          project.watermarkEnabled !== props.project.watermarkEnabled
         )
           return project;
         accepted = true;
         const previous =
           project.watermark ??
           createQuickEditWatermark(translate('gallery.videoReview.watermarkSeed'));
-        if (JSON.stringify(parseQuickEditWatermark(previous)) === JSON.stringify(parsed))
+        const inactive = parsed.mode === 'none' && previous.mode !== 'none';
+        const watermark = inactive ? { ...parsed, mode: previous.mode } : parsed;
+        if (
+          JSON.stringify(parseQuickEditWatermark(previous)) === JSON.stringify(watermark) &&
+          inactive === (project.watermarkEnabled === false)
+        )
           return project;
-        return { ...project, watermark: parsed };
+        const { watermarkEnabled: _disabled, ...active } = project;
+        return { ...active, watermark, ...(inactive ? { watermarkEnabled: false as const } : {}) };
       });
     } catch {
       fail();
@@ -114,7 +121,11 @@ export function SceneWatermarkFields(props: {
       key={reset}
       Disclosure={InspectorDetails}
       dataUi="video-editor.watermark.inspector"
-      settings={props.project.watermark}
+      settings={
+        props.project.watermarkEnabled === false && props.project.watermark
+          ? { ...props.project.watermark, mode: 'none' }
+          : props.project.watermark
+      }
       output={props.project}
       onChange={accept}
       onPreview={(settings) => {
