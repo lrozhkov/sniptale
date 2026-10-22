@@ -14,6 +14,10 @@ import type {
 } from '../../../contracts/settings';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import {
+  PAGE_TOOLBAR_OVERRIDE_MODES,
+  type PageToolbarControlOverrides,
+} from '../../../contracts/settings';
+import {
   DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
   DEFAULT_FULL_PAGE_QUALITY_POLICY,
   parseFullPageQualityPolicy,
@@ -131,6 +135,16 @@ function cloneContentToolbarSettings(
     ...settings,
     ...(settings.recordingControls ? { recordingControls: { ...settings.recordingControls } } : {}),
     ...(settings.pageControls ? { pageControls: { ...settings.pageControls } } : {}),
+    ...(settings.pageControlOverrides
+      ? {
+          pageControlOverrides: Object.fromEntries(
+            Object.entries(settings.pageControlOverrides).map(([mode, controls]) => [
+              mode,
+              { ...controls },
+            ])
+          ),
+        }
+      : {}),
     position: settings.position ? { ...settings.position } : null,
   };
 }
@@ -423,10 +437,26 @@ function queueSettingsMutation(
   return nextMutation;
 }
 
+function mergePageControlOverrides(
+  current: PageToolbarControlOverrides | undefined,
+  patch: PageToolbarControlOverrides | undefined
+) {
+  if (!current && !patch) return undefined;
+  const merged = { ...current };
+  for (const mode of PAGE_TOOLBAR_OVERRIDE_MODES) {
+    if (patch?.[mode]) merged[mode] = { ...current?.[mode], ...patch[mode] };
+  }
+  return merged;
+}
+
 function applySettingsPatch(
   currentSettings: NormalizedSettings,
   settingsPatch: SettingsPatch
 ): NormalizedSettings {
+  const pageControlOverrides = mergePageControlOverrides(
+    currentSettings.contentToolbar?.pageControlOverrides,
+    settingsPatch.contentToolbar?.pageControlOverrides
+  );
   return normalizeLoadedSettings({
     ...currentSettings,
     ...settingsPatch,
@@ -434,6 +464,7 @@ function applySettingsPatch(
       ...DEFAULT_CONTENT_TOOLBAR_SETTINGS,
       ...currentSettings.contentToolbar,
       ...settingsPatch.contentToolbar,
+      ...(pageControlOverrides ? { pageControlOverrides } : {}),
       ...(currentSettings.contentToolbar?.pageControls || settingsPatch.contentToolbar?.pageControls
         ? {
             pageControls: {

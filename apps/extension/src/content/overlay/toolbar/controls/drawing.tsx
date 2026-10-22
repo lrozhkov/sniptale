@@ -7,7 +7,7 @@ import {
   Type,
   ArrowUpRight,
 } from 'lucide-react';
-import { createElement, Fragment, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useId, useRef, useState, type ReactNode } from 'react';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -20,7 +20,7 @@ import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
 import { useDrawingOptionsLayout, type DrawingMenuLayoutResolver } from './drawing-options-layout';
 import { useToolbarMenuDirection } from '../menu/direction';
-import { PageControlVisibility } from './control-visibility';
+import { PageControlVisibility, PageProtectedControls } from './control-visibility';
 
 type DrawingToolDescriptor = {
   tool: DrawingTool;
@@ -246,13 +246,9 @@ export function ToolbarDrawingControls(props: {
               {props.owner?.renderToolControl ? (
                 props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
               ) : tool === 'select' ? (
-                control
+                <PageProtectedControls>{control}</PageProtectedControls>
               ) : (
-                <PageControlVisibility
-                  control={`drawing-${tool}`}
-                  icon={createElement(icon, { size: 18 })}
-                  label={translate(label)}
-                >
+                <PageControlVisibility control={`drawing-${tool}`} label={translate(label)}>
                   {control}
                 </PageControlVisibility>
               )}
@@ -268,7 +264,7 @@ export function ToolbarDrawingControls(props: {
             aria-label={translate('content.toolbar.drawingActions')}
             dataUi="content.toolbar.drawing-actions-group"
           >
-            {props.owner.renderActions(snapshot)}
+            <PageProtectedControls>{props.owner.renderActions(snapshot)}</PageProtectedControls>
           </ContentToolbarGroup>
         </>
       )}

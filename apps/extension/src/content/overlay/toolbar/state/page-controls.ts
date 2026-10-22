@@ -1,13 +1,21 @@
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
-import type { ContentToolbarPreferences, PageToolbarControl } from '../../../../contracts/settings';
+import {
+  PAGE_TOOLBAR_CONTROLS,
+  type ContentToolbarPreferences,
+  type PageToolbarControl,
+  type PageToolbarMode,
+} from '../../../../contracts/settings';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import { translate } from '../../../../platform/i18n';
 
 type Controls = NonNullable<ContentToolbarPreferences['pageControls']>;
 
 /** Owns persistent visibility and disposable customization for one mounted page toolbar. */
-export function usePageToolbarControls(enabled: boolean) {
+export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode = 'cursor') {
   const [controls, setControls] = useState<Controls>({});
+  const [overrides, setOverrides] = useState<
+    NonNullable<ContentToolbarPreferences['pageControlOverrides']>
+  >({});
   const [editing, setEditing] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -24,6 +32,7 @@ export function usePageToolbarControls(enabled: boolean) {
       const settings = await loadSettings();
       if (request !== generation.current) return;
       setControls(settings.contentToolbar?.pageControls ?? {});
+      setOverrides(settings.contentToolbar?.pageControlOverrides ?? {});
       setReady(true);
     } catch {
       if (request === generation.current) setError(translate('common.errors.loadFailed'));
@@ -48,7 +57,9 @@ export function usePageToolbarControls(enabled: boolean) {
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
   }, [editing]);
-  const setVisible = async (control: PageToolbarControl, visible: boolean) => {
+  const setPreferences = async (
+    patch: Pick<ContentToolbarPreferences, 'pageControls' | 'pageControlOverrides'>
+  ) => {
     if (!enabled || !ready || saving.current) return;
     const request = generation.current;
     saving.current = true;
@@ -56,9 +67,12 @@ export function usePageToolbarControls(enabled: boolean) {
     setError(null);
     try {
       const settings = await patchSettings({
-        contentToolbar: { pageControls: { [control]: visible } },
+        contentToolbar: patch,
       });
-      if (request === generation.current) setControls(settings.contentToolbar?.pageControls ?? {});
+      if (request === generation.current) {
+        setControls(settings.contentToolbar?.pageControls ?? {});
+        setOverrides(settings.contentToolbar?.pageControlOverrides ?? {});
+      }
     } catch {
       if (request === generation.current) setError(translate('common.errors.saveFailed'));
     } finally {
@@ -69,19 +83,41 @@ export function usePageToolbarControls(enabled: boolean) {
       }
     }
   };
+  const modeOverrides = mode === 'cursor' ? undefined : overrides[mode];
+  const effectiveControls = { ...controls };
+  for (const control of PAGE_TOOLBAR_CONTROLS) {
+    const choice = modeOverrides?.[control];
+    if (typeof choice === 'boolean') effectiveControls[control] = choice;
+  }
   return {
-    controls,
+    controls: effectiveControls,
+    mode,
+    hasOverrides: Object.values(modeOverrides ?? {}).some((choice) => typeof choice === 'boolean'),
+    isOverridden: (control: PageToolbarControl) => typeof modeOverrides?.[control] === 'boolean',
     editing: enabled && editing,
     revealed: enabled && revealed,
     ready,
     pending,
     error,
     reload,
-    setVisible,
+    setVisible: (control: PageToolbarControl, visible: boolean) =>
+      setPreferences(
+        mode === 'cursor'
+          ? { pageControls: { [control]: visible } }
+          : { pageControlOverrides: { [mode]: { [control]: visible } } }
+      ),
+    resetOverrides: () =>
+      mode === 'cursor'
+        ? Promise.resolve()
+        : setPreferences({
+            pageControlOverrides: {
+              [mode]: Object.fromEntries(PAGE_TOOLBAR_CONTROLS.map((control) => [control, null])),
+            },
+          }),
     isVisible: (control: PageToolbarControl) =>
-      !enabled || editing || revealed || controls[control] !== false,
+      !enabled || editing || revealed || effectiveControls[control] !== false,
     toggleEditing: () => {
-      if (ready && !saving.current) {
+      if (ready && (editing || !saving.current)) {
         setRevealed(false);
         setEditing((value) => !value);
       }

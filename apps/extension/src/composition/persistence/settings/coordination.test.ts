@@ -110,6 +110,7 @@ it('merges page controls from independent toolbars without replacing recording p
   let persisted: Record<string, unknown> = {
     contentToolbar: {
       pageControls: { 'capture-delay': false },
+      pageControlOverrides: { drawing: { 'capture-delay': false } },
       recordingControls: { camera: false },
     },
   };
@@ -127,16 +128,29 @@ it('merges page controls from independent toolbars without replacing recording p
   vi.resetModules();
   const secondPage = await import('./index');
   const first = firstPage.patchSettings({
-    contentToolbar: { pageControls: { 'drawing-pencil': false } },
+    contentToolbar: {
+      pageControls: { 'drawing-pencil': false },
+      pageControlOverrides: { drawing: { 'capture-full': true } },
+    },
   });
   await entered.promise;
   const second = secondPage.patchSettings({
-    contentToolbar: { pageControls: { 'review-panel': false } },
+    contentToolbar: {
+      pageControls: { 'review-panel': false },
+      pageControlOverrides: {
+        drawing: { 'capture-visible': false },
+        highlighter: { 'capture-full': false },
+      },
+    },
   });
   releaseWrite.release();
   await Promise.all([first, second]);
   expect((await secondPage.loadSettings()).contentToolbar).toMatchObject({
     pageControls: { 'capture-delay': false, 'drawing-pencil': false, 'review-panel': false },
+    pageControlOverrides: {
+      drawing: { 'capture-delay': false, 'capture-full': true, 'capture-visible': false },
+      highlighter: { 'capture-full': false },
+    },
     recordingControls: { camera: false },
   });
 });
@@ -155,15 +169,26 @@ it('orders page visibility reset and a later choice without resurrecting hidden 
   });
   const page = await import('./index');
   const first = page.patchSettings({
-    contentToolbar: { pageControls: { 'drawing-pencil': false } },
+    contentToolbar: {
+      pageControls: { 'drawing-pencil': false },
+      pageControlOverrides: { drawing: { 'capture-full': true } },
+    },
   });
   await entered.promise;
   const reset = page.resetSettingsToDefaults();
-  const next = page.patchSettings({ contentToolbar: { pageControls: { 'capture-size': false } } });
+  const next = page.patchSettings({
+    contentToolbar: {
+      pageControls: { 'capture-size': false },
+      pageControlOverrides: { highlighter: { 'capture-full': true } },
+    },
+  });
   releaseWrite.release();
   await Promise.all([first, reset, next]);
   expect((await page.loadSettings()).contentToolbar?.pageControls).toEqual({
     'capture-size': false,
+  });
+  expect((await page.loadSettings()).contentToolbar?.pageControlOverrides).toEqual({
+    highlighter: { 'capture-full': true },
   });
 });
 

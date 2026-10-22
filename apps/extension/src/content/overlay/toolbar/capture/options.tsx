@@ -1,6 +1,6 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import React from 'react';
-import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save, Scan } from 'lucide-react';
+import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
 import { PageControlVisibility } from '../controls/control-visibility';
 import { translate } from '../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../contracts/settings';
@@ -130,7 +130,6 @@ export function ToolbarCaptureButtons(props: {
     <>
       <PageControlVisibility
         control="capture-visible"
-        icon={<AppWindow size={18} />}
         label={translate('content.toolbar.visibleArea')}
       >
         <ToolbarViewportCaptureButton
@@ -143,7 +142,6 @@ export function ToolbarCaptureButtons(props: {
       </PageControlVisibility>
       <PageControlVisibility
         control="capture-selection"
-        icon={<Crop size={18} />}
         label={translate('content.toolbar.selectionArea')}
       >
         <ToolbarSelectionCaptureButton
@@ -151,11 +149,7 @@ export function ToolbarCaptureButtons(props: {
           onClick={handleTakeScreenshotClick('selection')}
         />
       </PageControlVisibility>
-      <PageControlVisibility
-        control="capture-full"
-        icon={<Scan size={18} />}
-        label={translate('content.toolbar.fullPage')}
-      >
+      <PageControlVisibility control="capture-full" label={translate('content.toolbar.fullPage')}>
         <FullPageCaptureSplitButton
           compactMenus={props.compactMenus}
           currentViewport={props.currentViewport}

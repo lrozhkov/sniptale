@@ -5,10 +5,9 @@ import type { PageToolbarControl } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
 import { PageToolbarControlsContext } from '../state/page-controls';
 
-/** Replaces an optional control with its visibility choice while editing the toolbar. */
+/** Retains the real control beneath a non-executing customization choice. */
 export function PageControlVisibility(props: {
   control: PageToolbarControl;
-  icon: ReactNode;
   label: string;
   children: ReactNode;
 }) {
@@ -18,38 +17,61 @@ export function PageControlVisibility(props: {
   if (!preferences.editing) return props.children;
   const visible = preferences.controls[props.control] !== false;
   const Indicator = visible ? Eye : EyeOff;
+  const overridden = preferences.isOverridden(props.control);
   const label = translate('content.toolbar.pageControlVisible').replace('{tool}', props.label);
+  const description = overridden
+    ? `${label}\n${translate('content.toolbar.pageControlOverride')}`
+    : label;
   return (
-    <ContentToolbarButton
-      type="button"
-      tone="property"
-      aria-pressed={visible}
-      aria-label={label}
-      title={label}
-      dataUi={`content.toolbar.visibility.${props.control}`}
-      disabled={preferences.pending}
-      onClick={(event) => {
-        event.stopPropagation();
-        void preferences.setVisible(props.control, !visible);
-      }}
-    >
-      <span
-        style={{
-          position: 'relative',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
-          height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+    <div className="relative inline-flex shrink-0">
+      <div
+        inert
+        aria-hidden="true"
+        className={
+          visible ? '[&_button:disabled]:opacity-100' : 'opacity-40 [&_button:disabled]:opacity-100'
+        }
+      >
+        {props.children}
+      </div>
+      <ContentToolbarButton
+        type="button"
+        tone="property"
+        aria-pressed={visible}
+        aria-label={description}
+        title={description}
+        dataUi={`content.toolbar.visibility.${props.control}`}
+        aria-disabled={preferences.pending}
+        className="!absolute inset-0 !h-full !w-full"
+        style={{ background: 'transparent' }}
+        onClick={(event) => {
+          event.stopPropagation();
+          void preferences.setVisible(props.control, !visible);
         }}
       >
-        <span className={visible ? undefined : 'opacity-40'}>{props.icon}</span>
         <Indicator
           size={10}
           style={{ width: 10, height: 10 }}
           className="absolute bottom-0 right-0 text-[var(--sniptale-color-text-secondary)]"
         />
-      </span>
-    </ContentToolbarButton>
+        {overridden ? (
+          <span
+            aria-hidden="true"
+            data-ui="content.toolbar.visibility-override"
+            className="absolute left-0 top-0 h-1 w-1 rounded-full bg-[var(--sniptale-color-text-secondary)]"
+          />
+        ) : null}
+      </ContentToolbarButton>
+    </div>
+  );
+}
+
+/** Keeps required controls visible but non-interactive during page customization. */
+export function PageProtectedControls(props: { children: ReactNode }) {
+  const preferences = useContext(PageToolbarControlsContext);
+  if (!preferences?.editing) return props.children;
+  return (
+    <fieldset disabled className="contents">
+      {props.children}
+    </fieldset>
   );
 }

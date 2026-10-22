@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+import React, { useContext, useRef } from 'react';
+import { PageToolbarControlsContext } from '../state/page-controls';
 import { Settings2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
@@ -49,6 +50,7 @@ function useToolbarSettingsMenuBindings(props: ToolbarSettingsMenuProps) {
 }
 
 export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
+  const visibility = useContext(PageToolbarControlsContext);
   const bindings = useToolbarSettingsMenuBindings(props);
   const resolveLayout = useToolbarSettingsDropdownLayout({
     ...bindings,
@@ -66,6 +68,7 @@ export function ToolbarSettingsMenu(props: ToolbarSettingsMenuProps) {
         type="button"
         tone="property"
         dataUi="content.toolbar.settings-button"
+        disabled={visibility?.editing}
         menuIndicator
         data-menu-side={menuSide}
         title={translate('content.toolbar.settingsLabel')}

@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { NormalizedSettings, SettingsPatch } from '../../../../contracts/settings';
+import type {
+  NormalizedSettings,
+  SettingsPatch,
+  PageToolbarMode,
+} from '../../../../contracts/settings';
 const persistence = vi.hoisted(() => ({
   load: vi.fn<() => Promise<NormalizedSettings>>(),
   patch: vi.fn<(patch: SettingsPatch) => Promise<NormalizedSettings>>(),
@@ -14,8 +18,7 @@ vi.mock('../../../../composition/persistence/settings', async (original) => ({
 }));
 import { createDefaultSettings } from '../../../../composition/persistence/settings';
 import { PageToolbarControlsContext, usePageToolbarControls } from './page-controls';
-import { PageControlVisibility } from '../controls/control-visibility';
-import { Clock } from 'lucide-react';
+import { PageControlVisibility, PageProtectedControls } from '../controls/control-visibility';
 import {
   PageToolbarCustomizationDone,
   PageToolbarCustomizationSettings,
@@ -23,10 +26,189 @@ import {
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 let controls: ReturnType<typeof usePageToolbarControls>;
-function Harness(props: { enabled: boolean }) {
-  controls = usePageToolbarControls(props.enabled);
+function Harness(props: { enabled: boolean; mode?: PageToolbarMode }) {
+  controls = usePageToolbarControls(props.enabled, props.mode);
   return null;
 }
+
+it('uses native disabled semantics for required controls only while customizing', async () => {
+  function ProtectedHarness() {
+    controls = usePageToolbarControls(true);
+    return (
+      <PageToolbarControlsContext.Provider value={controls}>
+        <PageProtectedControls>
+          <button>Required</button>
+        </PageProtectedControls>
+      </PageToolbarControlsContext.Provider>
+    );
+  }
+  await act(async () => root.render(<ProtectedHarness />));
+  expect(host.querySelector('button')!.matches(':disabled')).toBe(false);
+  act(() => controls.toggleEditing());
+  expect(host.querySelector('button')!.matches(':disabled')).toBe(true);
+  act(() => controls.toggleEditing());
+  expect(host.querySelector('button')!.matches(':disabled')).toBe(false);
+});
+
+it('keeps explicit mode choices after global changes and can restore inheritance', async () => {
+  const defaults = createDefaultSettings();
+  persistence.load.mockResolvedValueOnce(defaults);
+  await act(async () => root.render(<Harness enabled mode="drawing" />));
+  expect(controls.isOverridden('capture-full')).toBe(false);
+  const explicit = {
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageControlOverrides: { drawing: { 'capture-full': true } },
+    },
+  };
+  persistence.patch.mockResolvedValueOnce(explicit);
+  await act(async () => controls.setVisible('capture-full', true));
+  expect(persistence.patch).toHaveBeenLastCalledWith({
+    contentToolbar: { pageControlOverrides: { drawing: { 'capture-full': true } } },
+  });
+  expect(controls.isOverridden('capture-full')).toBe(true);
+  await act(async () => root.render(<Harness enabled mode="cursor" />));
+  const hidden = {
+    ...explicit,
+    contentToolbar: { ...explicit.contentToolbar, pageControls: { 'capture-full': false } },
+  };
+  persistence.patch.mockResolvedValueOnce(hidden);
+  await act(async () => controls.setVisible('capture-full', false));
+  await act(async () => root.render(<Harness enabled mode="highlighter" />));
+  expect(controls.isVisible('capture-full')).toBe(false);
+  await act(async () => root.render(<Harness enabled mode="drawing" />));
+  expect(controls.isVisible('capture-full')).toBe(true);
+  persistence.patch.mockResolvedValueOnce({
+    ...hidden,
+    contentToolbar: {
+      ...hidden.contentToolbar,
+      pageControlOverrides: { drawing: { 'capture-full': null } },
+    },
+  });
+  await act(async () => controls.resetOverrides());
+  expect(controls.isVisible('capture-full')).toBe(false);
+  expect(controls.hasOverrides).toBe(false);
+});
+
+it('retains the originating mode for a delayed write and retries refused overrides', async () => {
+  await act(async () => root.render(<Harness enabled mode="drawing" />));
+  let complete!: (settings: NormalizedSettings) => void;
+  persistence.patch.mockReturnValueOnce(
+    new Promise((resolve) => {
+      complete = resolve;
+    })
+  );
+  let write!: Promise<void>;
+  act(() => {
+    write = controls.setVisible('capture-full', false);
+  });
+  await act(async () => root.render(<Harness enabled mode="design-review" />));
+  const defaults = createDefaultSettings();
+  await act(async () => {
+    complete({
+      ...defaults,
+      contentToolbar: {
+        ...defaults.contentToolbar!,
+        pageControlOverrides: { drawing: { 'capture-full': false } },
+      },
+    });
+    await write;
+  });
+  expect(controls.isVisible('capture-full')).toBe(true);
+  await act(async () => root.render(<Harness enabled mode="drawing" />));
+  expect(controls.isVisible('capture-full')).toBe(false);
+  persistence.patch.mockRejectedValueOnce(new Error('refused'));
+  await act(async () => controls.setVisible('capture-full', true));
+  expect(controls.isVisible('capture-full')).toBe(false);
+  persistence.patch.mockResolvedValueOnce({
+    ...defaults,
+    contentToolbar: {
+      ...defaults.contentToolbar!,
+      pageControlOverrides: { drawing: { 'capture-full': true } },
+    },
+  });
+  await act(async () => controls.setVisible('capture-full', true));
+  expect(controls.isVisible('capture-full')).toBe(true);
+});
+
+function VisualHarness() {
+  controls = usePageToolbarControls(true);
+  return (
+    <PageToolbarControlsContext.Provider value={controls}>
+      {(['capture-full', 'capture-size'] as const).map((control) => (
+        <PageControlVisibility key={control} control={control} label={control}>
+          <button>
+            <svg data-original-icon={control}>
+              <path d="M2 2 L18 18" />
+            </svg>
+          </button>
+        </PageControlVisibility>
+      ))}
+    </PageToolbarControlsContext.Provider>
+  );
+}
+
+it('exits through Done while an admitted visibility write is pending', async () => {
+  let complete!: (settings: NormalizedSettings) => void;
+  persistence.patch.mockReturnValueOnce(new Promise((resolve) => (complete = resolve)));
+  function PendingDoneHarness() {
+    controls = usePageToolbarControls(true, 'drawing');
+    return (
+      <PageToolbarControlsContext.Provider value={controls}>
+        <PageToolbarCustomizationDone onCloseMenus={() => undefined} />
+      </PageToolbarControlsContext.Provider>
+    );
+  }
+  await act(async () => root.render(<PendingDoneHarness />));
+  act(() => controls.toggleEditing());
+  let write!: Promise<void>;
+  act(() => {
+    write = controls.setVisible('capture-full', false);
+  });
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.customize-done"]')!.click()
+  );
+  expect(controls.editing).toBe(false);
+  expect(controls.pending).toBe(true);
+  const defaults = createDefaultSettings();
+  await act(async () => {
+    complete({
+      ...defaults,
+      contentToolbar: {
+        ...defaults.contentToolbar!,
+        pageControlOverrides: { drawing: { 'capture-full': false } },
+      },
+    });
+    await write;
+  });
+  expect(controls.isVisible('capture-full')).toBe(false);
+  expect(controls.editing).toBe(false);
+});
+
+it('uses the actual control icons during customization instead of substitute icons', async () => {
+  await act(async () => root.render(<VisualHarness />));
+  act(() => controls.toggleEditing());
+  expect(host.querySelectorAll('svg[data-original-icon]')).toHaveLength(2);
+});
+
+it('keeps every customization button mounted and enabled while a choice is saved', async () => {
+  let complete!: (settings: NormalizedSettings) => void;
+  persistence.patch.mockReturnValueOnce(
+    new Promise((resolve) => {
+      complete = resolve;
+    })
+  );
+  await act(async () => root.render(<VisualHarness />));
+  act(() => controls.toggleEditing());
+  const buttons = [
+    ...host.querySelectorAll<HTMLButtonElement>('[data-ui^="content.toolbar.visibility."]'),
+  ];
+  act(() => buttons[0]!.click());
+  expect(buttons.every((button) => button.isConnected && !button.disabled)).toBe(true);
+  await act(async () => complete(createDefaultSettings()));
+  expect(buttons.every((button) => button.isConnected && !button.disabled)).toBe(true);
+});
 
 it('intercepts customization clicks instead of executing the wrapped command', async () => {
   const command = vi.fn();
@@ -34,7 +216,7 @@ it('intercepts customization clicks instead of executing the wrapped command', a
     controls = usePageToolbarControls(true);
     return (
       <PageToolbarControlsContext.Provider value={controls}>
-        <PageControlVisibility control="capture-delay" icon={<Clock />} label="Delay">
+        <PageControlVisibility control="capture-delay" label="Delay">
           <button onClick={command}>Run command</button>
         </PageControlVisibility>
       </PageToolbarControlsContext.Provider>

@@ -1,5 +1,7 @@
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
+import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageProtectedControls } from '../controls/control-visibility';
 import { Redo2, Undo2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -149,9 +151,18 @@ export function ToolbarHistoryControls(props: {
   onClearPagePreparation?: () => void;
 }) {
   const historyState = usePagePreparationHistoryState();
+  const visibility = useContext(PageToolbarControlsContext);
   const frameEditing = useFrameEditingState();
-  const canUndo = historyState.canUndo && !historyState.hasOpenTransactions && !frameEditing;
-  const canRedo = historyState.canRedo && !historyState.hasOpenTransactions && !frameEditing;
+  const canUndo =
+    !visibility?.editing &&
+    historyState.canUndo &&
+    !historyState.hasOpenTransactions &&
+    !frameEditing;
+  const canRedo =
+    !visibility?.editing &&
+    historyState.canRedo &&
+    !historyState.hasOpenTransactions &&
+    !frameEditing;
 
   usePagePreparationHistoryHotkeys({
     canRedo,
@@ -161,15 +172,17 @@ export function ToolbarHistoryControls(props: {
 
   return (
     <>
-      {props.isNavigationMode ? null : <HistoryButton action="undo" canRun={canUndo} />}
-      {props.isNavigationMode ? null : <HistoryButton action="redo" canRun={canRedo} />}
-      <ToolbarResetConfirmControl
-        displayMode={props.displayMode}
-        toolbarMenuState={props.toolbarMenuState}
-        available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
-        onConfirm={props.onClearPagePreparation}
-        scope={props.resetScope ?? 'all'}
-      />
+      <PageProtectedControls>
+        {props.isNavigationMode ? null : <HistoryButton action="undo" canRun={canUndo} />}
+        {props.isNavigationMode ? null : <HistoryButton action="redo" canRun={canRedo} />}
+        <ToolbarResetConfirmControl
+          displayMode={props.displayMode}
+          toolbarMenuState={props.toolbarMenuState}
+          available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
+          onConfirm={props.onClearPagePreparation}
+          scope={props.resetScope ?? 'all'}
+        />
+      </PageProtectedControls>
     </>
   );
 }

@@ -7,7 +7,6 @@ import { AutoBlurMenu } from './auto-blur-menu';
 import { FutureFrameStyleControls } from './frame-style';
 import type { EffectMode } from '../../../../features/highlighter/contracts';
 import { useContext } from 'react';
-import { Droplet } from 'lucide-react';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import { PageControlVisibility } from './control-visibility';
 import { translate } from '../../../../platform/i18n';
@@ -61,11 +60,7 @@ export function ToolbarUtilityButtons(props: {
         </>
       ) : null}
       {highlighterMode || showPersistentAutoBlur ? (
-        <PageControlVisibility
-          control="auto-blur"
-          icon={<Droplet size={18} />}
-          label={translate('content.toolbar.autoBlur')}
-        >
+        <PageControlVisibility control="auto-blur" label={translate('content.toolbar.autoBlur')}>
           <AutoBlurMenu
             autoBlur={autoBlur}
             compactMenus={props.compactMenus}

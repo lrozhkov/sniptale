@@ -16,6 +16,15 @@ import { PageToolbarControlsContext, usePageToolbarControls } from '../state/pag
 
 type ToolbarViewModel = ReturnType<typeof useToolbarViewModel>;
 
+function getCustomizationMode(toolbarProps: ToolbarProps, viewModel: ToolbarViewModel) {
+  if (toolbarProps.drawingMode) return 'drawing';
+  if (viewModel.designReviewMode) return 'design-review';
+  if (viewModel.highlighterMode) return 'highlighter';
+  if (viewModel.quickEditMode || toolbarProps.aiPickMode || toolbarProps.isCursorMode === false)
+    return 'quick-edit';
+  return 'cursor';
+}
+
 function getToolbarVisibilityStyle(
   positionReady: boolean,
   position: { x: number; y: number },
@@ -47,6 +56,23 @@ function preventPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElem
   if (getPointerActivatedToolbarButton(event)) event.preventDefault();
 }
 
+function useCustomizationFocus(
+  editing: boolean,
+  recording: boolean | undefined,
+  menuOpen: boolean,
+  toolbarRef: ToolbarViewModel['derivedState']['toolbarRef']
+) {
+  const wasCustomizing = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (wasCustomizing.current && !editing && !recording && !menuOpen) {
+      toolbarRef.current
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.settings-button"]')
+        ?.focus({ preventScroll: true });
+    }
+    wasCustomizing.current = editing;
+  }, [editing, recording, toolbarRef, menuOpen]);
+}
+
 export function ToolbarShellContent(props: {
   toolbarProps: ToolbarProps;
   viewModel: ToolbarViewModel;
@@ -70,21 +96,16 @@ export function ToolbarShellContent(props: {
   }, [derivedState.isDragging]);
   const uiScale = useContentUiScale();
   const menuOpen = viewModel.toolbarMenuState.activeMenuType !== null;
-  const pageControls = usePageToolbarControls(!toolbarProps.videoRecordingMode);
-  const wasCustomizing = React.useRef(false);
-  React.useLayoutEffect(() => {
-    if (
-      wasCustomizing.current &&
-      !pageControls.editing &&
-      !toolbarProps.videoRecordingMode &&
-      !menuOpen
-    ) {
-      derivedState.toolbarRef.current
-        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.settings-button"]')
-        ?.focus({ preventScroll: true });
-    }
-    wasCustomizing.current = pageControls.editing;
-  }, [pageControls.editing, toolbarProps.videoRecordingMode, derivedState.toolbarRef, menuOpen]);
+  const pageControls = usePageToolbarControls(
+    !toolbarProps.videoRecordingMode,
+    getCustomizationMode(toolbarProps, viewModel)
+  );
+  useCustomizationFocus(
+    pageControls.editing,
+    toolbarProps.videoRecordingMode,
+    menuOpen,
+    derivedState.toolbarRef
+  );
   const recordingControls = useRecordingToolbarControls(
     toolbarProps.videoRecordingMode ?? false,
     Boolean(

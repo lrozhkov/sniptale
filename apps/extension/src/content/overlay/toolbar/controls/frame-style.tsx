@@ -1,6 +1,13 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import {
   FrameAnnotationCreationControls,
   type FrameAnnotationCreationMenu,
@@ -39,7 +46,7 @@ import {
   SETTINGS_POPOVER_WIDTH,
 } from '../../../../composition/frame-annotation-controls/popover/surface';
 import { resolveMainToolbarFramePopoverDirection } from '../../../selection/interactive-frame/layout/popover-position';
-import { ListOrdered, MessageSquare } from 'lucide-react';
+import { PageToolbarControlsContext } from '../state/page-controls';
 import { PageControlVisibility } from './control-visibility';
 import { translate } from '../../../../platform/i18n';
 
@@ -50,7 +57,6 @@ function renderAnnotationVisibility(menu: 'callout' | 'step-badge', control: Rea
   return (
     <PageControlVisibility
       control={menu === 'callout' ? 'annotation-callout' : 'annotation-step-badge'}
-      icon={menu === 'callout' ? <MessageSquare size={18} /> : <ListOrdered size={18} />}
       label={translate(
         menu === 'callout' ? 'content.callout.settingsTitle' : 'content.stepBadge.settingsTitle'
       )}
@@ -86,6 +92,7 @@ export function FutureFrameStyleControls(props: {
   futureFrameStepBadgeActions?: ToolbarFutureFrameStepBadgeActions;
   toolbarMenuState: ToolbarMenuState;
 }) {
+  const visibility = useContext(PageToolbarControlsContext);
   const [style, setStyle] = useState(props.futureFrameStyle);
   const [frameActive, setFrameActive] = useState(true);
   const [forkDraftsHydrated, setForkDraftsHydrated] = useState(false);
@@ -155,6 +162,7 @@ export function FutureFrameStyleControls(props: {
     <CommandPressScope value={true}>
       <InspectorLayout>
         <FrameAnnotationCreationControls
+          disabled={visibility?.editing ?? false}
           renderAnnotationControl={renderAnnotationVisibility}
           activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
           context="content"

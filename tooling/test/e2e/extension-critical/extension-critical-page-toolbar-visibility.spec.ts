@@ -6,21 +6,93 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
 const ui = (page: Page, name: string) => page.locator(`[data-ui="content.toolbar.${name}"]`);
 async function customize(page: Page) {
+  const originalIcons = await captureIcons(page);
   await ui(page, 'settings-button').click();
+  await expect(
+    page.getByText(/Choose which buttons to show|Выберите, какие кнопки показывать/u)
+  ).toBeVisible();
   await ui(page, 'settings.customize-buttons').click();
   await expect(ui(page, 'customize-done')).toBeVisible();
+  await expect(ui(page, 'settings-button')).toBeDisabled();
+  await expect(ui(page, 'mode-selector-button')).toBeEnabled();
+  const customizingIcons = await captureIcons(page);
+  for (const [name, icon] of Object.entries(originalIcons))
+    expect(customizingIcons[name]).toBe(icon);
 }
 async function hide(page: Page, control: string) {
   const button = ui(page, `visibility.${control}`);
   await expect(button).toHaveAttribute('aria-pressed', 'true');
   const indicator = button.locator('svg').last();
   const before = await indicator.boundingBox();
+  await ui(page, 'root').evaluate((root) => {
+    const buttons = [
+      ...root.querySelectorAll<HTMLButtonElement>('[data-ui^="content.toolbar.visibility."]'),
+    ];
+    const changes: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => changes.push(...records));
+    observer.observe(root, { attributes: true, subtree: true, attributeFilter: ['disabled'] });
+    Reflect.set(root, '__visibilityProof', { buttons, changes, observer });
+  });
   await button.click();
   await expect(button).toHaveAttribute('aria-pressed', 'false');
   await expect(button).toBeEnabled();
   const after = await indicator.boundingBox();
   expect(Math.abs(after!.x - before!.x)).toBeLessThanOrEqual(0.5);
   expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(0.5);
+  expect(
+    await ui(page, 'root').evaluate((root) => {
+      const proof = Reflect.get(root, '__visibilityProof');
+      proof.observer.disconnect();
+      return (
+        proof.changes.length === 0 &&
+        proof.buttons.every((button: HTMLButtonElement) => button.isConnected && !button.disabled)
+      );
+    })
+  ).toBe(true);
+}
+
+async function captureIcons(page: Page) {
+  const icons: Record<string, string> = {};
+  for (const name of [
+    'auto-blur-button',
+    'capture-visible-button',
+    'capture-selection-button',
+    'capture-full-button',
+    'viewport-button',
+    'timer-button',
+    'drawing.select',
+    'drawing.pencil',
+    'drawing.shape',
+    'future-frame-style',
+    'future-frame-callout',
+    'future-frame-step-badge',
+    'page-editing-mode.block-selection',
+    'page-editing-mode.direct-text',
+    'design-review-panel-button',
+  ]) {
+    const icon = ui(page, name).locator('svg').first();
+    if (await icon.count()) icons[name] = await icon.evaluate((element) => element.outerHTML);
+  }
+  return icons;
+}
+
+async function verifyOverrideReset(page: Page) {
+  await customize(page);
+  await ui(page, 'visibility.capture-full').click();
+  await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'true');
+  await hide(page, 'capture-full');
+  await ui(page, 'customize-done').click();
+  await mode(page, 'drawing');
+  await expect(ui(page, 'capture-full-button')).toBeVisible();
+  await ui(page, 'settings-button').click();
+  await ui(page, 'settings.inherit-buttons').click();
+  await expect(ui(page, 'settings.inherit-buttons')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(ui(page, 'capture-full-button')).toHaveCount(0);
+  await expect(ui(page, 'drawing.pencil')).toBeVisible();
+  await mode(page, 'highlighter');
+  await expect(ui(page, 'future-frame-callout')).toHaveCount(0);
+  await mode(page, 'cursor');
 }
 async function mode(page: Page, name: string) {
   await ui(page, 'mode-selector-button').click();
@@ -69,7 +141,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               .click();
           await vertical.click();
         }
+        await mode(page, 'cursor');
         await customize(page);
+        await expect(ui(page, 'settings-button')).toBeDisabled();
+        await expect(ui(page, 'navigation.pin-to-tab')).toBeDisabled();
+        await expect(ui(page, 'navigation.collapse')).toBeDisabled();
+        await ui(page, 'customize-done').click();
         await ui(page, 'settings-button').click();
         await ui(page, 'settings.show-hidden-buttons').focus();
         await page.keyboard.press('Enter');
@@ -102,6 +179,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         ]) {
           if (await ui(page, `visibility.${control}`).count()) await hide(page, control);
         }
+        await mode(page, 'design-review');
+        await expect(ui(page, 'customize-done')).toBeVisible();
         for (const control of [
           'review-panel',
           'review-measurements',
@@ -121,14 +200,25 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await mode(page, 'drawing');
         await expect(ui(page, 'drawing.select')).toBeVisible();
         await customize(page);
+        await expect(ui(page, 'drawing.select')).toBeDisabled();
         await expect(ui(page, 'visibility.drawing-select')).toHaveCount(0);
+        await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'false');
+        await ui(page, 'visibility.capture-full').click();
+        await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'true');
+        await expect(
+          ui(page, 'visibility.capture-full').locator(
+            '[data-ui="content.toolbar.visibility-override"]'
+          )
+        ).toBeVisible();
         await hide(page, 'drawing-pencil');
         await ui(page, 'customize-done').click();
         await expect(ui(page, 'drawing.pencil')).toHaveCount(0);
         await expect(ui(page, 'drawing.select')).toBeVisible();
+        await expect(ui(page, 'capture-full-button')).toBeVisible();
         await mode(page, 'highlighter');
         await customize(page);
         await expect(ui(page, 'future-frame-style')).toBeVisible();
+        await expect(ui(page, 'future-frame-style')).toBeDisabled();
         await hide(page, 'annotation-callout');
         await ui(page, 'customize-done').click();
         await expect(ui(page, 'future-frame-callout')).toHaveCount(0);
@@ -136,6 +226,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await mode(page, 'quick-edit');
         await customize(page);
         await expect(ui(page, 'page-editing-mode.block-selection')).toBeVisible();
+        await expect(ui(page, 'page-editing-mode.block-selection')).toBeDisabled();
         await hide(page, 'editing-direct-text');
         await ui(page, 'customize-done').click();
         await expect(ui(page, 'page-editing-mode.direct-text')).toHaveCount(0);
@@ -143,6 +234,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await mode(page, 'cursor');
         await expect(ui(page, 'navigation.pin-to-tab')).toBeVisible();
         await expect(ui(page, 'navigation.collapse')).toBeVisible();
+        await verifyOverrideReset(page);
         await expectSeparators(page);
         await ui(page, 'settings-button').click();
         await ui(page, 'settings.show-hidden-buttons').click();
@@ -205,7 +297,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             popup.evaluate(
               async () =>
                 (await chrome.storage.sync.get('sniptale_settings')).sniptale_settings
-                  ?.contentToolbar?.pageControls?.['drawing-pencil']
+                  ?.contentToolbar?.pageControlOverrides?.highlighter?.['annotation-callout']
             )
           )
           .toBe(false);

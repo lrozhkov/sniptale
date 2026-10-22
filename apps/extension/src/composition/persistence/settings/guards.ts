@@ -2,6 +2,7 @@ import {
   CONTENT_TOOLBAR_DOCK_EDGES,
   RECORDING_TOOLBAR_CONTROLS,
   PAGE_TOOLBAR_CONTROLS,
+  PAGE_TOOLBAR_OVERRIDE_MODES,
 } from '../../../contracts/settings';
 import type {
   CaptureActionType,
@@ -126,6 +127,36 @@ function parseToolbarControls<Control extends string>(
   return parsed;
 }
 
+function parsePageControlOverrides(
+  value: unknown
+): ParsedFieldValue<ContentToolbarPreferences['pageControlOverrides']> {
+  if (value === undefined) return undefined;
+  if (
+    !isPlainRecord(value) ||
+    Object.keys(value).some((key) => !PAGE_TOOLBAR_OVERRIDE_MODES.some((mode) => mode === key))
+  )
+    return INVALID_FIELD;
+  const parsed: NonNullable<ContentToolbarPreferences['pageControlOverrides']> = {};
+  for (const mode of PAGE_TOOLBAR_OVERRIDE_MODES) {
+    const controls = value[mode];
+    if (controls === undefined) continue;
+    if (
+      !isPlainRecord(controls) ||
+      Object.keys(controls).some((key) => !PAGE_TOOLBAR_CONTROLS.some((control) => control === key))
+    )
+      return INVALID_FIELD;
+    const choices: NonNullable<(typeof parsed)[typeof mode]> = {};
+    for (const control of PAGE_TOOLBAR_CONTROLS) {
+      const visible = controls[control];
+      if (visible === undefined) continue;
+      if (visible !== null && !isBoolean(visible)) return INVALID_FIELD;
+      choices[control] = visible;
+    }
+    parsed[mode] = choices;
+  }
+  return parsed;
+}
+
 function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentToolbarPreferences> {
   if (value === undefined) {
     return undefined;
@@ -144,11 +175,17 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   const fadeDuringRecording = value['fadeDuringRecording'];
   if (fadeDuringRecording !== undefined && !isBoolean(fadeDuringRecording)) return INVALID_FIELD;
   const pageControls = parseToolbarControls(value['pageControls'], PAGE_TOOLBAR_CONTROLS);
+  const pageControlOverrides = parsePageControlOverrides(value['pageControlOverrides']);
   const recordingControls = parseToolbarControls(
     value['recordingControls'],
     RECORDING_TOOLBAR_CONTROLS
   );
-  if (pageControls === INVALID_FIELD || recordingControls === INVALID_FIELD) return INVALID_FIELD;
+  if (
+    pageControls === INVALID_FIELD ||
+    recordingControls === INVALID_FIELD ||
+    pageControlOverrides === INVALID_FIELD
+  )
+    return INVALID_FIELD;
   const cropMode = value['cropMode'];
   if (cropMode !== undefined && cropMode !== 'drawing' && cropMode !== 'resize')
     return INVALID_FIELD;
@@ -175,6 +212,7 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   return {
     ...(recordingControls === undefined ? {} : { recordingControls }),
     ...(pageControls === undefined ? {} : { pageControls }),
+    ...(pageControlOverrides === undefined ? {} : { pageControlOverrides }),
     ...(fadeDuringRecording === undefined ? {} : { fadeDuringRecording }),
     ...(cropMode === undefined ? {} : { cropMode }),
     ...(freePlacement === undefined ? {} : { freePlacement }),

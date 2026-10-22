@@ -15,6 +15,7 @@ import type { useToolbarCaptureMenus } from './use-menus';
 import { useContext } from 'react';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import { PageToolbarCustomizationDone } from './page-control-settings';
+import { PageProtectedControls } from '../controls/control-visibility';
 
 function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
   const pinned = props.pinToTab || props.pinToTabLocked;
@@ -128,7 +129,11 @@ export function ToolbarCaptureActionGroup(
         </>
       ) : null}
       <ContentToolbarGroup dataUi="content.toolbar.settings-group">
-        {captureProps.isNavigationMode ? <NavigationToolbarActions {...captureProps} /> : null}
+        {captureProps.isNavigationMode ? (
+          <PageProtectedControls>
+            <NavigationToolbarActions {...captureProps} />
+          </PageProtectedControls>
+        ) : null}
         <ToolbarSettingsMenu
           compactMenus={captureProps.compactMenus}
           pinToTab={captureProps.pinToTab}

@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { Check, Eye, RefreshCw } from 'lucide-react';
+import { Check, Eye, RefreshCw, Undo2 } from 'lucide-react';
 import { Icon } from '@iconify/react';
 import eyeCogIcon from '@iconify-icons/tabler/eye-cog';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -11,7 +11,10 @@ import { PopoverCheckIcon } from '../../icons/icons';
 import { translate } from '../../../../platform/i18n';
 import { PageToolbarControlsContext } from '../state/page-controls';
 
-export function PageToolbarCustomizationSettings(props: { onClose: () => void }) {
+export function PageToolbarCustomizationSettings(props: {
+  onClose: () => void;
+  compactMenus?: boolean;
+}) {
   const preferences = useContext(PageToolbarControlsContext);
   if (!preferences) return null;
   return (
@@ -25,7 +28,12 @@ export function PageToolbarCustomizationSettings(props: { onClose: () => void })
         }}
       >
         <Icon icon={eyeCogIcon} className="sniptale-popover-icon" />
-        <ProductToolbarMenuItemCopy label={translate('content.toolbar.pageCustomizeControls')} />
+        <ProductToolbarMenuItemCopy
+          label={translate('content.toolbar.pageCustomizeControls')}
+          {...(props.compactMenus
+            ? {}
+            : { hint: translate('content.toolbar.pageCustomizeControlsHint') })}
+        />
       </ProductToolbarMenuItem>
       <ProductToolbarMenuItem
         dataUi="content.toolbar.settings.show-hidden-buttons"
@@ -43,6 +51,21 @@ export function PageToolbarCustomizationSettings(props: { onClose: () => void })
         />
         {preferences.revealed ? <PopoverCheckIcon /> : null}
       </ProductToolbarMenuItem>
+      {preferences.mode !== 'cursor' ? (
+        <ProductToolbarMenuItem
+          dataUi="content.toolbar.settings.inherit-buttons"
+          disabled={!preferences.hasOverrides || preferences.pending}
+          onClick={() => void preferences.resetOverrides()}
+        >
+          <Undo2 className="sniptale-popover-icon" />
+          <ProductToolbarMenuItemCopy
+            label={translate('content.toolbar.pageInheritControls')}
+            {...(props.compactMenus
+              ? {}
+              : { hint: translate('content.toolbar.pageInheritControlsHint') })}
+          />
+        </ProductToolbarMenuItem>
+      ) : null}
       {preferences.error ? (
         <ProductToolbarMenuItem
           onClick={() => void preferences.reload()}

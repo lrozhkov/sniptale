@@ -42,7 +42,12 @@ describe('recording toolbar visibility settings', () => {
         persisted = items.sniptale_settings;
       }
     );
-    const write = patchSettings({ contentToolbar: { pageControls: { 'drawing-pencil': false } } });
+    const write = patchSettings({
+      contentToolbar: {
+        pageControls: { 'drawing-pencil': false },
+        pageControlOverrides: { drawing: { 'capture-full': false, 'capture-visible': false } },
+      },
+    });
     await entered;
     const erase = vi.fn(() => {
       persisted = {};
@@ -53,8 +58,57 @@ describe('recording toolbar visibility settings', () => {
     release();
     await Promise.all([write, erasure]);
     expect((await loadSettings()).contentToolbar?.pageControls).toBeUndefined();
-    await patchSettings({ contentToolbar: { pageControls: { 'capture-size': false } } });
+    expect((await loadSettings()).contentToolbar?.pageControlOverrides).toBeUndefined();
+    await patchSettings({
+      contentToolbar: {
+        pageControls: { 'capture-size': false },
+        pageControlOverrides: { drawing: { 'capture-full': true } },
+      },
+    });
     expect((await loadSettings()).contentToolbar?.pageControls).toEqual({ 'capture-size': false });
+    expect((await loadSettings()).contentToolbar?.pageControlOverrides).toEqual({
+      drawing: { 'capture-full': true },
+    });
+  });
+
+  it('validates mode overrides, keeps inherit entries, and clones nested choices', async () => {
+    const pageControlOverrides = {
+      drawing: { 'capture-full': true, 'capture-delay': null },
+      highlighter: { 'capture-full': false },
+    };
+    expect(parseStoredSettings({ contentToolbar: { pageControlOverrides } })).toMatchObject({
+      invalidFieldCount: 0,
+      value: { contentToolbar: { pageControlOverrides } },
+    });
+    for (const invalid of [
+      null,
+      [],
+      { cursor: {} },
+      { video: {} },
+      { drawing: null },
+      { drawing: [] },
+      { drawing: { settings: false } },
+      { drawing: { 'capture-full': 'true' } },
+    ]) {
+      expect(
+        parseStoredSettings({ contentToolbar: { pageControlOverrides: invalid } }).invalidFieldCount
+      ).toBeGreaterThan(0);
+    }
+    storage.get.mockResolvedValue({
+      sniptale_settings: { contentToolbar: { pageControlOverrides } },
+    });
+    const loaded = await loadSettings();
+    loaded.contentToolbar!.pageControlOverrides!.drawing!['capture-full'] = false;
+    expect((await loadSettings()).contentToolbar?.pageControlOverrides).toEqual(
+      pageControlOverrides
+    );
+    const reset = await patchSettings({
+      contentToolbar: { pageControlOverrides: { drawing: { 'capture-full': null } } },
+    });
+    expect(reset.contentToolbar?.pageControlOverrides).toEqual({
+      ...pageControlOverrides,
+      drawing: { 'capture-full': null, 'capture-delay': null },
+    });
   });
   it('admits page visibility independently and rejects mandatory or malformed choices', async () => {
     const pageControls = { 'capture-delay': false, 'drawing-pencil': false, 'review-export': true };

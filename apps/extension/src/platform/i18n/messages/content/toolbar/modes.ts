@@ -12,6 +12,19 @@ const VIEWPORT_CONFLICT_ERROR_EN = [
 
 export const contentToolbarModesMessages = defineMessageSource({
   pageCustomizeControls: { ru: 'Настроить кнопки панели', en: 'Customize toolbar buttons' },
+  pageCustomizeControlsHint: {
+    ru: 'Выберите, какие кнопки показывать.',
+    en: 'Choose which buttons to show.',
+  },
+  pageControlOverride: {
+    ru: 'Своя настройка для этого режима.',
+    en: 'Custom visibility for this mode.',
+  },
+  pageInheritControls: { ru: 'Кнопки как в навигации', en: 'Use navigation visibility' },
+  pageInheritControlsHint: {
+    ru: 'Убрать свои настройки кнопок этого режима.',
+    en: 'Remove this mode’s visibility overrides.',
+  },
   pageControlVisible: { ru: 'Показывать «{tool}» на панели', en: 'Show {tool} on the toolbar' },
   pageShowHidden: { ru: 'Показать скрытые кнопки', en: 'Show hidden buttons' },
   pageShowHiddenHint: {

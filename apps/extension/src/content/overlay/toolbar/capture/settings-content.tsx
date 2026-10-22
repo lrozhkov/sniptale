@@ -198,7 +198,7 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
       />
       {props.showPinItem !== false ? renderPinToTabItem(props) : null}
       <RecordingToolbarFadeSetting />
-      <PageToolbarCustomizationSettings onClose={props.onClose} />
+      <PageToolbarCustomizationSettings onClose={props.onClose} compactMenus={props.compactMenus} />
       <ProductToolbarMenuDivider />
       {props.showHideItem === false
         ? null

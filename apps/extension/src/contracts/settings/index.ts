@@ -111,9 +111,22 @@ export const PAGE_TOOLBAR_CONTROLS = [
 ] as const;
 export type PageToolbarControl = (typeof PAGE_TOOLBAR_CONTROLS)[number];
 
+export const PAGE_TOOLBAR_OVERRIDE_MODES = [
+  'drawing',
+  'highlighter',
+  'quick-edit',
+  'design-review',
+] as const;
+export type PageToolbarMode = 'cursor' | (typeof PAGE_TOOLBAR_OVERRIDE_MODES)[number];
+export type PageToolbarControlOverrides = Partial<
+  Record<Exclude<PageToolbarMode, 'cursor'>, Partial<Record<PageToolbarControl, boolean | null>>>
+>;
+
 export interface ContentToolbarPreferences {
   /** Shared non-recording toolbar choices. Missing controls remain visible. */
   pageControls?: Partial<Record<PageToolbarControl, boolean>>;
+  /** Mode choices override shared defaults. Null restores inheritance for one control. */
+  pageControlOverrides?: PageToolbarControlOverrides;
   cropMode?: 'drawing' | 'resize';
   /** Missing controls remain visible during recording. This does not enable their tools. */
   recordingControls?: Partial<Record<RecordingToolbarControl, boolean>>;

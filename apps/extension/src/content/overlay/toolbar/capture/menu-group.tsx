@@ -2,7 +2,6 @@ import { ToolbarCaptureActionMenu, ToolbarTimerMenu, ToolbarViewportMenu } from 
 import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionIcon, getCaptureActionOptions, getTimerOptions } from './options';
 import type { useToolbarCaptureMenus } from './use-menus';
-import { Clock, Maximize2 } from 'lucide-react';
 import { PageControlVisibility } from '../controls/control-visibility';
 import { translate } from '../../../../platform/i18n';
 
@@ -94,7 +93,6 @@ export function ToolbarCaptureMenuGroup(
     <>
       <PageControlVisibility
         control="after-capture"
-        icon={getCaptureActionIcon(captureProps.captureAction)}
         label={translate('content.toolbar.afterCaptureTitle')}
       >
         <CaptureActionMenuNode
@@ -108,7 +106,6 @@ export function ToolbarCaptureMenuGroup(
       </PageControlVisibility>
       <PageControlVisibility
         control="capture-delay"
-        icon={<Clock size={18} />}
         label={translate('content.toolbar.screenshotDelayTooltip')}
       >
         <TimerMenuNode
@@ -122,7 +119,6 @@ export function ToolbarCaptureMenuGroup(
       </PageControlVisibility>
       <PageControlVisibility
         control="capture-size"
-        icon={<Maximize2 size={18} />}
         label={translate('content.toolbar.viewportButton')}
       >
         {viewportMenu}

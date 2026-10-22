@@ -472,6 +472,18 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/toolbar/state/view-model.test.tsx'],
   },
   {
+    owner: 'content-toolbar-page-control-visibility',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/controls/control-visibility.tsx',
+    reason: 'The page-controls suite operates real customization choices and protected controls.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/state/page-controls.test.tsx'],
+  },
+  {
+    owner: 'content-toolbar-page-control-settings',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/capture/page-control-settings.tsx',
+    reason: 'The page-controls suite operates customization, reveal, Done, and retry menu actions.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/state/page-controls.test.tsx'],
+  },
+  {
     owner: 'content-overlay-scenario-controller',
     productionFile: 'apps/extension/src/content/overlay/scenario/controller.ts',
     exclusive: true,

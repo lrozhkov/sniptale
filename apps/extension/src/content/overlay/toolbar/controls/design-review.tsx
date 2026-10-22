@@ -1,5 +1,5 @@
 import { useContext, useSyncExternalStore } from 'react';
-import { Download, Ruler, ScanLine } from 'lucide-react';
+import { Ruler, ScanLine } from 'lucide-react';
 import { PageControlVisibility } from './control-visibility';
 import { PageToolbarControlsContext } from '../state/page-controls';
 import {
@@ -38,7 +38,6 @@ export function ToolbarDesignReviewControls(props: {
     <ContentToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
       <PageControlVisibility
         control="review-panel"
-        icon={<FeedbackCollectionIcon size={18} />}
         label={translate('content.designReview.showFeedbackPanel')}
       >
         <ContentToolbarButton
@@ -61,7 +60,6 @@ export function ToolbarDesignReviewControls(props: {
       </PageControlVisibility>
       <PageControlVisibility
         control="review-measurements"
-        icon={<Ruler size={18} />}
         label={translate('content.designReview.showDistances')}
       >
         <ContentToolbarButton
@@ -85,7 +83,6 @@ export function ToolbarDesignReviewControls(props: {
       </PageControlVisibility>
       <PageControlVisibility
         control="review-layout-guides"
-        icon={<ScanLine size={18} />}
         label={translate('content.designReview.showLayoutGuides')}
       >
         <ContentToolbarButton
@@ -109,7 +106,6 @@ export function ToolbarDesignReviewControls(props: {
       </PageControlVisibility>
       <PageControlVisibility
         control="review-export"
-        icon={<Download size={18} />}
         label={translate('content.toolbar.annotationExportMenuTitle')}
       >
         <AnnotationExportMenu
