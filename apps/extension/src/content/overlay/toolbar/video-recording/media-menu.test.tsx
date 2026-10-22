@@ -6,6 +6,9 @@ import { Camera, CameraOff } from 'lucide-react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RecordingMediaSplitControl } from './media-menu';
 
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: showToastMock }));
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -15,6 +18,7 @@ let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
 beforeEach(() => {
+  showToastMock.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -73,8 +77,10 @@ it('awaits device switching and keeps the menu open when the owner rejects it', 
   });
 
   expect(onDeviceChange).toHaveBeenCalledWith('camera-2');
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    'content.toolbar.unknownError'
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(showToastMock).toHaveBeenCalledExactlyOnceWith(
+    'content.toolbar.videoRecordingActionFailed',
+    'error'
   );
   expect(host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')).toBe(
     'true'
@@ -121,6 +127,77 @@ it('does not flash the loading row for a fast device catalog', async () => {
   expect(host.textContent).toContain('Camera 1');
   vi.useRealTimers();
 });
+
+it.each(['toggle', 'catalog', 'placement'])(
+  'uses one shared toast for %s failure without adding an inline alert',
+  async (action) => {
+    const failure = new Error('Device action failed');
+    const onToggle = vi.fn().mockRejectedValue(failure);
+    const onPlacement = vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(undefined);
+    const onLoadDevices = vi.fn(async () => {
+      if (action === 'catalog') throw failure;
+      return [];
+    });
+    act(() =>
+      root.render(
+        <RecordingMediaSplitControl
+          active
+          activeIcon={Camera}
+          disabled={false}
+          inactiveIcon={CameraOff}
+          kind="videoinput"
+          dataUi="test.camera"
+          displayMode="horizontal"
+          label="Camera"
+          selectedDeviceId={null}
+          onLoadDevices={onLoadDevices}
+          onToggle={onToggle}
+          cameraPlacement={{ mode: 'embedded', locked: false, onChange: onPlacement }}
+        />
+      )
+    );
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>(
+          action === 'toggle' ? '[data-ui="test.camera.toggle"]' : '[data-ui="test.camera.menu"]'
+        )
+        ?.click();
+    });
+    if (action === 'placement')
+      await act(async () => {
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-ui="content.toolbar.video-recording.camera.placement"] button[aria-pressed="false"]'
+          )
+          ?.click();
+      });
+    expect(showToastMock).toHaveBeenCalledExactlyOnceWith(
+      'content.toolbar.videoRecordingActionFailed',
+      'error'
+    );
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    if (action !== 'toggle')
+      expect(
+        host.querySelector('[data-ui="test.camera.menu"]')?.getAttribute('aria-expanded')
+      ).toBe('true');
+    if (action === 'placement') {
+      expect(
+        host
+          .querySelector('[data-ui="content.toolbar.video-recording.camera.placement"] button')
+          ?.getAttribute('aria-pressed')
+      ).toBe('true');
+      await act(async () => {
+        host
+          .querySelector<HTMLButtonElement>(
+            '[data-ui="content.toolbar.video-recording.camera.placement"] button[aria-pressed="false"]'
+          )
+          ?.click();
+      });
+      expect(onPlacement).toHaveBeenCalledTimes(2);
+      expect(showToastMock).toHaveBeenCalledTimes(1);
+    }
+  }
+);
 
 it('keeps the explicit permission result authoritative across native prompt focus changes', async () => {
   let grant!: (devices: { deviceId: string; kind: 'videoinput'; label: string }[]) => void;

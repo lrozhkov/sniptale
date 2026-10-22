@@ -84,6 +84,37 @@ for (const { name, size } of [
           name: /^(Separate track|Отдельная дорожка)$/u,
         });
         await expect(embedded).toHaveAttribute('aria-pressed', 'true');
+        const worker = launched.context.serviceWorkers()[0]!;
+        await worker.evaluate(() => {
+          const original = chrome.storage.local.set;
+          Object.defineProperty(chrome.storage.local, 'set', {
+            configurable: true,
+            value: (items: Record<string, unknown>, callback?: () => void) => {
+              if ('sniptale_video_settings' in items) {
+                Object.defineProperty(chrome.storage.local, 'set', {
+                  configurable: true,
+                  value: original,
+                });
+                throw new Error('Simulated camera placement write failure');
+              }
+              return callback ? original(items, callback) : original(items);
+            },
+          });
+        });
+        await separate.click();
+        const errorToast = page.locator('.sniptale-toast-error');
+        await expect(errorToast).toHaveCount(1);
+        await expect(errorToast).toBeVisible();
+        await expect(embedded).toHaveAttribute('aria-pressed', 'true');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        await expect(page.locator('.sniptale-recording-media-control [role="alert"]')).toHaveCount(
+          0
+        );
+        expect((await errorToast.boundingBox())!.width).toBeGreaterThan(200);
+        await page.screenshot({
+          path: info.outputPath('camera-placement-error-toast.png'),
+          fullPage: false,
+        });
         await separate.click();
         await expect(separate).toHaveAttribute('aria-pressed', 'true');
         expect(
@@ -106,6 +137,15 @@ for (const { name, size } of [
             })
           )
           .toBe('separate-track');
+        await embedded.click();
+        await expect(embedded).toHaveAttribute('aria-pressed', 'true');
+        await expect(preview).toBeVisible();
+        await expect
+          .poll(() => preview.evaluate((video: HTMLVideoElement) => video.readyState))
+          .toBeGreaterThanOrEqual(2);
+        await separate.click();
+        await expect(separate).toHaveAttribute('aria-pressed', 'true');
+        await expect(preview).toBeHidden();
         const bounds = (await placement.boundingBox())!;
         expect(bounds.x).toBeGreaterThanOrEqual(0);
         expect(bounds.y).toBeGreaterThanOrEqual(0);

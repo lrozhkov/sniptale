@@ -2,6 +2,7 @@ import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   ProductToolbarMenu,
@@ -40,6 +41,10 @@ type RecordingMediaSplitControlProps = {
   onToggle(): Promise<void> | void;
 };
 
+function notifyRecordingMediaFailure() {
+  showToast(translate('content.toolbar.videoRecordingActionFailed'), 'error');
+}
+
 function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const { kind, menuType, onLoadDevices, toolbarMenuState } = props;
   const [localOpen, setLocalOpen] = useState(false);
@@ -56,14 +61,12 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const [loading, setLoading] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const runToggle = async () => {
     setSwitching(true);
-    setError(null);
     try {
       await props.onToggle();
     } catch {
-      setError(translate('content.toolbar.unknownError'));
+      notifyRecordingMediaFailure();
     } finally {
       setSwitching(false);
     }
@@ -75,7 +78,6 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     const loadingDelay = window.setTimeout(() => {
       if (active) setShowLoading(true);
     }, 500);
-    setError(null);
     setLoading(true);
     setShowLoading(false);
     const load = (requestPermission: boolean) => {
@@ -94,7 +96,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
         .catch(() => {
           if (active && request === sequence) {
             window.clearTimeout(loadingDelay);
-            setError(translate('content.toolbar.unknownError'));
+            notifyRecordingMediaFailure();
             setLoading(false);
             setShowLoading(false);
           }
@@ -136,12 +138,11 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   };
   const selectDevice = async (deviceId: string) => {
     setSwitching(true);
-    setError(null);
     try {
       await props.onDeviceChange?.(deviceId);
       closeMenu();
     } catch {
-      setError(translate('content.toolbar.unknownError'));
+      notifyRecordingMediaFailure();
     } finally {
       setSwitching(false);
     }
@@ -155,11 +156,10 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     )
       return;
     setSwitching(true);
-    setError(null);
     try {
       await props.cameraPlacement.onChange(mode);
     } catch {
-      setError(translate('content.toolbar.videoRecordingActionFailed'));
+      notifyRecordingMediaFailure();
     } finally {
       setSwitching(false);
     }
@@ -168,7 +168,6 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     closeMenu,
     devices,
     dropdown,
-    error,
     loading,
     showLoading,
     menuRef,
@@ -308,18 +307,6 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         selectedDeviceId={props.selectedDeviceId}
         {...(props.cameraPlacement ? { cameraPlacement: props.cameraPlacement } : {})}
       />
-      {control.error ? (
-        <div
-          role="alert"
-          className={
-            'absolute top-[calc(100%+10px)] right-0 max-w-56 rounded-[4px] select-text ' +
-            'bg-[var(--sniptale-color-danger-subtle)] px-2 py-1 text-[14px] leading-5 font-normal ' +
-            'text-[var(--sniptale-color-danger)]'
-          }
-        >
-          {control.error}
-        </div>
-      ) : null}
     </div>
   );
 }
