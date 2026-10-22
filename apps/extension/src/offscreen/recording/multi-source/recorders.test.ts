@@ -47,6 +47,15 @@ beforeEach(() => {
   MediaRecorderMock.throwAt = null;
   MediaRecorderMock.isTypeSupported.mockReturnValue(true);
   vi.stubGlobal('MediaRecorder', MediaRecorderMock);
+  vi.stubGlobal(
+    'AudioContext',
+    class {
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+      createGain = () => ({ connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } });
+      createMediaStreamDestination = () => ({ stream: createAudioStream() });
+      close = vi.fn().mockResolvedValue(undefined);
+    }
+  );
 });
 
 afterEach(() => {
@@ -195,10 +204,15 @@ it('owns and releases the complete gain-processing graph', async () => {
 
   const recorder = await createMicrophoneRecorder(
     'rec',
-    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 2 },
+    { ...DEFAULT_VIDEO_SETTINGS, microphoneEnabled: true, microphoneGain: 1 },
     createRecordingStagingCoordinatorTestDouble(),
     messaging
   );
+  expect(gainNode.gain.value).toBe(1);
+  recorder!.setMicrophoneGain!(0);
+  expect(gainNode.gain.value).toBe(0);
+  recorder!.setMicrophoneGain!(2);
+  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledOnce();
   stopRecorderStreams([recorder]);
 
   expect(gainNode.gain.value).toBe(2);
@@ -209,8 +223,8 @@ it('owns and releases the complete gain-processing graph', async () => {
   expect(raw.getTracks()[0]?.stop).toHaveBeenCalledOnce();
   expect(processed.getTracks()[0]?.stop).toHaveBeenCalledOnce();
   expect(analysisSource.connect).toHaveBeenCalledWith(analyser);
-  expect(analysisSource.disconnect).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledTimes(2);
+  expect(analysisSource.disconnect).toHaveBeenCalledTimes(3);
+  expect(close).toHaveBeenCalledTimes(4);
 });
 
 it('rolls back a partially created gain-processing graph', async () => {

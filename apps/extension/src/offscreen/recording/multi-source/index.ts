@@ -336,6 +336,7 @@ export function resumeMultiSourceRecording(): void {
 
 export function updateMultiSourceRecordingSettings(patch: {
   microphoneEnabled?: boolean;
+  microphoneGain?: number;
   webcamEnabled?: boolean;
 }): void {
   setSessionMediaEnabled(getActiveMultiSourceSession(), patch);

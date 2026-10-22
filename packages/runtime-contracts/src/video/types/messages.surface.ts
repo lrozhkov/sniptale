@@ -1,6 +1,7 @@
 import type { ContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 import { isContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 import { VideoMessageType } from '../messages';
+import { MICROPHONE_GAIN_MIN, MICROPHONE_GAIN_MAX } from './microphone-processing';
 import {
   VideoRecordingStatus,
   WebcamPresentationMode,
@@ -62,6 +63,7 @@ export interface VideoRecordingSurfaceSnapshot {
   status: VideoRecordingStatus;
   duration: number;
   microphoneEnabled: boolean;
+  microphoneGain?: number;
   microphoneDeviceId: string | null;
   webcamEnabled: boolean;
   webcamDeviceId: string | null;
@@ -122,6 +124,7 @@ export type VideoRecordingSurfaceCommand =
       clickAnimationEnabled: boolean;
     }
   | { kind: 'set-microphone-enabled' | 'set-webcam-enabled'; enabled: boolean }
+  | { kind: 'set-microphone-gain'; gain: number }
   | { kind: 'select-microphone-device' | 'select-webcam-device'; deviceId: string | null }
   | { kind: 'set-webcam-presentation-mode'; mode: WebcamPresentationMode }
   | {
@@ -328,6 +331,7 @@ export function isVideoRecordingSurfaceSnapshot(
         'status',
         'duration',
         'microphoneEnabled',
+        'microphoneGain',
         'microphoneDeviceId',
         'webcamEnabled',
         'webcamDeviceId',
@@ -361,6 +365,7 @@ export function isVideoRecordingSurfaceSnapshot(
     isRecordingStatus(value['status']) &&
     isFiniteNonNegativeNumber(value['duration']) &&
     typeof value['microphoneEnabled'] === 'boolean' &&
+    (value['microphoneGain'] === undefined || isMicrophoneGain(value['microphoneGain'])) &&
     isNullableString(value['microphoneDeviceId']) &&
     typeof value['webcamEnabled'] === 'boolean' &&
     isNullableString(value['webcamDeviceId']) &&
@@ -460,6 +465,9 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   if (['cancel-start', 'pause', 'resume', 'stop'].includes(value['kind'])) {
     return hasExactKeys(value, ['kind']);
   }
+  if (value['kind'] === 'set-microphone-gain') {
+    return hasExactKeys(value, ['kind', 'gain']) && isMicrophoneGain(value['gain']);
+  }
   if (value['kind'] === 'list-media-devices') {
     return (
       (hasExactKeys(value, ['kind', 'deviceKind']) ||
@@ -516,6 +524,15 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   }
 
   return isWebcamPresentationSettings({ ...value['appearance'], mode: 'embedded' });
+}
+
+function isMicrophoneGain(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MICROPHONE_GAIN_MIN &&
+    value <= MICROPHONE_GAIN_MAX
+  );
 }
 
 export function isVideoRecordingSurfaceCommandMessage(

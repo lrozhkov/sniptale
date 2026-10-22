@@ -12,6 +12,7 @@ export type MultiSourceRecorder = {
   artifactSession: RecordingArtifactSession;
   label: string | null;
   microphoneActivity?: MicrophoneActivityObserver;
+  setMicrophoneGain?: (gain: number) => void;
   recorder: MediaRecorder;
   recordingId: string;
   release?: () => void;

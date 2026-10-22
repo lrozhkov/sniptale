@@ -129,6 +129,13 @@ export class AudioMixer {
     return this.micStream !== null;
   }
 
+  setMicrophoneGain(gain: number): void {
+    const resolved = resolveMicrophoneGain({ microphoneGain: gain });
+    this.graph.setMicrophoneGain(resolved);
+    this.microphoneGain = resolved;
+    this.observeMicrophone?.(this.micStream, resolved);
+  }
+
   getMixedStream(): MediaStream {
     return this.graph.getMixedStream();
   }

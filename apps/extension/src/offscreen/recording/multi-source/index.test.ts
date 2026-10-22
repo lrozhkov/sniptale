@@ -142,6 +142,15 @@ beforeEach(() => {
   FakeMediaRecorder.autoEmitStart = true;
   FakeMediaRecorder.instances = [];
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+  vi.stubGlobal(
+    'AudioContext',
+    class {
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+      createGain = () => ({ connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } });
+      createMediaStreamDestination = () => ({ stream: createAudioStream() });
+      close = vi.fn().mockResolvedValue(undefined);
+    }
+  );
   sendRuntimeMessageMock.mockImplementation(async (message) => {
     if (message.type === 'OFFSCREEN_SOURCE_READY') {
       allowRecordingBegin(message);

@@ -32,8 +32,10 @@ import {
 import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
 import { cancelSavedTabVideoRecordingStart, isSavedTabVideoRecordingStartPending } from './start';
 import { hasRecordingMediaAccess, resolveRecordingMediaAccess } from './media-access';
+import { resolveMicrophoneGain } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
   'select-microphone-device',
@@ -47,6 +49,7 @@ const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['comm
 ]);
 
 const SERIALIZED_MEDIA_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
   'select-microphone-device',
@@ -178,6 +181,12 @@ async function applySurfaceCommand(
         message,
         { microphoneEnabled: message.command.enabled },
         buildMicrophoneLivePatch
+      );
+    case 'set-microphone-gain':
+      return applyLiveSettingsWithDurableCommit(
+        message,
+        { microphoneGain: message.command.gain },
+        (settings) => ({ microphoneGain: resolveMicrophoneGain(settings) })
       );
     case 'set-webcam-enabled':
       if (message.command.enabled && !(await hasRecordingMediaAccess('videoinput'))) {

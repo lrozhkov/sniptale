@@ -174,14 +174,8 @@ export async function createSourceRecorders(params: {
 function createGainProcessedMicrophoneStream(params: {
   rawStream: MediaStream;
   settings: VideoRecordingSettings;
-}): { release: () => void; stream: MediaStream } {
+}): { release: () => void; stream: MediaStream; setGain: (gain: number) => void } {
   const gain = resolveMicrophoneGain(params.settings);
-  if (gain === 1) {
-    return {
-      release: () => undefined,
-      stream: params.rawStream,
-    };
-  }
 
   const audioContext = new AudioContext();
   let source: MediaStreamAudioSourceNode | null = null;
@@ -195,6 +189,9 @@ function createGainProcessedMicrophoneStream(params: {
     gainNode.connect(destination);
 
     return {
+      setGain: (value) => {
+        if (gainNode) gainNode.gain.value = resolveMicrophoneGain({ microphoneGain: value });
+      },
       release: () => {
         source?.disconnect();
         gainNode?.disconnect();
@@ -225,7 +222,7 @@ export async function createMicrophoneRecorder(
   const rawStream = await navigator.mediaDevices.getUserMedia({
     audio: buildMicrophoneAudioConstraints(settings),
   });
-  let processed: { release: () => void; stream: MediaStream };
+  let processed: ReturnType<typeof createGainProcessedMicrophoneStream>;
   try {
     processed = createGainProcessedMicrophoneStream({ rawStream, settings });
   } catch (error) {
@@ -253,6 +250,13 @@ export async function createMicrophoneRecorder(
         .catch(() => undefined);
     });
     source.microphoneActivity.setSource(rawStream, resolveMicrophoneGain(settings));
+    source.setMicrophoneGain = (gain) => {
+      processed.setGain(gain);
+      source.microphoneActivity?.setSource(
+        rawStream,
+        resolveMicrophoneGain({ microphoneGain: gain })
+      );
+    };
     const release = source.release;
     source.release = () => {
       source.microphoneActivity?.dispose();

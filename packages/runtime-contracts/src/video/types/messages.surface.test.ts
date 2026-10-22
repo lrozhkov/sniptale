@@ -32,6 +32,26 @@ const identity = {
 
 const contentIntent = { requestId: 'request-1', token: 'intent-1' };
 
+it.each([0, 1, 2, -0.01, 2.01, NaN, Infinity, '1', null])('bounds microphone gain %s', (gain) => {
+  const message = {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND,
+    ...identity,
+    capabilityEpoch: 1,
+    recordingId: null,
+    command: { kind: 'set-microphone-gain', gain },
+  };
+  const { peerGeneration: _peer, ...request } = message;
+  expect(isVideoRecordingSurfaceCommandMessage(request)).toBe(
+    typeof gain === 'number' && Number.isFinite(gain) && gain >= 0 && gain <= 2
+  );
+  expect(
+    isVideoRecordingSurfaceCommandMessage({
+      ...request,
+      command: { ...request.command, extra: true },
+    })
+  ).toBe(false);
+});
+
 it.each(['circle', 'rectangle', 'soft', 'ellipse'])(
   'admits bounded %s appearance in camera commands',
   (shape) => {
@@ -343,6 +363,19 @@ it('validates release, snapshot, and command authority fields narrowly', () => {
         },
       })
     ).toBe(typeof freePlacement === 'boolean');
+  }
+  for (const microphoneGain of [0, 1, 2, -1, 3, NaN, Infinity, '1', null]) {
+    expect(
+      isVideoRecordingSurfaceSnapshotMessage({
+        type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+        snapshot: { ...snapshot, microphoneGain },
+      })
+    ).toBe(
+      typeof microphoneGain === 'number' &&
+        Number.isFinite(microphoneGain) &&
+        microphoneGain >= 0 &&
+        microphoneGain <= 2
+    );
   }
   expect(
     isVideoRecordingSurfaceActivation({

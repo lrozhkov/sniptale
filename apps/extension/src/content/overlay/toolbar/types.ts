@@ -43,6 +43,7 @@ export interface ToolbarVideoRecordingProps {
   onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onMicrophoneGainChange?: (gain: number) => Promise<void> | void;
   onMicrophoneDeviceChange?: (deviceId: string) => Promise<void> | void;
   onLoadMediaDevices?: (
     kind: 'audioinput' | 'videoinput',

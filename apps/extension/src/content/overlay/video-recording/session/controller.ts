@@ -509,6 +509,8 @@ function createSurfaceMediaActions(args: SurfaceControllerProjectionArgs) {
         appearance: pickEmbeddedCameraGeometry(appearance),
       }),
     onMicrophoneEnabledChange: (enabled: boolean) => args.setMediaEnabled('microphone', enabled),
+    onMicrophoneGainChange: (gain: number) =>
+      args.command({ kind: 'set-microphone-gain', gain }, false),
     onMicrophoneDeviceChange: (deviceId: string) =>
       args.command({ kind: 'select-microphone-device', deviceId }, false),
     onLoadMediaDevices: args.loadMediaDevices,

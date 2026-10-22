@@ -26,6 +26,7 @@ export type VideoRecordingToolbarState = {
   error: string | null;
   interaction: VideoRecordingToolbarInteraction;
   microphoneEnabled: boolean;
+  microphoneGain?: number;
   microphoneDeviceId: string | null;
   peerGeneration: number;
   phase: VideoRecordingToolbarPhase;
@@ -47,6 +48,7 @@ export const INITIAL_VIDEO_RECORDING_TOOLBAR_STATE: VideoRecordingToolbarState =
   error: null,
   interaction: 'navigation',
   microphoneEnabled: false,
+  microphoneGain: 1,
   microphoneDeviceId: null,
   peerGeneration: 0,
   phase: 'idle',
@@ -118,6 +120,7 @@ function projectSurfaceSnapshot(
     durationSeconds: Math.max(0, snapshot.duration),
     error: action.error,
     microphoneEnabled: snapshot.microphoneEnabled,
+    microphoneGain: snapshot.microphoneGain ?? 1,
     microphoneDeviceId: snapshot.microphoneDeviceId,
     peerGeneration: snapshot.peerGeneration,
     spotlightEnabled: snapshot.cursorSpotlightEnabled,

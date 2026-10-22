@@ -73,6 +73,17 @@ export class AudioMixerGraph {
     this.tabSource = null;
   }
 
+  setMicrophoneGain(gain: number): void {
+    if (!this.micSource) return;
+    if (!this.micGain) {
+      this.micGain = this.getInitializedAudioContext().createGain();
+      this.micSource.disconnect();
+      this.micSource.connect(this.micGain);
+      this.micGain.connect(this.getInitializedDestination());
+    }
+    this.micGain.gain.value = gain;
+  }
+
   disconnectMicrophoneStream(): void {
     if (this.micGain) {
       this.micGain.disconnect();

@@ -51,6 +51,22 @@ it('switches the stable camera input before reporting live success', async () =>
   expect(switchCameraSourceInputMock).toHaveBeenCalledWith('cam-2');
 });
 
+it('updates recording gain without switching or enabling the microphone', async () => {
+  const mixer = new AudioMixer();
+  const gain = vi.spyOn(mixer, 'setMicrophoneGain').mockImplementation(() => undefined);
+  const switchInput = vi.spyOn(mixer, 'switchMicrophone');
+  const enabled = vi.spyOn(mixer, 'setMicrophoneEnabled');
+  recordingContext.audioMixer = mixer;
+  await updateRecordingSettings({ microphoneGain: 1.5 });
+  expect(gain).toHaveBeenCalledExactlyOnceWith(1.5);
+  expect(switchInput).not.toHaveBeenCalled();
+  expect(enabled).not.toHaveBeenCalled();
+  hasActiveMultiSourceRecordingMock.mockReturnValue(true);
+  await updateRecordingSettings({ microphoneGain: 0 });
+  expect(updateMultiSourceRecordingSettingsMock).toHaveBeenLastCalledWith({ microphoneGain: 0 });
+  expect(gain).toHaveBeenCalledOnce();
+});
+
 it('switches the microphone through the active mixer and rejects unsupported sessions', async () => {
   const mixer = new AudioMixer();
   const switchMicrophone = vi.spyOn(mixer, 'switchMicrophone').mockResolvedValue(undefined);

@@ -65,6 +65,15 @@ function createSession(): MultiSourceSession {
 }
 
 describe('multi-source recorder controls', () => {
+  it('updates microphone gain without muting either source', () => {
+    const session = createSession();
+    const gain = vi.fn();
+    session.audioRecorder!.setMicrophoneGain = gain;
+    setSessionMediaEnabled(session, { microphoneGain: 0 });
+    expect(gain).toHaveBeenCalledExactlyOnceWith(0);
+    expect(session.audioRecorder!.stream.getAudioTracks()[0]!.enabled).toBe(true);
+    expect(session.recorders[0]!.stream.getVideoTracks()[0]!.enabled).toBe(true);
+  });
   it('suspends the microphone observation and resets intentional mute independently of processed output', () => {
     const session = createSession();
     const observation = createMicrophoneActivityObserver(vi.fn());

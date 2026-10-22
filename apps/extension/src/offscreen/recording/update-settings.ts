@@ -53,6 +53,9 @@ export async function updateRecordingSettings(patch: LiveSettingsPatch): Promise
   if (patch.microphoneEnabled !== undefined) {
     await setSingleSourceMicrophoneEnabled(patch);
   }
+  if (patch.microphoneGain !== undefined) {
+    recordingContext.audioMixer?.setMicrophoneGain(patch.microphoneGain);
+  }
   if (patch.webcamEnabled !== undefined) {
     setActiveSidecarWebcamEnabled(patch.webcamEnabled);
   }

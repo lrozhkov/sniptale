@@ -251,6 +251,14 @@ function MediaControls(props: {
           displayMode={props.displayMode}
           label={translate('content.toolbar.videoRecordingMicrophone')}
           selectedDeviceId={props.recording.state.microphoneDeviceId}
+          {...(props.recording.onMicrophoneGainChange
+            ? {
+                microphoneGain: {
+                  value: props.recording.state.microphoneGain ?? 1,
+                  onChange: props.recording.onMicrophoneGainChange,
+                },
+              }
+            : {})}
           menuType="recording-microphone"
           toolbarMenuState={props.toolbarMenuState}
           {...(onLoadMediaDevices ? { onLoadDevices: loadMicrophones } : {})}

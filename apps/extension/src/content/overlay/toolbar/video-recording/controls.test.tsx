@@ -80,6 +80,7 @@ function renderPhase(
     onDeactivate: vi.fn(() => true),
     onInteractionChange: vi.fn(),
     onMicrophoneEnabledChange: vi.fn(),
+    onMicrophoneGainChange: vi.fn(),
     onPause: vi.fn(),
     onResume: vi.fn(),
     onSpotlightEnabledChange: vi.fn(),

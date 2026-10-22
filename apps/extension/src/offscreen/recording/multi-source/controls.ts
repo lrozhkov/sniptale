@@ -32,8 +32,11 @@ export function resumeSessionRecorders(session: MultiSourceSession | null): void
 
 export function setSessionMediaEnabled(
   session: MultiSourceSession | null,
-  patch: { microphoneEnabled?: boolean; webcamEnabled?: boolean }
+  patch: { microphoneEnabled?: boolean; microphoneGain?: number; webcamEnabled?: boolean }
 ): void {
+  if (patch.microphoneGain !== undefined) {
+    session?.audioRecorder?.setMicrophoneGain?.(patch.microphoneGain);
+  }
   if (patch.microphoneEnabled !== undefined) {
     session?.audioRecorder?.microphoneActivity?.setEnabled(patch.microphoneEnabled);
     session?.audioRecorder?.stream.getAudioTracks().forEach((track) => {

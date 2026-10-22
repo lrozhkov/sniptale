@@ -61,6 +61,72 @@ beforeEach(() => {
   mocks.mutate.mockImplementation(async (mutation) => mutation(DEFAULT_VIDEO_SETTINGS));
   vi.stubGlobal('navigator', { permissions: { query: vi.fn(async () => ({ state: 'prompt' })) } });
 });
+
+it('persists idle gain without acquiring media and rolls back failed live persistence', async () => {
+  mocks.patch.mockResolvedValue(undefined);
+  await runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'set-microphone-gain', gain: 1.5 },
+  });
+  expect(mocks.patch).toHaveBeenLastCalledWith({ microphoneGain: 1.5 });
+  expect(mocks.update).not.toHaveBeenCalled();
+  expect(mocks.switchPeer).not.toHaveBeenCalled();
+  mocks.update.mockResolvedValue({ result: 'accepted' });
+  mocks.patch.mockRejectedValueOnce(new Error('storage refused'));
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      recordingId: 'recording-1',
+      command: { kind: 'set-microphone-gain', gain: 0 },
+    })
+  ).rejects.toThrow('storage refused');
+  expect(mocks.update.mock.calls.map(([patch]) => patch)).toEqual([
+    { microphoneGain: 0 },
+    { microphoneGain: 1 },
+  ]);
+  await runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    recordingId: 'recording-1',
+    command: { kind: 'set-microphone-gain', gain: 2 },
+  });
+  expect(mocks.update).toHaveBeenLastCalledWith({ microphoneGain: 2 });
+});
+
+it('does not persist a refused live gain update', async () => {
+  mocks.update.mockResolvedValueOnce({ result: 'refused', error: 'unavailable' });
+  await expect(
+    runVideoRecordingSurfaceCommand(12, {
+      ...base,
+      recordingId: 'recording-1',
+      command: { kind: 'set-microphone-gain', gain: 0.5 },
+    })
+  ).rejects.toThrow('unavailable');
+  expect(mocks.patch).not.toHaveBeenCalled();
+});
+
+it('serializes parallel microphone gain edits on the surface queue', async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  mocks.patch.mockImplementationOnce(() => held);
+  const first = runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'set-microphone-gain', gain: 0.5 },
+  });
+  await vi.waitFor(() => expect(mocks.patch).toHaveBeenCalledTimes(1));
+  const second = runVideoRecordingSurfaceCommand(12, {
+    ...base,
+    command: { kind: 'set-microphone-gain', gain: 1.5 },
+  });
+  expect(mocks.patch).toHaveBeenCalledTimes(1);
+  release();
+  await Promise.all([first, second]);
+  expect(mocks.patch.mock.calls.map(([patch]) => patch)).toEqual([
+    { microphoneGain: 0.5 },
+    { microphoneGain: 1.5 },
+  ]);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const base = {

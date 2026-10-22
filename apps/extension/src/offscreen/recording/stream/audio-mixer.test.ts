@@ -42,6 +42,7 @@ vi.mock('./audio-mixer-graph', () => ({
       getMixedStream: getMixedStreamMock,
       hasAudio: hasAudioMock,
       initialize: vi.fn().mockResolvedValue(undefined),
+      setMicrophoneGain: vi.fn(),
     };
   }),
 }));
@@ -55,6 +56,18 @@ beforeEach(() => {
       getUserMedia: vi.fn(),
     },
   });
+});
+
+it('changes observed gain without acquiring a new microphone', async () => {
+  const stream = createAudioStream();
+  vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValue(stream);
+  const observe = vi.fn();
+  const mixer = new AudioMixer(observe);
+  await mixer.addMicrophone();
+  mixer.setMicrophoneGain(1.5);
+  expect(observe).toHaveBeenLastCalledWith(stream, 1.5);
+  expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledOnce();
+  expect(stream.getTracks()[0]!.stop).not.toHaveBeenCalled();
 });
 
 function getOnlyAudioTrack(stream: MediaStream): MediaStreamTrack {

@@ -33,6 +33,55 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it('edits microphone gain without closing the menu and reports refusal with retry', async () => {
+  const onChange = vi.fn().mockResolvedValue(undefined);
+  act(() =>
+    root.render(
+      <RecordingMediaSplitControl
+        active
+        activeIcon={Camera}
+        inactiveIcon={CameraOff}
+        disabled={false}
+        kind="audioinput"
+        dataUi="test.mic"
+        displayMode="horizontal"
+        label="Microphone"
+        selectedDeviceId={null}
+        onToggle={vi.fn()}
+        microphoneGain={{ value: 1, onChange }}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="test.mic.menu"]')!.click()
+  );
+  let input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="popup.video.microphoneGainLabel"]'
+  )!;
+  expect(input.value).toBe('100');
+  const commit = async (value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+  await commit('150');
+  expect(onChange).toHaveBeenLastCalledWith(1.5);
+  expect(host.querySelector('[data-ui="test.mic.menu"]')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  onChange.mockRejectedValueOnce(new Error('refused'));
+  await commit('50');
+  expect(showToastMock).toHaveBeenLastCalledWith(expect.any(String), 'error');
+  input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="popup.video.microphoneGainLabel"]'
+  )!;
+  expect(input.value).toBe('100');
+  await commit('125');
+  expect(onChange).toHaveBeenLastCalledWith(1.25);
+});
+
 it.each([false, true])(
   'exposes controlled free placement with selected state %s',
   async (freePlacement) => {

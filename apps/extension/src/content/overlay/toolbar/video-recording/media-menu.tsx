@@ -6,6 +6,8 @@ import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 import type { WebcamPresentationSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { RecordingCameraControls } from '../../../../ui/recording-camera-controls';
+import { NumericRow } from '../../../../ui/compact-inspector-controls';
+import { InspectorSurface } from '../../../../ui/compact-inspector-controls/layout';
 import {
   ProductToolbarMenu,
   ProductToolbarMenuItem,
@@ -35,6 +37,7 @@ type RecordingMediaSplitControlProps = {
   toolbarMenuState?: ToolbarMenuState;
   onLoadDevices?: (requestPermission?: boolean) => Promise<VideoRecordingMediaDevice[]>;
   onDeviceChange?: (deviceId: string) => Promise<void> | void;
+  microphoneGain?: { value: number; onChange: (gain: number) => Promise<void> | void };
   cameraPlacement?: {
     mode: WebcamPresentationMode;
     presentation: WebcamPresentationSettings;
@@ -65,15 +68,18 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const [loading, setLoading] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [gainFailureRevision, setGainFailureRevision] = useState(0);
   const pendingRef = useRef(false);
   const changeMedia = async (change: () => Promise<void> | void) => {
-    if (pendingRef.current || props.disabled) return;
+    if (pendingRef.current || props.disabled) return false;
     pendingRef.current = true;
     setSwitching(true);
     try {
       await change();
+      return true;
     } catch {
       notifyRecordingMediaFailure();
+      return false;
     } finally {
       pendingRef.current = false;
       setSwitching(false);
@@ -128,7 +134,9 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
       anchorRef: triggerRef,
       displayMode: props.displayMode,
       getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
-      menuHeight: Math.max(96, devices.length * 48 + 48) + (props.cameraPlacement ? 480 : 0),
+      menuHeight:
+        Math.max(96, devices.length * 48 + 48) +
+        (props.cameraPlacement ? 480 : props.microphoneGain ? 56 : 0),
       menuWidth: props.cameraPlacement ? 280 : 260,
       preferredAlign: 'end',
     });
@@ -167,6 +175,12 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     runToggle,
     selectDevice,
     selectPlacement,
+    gainFailureRevision,
+    selectGain: async (gain: number) => {
+      if (!(await changeMedia(() => props.microphoneGain?.onChange(gain)))) {
+        setGainFailureRevision((revision) => revision + 1);
+      }
+    },
     selectAppearance: (patch: Partial<WebcamPresentationSettings>) =>
       changeMedia(() => props.cameraPlacement?.onAppearanceChange(patch)),
     switching,
@@ -181,6 +195,7 @@ function RecordingMediaDeviceMenu(props: {
   label: string;
   selectedDeviceId: string | null;
   cameraPlacement?: RecordingMediaSplitControlProps['cameraPlacement'];
+  microphoneGain?: RecordingMediaSplitControlProps['microphoneGain'];
 }) {
   const { control } = props;
   if (!control.open || !control.dropdown.style) return null;
@@ -188,7 +203,7 @@ function RecordingMediaDeviceMenu(props: {
     <ToolbarMenuDropdown dataUi={`${props.dataUi}.dropdown`} menuRef={control.menuRef}>
       <ProductToolbarMenu
         className="sniptale-content-menu-adopted"
-        variant={props.cameraPlacement ? 'viewport' : 'default'}
+        variant={props.cameraPlacement || props.microphoneGain ? 'viewport' : 'default'}
         compact
         title={props.label}
         placement={control.dropdown.placement}
@@ -224,6 +239,27 @@ function RecordingMediaDeviceMenu(props: {
             ) : null}
           </ProductToolbarMenuItem>
         ))}
+        {props.microphoneGain ? (
+          <>
+            <ProductToolbarMenuDivider />
+            <InspectorSurface className="pr-4 pb-1">
+              <NumericRow
+                key={control.gainFailureRevision}
+                appearance="plain"
+                label={translate('popup.video.microphoneGainLabel')}
+                value={Math.round(props.microphoneGain.value * 100)}
+                min={0}
+                max={200}
+                step={1}
+                precision={0}
+                unit="%"
+                onCommitValue={(value) => void control.selectGain(value / 100)}
+                onPreviewValue={() => undefined}
+                scrub={{ value: props.microphoneGain.value * 100, min: 0, max: 200, step: 1 }}
+              />
+            </InspectorSurface>
+          </>
+        ) : null}
         {props.cameraPlacement ? (
           <>
             <ProductToolbarMenuDivider />
@@ -312,6 +348,7 @@ export function RecordingMediaSplitControl(props: RecordingMediaSplitControlProp
         dataUi={props.dataUi}
         label={props.label}
         selectedDeviceId={props.selectedDeviceId}
+        {...(props.microphoneGain ? { microphoneGain: props.microphoneGain } : {})}
         {...(props.cameraPlacement ? { cameraPlacement: props.cameraPlacement } : {})}
       />
     </div>
