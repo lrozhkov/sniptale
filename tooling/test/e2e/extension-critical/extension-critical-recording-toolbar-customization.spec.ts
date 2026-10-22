@@ -17,8 +17,10 @@ import { parseRuntimeResponseForMessage } from '../../../../apps/extension/src/c
 test.setTimeout(120000);
 test.use({ actionTimeout: 10000 });
 
-for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`recording media selection feedback ${name}`, async ({}, info) => {
+for (const { name, size, orientation } of PRIMARY_BROWSER_VIEWPORTS.flatMap((viewport) =>
+  (['horizontal', 'vertical'] as const).map((orientation) => ({ ...viewport, orientation }))
+)) {
+  test(`recording media selection feedback ${name} ${orientation}`, async ({}, info) => {
     const host = await startHostServer();
     const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });
     const diagnostics: string[] = [];
@@ -53,10 +55,26 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const action = await triggerExtensionAction(launched.context, launched.extensionId, page);
       await evaluateInTarget(launched.context, action, 'window.close()').catch(() => undefined);
       await page.bringToFront();
+      if (orientation === 'vertical') {
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+        if (!(await vertical.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await vertical.click();
+        await page.keyboard.press('Escape');
+      }
+      await expect(page.locator('[data-ui="content.toolbar.root"]')).toHaveAttribute(
+        'data-display-mode',
+        orientation
+      );
+      for (const kind of ['microphone', 'camera', 'cursor'] as const)
+        await expectRecordingSplitChrome(page, info, kind);
       for (const kind of ['microphone', 'camera']) {
         if (kind === 'camera') {
           const toggle = page.locator('[data-ui="content.toolbar.video-recording.camera.toggle"]');
-          await toggle.click();
+          if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
           await expect(toggle).toHaveAttribute('aria-pressed', 'true');
           const video = page.locator('[data-ui="content.video-recording.embedded-camera"] video');
           await expect
@@ -111,6 +129,83 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       );
     }
   });
+}
+
+async function expectRecordingSplitChrome(
+  page: Page,
+  info: TestInfo,
+  kind: 'microphone' | 'camera' | 'cursor'
+) {
+  const primary = page.locator(
+    `[data-ui="content.toolbar.video-recording.${kind === 'cursor' ? 'spotlight' : `${kind}.toggle`}"]`
+  );
+  const arrow = page.locator(
+    `[data-ui="content.toolbar.video-recording.${kind === 'cursor' ? 'cursor-settings' : `${kind}.menu`}"]`
+  );
+  const group = primary.locator('..');
+  const surface = async () =>
+    group.evaluate((element) => {
+      const primary = element.querySelector('.sniptale-split-action-start')!;
+      const arrow = element.querySelector('.sniptale-split-action-end')!;
+      const style = getComputedStyle(primary);
+      return {
+        radius: style.getPropertyValue('--sniptale-radius-sm').trim(),
+        corners: [
+          style.borderTopLeftRadius,
+          style.borderTopRightRadius,
+          style.borderBottomRightRadius,
+          style.borderBottomLeftRadius,
+        ],
+        group: getComputedStyle(element).backgroundColor,
+        primary: style.backgroundColor,
+        arrow: getComputedStyle(arrow).backgroundColor,
+      };
+    });
+  for (const active of [false, true]) {
+    if (active) {
+      await primary.click();
+      if (kind === 'cursor') {
+        await page.locator('[data-ui="content.toolbar.video-recording.spotlight-halo"]').click();
+        await page.keyboard.press('Escape');
+      }
+    }
+    if (active) await expect(primary).toHaveAttribute('data-active', 'true');
+    else await expect(primary).not.toHaveAttribute('data-active', 'true');
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(async () => {
+        const appearance = await surface();
+        return appearance.corners.every((corner) => corner === appearance.radius);
+      })
+      .toBe(true);
+    await expect.poll(async () => (await surface()).group).toBe('rgba(0, 0, 0, 0)');
+    if (active)
+      await expect.poll(async () => (await surface()).primary).not.toBe('rgba(0, 0, 0, 0)');
+    await page.screenshot({ path: info.outputPath(`${kind}-${active}-idle.png`), fullPage: false });
+    await primary.hover();
+    if (active) await expect.poll(async () => (await surface()).group).toBe('rgba(0, 0, 0, 0)');
+    await arrow.hover();
+    await expect.poll(async () => (await surface()).group).not.toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(async () => (await surface()).primary).toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(async () => (await surface()).arrow).toBe('rgba(0, 0, 0, 0)');
+    await page.screenshot({
+      path: info.outputPath(`${kind}-${active}-arrow-hover.png`),
+      fullPage: false,
+    });
+    await page.mouse.down();
+    await expect.poll(async () => (await surface()).primary).toBe('rgba(0, 0, 0, 0)');
+    await page.mouse.up();
+    await expect(arrow).toHaveAttribute('aria-expanded', 'true');
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await surface()).group).not.toBe('rgba(0, 0, 0, 0)');
+    await page.keyboard.press('Escape');
+    await expect(arrow).toHaveAttribute('aria-expanded', 'false');
+    await primary.focus();
+    await page.keyboard.press('Tab');
+    await expect(arrow).toBeFocused();
+    await expect.poll(async () => (await surface()).group).not.toBe('rgba(0, 0, 0, 0)');
+    await page.mouse.click(0, 0);
+  }
 }
 
 async function openRecordingToolbarSettings(page: Page) {

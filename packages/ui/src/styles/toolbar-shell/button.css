@@ -376,17 +376,36 @@
 }
 
 @layer utilities {
-  /* Split media controls share one silhouette while retaining separate targets. */
   .sniptale-content-toolbar-adopted
     .sniptale-recording-media-control
-    .sniptale-split-action-start[data-command-press] {
-    border-radius: 4px 0 0 4px !important;
+    > .sniptale-btn[data-command-press] {
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
+  }
+
+  .sniptale-content-toolbar-adopted .sniptale-recording-media-control::after {
+    display: none;
+  }
+
+  .sniptale-content-toolbar-adopted .sniptale-recording-media-control {
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
+    background: transparent;
   }
 
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control
-    .sniptale-split-action-end[data-command-press] {
-    border-radius: 0 4px 4px 0 !important;
+    .sniptale-recording-media-control:is(
+      :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
+      :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
+    ) {
+    background: var(--sniptale-color-surface-hover);
+  }
+
+  .sniptale-content-toolbar-adopted
+    .sniptale-recording-media-control:is(
+      :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
+      :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
+    )
+    > .sniptale-btn[data-command-press] {
+    background: transparent !important;
   }
 
   .sniptale-content-toolbar-adopted
