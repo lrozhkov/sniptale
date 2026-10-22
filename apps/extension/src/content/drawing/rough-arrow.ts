@@ -26,18 +26,23 @@ function buildRoughArrow(object: DrawingArrowObject): readonly Drawable[] {
   const drawables = buildDrawingFreehandArrowLines(object).flatMap((line, index) => {
     const [start, end] = line;
     if (!start || !end) return [];
+    const points = line.map<[number, number]>((point) => [point.x, point.y]);
+    const options = {
+      bowing: 0.7,
+      preserveVertices: true,
+      roughness: 0.8,
+      seed: seed + index,
+      stroke: object.color,
+      strokeWidth,
+    };
     return [
-      ROUGH_GENERATOR.linearPath(
-        line.map((point) => [point.x, point.y]),
-        {
-          bowing: 0.7,
-          preserveVertices: true,
-          roughness: 0.8,
-          seed: seed + index,
-          stroke: object.color,
-          strokeWidth,
-        }
-      ),
+      index === 0 && line.length > 2
+        ? ROUGH_GENERATOR.curve(points, {
+            ...options,
+            roughness: 0,
+            disableMultiStroke: true,
+          })
+        : ROUGH_GENERATOR.linearPath(points, options),
     ];
   });
   roughArrowCache.set(object, drawables);
