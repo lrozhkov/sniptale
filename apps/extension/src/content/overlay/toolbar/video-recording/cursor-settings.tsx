@@ -2,6 +2,7 @@ import { CircleDot, MousePointer2, MousePointerClick, SunDim } from 'lucide-reac
 import { useLayoutEffect, useState } from 'react';
 import { multiplyColorAlpha } from '@sniptale/foundation/color';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { resolvePickerColor } from '@sniptale/ui/color-selector/helpers';
 import { useResolvedPortalTheme } from '@sniptale/ui/theme/safe-portal';
 import {
@@ -10,7 +11,7 @@ import {
   type VideoCursorEffectSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n';
-import { ColorField, NumericRow, ToggleField } from '../../../../ui/compact-inspector-controls';
+import { ColorField, NumericRow } from '../../../../ui/compact-inspector-controls';
 import { InspectorSurface } from '../../../../ui/compact-inspector-controls/layout';
 import { SettingsPopoverHeader } from '../../../../composition/frame-annotation-controls/popover/header';
 
@@ -99,6 +100,23 @@ export function RecordingCursorSettingsPanel(props: {
         initialSection="halo"
         sections={sections}
         showSectionHeading
+        renderSectionHeadingControl={(section) =>
+          section === 'cursor' ? null : (
+            <ProductGlassSwitch
+              role="switch"
+              aria-label={sections.find((item) => item.id === section)!.label}
+              aria-checked={props.settings[ENABLE_KEYS[section]]}
+              on={props.settings[ENABLE_KEYS[section]]}
+              disabled={props.disabled}
+              onClick={() =>
+                props.onChange({
+                  ...props.settings,
+                  [ENABLE_KEYS[section]]: !props.settings[ENABLE_KEYS[section]],
+                })
+              }
+            />
+          )
+        }
         renderSection={(section) =>
           section === 'cursor' ? (
             <p
@@ -109,14 +127,6 @@ export function RecordingCursorSettingsPanel(props: {
             </p>
           ) : (
             <div className="grid gap-1">
-              <ToggleField
-                label={translate('content.toolbar.cursorEffectEnabled')}
-                value={props.settings[ENABLE_KEYS[section]]}
-                disabled={props.disabled}
-                onChange={(enabled) =>
-                  props.onChange({ ...props.settings, [ENABLE_KEYS[section]]: enabled })
-                }
-              />
               <ColorField
                 label={translate('content.toolbar.cursorEffectColor')}
                 title={translate('content.toolbar.cursorEffectColor')}

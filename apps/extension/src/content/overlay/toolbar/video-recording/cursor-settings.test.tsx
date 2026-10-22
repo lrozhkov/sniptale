@@ -103,3 +103,44 @@ it('edits click alpha without resetting the independent halo multiplier', () => 
     cursorEffects: { ...settings.cursorEffects, clickColor: '#ef444400' },
   });
 });
+
+it.each([false, true])('keeps category switches in the heading with disabled=%s', (disabled) => {
+  const onChange = vi.fn();
+  const settings = {
+    cursorHaloEnabled: true,
+    cursorDimmingEnabled: false,
+    clickAnimationEnabled: true,
+  };
+  act(() => {
+    root.render(
+      <RecordingCursorSettingsPanel
+        disabled={disabled}
+        settings={settings}
+        onChange={onChange}
+        onPreview={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+  });
+  for (const [index, key] of [
+    [0, 'cursorHaloEnabled'],
+    [1, 'cursorDimmingEnabled'],
+    [2, 'clickAnimationEnabled'],
+  ] as const) {
+    act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[index]!.click());
+    const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+    const toggle = heading.querySelector<HTMLButtonElement>('[role="switch"]')!;
+    expect(toggle).not.toBeNull();
+    expect(host.querySelectorAll('[role="switch"]')).toHaveLength(1);
+    expect(toggle.disabled).toBe(disabled);
+    expect(toggle.getAttribute('aria-checked')).toBe(String(settings[key]));
+    expect(toggle.getAttribute('aria-label')).toBe(heading.querySelector('span')!.textContent);
+    expect(host.textContent).not.toContain('content.toolbar.cursorEffectEnabled');
+    onChange.mockClear();
+    act(() => toggle.click());
+    if (disabled) expect(onChange).not.toHaveBeenCalled();
+    else expect(onChange).toHaveBeenCalledExactlyOnceWith({ ...settings, [key]: !settings[key] });
+  }
+  act(() => host.querySelectorAll<HTMLButtonElement>('nav button')[3]!.click());
+  expect(host.querySelector('[role="switch"]')).toBeNull();
+});

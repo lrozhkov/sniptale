@@ -72,7 +72,7 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       };
     })
   );
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(2);
   for (const row of rows) {
     expect(row.centerDifference).toBeLessThanOrEqual(1);
     expect(row.height).toBeCloseTo(40, 0);
@@ -209,7 +209,27 @@ async function expectCursorSettings(page: Page, popup: Page, info: TestInfo) {
       'none'
     );
     const toggle = panel.getByRole('switch');
+    await expect(
+      panel.locator('[data-ui="shared.categorized-inspector.section-heading"]').getByRole('switch')
+    ).toHaveCount(1);
+    expect(
+      await toggle.evaluate((element) => {
+        const heading = element.parentElement!;
+        const label = heading.querySelector('span')!.getBoundingClientRect();
+        const control = element.getBoundingClientRect();
+        return Math.abs(label.y + label.height / 2 - control.y - control.height / 2);
+      })
+    ).toBeLessThanOrEqual(1);
     if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+    if (choice.section === 0) {
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(toggle).toBeEnabled();
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    }
     for (const [index, field] of choice.fields.entries()) {
       await open();
       await panel.locator('nav button').nth(choice.section).click();
