@@ -41,7 +41,10 @@ export type TabVideoRequestByType = {
     regionSelectionRequestGeneration: string;
     regionSelectionRequestId: string;
   };
-  [VideoMessageType.HIDE_REGION_SELECTOR]: { type: typeof VideoMessageType.HIDE_REGION_SELECTOR };
+  [VideoMessageType.HIDE_REGION_SELECTOR]: {
+    type: typeof VideoMessageType.HIDE_REGION_SELECTOR;
+    regionSelectionRequestId?: string;
+  };
   [VideoMessageType.REGION_SELECTED]: RuntimeRequestByType[typeof VideoMessageType.REGION_SELECTED];
   [VideoMessageType.REGION_SELECTION_CANCELLED]: {
     type: typeof VideoMessageType.REGION_SELECTION_CANCELLED;

@@ -78,6 +78,25 @@ function verifyRegionSelectionContracts() {
 }
 
 describe('tab-contracts/video tab runtime contracts', () => {
+  it('validates scoped selector cleanup without changing unscoped cleanup', () => {
+    const contract = tabVideoMessageContracts[VideoMessageType.HIDE_REGION_SELECTOR]!;
+    expect(contract.parseRequest({ type: VideoMessageType.HIDE_REGION_SELECTOR })).toEqual({
+      type: VideoMessageType.HIDE_REGION_SELECTOR,
+    });
+    expect(
+      contract.parseRequest({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        regionSelectionRequestId: 'request-1',
+      })
+    ).toMatchObject({ regionSelectionRequestId: 'request-1' });
+    expect(() =>
+      contract.parseRequest({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        regionSelectionRequestId: 123,
+      })
+    ).toThrow(MessageContractError);
+  });
+
   it(
     'validates controlled cursor capture pause and resume contracts',
     verifyControlledCursorCaptureLifecycleContracts

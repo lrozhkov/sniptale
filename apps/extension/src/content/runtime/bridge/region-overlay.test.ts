@@ -57,7 +57,15 @@ function expectSelectorVisibilityRouting() {
     handleRegionOverlayMessage({ type: VideoMessageType.HIDE_REGION_SELECTOR }, sendResponse, deps)
   ).toBe(true);
   expect(deps.hideRegionSelector).toHaveBeenCalledOnce();
+  expect(deps.hideRegionSelector).toHaveBeenLastCalledWith(undefined);
   expect(sendResponse).toHaveBeenLastCalledWith({ success: true });
+
+  handleRegionOverlayMessage(
+    { type: VideoMessageType.HIDE_REGION_SELECTOR, regionSelectionRequestId: 'request-1' },
+    sendResponse,
+    deps
+  );
+  expect(deps.hideRegionSelector).toHaveBeenLastCalledWith('request-1');
 }
 
 function expectOverlayVisibilityRouting() {

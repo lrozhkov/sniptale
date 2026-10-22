@@ -3,7 +3,7 @@ import { clearPinToTabSessionStorageState } from '../../../../composition/persis
 import { clearAnnotationForkSessionForTab } from '../../../annotation-fork-session/route';
 import { clearPinnedToolbarOperationState } from '../../../page-access/pinned-toolbar-operation';
 import { clearBackgroundRuntimeTabState } from '../../../application/runtime-state';
-import { handleTabClose } from '../../../media/lifecycle';
+import { handleRegionSelectionNavigationStart, handleTabClose } from '../../../media/lifecycle';
 import { cleanupScreenshotModeAfterTabClose } from '../../tab-mode-router-screenshot';
 import type { BackgroundModeState, RuntimeWiringLogger } from './shared';
 import { clearRecentCaptureEditorAssetCapabilitiesForTab } from '../../../capture/editor/recent-asset-capability';
@@ -13,6 +13,7 @@ export function registerTabLifecycleListeners(
   logger: RuntimeWiringLogger
 ): void {
   browserTabs.subscribeToRemoved((tabId) => {
+    handleRegionSelectionNavigationStart(tabId);
     clearRecentCaptureEditorAssetCapabilitiesForTab(tabId);
     clearPinnedToolbarOperationState(tabId);
     void (async () => {

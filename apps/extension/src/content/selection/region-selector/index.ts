@@ -177,7 +177,14 @@ function createRegionSelectorPublicController(args: {
     },
 
     hideRecordingOverlay: () => hideRecordingOverlay(args.state),
-    hideRegionSelector: args.hideSelector,
+    hideRegionSelector: (requestId) => {
+      if (
+        requestId !== undefined &&
+        args.state.activeRequestBinding?.regionSelectionRequestId !== requestId
+      )
+        return;
+      args.hideSelector();
+    },
     showRecordingOverlay: (region) => args.surfaceActions.showRecordingOverlay(region),
     showRegionSelector: (binding) => {
       args.state.activeRequestBinding = binding;

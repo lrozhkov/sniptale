@@ -48,7 +48,7 @@ export type RegionSelectorController = {
   dispose: () => void;
   getSelectedRegion: () => RegionSelectorBounds | null;
   hideRecordingOverlay: () => void;
-  hideRegionSelector: () => void;
+  hideRegionSelector: (requestId?: string) => void;
   showRecordingOverlay: (region: RegionSelectorBounds) => void;
   showRegionSelector: (binding: RegionSelectorRequestBinding) => void;
 };

@@ -57,17 +57,20 @@ function sender(overrides: Partial<chrome.runtime.MessageSender> = {}) {
 
 function createRequest(
   binding = createBinding(),
-  showRecordingOverlay = vi.fn().mockResolvedValue(undefined)
+  showRecordingOverlay = vi.fn().mockResolvedValue(undefined),
+  keepAlive = vi.fn().mockResolvedValue(undefined)
 ) {
   const runtime = createRuntimeSubscriptionHarness();
+  const sendTabMessage = vi.fn().mockResolvedValue(undefined);
   const resultPromise = requestRegionSelection(42, {
     createRequestBinding: vi.fn().mockResolvedValue(binding),
     logger: { debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: vi.fn() },
-    sendTabMessage: vi.fn().mockResolvedValue(undefined),
+    sendTabMessage,
+    keepAlive,
     showRecordingOverlay,
     subscribeToMessages: runtime.subscribeToMessages,
   });
-  return { binding, resultPromise, runtime, showRecordingOverlay };
+  return { binding, resultPromise, runtime, showRecordingOverlay, sendTabMessage, keepAlive };
 }
 
 function createDeferred<T>() {
@@ -107,6 +110,33 @@ it('acknowledges only an admitted selection through the runtime response contrac
   await expect(request.resultPromise).resolves.toEqual(selection);
 });
 
+it.each(['selected', 'cancelled', 'navigation', 'timeout'] as const)(
+  'keeps the pending region request alive and stops after %s',
+  async (outcome) => {
+    vi.useFakeTimers();
+    const request = createRequest(createBinding({ expiresAtMs: Date.now() + 240000 }));
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(65000);
+    expect(request.keepAlive).toHaveBeenCalledTimes(3);
+    expect(request.runtime.unsubscribe).not.toHaveBeenCalled();
+    if (outcome === 'selected') request.runtime.emit(selectedMessage(request.binding), sender());
+    if (outcome === 'cancelled') request.runtime.emit(cancelledMessage(request.binding), sender());
+    if (outcome === 'navigation') handleRegionSelectionNavigationStart(42);
+    if (outcome === 'timeout') await vi.advanceTimersByTimeAsync(175000);
+    await expect(request.resultPromise).resolves.toEqual(outcome === 'selected' ? selection : null);
+    const calls = request.keepAlive.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(request.keepAlive).toHaveBeenCalledTimes(calls);
+    expect(request.runtime.unsubscribe).toHaveBeenCalledOnce();
+    if (outcome !== 'selected')
+      expect(request.sendTabMessage).toHaveBeenLastCalledWith(42, {
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        regionSelectionRequestId: request.binding.regionSelectionRequestId,
+      });
+    vi.useRealTimers();
+  }
+);
+
 it('rejects stale request bindings before accepting the current selection', async () => {
   const request = createRequest();
   await Promise.resolve();
@@ -139,6 +169,78 @@ it('rejects stale request bindings before accepting the current selection', asyn
 
   await expect(request.resultPromise).resolves.toEqual(selection);
   expect(request.showRecordingOverlay).toHaveBeenCalledOnce();
+});
+
+it('retains a valid selection after a failed keepalive probe', async () => {
+  vi.useFakeTimers();
+  const keepAlive = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('probe failed'))
+    .mockResolvedValue(undefined);
+  const request = createRequest(
+    createBinding({ expiresAtMs: Date.now() + 240000 }),
+    undefined,
+    keepAlive
+  );
+  await vi.advanceTimersByTimeAsync(65000);
+  expect(keepAlive).toHaveBeenCalledTimes(3);
+  request.runtime.emit(selectedMessage(request.binding), sender());
+  await expect(request.resultPromise).resolves.toEqual(selection);
+  vi.useRealTimers();
+});
+
+it('does not display or keep alive a binding that already expired before delivery', async () => {
+  const request = createRequest(createBinding({ expiresAtMs: Date.now() - 1 }));
+  await expect(request.resultPromise).resolves.toBeNull();
+  expect(request.sendTabMessage).not.toHaveBeenCalled();
+  expect(request.keepAlive).not.toHaveBeenCalled();
+  expect(handleRegionSelectionNavigationStart(42)).toBe(false);
+});
+
+it('stops keepalive and scopes cleanup after selector delivery fails', async () => {
+  vi.useFakeTimers();
+  const runtime = createRuntimeSubscriptionHarness();
+  const pending = createDeferred<unknown>();
+  const binding = createBinding({ expiresAtMs: Date.now() + 240000 });
+  const keepAlive = vi.fn().mockResolvedValue(undefined);
+  const sendTabMessage = vi.fn().mockResolvedValue(undefined).mockReturnValueOnce(pending.promise);
+  const result = requestRegionSelection(42, {
+    createRequestBinding: vi.fn().mockResolvedValue(binding),
+    keepAlive,
+    logger: { debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: vi.fn() },
+    sendTabMessage,
+    showRecordingOverlay: vi.fn(),
+    subscribeToMessages: runtime.subscribeToMessages,
+  });
+  await vi.advanceTimersByTimeAsync(21000);
+  expect(keepAlive).toHaveBeenCalledOnce();
+  pending.reject(new Error('delivery failed'));
+  await expect(result).resolves.toBeNull();
+  await vi.advanceTimersByTimeAsync(60000);
+  expect(keepAlive).toHaveBeenCalledOnce();
+  expect(sendTabMessage).toHaveBeenLastCalledWith(42, {
+    type: VideoMessageType.HIDE_REGION_SELECTOR,
+    regionSelectionRequestId: binding.regionSelectionRequestId,
+  });
+  vi.useRealTimers();
+});
+
+it('releases the old request keepalive on replacement without ending the new request', async () => {
+  vi.useFakeTimers();
+  const old = createRequest(createBinding({ expiresAtMs: Date.now() + 240000 }));
+  await vi.advanceTimersByTimeAsync(21000);
+  const latest = createRequest(
+    createBinding({ regionSelectionRequestId: 'latest', expiresAtMs: Date.now() + 240000 })
+  );
+  await expect(old.resultPromise).resolves.toBeNull();
+  await vi.advanceTimersByTimeAsync(21000);
+  expect(old.keepAlive).toHaveBeenCalledOnce();
+  expect(latest.keepAlive).toHaveBeenCalledOnce();
+  latest.runtime.emit(selectedMessage(latest.binding), sender());
+  await expect(latest.resultPromise).resolves.toEqual(selection);
+  await vi.advanceTimersByTimeAsync(60000);
+  expect(latest.keepAlive).toHaveBeenCalledOnce();
+  vi.useRealTimers();
 });
 
 it('requires exact tab, frame, document, and sender URL binding', async () => {

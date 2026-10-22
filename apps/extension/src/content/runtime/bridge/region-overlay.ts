@@ -51,7 +51,7 @@ function handleKnownRegionOverlayMessage(
       return acknowledgeOverlayRequest(sendResponse);
     case VideoMessageType.HIDE_REGION_SELECTOR:
       deps.logger.debug('[ContentRegionOverlay] hide selector');
-      deps.hideRegionSelector();
+      deps.hideRegionSelector(message.regionSelectionRequestId);
       return acknowledgeOverlayRequest(sendResponse);
     case VideoMessageType.REGION_SELECTED:
       deps.logger.debug('[ContentRegionOverlay] region selected');

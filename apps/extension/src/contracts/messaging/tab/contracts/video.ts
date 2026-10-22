@@ -101,7 +101,10 @@ export const tabVideoMessageContracts = {
   [VideoMessageType.HIDE_REGION_SELECTOR]: {
     parseRequest: createGuardParser(
       'tab HIDE_REGION_SELECTOR message',
-      createMessageGuard({ type: VideoMessageType.HIDE_REGION_SELECTOR })
+      createMessageGuard({
+        type: VideoMessageType.HIDE_REGION_SELECTOR,
+        optional: { regionSelectionRequestId: isString },
+      })
     ),
     parseResponse: createGuardParser(
       'tab HIDE_REGION_SELECTOR response',

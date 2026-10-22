@@ -60,6 +60,16 @@ const requestBinding = {
 };
 
 describe('region selector controller', () => {
+  it('does not let late cleanup for an old request close the current selection', () => {
+    const controller = createRegionSelectorController();
+    controller.showRegionSelector(requestBinding);
+    controller.hideRegionSelector('old-request');
+    expect(document.body.querySelector('div')).not.toBeNull();
+    controller.hideRegionSelector(requestBinding.regionSelectionRequestId);
+    expect(document.body.querySelector('div')).toBeNull();
+    controller.dispose();
+  });
+
   it('shows, cancels, and disposes the region selector overlay', () => {
     installContentRuntimeMessagingMock(mocks.sendRuntimeMessageMock);
     const controller = createRegionSelectorController();

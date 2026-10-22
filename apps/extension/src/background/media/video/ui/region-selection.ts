@@ -32,6 +32,7 @@ type MessageSubscription = typeof browserRuntime.subscribeToMessages;
 
 type RegionSelectionRequestDeps = {
   createRequestBinding?: typeof createRegionSelectionRequestBinding;
+  keepAlive?: () => Promise<unknown>;
   logger: VideoManagerUiLogger;
   sendTabMessage: RuntimeMessagingTransport['sendTabMessage'];
   showRecordingOverlay: typeof showRecordingOverlay;
@@ -40,6 +41,7 @@ type RegionSelectionRequestDeps = {
 
 const defaultRegionSelectionRequestDeps: RegionSelectionRequestDeps = {
   createRequestBinding: createRegionSelectionRequestBinding,
+  keepAlive: () => browserRuntime.getPlatformInfo(),
   logger: createLogger({ namespace: 'BackgroundVideoUi:RegionSelection' }),
   sendTabMessage: (tabId, message) =>
     getBackgroundRuntimeMessaging().sendTabMessage(tabId, message),
@@ -211,11 +213,19 @@ export function requestRegionSelection(
   cancelActiveRegionSelectionRequest(tabId);
 
   return createRequestBinding(tabId).then((binding) => {
-    if (!isLatestRegionSelectionOwner(tabId, owner)) {
+    if (!isLatestRegionSelectionOwner(tabId, owner) || Date.now() >= binding.expiresAtMs) {
+      clearActiveRegionSelectionRequest(tabId, owner);
       return null;
     }
 
-    return runRequestWorkflow({
+    const keepAliveInterval = deps.keepAlive
+      ? setInterval(() => {
+          void deps.keepAlive?.().catch((error: unknown) => {
+            deps.logger.warn('[VideoManager] Region selection keepalive failed:', error);
+          });
+        }, 20000)
+      : null;
+    return runRequestWorkflow<RecordingRegionSelection | null>({
       createListener: (finish) =>
         createRegionSelectionListener({
           finish,
@@ -237,7 +247,23 @@ export function requestRegionSelection(
       },
       request: () => deps.sendTabMessage(tabId, toShowRegionSelectorMessage(binding)),
       subscribeToMessages: deps.subscribeToMessages,
-      timeoutMs: 60000,
-    });
+      timeoutMs: binding.expiresAtMs - Date.now(),
+    })
+      .then((selection) => {
+        if (selection === null) {
+          void deps
+            .sendTabMessage(tabId, {
+              type: VideoMessageType.HIDE_REGION_SELECTOR,
+              regionSelectionRequestId: binding.regionSelectionRequestId,
+            })
+            .catch((error: unknown) => {
+              deps.logger.warn('[VideoManager] Failed to close region selector:', error);
+            });
+        }
+        return selection;
+      })
+      .finally(() => {
+        if (keepAliveInterval !== null) clearInterval(keepAliveInterval);
+      });
   });
 }
