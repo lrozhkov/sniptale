@@ -76,6 +76,7 @@ async function captureIcons(page: Page) {
     'timer-button',
     'drawing.select',
     'drawing.pencil',
+    'drawing.marker',
     'drawing.shape',
     'future-frame-style',
     'future-frame-callout',
@@ -103,7 +104,7 @@ async function verifyOverrideReset(page: Page) {
   await expect(ui(page, 'settings.inherit-buttons')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(ui(page, 'capture-full-button')).toHaveCount(0);
-  await expect(ui(page, 'drawing.pencil')).toHaveCount(0);
+  await expect(ui(page, 'drawing.marker')).toHaveCount(0);
   await mode(page, 'highlighter');
   await expect(ui(page, 'future-frame-callout')).toHaveCount(0);
   await mode(page, 'cursor');
@@ -219,6 +220,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(ui(page, 'drawing.select')).toBeVisible();
         await customize(page);
         await expect(ui(page, 'drawing.select')).toBeDisabled();
+        await expect(ui(page, 'drawing.pencil')).toBeDisabled();
+        await expect(ui(page, 'visibility.drawing-pencil')).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('drawing-required-pencil.png'),
+          fullPage: false,
+        });
         await expect(ui(page, 'visibility.drawing-select')).toHaveCount(0);
         await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'false');
         await ui(page, 'visibility.capture-full').click();
@@ -228,14 +235,18 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             '[data-ui="content.toolbar.visibility-override"]'
           )
         ).toBeVisible();
-        await hide(page, 'drawing-pencil');
+        await hide(page, 'drawing-marker');
         await expect(
-          ui(page, 'visibility.drawing-pencil').locator(
+          ui(page, 'visibility.drawing-marker').locator(
             '[data-ui="content.toolbar.visibility-override"]'
           )
         ).toHaveCount(0);
         await ui(page, 'customize-done').click();
-        await expect(ui(page, 'drawing.pencil')).toHaveCount(0);
+        await expect(ui(page, 'drawing.marker')).toHaveCount(0);
+        await expect(ui(page, 'drawing.pencil')).toBeVisible();
+        await expect(ui(page, 'drawing.pencil')).toBeEnabled();
+        await ui(page, 'drawing.pencil').click();
+        await expect(ui(page, 'drawing.pencil')).toHaveAttribute('aria-pressed', 'true');
         await expect(ui(page, 'drawing.select')).toBeVisible();
         await expect(ui(page, 'capture-full-button')).toBeVisible();
         await mode(page, 'highlighter');

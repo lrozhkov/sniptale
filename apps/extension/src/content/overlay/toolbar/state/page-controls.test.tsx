@@ -31,6 +31,30 @@ function Harness(props: { enabled: boolean; mode?: PageToolbarMode }) {
   return null;
 }
 
+it.each(['global', 'mode'] as const)(
+  'ignores an older hidden Pencil choice from %s settings',
+  async (source) => {
+    const defaults = createDefaultSettings();
+    persistence.load.mockResolvedValueOnce({
+      ...defaults,
+      contentToolbar: {
+        ...defaults.contentToolbar!,
+        pageControls: source === 'global' ? { 'drawing-pencil': false } : {},
+        pageControlOverrides: source === 'mode' ? { drawing: { 'drawing-pencil': false } } : {},
+      },
+    });
+    await act(async () => root.render(<Harness enabled mode="drawing" />));
+    expect(controls.isVisible('drawing-pencil')).toBe(true);
+    expect(controls.controls['drawing-pencil']).toBe(true);
+    expect(controls.hasHidden).toBe(false);
+    act(() => controls.toggleEditing());
+    await act(async () => controls.setVisible('drawing-pencil', false));
+    expect(persistence.patch).not.toHaveBeenCalled();
+    act(() => controls.toggleEditing());
+    expect(controls.isVisible('drawing-pencil')).toBe(true);
+  }
+);
+
 it('omits reveal and inheritance actions when the current mode has no applicable choices', async () => {
   const defaults = createDefaultSettings();
   persistence.load.mockResolvedValueOnce({
@@ -38,7 +62,7 @@ it('omits reveal and inheritance actions when the current mode has no applicable
     contentToolbar: {
       ...defaults.contentToolbar!,
       pageControls: {},
-      pageControlOverrides: { drawing: { 'drawing-pencil': false } },
+      pageControlOverrides: { drawing: { 'drawing-marker': false } },
     },
   });
   function SettingsHarness(props: { mode: PageToolbarMode }) {
@@ -61,14 +85,14 @@ it('omits reveal and inheritance actions when the current mode has no applicable
   await act(async () => root.render(<SettingsHarness mode="drawing" />));
   expect(item('show-hidden-buttons')).not.toBeNull();
   expect(item('inherit-buttons')).toBeNull();
-  expect(controls.isOverridden('drawing-pencil')).toBe(false);
+  expect(controls.isOverridden('drawing-marker')).toBe(false);
   act(() => controls.toggleRevealed());
   expect(item('show-hidden-buttons')).not.toBeNull();
-  expect(controls.isVisible('drawing-pencil')).toBe(true);
+  expect(controls.isVisible('drawing-marker')).toBe(true);
 });
 
 it.each([
-  ['drawing', 'drawing-pencil'],
+  ['drawing', 'drawing-marker'],
   ['highlighter', 'annotation-callout'],
   ['quick-edit', 'editing-ai'],
   ['design-review', 'review-export'],

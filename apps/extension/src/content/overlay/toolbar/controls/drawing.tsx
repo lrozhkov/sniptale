@@ -245,7 +245,7 @@ export function ToolbarDrawingControls(props: {
             <Fragment key={tool}>
               {props.owner?.renderToolControl ? (
                 props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
-              ) : tool === 'select' ? (
+              ) : tool === 'select' || tool === 'pencil' ? (
                 <PageProtectedControls>{control}</PageProtectedControls>
               ) : (
                 <PageControlVisibility control={`drawing-${tool}`} label={translate(label)}>

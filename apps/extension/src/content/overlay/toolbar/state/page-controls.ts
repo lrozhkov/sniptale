@@ -107,6 +107,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
     const choice = modeOverrides?.[control];
     if (typeof choice === 'boolean') effectiveControls[control] = choice;
   }
+  if (mode === 'drawing') effectiveControls['drawing-pencil'] = true;
   return {
     controls: effectiveControls,
     mode,
@@ -128,11 +129,13 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
     error,
     reload,
     setVisible: (control: PageToolbarControl, visible: boolean) =>
-      setPreferences(
-        mode === 'cursor'
-          ? { pageControls: { [control]: visible } }
-          : { pageControlOverrides: { [mode]: { [control]: visible } } }
-      ),
+      mode === 'drawing' && control === 'drawing-pencil'
+        ? Promise.resolve()
+        : setPreferences(
+            mode === 'cursor'
+              ? { pageControls: { [control]: visible } }
+              : { pageControlOverrides: { [mode]: { [control]: visible } } }
+          ),
     resetOverrides: () =>
       mode === 'cursor'
         ? Promise.resolve()
