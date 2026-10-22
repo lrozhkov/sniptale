@@ -2,15 +2,10 @@
   display: none !important;
 }
 
-.sniptale-show-toolbar-button[data-hidden='true'] {
-  display: none !important;
-}
-
 /*
  * This is the interactive-chrome subset of the capture-hidden contract below. Geometry previews
  * stay in page scale so their rectangles keep matching the DOM; controls remain physically stable.
  */
-.sniptale-show-toolbar-button,
 .sniptale-frame-style-editor-layer,
 [data-floating-ui-capture-transient='true'],
 .sniptale-callout-format-toolbar,
@@ -85,10 +80,6 @@
 .sniptale-resize-handle,
 .sniptale-callout-tail-handle {
   transform-origin: center;
-}
-
-.sniptale-show-toolbar-button {
-  transform-origin: bottom right;
 }
 
 .sniptale-scenario-recorder-sidebar,
@@ -167,7 +158,6 @@
 
 :host(.sniptale-capture-ui-hidden) .sniptale-app,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar,
-:host(.sniptale-capture-ui-hidden) .sniptale-show-toolbar-button,
 :host(.sniptale-capture-ui-hidden) .sniptale-action-toolbar,
 :host(.sniptale-capture-ui-hidden) .sniptale-toolbar-portal-wrapper,
 :host(.sniptale-capture-ui-hidden) .sniptale-frame-toolbar-trigger,

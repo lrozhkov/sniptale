@@ -4,6 +4,23 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
 import { ToolbarDockingGuides } from './docking-guides';
 
+it('shows only horizontal corner targets for a collapsed-panel dock', () => {
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <ToolbarDockingGuides activeEdge="bottom-left" uiScale={1} cornersOnly />
+  );
+  expect(root.querySelectorAll('[data-active]')).toHaveLength(4);
+  const layer = root.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-guides"]')!;
+  expect(layer.dataset['floatingUiCaptureTransient']).toBe('true');
+  expect(layer.style.scale).toBe('1');
+  expect(
+    root
+      .querySelector('[data-ui="content.toolbar.dock-zone.bottom-left"]')
+      ?.getAttribute('data-active')
+  ).toBe('true');
+  expect(root.querySelector('[data-ui="content.toolbar.dock-zone.left"]')).toBeNull();
+});
+
 it.each([null, 'left'] as const)(
   'keeps neutral guides pointer-transparent with active edge %s',
   (activeEdge) => {

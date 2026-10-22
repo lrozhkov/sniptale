@@ -8,6 +8,7 @@ import type { ContentAppLayoutProps } from './types';
 import { DrawingSurface } from '../../drawing/surface';
 import { VideoRecordingSpotlight } from '../video-recording/spotlight/view';
 import { EmbeddedRecordingCamera } from '../video-recording/camera/view';
+import { CollapsedPanels } from './collapsed-panels';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
@@ -143,6 +144,11 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
           props.toolbar.autoBlurController.autoApplyEnabled &&
           props.toolbar.autoBlurController.autoApplyAllowed
         }
+      />
+      <CollapsedPanels
+        toolbar={props.toolbar}
+        scenario={props.scenario}
+        countdownActive={props.dialogs.countdown !== null}
       />
       {isCaptureUiHidden ? null : <ContentDialogStack dialogs={props.dialogs} />}
     </>

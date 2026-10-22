@@ -8,7 +8,7 @@ import { resolvePortalTheme } from '@sniptale/ui/theme/safe-portal';
 const DEFAULT_CONTENT_RUNTIME_TREE_CLASSES = [
   'sniptale-toolbar',
   'sniptale-app',
-  'sniptale-show-toolbar-button',
+  'sniptale-collapsed-panels',
 ] as const;
 
 type ContentRuntimeTreeOptions = {

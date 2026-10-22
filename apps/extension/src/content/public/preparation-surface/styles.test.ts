@@ -54,7 +54,7 @@ describe('content entrypoint styles', () => {
       '.sniptale-content-ui-zoom-surface {\n  zoom: var(--sniptale-content-ui-scale);'
     );
     expect(effectsStyles).not.toContain(
-      '.sniptale-toolbar,\n.sniptale-show-toolbar-button,\n.sniptale-toolbar-portal-wrapper'
+      '.sniptale-toolbar,\n.sniptale-collapsed-panels,\n.sniptale-toolbar-portal-wrapper'
     );
     expect(effectsStyles).toContain('.sniptale-resize-handle');
     expect(effectsStyles).toContain('.sniptale-toolbar-portal-wrapper');

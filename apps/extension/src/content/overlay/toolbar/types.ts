@@ -111,7 +111,7 @@ export interface ToolbarCaptureActionsProps {
   ) => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
   onCaptureActionCommitted?: (action: CaptureActionType) => Promise<void> | void;
-  onClose: () => void;
+  onClose: (restoreFocus?: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
   timerDelay: number;
   onTimerDelayChange: (delay: number) => void;
@@ -196,7 +196,7 @@ export interface ToolbarProps {
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
-  onHide: () => void;
+  onHide: (restoreFocus?: boolean) => void;
   onClearHighlights: () => void;
   onClearPagePreparation?: () => void;
   canClearPagePreparation?: boolean;

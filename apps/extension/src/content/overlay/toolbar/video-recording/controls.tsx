@@ -278,7 +278,7 @@ export function ToolbarVideoRecordingControls(props: {
   displayMode: ContentToolbarDisplayMode;
   freePlacement?: boolean;
   onFreePlacementChange?: ((value: boolean) => void) | undefined;
-  onCollapse(): void;
+  onCollapse(restoreFocus?: boolean): void;
   onCompactMenusChange(compact: boolean): void;
   onDisplayModeChange(displayMode: ContentToolbarDisplayMode): void;
   recording: ToolbarVideoRecordingProps;
@@ -294,9 +294,9 @@ export function ToolbarVideoRecordingControls(props: {
     setInteractionMode(mode);
     props.recording.onInteractionChange(mode === 'navigation' ? 'navigation' : 'drawing');
   };
-  const collapse = () => {
+  const collapse = (restoreFocus?: boolean) => {
     setMode('navigation');
-    props.onCollapse();
+    props.onCollapse(restoreFocus);
   };
   return (
     <>

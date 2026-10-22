@@ -50,7 +50,7 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
         title={translate('content.toolbar.hideToolbar')}
         onClick={(event) => {
           event.stopPropagation();
-          props.onClose();
+          props.onClose(event.detail === 0);
         }}
       >
         <PanelBottomClose size={18} strokeWidth={2} />
