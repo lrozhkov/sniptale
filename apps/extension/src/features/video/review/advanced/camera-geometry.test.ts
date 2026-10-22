@@ -1,7 +1,9 @@
+import type { QuickEditBackgroundSettings } from './types';
 import { expect, it } from 'vitest';
 import {
   createReviewCameraLinkGeometry,
   createReviewWorkingZoneCameraGeometry,
+  proveReviewCameraGap,
 } from './camera-geometry';
 import {
   computeQuickEditSceneLayout,
@@ -45,14 +47,31 @@ const base = computeQuickEditSceneLayout({
   camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
 });
 
-it.each(['window', 'content', 'fixed'] as const)(
-  'uses the renderer nominal phase and projection in %s scenes',
-  (zoomBehavior) => {
+it.each(
+  (['window', 'content', 'fixed', 'follow-video'] as const).flatMap((zoomBehavior) =>
+    [false, true].flatMap((spatial) =>
+      [false, true].map((enabled) => ({ zoomBehavior, spatial, enabled }))
+    )
+  )
+)(
+  'uses the renderer nominal phase and projection in $zoomBehavior spatial=$spatial enabled=$enabled',
+  ({ zoomBehavior, spatial, enabled }) => {
     const selected = {
       ...region,
-      perspective: { enabled: true, rotateX: 20, rotateY: -15, rotateZ: 15, strength: 0.5 },
+      ...(spatial
+        ? { perspective: { enabled: true, rotateX: 20, rotateY: -15, rotateZ: 15, strength: 0.5 } }
+        : {}),
     };
-    const sceneBackground = { ...background, zoomBehavior };
+    const sceneBackground: QuickEditBackgroundSettings = enabled
+      ? { ...background, zoomBehavior }
+      : { enabled: false, zoomBehavior };
+    const base = computeQuickEditSceneLayout({
+      source,
+      output,
+      background: sceneBackground,
+      windowHeader: DEFAULT_WINDOW_HEADER,
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
     const geometry = createReviewWorkingZoneCameraGeometry({
       output,
       background: sceneBackground,
@@ -72,20 +91,24 @@ it.each(['window', 'content', 'fixed'] as const)(
         windowHeader: DEFAULT_WINDOW_HEADER,
         camera,
       });
-      const raster = computeQuickEditSpatialRasterLayout(layout, sceneBackground);
+      const raster = camera.spatial
+        ? computeQuickEditSpatialRasterLayout(layout, sceneBackground)
+        : layout;
       const native = { x: 0.57, y: 0.5 };
       const point = {
         x: raster.videoTransform.x + native.x * raster.videoTransform.width,
         y: raster.videoTransform.y + native.y * raster.videoTransform.height,
       };
-      const projected = projectQuickEditPoint(
-        quickEditPlaneProjection(
-          layout.windowRect,
-          computeQuickEditSpatialWindow(layout, sceneBackground),
-          camera.spatial!
-        ),
-        point
-      )!;
+      const projected = camera.spatial
+        ? projectQuickEditPoint(
+            quickEditPlaneProjection(
+              layout.windowRect,
+              computeQuickEditSpatialWindow(layout, sceneBackground),
+              camera.spatial!
+            ),
+            point
+          )!
+        : point;
       const pan = {
         x: (selected.transform.centerX * selected.transform.scale - 0.5) * base.windowRect.width,
         y: (selected.transform.centerY * selected.transform.scale - 0.5) * base.windowRect.height,
@@ -186,7 +209,7 @@ it('preserves disabled entry/exit phases for linked source cameras', () => {
   expect(geometry.breaks).toContain(next.end - next.exit.duration);
 });
 
-it.each(['window', 'content', 'fixed'] as const)(
+it.each(['window', 'content', 'fixed', 'follow-video'] as const)(
   'matches the real combined-angle link projection in %s scenes',
   (zoomBehavior) => {
     const from = {
@@ -232,20 +255,24 @@ it.each(['window', 'content', 'fixed'] as const)(
         windowHeader: DEFAULT_WINDOW_HEADER,
         camera,
       });
-      const raster = computeQuickEditSpatialRasterLayout(layout, sceneBackground);
+      const raster = camera.spatial
+        ? computeQuickEditSpatialRasterLayout(layout, sceneBackground)
+        : layout;
       const native = { x: 0.57, y: 0.5 };
       const point = {
         x: raster.videoTransform.x + native.x * raster.videoTransform.width,
         y: raster.videoTransform.y + native.y * raster.videoTransform.height,
       };
-      const projected = projectQuickEditPoint(
-        quickEditPlaneProjection(
-          layout.windowRect,
-          computeQuickEditSpatialWindow(layout, sceneBackground),
-          camera.spatial!
-        ),
-        point
-      )!;
+      const projected = camera.spatial
+        ? projectQuickEditPoint(
+            quickEditPlaneProjection(
+              layout.windowRect,
+              computeQuickEditSpatialWindow(layout, sceneBackground),
+              camera.spatial!
+            ),
+            point
+          )!
+        : point;
       const bounds = geometry.clearanceBounds({
         start: time,
         end: time,
@@ -291,5 +318,50 @@ it.each([1.2, 2, 2.5])(
     const plan = planWorkingZoneCamera({ frames, start: 0, end: 3, targetScale, policy, geometry });
     expect(plan).toMatchObject({ status: 'ready', targetScale });
     expect(frames).toEqual(before);
+  }
+);
+
+it.each(
+  (['window', 'content', 'fixed', 'follow-video'] as const).flatMap((zoomBehavior) =>
+    ['disabled', 'source', 'canvas'].flatMap((sceneKind) =>
+      [false, true].map((excursion) => ({ zoomBehavior, sceneKind, excursion }))
+    )
+  )
+)(
+  'checks the authored link for $zoomBehavior scene=$sceneKind excursion=$excursion',
+  ({ zoomBehavior, sceneKind, excursion }) => {
+    const sceneBackground: QuickEditBackgroundSettings =
+      sceneKind === 'disabled' ? { enabled: false, zoomBehavior } : { ...background, zoomBehavior };
+    const scene = {
+      source,
+      output,
+      background: sceneBackground,
+      ...(sceneKind === 'canvas' ? { canvas: { width: 1200, height: 750 } } : {}),
+      windowHeader: DEFAULT_WINDOW_HEADER,
+    };
+    const layout = computeQuickEditSceneLayout({
+      ...scene,
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+    const transform = { scale: 1.5, centerX: 0.5, centerY: 0.5 };
+    const from = { ...region, id: 'from', start: 0, end: 1, linkTo: 'to', transform };
+    const to = { ...region, id: 'to', start: 3, end: 4, transform };
+    const result = proveReviewCameraGap({
+      output,
+      layout,
+      scene,
+      regions: [from, to],
+      source: from,
+      target: to,
+      from: transform,
+      to: transform,
+      policy,
+      observations: [1, 2, 3].map((time) => ({
+        time,
+        segmentId: 'source',
+        actual: { x: excursion && time === 2 ? 0.99 : 0.5, y: 0.5 },
+      })),
+    });
+    expect(result.status).toBe(excursion ? 'conflict' : 'proven');
   }
 );

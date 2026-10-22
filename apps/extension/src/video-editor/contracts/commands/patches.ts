@@ -13,7 +13,10 @@ import type {
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
 
 /** Replace the paint or edit its common blur under the current project authority. */
-export type VideoEditorSceneBackgroundEdit = VideoProjectSceneBackground | { blur: number };
+export type VideoEditorSceneBackgroundEdit =
+  | VideoProjectSceneBackground
+  | { blur: number }
+  | { zoomBehavior: NonNullable<VideoProjectSceneBackground['zoomBehavior']> };
 
 export type VideoEditorAudioEnvelopePatch = {
   volumeEnvelopeEnd?: number;

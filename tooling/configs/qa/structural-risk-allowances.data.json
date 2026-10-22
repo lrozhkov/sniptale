@@ -490,10 +490,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
       "symbol": "createProjectWorkingZoneCameraGeometry",
       "owner": "composition:motion",
-      "reason": "tool-noise: This factory returns one geometry receiver. Its closures share immutable project, source mappings, phase and output transform. They implement point, interval and derivative bounds for the same admission contract. No writer, UI session, resource lease or recovery lifetime is present. Nested methods own their calculations. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This pure factory returns one geometry receiver. Its closures share immutable project, source mapping, phase and output transform. The candidate adds a bounded window-weight policy call in the existing source-window branch. Point, interval and derivative bounds still enforce the same admission contract. No writer, resource or recovery authority enters the factory. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "cc68dc66658ce150674c05aa709c67c58503f6be9d37761bd674e94d89b3d4f1",
+      "astHash": "eba681d57b15ba767aef360ab5a35f9a7f8fe8b9d38f77a7151414fb715c7938",
       "signatureHash": "bf0f4f53e34843f435e3221d9ec8a76f30cbe24c2ee8d7c390def907f6c82e95"
     },
     {
@@ -1678,10 +1678,10 @@
       "file": "apps/extension/src/features/video/composition/motion/index.ts",
       "symbol": "resolveVideoCompositionCamera",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure resolver chooses the active camera and produces one frame. Scene and source-window branches share the same phase, focus and blur. It owns no state or effects. Returning either camera from the same decision preserves layer partition and legacy scene behavior. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This pure resolver selects one active camera frame. The candidate applies the authored window/content split at the existing source-window and connection returns. Endpoint evaluation remains in the existing owners. It adds no state, effects or recovery lifetime. A mechanical split would distribute this decision. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "ac6c75d386956c510f2812017ee6706d3779f785769f946c6db83fc3c6fc8a15",
+      "astHash": "cbee2abb67a7b3a68acae02336964a93974a788e8db80ee2249be0313f45e7c1",
       "signatureHash": "40a97668312cca68cbb4b5f4e9aaf1a061ed96f550635aedbd54936e4887d342"
     },
     {
@@ -1755,10 +1755,10 @@
       "file": "apps/extension/src/features/video/review/project-conversion.ts",
       "symbol": "planReviewProjectConversion",
       "owner": "review:conversion",
-      "reason": "tool-noise: This planner returns one unpublished destination or one typed refusal. The candidate raises its minimum schema for retained inactive scene fields. Acquisition and guarded publication stay outside this function. Score 11 and delta 0 are unchanged. Local maps and cloned records add no writer or session authority. A mechanical split would distribute the same admission decision. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This planner returns one unpublished destination or one typed refusal. The candidate raises the schema floor for the authored background mode. Acquisition and guarded publication remain outside this function. Score 11 and delta 0 remain unchanged. Local maps and cloned records add no writer or session authority. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "eeb15a6e659ac73cb76f973f8e2a7d402dd7061b9f00edfb59535365f595ae76",
+      "astHash": "541d05fde225bfffeba6725d180d30432a092da8a2594c447596ad25879b5872",
       "signatureHash": "4723efd60b994dfbbad28fa1cfb6e50a6a8faeb21d3ab9bd0c06f17c43462415"
     },
     {
@@ -1865,21 +1865,21 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This file contains three acceptance scenarios with local data and existing encoding helpers. The candidate extends the retained appearance scenario through explicit activation, suppression, reopen and source deletion. There is no shared mutable fixture authority. Score 5 and delta 0 are unchanged. Cohesion is 1.00. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This file contains continuous acceptance scenarios with local data and existing encoding helpers. The candidate extends transfer through authored background modes and focus recovery. There is no shared mutable fixture authority. File score 5 and delta 0 remain unchanged. Cohesion is 1.00. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "e68fedda1ff28cbfbbcce207a683365491b3d0a92e903fa474d713e37632f080",
-      "signatureHash": "0bc5f11a49481348618da8cbf6cb3ae99cabe1f54e745a1c796a6a7f2126a7ea"
+      "astHash": "8225fec1bba4227ed669485ab4e74f77d3da695f7ecac9fdf59905573b345eca",
+      "signatureHash": "7af14566b0bd9b1a096a8c8df9428695653a402e5bc8199ed74fa3ebbaecc5ac"
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "test callback#2",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: The callback proves one continuous Gallery-to-montage identity, authored cursor and camera edits, source purge, reopen, and export. Splitting phases into seeded tests would lose the continuity proof. The existing host cleanup remains in one finally block. Independent read-only structural diagnosis classified this owner as Keep. Final complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent result, writer, publication, lifetime, recovery, or shared fixture authority. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-10-21",
-      "astHash": "7c6a92b05e488dba5479643f167711dc5f916209e6e76b58926e887fd059d86c",
+      "reason": "tool-noise: This callback proves one continuous Gallery transfer, montage editing, source purge, reopen and real export. The candidate selects Content and recovers an excluded cursor through the existing Manual focus control. Splitting phases into seeded tests would lose identity and recovery proof. Host cleanup remains in one finally block. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-22",
+      "astHash": "f72622f7aa4c0be09a111f0c74de5fee9af6e40099848067061f55b3e821855b",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -1975,10 +1975,10 @@
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.ts",
       "symbol": "<file>",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure Native adapter maps source observations and clip transitions into one WorkingZoneCameraGeometry contract. File cohesion is1.00 with no effects or state authorities. The window branch uses the existing shared window adapter. A file split based on length would separate the same projection inputs from their bounds. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This pure Native adapter maps observations and clip planes into one camera geometry contract. File cohesion is 1.00, with no effects or state authorities. The candidate selects the existing shared window-weight policy. A mechanical split would separate the same projection inputs from their bounds. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "dc25c3ac78e8e54cabc9f4fa23e997a507d7c6f4f2e6b72f8615ec057ef205b2",
+      "astHash": "d0b1788fc839a4ede210ec1db12ce25d99b88c92e06fe875f90b6f78d882f325",
       "signatureHash": "7fa14f86d047fe67b6f395d6dcebc5e5dfbe5dbb8f1b6a22d2d4b4b0b4350d95"
     },
     {
@@ -2008,11 +2008,11 @@
       "file": "apps/extension/src/features/video/composition/motion/source-window.test.ts",
       "symbol": "<file>",
       "owner": "composition:motion:proof",
-      "reason": "tool-noise: These fixtures compare Gallery and Native source-window projection through phases, rates, links and concrete source identity. Runtime store and history imports were removed. The remaining state signals are isolated test fixtures, not authorities. Tests share the same pure camera contract and independent Gallery oracle. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
+      "reason": "tool-noise: These isolated fixtures compare Gallery and Native source-window geometry through phases, rates, links, rotation and background modes. They use the same pure camera contract and independent Gallery oracle. The reported state receivers belong to local fixtures. They are not shared runtime authorities. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "2eca28153dcfd7c34dea9c17cd9c634cb178492a1939fac0da57fc943242d88b",
-      "signatureHash": "1e5550bb9f0b4d6cb14dfa4e3eba0870bda9c5cca09ae53adaad317ba1a07090"
+      "astHash": "3063fcedb2a704748eccabbaa90f417cf277b7043ae565d2a4b7481d04338bce",
+      "signatureHash": "30af346ce8f725ce55277a1866ca5408854171570e4bc8fe9df3f3c427b7d9f2"
     },
     {
       "rule": "structural-function-risk",
@@ -2107,10 +2107,10 @@
       "file": "apps/extension/src/features/video/review/project-scene.ts",
       "symbol": "planReviewProjectScene",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure adapter maps one Gallery scene into the existing Native scene and media fields. It owns no state, effects, acquisition, writer or recovery. The analyzer reports one owner, cohesion 1.00, score 5 and delta 0. Its branches preserve active and inactive values in the same mapping. A mechanical split would distribute this decision across forwarding helpers. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This pure adapter maps one Gallery scene into existing Native scene and media fields. The candidate retains the authored background mode instead of refusing it. Active and inactive appearance remain in one mapping. It adds no state, effects, acquisition or recovery authority. Score 5 and delta 0 remain unchanged. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "8001d4df784f702d1e14ae12f4affa7acda07b1c6a2aab9e52fd9c4ef8a196e2",
+      "astHash": "0d50469e449c9c8fed62810dc38ac380c77b121fa2dc2d8279b08dd88da9e1fd",
       "signatureHash": "126fee864af84248405c8ceabed19ef87386fa24beab5db3959393abb0d4e328"
     },
     {
@@ -2129,11 +2129,55 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-materials.spec.ts",
       "symbol": "test callback#3",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This callback proves one continuous Gallery transfer, retained appearance edits, reopen and source deletion. Splitting its phases into seeded tests would lose proof that the same destination retains the authored image bytes. The existing host cleanup stays in one finally block. Score 4 and delta 0 are unchanged. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state authority, effect, resource, recovery or shared fixture lifetime. Remove when the analyzer models this cohesive operation. Independent architecture review must check this classification.",
+      "reason": "tool-noise: This callback proves one continuous Gallery transfer, retained appearance editing, reopen and source deletion. The candidate proves Window and Content variants through their schema fences. Local fixtures do not share product state. Splitting phases into seeded tests would lose proof that the same destination retains authored image bytes. Host cleanup remains in one finally block. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-22",
-      "astHash": "39079e0808f7bcc2b154b9fdb64ffdf95edf66c59d1c2f05a2cf2a65d15a9538",
+      "astHash": "62cd6fd3b8be023d245dda53c146cea80c99645afb52c7f0e46aa32d5e4bcaeb",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-background-blur.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "astHash": "ec79310224725c8beaf7597e44dbbe5bf63d871039e728a309f78830e3aadf42",
+      "signatureHash": "f882d4520aaaec5e8c7fb747934697bb85fa7d08270983f062c38aab855ef250",
+      "reviewDate": "2026-10-22",
+      "reason": "tool-noise: This file proves the existing background inspector and its shared renderer. The candidate compares real Gallery and Native pixels for the same camera modes and source effects. Each test owns local canvases and one browser page. Host cleanup remains in finally. Reported state and effect signals belong to isolated fixtures, not shared product authorities. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/draw/video.ts",
+      "symbol": "drawVideoLayer",
+      "owner": "composition:draw",
+      "reason": "tool-noise: This function owns one existing video-window paint transaction. Its local callbacks share the media, frame, source and action context. The candidate applies inner motion either to plain source pixels or to the existing joined header plane. Sampling stays in the original source space. It adds no writer, resource or recovery authority. Score 2 and delta 0 remain unchanged. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "astHash": "4b6cc810a8e2e01d41535bcb6b913bf6413ecd714242444571bdf0d65e1635a4",
+      "signatureHash": "d67cfcddcc16554f55303e45841f1db78c56524c9f4f2c4c8d9ce5a3d5591405",
+      "reviewDate": "2026-10-22",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/motion/source-window.test.ts",
+      "symbol": "it.each(\n  (['window', 'content', 'fixed', 'follow-video'] as const).flatMap((mode) =>\n    [false, true].flatMap((spatial) => [0, 21].map((rotation) => ({ mode, spatial, rotation })))\n  )\n) callback",
+      "owner": "composition:motion:proof",
+      "reason": "tool-noise: This callback proves one source-window exposure against the same Gallery layout through Native pixels and a captured cursor. It varies mode, spatial pose and clip rotation. Cursor and source positions and scales must agree. Local fixtures share no runtime state. A mechanical split would duplicate the reference geometry and separate this coincidence invariant. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "astHash": "19296733868e4fe4cdc7b73c1ee673efcd9d6f2a54e91a0c29ce1c486beda91a",
+      "signatureHash": "18fe45866b26a8e2818f67df503c91f04b663ede035b064e87d3d662e65d3867",
+      "reviewDate": "2026-10-22",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-background-blur.spec.ts",
+      "symbol": "test callback#4",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: This callback owns one browser acceptance transaction for Gallery and Native camera receivers. Its inline browser module accounts for most recorded lines. Localhost and spatial renderer cleanup remain in their existing finally blocks. Pixel samples prove camera modes, source effects, joined headers and cursor rendering. It introduces no shared product state or resource authority. Main inspected this exact body. Independent architecture review must validate this classification.",
+      "astHash": "d87ed15dbf6102ca0a4eefcd5f82fa1a649ce6b58425f3b1864f36cc5b4f05fe",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "reviewDate": "2026-10-22",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, state, resource or recovery authority. Remove when the analyzer models this cohesive contract. Independent architecture review must inspect this classification."
     }
   ]
 }

@@ -1,3 +1,5 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import type { VideoProjectSceneBackground } from '../../../features/video/project/types';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { drawExportSceneBackground } from './background';
 
@@ -7,7 +9,10 @@ const {
   resolveSceneBackgroundAudioEnvelopeMock,
 } = vi.hoisted(() => ({
   drawSceneBackgroundMock: vi.fn(),
-  getProjectSceneBackgroundMock: vi.fn(() => ({ color: '#000000', kind: 'solid' })),
+  getProjectSceneBackgroundMock: vi.fn<() => VideoProjectSceneBackground>(() => ({
+    color: '#000000',
+    kind: 'solid',
+  })),
   resolveSceneBackgroundAudioEnvelopeMock: vi.fn(() => 0.5),
 }));
 
@@ -215,4 +220,32 @@ it('retries a failed static raster instead of publishing an incomplete cached su
   drawExportSceneBackground(params);
   expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(2);
   expect(context.drawImage).toHaveBeenCalledOnce();
+});
+
+it('keeps moving background cameras out of the static export cache', () => {
+  const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+  const buffer = {} as HTMLCanvasElement;
+  const cache = { buffer, key: JSON.stringify(['image', 1280, 720, 640, 'image-1', 'cover', 0]) };
+  const project = createEmptyVideoProject('Moving background');
+  project.width = 640;
+  getProjectSceneBackgroundMock.mockReturnValue({ assetId: 'image-1', kind: 'image' });
+  for (const viewportX of [20, 40]) {
+    const camera = { scale: 2, viewportX, viewportY: 30 };
+    drawExportSceneBackground({
+      context,
+      cache,
+      currentTime: 1,
+      width: 1280,
+      height: 720,
+      project,
+      loadedImages: {},
+      backgroundCamera: camera,
+    });
+    expect(drawSceneBackgroundMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ camera, projectScale: 2 })
+    );
+  }
+  expect(context.drawImage).not.toHaveBeenCalled();
+  expect(drawSceneBackgroundMock).toHaveBeenCalledTimes(2);
+  expect(cache.buffer).toBe(buffer);
 });

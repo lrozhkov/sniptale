@@ -537,3 +537,25 @@ it('keeps a touching Gallery edge passive without suppressing the next camera en
   expect(resolveVideoCompositionFrame(plan.project, 1).camera.scale).toBe(1);
   expect(input).toEqual(before);
 });
+
+it.each(
+  (['window', 'content', 'fixed', 'follow-video'] as const).flatMap((zoomBehavior) =>
+    (['basic', 'advanced'] as const).map((mode) => ({ zoomBehavior, mode }))
+  )
+)('transfers authored background camera mode $zoomBehavior in $mode', ({ zoomBehavior, mode }) => {
+  const input = motionFixture();
+  input.ui.mode = mode;
+  input.document.advancedContent.background = {
+    ...input.document.advancedContent.background,
+    zoomBehavior,
+  };
+  const before = structuredClone(input);
+  const converted = planReviewProjectConversion(input);
+  expect(converted.status).toBe('prepared');
+  if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+  expect(converted.project.motionRegions?.length).toBeGreaterThan(0);
+  const saved = JSON.parse(JSON.stringify(converted.project));
+  expect(isExportReadyVideoProject(saved)).toBe(true);
+  expect(hydrateVideoProject(saved).motionRegions).toMatchObject(converted.project.motionRegions!);
+  expect(input).toEqual(before);
+});

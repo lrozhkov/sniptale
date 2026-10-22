@@ -1,3 +1,4 @@
+import { projectSourceContentRect } from '../motion/source-window';
 import type { VideoProject } from '../../project/types';
 import type {
   VideoCompositionFrame,
@@ -145,7 +146,7 @@ function resolveBoundSceneSpotlight(
     extent,
     projection,
     clip: attachment.clip,
-    scale: projectionDensity(projection, attachment.window),
+    scale: projectionDensity(projection, attachment.window) * attachment.sourceScale,
   });
   const opacity = Math.max(0, Math.min(1, layer.opacity));
   return {
@@ -284,7 +285,11 @@ function spotlightWindowAttachment(
         }
       : {}),
   };
-  return { window, clip, projection };
+  const source =
+    coordinateSpace === 'source-window' && layer.sourceContentTransform
+      ? projectSourceContentRect(window, layer.sourceContentTransform)
+      : null;
+  return { window: source?.rect ?? window, clip, projection, sourceScale: source?.scale ?? 1 };
 }
 
 function affineProjection(

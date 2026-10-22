@@ -127,8 +127,11 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 36) &&
+    isBoundedNumber(version, 2, 37) &&
     Number.isInteger(version) &&
+    (version >= 37 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['zoomBehavior'] === undefined) &&
     (version >= 36 ||
       (value['watermarkEnabled'] === undefined &&
         (!isRecord(value['sceneBackground']) ||

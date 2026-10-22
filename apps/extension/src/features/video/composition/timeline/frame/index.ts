@@ -1,3 +1,4 @@
+import { mapCompositionPointThroughSourceContent } from '../../motion/source-window';
 import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
 import { resolveVideoCompositionSpotlights } from './spotlights';
 import { resolveVideoCompositionBorders } from './borders';
@@ -46,25 +47,50 @@ export function resolveVideoCompositionFrame(
     windowSpotlights: spotlights.windows,
   };
 
+  const camera = resolveVideoCompositionCamera({
+    actions,
+    cursorSample,
+    currentTime,
+    project,
+    ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
+  });
+  const cursor = resolveVideoCompositionCursor(project, currentTime, actions);
+  const sourceContentTransform = camera.sourceContentTransform;
+  const contentLayers = (layers: VideoCompositionFrame['visualLayers']) =>
+    sourceContentTransform
+      ? layers.map((layer) =>
+          layer.kind === 'video' && layer.clipId === camera.sourceClipId
+            ? { ...layer, sourceContentTransform }
+            : layer
+        )
+      : layers;
   return {
     ...(spotlights.scene.length ? { sceneSpotlights: spotlights.scene } : {}),
     ...(borders.viewport.length ? { viewportBorders: borders.viewport } : {}),
     actions: actions.filter((action) => action.clipId === null),
-    camera: resolveVideoCompositionCamera({
-      actions,
-      cursorSample,
-      currentTime,
-      project,
-      ...(options.cameraViewport ? { cameraViewport: options.cameraViewport } : {}),
-    }),
-    cursor: resolveVideoCompositionCursor(project, currentTime, actions),
-    effectInputLayers: resolveVideoCompositionEffectInputLayers(
-      project,
-      currentTime,
-      effectRuntimePlans,
-      layerOptions
+    camera,
+    cursor:
+      cursor &&
+      sourceContentTransform &&
+      (!cursorSample?.sourceAnchor ||
+        cursorSample.sourceAnchor.sourceClipId === camera.sourceClipId)
+        ? {
+            ...cursor,
+            ...mapCompositionPointThroughSourceContent(project, camera, currentTime, cursor),
+            scale: cursor.scale * Math.hypot(sourceContentTransform[0], sourceContentTransform[3]),
+          }
+        : cursor,
+    effectInputLayers: contentLayers(
+      resolveVideoCompositionEffectInputLayers(
+        project,
+        currentTime,
+        effectRuntimePlans,
+        layerOptions
+      )
     ),
     effectRuntimePlans,
-    visualLayers: resolveVideoCompositionVisualLayers(project, currentTime, layerOptions),
+    visualLayers: contentLayers(
+      resolveVideoCompositionVisualLayers(project, currentTime, layerOptions)
+    ),
   };
 }

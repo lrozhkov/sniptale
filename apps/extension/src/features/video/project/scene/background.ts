@@ -133,6 +133,7 @@ export function getProjectSceneBackgroundImageAssetId(
 }
 
 interface SceneBackgroundDraw {
+  camera?: { scale: number; viewportX: number; viewportY: number };
   context: CanvasRenderingContext2D;
   currentTime?: number;
   projectScale?: number;
@@ -226,6 +227,21 @@ export function drawSceneBackground(params: SceneBackgroundDraw) {
     if (previous) {
       releaseBackgroundRaster(previous);
       backgroundRasters.delete(params.context);
+    }
+    return;
+  }
+  if (params.camera) {
+    const { camera, ...paint } = params;
+    params.context.save();
+    try {
+      params.context.scale(camera.scale, camera.scale);
+      params.context.translate(
+        -camera.viewportX * (params.projectScale ?? 1),
+        -camera.viewportY * (params.projectScale ?? 1)
+      );
+      drawSceneBackground(paint);
+    } finally {
+      params.context.restore();
     }
     return;
   }

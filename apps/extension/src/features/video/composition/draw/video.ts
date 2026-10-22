@@ -53,6 +53,38 @@ export function drawVideoLayer(
         else source.draw(target, x, y, width, height);
       }
     );
+  const drawContent = (
+    target: CanvasRenderingContext2D,
+    destination: VideoFrame,
+    visible: VideoFrame,
+    paint: () => void
+  ) => {
+    const transform = layer.sourceContentTransform;
+    if (!transform || media.windowHeaderImage) return paint();
+    target.save();
+    try {
+      target.beginPath();
+      target.rect(visible.x, visible.y, visible.width, visible.height);
+      target.clip();
+      target.translate(destination.x, destination.y);
+      target.scale(destination.width / frame.width, destination.height / frame.height);
+      target.translate(-frame.x, -frame.y);
+      target.transform(
+        transform[0],
+        transform[3],
+        transform[1],
+        transform[4],
+        transform[2] * displayScale,
+        transform[5] * displayScale
+      );
+      target.translate(frame.x, frame.y);
+      target.scale(frame.width / destination.width, frame.height / destination.height);
+      target.translate(-destination.x, -destination.y);
+      paint();
+    } finally {
+      target.restore();
+    }
+  };
   const feedbackSource: PointerFeedbackSource = {
     rect: frame,
     draw: (target, x, y, width, height) => {
@@ -62,6 +94,7 @@ export function drawVideoLayer(
         context: target,
         frame: destination,
         displayScale: (displayScale * width) / Math.max(0.001, frame.width),
+        // The action context already includes the source-content camera.
         render: (drawX, drawY, drawWidth, drawHeight, drawContext = target) =>
           paintSource(drawContext, destination, drawX, drawY, drawWidth, drawHeight),
       });
@@ -74,23 +107,32 @@ export function drawVideoLayer(
   const paintWindow = (target: CanvasRenderingContext2D) =>
     drawFittedMediaLayer({
       ...media,
+      ...(layer.sourceContentTransform
+        ? { sourceContentTransform: layer.sourceContentTransform }
+        : {}),
       ...(layer.effectActionsOnly ? { hideWindowHeader: true } : {}),
       context: target,
       frame,
-      render: (drawX, drawY, drawWidth, drawHeight, drawContext = target, visibleContent) => {
-        if (!layer.effectActionsOnly)
-          paintSource(drawContext, frame, drawX, drawY, drawWidth, drawHeight);
-        if (!deferActions)
-          drawVideoSourceActions(
-            drawContext,
-            layer,
-            frame,
-            { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-            { width: media.sourceWidth, height: media.sourceHeight },
-            visibleContent,
-            feedbackSource
-          );
-      },
+      render: (drawX, drawY, drawWidth, drawHeight, drawContext = target, visibleContent) =>
+        drawContent(
+          drawContext,
+          frame,
+          visibleContent ?? { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+          () => {
+            if (!layer.effectActionsOnly)
+              paintSource(drawContext, frame, drawX, drawY, drawWidth, drawHeight);
+            if (!deferActions)
+              drawVideoSourceActions(
+                drawContext,
+                layer,
+                frame,
+                { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+                { width: media.sourceWidth, height: media.sourceHeight },
+                visibleContent,
+                feedbackSource
+              );
+          }
+        ),
     });
   if (!layer.effectActionsOnly && layer.spotlights?.length)
     drawIsolatedVideoWindow(context, layer, media, frame, displayScale, paintWindow);
@@ -99,19 +141,28 @@ export function drawVideoLayer(
   if (deferActions)
     drawFittedMediaLayer({
       ...media,
+      ...(layer.sourceContentTransform
+        ? { sourceContentTransform: layer.sourceContentTransform }
+        : {}),
       context,
       frame,
       hideWindowHeader: true,
       shadowIntensity: 0,
       render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) =>
-        drawVideoSourceActions(
+        drawContent(
           drawContext,
-          layer,
           frame,
-          { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-          { width: media.sourceWidth, height: media.sourceHeight },
-          visibleContent,
-          feedbackSource
+          visibleContent ?? { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+          () =>
+            drawVideoSourceActions(
+              drawContext,
+              layer,
+              frame,
+              { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
+              { width: media.sourceWidth, height: media.sourceHeight },
+              visibleContent,
+              feedbackSource
+            )
         ),
     });
 }
@@ -186,7 +237,8 @@ function drawVideoWindowBorders(
         window,
         displayScale,
         radius,
-        getFittedMediaOriginalWindowFrame({ ...media, frame })
+        getFittedMediaOriginalWindowFrame({ ...media, frame }),
+        layer.sourceContentTransform
       );
     else drawCompositionBorders(context, layer.borders, window, displayScale, radius);
   } finally {

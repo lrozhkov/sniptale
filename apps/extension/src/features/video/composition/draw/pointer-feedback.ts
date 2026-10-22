@@ -72,9 +72,12 @@ function drawLens(
     context.beginPath();
     context.rect(source.rect.x, source.rect.y, source.rect.width, source.rect.height);
     context.clip();
-    context.beginPath();
-    if (lens.shape === 'circle') context.arc(x, y, radius, 0, Math.PI * 2);
-    else context.roundRect(x - radius, y - radius, radius * 2, radius * 2, radius * 0.18);
+    const traceLens = () => {
+      context.beginPath();
+      if (lens.shape === 'circle') context.arc(x, y, radius, 0, Math.PI * 2);
+      else context.roundRect(x - radius, y - radius, radius * 2, radius * 2, radius * 0.18);
+    };
+    traceLens();
     context.save();
     try {
       context.shadowColor = `rgba(0,0,0,${lens.shadow / 100})`;
@@ -98,6 +101,8 @@ function drawLens(
     } finally {
       context.restore();
     }
+    // Canvas paths survive save/restore; the media sampler can replace the current path.
+    traceLens();
     context.globalAlpha = layerOpacity * frame.opacity;
     context.strokeStyle = frame.color;
     context.lineWidth = frame.stroke;

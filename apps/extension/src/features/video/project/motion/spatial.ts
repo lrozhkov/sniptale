@@ -1,5 +1,26 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
+export type CameraBackgroundZoomBehavior = 'fixed' | 'follow-video' | 'window' | 'content';
+
+/** Admit only the authored camera modes supported by both renderers. */
+export function parseCameraBackgroundZoomBehavior(
+  value: unknown
+): CameraBackgroundZoomBehavior | null {
+  return value === 'window' || value === 'content' || value === 'fixed' || value === 'follow-video'
+    ? value
+    : null;
+}
+
+/** Shared window policy; each editor resolves its own topology and effective background state. */
+export function resolveCameraWindowWeight(
+  behavior: CameraBackgroundZoomBehavior | undefined,
+  follows: boolean,
+  spatial: boolean
+): 'window' | 'content' | 'spatial' {
+  if (behavior === 'window' || follows) return 'window';
+  return behavior === 'content' || !spatial ? 'content' : 'spatial';
+}
+
 export interface CameraPerspective {
   enabled: boolean;
   rotateX: number;

@@ -1,3 +1,5 @@
+import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
+import { mapCompositionPointThroughSourceContent } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { fitQuickEditSourceCrop } from '../../../../apps/extension/src/features/video/review/advanced/canvas';
 import { motionWindowAreaPoints } from '../../../../apps/extension/src/features/video/composition/motion/source-window';
 import { resolveVideoCompositionFrame } from '../../../../apps/extension/src/features/video/composition/timeline/frame';
@@ -2115,7 +2117,79 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         )
       ).toBe(true);
       await page.locator('[data-ui="video-editor.materials.close"]').click();
+      const beforeCameraMode = (await readNativeVideoProject(page))!;
+      await page
+        .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+        .click();
+      await page
+        .locator('nav')
+        .getByRole('button', {
+          name: label('videoEditor.sidebar.inspectorGroupBackground'),
+          exact: true,
+        })
+        .click();
+      const cameraBackground = page.locator('[data-ui="video-editor.scene-background"]');
+      await chooseInspectorValue(
+        page,
+        cameraBackground,
+        label('gallery.videoReview.backgroundZoom'),
+        label('gallery.videoReview.backgroundZoomContent')
+      );
+      await expect
+        .poll(async () => (await readNativeVideoProject(page))?.sceneBackground?.zoomBehavior)
+        .toBe('content');
+      await checkInspectorPaintedFont(
+        page,
+        cameraBackground.getByRole('button', {
+          name: label('gallery.videoReview.backgroundZoomContent'),
+          exact: true,
+        }),
+        'migrated-project-content-camera'
+      );
+      if (index === 1) {
+        // This authored crop excludes part of the cursor path from the fixed window.
+        await motionSegment.scrollIntoViewIfNeeded();
+        await motionSegment
+          .getByRole('button', {
+            name: `${label('videoEditor.timeline.motionSegment')} · ${importedMotion.scale.toFixed(2)}x`,
+            exact: true,
+          })
+          .click();
+        await page
+          .locator('nav')
+          .getByRole('button', {
+            name: label('videoEditor.sidebar.inspectorGroupFraming'),
+            exact: true,
+          })
+          .click();
+        await expect(page.locator('[data-ui="video-editor.framing-preview"]')).toContainText(
+          label('videoEditor.app.exportCameraConflict')
+        );
+        await chooseInspectorValue(
+          page,
+          motionControls,
+          label('videoEditor.sidebar.motionFocusLabel'),
+          label('videoEditor.sidebar.motionFocusManual')
+        );
+        await expect
+          .poll(
+            async () =>
+              (await readNativeVideoProject(page))?.motionRegions?.find(
+                (region) => region.id === importedMotion.id
+              )?.focusMode
+          )
+          .toBe('MANUAL');
+        await expect(page.locator('[data-ui="video-editor.framing-preview"]')).not.toContainText(
+          label('videoEditor.app.exportCameraConflict')
+        );
+      }
       const final = (await readNativeVideoProject(page))!;
+      expect(final.version).toBe(37);
+      expect(hydrateVideoProject(final).clips).toEqual(hydrateVideoProject(beforeCameraMode).clips);
+      await page.screenshot({
+        path: info.outputPath('migrated-project-content-camera.png'),
+        fullPage: false,
+      });
       expect(final.id).toBe(migrated.id);
       const finalPassiveMotion = final.motionRegions!.filter(
         (region) => region.sourceBinding?.dormant
@@ -2279,10 +2353,10 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       ]
         .map((y) =>
           mapCompositionPointThroughCamera(
-            {
+            mapCompositionPointThroughSourceContent(final, borderFrame.camera, borderSampleTime, {
               x: originalWindow.x + (border.area.x + border.area.width / 2) * originalWindow.width,
               y: originalWindow.y + y,
-            },
+            }),
             borderFrame.camera
           )
         )
@@ -2429,7 +2503,11 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         page,
         inspector,
         label('gallery.videoReview.backgroundZoom'),
-        label('gallery.videoReview.backgroundZoomWindow')
+        label(
+          index === 0
+            ? 'gallery.videoReview.backgroundZoomWindow'
+            : 'gallery.videoReview.backgroundZoomContent'
+        )
       );
       await chooseInspectorValue(
         page,
@@ -2519,7 +2597,8 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       const project = (await readNativeVideoProject(page))!;
       expect(project.id).not.toBe(source.aggregateId);
-      expect(project.version).toBe(36);
+      expect(project.version).toBe(index === 0 ? 36 : 37);
+      expect(project.sceneBackground?.zoomBehavior).toBe(index === 0 ? undefined : 'content');
       const video = project.clips.find((clip) => clip.type === 'VIDEO')!;
       expect(video).toMatchObject({ rememberedWindowHeader: header, rememberedSourceCrop: crop });
       expect(video).not.toHaveProperty('sourceCrop');

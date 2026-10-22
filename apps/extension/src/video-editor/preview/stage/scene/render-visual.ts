@@ -157,6 +157,9 @@ export function drawPreviewVisualPasses(params: {
   stage: HTMLDivElement | null;
 }) {
   const prepared = resolvePreparedPreviewSceneCanvas({
+    ...(params.overlayFrame.camera.backgroundCamera
+      ? { backgroundCamera: params.overlayFrame.camera.backgroundCamera }
+      : {}),
     canvas: params.canvas,
     ...(params.viewportCanvas ? { viewportCanvas: params.viewportCanvas } : {}),
     currentTime: params.currentTime ?? 0,

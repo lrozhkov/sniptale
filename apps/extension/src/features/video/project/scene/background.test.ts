@@ -371,3 +371,31 @@ it('does not paint or request a disabled background image and leaves retained by
     sceneBackground
   );
 });
+
+it('restores the background camera context after paint failure and leaves disabled paint untouched', () => {
+  const context = createContext();
+  const scale = vi.fn(),
+    translate = vi.fn();
+  context.scale = scale;
+  context.translate = translate;
+  const paint = {
+    context,
+    width: 640,
+    height: 360,
+    projectScale: 0.5,
+    sceneBackground: { kind: 'solid' as const, color: '#123456' },
+    camera: { scale: 2, viewportX: 40, viewportY: 30 },
+  };
+  drawSceneBackground(paint);
+  expect(scale).toHaveBeenCalledExactlyOnceWith(2, 2);
+  expect(translate).toHaveBeenCalledExactlyOnceWith(-20, -15);
+  vi.mocked(context.fillRect).mockImplementationOnce(() => {
+    throw new Error('paint failed');
+  });
+  expect(() => drawSceneBackground(paint)).toThrow('paint failed');
+  expect(context.restore).toHaveBeenCalledTimes(2);
+  vi.clearAllMocks();
+  drawSceneBackground({ ...paint, sceneBackground: { ...paint.sceneBackground, enabled: false } });
+  expect(scale).not.toHaveBeenCalled();
+  expect(context.fillRect).not.toHaveBeenCalled();
+});

@@ -1,3 +1,5 @@
+import { projectSourceContentRect } from '../motion/source-window';
+import type { QuickEditHomography } from '../motion/spatial-geometry';
 import { sampleSceneBorder } from '../scene-border';
 import type { VideoCompositionBorderState } from '../types';
 import type { RenderResources, RenderCanvasLease } from '../canvas/render-resources';
@@ -159,14 +161,21 @@ export function drawCompositionBorders(
   window: QuickEditBorder['area'],
   scale: number,
   radius = 0,
-  originalWindow?: QuickEditBorder['area']
+  originalWindow?: QuickEditBorder['area'],
+  sourceContentTransform?: QuickEditHomography
 ): void {
   if (!states?.length || window.width <= 0 || window.height <= 0) return;
+  const source = originalWindow ?? window;
+  const projectedSource = sourceContentTransform
+    ? projectSourceContentRect(source, sourceContentTransform, scale)
+    : null;
   const frames = states.flatMap((state) =>
     sampleSceneBorder({
       ...state,
-      window: state.coordinateSpace === 'source-window' ? (originalWindow ?? window) : window,
-      scale,
+      window:
+        state.coordinateSpace === 'source-window' ? (projectedSource?.rect ?? source) : window,
+      scale:
+        scale * (state.coordinateSpace === 'source-window' ? (projectedSource?.scale ?? 1) : 1),
     })
   );
   const ownerDocument = context.canvas.ownerDocument ?? document;

@@ -100,6 +100,8 @@ export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
       /** Role of the source track, retained for independent camera composition. */
       trackRole?: VideoProjectTrackRole;
+      /** Inner source exposure remains inside the decorated window mask. */
+      sourceContentTransform?: QuickEditHomography;
       actions?: readonly VideoCompositionActionState[];
       /** Window-local borders enter the same clip/effect input and transform pipeline once. */
       borders?: readonly VideoCompositionBorderState[];
@@ -146,6 +148,10 @@ export interface VideoCompositionActionState {
 export interface VideoCompositionCameraState {
   /** A source-window camera leaves all other visual layers outside its exposure passes. */
   sourceClipId?: string;
+  /** Inner source motion in the clip plane, before outer window projection. */
+  sourceContentTransform?: QuickEditHomography;
+  /** Following paint uses the source exposure without moving independent clips. */
+  backgroundCamera?: { scale: number; viewportX: number; viewportY: number };
   /** Disposable pose and absolute project-plane reference, never persisted. */
   spatial?: CameraSpatialFrame & {
     reference: CameraSpatialRect;

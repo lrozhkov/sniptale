@@ -201,3 +201,24 @@ it('restores the output context when scene mask drawing fails', () => {
   expect(context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
   expect(context.restore).toHaveBeenCalledOnce();
 });
+
+it.each([false, true])(
+  'projects inner source masks without moving the window clip: source=%s',
+  (source) => {
+    const args = sceneFixture();
+    const layer = args.frame.visualLayers[0]!;
+    if (layer.kind !== 'video') throw new Error('Expected video');
+    layer.sourceContentTransform = [2, 0, -50, 0, 2, -30, 0, 0, 1];
+    args.frame.sceneSpotlights = args.frame.sceneSpotlights!.map((state) => ({
+      ...state,
+      ...(source ? { coordinateSpace: 'source-window' as const } : {}),
+      spotlight: { ...state.spotlight, effect: 'blur' as const, blur: 5 },
+    }));
+    const mask = resolveCompositionSceneSpotlights(args)[0]!;
+    expect(mask.protectionOpening).toEqual(
+      source ? { x: 130, y: 75, width: 160, height: 90 } : { x: 90, y: 52.5, width: 80, height: 45 }
+    );
+    expect(mask.clip).toMatchObject({ radius: 12, rect: { x: 50, y: 30, width: 160, height: 90 } });
+    expect(mask.blur).toBe(source ? 40 : 20);
+  }
+);

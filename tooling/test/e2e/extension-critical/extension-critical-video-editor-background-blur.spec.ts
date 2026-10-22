@@ -636,7 +636,7 @@ test('native background filtering is bounded and preserves animation and opaque 
       contents: `
       import { drawSceneBackground } from './apps/extension/src/features/video/project/scene/background';
       import { createSceneGradientBackground } from './apps/extension/src/features/video/project/scene/background-gradient';
-      export function probe() {
+      export async function probe() {
         const canvas = document.createElement('canvas'); canvas.width = 1920; canvas.height = 900;
         const context = canvas.getContext('2d', { willReadFrequently: true });
         const background = { ...createSceneGradientBackground('#000000ff'), blur: 18, animation: { mode: 'rotate', speed: 80, intensity: 70 } };
@@ -669,4 +669,257 @@ test('native background filtering is bounded and preserves animation and opaque 
   for (const frame of proof.frames) for (const pixel of frame) expect(pixel[3]).toBe(255);
   expect(proof.frames[1]).not.toEqual(proof.frames[0]);
   await writeFile(info.outputPath('native-blur-performance.json'), JSON.stringify(proof, null, 2));
+});
+
+test('background camera modes match Gallery pixels and keep a second video independent', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1920, height: 900 });
+    await page.goto(host.origin);
+    await page.setContent('<main></main>');
+    const bundle = await build({
+      stdin: {
+        contents: `
+      import { fixture } from './apps/extension/src/features/video/review/project-conversion.test-support';
+      import { planReviewProjectConversion } from './apps/extension/src/features/video/review/project-conversion';
+      import { createVideoProjectMotionRegion } from './apps/extension/src/features/video/project/motion';
+      import { createSceneGradientBackground } from './apps/extension/src/features/video/project/scene/background-gradient';
+      import { drawSceneBackground } from './apps/extension/src/features/video/project/scene/background';
+      import { computeQuickEditSceneLayout, evaluateQuickEditCameraAtTime } from './apps/extension/src/features/video/review/advanced/scene';
+      import { drawReviewSceneFrame } from './apps/extension/src/workflows/video-review/scene-frame';
+      import { resolveVideoCompositionFrame } from './apps/extension/src/features/video/composition/timeline/frame';
+      import { drawCompositionVisualLayer } from './apps/extension/src/features/video/composition/draw/visual';
+      import { shouldLockVisualLayerToViewport } from './apps/extension/src/features/video/composition/motion/layer-camera';
+      import { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';
+      import { drawSpatialCompositionGroup } from './apps/extension/src/features/video/composition/draw/spatial';
+      import { drawReviewSceneOverlays } from './apps/extension/src/workflows/video-review/render-scene-overlays';
+      import { createQuickEditBorder, createQuickEditSpotlight } from './apps/extension/src/features/video/project/scene/focus-appearance';
+      import { drawCompositionSceneSpotlights } from './apps/extension/src/features/video/composition/draw/project-spotlight';
+      import { drawReviewClicks } from './apps/extension/src/workflows/video-review/render-click-animation';
+      import { computeQuickEditSceneCamera } from './apps/extension/src/features/video/review/advanced/scene';
+      import { windowHeaderImageKey } from './apps/extension/src/features/video/composition/draw/window-header';
+      import { normalizeVideoProjectCursorSkin } from './apps/extension/src/features/video/project/cursor';
+      import { drawCursorCompositionState } from './apps/extension/src/features/video/composition/draw/effects/cursor';
+      import { drawExportOverlayPass } from './apps/extension/src/offscreen/project-export/renderer/frame-overlays';
+      export async function probe() {
+        const source = document.createElement('canvas'); source.width = 640; source.height = 360;
+        const paint = source.getContext('2d');
+        for (let y = 0; y < 360; y += 30) for (let x = 0; x < 640; x += 40) {
+          paint.fillStyle = ((x / 40 + y / 30) % 2) ? '#20b060' : '#e04060';
+          paint.fillRect(x, y, 40, 30);
+        }
+        const headerCanvas = document.createElement('canvas'); headerCanvas.width = 640; headerCanvas.height = 40;
+        const headerPaint = headerCanvas.getContext('2d'); headerPaint.fillStyle = '#e0d020'; headerPaint.fillRect(0, 0, 640, 40);
+        const headerImage = new Image(); headerImage.src = headerCanvas.toDataURL(); await headerImage.decode();
+        const results = [];
+        const galleryRenderer = createReviewSpatialRenderer(), nativeRenderer = createReviewSpatialRenderer();
+        try {
+        for (const mode of ['window', 'content', 'fixed', 'follow-video']) for (const spatial of [false, true]) for (const appearance of ['none', 'border', 'spotlight', 'click', 'header', 'cursor']) {
+          if ((appearance === 'click' || appearance === 'cursor') && spatial) continue;
+          const input = fixture();
+          const primarySource = appearance === 'header' ? document.createElement('canvas') : source;
+          if (appearance === 'header') {
+            primarySource.width = 640; primarySource.height = 360;
+            const solid = primarySource.getContext('2d'); solid.fillStyle = '#20b060'; solid.fillRect(0, 0, 640, 360);
+          }
+          const gradient = createSceneGradientBackground('#102030ff').gradient;
+          gradient.stops[gradient.stops.length - 1].color = '#e0c080ff';
+          input.document.advancedContent.background = {
+            enabled: true, type: 'gradient', gradient, zoomBehavior: 'window',
+            layout: { padding: 40, cornerRadius: 12, blur: 0 },
+          };
+          if (appearance === 'header') input.document.advancedContent.windowHeader = {
+            kind: 'browser', style: 'windows', theme: 'light', title: '', url: '', faviconEnabled: false,
+          };
+          const converted = planReviewProjectConversion(input);
+          if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+          const project = converted.project;
+          project.version = 37; project.sceneBackground.zoomBehavior = mode;
+          input.document.advancedContent.background.zoomBehavior = mode;
+          const clip = project.clips.find(clip => clip.type === 'VIDEO');
+          const focus = {
+            id: 'focus', start: 0, end: 2,
+            transform: { scale: 2.5, centerX: 0.4, centerY: 0.65 },
+            enter: { type: 'linear', duration: 0.5 }, exit: { type: 'linear', duration: 0.5 },
+            ...(spatial ? { perspective: { enabled: true, rotateX: 18, rotateY: -23, rotateZ: 7, strength: 0.6 } } : {}),
+          };
+          const decoration = appearance === 'border'
+            ? { ...focus, id: 'decoration', border: createQuickEditBorder() }
+            : appearance === 'spotlight' ? { ...focus, id: 'decoration', spotlight: createQuickEditSpotlight() } : null;
+          const regions = decoration ? [focus, decoration] : [focus];
+          const click = { effect: 'magnify', point: { x: 0.4, y: 0.65 }, color: '#ffffffff',
+            radius: 18, stroke: 2, opacity: 1, lens: { scale: 2, shape: 'circle', shadow: 0 } };
+          project.motionRegions = regions.map(region => ({
+            ...createVideoProjectMotionRegion(project, 0, { enter: 'linear', exit: 'linear' }),
+            id: region.id, duration: 2, scale: focus.transform.scale, focusMode: 'MANUAL',
+            focusPoint: { x: project.width * 0.4, y: project.height * 0.65 },
+            zoomInDuration: 0.5, zoomOutDuration: 0.5,
+            ...(region.perspective ? { perspective: region.perspective } : {}),
+            ...(region.border ? { border: region.border, borderTarget: 'window' } : {}),
+            ...(region.spotlight ? { spotlight: region.spotlight, spotlightTarget: 'scene' } : {}),
+            sourceBinding: { clipId: clip.id, coordinateSpace: 'source-window', sourceStart: 0,
+              sourceEnd: 2, animation: { start: 0, end: 2, duration: 2 } },
+          }));
+          if (appearance === 'cursor') project.cursorTrack = {
+            captureMode: 'separate', skin: { ...normalizeVideoProjectCursorSkin(undefined), shadow: false, preset: 'RING' },
+            samples: [{ id: 'pointer', time: 0, x: 0, y: 0, visible: true,
+              recordingPoint: { x: 0.3, y: 0.6 }, sourceAnchor: { kind: 'recording-source', recordingId: 'recording', sourceClipId: clip.id, sourceTime: 0 } }],
+          };
+          const secondary = { x: project.width - 110, y: 10, width: 100, height: 56.25 };
+          project.tracks = project.tracks.map(track => ({ ...track, order: track.order + 1 }));
+          project.tracks.push({ ...project.tracks[0], id: 'secondary', order: 0, isRoot: false });
+          project.clips.push({ ...clip, id: 'second', sourceInstanceId: 'second', trackId: 'secondary',
+            windowCornerRadius: 0, transform: { ...clip.transform, ...secondary } });
+          const images = clip.windowHeader ? { [windowHeaderImageKey(clip.id, clip.windowHeader)]: headerImage } : {};
+          const scene = { source: input.source, windowHeader: input.document.advancedContent.windowHeader, output: { width: project.width, height: project.height },
+            background: input.document.advancedContent.background };
+          for (const time of [0.125, 0.5, 1.875]) {
+            const gallery = document.createElement('canvas'), native = document.createElement('canvas');
+            for (const canvas of [gallery, native]) { canvas.width = project.width; canvas.height = project.height; }
+            const expected = gallery.getContext('2d', { willReadFrequently: true });
+            const actual = native.getContext('2d', { willReadFrequently: true });
+            const layout = computeQuickEditSceneLayout({ ...scene, camera: evaluateQuickEditCameraAtTime(regions, time, scene) });
+            drawReviewSceneFrame(expected, { canvas: scene.output, layout, background: scene.background,
+              image: null, ...(appearance === 'header' ? { headerImage } : {}), spatialRenderer: galleryRenderer, sample: { draw(ctx, x, y, width, height) { ctx.drawImage(primarySource, x, y, width, height); } } });
+            const overlays = () => drawReviewSceneOverlays({
+              scene: { canvas: scene.output, layout, background: scene.background, sourceTime: time },
+              renderer: galleryRenderer, context: expected, canvas: gallery,
+              spotlightScratch: document.createElement('canvas'), regions,
+              globalResultTime: time, cameraScale: evaluateQuickEditCameraAtTime(regions, time, scene).scale,
+              sourceWidth: input.source.width,
+            });
+            if (appearance !== 'spotlight') overlays();
+            if (appearance === 'click') {
+              const sampled = document.createElement('canvas'); sampled.width = project.width; sampled.height = project.height;
+              sampled.getContext('2d').drawImage(gallery, 0, 0);
+              const motion = computeQuickEditSceneCamera(layout, scene.background);
+              drawReviewClicks(expected, [click], layout.videoTransform, input.source.width,
+                { rect: motion.windowClip, radius: scene.background.layout.cornerRadius * motion.scale },
+                { rect: { x: 0, y: 0, width: project.width, height: project.height },
+                  draw(ctx, x, y, width, height) { ctx.drawImage(sampled, x, y, width, height); } });
+            }
+            expected.drawImage(source, secondary.x, secondary.y, secondary.width, secondary.height);
+            if (appearance === 'spotlight') overlays();
+            const frame = resolveVideoCompositionFrame(project, time);
+            if (appearance === 'click') {
+              const owner = frame.visualLayers.find(layer => layer.clipId === clip.id);
+              owner.actions = [{ renderKind: 'accent', preset: 'CLICK_RIPPLE', point: click.point, gestureFeedback: click }];
+            }
+            drawSceneBackground({ context: actual, width: project.width, height: project.height,
+              projectScale: 1, sceneBackground: project.sceneBackground,
+              ...(frame.camera.backgroundCamera ? { camera: frame.camera.backgroundCamera } : {}) });
+            const sources = new Map(project.clips.map(clip => [clip.id, {
+              sourceWidth: input.source.width, sourceHeight: input.source.height,
+              draw(ctx, x, y, width, height) { ctx.drawImage(clip.id === project.clips[0].id ? primarySource : source, x, y, width, height); },
+            }]));
+            for (const layer of frame.visualLayers) {
+              actual.save();
+              const moving = !shouldLockVisualLayerToViewport(layer, frame.camera);
+              if (moving && frame.camera.spatial) {
+                drawSpatialCompositionGroup({
+                  camera: frame.camera, clipMediaElements: sources, context: actual,
+                  destination: { x: 0, y: 0, width: project.width, height: project.height },
+                  effectState: { drawnTransitionIds: new Set() }, imageBank: images, layers: [layer],
+                  logicalSize: scene.output, output: scene.output, rasterScale: 1, renderer: nativeRenderer,
+                });
+              } else {
+                if (moving) {
+                  actual.scale(frame.camera.scale, frame.camera.scale);
+                  actual.translate(-frame.camera.viewportX, -frame.camera.viewportY);
+                }
+                drawCompositionVisualLayer(actual, layer, 1, 1, images, sources);
+              }
+              actual.restore();
+            }
+            drawCompositionSceneSpotlights({ context: actual, project, frame, images,
+              viewport: { x: 0, y: 0, width: project.width, height: project.height },
+              composition: { x: 0, y: 0, scale: 1 },
+            });
+            if (appearance === 'cursor') {
+              drawCursorCompositionState(expected, { ...project.cursorTrack.skin,
+                captureMode: 'separate', visible: true, time,
+                x: layout.videoTransform.x + layout.videoTransform.width * 0.3,
+                y: layout.videoTransform.y + layout.videoTransform.height * 0.6,
+                scale: project.cursorTrack.skin.scale * layout.videoTransform.width / layout.videoRect.width });
+              drawExportOverlayPass(actual, frame, 1, 1);
+            }
+            const a = expected.getImageData(0, 0, project.width, project.height).data;
+            const b = actual.getImageData(0, 0, project.width, project.height).data;
+            let sum = 0, bad = 0, comparedPixels = 0;
+            for (let i = 0; i < a.length; i += 4) {
+              if (appearance === 'header') {
+                const x = (i / 4) % project.width, y = Math.floor(i / 4 / project.width);
+                // Joined rasters round their toolbar join separately. Compare solid interiors, three pixels from those edges.
+                const flat = (a[i] === 32 && a[i + 1] === 176 && a[i + 2] === 96) ||
+                  (a[i] === 224 && a[i + 1] === 208 && a[i + 2] === 32);
+                if (!flat || x < 3 || y < 3 || x >= project.width - 3 || y >= project.height - 3 ||
+                  [-3, 0, 3].some(dy => [-3, 0, 3].some(dx => {
+                    const j = i + (dy * project.width + dx) * 4;
+                    return a[j] !== a[i] || a[j + 1] !== a[i + 1] || a[j + 2] !== a[i + 2];
+                  }))) continue;
+              }
+              comparedPixels++;
+              let maximum = 0;
+              for (let c = 0; c < 4; c++) { const delta = Math.abs(a[i + c] - b[i + c]); sum += delta; maximum = Math.max(maximum, delta); }
+              if (maximum > 16) bad++;
+            }
+            const secondaryPixel = Array.from(actual.getImageData(Math.round(secondary.x + 17), 22, 1, 1).data);
+            results.push({ mode, spatial, appearance, time, effectiveScale: frame.camera.scale * (frame.camera.sourceContentTransform?.[0] ?? 1), mean: sum / (comparedPixels * 4), bad: bad / comparedPixels, comparedPixels, secondaryPixel });
+            if (time === 0.5 && (spatial || appearance === 'click' || appearance === 'cursor')) {
+              const row = document.createElement('div'); row.style.display = 'flex'; row.dataset.appearance = appearance;
+              for (const canvas of [gallery, native]) { canvas.style.width = '360px'; canvas.style.height = 'auto'; row.append(canvas); }
+              document.body.append(row);
+            }
+          }
+        }
+        return results;
+        } finally { galleryRenderer.dispose(); nativeRenderer.dispose(); }
+      }
+      `,
+        resolveDir: process.cwd(),
+        loader: 'ts',
+      },
+      loader: { '.woff2': 'dataurl', '.svg': 'text' },
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      write: false,
+    });
+    const proof = await page.evaluate(async (text) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      try {
+        return (await import(url)).probe();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }, bundle.outputFiles[0]!.text);
+    await writeFile(info.outputPath('camera-mode-pixels.json'), JSON.stringify(proof, null, 2));
+    for (const appearance of ['none', 'border', 'spotlight', 'click', 'header', 'cursor']) {
+      await page.locator('[data-appearance]').evaluateAll((rows, selected) => {
+        for (const row of rows)
+          if (row instanceof HTMLElement)
+            row.style.display = row.dataset.appearance === selected ? 'flex' : 'none';
+      }, appearance);
+      await page.screenshot({
+        path: info.outputPath('camera-mode-' + appearance + '.png'),
+        fullPage: false,
+      });
+    }
+    for (const result of proof) {
+      if (result.appearance !== 'spotlight')
+        expect(result.secondaryPixel, JSON.stringify(result)).toEqual(proof[0].secondaryPixel);
+      expect(result.effectiveScale, JSON.stringify(result)).toBeGreaterThan(1.1);
+      expect(result.comparedPixels, JSON.stringify(result)).toBeGreaterThan(1000);
+      // Two resampled stroke edges permit one-pixel antialiasing; mean channel error stays below 0.1.
+      expect(result.mean, JSON.stringify(result)).toBeLessThan(0.1);
+      expect(result.bad, JSON.stringify(result)).toBeLessThan(
+        result.appearance === 'border' ? 0.005 : 0.002
+      );
+    }
+  } finally {
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
 });

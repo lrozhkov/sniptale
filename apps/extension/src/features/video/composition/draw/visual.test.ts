@@ -439,6 +439,7 @@ it('paints original-window border coordinates while clipping to the retained vis
     { x: 10, y: 20, width: 100, height: 100 },
     1,
     0,
-    { x: -2.5, y: 7.5, width: 125, height: 125 }
+    { x: -2.5, y: 7.5, width: 125, height: 125 },
+    undefined
   );
 });

@@ -64,7 +64,12 @@ it.each([false, true])(
     };
     const canvas = { width: 0, height: 0, getContext: () => plane };
     const ownerDocument = { createElement: () => canvas };
-    const context = { canvas: { ownerDocument }, drawImage: vi.fn() };
+    const context = {
+      canvas: { ownerDocument },
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+    };
     const header = {
       naturalHeight: windowHeaderGeometry(DEFAULT_WINDOW_HEADER, { width: 1920, height: 1080 })
         .height,
@@ -195,7 +200,8 @@ it('rounds the complete cropped header plane while keeping source coordinates be
   });
   expect(context.roundRect).toHaveBeenCalledExactlyOnceWith(20, 40, 200, 200, 12);
   expect(context.clip).toHaveBeenCalledOnce();
-  expect(context.restore).toHaveBeenCalledOnce();
+  expect(context.save).toHaveBeenCalledTimes(2);
+  expect(context.restore).toHaveBeenCalledTimes(2);
   expect(render.mock.calls[0]![1]).toBeGreaterThan(40);
   expect(render.mock.calls[0]![4]).toBe(plane);
   const mapping = {

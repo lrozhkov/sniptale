@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest';
+import { drawCompositionBorders } from './draw/border';
+import { expect, it, vi } from 'vitest';
 import { createQuickEditBorder } from '../project/scene/focus-appearance';
 import type { CameraTransitionType } from '../project/motion/transitions';
 import { sampleSceneBorder } from './scene-border';
@@ -83,3 +84,82 @@ it('keeps ripple energy inside the retained hold and uses one independent outlin
   expect(active[1]!.opacity).toBeCloseTo(0.6 * Math.SQRT1_2, 12);
   expect(active[1]!.perimeter).toBeGreaterThan(active[0]!.perimeter);
 });
+
+it.each(['source', 'window', 'legacy'] as const)(
+  'paints a %s border in its source geometry under a fixed visible crop',
+  (attachment) => {
+    class StrokePath {
+      constructor(readonly path: string) {}
+    }
+    vi.stubGlobal('Path2D', StrokePath);
+    const surfaces: { stroke: ReturnType<typeof vi.fn>; lineWidth: number }[] = [];
+    const document = {
+      createElement: () => {
+        const surface = {
+          clearRect: vi.fn(),
+          save: vi.fn(),
+          restore: vi.fn(),
+          setTransform: vi.fn(),
+          setLineDash: vi.fn(),
+          stroke: vi.fn(),
+          lineWidth: 0,
+        };
+        surfaces.push(surface);
+        return { width: 0, height: 0, getContext: () => surface };
+      },
+    };
+    const context = {
+      canvas: { width: 400, height: 300, ownerDocument: document },
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      clip: vi.fn(),
+      drawImage: vi.fn(),
+      setTransform: vi.fn(),
+      getTransform: () => ({ a: 1, d: 1 }),
+      globalAlpha: 1,
+    };
+    const visible = { x: 10, y: 20, width: 100, height: 80 };
+    try {
+      drawCompositionBorders(
+        context as unknown as CanvasRenderingContext2D,
+        [
+          {
+            id: 'border',
+            ...(attachment === 'window' ? {} : { coordinateSpace: 'source-window' as const }),
+            border: {
+              ...createQuickEditBorder(),
+              area: { x: 0, y: 0, width: 1, height: 1 },
+              width: 2,
+              roundness: 0,
+              style: 'solid',
+            },
+            clock: {
+              time: 1,
+              duration: 3,
+              enter: { type: 'none', duration: 0 },
+              exit: { type: 'none', duration: 0 },
+            },
+          },
+        ],
+        visible,
+        1,
+        6,
+        attachment === 'legacy' ? undefined : { x: -10, y: 0, width: 200, height: 160 },
+        attachment === 'legacy' ? undefined : [2, 0, -30, 0, 2, -40, 0, 0, 1]
+      );
+      expect(context.roundRect).toHaveBeenCalledExactlyOnceWith(10, 20, 100, 80, 6);
+      expect(context.clip).toHaveBeenCalledOnce();
+      expect(surfaces[0]!.lineWidth).toBe(attachment === 'source' ? 4 : 2);
+      const path = surfaces[0]!.stroke.mock.calls[0]![0] as StrokePath;
+      expect(path.path).toBe(
+        attachment === 'source' ? 'M150 -38H348V278H-48V-38H150Z' : 'M60 21H109V99H11V21H60Z'
+      );
+      expect(context.drawImage).toHaveBeenCalledOnce();
+      expect(context.save).toHaveBeenCalledTimes(context.restore.mock.calls.length);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);

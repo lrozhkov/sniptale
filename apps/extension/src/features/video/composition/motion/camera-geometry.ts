@@ -4,7 +4,7 @@ import {
   boundCameraPlaneProjection,
   type QuickEditCameraProjectionInterval,
 } from './spatial-projection-bounds';
-import { hasCameraPerspective } from '../../project/motion/spatial';
+import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
 import { evaluateMotionSpatial } from './spatial';
 import {
   type QuickEditHomography,
@@ -538,7 +538,13 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       ...createProjectWindowPlaneProjection(project, region, size),
       video: mapRect(sourceWindow.video),
       cornerRadius: clip?.type === 'VIDEO' ? (clip.windowCornerRadius ?? 0) * transform.scale : 0,
-      windowWeight: 'window',
+      windowWeight: resolveCameraWindowWeight(
+        project.sceneBackground?.zoomBehavior ?? 'window',
+        project.sceneBackground?.enabled !== false &&
+          project.sceneBackground?.zoomBehavior === 'follow-video' &&
+          !hasCameraPerspective(region.perspective),
+        hasCameraPerspective(region.perspective)
+      ),
       region: {
         ...region,
         start,

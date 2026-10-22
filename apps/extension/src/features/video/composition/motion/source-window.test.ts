@@ -1,3 +1,4 @@
+import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import { motionCameraProjection } from './spatial';
 import { quickEditPlaneProjection, projectQuickEditPoint } from './spatial-geometry';
 import { expect, it } from 'vitest';
@@ -8,12 +9,14 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditWindowTransform,
   computeQuickEditSpatialWindow,
+  computeQuickEditSceneCamera,
+  computeQuickEditSpatialRasterLayout,
   evaluateQuickEditCameraAtTime,
 } from '../../review/advanced/scene';
 import type { QuickEditZoomRegion } from '../../review/advanced/types';
-import { getFittedMediaWindowFrame } from '../draw/fitted-media';
+import { getFittedMediaWindowFrame, getFittedMediaContentFrame } from '../draw/fitted-media';
 import { shouldLockVisualLayerToViewport } from './layer-camera';
-import { resolveVideoCompositionFrame } from '../timeline/frame';
+import { resolveVideoCompositionFrame, resolveVideoCompositionCursor } from '../timeline/frame';
 import { applyVideoProjectMutationPatch } from '../../project/mutation';
 import { isExportReadyVideoProject } from '../../project/validation/root';
 import { motionWindowFocusToComposition } from './source-window';
@@ -324,12 +327,11 @@ it.each(
         })
       );
     for (const time of [0.125, 1.25, 1.75, 2.5, 6.75, 0.5]) {
-      const expected = computeQuickEditWindowTransform(
-        computeQuickEditSceneLayout({
-          ...scene,
-          camera: evaluateQuickEditCameraAtTime(gallery, time, scene),
-        })
-      );
+      const layout = computeQuickEditSceneLayout({
+        ...scene,
+        camera: evaluateQuickEditCameraAtTime(gallery, time, scene),
+      });
+      const expected = computeQuickEditSceneCamera(layout, scene.background).windowClip;
       const clip = project.clips.find(
         (item) =>
           item.type === 'VIDEO' && item.startTime <= time && item.startTime + item.duration > time
@@ -354,6 +356,27 @@ it.each(
       expect(corner.y, `top at ${time}`).toBeCloseTo(expected.y, 6);
       expect(actual.scale).toBeCloseTo(expected.width / window.width, 8);
       expect(actual.sourceClipId).toBe(clip.id);
+      const video = getFittedMediaContentFrame({
+        frame: clip.transform,
+        fitMode: clip.fitMode,
+        sourceWidth: input.source.width,
+        sourceHeight: input.source.height,
+        ...(clip.sourceCrop ? { sourceCrop: clip.sourceCrop } : {}),
+        ...(clip.windowHeader ? { windowHeader: clip.windowHeader } : {}),
+      });
+      const sourcePoint = { x: video.x + video.width * 0.3, y: video.y + video.height * 0.6 };
+      const inner = actual.sourceContentTransform
+        ? projectQuickEditPoint(actual.sourceContentTransform, sourcePoint)!
+        : sourcePoint;
+      const body = mapCompositionPointThroughCamera(inner, actual)!;
+      expect(body.x, `source x at ${time}`).toBeCloseTo(
+        layout.videoTransform.x + layout.videoTransform.width * 0.3,
+        6
+      );
+      expect(body.y, `source y at ${time}`).toBeCloseTo(
+        layout.videoTransform.y + layout.videoTransform.height * 0.6,
+        6
+      );
     }
   }
 );
@@ -364,6 +387,7 @@ it.each(['MANUAL', 'CURSOR'] as const)(
     const converted = planReviewProjectConversion(fixture());
     if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
     const project = converted.project;
+    project.sceneBackground = { ...project.sceneBackground!, zoomBehavior: 'window' };
     const clip = project.clips.find((item) => item.type === 'VIDEO')!;
     const region = {
       ...createVideoProjectMotionRegion(project, 0),
@@ -819,4 +843,210 @@ it.each(
     expect(restored.y).toBeCloseTo(region.focusPoint.y, 7);
   }
   expect(rotated).toEqual(before);
+});
+
+it.each(
+  (['window', 'content', 'fixed', 'follow-video'] as const).flatMap((mode) =>
+    [false, true].flatMap((spatial) => [0, 21].map((rotation) => ({ mode, spatial, rotation })))
+  )
+)(
+  'matches Gallery planes for $mode spatial=$spatial rotation=$rotation',
+  ({ mode, spatial, rotation }) => {
+    const input = fixture();
+    input.document.advancedContent.background = {
+      enabled: true,
+      type: 'solid',
+      color: '#123456ff',
+      zoomBehavior: 'window',
+      layout: { padding: 40, cornerRadius: 0, blur: 0 },
+    };
+    const converted = planReviewProjectConversion(input);
+    if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+    const project = converted.project;
+    project.version = 37;
+    project.sceneBackground = { ...project.sceneBackground!, zoomBehavior: mode };
+    input.document.advancedContent.background.zoomBehavior = mode;
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    clip.transform.rotation = rotation;
+    project.cursorTrack = {
+      captureMode: 'separate',
+      skin: normalizeVideoProjectCursorSkin(undefined),
+      samples: [
+        {
+          id: 'cursor',
+          time: 0,
+          x: 0,
+          y: 0,
+          visible: true,
+          recordingPoint: { x: 0.3, y: 0.6 },
+          sourceAnchor: {
+            kind: 'recording-source',
+            recordingId: 'recording',
+            sourceClipId: clip.id,
+            sourceTime: 0,
+          },
+        },
+      ],
+    };
+    const rotatePoint = (point: { x: number; y: number }) => {
+      const angle = (rotation * Math.PI) / 180;
+      const center = {
+        x: clip.transform.x + clip.transform.width / 2,
+        y: clip.transform.y + clip.transform.height / 2,
+      };
+      const dx = point.x - center.x,
+        dy = point.y - center.y;
+      return {
+        x: center.x + dx * Math.cos(angle) - dy * Math.sin(angle),
+        y: center.y + dx * Math.sin(angle) + dy * Math.cos(angle),
+      };
+    };
+    const focus: QuickEditZoomRegion = {
+      id: 'focus',
+      start: 0,
+      end: 2,
+      transform: { scale: 2.5, centerX: 0.4, centerY: 0.65 },
+      enter: { type: 'linear', duration: 0.5 },
+      exit: { type: 'linear', duration: 0.5 },
+      ...(spatial
+        ? {
+            perspective: { enabled: true, rotateX: 18, rotateY: -23, rotateZ: 7, strength: 0.6 },
+          }
+        : {}),
+    };
+    project.motionRegions = [
+      {
+        ...createVideoProjectMotionRegion(project, 0, { enter: 'linear', exit: 'linear' }),
+        id: focus.id,
+        duration: 2,
+        scale: focus.transform.scale,
+        focusMode: 'MANUAL',
+        focusPoint: { x: project.width * 0.4, y: project.height * 0.65 },
+        zoomInDuration: 0.5,
+        zoomOutDuration: 0.5,
+        ...(focus.perspective ? { perspective: focus.perspective } : {}),
+        sourceBinding: {
+          clipId: clip.id,
+          coordinateSpace: 'source-window',
+          sourceStart: 0,
+          sourceEnd: 2,
+          animation: { start: 0, end: 2, duration: 2 },
+        },
+      },
+    ];
+    const window = getFittedMediaWindowFrame({
+      frame: clip.transform,
+      fitMode: clip.fitMode,
+      sourceWidth: input.source.width,
+      sourceHeight: input.source.height,
+    });
+    const scene = {
+      source: input.source,
+      output: { width: project.width, height: project.height },
+      background: input.document.advancedContent.background,
+    };
+    for (const time of [0.125, 0.25, 0.5, 1, 1.75, 1.875]) {
+      const layout = computeQuickEditSceneLayout({
+        ...scene,
+        camera: evaluateQuickEditCameraAtTime([focus], time, scene),
+      });
+      const outer = computeQuickEditSceneCamera(layout, scene.background).windowClip;
+      const actual = resolveVideoCompositionCamera({
+        project,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+      const matrix = layout.spatial
+        ? quickEditPlaneProjection(window, outer, layout.spatial)
+        : null;
+      const expectedOuter = rotatePoint(matrix ? projectQuickEditPoint(matrix, window)! : outer);
+      const actualOuter = mapCompositionPointThroughCamera(rotatePoint(window), actual)!;
+      expect(actualOuter.x, `window x ${time}`).toBeCloseTo(expectedOuter.x, 7);
+      expect(actualOuter.y, `window y ${time}`).toBeCloseTo(expectedOuter.y, 7);
+      const raster = layout.spatial
+        ? computeQuickEditSpatialRasterLayout(layout, scene.background)
+        : layout;
+      const sourcePoint = { x: window.x + window.width * 0.3, y: window.y + window.height * 0.6 };
+      const inner = actual.sourceContentTransform
+        ? projectQuickEditPoint(actual.sourceContentTransform, sourcePoint)!
+        : sourcePoint;
+      const actualBody = mapCompositionPointThroughCamera(rotatePoint(inner), actual)!;
+      const expectedPoint = {
+        x: raster.videoTransform.x + raster.videoTransform.width * 0.3,
+        y: raster.videoTransform.y + raster.videoTransform.height * 0.6,
+      };
+      const expectedBody = rotatePoint(
+        matrix ? projectQuickEditPoint(matrix, expectedPoint)! : expectedPoint
+      );
+      expect(actualBody.x, `content x ${time}`).toBeCloseTo(expectedBody.x, 7);
+      expect(actualBody.y, `content y ${time}`).toBeCloseTo(expectedBody.y, 7);
+      const cursor = resolveVideoCompositionFrame(project, time).cursor;
+      expect(cursor).not.toBeNull();
+      const paintedCursor = mapCompositionPointThroughCamera(cursor!, actual)!;
+      expect(paintedCursor.x, `cursor x ${time}`).toBeCloseTo(expectedBody.x, 7);
+      expect(paintedCursor.y, `cursor y ${time}`).toBeCloseTo(expectedBody.y, 7);
+      expect(cursor!.scale * actual.scale, `cursor size ${time}`).toBeCloseTo(
+        layout.videoTransform.width / window.width,
+        7
+      );
+    }
+  }
+);
+
+it('keeps the cursor of a second video independent from inner source motion', () => {
+  const input = fixture();
+  const converted = planReviewProjectConversion(input);
+  if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
+  const project = converted.project;
+  project.sceneBackground = { ...project.sceneBackground!, zoomBehavior: 'content' };
+  const owner = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const second = {
+    ...owner,
+    id: 'independent-cursor',
+    sourceInstanceId: 'independent',
+    transform: { ...owner.transform, x: 150, y: 70, width: 100, height: 60 },
+  };
+  project.clips.push(second);
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 2,
+      scale: 2,
+      focusMode: 'MANUAL',
+      sourceBinding: {
+        clipId: owner.id,
+        coordinateSpace: 'source-window',
+        sourceStart: 0,
+        sourceEnd: 2,
+        animation: { start: 0, end: 2, duration: 2 },
+      },
+    },
+  ];
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [
+      {
+        id: 'second-cursor',
+        time: 0,
+        x: 0,
+        y: 0,
+        visible: true,
+        recordingPoint: { x: 0.4, y: 0.6 },
+        sourceAnchor: {
+          kind: 'recording-source',
+          recordingId: 'recording',
+          sourceClipId: second.id,
+          sourceTime: 0,
+        },
+      },
+    ],
+  };
+  const baseline = resolveVideoCompositionCursor(project, 0.5, []);
+  expect(baseline).not.toBeNull();
+  const frame = resolveVideoCompositionFrame(project, 0.5);
+  expect(frame.camera.sourceContentTransform).toBeDefined();
+  expect(frame.cursor).toEqual(baseline);
 });

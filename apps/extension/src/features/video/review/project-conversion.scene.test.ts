@@ -122,6 +122,7 @@ it('retains gradient paint and remembered solid paint in existing scene variants
   expect(result.project.sceneBackground).toEqual({
     kind: 'gradient',
     gradient: gradient.gradient,
+    zoomBehavior: 'fixed',
     remembered: { solid: { kind: 'solid', color: '#abcdef22' } },
   });
 });
@@ -188,7 +189,7 @@ it('keeps a basic Gallery window header dormant through independent conversion a
   const result = planReviewProjectConversion(input);
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
   const restored = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
-  expect(restored.version).toBe(36);
+  expect(restored.version).toBe(37);
   expect(restored.utilityLanes?.camera?.visible).toBe(false);
   expect(restored.motionRegions?.length).toBeGreaterThan(0);
   expect(isExportReadyVideoProject(restored)).toBe(true);
@@ -216,7 +217,7 @@ it('retains a basic-mode canvas and crop without changing the visible source', (
   if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
   const project = hydrateVideoProject(JSON.parse(JSON.stringify(result.project)));
   expect(project).toMatchObject({
-    version: 36,
+    version: 37,
     width: input.source.width,
     height: input.source.height,
     rememberedCanvas: { width: 320, height: 360 },

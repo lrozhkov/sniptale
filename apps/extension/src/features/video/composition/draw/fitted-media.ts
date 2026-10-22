@@ -1,3 +1,4 @@
+import type { QuickEditHomography } from '../motion/spatial-geometry';
 import {
   resolveDecoratedMediaFrame,
   roundedWindowClearance,
@@ -270,6 +271,8 @@ export function drawFittedMediaFrame(
 }
 
 export function drawFittedMediaLayer(params: {
+  /** Inner source camera acts on the joined header/video plane, inside its fixed window. */
+  sourceContentTransform?: QuickEditHomography;
   windowCornerRadius?: number;
   sourceCrop?: MediaSourceCrop;
   cameraAppearance?: CameraAppearance;
@@ -436,13 +439,33 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
     } finally {
       plane.restore();
     }
-    params.context.drawImage(
-      lease.canvas,
-      params.frame.x,
-      params.frame.y,
-      params.frame.width,
-      params.frame.height
-    );
+    params.context.save();
+    try {
+      const transform = params.sourceContentTransform;
+      if (transform) {
+        const clip = getFittedMediaWindowFrame(params);
+        params.context.beginPath();
+        params.context.rect(clip.x, clip.y, clip.width, clip.height);
+        params.context.clip();
+        params.context.transform(
+          transform[0],
+          transform[3],
+          transform[1],
+          transform[4],
+          transform[2] * params.displayScale,
+          transform[5] * params.displayScale
+        );
+      }
+      params.context.drawImage(
+        lease.canvas,
+        params.frame.x,
+        params.frame.y,
+        params.frame.width,
+        params.frame.height
+      );
+    } finally {
+      params.context.restore();
+    }
   } finally {
     lease.release();
   }

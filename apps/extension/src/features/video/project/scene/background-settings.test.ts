@@ -252,3 +252,46 @@ it('keeps disabled scene paint offline and restores its exact active variant exp
   expect(active.sceneBackground.remembered?.solid).toEqual({ kind: 'solid', color: '#123456ff' });
   expect(parseSceneBackgroundSettings(active.sceneBackground)).toEqual(active.sceneBackground);
 });
+
+it.each(['window', 'content', 'fixed', 'follow-video'] as const)(
+  'retains camera mode %s independently from paint and suppression',
+  (zoomBehavior) => {
+    const value = {
+      kind: 'solid',
+      color: '#123456ff',
+      enabled: false,
+      zoomBehavior,
+      remembered: { gradient: createSceneGradientBackground('#111111ff') },
+    };
+    const parsed = parseSceneBackgroundSettings(value);
+    expect(parsed).toEqual(value);
+    if (!parsed) throw new Error('Expected background');
+    const next = retainSceneBackgroundVariants(
+      parsed,
+      resolveSceneBackgroundKind(parsed, 'gradient')!
+    );
+    expect(next).toMatchObject({ kind: 'gradient', zoomBehavior });
+    expect(next).not.toHaveProperty('enabled');
+    expect(next.remembered?.solid).not.toHaveProperty('zoomBehavior');
+    const changed = applyVideoProjectMutationPatch(createEmptyVideoProject('Modes'), {
+      sceneBackground: parsed,
+    });
+    expect(changed.version).toBe(37);
+    expect(isHydratableVideoProject(changed)).toBe(true);
+    expect(isHydratableVideoProject({ ...changed, version: 36 })).toBe(false);
+  }
+);
+
+it('refuses unknown camera modes and modes nested inside paint variants', () => {
+  for (const zoomBehavior of [null, 'other', true, 1, {}])
+    expect(
+      parseSceneBackgroundSettings({ kind: 'solid', color: '#123456', zoomBehavior })
+    ).toBeNull();
+  expect(
+    parseSceneBackgroundSettings({
+      kind: 'solid',
+      color: '#123456',
+      remembered: { gradient: { ...createSceneGradientBackground(), zoomBehavior: 'content' } },
+    })
+  ).toBeNull();
+});

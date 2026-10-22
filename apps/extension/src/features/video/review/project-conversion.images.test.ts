@@ -126,6 +126,7 @@ it.each(['text', 'none'] as const)(
       kind: 'solid',
       color: '#123456aa',
       enabled: false,
+      zoomBehavior: 'fixed',
       remembered: {
         solid: { kind: 'solid', color: '#123456aa' },
         image: { kind: 'image', assetId: 'native-background', imageFit: 'cover' },
@@ -217,7 +218,7 @@ it.each(['text', 'image'] as const)(
     const before = structuredClone(input);
     const converted = planReviewProjectConversion(input);
     if (converted.status !== 'prepared') throw new Error(JSON.stringify(converted));
-    expect(converted.project.version).toBe(36);
+    expect(converted.project.version).toBe(37);
     expect(converted.project.watermarkEnabled).toBe(false);
     expect(converted.project.watermark).toMatchObject({ mode });
     expect(converted.project.assets).toContainEqual(input.imageAssets[0]!.asset);

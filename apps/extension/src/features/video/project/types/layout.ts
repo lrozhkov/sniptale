@@ -1,3 +1,4 @@
+import type { CameraBackgroundZoomBehavior } from '../motion/spatial';
 import type { Gradient } from '@sniptale/foundation/paint';
 
 /** Controls whether retained content extends the montage clock. */
@@ -193,5 +194,7 @@ export type VideoProjectSceneBackground = (
   blur?: number;
   /** Passive legacy layout blur when a distinct active layout also exists. */
   rememberedBlur?: number;
+  /** Window is the Native default; Gallery defaults are explicit after conversion. */
+  zoomBehavior?: CameraBackgroundZoomBehavior;
   remembered?: VideoProjectBackgroundVariants;
 };

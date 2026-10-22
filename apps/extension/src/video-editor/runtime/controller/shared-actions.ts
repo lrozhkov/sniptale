@@ -1,3 +1,4 @@
+import { parseCameraBackgroundZoomBehavior } from '../../../features/video/project/motion/spatial';
 import { DEFAULT_MOTION_PHASE_TRANSITIONS } from '../../../features/video/project/motion/transitions';
 import type { VideoEditorSceneBackgroundEdit } from '../../contracts/commands/patches';
 import { isRecord, isBoundedNumber } from '../../../features/video/project/validation/primitives';
@@ -274,18 +275,25 @@ function createProjectPresentationUpdaters(store: WorkspaceProjectUpdaterStore) 
       }));
     },
     setSceneBackground(sceneBackground: VideoEditorSceneBackgroundEdit) {
-      const parsed = parseSceneBackgroundSettings(sceneBackground);
+      const input: unknown = sceneBackground;
+      const parsed = parseSceneBackgroundSettings(input);
       const blur =
-        isRecord(sceneBackground) &&
-        Object.keys(sceneBackground).length === 1 &&
-        isBoundedNumber(sceneBackground['blur'], 0, 25)
-          ? sceneBackground['blur']
+        isRecord(input) && Object.keys(input).length === 1 && isBoundedNumber(input['blur'], 0, 25)
+          ? input['blur']
           : null;
-      if (!parsed && blur === null) return;
+      const zoomBehavior =
+        isRecord(input) && Object.keys(input).length === 1
+          ? parseCameraBackgroundZoomBehavior(input['zoomBehavior'])
+          : null;
+      if (!parsed && blur === null && zoomBehavior === null) return;
       store.updateProject((project) => {
         const next = syncProjectSceneBackground(
           project,
-          parsed ?? { ...getProjectSceneBackground(project), ...(blur !== null ? { blur } : {}) }
+          parsed ?? {
+            ...getProjectSceneBackground(project),
+            ...(blur !== null ? { blur } : {}),
+            ...(zoomBehavior !== null ? { zoomBehavior } : {}),
+          }
         );
         const imageIds = [
           ...(next.sceneBackground.kind === 'image' ? [next.sceneBackground.assetId] : []),

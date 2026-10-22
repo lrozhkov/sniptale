@@ -144,7 +144,7 @@ it('preserves the actual linear observation at a cut edge between sparse capture
 it('retains all original observations and sparse source-bound authoring without painting a new cursor', () => {
   const { input, facts, authored, project } = convertedCursorProject();
   const group = project.cursorTrack?.sourceObservations?.[0];
-  expect(project.version).toBe(36);
+  expect(project.version).toBe(37);
   expect(group).toMatchObject({
     recordingId: 'recording',
     sourceInstanceId: 'conversion-1:source',

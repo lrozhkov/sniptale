@@ -324,9 +324,9 @@ it('fences timing at schema 32 and admits video timing on compatible ordinary tr
   clip.cameraTiming = { offsetSeconds: 2, transitions: 'bounded' };
   for (let version = 2; version < 32; version++)
     expect(isHydratableVideoProject({ ...project, version })).toBe(false);
-  for (const version of [32, 33, 34, 35, 36])
+  for (const version of [32, 33, 34, 35, 36, 37])
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
-  expect(isHydratableVideoProject({ ...project, version: 37 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 38 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,

@@ -1,3 +1,4 @@
+import { resolveCameraWindowWeight } from '../../project/motion/spatial';
 import {
   createWindowCameraGeometry,
   createWindowCameraLinkGeometry,
@@ -36,12 +37,11 @@ export function createReviewWorkingZoneCameraGeometry(input: {
   const lockBackground = quickEditSpatialSpan(input.topology, (region.start + region.end) / 2);
   const follows =
     input.background.enabled && input.background.zoomBehavior === 'follow-video' && !lockBackground;
-  const windowWeight =
-    input.background.zoomBehavior === 'window' || follows
-      ? 'window'
-      : input.background.zoomBehavior === 'content' || !hasQuickEditPerspective(region.perspective)
-        ? 'content'
-        : 'spatial';
+  const windowWeight = resolveCameraWindowWeight(
+    input.background.zoomBehavior,
+    follows,
+    hasQuickEditPerspective(region.perspective)
+  );
   return createWindowCameraGeometry({
     output: input.output,
     window: input.window,
@@ -72,12 +72,11 @@ export function createReviewCameraLinkGeometry(input: {
   const lockBackground = quickEditSpatialSpan(input.topology, (start + end) / 2);
   const follows =
     input.background.enabled && input.background.zoomBehavior === 'follow-video' && !lockBackground;
-  const windowWeight =
-    input.background.zoomBehavior === 'window' || follows
-      ? 'window'
-      : input.background.zoomBehavior === 'content' || !lockBackground
-        ? 'content'
-        : 'spatial';
+  const windowWeight = resolveCameraWindowWeight(
+    input.background.zoomBehavior,
+    follows,
+    lockBackground
+  );
   return createWindowCameraLinkGeometry({
     output: input.output,
     window: input.window,

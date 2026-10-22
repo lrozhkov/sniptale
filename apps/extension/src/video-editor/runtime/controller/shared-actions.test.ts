@@ -247,3 +247,49 @@ it('creates new phase curves through the actual project mutation and history', (
   expect(store.getState().project?.motionRegions).toEqual(project.motionRegions);
   store.setState(store.getInitialState(), true);
 });
+
+it('merges a camera mode with the latest scene paint and suppression', () => {
+  const project = createEmptyVideoProject('Latest camera mode');
+  const store = createStore(project);
+  let pending: ((current: VideoProject) => VideoProject) | undefined;
+  store.updateProject = (updater) => {
+    pending = updater;
+  };
+  createWorkspaceProjectUpdaters(store).setSceneBackground({ zoomBehavior: 'content' });
+  project.sceneBackground = {
+    kind: 'solid',
+    color: '#abcdef',
+    enabled: false,
+    blur: 2,
+    rememberedBlur: 9,
+  };
+  project.name = 'Accepted unrelated edit';
+  const latest = structuredClone(project);
+  expect(pending!(project).sceneBackground).toEqual({
+    ...latest.sceneBackground,
+    zoomBehavior: 'content',
+  });
+  expect(pending!(project).name).toBe(latest.name);
+  expect(project).toEqual(latest);
+});
+
+it('changes camera mode in one history operation and keeps equal retries as no-ops', () => {
+  const store = useVideoEditorStore;
+  store.setState(store.getInitialState(), true);
+  store.getState().setProject(createEmptyVideoProject('Mode history'));
+  const actions = createWorkspaceProjectUpdaters({ ...store.getState(), getCurrentTime: () => 0 });
+  actions.setSceneBackground({ zoomBehavior: 'content' });
+  const accepted = store.getState().project!;
+  const history = store.getState().projectHistory;
+  expect(accepted.version).toBe(37);
+  expect(accepted.sceneBackground?.zoomBehavior).toBe('content');
+  expect(history.past).toHaveLength(1);
+  actions.setSceneBackground({ zoomBehavior: 'content' });
+  expect(store.getState().project).toBe(accepted);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().undoProject();
+  expect(store.getState().project?.sceneBackground?.zoomBehavior).toBeUndefined();
+  store.getState().redoProject();
+  expect(store.getState().project?.sceneBackground?.zoomBehavior).toBe('content');
+  store.setState(store.getInitialState(), true);
+});

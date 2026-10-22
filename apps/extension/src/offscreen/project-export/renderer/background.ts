@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -34,6 +35,7 @@ function getStaticBackgroundCacheKey(project: VideoProject, width: number, heigh
 }
 
 function drawExportSceneBackgroundUncached(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   context: CanvasRenderingContext2D;
   currentTime: number;
   height: number;
@@ -42,6 +44,7 @@ function drawExportSceneBackgroundUncached(params: {
   width: number;
 }) {
   drawSceneBackground({
+    ...(params.backgroundCamera ? { camera: params.backgroundCamera } : {}),
     projectScale: params.width / params.project.width,
     context: params.context,
     currentTime: params.currentTime,
@@ -54,6 +57,7 @@ function drawExportSceneBackgroundUncached(params: {
 }
 
 export function drawExportSceneBackground(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   cache?: ExportSceneBackgroundCache | undefined;
   context: CanvasRenderingContext2D;
   currentTime: number;
@@ -62,9 +66,10 @@ export function drawExportSceneBackground(params: {
   project: VideoProject;
   width: number;
 }) {
-  const cacheKey = params.cache
-    ? getStaticBackgroundCacheKey(params.project, params.width, params.height)
-    : null;
+  const cacheKey =
+    params.cache && !params.backgroundCamera
+      ? getStaticBackgroundCacheKey(params.project, params.width, params.height)
+      : null;
   if (!params.cache || !cacheKey) {
     drawExportSceneBackgroundUncached(params);
     return;

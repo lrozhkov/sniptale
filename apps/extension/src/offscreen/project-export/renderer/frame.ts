@@ -292,6 +292,9 @@ export function drawProjectFrame(
   context.save();
   context.clearRect(0, 0, settings.width, settings.height);
   drawExportSceneBackground({
+    ...(renderPasses.overlayFrame.camera.backgroundCamera
+      ? { backgroundCamera: renderPasses.overlayFrame.camera.backgroundCamera }
+      : {}),
     ...(options.backgroundCache ? { cache: options.backgroundCache } : {}),
     context,
     currentTime,

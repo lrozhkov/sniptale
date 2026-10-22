@@ -120,7 +120,7 @@ it('caps EffectV1 preview raster to the physical viewport while retaining logica
   ).toBe(0.25);
 });
 
-it('converts authored background pixels to preview coordinates before applying DPR', () => {
+it.each([false, true])('converts background pixels before DPR with camera=%s', (moving) => {
   const project = createEmptyVideoProject('Preview blur');
   project.width = 640;
   project.height = 360;
@@ -133,7 +133,9 @@ it('converts authored background pixels to preview coordinates before applying D
     height: 360,
     getContext: () => context,
   } as unknown as HTMLCanvasElement;
+  const camera = { scale: 2, viewportX: 40, viewportY: 30 };
   const prepared = resolvePreparedPreviewSceneCanvas({
+    ...(moving ? { backgroundCamera: camera } : {}),
     canvas,
     project,
     imageBank: {},
@@ -146,6 +148,7 @@ it('converts authored background pixels to preview coordinates before applying D
     expect.objectContaining({
       width: 320,
       height: 180,
+      ...(moving ? { camera } : {}),
       projectScale: 0.5,
       sceneBackground: { kind: 'solid' },
     })

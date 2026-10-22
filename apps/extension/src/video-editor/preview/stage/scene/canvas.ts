@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -122,6 +123,7 @@ function clearPreviewSceneCanvas(params: {
   bounds: PreviewSceneBounds;
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   currentTime?: number;
   dpr: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -131,6 +133,7 @@ function clearPreviewSceneCanvas(params: {
   params.context.clearRect(0, 0, params.canvas.width, params.canvas.height);
   params.context.setTransform(params.dpr, 0, 0, params.dpr, 0, 0);
   drawSceneBackground({
+    ...(params.backgroundCamera ? { camera: params.backgroundCamera } : {}),
     projectScale: params.bounds.width / params.project.width,
     context: params.context,
     currentTime: params.currentTime ?? 0,
@@ -155,6 +158,7 @@ function hasUsablePreviewViewport(
 }
 
 export function resolvePreparedPreviewSceneCanvas(params: {
+  backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
   imageBank: Record<string, HTMLImageElement>;
@@ -178,6 +182,7 @@ export function resolvePreparedPreviewSceneCanvas(params: {
   if (params.shouldClearCanvas) {
     const currentTime = params.currentTime ?? 0;
     clearPreviewSceneCanvas({
+      ...(params.backgroundCamera ? { backgroundCamera: params.backgroundCamera } : {}),
       bounds: prepared.bounds,
       canvas: params.canvas,
       context: prepared.context,

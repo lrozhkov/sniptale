@@ -105,8 +105,6 @@ export function planReviewProjectScene(args: {
     } {
   const { content, ui, source } = args;
   const background = content.background;
-  if (background.zoomBehavior !== undefined && background.zoomBehavior !== 'window')
-    return { status: 'blocked', fields: ['background'] };
   const enabled = ui.mode === 'advanced' && background.enabled;
   const inactiveLayout =
     ui.mode === 'basic' && background.enabled ? background.layout : background.rememberedLayout;
@@ -186,6 +184,9 @@ export function planReviewProjectScene(args: {
         : {}),
       sceneBackground: {
         ...retainedFill,
+        ...(background.zoomBehavior !== 'window'
+          ? { zoomBehavior: background.zoomBehavior ?? 'fixed' }
+          : {}),
         ...(!enabled ? { enabled: false as const } : {}),
         ...(background.enabled && background.layout.blur !== undefined
           ? { blur: background.layout.blur }

@@ -16,8 +16,37 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
     if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
   }, [props.sceneBackground.kind]);
   const blur = props.sceneBackground.blur ?? 0;
+  const zoomBehavior = props.sceneBackground.zoomBehavior ?? 'window';
+  const zoomOptions = [
+    { value: 'window' as const, label: translate('gallery.videoReview.backgroundZoomWindow') },
+    { value: 'content' as const, label: translate('gallery.videoReview.backgroundZoomContent') },
+  ];
   return (
     <div className="sniptale-parameter-stack grid gap-3" data-ui="video-editor.scene-background">
+      <OptionButtonsField
+        layout="stacked"
+        label={translate('gallery.videoReview.backgroundZoom')}
+        value={zoomBehavior}
+        options={
+          zoomBehavior === 'fixed' || zoomBehavior === 'follow-video'
+            ? [
+                {
+                  value: zoomBehavior,
+                  label: translate(
+                    zoomBehavior === 'fixed'
+                      ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+                      : 'gallery.videoReview.backgroundZoomLegacyFollow'
+                  ),
+                },
+                ...zoomOptions,
+              ]
+            : zoomOptions
+        }
+        onChange={(zoomBehavior) => {
+          props.onSetSceneBackground({ zoomBehavior });
+          props.onResetSceneBackgroundPreview();
+        }}
+      />
       <OptionButtonsField
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
         value={

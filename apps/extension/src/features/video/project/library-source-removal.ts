@@ -213,6 +213,7 @@ function removeSourceBackground(
     : active;
   const sceneBackground = {
     ...next,
+    ...(background.zoomBehavior !== undefined ? { zoomBehavior: background.zoomBehavior } : {}),
     ...(background.enabled === false ? { enabled: false as const } : {}),
     ...(background.blur !== undefined ? { blur: background.blur } : {}),
     ...(background.rememberedBlur !== undefined

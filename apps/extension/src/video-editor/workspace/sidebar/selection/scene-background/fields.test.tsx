@@ -184,7 +184,7 @@ function SceneBackgroundHarness(props: SceneBackgroundFieldProps) {
       onSetSceneBackground={(nextBackground) => {
         props.onSetSceneBackground(nextBackground);
         setSceneBackground((current) =>
-          'kind' in nextBackground ? nextBackground : { ...current, blur: nextBackground.blur }
+          'kind' in nextBackground ? nextBackground : { ...current, ...nextBackground }
         );
       }}
     />
@@ -301,3 +301,28 @@ it('keeps disabled paint hidden until explicit activation and preserves its sett
   expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(retained);
   expect(container?.querySelector('input')).toBeNull();
 });
+
+it.each(['fixed', 'follow-video'] as const)(
+  'keeps saved %s visible until an explicit current zoom mode is selected',
+  async (zoomBehavior) => {
+    const onSetSceneBackground = vi.fn();
+    renderBackgroundHarness({
+      ...createProps(),
+      onSetSceneBackground,
+      sceneBackground: { kind: 'solid', color: '#123456', enabled: false, zoomBehavior },
+    });
+    expect(container?.textContent).toContain(
+      zoomBehavior === 'fixed'
+        ? 'gallery.videoReview.backgroundZoomLegacyFixed'
+        : 'gallery.videoReview.backgroundZoomLegacyFollow'
+    );
+    await clickBackgroundKind('gallery.videoReview.backgroundZoomWindow');
+    expect(onSetSceneBackground).toHaveBeenLastCalledWith({ zoomBehavior: 'window' });
+    expect(container?.textContent).not.toContain('gallery.videoReview.backgroundZoomLegacy');
+    await clickBackgroundKind('gallery.videoReview.backgroundZoomContent');
+    expect(onSetSceneBackground).toHaveBeenLastCalledWith({ zoomBehavior: 'content' });
+    expect(getKindOption('gallery.videoReview.backgroundNone')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+  }
+);

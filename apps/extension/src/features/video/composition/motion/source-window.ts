@@ -1,3 +1,10 @@
+import { resolveCameraWindowWeight } from '../../project/motion/spatial';
+import {
+  invertQuickEditProjection,
+  multiplyQuickEditProjections,
+  projectQuickEditPoint,
+} from './spatial-geometry';
+import type { VideoCompositionCameraState } from '../types';
 import type { QuickEditHomography } from './spatial-geometry';
 import { motionFocusAreaPoint, isMotionFocusArea } from '../../project/motion/focus-area';
 import type {
@@ -239,4 +246,131 @@ export function motionWindowAreaPoints(
   const point = (x: number, y: number) =>
     motionWindowFocusToComposition(project, region, motionFocusAreaPoint(area, x, y), time);
   return { nw: point(0, 0), ne: point(1, 0), se: point(1, 1), sw: point(0, 1) };
+}
+
+/** Split one source exposure into the authored window and its inner source raster. */
+export function applySourceWindowCameraMode(
+  project: VideoProject,
+  camera: VideoCompositionCameraState,
+  time: number
+): VideoCompositionCameraState {
+  if (!camera.sourceClipId) return camera;
+  const background = project.sceneBackground;
+  const mode = background?.zoomBehavior ?? 'window';
+  if (mode === 'window') return camera;
+  const follows =
+    mode === 'follow-video' && background?.enabled !== false && !camera.spatial?.lockBackground;
+  const policy = resolveCameraWindowWeight(mode, follows, camera.spatial?.lockBackground ?? false);
+  const weight =
+    policy === 'window' ? 1 : policy === 'content' ? 0 : (camera.spatial?.windowMotion ?? 0);
+  const following = follows
+    ? {
+        backgroundCamera: {
+          scale: camera.scale,
+          viewportX: camera.viewportX,
+          viewportY: camera.viewportY,
+        },
+      }
+    : {};
+  if (weight === 1) return { ...camera, ...following };
+  const region = project.motionRegions?.find((region) => region.id === camera.regionId);
+  if (!region?.sourceBinding) return camera;
+  const geometry = resolveMotionSourceWindow(
+    project,
+    {
+      ...region,
+      sourceBinding: { ...region.sourceBinding, clipId: camera.sourceClipId },
+    },
+    time
+  );
+  if (!geometry) return camera;
+  const outerScale = 1 + (camera.scale - 1) * weight;
+  const ratio = camera.scale / outerScale;
+  const inner: QuickEditHomography = [
+    ratio,
+    0,
+    (-camera.viewportX * camera.scale * (1 - weight)) / outerScale,
+    0,
+    ratio,
+    (-camera.viewportY * camera.scale * (1 - weight)) / outerScale,
+    0,
+    0,
+    1,
+  ];
+  const plane = geometry.planeTransform;
+  const inverse = plane ? invertQuickEditProjection(plane) : null;
+  if (plane && !inverse) return camera;
+  const sourceContentTransform =
+    plane && inverse
+      ? multiplyQuickEditProjections(inverse, multiplyQuickEditProjections(inner, plane))
+      : inner;
+  return {
+    ...camera,
+    ...following,
+    scale: outerScale,
+    viewportX: (camera.viewportX * camera.scale * weight) / outerScale,
+    viewportY: (camera.viewportY * camera.scale * weight) / outerScale,
+    viewportWidth: project.width / outerScale,
+    viewportHeight: project.height / outerScale,
+    sourceContentTransform,
+  };
+}
+
+/** Source overlays share the same inner plane as the pixels they identify. */
+export function mapCompositionPointThroughSourceContent(
+  project: VideoProject,
+  camera: VideoCompositionCameraState,
+  time: number,
+  point: { x: number; y: number },
+  inverse = false
+) {
+  let transform = camera.sourceContentTransform;
+  if (!transform || !camera.sourceClipId) return point;
+  const region = project.motionRegions?.find((region) => region.id === camera.regionId);
+  if (!region?.sourceBinding) return point;
+  const geometry = resolveMotionSourceWindow(
+    project,
+    {
+      ...region,
+      sourceBinding: { ...region.sourceBinding, clipId: camera.sourceClipId },
+    },
+    time
+  );
+  const plane = geometry?.planeTransform;
+  const planeInverse = plane ? invertQuickEditProjection(plane) : null;
+  if (plane && planeInverse)
+    transform = multiplyQuickEditProjections(
+      plane,
+      multiplyQuickEditProjections(transform, planeInverse)
+    );
+  const mapping = inverse ? invertQuickEditProjection(transform) : transform;
+  return mapping ? (projectQuickEditPoint(mapping, point) ?? point) : point;
+}
+
+/** Inner source motion is uniform scale/translation; clip affine projection follows it. */
+export function projectSourceContentRect(
+  rect: { x: number; y: number; width: number; height: number },
+  transform: QuickEditHomography,
+  rasterScale = 1
+) {
+  if (!Number.isFinite(rasterScale) || rasterScale <= 0) return null;
+  const start = projectQuickEditPoint(transform, {
+    x: rect.x / rasterScale,
+    y: rect.y / rasterScale,
+  });
+  const end = projectQuickEditPoint(transform, {
+    x: (rect.x + rect.width) / rasterScale,
+    y: (rect.y + rect.height) / rasterScale,
+  });
+  const scale = Math.hypot(transform[0], transform[3]);
+  if (!start || !end || !Number.isFinite(scale) || scale <= 0) return null;
+  return {
+    scale,
+    rect: {
+      x: start.x * rasterScale,
+      y: start.y * rasterScale,
+      width: (end.x - start.x) * rasterScale,
+      height: (end.y - start.y) * rasterScale,
+    },
+  };
 }

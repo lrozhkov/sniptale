@@ -128,6 +128,7 @@ function projectSchemaRequirement(
   patch: MutationPatch
 ): VideoProject['version'] {
   const sceneBackground = patch.sceneBackground ?? project.sceneBackground;
+  if (sceneBackground?.zoomBehavior !== undefined) return 37;
   if (
     project.watermarkEnabled !== undefined ||
     patch.watermarkEnabled !== undefined ||

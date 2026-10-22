@@ -1,3 +1,4 @@
+import { applySourceWindowCameraMode } from './source-window';
 import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
 import { resolveSourceWindowCamera, resolveMotionSourceWindow } from './source-window';
 import { projectMotionSourcePhases } from '../../project/motion/source-binding';
@@ -91,7 +92,10 @@ export function resolveVideoCompositionCamera(params: {
 
   const activeRegion = resolveActiveMotionRegion(params.project, params.currentTime);
   if (!activeRegion) {
-    return resolveConnectingCamera(params) ?? createDefaultCameraState(params.project);
+    const connected = resolveConnectingCamera(params);
+    return connected
+      ? applySourceWindowCameraMode(params.project, connected, params.currentTime)
+      : createDefaultCameraState(params.project);
   }
 
   const edges = resolveProjectCameraEdges(params.project, activeRegion);
@@ -140,12 +144,16 @@ export function resolveVideoCompositionCamera(params: {
         : undefined
     );
     if (windowCamera)
-      return {
-        ...windowCamera,
-        regionId: activeRegion.id,
-        motionBlurAmount,
-        overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
-      };
+      return applySourceWindowCameraMode(
+        params.project,
+        {
+          ...windowCamera,
+          regionId: activeRegion.id,
+          motionBlurAmount,
+          overlayZoomMode: resolveMotionOverlayZoomMode(activeRegion.overlayZoomMode),
+        },
+        params.currentTime
+      );
   }
   if (following)
     return {
