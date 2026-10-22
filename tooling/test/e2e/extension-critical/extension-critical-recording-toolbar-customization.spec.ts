@@ -772,9 +772,18 @@ async function expectRecordingControlOrder(
 
 async function expectAutoHideValue(trigger: Locator, delay: number) {
   const icon = trigger.locator('svg.lucide-broom-sparkles');
-  await expect(icon).toBeVisible();
-  await expect(icon).toHaveAttribute('width', '18');
-  const center = await icon.evaluate((node) => {
+  const value = trigger.locator('[data-ui="content.toolbar.video-recording.auto-hide-value"]');
+  if (delay === 0) {
+    await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
+    await expect(value).toHaveCount(0);
+    await expect(icon).toBeVisible();
+  } else {
+    await expect(icon).toHaveCount(0);
+    await expect(value).toHaveText(String(delay));
+    await expect(value).toHaveCSS('font-size', '13px');
+    await expect(trigger).not.toHaveAttribute('data-menu-indicator');
+  }
+  const center = await (delay === 0 ? icon : value).evaluate((node) => {
     const icon = node.getBoundingClientRect();
     const button = node.closest('button')!.getBoundingClientRect();
     const content = node.closest('.sniptale-command-content');
@@ -787,40 +796,57 @@ async function expectAutoHideValue(trigger: Locator, delay: number) {
   });
   expect(Math.abs(center.x)).toBeLessThanOrEqual(0.5);
   expect(Math.abs(center.y)).toBeLessThanOrEqual(0.5);
-  const value = trigger.locator('[data-ui="content.toolbar.video-recording.auto-hide-value"]');
-  if (delay === 0) {
-    await expect(trigger).toHaveAttribute('data-menu-indicator', 'true');
-    await expect(value).toHaveCount(0);
-    return null;
+  return center;
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`recording auto-hide value presentation ${name} ${orientation}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size });
+      try {
+        const worker =
+          launched.context.serviceWorkers()[0] ??
+          (await launched.context.waitForEvent('serviceworker'));
+        await worker.evaluate(
+          async (theme) => {
+            await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+          },
+          size.width === 1920 ? 'dark' : 'light'
+        );
+        const { page } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        if (orientation === 'vertical') {
+          await openRecordingToolbarSettings(page);
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+          await page.keyboard.press('Escape');
+        }
+        const trigger = page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]');
+        for (const delay of [0, 3, 5, 10, 30, 0]) {
+          await trigger.click();
+          await page
+            .locator(`[data-ui="content.toolbar.video-recording.auto-hide-${delay}"]`)
+            .click();
+          await expectAutoHideValue(trigger, delay);
+          await page.screenshot({ path: info.outputPath(`delay-${delay}.png`), fullPage: false });
+        }
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
   }
-  await expect(value).toHaveText(String(delay));
-  await expect(trigger).not.toHaveAttribute('data-menu-indicator');
-  const appearance = await value.evaluate((node) => {
-    const button = node.closest('button')!;
-    const icon = button.querySelector('svg')!.getBoundingClientRect();
-    const badge = node.getBoundingClientRect();
-    const bounds = button.getBoundingClientRect();
-    const probe = document.createElement('span');
-    probe.style.cssText = 'position:absolute;color:var(--sniptale-color-text-secondary)';
-    node.parentElement!.append(probe);
-    const neutral = getComputedStyle(probe).color;
-    probe.remove();
-    return {
-      color: getComputedStyle(node).color,
-      neutral,
-      right: bounds.right - badge.right,
-      bottom: bounds.bottom - badge.bottom,
-      centerX: badge.x + badge.width / 2 - (bounds.x + bounds.width / 2),
-      centerY: badge.y + badge.height / 2 - (bounds.y + bounds.height / 2),
-      iconOffset: { x: badge.x - icon.x, y: badge.y - icon.y },
-    };
-  });
-  expect(appearance.color).toBe(appearance.neutral);
-  expect(appearance.right).toBeGreaterThanOrEqual(1);
-  expect(appearance.bottom).toBeGreaterThanOrEqual(1);
-  expect(appearance.centerX).toBeGreaterThan(0);
-  expect(appearance.centerY).toBeGreaterThan(0);
-  return appearance.iconOffset;
 }
 
 for (const { name, size } of [

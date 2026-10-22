@@ -152,24 +152,22 @@ it('marks only the selected drawing auto-hide delay including off', () => {
       '[data-ui="content.toolbar.video-recording.auto-hide"]'
     )!;
     const icon = trigger.querySelector<SVGElement>('svg.lucide-broom-sparkles');
-    expect(icon).not.toBeNull();
-    expect(icon?.parentElement?.style.alignItems).toBe('center');
-    expect(icon?.parentElement?.style.justifyContent).toBe('center');
-    expect(icon?.style.position).toBe('');
-    expect(trigger.querySelectorAll('svg')).toHaveLength(1);
     const value = trigger.querySelector<HTMLElement>(
       '[data-ui="content.toolbar.video-recording.auto-hide-value"]'
     );
     if (delay > 0) {
+      expect(icon).toBeNull();
+      expect(value?.classList.contains('sniptale-timer-badge')).toBe(true);
       expect(trigger.getAttribute('data-menu-indicator')).toBeNull();
       expect(value?.textContent).toBe(String(delay));
       expect(value?.style.color).toBe('var(--sniptale-color-text-secondary)');
       expect(value?.getAttribute('aria-hidden')).toBe('true');
-      expect(value?.parentElement?.style.position).toBe('relative');
+      expect(value?.style.position).toBe('');
       expect(trigger.getAttribute('aria-label')).toContain(
         `${delay} content.toolbar.recordingDrawingAutoHideSeconds`
       );
     } else {
+      expect(icon).not.toBeNull();
       expect(value).toBeNull();
       expect(trigger.getAttribute('data-menu-indicator')).toBe('true');
     }

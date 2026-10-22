@@ -133,38 +133,18 @@ function AutoHideControl(props: {
           else setLocalOpen(true);
         }}
       >
-        <span
-          style={{
-            position: 'relative',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
-            height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
-          }}
-        >
+        {props.delay > 0 ? (
+          <span
+            aria-hidden="true"
+            className="sniptale-timer-badge"
+            data-ui="content.toolbar.video-recording.auto-hide-value"
+            style={{ color: 'var(--sniptale-color-text-secondary)' }}
+          >
+            {props.delay}
+          </span>
+        ) : (
           <BroomSparkles size={18} />
-          {props.delay > 0 && (
-            <span
-              aria-hidden="true"
-              data-ui="content.toolbar.video-recording.auto-hide-value"
-              style={{
-                position: 'absolute',
-                right: 1,
-                bottom: 1,
-                color: 'var(--sniptale-color-text-secondary)',
-                fontSize: 9,
-                fontWeight: 500,
-                lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-                pointerEvents: 'none',
-              }}
-            >
-              {props.delay}
-            </span>
-          )}
-        </span>
+        )}
       </ContentToolbarButton>
       {open && dropdown.style ? (
         <ToolbarMenuDropdown
