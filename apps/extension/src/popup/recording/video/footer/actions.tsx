@@ -1,4 +1,4 @@
-import { Circle } from 'lucide-react';
+import { RecordingIcon } from '../../../../ui/recording-icon';
 import { translate } from '../../../../platform/i18n/popup';
 import { PopupActionButton } from '../../../../ui/popup-shell/action-button';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
@@ -8,7 +8,7 @@ import {
 } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoActiveFooterControls } from './active-controls';
 
-const START_RECORDING_ICON_CLASS_NAME = 'fill-current text-[var(--sniptale-color-danger)]';
+const START_RECORDING_ICON_CLASS_NAME = 'text-[var(--sniptale-color-danger)]';
 
 function VideoSetupStartButton({
   canStart,
@@ -23,7 +23,7 @@ function VideoSetupStartButton({
 }) {
   return (
     <PopupActionButton
-      icon={Circle}
+      icon={RecordingIcon}
       label={startButtonLabel}
       iconClassName={START_RECORDING_ICON_CLASS_NAME}
       tone="primary"

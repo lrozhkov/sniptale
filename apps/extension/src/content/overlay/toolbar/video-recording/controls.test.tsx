@@ -305,6 +305,17 @@ it('explains that Start uses the saved popup Video settings without adding new U
   expect(start?.textContent).toBe('');
 });
 
+it('uses the shared outlined REC marker and standard action hover presentation', () => {
+  renderPhase('idle');
+  const start = queryButton('content.toolbar.video-recording.start')!;
+  expect(start.classList.contains('sniptale-btn-danger')).toBe(false);
+  expect(start.querySelector('svg')?.getAttribute('data-icon')).toBe('recording');
+  expect([...start.querySelectorAll('circle')].map((circle) => circle.getAttribute('r'))).toEqual([
+    '10',
+    '7',
+  ]);
+});
+
 it('preserves the original Start event through the adopted command owner', () => {
   const actions = renderPhase('idle');
   const start = queryButton('content.toolbar.video-recording.start')!;

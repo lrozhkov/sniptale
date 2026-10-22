@@ -45,6 +45,7 @@ vi.mock('./active-controls', (_importOriginal) => ({
 }));
 
 import { VideoSetupFooter } from './actions';
+import { RecordingIcon } from '../../../../ui/recording-icon';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 let root: Root | null = null;
@@ -129,7 +130,8 @@ it('offers one centered full-width start action with the recording marker', () =
   expect(mocks.activeFooter).not.toHaveBeenCalled();
   expect(mocks.actionButton).toHaveBeenCalledWith(
     expect.objectContaining({
-      iconClassName: 'fill-current text-[var(--sniptale-color-danger)]',
+      icon: RecordingIcon,
+      iconClassName: 'text-[var(--sniptale-color-danger)]',
       dataUi: 'popup.video-setup.start-recording-button',
       centered: true,
     })

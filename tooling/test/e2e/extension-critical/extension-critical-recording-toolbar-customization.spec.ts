@@ -171,6 +171,110 @@ async function drawingCanvasHasInk(canvas: Locator) {
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const orientation of ['horizontal', 'vertical'] as const) {
+    test(`recording ring icon and action border ${name} ${orientation}`, async ({}, info) => {
+      const host = await startHostServer();
+      const launched = await launchExtensionBrowser({ viewport: size });
+      try {
+        const worker =
+          launched.context.serviceWorkers()[0] ??
+          (await launched.context.waitForEvent('serviceworker'));
+        await worker.evaluate(
+          async (theme) => {
+            await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+          },
+          size.width === 1920 ? 'dark' : 'light'
+        );
+        const { page, popup } = await openDesignReview(
+          launched.context,
+          launched.extensionId,
+          host.origin,
+          size
+        );
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
+        if (orientation === 'vertical') {
+          await openRecordingToolbarSettings(page);
+          const vertical = page.getByRole('button', { name: /Vertical view|Вертикальный вид/u });
+          if (!(await vertical.isVisible()))
+            await page
+              .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+              .click();
+          await vertical.click();
+          await page.keyboard.press('Escape');
+        }
+        const start = page.locator('[data-ui="content.toolbar.video-recording.start"]');
+        await expect(start).toBeEnabled();
+        await expect(start).toHaveAccessibleName(/\S/u);
+        const icon = start.locator('svg[data-icon="recording"]');
+        await expect(icon.locator('circle')).toHaveCount(2);
+        await expect(icon.locator('circle').first()).toHaveCSS('fill', 'none');
+        await page.mouse.move(0, 0);
+        const bounds = (await start.boundingBox())!;
+        const borderAlpha = () =>
+          start.evaluate((button) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 1;
+            const context = canvas.getContext('2d')!;
+            context.fillStyle = getComputedStyle(button).borderTopColor;
+            context.fillRect(0, 0, 1, 1);
+            return context.getImageData(0, 0, 1, 1).data[3];
+          });
+        await expect.poll(borderAlpha).toBe(0);
+        await page.screenshot({ path: info.outputPath('rec-idle.png'), fullPage: false });
+        await start.hover();
+        await expect.poll(borderAlpha).toBeGreaterThan(0);
+        const hovered = (await start.boundingBox())!;
+        for (const key of ['x', 'y', 'width', 'height'] as const)
+          expect(Math.abs(hovered[key] - bounds[key])).toBeLessThanOrEqual(0.1);
+        await page.screenshot({ path: info.outputPath('rec-hover.png'), fullPage: false });
+        await popup.evaluate(async () => {
+          await chrome.storage.local.set({
+            sniptale_popup_startup: {
+              selection: 'video',
+              lastPage: 'video',
+              lastExportDestination: 'export',
+            },
+          });
+        });
+        const target = await triggerExtensionAction(launched.context, launched.extensionId, page);
+        const popupIconSelector =
+          '[data-ui="popup.video-setup.start-recording-button"] svg[data-icon="recording"]';
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              launched.context,
+              target,
+              `Boolean(document.querySelector(${JSON.stringify(popupIconSelector)}))`
+            )
+          )
+          .toBe(true);
+        expect(
+          await evaluateInTarget(
+            launched.context,
+            target,
+            `(() => {
+          const button = document.querySelector('[data-ui="popup.video-setup.start-recording-button"]');
+          const circles = button.querySelectorAll('circle');
+          return { radii: [...circles].map(circle => circle.getAttribute('r')),
+            outerFill: getComputedStyle(circles[0]).fill, named: Boolean(button.textContent.trim()) };
+        })()`
+          )
+        ).toEqual({ radii: ['10', '7'], outerFill: 'none', named: true });
+        await evaluateInTarget(launched.context, target, 'window.close()').catch(() => undefined);
+        await popup.setViewportSize({ width: 392, height: 560 });
+        await popup.reload();
+        await expect(
+          popup.locator(
+            '[data-ui="popup.video-setup.start-recording-button"] svg[data-icon="recording"]'
+          )
+        ).toBeVisible();
+        await popup.screenshot({ path: info.outputPath('popup-rec-icon.png'), fullPage: false });
+      } finally {
+        await closeExtensionBrowser(launched);
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+
     test(`embedded camera corner docking ${name} ${orientation}`, async ({}, info) => {
       const host = await startHostServer();
       const launched = await launchExtensionBrowser({ viewport: size, fakeMediaDevices: true });

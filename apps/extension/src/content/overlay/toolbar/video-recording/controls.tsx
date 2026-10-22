@@ -1,5 +1,4 @@
 import {
-  Circle,
   Check,
   LoaderCircle,
   Mic,
@@ -14,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Icon } from '@iconify/react';
 import eyeCogIcon from '@iconify-icons/tabler/eye-cog';
+import { RecordingIcon } from '../../../../ui/recording-icon';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -188,18 +188,13 @@ function RecordingLifecycleControl(props: {
         ref={triggerRef}
         disabled={visibility?.editing || visibility?.pending}
         dataUi="content.toolbar.video-recording.start"
-        tone="danger"
+        tone="default"
         title={translate('content.toolbar.videoRecordingStartHint')}
         onClick={(event) => void start(event.nativeEvent)}
         aria-expanded={confirmationOpen}
         aria-haspopup="dialog"
       >
-        <Circle
-          style={{ height: 13, width: 13 }}
-          fill="currentColor"
-          strokeWidth={2}
-          className="text-[var(--sniptale-color-danger)]"
-        />
+        <RecordingIcon size={18} className="text-[var(--sniptale-color-danger)]" />
       </ContentToolbarButton>
       {confirmationOpen ? (
         <RecordingStartConfirmation
