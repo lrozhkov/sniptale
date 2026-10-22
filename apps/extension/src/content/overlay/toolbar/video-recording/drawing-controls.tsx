@@ -1,4 +1,11 @@
-import { BrushCleaning, Check, Clock3, Eraser, Touchpad, type LucideIcon } from 'lucide-react';
+import {
+  BroomSparkles,
+  BrushCleaning,
+  Check,
+  Eraser,
+  Touchpad,
+  type LucideIcon,
+} from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -100,6 +107,11 @@ function AutoHideControl(props: {
   const dropdown = resolveLayout();
   const menuSide = useToolbarMenuDirection(resolveLayout);
   const label = translate('content.toolbar.recordingDrawingAutoHide');
+  const valueLabel =
+    props.delay > 0
+      ? `${props.delay} ${translate('content.toolbar.recordingDrawingAutoHideSeconds')}`
+      : translate('content.toolbar.recordingDrawingAutoHideOff');
+  const triggerLabel = `${label}: ${valueLabel}`;
   return (
     <div className="relative flex">
       <ContentToolbarButton
@@ -110,9 +122,10 @@ function AutoHideControl(props: {
         tone="property"
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={label}
-        title={label}
+        aria-label={triggerLabel}
+        title={triggerLabel}
         dataUi="content.toolbar.video-recording.auto-hide"
+        style={{ padding: 0 }}
         menuIndicator
         onClick={() => {
           if (open) closeMenu();
@@ -120,7 +133,36 @@ function AutoHideControl(props: {
           else setLocalOpen(true);
         }}
       >
-        <Clock3 size={18} />
+        <span
+          style={{
+            position: 'relative',
+            display: 'inline-flex',
+            flexShrink: 0,
+            width: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+            height: 'calc(var(--sniptale-toolbar-button-size) - 2px)',
+          }}
+        >
+          <BroomSparkles size={18} style={{ position: 'absolute', left: 4, top: 4 }} />
+          {props.delay > 0 && (
+            <span
+              aria-hidden="true"
+              data-ui="content.toolbar.video-recording.auto-hide-value"
+              style={{
+                position: 'absolute',
+                right: 4,
+                bottom: 1,
+                color: 'var(--sniptale-color-text-secondary)',
+                fontSize: 10,
+                fontWeight: 500,
+                lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+                pointerEvents: 'none',
+              }}
+            >
+              {props.delay}
+            </span>
+          )}
+        </span>
       </ContentToolbarButton>
       {open && dropdown.style ? (
         <ToolbarMenuDropdown

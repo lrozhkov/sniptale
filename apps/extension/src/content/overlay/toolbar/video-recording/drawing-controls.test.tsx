@@ -97,6 +97,9 @@ it('reuses the complete drawing catalog while recording owns navigation, eraser,
   );
   expect(owner.getAutoHideDelay()).toBe(0);
   expect(onAutoHideDelayChange).toHaveBeenCalledWith(5);
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.auto-hide-value"]')
+  ).toBeNull();
 
   act(() =>
     host
@@ -132,7 +135,7 @@ it('marks only the selected drawing auto-hide delay including off', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  for (const delay of [0, 3, 30] as const) {
+  for (const delay of [0, 3, 5, 10, 30, 0] as const) {
     owner.setAutoHideDelay(delay);
     act(() =>
       root.render(
@@ -145,6 +148,23 @@ it('marks only the selected drawing auto-hide delay including off', () => {
         />
       )
     );
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.video-recording.auto-hide"]'
+    )!;
+    expect(trigger.querySelector('svg.lucide-broom-sparkles')).not.toBeNull();
+    expect(trigger.querySelectorAll('svg')).toHaveLength(1);
+    const value = trigger.querySelector<HTMLElement>(
+      '[data-ui="content.toolbar.video-recording.auto-hide-value"]'
+    );
+    if (delay > 0) {
+      expect(value?.textContent).toBe(String(delay));
+      expect(value?.style.color).toBe('var(--sniptale-color-text-secondary)');
+      expect(value?.getAttribute('aria-hidden')).toBe('true');
+      expect(value?.parentElement?.style.position).toBe('relative');
+      expect(trigger.getAttribute('aria-label')).toContain(
+        `${delay} content.toolbar.recordingDrawingAutoHideSeconds`
+      );
+    } else expect(value).toBeNull();
     act(() =>
       host
         .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!

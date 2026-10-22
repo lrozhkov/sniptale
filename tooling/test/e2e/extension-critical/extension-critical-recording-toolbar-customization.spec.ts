@@ -620,6 +620,44 @@ async function expectRecordingControlOrder(
   }
 }
 
+async function expectAutoHideValue(trigger: Locator, delay: number) {
+  const icon = trigger.locator('svg.lucide-broom-sparkles');
+  await expect(icon).toBeVisible();
+  await expect(icon).toHaveAttribute('width', '18');
+  const value = trigger.locator('[data-ui="content.toolbar.video-recording.auto-hide-value"]');
+  if (delay === 0) {
+    await expect(value).toHaveCount(0);
+    return null;
+  }
+  await expect(value).toHaveText(String(delay));
+  const appearance = await value.evaluate((node) => {
+    const button = node.closest('button')!;
+    const icon = button.querySelector('svg')!.getBoundingClientRect();
+    const badge = node.getBoundingClientRect();
+    const bounds = button.getBoundingClientRect();
+    const probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;color:var(--sniptale-color-text-secondary)';
+    node.parentElement!.append(probe);
+    const neutral = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      color: getComputedStyle(node).color,
+      neutral,
+      right: bounds.right - badge.right,
+      bottom: bounds.bottom - badge.bottom,
+      centerX: badge.x + badge.width / 2 - (bounds.x + bounds.width / 2),
+      centerY: badge.y + badge.height / 2 - (bounds.y + bounds.height / 2),
+      iconOffset: { x: badge.x - icon.x, y: badge.y - icon.y },
+    };
+  });
+  expect(appearance.color).toBe(appearance.neutral);
+  expect(appearance.right).toBeGreaterThanOrEqual(1);
+  expect(appearance.bottom).toBeGreaterThanOrEqual(1);
+  expect(appearance.centerX).toBeGreaterThan(0);
+  expect(appearance.centerY).toBeGreaterThan(0);
+  return appearance.iconOffset;
+}
+
 for (const { name, size } of [
   ...PRIMARY_BROWSER_VIEWPORTS,
   { name: '960x560', size: { width: 960, height: 560 } },
@@ -696,7 +734,7 @@ for (const { name, size } of [
         await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
         await expectRecordingControlOrder(page, orientation, 'idle');
         await expectCursorSettings(page, popup, info);
-        for (const delay of [0, 3, 0]) {
+        for (const delay of [0, 3, 5, 10, 30, 0]) {
           const trigger = page.locator('[data-ui="content.toolbar.video-recording.auto-hide"]');
           const menu = page.locator('[data-ui="content.toolbar.video-recording.auto-hide-menu"]');
           await trigger.click();
@@ -709,11 +747,26 @@ for (const { name, size } of [
           }
           await expect(choice.locator('svg.lucide-check')).toHaveCount(1);
           await expect(menu.locator('svg.lucide-check')).toHaveCount(1);
+          const offset = await expectAutoHideValue(trigger, delay);
           if (delay === 3)
             await page.screenshot({
               path: info.outputPath('auto-hide-selected-check.png'),
               fullPage: false,
             });
+          if (delay === 30) {
+            await trigger.hover();
+            await page.mouse.down();
+            const pressedOffset = await expectAutoHideValue(trigger, delay);
+            expect(pressedOffset!.x).toBeCloseTo(offset!.x, 1);
+            expect(pressedOffset!.y).toBeCloseTo(offset!.y, 1);
+            await page.mouse.up();
+            await expect(menu).toHaveCount(0);
+            await page.screenshot({
+              path: info.outputPath('auto-hide-corner-value.png'),
+              fullPage: false,
+            });
+            continue;
+          }
           await trigger.click();
         }
         const bounds = await toolbar.boundingBox();
