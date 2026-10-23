@@ -156,6 +156,7 @@ it('restores the input shield when editable activation fails', () => {
 
   expect(() => actions.makeElementEditable(element)).toThrow(activationError);
   expect(setInputShieldSuspended.mock.calls).toEqual([[true], [false]]);
+  expect(mocks.cancelTransaction).toHaveBeenCalledOnce();
 });
 
 it('preserves the input shield when a later editable activation fails', () => {

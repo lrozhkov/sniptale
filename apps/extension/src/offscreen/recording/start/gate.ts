@@ -12,6 +12,9 @@ type Gate = StartBinding & {
 const RECORDING_BEGIN_TIMEOUT_MS = 10_000;
 let pending: Gate | null = null;
 
+/** Identifies an explicit cancellation of prepared recording activation. */
+export class RecordingBeginCancelledError extends Error {}
+
 function matches(left: StartBinding, right: StartBinding): boolean {
   return (
     left.recordingId === right.recordingId &&
@@ -85,5 +88,5 @@ export function cancelRecordingBegin(reason = 'Recording start was cancelled'): 
   const gate = pending;
   pending = null;
   clearTimeout(gate.timeout);
-  gate.reject(new Error(reason));
+  gate.reject(new RecordingBeginCancelledError(reason));
 }

@@ -31,7 +31,7 @@ Measure the content box after actual padding, borders, and scrollbar width. Do n
 
 Reserve scrollbar space only when overflow exists. Necessary check columns remain stable.
 
-Searchable catalogs keep the search field visible while their results scroll. Bound the surface to the viewport and its clipping ancestors. Long user-defined names must not expand the host layout. Use a native title for truncated names. Keep text behind the surface from showing through its input and option labels.
+Searchable catalogs keep the search field visible while their results scroll. Bound the surface to the viewport and its clipping ancestors. Long user-defined names must not expand the host layout. Follow [full-text access](localization.md#full-text-access) for truncated names. Keep text behind the surface from showing through its input and option labels.
 
 ## Pointer and keyboard contract
 

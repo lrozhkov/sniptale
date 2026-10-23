@@ -1,5 +1,4 @@
 import type { CameraPerspective, CameraDepthOfField, CameraSpatialRect } from '../motion/spatial';
-import type { MotionPhaseTransitions } from '../motion/transitions';
 import type { MotionBlurPhases } from '../motion/blur';
 export const VideoProjectSourceKind = {
   MANUAL: 'manual',
@@ -47,6 +46,15 @@ export const VideoTemporalEasing = {
 } as const;
 
 export type VideoTemporalEasing = (typeof VideoTemporalEasing)[keyof typeof VideoTemporalEasing];
+
+export type CameraTransitionType = 'none' | 'linear' | 'ease-in-out' | 'ease-out' | 'instant';
+export type CameraTransitionPhase = 'enter' | 'exit';
+export type MotionPhaseTransitions = Partial<
+  Record<CameraTransitionPhase, CameraTransitionType>
+> & {
+  /** Source-owned preference remains after its outgoing connection is removed. */
+  link?: VideoTemporalEasing;
+};
 
 export const VideoMotionFocusMode = {
   MANUAL: 'MANUAL',

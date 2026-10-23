@@ -20,26 +20,14 @@ import {
 import { createOffscreenProjectEffectRuntime } from './effect-runtime';
 import { syncVideoClipFrame } from './media-playback/frame';
 import { waitForMediaElementReady } from './media-loading/ready';
-import type { ExportJobState } from './types';
+import type { ExportJobState, ProjectExportCompositionJoinRenderer } from './types';
 
 type Input = ProjectCompositionSceneInput & {
   job: ProjectCompositionSceneInput['job'] &
     Pick<ExportJobState, 'compositionJoinRenderer' | 'clipMediaElements'>;
 };
 
-/** The existing job owns the immutable endpoints and borrowed-URL paused decoders. */
-export interface ProjectExportCompositionJoinRenderer {
-  project: Input['project'];
-  settings: Input['settings'];
-  clear(): void;
-  dispose(): void;
-  draw(
-    context: CanvasRenderingContext2D,
-    plan: VideoProjectCompositionJoinPlan | undefined,
-    time: number,
-    signal: AbortSignal
-  ): Promise<void>;
-}
+export type { ProjectExportCompositionJoinRenderer } from './types';
 
 /** Applies final composition joins and outer fades after the caller synchronizes its ordinary media. */
 export async function renderProjectCompositionFrame(args: Input): Promise<void> {

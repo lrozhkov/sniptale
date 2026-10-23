@@ -7,10 +7,10 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/page-access';
 import { PageAccessOperation as PageAccessOperationValue } from '@sniptale/runtime-contracts/messaging/page-access';
 
-const pageAccessSectionClassName = ['flex h-[88px] min-h-[88px] flex-col gap-1.5'].join(' ');
+const pageAccessSectionClassName = ['flex min-h-0 flex-col gap-1.5'].join(' ');
 
 const pageAccessButtonClassName = [
-  'flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-1.5 rounded-[12px] border px-1.5 py-2',
+  'flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-1.5 rounded-[6px] border px-1.5 py-2',
   'text-center text-[10px] font-semibold leading-[1.15] transition-colors',
   'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
   'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-muted)]',
@@ -20,16 +20,7 @@ const pageAccessButtonClassName = [
 
 function PageAccessErrorMessage({ message }: { message: string }) {
   return (
-    <div
-      className={[
-        'min-h-5 truncate rounded-[6px] border px-2 py-0.5 text-[10px]',
-        'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,var(--sniptale-color-border-soft)_86%)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_5%,var(--sniptale-color-surface-hover)_95%)]',
-        'text-[var(--sniptale-color-text-primary-strong)]',
-      ].join(' ')}
-      role="alert"
-      title={message}
-    >
+    <div className="popup-error-message" role="alert">
       {message}
     </div>
   );
@@ -79,7 +70,9 @@ export function PageAccessControls(props: {
 
   return (
     <section className={pageAccessSectionClassName} data-ui="popup.page-access.controls">
-      <div className={`grid min-h-0 flex-1 gap-2 ${isLocalFile ? 'grid-cols-1' : 'grid-cols-3'}`}>
+      <div
+        className={`grid min-h-[88px] shrink-0 gap-2 ${isLocalFile ? 'grid-cols-1' : 'grid-cols-3'}`}
+      >
         {isLocalFile ? (
           <PageAccessActionButton
             disabled={props.disabled}

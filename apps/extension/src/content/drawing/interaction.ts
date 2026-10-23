@@ -5,6 +5,7 @@ import {
   getDrawingObjectRotation,
   getDrawingObjectSkewX,
   getDrawingShapeShearOffset,
+  getDrawingSelectionBounds,
   hitTestDrawingDocument,
   replaceDrawingObjectBounds,
   resolveDrawingTextFontFamily,
@@ -13,6 +14,8 @@ import {
   transformDrawingObjectVector,
   untransformDrawingObjectVector,
   resolveDrawingTextHeight,
+  rotateDrawingObjectAround,
+  type DrawingBounds,
   type DrawingObject,
   type DrawingPoint,
   type DrawingResizeHandle,
@@ -21,17 +24,39 @@ import {
   type DrawingSession,
   type DrawingSelectionMode,
   createDrawingObject,
+  resolveDrawingArrowBendTarget,
+  type DrawingArrowBendTarget,
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
 import { resizeDrawingBox } from './box-resize';
-import type { DrawingViewportProjection } from './render';
+
+export type DrawingArrowHover = {
+  object: Extract<DrawingObject, { kind: 'arrow' }>;
+  target: DrawingArrowBendTarget;
+};
 
 export type PointerDraft =
   | { kind: 'create'; start: DrawingPoint; object: DrawingObject; arrowFromTip: boolean }
   | { kind: 'move'; start: DrawingPoint; original: DrawingObject; object: DrawingObject }
   | {
+      kind: 'bend';
+      start: DrawingPoint;
+      original: Extract<DrawingObject, { kind: 'arrow' }>;
+      object: Extract<DrawingObject, { kind: 'arrow' }>;
+      target: DrawingArrowBendTarget;
+    }
+  | {
       kind: 'move-selection';
       start: DrawingPoint;
+      originals: readonly DrawingObject[];
+      objects: readonly DrawingObject[];
+      object?: never;
+    }
+  | {
+      kind: 'rotate-selection';
+      start: DrawingPoint;
+      bounds: DrawingBounds;
+      angle: number;
       originals: readonly DrawingObject[];
       objects: readonly DrawingObject[];
       object?: never;
@@ -60,6 +85,7 @@ export type PointerDraft =
     };
 
 type DrawingPointerModifiers = {
+  altKey?: boolean;
   ctrlKey: boolean;
   shiftKey: boolean;
 };
@@ -78,7 +104,7 @@ function getDrawingTextMeasurementContext(): CanvasRenderingContext2D | null {
   return drawingTextMeasurementContext;
 }
 
-export function getDrawingViewportProjection(root: PageScrollRoot): DrawingViewportProjection {
+export function getDrawingViewportProjection(root: PageScrollRoot): Readonly<DrawingPoint> {
   const scroll = readPageScroll(root);
   if (root.kind !== 'element') return scroll;
   const rect = root.element.getBoundingClientRect();
@@ -190,6 +216,42 @@ export function rotateDrawingObject(
     resolveDrawingSnappedAngle(getDrawingObjectRotation(draft.original) + delta, modifiers)
   );
   return { ...draft.original, rotation };
+}
+
+export function getDrawingMultiRotationHandlePoint(bounds: DrawingBounds): DrawingPoint {
+  const center = getDrawingBoundsCenter(bounds);
+  const corner = { x: bounds.x + bounds.width, y: bounds.y };
+  const distance = Math.max(0.001, Math.hypot(corner.x - center.x, corner.y - center.y));
+  return {
+    x: corner.x + ((corner.x - center.x) / distance) * ROTATION_HANDLE_OFFSET,
+    y: corner.y + ((corner.y - center.y) / distance) * ROTATION_HANDLE_OFFSET,
+  };
+}
+
+export function isDrawingMultiRotationHandle(bounds: DrawingBounds, point: DrawingPoint): boolean {
+  const handle = getDrawingMultiRotationHandlePoint(bounds);
+  return Math.hypot(point.x - handle.x, point.y - handle.y) <= ROTATION_HANDLE_RADIUS;
+}
+
+export function rotateDrawingSelection(
+  draft: Extract<PointerDraft, { kind: 'rotate-selection' }>,
+  point: DrawingPoint,
+  modifiers: DrawingPointerModifiers
+): Extract<PointerDraft, { kind: 'rotate-selection' }> {
+  const center = getDrawingBoundsCenter(draft.bounds);
+  const startAngle = Math.atan2(draft.start.y - center.y, draft.start.x - center.x);
+  const nextAngle = Math.atan2(point.y - center.y, point.x - center.x);
+  const angle = normalizeAngle(
+    resolveDrawingSnappedAngle(
+      normalizeAngle(((nextAngle - startAngle) * 180) / Math.PI),
+      modifiers
+    )
+  );
+  return {
+    ...draft,
+    angle,
+    objects: draft.originals.map((object) => rotateDrawingObjectAround(object, center, angle)),
+  };
 }
 
 function withDrawingObjectRotation(object: DrawingObject, rotation: number): DrawingObject {
@@ -436,6 +498,20 @@ export function beginDrawingPointer(args: {
     snapshot.selectedObjectIds.includes(object.id)
   );
   const selected = selectedObjects.length === 1 ? selectedObjects[0] : null;
+  const selectionBounds =
+    selectedObjects.length > 1 ? getDrawingSelectionBounds(selectedObjects) : null;
+  if (selectionBounds && isDrawingMultiRotationHandle(selectionBounds, point)) {
+    return {
+      draft: {
+        kind: 'rotate-selection',
+        start: point,
+        bounds: selectionBounds,
+        angle: 0,
+        originals: selectedObjects,
+        objects: selectedObjects,
+      },
+    };
+  }
   const hit = hitTestDrawingDocument(snapshot.document.objects, point);
   const rotationHandle = selected ? resolveDrawingRotationHandle(selected, point) : null;
   if (selected && rotationHandle) {
@@ -453,6 +529,15 @@ export function beginDrawingPointer(args: {
   if (selected && handle) {
     return {
       draft: { kind: 'resize', start: point, original: selected, object: selected, handle },
+    };
+  }
+  const bend =
+    selected?.kind === 'arrow' && !modifiers.altKey && !modifiers.ctrlKey && !modifiers.shiftKey
+      ? resolveDrawingArrowBendTarget(selected, point)
+      : null;
+  if (selected?.kind === 'arrow' && bend) {
+    return {
+      draft: { kind: 'bend', start: point, original: selected, object: selected, target: bend },
     };
   }
   if (selected && hit?.id === selected.id && snapshot.activeTool !== 'select') {
@@ -532,7 +617,7 @@ export function commitDrawingPointerDraft(
 ): void {
   if (!draft) return;
   if (draft.kind === 'marquee') return;
-  if (draft.kind === 'move-selection') {
+  if (draft.kind === 'move-selection' || draft.kind === 'rotate-selection') {
     if (draft.objects.some((object, index) => object !== draft.originals[index]))
       session.replaceObjects(draft.objects);
     return;

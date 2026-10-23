@@ -70,12 +70,13 @@ export function useBackgroundCatalog() {
     status,
     reload,
     edit,
-    add: async (image: AcquiredBackground) => {
+    add: async (image: AcquiredBackground, name?: string) => {
       const mediaId = await retainBackgroundInLibrary(image);
       await edit({
         type: 'add',
         mediaId,
-        name: image.file.name.replace(/\.[^.]+$/, '').slice(0, 120) || 'Background',
+        name:
+          (name?.trim() || image.file.name.replace(/\.[^.]+$/, '')).slice(0, 120) || 'Background',
       });
     },
     presets: presets.map((preset) => {

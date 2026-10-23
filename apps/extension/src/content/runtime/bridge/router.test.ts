@@ -44,6 +44,7 @@ function createViewportInfo() {
 
 function createRegionSelectorController() {
   return {
+    isRegionSelectorActive: vi.fn(),
     hideRecordingOverlay: vi.fn(),
     hideRegionSelector: vi.fn(),
     showRecordingOverlay: vi.fn(),

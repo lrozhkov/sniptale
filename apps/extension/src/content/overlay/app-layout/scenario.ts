@@ -1,3 +1,10 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../platform/i18n';
+import { teardownDesignReviewSessionAfterUiTransition } from '../design-review/runtime/session-teardown';
+
+const logger = createLogger({ namespace: 'ContentToolbarExit' });
+
 type ScenarioBlockedModes = {
   aiPickMode: boolean;
   designReviewMode: boolean;
@@ -52,10 +59,13 @@ export function resolveScenarioByClickTransition(args: {
 }
 
 export function exitScreenshotModeFromUserAction(args: UserScreenshotModeExitArgs): void {
-  args.modeController.handleToggleScreenshotMode(false);
-  if (!args.keepPinnedForAutoBlur) {
-    args.setPinToTab(false);
-  }
+  void teardownDesignReviewSessionAfterUiTransition(() => {
+    args.modeController.handleToggleScreenshotMode(false);
+    if (!args.keepPinnedForAutoBlur) args.setPinToTab(false);
+  }).catch((error) => {
+    logger.error('Failed to restore page changes before toolbar exit', error);
+    showToast(translate('content.toolbar.screenshotDisableError'), 'error');
+  });
 }
 
 export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {

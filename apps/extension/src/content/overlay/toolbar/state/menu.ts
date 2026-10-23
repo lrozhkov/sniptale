@@ -37,12 +37,16 @@ export interface ToolbarMenuState {
   toggleMenu: (menu: ToolbarPopoverMenu) => void;
 }
 
-let escapeOwner: (() => void) | null = null;
+let escapeOwner: { onClose: () => void; shouldDefer: (() => boolean) | undefined } | null = null;
 
-export function registerToolbarMenuEscapeOwner(owner: () => void): () => void {
-  escapeOwner = owner;
+export function registerToolbarMenuEscapeOwner(
+  owner: () => void,
+  shouldDefer?: () => boolean
+): () => void {
+  const registration = { onClose: owner, shouldDefer };
+  escapeOwner = registration;
   return () => {
-    if (escapeOwner === owner) escapeOwner = null;
+    if (escapeOwner === registration) escapeOwner = null;
   };
 }
 
@@ -74,12 +78,13 @@ export function useToolbarMenuState(): ToolbarMenuState {
       if (event.key !== 'Escape' || menu === null) {
         return;
       }
+      if (escapeOwner?.shouldDefer?.()) return;
 
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
       const snapshot = focusOwner.snapshot();
-      if (escapeOwner) escapeOwner();
+      escapeOwner?.onClose();
       if (activeMenuTypeRef.current === menu) setActiveMenuType(null);
       pendingRestore.current = snapshot;
     };

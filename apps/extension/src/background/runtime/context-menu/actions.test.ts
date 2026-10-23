@@ -213,6 +213,10 @@ function seedContextMenuActionMocks() {
 }
 
 async function verifyPresetRecordingRouting() {
+  loadVideoSettingsMock.mockResolvedValueOnce({
+    ...contextMenuVideoSettingsFixture,
+    warnWithoutMicrophone: false,
+  });
   await handleBackgroundContextMenuAction({
     deps: createDeps(),
     menuId: CONTEXT_MENU_VIDEO_PRESET_ID,

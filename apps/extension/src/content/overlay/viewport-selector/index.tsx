@@ -10,6 +10,7 @@ import type { ProductToolbarMenuPlacement } from '@sniptale/ui/product-menus/too
 import { ViewportSelectorButton, ViewportSelectorMenu } from './views';
 import { useViewportSelectorMenu } from './menu';
 import { useViewportSelectorPresets } from './presets';
+import { useToolbarMenuDirection } from '../toolbar/menu/direction';
 
 interface ViewportSelectorProps {
   windowSize?: ScreenshotWindowSizeControls;
@@ -157,12 +158,17 @@ export const ViewportSelector = forwardRef<ViewportSelectorRef, ViewportSelector
       wrapperRef,
     });
     const menuPlacement = resolveToolbarMenuPlacement(displayMode, menuPosition);
+    const menuSide = useToolbarMenuDirection(() => ({
+      placement: menuPlacement,
+      style: resolveViewportSelectorMenuStyle({ displayMode, menuPosition, wrapperRef }),
+    }));
 
     useViewportSelectorHandle(ref, menuRef, setShowMenu);
 
     return (
       <div
         className="sniptale-viewport-wrapper"
+        data-menu-side={menuSide}
         ref={wrapperRef as React.RefObject<HTMLDivElement>}
       >
         <ViewportSelectorButton

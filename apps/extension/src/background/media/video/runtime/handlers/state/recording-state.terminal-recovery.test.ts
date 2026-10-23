@@ -306,6 +306,53 @@ it('persists terminal intent before Stop dispatch and keeps it through worker-me
   expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.IDLE);
 });
 
+it('lets the bound Stop acknowledgement settle a concurrent startup error', async () => {
+  await start(CaptureMode.TAB);
+  const entered = deferred();
+  const release = deferred();
+  boundary.requestStop.mockImplementationOnce(async () => {
+    entered.resolve();
+    await release.promise;
+    return { terminalError: null, recordingPointTransform: null };
+  });
+  const stopped = stopRecording(true);
+  await entered.promise;
+  await new Promise((resolve) => {
+    handleOffscreenError({ recordingId, phase: 'start', error: 'Source unavailable' }, resolve);
+  });
+  const pending = getActiveVideoRecordingLeaseSnapshot();
+  release.resolve();
+  await expect(stopped).resolves.toEqual({ result: 'accepted' });
+  expect(pending).toMatchObject({
+    phase: 'terminal',
+    terminal: { outcome: 'unknown' },
+  });
+  expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.IDLE);
+  expect(getVideoRecordingId()).toBeNull();
+});
+
+it('does not classify startup failure as failed cleanup while Stop intent is committing', async () => {
+  await start(CaptureMode.TAB);
+  const entered = deferred();
+  const release = deferred();
+  boundary.set.mockImplementationOnce(async (values: Record<string, unknown>) => {
+    entered.resolve();
+    await release.promise;
+    Object.assign(stored, structuredClone(values));
+  });
+  const stopping = stopRecording(true);
+  await entered.promise;
+  const error = new Promise((resolve) => {
+    handleOffscreenError({ recordingId, phase: 'start', error: 'Source unavailable' }, resolve);
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  release.resolve();
+  await expect(stopping).resolves.toEqual({ result: 'accepted' });
+  await error;
+  expect(getVideoRecordingRuntimeState().status).toBe(VideoRecordingStatus.IDLE);
+  expect(getVideoRecordingId()).toBeNull();
+});
+
 it('does not dispatch Stop when terminal intent storage refuses the write', async () => {
   await start(CaptureMode.TAB);
   setVideoRecordingRuntimeState({ status: VideoRecordingStatus.RECORDING });

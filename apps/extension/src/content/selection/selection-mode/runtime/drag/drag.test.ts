@@ -246,6 +246,23 @@ function registerSuppressedOutputTest() {
 }
 
 describe('selection-mode runtime drag lifecycle', () => {
+  it.each(['isResizing', 'isDragging'] as const)(
+    'hides chrome during %s and restores it after release',
+    (gesture) => {
+      const args = createArgs();
+      applySelectionModeDragSelectionMock.mockReturnValue(createDragRuntime());
+      args.state.dom.finalFrame = document.createElement('div');
+      args.state.dom.sizePanel = document.createElement('div');
+      args.state[gesture] = true;
+      updateSelectionModeFinalFrame(args);
+      expect(args.state.dom.finalFrame.style.opacity).toBe('0');
+      expect(args.state.dom.sizePanel.style.visibility).toBe('hidden');
+      args.state[gesture] = false;
+      updateSelectionModeFinalFrame(args);
+      expect(args.state.dom.finalFrame.style.opacity).toBe('1');
+      expect(args.state.dom.sizePanel.style.visibility).toBe('visible');
+    }
+  );
   registerHoverLifecycleTest();
   registerElementSelectionTest();
   registerDragResultTest();

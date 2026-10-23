@@ -4,6 +4,19 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { runtimeModeMessageContracts } from './mode';
 
 describe('runtimeModeMessageContracts', () => {
+  it('parses borrowed-only cleanup identity without weakening legacy Close', () => {
+    const contract = runtimeModeMessageContracts[MessageType.DISABLE_SCREENSHOT_MODE];
+    const request = {
+      type: MessageType.DISABLE_SCREENSHOT_MODE,
+      quickActionTransactionId: 'transaction-1',
+    };
+    expect(contract.parseRequest(request)).toEqual(request);
+    expect(contract.parseRequest({ type: MessageType.DISABLE_SCREENSHOT_MODE })).toEqual({
+      type: MessageType.DISABLE_SCREENSHOT_MODE,
+    });
+    expect(() => contract.parseRequest({ ...request, quickActionTransactionId: 42 })).toThrow();
+    expect(() => contract.parseRequest({ ...request, quickActionTransactionId: null })).toThrow();
+  });
   it('accepts a narrow content intent on screenshot enable and rejects malformed intent', () => {
     const contract = runtimeModeMessageContracts[MessageType.ENABLE_SCREENSHOT_MODE];
     expect(

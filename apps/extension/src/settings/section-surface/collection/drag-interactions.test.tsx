@@ -19,12 +19,13 @@ let root: Root;
 function dispatchPointer(
   target: Element | null,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
-  options: { clientY?: number; pointerId?: number } = {}
+  options: { clientX?: number; clientY?: number; pointerId?: number } = {}
 ) {
   const event = new MouseEvent(type, {
     bubbles: true,
     button: 0,
     cancelable: true,
+    clientX: options.clientX ?? 0,
     clientY: options.clientY ?? 0,
   });
   Object.defineProperty(event, 'pointerId', { value: options.pointerId ?? 1 });
@@ -62,7 +63,120 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('SettingsCollection asynchronous drop completion', () => {
+  it('keeps the preview order until the asynchronous move settles', async () => {
+    let finish!: () => void;
+    const onMove = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const render = (nextItems = items) =>
+      act(() =>
+        root.render(
+          <SettingsCollection
+            ariaLabel="Pending move"
+            items={nextItems}
+            onAction={vi.fn()}
+            onMove={onMove}
+          />
+        )
+      );
+    render();
+    const source = container.querySelector('[data-settings-collection-item="first"] button');
+    const destination = container.querySelector('[data-settings-collection-item="second"]');
+    pointAt(destination);
+    act(() => dispatchPointer(source, 'pointerdown'));
+    act(() => dispatchPointer(source, 'pointermove', { clientY: 100 }));
+    const order = () =>
+      [...container.querySelectorAll<HTMLElement>('[data-settings-collection-item]')].map(
+        (row) => row.dataset['settingsCollectionItem']
+      );
+    expect(order()).toEqual(['second', 'first']);
+    act(() => dispatchPointer(source, 'pointerup', { clientY: 100 }));
+    expect(onMove).toHaveBeenCalledTimes(1);
+    expect(order()).toEqual(['second', 'first']);
+    expect(container.querySelector('[data-settings-collection-item="first"] button')).toBe(source);
+    render([items[1]!, items[0]!]);
+    await act(async () => finish());
+    expect(order()).toEqual(['second', 'first']);
+  });
+
+  it('restores authoritative order after a failed asynchronous move', async () => {
+    let rejectMove!: (reason: Error) => void;
+    const onMove = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectMove = reject;
+        })
+    );
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Failed move"
+          items={items}
+          onAction={vi.fn()}
+          onMove={onMove}
+        />
+      )
+    );
+    const source = container.querySelector('[data-settings-collection-item="first"] button');
+    pointAt(container.querySelector('[data-settings-collection-item="second"]'));
+    act(() => dispatchPointer(source, 'pointerdown'));
+    act(() => dispatchPointer(source, 'pointermove', { clientY: 100 }));
+    act(() => dispatchPointer(source, 'pointerup', { clientY: 100 }));
+    expect(
+      container
+        .querySelector('[data-settings-collection-item]')
+        ?.getAttribute('data-settings-collection-item')
+    ).toBe('second');
+    await act(async () => rejectMove(new Error('Save failed')));
+    expect(
+      container
+        .querySelector('[data-settings-collection-item]')
+        ?.getAttribute('data-settings-collection-item')
+    ).toBe('first');
+    expect(container.textContent).toContain('Перемещение отменено');
+    expect(
+      container.querySelector('[data-settings-collection-item="first"] button')
+    ).not.toBeNull();
+  });
+});
+
 describe('SettingsCollection drag lifecycle', () => {
+  it('uses horizontal pointer movement to reorder tiles in the same row', () => {
+    const onMove = vi.fn();
+    act(() =>
+      root.render(
+        <SettingsCollection
+          ariaLabel="Palette tiles"
+          layout="tiles"
+          items={items}
+          onAction={vi.fn()}
+          onMove={onMove}
+        />
+      )
+    );
+    for (const [index, row] of [
+      ...container.querySelectorAll<HTMLElement>('[data-settings-collection-item]'),
+    ].entries()) {
+      row.getBoundingClientRect = () =>
+        ({ top: 0, left: index * 200, width: 190, height: 44, bottom: 44 }) as DOMRect;
+    }
+    const handle = container.querySelector<HTMLElement>('[aria-label="Изменить позицию"]');
+    act(() => dispatchPointer(handle, 'pointerdown', { clientX: 20, clientY: 20 }));
+    act(() => dispatchPointer(document.body, 'pointermove', { clientX: 350, clientY: 20 }));
+    expect(onMove).not.toHaveBeenCalled();
+    act(() => dispatchPointer(document.body, 'pointerup', { clientX: 350, clientY: 20 }));
+    expect(onMove).toHaveBeenCalledExactlyOnceWith({
+      itemId: 'first',
+      beforeItemId: null,
+      groupId: null,
+      source: 'drag',
+    });
+  });
+
   it('announces rejected self and cross-group drops as cancelled', () => {
     const onMove = vi.fn();
     act(() =>

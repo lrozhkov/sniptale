@@ -1,5 +1,6 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { detachCachedPreview } from '../setup/desktop-media';
+import { cleanupCountdownCameraPreview } from '../countdown-preview';
 import { recordingContext } from '../context';
 import { cleanupActiveSidecarRecorders } from '../sidecar';
 import { cancelRecordingBegin } from './gate';
@@ -18,6 +19,7 @@ export function cleanupResources(): void {
 function cleanupOwnedRecordingResources(): void {
   logger.debug('Cleaning up recording resources');
   cancelRecordingBegin();
+  cleanupCountdownCameraPreview();
 
   detachCachedPreview();
   cleanupActiveSidecarRecorders();

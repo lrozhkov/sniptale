@@ -3,6 +3,7 @@
 @import './toolbar/transient/root.css';
 @import './tailwind.css';
 @import './foundation.css';
+@import './interface-labels.css';
 @import './product-form-controls/index.css';
 @import './popup-shell/select.css';
 @import './toolbar/legacy-shell.css';

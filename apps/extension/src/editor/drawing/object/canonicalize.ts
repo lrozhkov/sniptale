@@ -53,6 +53,7 @@ export function canonicalizeModifiedEditorDrawingSelection(args: {
     args.object instanceof ActiveSelection ? args.object.getObjects() : [args.object];
   const drawingObjects = selected.filter((object) => readEditorDrawingObject(object) !== null);
   if (drawingObjects.length === 0) return null;
+  if (args.canvas._currentTransform?.target === args.object) args.canvas._currentTransform = null;
   if (args.object instanceof ActiveSelection) args.canvas.discardActiveObject();
   const replacements = selected.map((object) =>
     readEditorDrawingObject(object)

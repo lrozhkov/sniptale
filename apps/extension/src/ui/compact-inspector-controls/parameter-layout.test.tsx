@@ -3,7 +3,7 @@ import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { InspectorLayout, InspectorParameterRow } from './layout';
+import { InspectorLayout, InspectorParameterRow, InspectorSurface } from './layout';
 import { CheckboxField, ColorField, SelectField, ToggleField } from './controls';
 import { TextField } from './text-field';
 import { NumericRow } from './numeric';
@@ -22,6 +22,27 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+});
+
+it('owns canonical inspector styling and switches focus paint without replacing native focus', () => {
+  act(() =>
+    root.render(
+      <InspectorSurface aria-label="Cursor settings">
+        <ToggleField label="Enabled" value={false} onChange={vi.fn()} />
+      </InspectorSurface>
+    )
+  );
+  const surface = host.querySelector<HTMLElement>('.sniptale-inspector-surface')!;
+  const button = surface.querySelector<HTMLButtonElement>('button')!;
+  expect(surface.classList.contains('sniptale-compact-workspace')).toBe(true);
+  expect(surface.dataset['focusModality']).toBe('pointer');
+  act(() => button.focus());
+  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+  expect(surface.dataset['focusModality']).toBe('keyboard');
+  act(() => button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  expect(surface.dataset['focusModality']).toBe('pointer');
+  expect(document.activeElement).toBe(button);
+  expect(surface.querySelector('.sniptale-parameter-row')).not.toBeNull();
 });
 
 it('keeps color names and padding inert while its value edits and selects all text', () => {

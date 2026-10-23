@@ -137,29 +137,174 @@ export type WebcamPresentationMode =
 
 export const WebcamPresentationShape = {
   CIRCLE: 'circle',
+  SQUARE: 'square',
   RECTANGLE: 'rectangle',
+  SOFT: 'soft',
+  ELLIPSE: 'ellipse',
 } as const;
 
 export type WebcamPresentationShape =
   (typeof WebcamPresentationShape)[keyof typeof WebcamPresentationShape];
+
+/** Appearance of page-local recording effects; does not replace the native cursor. */
+export interface VideoCursorEffectSettings {
+  haloSize: number;
+  haloOpacity: number;
+  dimmingRadius: number;
+  dimmingOpacity: number;
+  clickSize: number;
+  clickDuration: number;
+  haloColor?: string;
+  dimmingColor?: string;
+  clickColor?: string;
+  clickEffect?: 'ripple' | 'press' | 'glow';
+  clickEasing?: 'linear' | 'ease-out' | 'ease-in-out';
+  clickStroke?: number;
+  clickPulses?: number;
+  haloStroke?: number;
+  haloGlow?: number;
+}
+
+export const DEFAULT_VIDEO_CURSOR_EFFECTS: Readonly<VideoCursorEffectSettings> = {
+  haloSize: 34,
+  haloOpacity: 100,
+  dimmingRadius: 54,
+  dimmingOpacity: 34,
+  clickSize: 44,
+  clickDuration: 420,
+  clickEffect: 'ripple',
+  clickEasing: 'ease-out',
+  clickStroke: 2,
+  clickPulses: 1,
+  haloStroke: 2,
+  haloGlow: 8,
+};
+
+export const VIDEO_CURSOR_EFFECT_LIMITS = {
+  haloSize: [20, 120],
+  haloOpacity: [10, 100],
+  dimmingRadius: [30, 240],
+  dimmingOpacity: [0, 80],
+  clickSize: [16, 120],
+  clickDuration: [150, 1200],
+  clickStroke: [0.5, 8],
+  clickPulses: [1, 5],
+  haloStroke: [0.5, 8],
+  haloGlow: [0, 40],
+} as const;
+
+function isCursorEffectNumber(value: unknown, bounds: readonly [number, number]): boolean {
+  return (
+    typeof value === 'number' && Number.isFinite(value) && value >= bounds[0] && value <= bounds[1]
+  );
+}
+
+function isCursorEffectColor(value: unknown): boolean {
+  return typeof value === 'string' && /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
+}
+
+/** Reject incomplete, unknown, or out-of-range appearance values at data boundaries. */
+export function isVideoCursorEffectSettings(value: unknown): value is VideoCursorEffectSettings {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length >= 6 &&
+    Object.keys(value).length <= 15 &&
+    Object.keys(value).every(
+      (key) =>
+        Object.hasOwn(VIDEO_CURSOR_EFFECT_LIMITS, key) ||
+        ['haloColor', 'dimmingColor', 'clickColor', 'clickEffect', 'clickEasing'].includes(key)
+    ) &&
+    (!('haloColor' in value) || isCursorEffectColor(value.haloColor)) &&
+    (!('dimmingColor' in value) || isCursorEffectColor(value.dimmingColor)) &&
+    (!('clickColor' in value) || isCursorEffectColor(value.clickColor)) &&
+    (!('clickEffect' in value) ||
+      (typeof value.clickEffect === 'string' &&
+        ['ripple', 'press', 'glow'].includes(value.clickEffect))) &&
+    (!('clickEasing' in value) ||
+      (typeof value.clickEasing === 'string' &&
+        ['linear', 'ease-out', 'ease-in-out'].includes(value.clickEasing))) &&
+    (!('clickStroke' in value) ||
+      isCursorEffectNumber(value.clickStroke, VIDEO_CURSOR_EFFECT_LIMITS.clickStroke)) &&
+    (!('clickPulses' in value) ||
+      (Number.isInteger(value.clickPulses) &&
+        isCursorEffectNumber(value.clickPulses, VIDEO_CURSOR_EFFECT_LIMITS.clickPulses))) &&
+    (!('haloStroke' in value) ||
+      isCursorEffectNumber(value.haloStroke, VIDEO_CURSOR_EFFECT_LIMITS.haloStroke)) &&
+    (!('haloGlow' in value) ||
+      isCursorEffectNumber(value.haloGlow, VIDEO_CURSOR_EFFECT_LIMITS.haloGlow)) &&
+    'haloSize' in value &&
+    isCursorEffectNumber(value.haloSize, VIDEO_CURSOR_EFFECT_LIMITS.haloSize) &&
+    'haloOpacity' in value &&
+    isCursorEffectNumber(value.haloOpacity, VIDEO_CURSOR_EFFECT_LIMITS.haloOpacity) &&
+    'dimmingRadius' in value &&
+    isCursorEffectNumber(value.dimmingRadius, VIDEO_CURSOR_EFFECT_LIMITS.dimmingRadius) &&
+    'dimmingOpacity' in value &&
+    isCursorEffectNumber(value.dimmingOpacity, VIDEO_CURSOR_EFFECT_LIMITS.dimmingOpacity) &&
+    'clickSize' in value &&
+    isCursorEffectNumber(value.clickSize, VIDEO_CURSOR_EFFECT_LIMITS.clickSize) &&
+    'clickDuration' in value &&
+    isCursorEffectNumber(value.clickDuration, VIDEO_CURSOR_EFFECT_LIMITS.clickDuration)
+  );
+}
 
 export interface VideoRecordingSurfaceSettings {
   toolbarEnabled: boolean;
   cursorSpotlightEnabled: boolean;
   cursorDimmingEnabled?: boolean;
   cursorClickAnimationEnabled?: boolean;
+  cursorEffects?: VideoCursorEffectSettings;
+}
+
+export const WEBCAM_DOCK_POSITIONS = [
+  'nw',
+  'n',
+  'ne',
+  'w',
+  'e',
+  'sw',
+  's',
+  'se',
+  'n25',
+  'n75',
+  's25',
+  's75',
+  'w25',
+  'w75',
+  'e25',
+  'e75',
+] as const;
+export type WebcamDockPosition = (typeof WEBCAM_DOCK_POSITIONS)[number];
+
+/** Admits only supported camera edge and corner anchors. */
+export function isWebcamDockPosition(value: unknown): value is WebcamDockPosition {
+  return WEBCAM_DOCK_POSITIONS.some((position) => position === value);
 }
 
 export interface WebcamPresentationSettings {
   mode: WebcamPresentationMode;
+  /** Missing or false enables anchored placement. */
+  freePlacement?: boolean;
+  /** Controls anchored geometry. Missing values preserve the legacy center quadrant. */
+  dockPosition?: WebcamDockPosition;
   shape: WebcamPresentationShape;
   center: { x: number; y: number };
   sizeFraction: number;
   cropOffset: { x: number; y: number };
+  /** Optional page-local appearance; absent fields retain the legacy camera rendering. */
+  appearance?: {
+    roundness: number;
+    zoom: number;
+    mirror: boolean;
+    shadow: boolean;
+    shadowColor: string;
+  };
 }
 
 export interface VideoRecordingSettings {
   microphoneEnabled: boolean;
+  warnWithoutMicrophone?: boolean;
   microphoneDeviceId: string | null;
   echoCancellation?: boolean;
   noiseSuppression?: boolean;
@@ -294,7 +439,16 @@ export interface VideoRecordingCompletionState {
   pending: boolean;
 }
 
+/** Transient microphone-only signal observation. This value does not identify speech or retain audio. */
+export interface VideoMicrophoneActivity {
+  status: 'disabled' | 'unavailable' | 'ready';
+  level: number;
+  warning: boolean;
+}
+
 export interface VideoRecordingRuntimeState {
+  outputProfile?: VideoOutputProfile | null;
+  microphoneActivity?: VideoMicrophoneActivity | null;
   completion?: VideoRecordingCompletionState | null;
   status: VideoRecordingStatus;
   duration: number;

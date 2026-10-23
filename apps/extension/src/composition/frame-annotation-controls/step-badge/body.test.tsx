@@ -117,9 +117,7 @@ it('forks any template in one click, guards unsaved return, and opens saving onl
   act(() => confirmApply.click());
   expect(onApplyToFuture).toHaveBeenCalledOnce();
 
-  const back = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-    (button) => button.textContent === translate('content.templateFork.backToTemplates')
-  )!;
+  const back = host.querySelector<HTMLButtonElement>('[data-settings-action="back-to-templates"]')!;
   act(() => back.click());
   expect(host.querySelector('[data-ui="content.template-fork.return-guard"]')).not.toBeNull();
   const save = [...host.querySelectorAll<HTMLButtonElement>('button')].find(

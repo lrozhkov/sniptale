@@ -20,6 +20,7 @@ import type {
   RecordingDrawingOwner,
 } from './video-recording/drawing-session';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type { WebcamPresentationPatch } from '../../../features/video/recording/webcam-presentation';
 
 export interface ToolbarVideoRecordingProps {
   drawingOwner: RecordingDrawingOwner;
@@ -28,20 +29,27 @@ export interface ToolbarVideoRecordingProps {
   onCancelStart: () => Promise<void> | void;
   onCameraEnabledChange: (enabled: boolean) => Promise<void> | void;
   onCameraDeviceChange?: (deviceId: string) => Promise<void> | void;
-  onCameraGeometryChange: (
-    appearance: Pick<
-      ToolbarVideoRecordingProps['state']['webcamPresentation'],
-      'shape' | 'center' | 'sizeFraction' | 'cropOffset'
-    >
+  onCameraPresentationModeChange?: (
+    mode: ToolbarVideoRecordingProps['state']['webcamPresentation']['mode']
   ) => Promise<void> | void;
+  onCameraGeometryChange: (
+    appearance: Omit<WebcamPresentationPatch, 'mode'>
+  ) => Promise<void> | void;
+  onCameraGeometryPreview?: (
+    appearance: Omit<ToolbarVideoRecordingProps['state']['webcamPresentation'], 'mode'> | null
+  ) => void;
   onCameraOffer: (sdp: string) => Promise<string>;
   onCameraPeerClose: () => Promise<void> | void;
   onDeactivate: () => Promise<boolean> | boolean;
   onAutoHideDelayChange?: (delay: RecordingDrawingAutoHideDelay) => Promise<void> | void;
   onInteractionChange: (interaction: VideoRecordingToolbarInteraction) => void;
   onMicrophoneEnabledChange: (enabled: boolean) => Promise<void> | void;
+  onMicrophoneGainChange?: (gain: number) => Promise<void> | void;
   onMicrophoneDeviceChange?: (deviceId: string) => Promise<void> | void;
-  onLoadMediaDevices?: (kind: 'audioinput' | 'videoinput') => Promise<VideoRecordingMediaDevice[]>;
+  onLoadMediaDevices?: (
+    kind: 'audioinput' | 'videoinput',
+    requestPermission?: boolean
+  ) => Promise<VideoRecordingMediaDevice[]>;
   onPause: () => Promise<void> | void;
   onResume: () => Promise<void> | void;
   onSpotlightEnabledChange: (enabled: boolean) => Promise<void> | void;
@@ -49,8 +57,12 @@ export interface ToolbarVideoRecordingProps {
     cursorHaloEnabled: boolean;
     cursorDimmingEnabled: boolean;
     clickAnimationEnabled: boolean;
+    cursorEffects?: NonNullable<VideoRecordingToolbarState['cursorEffects']>;
   }) => Promise<void> | void;
-  onStart: (activationEvent?: Event) => Promise<void> | void;
+  onStart: (
+    activationEvent?: Event,
+    confirmation?: { confirmedWithoutMicrophone?: boolean; rememberWithoutMicrophone?: boolean }
+  ) => Promise<'confirmation-required' | 'started' | 'failed' | void> | void;
   onStop: () => Promise<void> | void;
 }
 
@@ -105,7 +117,7 @@ export interface ToolbarCaptureActionsProps {
   ) => void;
   onCaptureActionChange: (action: CaptureActionType) => void;
   onCaptureActionCommitted?: (action: CaptureActionType) => Promise<void> | void;
-  onClose: () => void;
+  onClose: (restoreFocus?: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
   timerDelay: number;
   onTimerDelayChange: (delay: number) => void;
@@ -190,7 +202,7 @@ export interface ToolbarProps {
     type: 'visible' | 'full' | 'selection',
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
-  onHide: () => void;
+  onHide: (restoreFocus?: boolean) => void;
   onClearHighlights: () => void;
   onClearPagePreparation?: () => void;
   canClearPagePreparation?: boolean;

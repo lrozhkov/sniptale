@@ -83,6 +83,7 @@ export interface DrawingArrowObject extends DrawingObjectBase {
   readonly kind: 'arrow';
   readonly start: DrawingPoint;
   readonly end: DrawingPoint;
+  readonly bendPoints?: readonly DrawingPoint[];
   readonly color: string;
   readonly design?: DrawingArrowDesign;
   readonly dynamicWidth: boolean;
@@ -150,6 +151,7 @@ export interface DrawingToolDefaults {
 export type DrawingShapeKind = 'rectangle' | 'ellipse' | 'triangle' | 'parallelogram';
 export type DrawingCreatableShapeKind = Exclude<DrawingShapeKind, 'parallelogram'>;
 export type DrawingArrowDesign = 'standard' | 'freehand';
+export const MAX_DRAWING_ARROW_BENDS = 128;
 export type DrawingFontFamily = 'sans' | 'serif' | 'mono' | 'handwritten';
 
 export const DRAWING_PENCIL_WIDTHS = [2, 4, 8, 16] as const;

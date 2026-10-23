@@ -13,6 +13,11 @@ vi.mock('../../recording/webcam', async (importOriginal) => ({
   requestWebcamPermission: vi.fn(),
 }));
 
+vi.mock('../../recording/media-devices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/media-devices')>()),
+  readPopupMediaAccessState: vi.fn().mockResolvedValue('granted'),
+}));
+
 const runtimeSendMessage = vi.fn();
 const tabsQuery = vi.fn();
 const setIsStartPending = vi.fn();

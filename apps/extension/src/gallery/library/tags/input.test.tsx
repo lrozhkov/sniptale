@@ -94,11 +94,15 @@ it('portals suggestions outside clipped content into their owning modal and repo
   expect(list.style.position).toBe('fixed');
   expect(list.style.top).toBe('475px');
   expect(list.style.transform).toBe('translateY(-100%)');
-  expect(Number.parseFloat(list.style.maxHeight)).toBeLessThanOrEqual(208);
+  const availableAbove = Number.parseFloat(list.style.top) - 8;
+  expect(Number.parseFloat(list.style.maxHeight)).toBe(availableAbove);
   top = 300;
   act(() => container!.dispatchEvent(new Event('scroll')));
   expect(list.style.top).toBe('337px');
   expect(list.style.transform).toBe('');
+  expect(Number.parseFloat(list.style.top) + Number.parseFloat(list.style.maxHeight)).toBe(
+    window.innerHeight - 8
+  );
   top = 320;
   act(() => window.dispatchEvent(new Event('resize')));
   expect(list.style.top).toBe('357px');

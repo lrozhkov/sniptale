@@ -120,11 +120,12 @@ function FilterMenuOption(props: {
     <button
       aria-checked={props.active}
       className={[
-        'flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
+        'flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-[4px] px-2 py-1.5',
+        'text-left text-xs transition-colors',
         'focus-visible:outline-none focus-visible:ring-2',
         'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
         props.active
-          ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent-emphasis)]'
+          ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
           : 'hover:bg-[var(--sniptale-color-surface-hover)]',
       ].join(' ')}
       data-active={props.active ? 'true' : 'false'}
@@ -172,7 +173,7 @@ function FilterMenuContent(
   };
 
   return (
-    <>
+    <div className="grid gap-0.5">
       {props.tags.map((tag) => (
         <FilterMenuOption
           active={props.activeFilterTagIds.includes(tag.id)}
@@ -189,9 +190,9 @@ function FilterMenuContent(
       {props.activeFilterTagIds.length > 0 ? (
         <button
           className={[
-            'mt-1 w-full cursor-pointer rounded-lg px-2 py-1.5 text-left text-xs transition-colors',
-            'text-[var(--sniptale-color-accent)]',
-            'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-accent-emphasis)]',
+            'mt-1 min-h-8 w-full cursor-pointer rounded-[4px] px-2 py-1.5 text-left text-xs transition-colors',
+            'text-[var(--sniptale-color-text-secondary)]',
+            'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
             'focus-visible:outline-none focus-visible:ring-2',
             'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
           ].join(' ')}
@@ -201,7 +202,7 @@ function FilterMenuContent(
           {props.clearLabel ?? translate('highlighter.templateTags.clearFilter')}
         </button>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -214,7 +215,7 @@ export function FloatingFilterMenu(props: FloatingFilterMenuProps) {
     <div
       className={[
         'pointer-events-auto fixed z-[2147483647] overflow-y-auto overscroll-contain',
-        'cursor-default rounded-xl border p-1.5',
+        'cursor-default rounded-[4px] border p-1.5',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)] shadow-xl',
       ].join(' ')}

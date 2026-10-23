@@ -112,6 +112,7 @@ it('reads permission snapshot across microphone, origin, and camera states', asy
 });
 
 it('requests microphone permission and maps failures to denied or prompt states', async () => {
+  defineNavigatorValue('permissions', { query: vi.fn().mockResolvedValue({ state: 'denied' }) });
   const deniedError = new DOMException('denied', 'NotAllowedError');
   const getUserMedia = vi
     .fn()
@@ -125,7 +126,29 @@ it('requests microphone permission and maps failures to denied or prompt states'
   await expect(requestMicrophonePermission()).resolves.toBe('prompt');
 });
 
+it.each(['prompt', 'denied'] as const)(
+  'preserves microphone permission state %s after the browser refuses acquisition',
+  async (state) => {
+    defineNavigatorValue('mediaDevices', {
+      getUserMedia: vi.fn().mockRejectedValue(new DOMException('refused', 'NotAllowedError')),
+    });
+    defineNavigatorValue('permissions', { query: vi.fn().mockResolvedValue({ state }) });
+    await expect(requestMicrophonePermission()).resolves.toBe(state);
+  }
+);
+
+it('keeps a refused microphone request retryable if permission inspection is unavailable', async () => {
+  defineNavigatorValue('mediaDevices', {
+    getUserMedia: vi.fn().mockRejectedValue(new DOMException('refused', 'NotAllowedError')),
+  });
+  defineNavigatorValue('permissions', {
+    query: vi.fn().mockRejectedValue(new Error('unsupported')),
+  });
+  await expect(requestMicrophonePermission()).resolves.toBe('prompt');
+});
+
 it('requests camera permission as video-only media and stops granted streams', async () => {
+  defineNavigatorValue('permissions', { query: vi.fn().mockResolvedValue({ state: 'denied' }) });
   const stop = vi.fn();
   const getUserMedia = vi
     .fn()
@@ -144,4 +167,25 @@ it('requests camera permission as video-only media and stops granted streams', a
 
   expect(getUserMedia).toHaveBeenNthCalledWith(1, { video: true, audio: false });
   expect(stop).toHaveBeenCalledOnce();
+});
+
+it.each(['prompt', 'denied'] as const)(
+  'preserves the browser camera permission state %s after a refused request',
+  async (state) => {
+    defineNavigatorValue('mediaDevices', {
+      getUserMedia: vi.fn().mockRejectedValue(new DOMException('refused', 'NotAllowedError')),
+    });
+    defineNavigatorValue('permissions', { query: vi.fn().mockResolvedValue({ state }) });
+    await expect(requestCameraPermission()).resolves.toBe(state);
+  }
+);
+
+it('keeps camera access retryable when permission inspection fails', async () => {
+  defineNavigatorValue('mediaDevices', {
+    getUserMedia: vi.fn().mockRejectedValue(new DOMException('refused', 'NotAllowedError')),
+  });
+  defineNavigatorValue('permissions', {
+    query: vi.fn().mockRejectedValue(new Error('unsupported')),
+  });
+  await expect(requestCameraPermission()).resolves.toBe('prompt');
 });

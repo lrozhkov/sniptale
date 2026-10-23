@@ -1,9 +1,22 @@
 // @vitest-environment jsdom
 
-import { ActiveSelection, Canvas, Rect, Textbox } from 'fabric';
+import {
+  ActiveSelection,
+  Canvas,
+  Group,
+  Path,
+  Point,
+  Rect,
+  Textbox,
+  util,
+  type Transform,
+} from 'fabric';
 import { describe, expect, it, vi } from 'vitest';
 import type { DrawingObject } from '../../../features/drawing/public';
-import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
+import {
+  createFabricCanvasFixture,
+  createTypedTestFixture,
+} from '../../testing/fabric-canvas.test-support';
 import {
   canonicalizeModifiedEditorDrawingSelection,
   replaceEditorDrawingObjectWithCanonicalGeometry,
@@ -18,15 +31,252 @@ import {
   writeEditorDrawingObject,
 } from './metadata';
 import { createEditorDrawingFabricObject } from './vector';
+import { resizeLayerObject } from '../../controller/layer-actions/state/resize';
+import { applyEditorDrawingInteractionControls } from './controls/apply';
 
-const shape: DrawingObject = {
+it('preserves bend vertices through duplicate translation, Fabric transforms and metadata revival', async () => {
+  const drawing = {
+    kind: 'arrow' as const,
+    id: 'bent',
+    design: 'freehand' as const,
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 100 },
+      { x: 160, y: 60 },
+    ],
+    color: '#f00',
+    width: 12,
+    dynamicWidth: false,
+  };
+  expect(translateEditorDrawingObject(drawing, { x: 30, y: 40 }, 'duplicate')).toMatchObject({
+    id: 'duplicate',
+    bendPoints: [
+      { x: 110, y: 140 },
+      { x: 190, y: 100 },
+    ],
+  });
+  const arrow = createEditorDrawingFabricObject(drawing, 1);
+  if (!(arrow instanceof Path)) throw new Error('Expected arrow');
+  arrow.set({ left: 40, top: 60, scaleX: 2, scaleY: 3, angle: 25 });
+  const transform = arrow.calcTransformMatrix();
+  const expected = drawing.bendPoints.map((point) =>
+    new Point(point.x - arrow.pathOffset.x, point.y - arrow.pathOffset.y).transform(transform)
+  );
+  const synchronized = synchronizeEditorDrawingObjectFromFabric(arrow);
+  if (synchronized?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+  synchronized.bendPoints!.forEach((point, index) => {
+    expect(point.x).toBeCloseTo(expected[index]!.x, 3);
+    expect(point.y).toBeCloseTo(expected[index]!.y, 3);
+  });
+  const revived = await Path.fromObject({
+    ...arrow.toObject(),
+    sniptaleDrawingJson: arrow.sniptaleDrawingJson,
+  });
+  expect(readEditorDrawingObject(revived)).toEqual(synchronized);
+  expect(synchronizeEditorDrawingObjectFromFabric(revived)).toMatchObject({
+    bendPoints: synchronized.bendPoints!.map((point) => ({
+      x: expect.closeTo(point.x, 3),
+      y: expect.closeTo(point.y, 3),
+    })),
+  });
+  expect(drawing.bendPoints).toEqual([
+    { x: 80, y: 100 },
+    { x: 160, y: 60 },
+  ]);
+});
+
+function createResizableArrow() {
+  const arrow = createEditorDrawingFabricObject(
+    {
+      color: '#f00',
+      dynamicWidth: false,
+      end: { x: 100, y: 70 },
+      id: 'resizable-arrow',
+      kind: 'arrow',
+      start: { x: 20, y: 30 },
+      width: 8,
+    },
+    1
+  );
+  if (!(arrow instanceof Path)) throw new Error('Expected arrow path');
+  return arrow;
+}
+
+function expectArrowGeometryClose(actual: DrawingObject | null, expected: DrawingObject | null) {
+  if (actual?.kind !== 'arrow' || expected?.kind !== 'arrow')
+    throw new Error('Expected arrow metadata');
+  expect(actual.start.x).toBeCloseTo(expected.start.x, 3);
+  expect(actual.start.y).toBeCloseTo(expected.start.y, 3);
+  expect(actual.end.x).toBeCloseTo(expected.end.x, 3);
+  expect(actual.end.y).toBeCloseTo(expected.end.y, 3);
+  expect(actual.width).toBeCloseTo(expected.width, 3);
+}
+
+it('keeps repeated layer resize and synchronization idempotent, including arrow controls', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const arrow = createResizableArrow();
+  canvas.add(arrow);
+  applyEditorDrawingInteractionControls(arrow);
+  resizeLayerObject(canvas, arrow.sniptaleId!, 180, 100, () => false);
+  const resized = readEditorDrawingObject(arrow);
+  expectArrowGeometryClose(synchronizeEditorDrawingObjectFromFabric(arrow), resized);
+  if (resized?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+  const reference = new Path(arrow.path, {
+    ...util.saveObjectTransform(arrow),
+    originX: arrow.originX,
+    originY: arrow.originY,
+    strokeWidth: arrow.strokeWidth,
+    scaleX: 180 / arrow.getScaledWidth(),
+    scaleY: 100 / arrow.getScaledHeight(),
+  });
+  const endpoint = (point: { x: number; y: number }) =>
+    util.transformPoint(
+      new Point(point.x, point.y).subtract(reference.pathOffset),
+      reference.calcTransformMatrix()
+    );
+  const expected = {
+    ...resized,
+    start: endpoint(resized.start),
+    end: endpoint(resized.end),
+    width: resized.width * Math.sqrt(reference.scaleX * reference.scaleY),
+  };
+  resizeLayerObject(canvas, arrow.sniptaleId!, 180, 100, () => false);
+  expectArrowGeometryClose(readEditorDrawingObject(arrow), expected);
+  expectArrowGeometryClose(synchronizeEditorDrawingObjectFromFabric(arrow), expected);
+  arrow.setCoords();
+  expect(arrow.oCoords['start']!.x).toBeCloseTo(expected.start.x, 3);
+  expect(arrow.oCoords['start']!.y).toBeCloseTo(expected.start.y, 3);
+  expect(arrow.oCoords['end']!.x).toBeCloseTo(expected.end.x, 3);
+  expect(arrow.oCoords['end']!.y).toBeCloseTo(expected.end.y, 3);
+  const endControl = arrow.controls['end']!;
+  expect(
+    endControl.actionHandler(
+      new MouseEvent('mousemove', { ctrlKey: true }),
+      createTypedTestFixture<Transform>({ target: arrow }),
+      260,
+      160
+    )
+  ).toBe(true);
+  arrow.setCoords();
+  expect(arrow.oCoords['start']!.x).toBeCloseTo(expected.start.x, 3);
+  expect(arrow.oCoords['start']!.y).toBeCloseTo(expected.start.y, 3);
+  expect(arrow.oCoords['end']!.x).toBeCloseTo(260, 3);
+  expect(arrow.oCoords['end']!.y).toBeCloseTo(160, 3);
+  canvas.dispose();
+});
+
+it('rotates a previously resized arrow once around the shared selection center', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const arrow = createResizableArrow();
+  const rectangle = createEditorDrawingFabricObject(shape, 2);
+  canvas.add(arrow, rectangle);
+  resizeLayerObject(canvas, arrow.sniptaleId!, 180, 100, () => false);
+  const resized = readEditorDrawingObject(arrow);
+  if (resized?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+  const active = new ActiveSelection([arrow, rectangle], { canvas });
+  canvas.setActiveObject(active);
+  const center = active.getCenterPoint();
+  const rotate = (point: { x: number; y: number }) =>
+    new Point(center.x - (point.y - center.y), center.y + (point.x - center.x));
+  const expectedStart = rotate(resized.start);
+  const expectedEnd = rotate(resized.end);
+  active.rotate(90);
+  const replacements = canonicalizeModifiedEditorDrawingSelection({
+    canvas,
+    object: active,
+    prepareObject: () => undefined,
+    source: null,
+  });
+  const result = replacements
+    ?.map(readEditorDrawingObject)
+    .find((drawing) => drawing?.kind === 'arrow');
+  if (result?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+  expect(result.start.x).toBeCloseTo(expectedStart.x, 3);
+  expect(result.start.y).toBeCloseTo(expectedStart.y, 3);
+  expect(result.end.x).toBeCloseTo(expectedEnd.x, 3);
+  expect(result.end.y).toBeCloseTo(expectedEnd.y, 3);
+  expect(result.width).toBeCloseTo(resized.width, 3);
+  canvas.dispose();
+});
+
+it('keeps synchronized arrow coordinates consistent after JSON revival', async () => {
+  const arrow = createResizableArrow();
+  arrow.set({ scaleX: 2, scaleY: 3, angle: 25 });
+  const synchronized = synchronizeEditorDrawingObjectFromFabric(arrow);
+  const revived = await Path.fromObject({
+    ...arrow.toObject(),
+    sniptaleDrawingJson: arrow.sniptaleDrawingJson,
+  });
+  expectArrowGeometryClose(synchronizeEditorDrawingObjectFromFabric(revived), synchronized);
+});
+
+it('bakes arrow geometry while retaining its parent transform exactly once', () => {
+  const arrow = createResizableArrow();
+  const group = new Group([arrow]);
+  group.set({ angle: 35, scaleX: 2, scaleY: 3, left: 80, top: 90 });
+  const parentTransform = group.calcTransformMatrix();
+  const synchronized = synchronizeEditorDrawingObjectFromFabric(arrow);
+  expectArrowGeometryClose(synchronizeEditorDrawingObjectFromFabric(arrow), synchronized);
+  expect(arrow.group).toBe(group);
+  expect(group.calcTransformMatrix()).toEqual(parentTransform);
+});
+
+const shape = {
   bounds: { height: 20, width: 40, x: 10, y: 15 },
   color: '#f00',
   fillColor: null,
   id: 'shape-1',
   kind: 'rectangle',
   width: 4,
-};
+} satisfies DrawingObject;
+
+it.each([45, 90, -30])(
+  'preserves arrow endpoints after a selection rotation of %s degrees',
+  (angle) => {
+    const canvas = new Canvas(document.createElement('canvas'));
+    const drawing: DrawingObject = {
+      color: '#f00',
+      dynamicWidth: false,
+      end: { x: 100, y: 70 },
+      id: 'rotated-arrow',
+      kind: 'arrow',
+      start: { x: 20, y: 30 },
+      width: 8,
+    };
+    const arrow = createEditorDrawingFabricObject(drawing, 1);
+    if (!(arrow instanceof Path)) throw new Error('Expected arrow path');
+    const rectangle = createEditorDrawingFabricObject({ ...shape, id: 'companion' }, 2);
+    canvas.add(arrow, rectangle);
+    const active = new ActiveSelection([arrow, rectangle], { canvas });
+    canvas.setActiveObject(active);
+    active.rotate(angle);
+    const endpoint = (point: { x: number; y: number }) =>
+      util.transformPoint(
+        new Point(point.x, point.y).subtract(arrow.pathOffset),
+        arrow.calcTransformMatrix()
+      );
+    const expectedStart = endpoint(drawing.start);
+    const expectedEnd = endpoint(drawing.end);
+
+    const replacements = canonicalizeModifiedEditorDrawingSelection({
+      canvas,
+      object: active,
+      prepareObject: () => undefined,
+      source: null,
+    });
+    const result = readEditorDrawingObject(replacements![0]!);
+    expect(result?.kind).toBe('arrow');
+    if (result?.kind !== 'arrow') throw new Error('Expected arrow metadata');
+    expect(result.start.x).toBeCloseTo(expectedStart.x, 3);
+    expect(result.start.y).toBeCloseTo(expectedStart.y, 3);
+    expect(result.end.x).toBeCloseTo(expectedEnd.x, 3);
+    expect(result.end.y).toBeCloseTo(expectedEnd.y, 3);
+    expect(result.width).toBeCloseTo(drawing.width, 3);
+    expect((canvas.getActiveObject() as ActiveSelection).getObjects()).toEqual(replacements);
+    canvas.dispose();
+  }
+);
 
 describe('editor drawing metadata authority', () => {
   it('recognizes both drawing objects and all-drawing ActiveSelections', () => {

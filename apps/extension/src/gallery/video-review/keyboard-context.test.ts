@@ -7,6 +7,21 @@ import {
   reviewOwnsPlaybackKeys,
 } from './keyboard-context';
 
+it('keeps editor shortcuts inactive while the initial mode choice owns the dialog', () => {
+  const editor = document.createElement('div');
+  editor.dataset['ui'] = 'gallery.videoReview.dialog';
+  const chooser = document.createElement('section');
+  chooser.dataset['ui'] = 'gallery.videoReview.modeChoice';
+  const button = document.createElement('button');
+  chooser.append(button);
+  editor.append(chooser);
+  expect(reviewKeyboardTarget({ target: button })).toBeNull();
+  expect(reviewKeyboardTarget({ target: editor })).toBeNull();
+  chooser.remove();
+  editor.append(button);
+  expect(reviewKeyboardTarget({ target: button })).toBe(button);
+});
+
 it('limits editor keys to its surface and yields to open layers including native dialogs', () => {
   const editor = document.createElement('div');
   editor.dataset['ui'] = 'gallery.videoReview.dialog';

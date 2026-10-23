@@ -1,11 +1,13 @@
 import type { Canvas, Rect } from 'fabric';
 import type { DrawSession } from '../../core/types';
+import { cancelEditorDrawingArrowBend } from '../../../drawing/object/controls/arrow';
 
 interface CancelEditorTransientInteractionOptions {
   canvas: Canvas | null;
   drawSession: DrawSession | null;
   cropGuide: Rect | null;
   activeTool: string;
+  preserveActiveTool?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
   syncRuntimeState: () => void;
@@ -30,6 +32,11 @@ export function cancelEditorTransientInteraction(
   let changed = false;
   let nextDrawSession = drawSession;
 
+  if (cancelEditorDrawingArrowBend(canvas)) {
+    syncRuntimeState();
+    return { changed: true, drawSession };
+  }
+
   if (drawSession?.object || cropGuide) {
     if (drawSession?.object) {
       canvas.remove(drawSession.object);
@@ -40,7 +47,7 @@ export function cancelEditorTransientInteraction(
   } else if (canvas.getActiveObjects().length > 0) {
     canvas.discardActiveObject();
     changed = true;
-  } else if (activeTool !== 'select') {
+  } else if (activeTool !== 'select' && !options.preserveActiveTool) {
     switchToSelectTool();
     changed = true;
   }

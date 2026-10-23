@@ -1,19 +1,27 @@
 import { VideoTemporalEasing } from '../types/interaction';
+import type {
+  CameraTransitionType,
+  CameraTransitionPhase,
+  MotionPhaseTransitions,
+} from '../types/interaction';
+export type {
+  CameraTransitionType,
+  CameraTransitionPhase,
+  MotionPhaseTransitions,
+} from '../types/interaction';
 import { isRecord, isBoundedNumber } from '../validation/primitives';
 
-const TYPES = ['none', 'linear', 'ease-in-out', 'ease-out', 'instant'] as const;
-export type CameraTransitionType = (typeof TYPES)[number];
-export type CameraTransitionPhase = 'enter' | 'exit';
+const TYPES = [
+  'none',
+  'linear',
+  'ease-in-out',
+  'ease-out',
+  'instant',
+] as const satisfies readonly CameraTransitionType[];
 export interface CameraTransition<T extends CameraTransitionType = CameraTransitionType> {
   type: T;
   duration: number;
 }
-export type MotionPhaseTransitions = Partial<
-  Record<CameraTransitionPhase, CameraTransitionType>
-> & {
-  /** Source-owned preference remains after its outgoing connection is removed. */
-  link?: VideoTemporalEasing;
-};
 export interface MotionTransitionPhaseEdit {
   phase: CameraTransitionPhase;
   type?: CameraTransitionType;

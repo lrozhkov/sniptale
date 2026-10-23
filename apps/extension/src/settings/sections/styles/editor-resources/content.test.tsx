@@ -18,12 +18,13 @@ vi.mock('./backgrounds/view', () => ({
   BackgroundPresetsSettings: () => <div>backgrounds-owner</div>,
 }));
 import { EditorResourcesContent } from './content';
-it('composes tools and palettes as route-controlled subpages', () => {
+it('shows palettes without the removed Tools tab', () => {
   const node = document.createElement('div');
   const root = createRoot(node);
   act(() => root.render(<EditorResourcesContent view="palettes" />));
   expect(node.textContent).toContain('palettes-owner');
   expect(node.textContent).not.toContain('tools-owner');
+  expect(node.textContent).not.toContain('settings.navigation.views.tools');
   act(() => root.unmount());
 });
 
@@ -41,13 +42,28 @@ it.each([
   act(() => root.unmount());
 });
 
-it('falls back to tools and forwards route navigation', () => {
-  const onViewChange = vi.fn();
-  const node = document.createElement('div');
-  const root = createRoot(node);
-  act(() => root.render(<EditorResourcesContent view="unknown" onViewChange={onViewChange} />));
-  expect(node.textContent).toContain('tools-owner');
-  act(() => node.querySelectorAll('button')[1]?.click());
-  expect(onViewChange).toHaveBeenCalledWith('palettes');
-  act(() => root.unmount());
-});
+it.each(['tools', 'unknown', undefined])(
+  'resolves %s to palettes and forwards visible navigation',
+  (view) => {
+    const onViewChange = vi.fn();
+    const node = document.createElement('div');
+    const root = createRoot(node);
+    act(() =>
+      root.render(
+        <EditorResourcesContent
+          {...(view === undefined ? {} : { view })}
+          onViewChange={onViewChange}
+        />
+      )
+    );
+    expect(node.textContent).toContain('palettes-owner');
+    expect(node.textContent).not.toContain('tools-owner');
+    expect(node.textContent).not.toContain('settings.navigation.views.tools');
+    expect(node.querySelector('[aria-current="page"]')?.textContent).toBe(
+      'settings.navigation.views.palettes'
+    );
+    act(() => node.querySelectorAll('button')[1]?.click());
+    expect(onViewChange).toHaveBeenCalledWith('surfaces');
+    act(() => root.unmount());
+  }
+);

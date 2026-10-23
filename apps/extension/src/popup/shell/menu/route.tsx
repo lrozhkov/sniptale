@@ -100,13 +100,14 @@ const pageToolActions = [
 ] as const;
 
 const MENU_SURFACE_CLASS_NAME = [
-  'flex min-h-0 flex-1 flex-col justify-between overflow-y-auto rounded-[16px] border p-3',
+  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[6px] border p-3',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
 const CAPTURE_BUTTON_CLASS_NAME = [
-  'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[12px] border-0',
+  'popup-menu-capture group flex min-h-[88px] min-w-0 flex-col',
+  'items-center justify-center gap-2.5 rounded-[6px] border-0',
   'bg-[var(--sniptale-color-surface-input)]',
   'px-1.5 py-2.5 text-center transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50',
@@ -126,8 +127,8 @@ const MENU_SMALL_ICON_CLASS_NAME = [
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group grid min-h-[58px] min-w-0 grid-rows-[18px_24px] content-center justify-items-center',
-  'gap-1.5 rounded-[12px] border-0 bg-transparent px-1.5 py-1.5',
+  'popup-menu-tile group grid min-h-[58px] min-w-0 grid-rows-[18px_24px] content-center justify-items-center',
+  'gap-1.5 rounded-[6px] border-0 bg-transparent px-1.5 py-1.5',
   'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
@@ -169,6 +170,19 @@ function getCaptureActions(): MenuAction[] {
   ];
 }
 
+function MenuHeading() {
+  return (
+    <header className="shrink-0 px-0.5">
+      <h1 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+        {translate('popup.home.menuTitle')}
+      </h1>
+      <p className="mt-0.5 text-[11px] leading-[1.4] text-[var(--sniptale-color-text-muted)]">
+        {translate('popup.home.menuSubtitle')}
+      </p>
+    </header>
+  );
+}
+
 export function MenuRoute({
   navigateToDescriptor,
 }: {
@@ -207,40 +221,39 @@ export function MenuRoute({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3" data-ui="popup.menu.route">
+    <div
+      className="flex h-full min-h-0 flex-col gap-3"
+      data-ui="popup.menu.route"
+      data-has-error={Boolean(error)}
+    >
       <section className={MENU_SURFACE_CLASS_NAME}>
-        <header className="shrink-0 px-0.5">
-          <h1 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-            {translate('popup.home.menuTitle')}
-          </h1>
-          <p className="mt-0.5 text-[11px] leading-[1.4] text-[var(--sniptale-color-text-muted)]">
-            {translate('popup.home.menuSubtitle')}
-          </p>
-        </header>
-        <MenuPrimaryActions
-          disabledReason={disabledReason}
-          pageAccess={pageAccess}
-          pendingAction={pendingAction}
-          onCapture={capture}
-        />
-        <MenuQuickScenarios
-          desktopDisabledReason={desktopDisabledReason}
-          disabledReason={disabledReason}
-          pendingAction={pendingAction}
-          recordDisabledReason={capabilities.videoByMode?.[CaptureMode.TAB]?.reason ?? null}
-          onCapture={capture}
-          onRecordTab={() => navigateToDescriptor({ page: 'video', videoMode: CaptureMode.TAB })}
-        />
-        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.tools">
-          <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
-          <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
-        </section>
-        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.workspace">
-          <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
+        <div
+          className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto"
+          data-ui="popup.menu.content"
+        >
+          <MenuHeading />
+          <MenuPrimaryActions
+            disabledReason={disabledReason}
+            pageAccess={pageAccess}
+            pendingAction={pendingAction}
+            onCapture={capture}
+          />
+          <MenuQuickScenarios
+            desktopDisabledReason={desktopDisabledReason}
+            disabledReason={disabledReason}
+            pendingAction={pendingAction}
+            recordDisabledReason={capabilities.videoByMode?.[CaptureMode.TAB]?.reason ?? null}
+            onCapture={capture}
+            onRecordTab={() => navigateToDescriptor({ page: 'video', videoMode: CaptureMode.TAB })}
+          />
+          <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.tools">
+            <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
+            <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
+          </section>
           <MenuWorkspace />
-        </section>
+        </div>
         {error ? (
-          <p className="mt-2 text-[11px] text-[var(--sniptale-color-danger)]" role="alert">
+          <p className="popup-error-message mt-2" role="alert">
             {error}
           </p>
         ) : null}
@@ -293,7 +306,7 @@ function MenuCaptureActions(props: {
           type="button"
           className={CAPTURE_BUTTON_CLASS_NAME}
           disabled={Boolean(props.disabledReason) || props.pendingAction !== null}
-          title={props.disabledReason ?? hint}
+          data-popup-hint={props.disabledReason ?? hint}
           onClick={() => void props.onCapture(`download:${mode}`, mode)}
         >
           <Icon className={CAPTURE_ICON_CLASS_NAME} />
@@ -359,11 +372,13 @@ function MenuQuickScenarios(props: {
           type="button"
           className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
           disabled={scenario.disabled}
-          title={scenario.title}
+          data-popup-hint={scenario.title}
           onClick={scenario.onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span className="min-h-6 text-[10px] font-medium leading-3">{label}</span>
+          <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+            {label}
+          </span>
         </button>
       ))}
     </div>
@@ -396,19 +411,24 @@ function MenuPageTools({
 
 function MenuWorkspace() {
   return (
-    <div className="grid grid-cols-4 gap-1">
-      {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
-        <button
-          key={labelKey}
-          type="button"
-          className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
-          onClick={onClick}
-        >
-          <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
-        </button>
-      ))}
-    </div>
+    <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.workspace">
+      <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
+      <div className="grid grid-cols-4 gap-1">
+        {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
+          <button
+            key={labelKey}
+            type="button"
+            className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
+            onClick={onClick}
+          >
+            <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
+            <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+              {translate(labelKey)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -432,12 +452,14 @@ function MenuToolbarButton({
       type="button"
       className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
       data-ui={`popup.menu.tool-action.${mode}`}
-      title={disabledReason ?? translate(hintKey)}
+      data-popup-hint={disabledReason ?? translate(hintKey)}
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >
       <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-      <span className="min-h-6 text-[10px] font-medium leading-3">{translate(labelKey)}</span>
+      <span className="sniptale-interface-label min-h-6 text-[10px] font-medium leading-3">
+        {translate(labelKey)}
+      </span>
     </button>
   );
 }

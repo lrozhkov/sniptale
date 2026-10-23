@@ -11,12 +11,17 @@ import type { BrowserDesignReviewAction } from '../../../parser/page-preparation
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import {
   dismissDesignReviewSelection,
+  canEditDesignReviewText,
+  canResetDesignReviewText,
   getDesignReviewModeState,
   openDesignReviewTarget,
   registerDesignReviewInspectorDismissRequestHandler,
+  resetDesignReviewText,
+  startDesignReviewTextEditing,
   subscribeToDesignReviewMode,
 } from '../../../selection/design-review';
 import { usePageStyleDraftState } from './draft';
+import { useDesignReviewTreeNavigation } from './tree-navigation';
 import { useDesignReviewCommentController } from './comment-controller';
 import { usePageStyleValueActions } from '../value-editing/actions';
 import {
@@ -26,9 +31,63 @@ import {
   serializeDesignReviewRecord,
 } from '../runtime/record';
 import { copyDesignReviewText } from './clipboard';
+import { flushPendingPageStyleHistory } from '../runtime/actions';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../../platform/i18n';
 
 interface UseDesignReviewControllerParams {
   enabled: boolean;
+}
+
+function createDesignReviewNavigationAction(args: {
+  readTargets: ReturnType<typeof useDesignReviewTreeNavigation>;
+  closeComment(): boolean;
+  stopVoiceInput(): void;
+}) {
+  return (target: Element) => {
+    const candidates = args.readTargets();
+    if (target !== candidates.parent && target !== candidates.child) return;
+    if (!target.isConnected || !args.closeComment()) return;
+    args.stopVoiceInput();
+    try {
+      flushPendingPageStyleHistory();
+      if (!openDesignReviewTarget(target)) {
+        showToast(translate('content.designReview.navigateElementFailed'), 'error');
+      }
+    } catch {
+      showToast(translate('content.designReview.navigateElementFailed'), 'error');
+    }
+  };
+}
+
+function createDesignReviewTextActions(args: {
+  target: Element | null;
+  closeComment(): boolean;
+  stopVoiceInput(): void;
+  setSettingsOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  return {
+    edit: () => {
+      if (!args.target || !args.closeComment()) return;
+      args.stopVoiceInput();
+      try {
+        flushPendingPageStyleHistory();
+        if (startDesignReviewTextEditing()) args.setSettingsOpen(false);
+      } catch {
+        showToast(translate('content.designReview.textEditFailed'), 'error');
+      }
+    },
+    reset: () => {
+      if (!args.target || !args.closeComment()) return;
+      args.stopVoiceInput();
+      try {
+        flushPendingPageStyleHistory();
+        resetDesignReviewText(args.target);
+      } catch {
+        showToast(translate('content.designReview.textResetFailed'), 'error');
+      }
+    },
+  };
 }
 
 function useDesignReviewPopoverDismissal(args: {
@@ -67,6 +126,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
   );
   const activeSelection = params.enabled && modeState.enabled ? modeState.selection : null;
   const selection = activeSelection?.snapshot ?? null;
+  const readTreeNavigation = useDesignReviewTreeNavigation(selection?.element ?? null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -133,6 +193,11 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
           await copyDesignReviewText(selection.domPath, 'content.designReview.pathCopied');
         }
       },
+      navigateElement: createDesignReviewNavigationAction({
+        readTargets: readTreeNavigation,
+        closeComment,
+        stopVoiceInput,
+      }),
       delete: () => {
         if (!selection) {
           return;
@@ -150,6 +215,12 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
         }
       },
       setSettingsOpen,
+      text: createDesignReviewTextActions({
+        target: selection?.element ?? null,
+        closeComment,
+        stopVoiceInput,
+        setSettingsOpen,
+      }),
       setSideFieldLinked: draftState.setSideFieldLinked,
       updateValue: valueActions.updateValue,
       updateValues: valueActions.updateValues,
@@ -158,7 +229,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
         stop: stopVoiceInput,
       },
     },
-    inspectorOpen: popoverOpen,
+    inspectorOpen: popoverOpen && !modeState.editingText,
     enabled: params.enabled && modeState.enabled,
     panel: {
       close: () => setPanelOpen(false),
@@ -175,6 +246,13 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       modifiedProperties: draftState.modifiedProperties,
       selection,
       settingsOpen,
+      treeNavigation: readTreeNavigation(),
+      text: {
+        editable: Boolean(selection && canEditDesignReviewText(selection.element)),
+        modified: Boolean(record?.textChange),
+        preview: selection?.element.textContent?.trim().slice(0, 80) ?? '',
+        resettable: Boolean(selection && canResetDesignReviewText(selection.element)),
+      },
       sideFieldLinks: draftState.sideFieldLinks,
       values: draftState.values,
       voice: comment.view.voice,

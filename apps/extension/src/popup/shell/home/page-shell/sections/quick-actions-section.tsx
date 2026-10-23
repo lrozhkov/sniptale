@@ -20,7 +20,7 @@ function QuickActionsLoadingState() {
   return (
     <div
       data-ui="popup.home.quick-actions-loading"
-      className="flex h-full min-h-[132px] flex-col justify-center gap-2.5 rounded-[12px]
+      className="flex h-full min-h-[132px] flex-col justify-center gap-2.5 rounded-[6px]
         border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_56%,transparent)] p-3"
     >
@@ -45,7 +45,7 @@ export function PopupHomeQuickActions({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+    <div className="min-h-0 flex-1 overflow-y-auto pr-1 pt-2">
       {!quickActionsReady ? (
         <DelayedLoadingFallback fallback={<QuickActionsLoadingState />} />
       ) : hasQuickActions ? (

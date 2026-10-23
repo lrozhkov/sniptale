@@ -74,7 +74,15 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
         ...createEditableElementOverlayBindings(props, element),
       });
     } catch (error) {
-      props.setInputShieldSuspended(props.editingElements.size > 0);
+      element.removeEventListener('input', notifyQuickEditChanges);
+      try {
+        if (props.editingElements.has(id)) {
+          cancelEditableElement(props.editingElements, clearElementEditingState, element);
+        }
+      } finally {
+        historyTracker.cancel(id);
+        props.setInputShieldSuspended(props.editingElements.size > 0);
+      }
       throw error;
     }
     element.addEventListener('input', notifyQuickEditChanges);

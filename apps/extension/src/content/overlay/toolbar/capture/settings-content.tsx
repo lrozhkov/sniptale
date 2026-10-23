@@ -1,6 +1,6 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import React, { useLayoutEffect, useState } from 'react';
-import { Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { Blend, Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
 import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { PopoverCheckIcon } from '../../icons/icons';
 import { translate } from '../../../../platform/i18n';
@@ -16,6 +16,8 @@ import {
   resolveToolbarMenuPlacement,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { RecordingToolbarControlsContext } from '../state/recording-controls';
+import { PageToolbarCustomizationSettings } from './page-control-settings';
 import {
   createTrustedContentActionIntentSource,
   type ContentPrivilegedActionIntentSource,
@@ -141,7 +143,7 @@ type ToolbarSettingsUtilityItemsProps = {
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
-  onHide: () => void;
+  onHide: (restoreFocus?: boolean) => void;
   onPinToTabChange: (
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource
@@ -154,6 +156,31 @@ type ToolbarSettingsUtilityItemsProps = {
   showPinItem?: boolean;
   showHideItem?: boolean;
 };
+
+function RecordingToolbarFadeSetting() {
+  const preferences = useContext(RecordingToolbarControlsContext);
+  if (!preferences) return null;
+  return (
+    <ProductToolbarMenuItem
+      dataUi="content.toolbar.settings.recording-fade"
+      selected={preferences.fadeDuringRecording}
+      ariaPressed={preferences.fadeDuringRecording}
+      disabled={!preferences.ready || preferences.pending || preferences.active}
+      onMouseDown={stopMenuEvent}
+      onClick={(event) => {
+        stopMenuEvent(event);
+        void preferences.setFadeDuringRecording(!preferences.fadeDuringRecording);
+      }}
+    >
+      <Blend className="sniptale-popover-icon" />
+      <ProductToolbarMenuItemCopy
+        label={translate('content.toolbar.recordingFadeToolbar')}
+        hint={translate('content.toolbar.recordingFadeToolbarHint')}
+      />
+      {preferences.fadeDuringRecording ? <PopoverCheckIcon /> : null}
+    </ProductToolbarMenuItem>
+  );
+}
 
 function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsProps) {
   return (
@@ -170,13 +197,15 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         }}
       />
       {props.showPinItem !== false ? renderPinToTabItem(props) : null}
+      <RecordingToolbarFadeSetting />
+      <PageToolbarCustomizationSettings onClose={props.onClose} compactMenus={props.compactMenus} />
       <ProductToolbarMenuDivider />
       {props.showHideItem === false
         ? null
         : renderActionItem({
             icon: <PanelBottomClose className="sniptale-popover-icon" />,
             label: translate('content.toolbar.hideToolbar'),
-            onAction: () => props.onHide(),
+            onAction: (event) => props.onHide(event.detail === 0),
             onClose: props.onClose,
           })}
       {renderDisableScreenshotModeItem(props)}
@@ -301,9 +330,23 @@ type ToolbarSettingsDropdownProps = ToolbarSettingsUtilityItemsProps & {
   viewportRightInset?: number;
 };
 
-export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
+export function useToolbarSettingsDropdownLayout(
+  props: Pick<
+    ToolbarSettingsDropdownProps,
+    | 'menuRef'
+    | 'triggerRef'
+    | 'displayMode'
+    | 'freePlacement'
+    | 'compactMenus'
+    | 'viewportRightInset'
+  > & { open: boolean }
+) {
+  const recording = useContext(RecordingToolbarControlsContext);
   const [menuSize, setMenuSize] = useState({ width: 280, height: 340 });
   useLayoutEffect(() => {
+    if (!props.open) {
+      return;
+    }
     const surface = props.menuRef.current?.firstElementChild;
     if (!(surface instanceof HTMLElement)) return;
     const measure = () => {
@@ -318,19 +361,35 @@ export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(surface);
     return () => observer?.disconnect();
-  }, [props.menuRef, props.freePlacement, props.compactMenus]);
-  const placement = getToolbarMenuPosition(props.triggerRef.current, menuSize.height);
-  const menuStyle = resolveToolbarFloatingMenuStyle({
-    anchorEl: props.triggerRef.current,
-    displayMode: props.displayMode,
-    menuHeight: menuSize.height,
-    menuWidth: menuSize.width,
-    placement,
-    preferredAlign: 'end',
-    ...(props.viewportRightInset === undefined
-      ? {}
-      : { viewportRightInset: props.viewportRightInset }),
-  });
+  }, [props.menuRef, props.freePlacement, props.compactMenus, props.open]);
+  const resolveLayout = () => {
+    const placement = getToolbarMenuPosition(props.triggerRef.current, menuSize.height);
+    const menuStyle = resolveToolbarFloatingMenuStyle({
+      anchorEl: props.triggerRef.current,
+      displayMode: props.displayMode,
+      menuHeight: menuSize.height,
+      menuWidth: menuSize.width,
+      placement,
+      preferredAlign: recording ? 'start' : 'end',
+      ...(props.viewportRightInset === undefined
+        ? {}
+        : { viewportRightInset: props.viewportRightInset }),
+    });
+    return {
+      placement: resolveToolbarMenuPlacement(props.displayMode, placement),
+      verticalPlacement: placement,
+      style: menuStyle,
+    };
+  };
+  return resolveLayout;
+}
+
+export function ToolbarSettingsDropdown(
+  props: ToolbarSettingsDropdownProps & {
+    layout: ReturnType<ReturnType<typeof useToolbarSettingsDropdownLayout>>;
+  }
+) {
+  const { verticalPlacement: placement, style: menuStyle } = props.layout;
   if (!menuStyle) {
     return null;
   }

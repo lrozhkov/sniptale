@@ -1,7 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { RuntimeResponseByType } from '../../../contracts/messaging/contracts/runtime-message';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
-import { openCameraRecorderPage } from '../../../platform/navigation/extension-pages';
+import {
+  openCameraRecorderPage,
+  openSettingsPage,
+} from '../../../platform/navigation/extension-pages';
 import { translate } from '../../../platform/i18n/popup';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -22,8 +25,13 @@ import {
 } from '../../recording/webcam';
 import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
 import { getPopupRuntimeServices } from '../../runtime-services';
+import {
+  readPopupMediaAccessState,
+  type PopupMediaPermissionName,
+} from '../../recording/media-devices';
 
 type StartRecordingArgs = {
+  targetTabId?: number | null;
   videoSettings: VideoRecordingSettings;
   captureMode: CaptureMode;
   microphoneDevices: MicrophoneOption[];
@@ -55,16 +63,20 @@ function sanitizeRecordingSettings(
   const sourceCount =
     captureMode === CaptureMode.SCREEN ? normalizeVideoSourceCount(settings.sourceCount) : 1;
   const webcamEnabled = captureMode === CaptureMode.CAMERA || settings.webcamEnabled === true;
+  const hasMicrophoneInventory = microphoneDevices.some((device) => device.deviceId.length > 0);
+  const hasWebcamInventory = webcamDevices.some((device) => device.deviceId.length > 0);
 
   return {
     ...settings,
-    microphoneDeviceId: settings.microphoneEnabled
-      ? resolveMicrophoneDeviceId(settings.microphoneDeviceId, microphoneDevices)
-      : settings.microphoneDeviceId,
+    microphoneDeviceId:
+      settings.microphoneEnabled && hasMicrophoneInventory
+        ? resolveMicrophoneDeviceId(settings.microphoneDeviceId, microphoneDevices)
+        : settings.microphoneDeviceId,
     sourceCount,
-    webcamDeviceId: webcamEnabled
-      ? resolveWebcamDeviceId(settings.webcamDeviceId ?? null, webcamDevices)
-      : (settings.webcamDeviceId ?? null),
+    webcamDeviceId:
+      webcamEnabled && hasWebcamInventory
+        ? resolveWebcamDeviceId(settings.webcamDeviceId ?? null, webcamDevices)
+        : (settings.webcamDeviceId ?? null),
     ...(sourceCount > 1 ? { systemAudioEnabled: false } : {}),
     ...(captureMode === CaptureMode.CAMERA
       ? {
@@ -79,10 +91,22 @@ function sanitizeRecordingSettings(
   };
 }
 
+async function hasCapturePermission(permissionName: PopupMediaPermissionName): Promise<boolean> {
+  if ((await readPopupMediaAccessState(permissionName)) === 'granted') return true;
+  await openSettingsPage({
+    requestMediaAccess: permissionName,
+    route: { section: 'access-data', view: 'permissions' },
+  });
+  return false;
+}
+
 async function ensureCapturePermissions(
   settings: VideoRecordingSettings,
   setStartError: Dispatch<SetStateAction<string | null>>
 ): Promise<boolean> {
+  if (settings.microphoneEnabled && !(await hasCapturePermission('microphone'))) return false;
+  if (settings.webcamEnabled && !(await hasCapturePermission('camera'))) return false;
+
   if (settings.microphoneEnabled) {
     try {
       await requestMicrophonePermission(settings.microphoneDeviceId);
@@ -141,9 +165,19 @@ function getNonAcceptedStartMessage(result: unknown): string {
 
 async function resolveActiveTabId(
   captureMode: CaptureMode,
-  setStartError: Dispatch<SetStateAction<string | null>>
+  setStartError: Dispatch<SetStateAction<string | null>>,
+  targetTabId?: number | null
 ): Promise<number | null> {
   if (captureMode === CaptureMode.CAMERA) {
+    return null;
+  }
+
+  if (targetTabId !== undefined) {
+    if (targetTabId !== null) {
+      const tab = await browserTabs.get(targetTabId);
+      if (tab.id === targetTabId) return targetTabId;
+    }
+    setStartError(translate('popup.common.noActiveTab'));
     return null;
   }
 
@@ -211,7 +245,7 @@ export async function startRecordingHandler(args: StartRecordingArgs): Promise<v
       return;
     }
 
-    const tabId = await resolveActiveTabId(recordingCaptureMode, setStartError);
+    const tabId = await resolveActiveTabId(recordingCaptureMode, setStartError, args.targetTabId);
     if (recordingCaptureMode !== CaptureMode.CAMERA && tabId === null) {
       return;
     }

@@ -7,7 +7,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   activeFooter: vi.fn(),
   openGallery: vi.fn(),
-  openVideoEditor: vi.fn(),
   actionButton: vi.fn(),
 }));
 
@@ -35,8 +34,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
 
 vi.mock('../../../../platform/navigation/extension-pages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/navigation/extension-pages')>()),
-  openGalleryPage: () => mocks.openGallery(),
-  openVideoEditorPage: () => mocks.openVideoEditor(),
+  openGalleryPage: (options: unknown) => mocks.openGallery(options),
 }));
 
 vi.mock('./active-controls', (_importOriginal) => ({
@@ -47,6 +45,7 @@ vi.mock('./active-controls', (_importOriginal) => ({
 }));
 
 import { VideoSetupFooter } from './actions';
+import { RecordingIcon } from '../../../../ui/recording-icon';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 
 let root: Root | null = null;
@@ -87,7 +86,6 @@ function renderVideoSetupFooter(options: {
         status: options.status,
         viewportPresetId: null,
       }}
-      galleryTitle="Gallery title"
     />
   );
 }
@@ -102,7 +100,6 @@ function clickFooterButtons(): void {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.openGallery.mockReset();
-  mocks.openVideoEditor.mockReset();
   mocks.actionButton.mockReset();
   mocks.activeFooter.mockReset();
   vi.stubGlobal('close', vi.fn());
@@ -116,37 +113,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps the footer actions and start button behavior stable', () => {
+it('offers one centered full-width start action with the recording marker', () => {
   const onStart = vi.fn();
 
   renderVideoSetupFooter({ duration: 0, onStart, status: VideoRecordingStatus.IDLE });
   clickFooterButtons();
 
   expect(container?.textContent).toContain('Start recording');
-  expect(container?.textContent).toContain('t:popup.video.videoEditorLabel');
-  expect(container?.textContent).toContain('t:popup.video.galleryLabel');
+  expect(container?.textContent).not.toContain('t:popup.video.videoEditorLabel');
+  expect(container?.textContent).not.toContain('t:popup.video.galleryLabel');
   expect(onStart).toHaveBeenCalledTimes(1);
-  expect(mocks.openVideoEditor).toHaveBeenCalledTimes(1);
-  expect(mocks.openGallery).toHaveBeenCalledTimes(1);
+  expect(mocks.openGallery).not.toHaveBeenCalled();
+  expect(window.close).not.toHaveBeenCalled();
+  expect(container?.querySelectorAll('button')).toHaveLength(1);
+  expect(container?.querySelector('button')?.parentElement?.className).toContain('grid-cols-1');
   expect(mocks.activeFooter).not.toHaveBeenCalled();
   expect(mocks.actionButton).toHaveBeenCalledWith(
     expect.objectContaining({
-      iconClassName: expect.stringContaining('group-hover:text-[var(--sniptale-color-accent)]'),
+      icon: RecordingIcon,
+      iconClassName: 'text-[var(--sniptale-color-danger)]',
       dataUi: 'popup.video-setup.start-recording-button',
+      centered: true,
     })
   );
   expect(
-    mocks.actionButton.mock.calls.every(([props]) =>
-      String(props.iconClassName).includes('group-hover:text-[var(--sniptale-color-accent)]')
+    mocks.actionButton.mock.calls.every(
+      ([props]) => !String(props.iconClassName).includes('--sniptale-color-accent')
     )
   ).toBe(true);
-  expect(
-    mocks.actionButton.mock.calls.some(([props]) =>
-      String(props.iconClassName).includes(
-        'group-hover:text-[var(--sniptale-color-accent-emphasis)]'
-      )
-    )
-  ).toBe(false);
 });
 
 it('switches to the active footer controls while recording is in progress', () => {

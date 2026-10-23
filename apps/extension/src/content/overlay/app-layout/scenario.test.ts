@@ -1,4 +1,17 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+
+const { teardown, showToast } = vi.hoisted(() => ({
+  teardown: vi.fn((transition: () => void) => {
+    transition();
+    return Promise.resolve();
+  }),
+  showToast: vi.fn(),
+}));
+vi.mock('../design-review/runtime/session-teardown', () => ({
+  teardownDesignReviewSessionAfterUiTransition: teardown,
+}));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast }));
+beforeEach(() => vi.clearAllMocks());
 
 import {
   exitScreenshotModeFromUserAction,
@@ -6,6 +19,35 @@ import {
   isScenarioByClickBlocked,
   resolveScenarioByClickTransition,
 } from './scenario';
+
+it('restores changes before local exit even when background teardown was bypassed', () => {
+  let transition!: () => void;
+  teardown.mockImplementationOnce((callback) => {
+    transition = callback;
+    return Promise.resolve();
+  });
+  const handleToggleScreenshotMode = vi.fn();
+  const setPinToTab = vi.fn();
+  exitScreenshotModeFromUserAction({ modeController: { handleToggleScreenshotMode }, setPinToTab });
+  expect(teardown).toHaveBeenCalledOnce();
+  expect(handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(setPinToTab).not.toHaveBeenCalled();
+  transition();
+  expect(handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+  expect(setPinToTab).toHaveBeenCalledWith(false);
+});
+
+it('retains toolbar and pin state when restoration is refused', async () => {
+  const failure = Promise.reject(new Error('Restoration refused'));
+  teardown.mockReturnValueOnce(failure);
+  const handleToggleScreenshotMode = vi.fn();
+  const setPinToTab = vi.fn();
+  exitScreenshotModeFromUserAction({ modeController: { handleToggleScreenshotMode }, setPinToTab });
+  await failure.catch(() => undefined);
+  expect(handleToggleScreenshotMode).not.toHaveBeenCalled();
+  expect(setPinToTab).not.toHaveBeenCalled();
+  expect(showToast).toHaveBeenCalledOnce();
+});
 
 it('always clears authoritative pin state on explicit exit despite a stale false projection', () => {
   const handleToggleScreenshotMode = vi.fn();

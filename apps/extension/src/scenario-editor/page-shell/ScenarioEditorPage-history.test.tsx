@@ -205,6 +205,11 @@ it('recovers a conflicted edit buffer by copying it and retains it if copying fa
   expect(io.select).toHaveBeenLastCalledWith({ projectId: 'copy' });
   expect(container.querySelectorAll('article')).toHaveLength(2);
   expect(container.textContent).not.toContain('Could not create a copy');
+  expect(
+    container.querySelector<HTMLButtonElement>(
+      '.guide-insertion-item[data-end="true"] .guide-action-menu-anchor > button'
+    )?.disabled
+  ).toBe(false);
   await click('Add step');
   await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {

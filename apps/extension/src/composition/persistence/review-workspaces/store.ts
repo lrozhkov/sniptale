@@ -329,6 +329,7 @@ export async function openVideoWorkspace(
     }
     if (media.lifecycle?.trashedAt !== undefined) throw new VideoWorkspaceError('missing-media');
     const now = Date.now();
+    const advanced = createQuickEditAdvancedState();
     const legacy = parseVideoWorkspace({
       aggregateId,
       formatVersion: 1,
@@ -338,7 +339,8 @@ export async function openVideoWorkspace(
       history: [],
       cursor: 0,
       advanced: {
-        ...createQuickEditAdvancedState(),
+        ...advanced,
+        ui: { ...advanced.ui, modeSelectionPending: true },
         background: { enabled: false, zoomBehavior: 'window' },
         presentation: createNewWorkspacePresentationSettings(),
       },

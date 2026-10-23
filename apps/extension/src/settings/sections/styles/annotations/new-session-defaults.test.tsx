@@ -16,6 +16,35 @@ const copy = {
   sectionTitle: 'For new sessions',
 };
 
+it('preserves control appearance while saving without admitting another mutation', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onEnabledChange = vi.fn();
+  const props = {
+    copy,
+    defaults: { enabled: true, templateSource: 'forced' as const },
+    disabled: true,
+    pending: true,
+    onEnabledChange,
+    onTemplateSourceChange: vi.fn(),
+  };
+  try {
+    await act(async () => root.render(<AnnotationNewSessionDefaults {...props} />));
+    for (const control of host.querySelectorAll<HTMLButtonElement>('button')) {
+      expect(control.disabled).toBe(true);
+      expect(control.className).toContain('disabled:!opacity-100');
+      control.click();
+    }
+    expect(onEnabledChange).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('exposes current defaults and routes both controls through explicit actions', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

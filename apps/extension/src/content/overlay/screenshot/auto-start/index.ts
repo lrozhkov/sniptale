@@ -134,6 +134,14 @@ function areSamePendingAutoStartCapture(
     return false;
   }
 
+  if (previous.startContext?.preparationBaseline !== next.startContext?.preparationBaseline) {
+    return false;
+  }
+
+  if (previous.startContext?.runGeneration !== next.startContext?.runGeneration) {
+    return false;
+  }
+
   if (!previous.contentIntentSource && !next.contentIntentSource) {
     return true;
   }

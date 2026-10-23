@@ -15,7 +15,11 @@ export function createContentRuntimeMessageHandlers(
   getViewportInfo: () => ViewportInfo,
   regionSelectorController: Pick<
     RegionSelectorController,
-    'hideRecordingOverlay' | 'hideRegionSelector' | 'showRecordingOverlay' | 'showRegionSelector'
+    | 'hideRecordingOverlay'
+    | 'hideRegionSelector'
+    | 'showRecordingOverlay'
+    | 'showRegionSelector'
+    | 'isRegionSelectorActive'
   >,
   fullPageCaptureAgent?: FullPageCaptureAgent
 ) {

@@ -312,6 +312,7 @@ function NumericRowLabel({
   return (
     <TextWithOverflowHint
       className={cx(
+        'sniptale-interface-label',
         'min-w-0 truncate font-semibold text-[color:var(--sniptale-color-text-secondary)]',
         appearance === 'plain'
           ? 'text-[length:var(--sniptale-compact-font-size,11px)]'

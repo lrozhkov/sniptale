@@ -224,7 +224,7 @@ async function verifiesCameraOfferReturnsDeferredSdpAnswer() {
       type: VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER,
       peerId: 'camera-peer-1',
       sdp: 'camera-offer-sdp',
-      settings,
+      source: { kind: 'surface', settings },
     },
     sendResponse
   );

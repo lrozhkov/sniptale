@@ -15,8 +15,10 @@ export function ToolsRoute() {
 
   return (
     <section
+      data-ui="popup.tools.route"
+      data-has-error={Boolean(error)}
       className={[
-        'flex h-full min-h-0 flex-col rounded-[16px] border p-3',
+        'flex h-full min-h-0 flex-col overflow-hidden rounded-[6px] border p-3',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
@@ -40,7 +42,7 @@ export function ToolsRoute() {
         }}
       />
       {error ? (
-        <p className="mt-2 shrink-0 text-[11px] text-[var(--sniptale-color-danger)]" role="alert">
+        <p className="popup-error-message mt-2" role="alert">
           {error}
         </p>
       ) : null}

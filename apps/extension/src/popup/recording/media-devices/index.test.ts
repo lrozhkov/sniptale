@@ -6,6 +6,10 @@ import {
   loadPopupMediaDevices,
   requestPopupMediaDevicePermission,
   resolvePopupMediaDeviceId,
+  getPopupMediaAccessErrorKey,
+  PopupMediaAccessError,
+  readPopupMediaAccessState,
+  subscribeToPopupMediaAccessChanges,
   type PopupMediaDeviceConfig,
 } from './index';
 
@@ -186,6 +190,164 @@ it('requests selected media and stops temporary tracks', async () => {
   });
   expect(stop).toHaveBeenCalledOnce();
 });
+
+it.each([
+  ['NotAllowedError', 'denied'],
+  ['NotFoundError', 'no-device'],
+  ['OverconstrainedError', 'no-device'],
+  ['NotReadableError', 'device-busy'],
+  ['SecurityError', 'unavailable'],
+  ['UnknownError', 'unknown'],
+])('classifies camera acquisition %s without exposing browser details', async (name, state) => {
+  installMediaDevicesMock({
+    getUserMedia: vi.fn().mockRejectedValue(new DOMException('private detail', name)),
+  });
+  await expect(
+    requestPopupMediaDevicePermission(cameraConfig, 'saved-camera')
+  ).rejects.toMatchObject({ permissionName: 'camera', state });
+});
+
+it('classifies unavailable capture and provides recovery for every access state', async () => {
+  installMediaDevicesMock({});
+  await expect(requestPopupMediaDevicePermission(cameraConfig)).rejects.toMatchObject({
+    state: 'unavailable',
+  });
+  expect(getPopupMediaAccessErrorKey(new Error('private'))).toBeNull();
+  expect(getPopupMediaAccessErrorKey(new PopupMediaAccessError('camera', 'denied'))).toBe(
+    'popup.video.cameraPermissionDenied'
+  );
+  expect(getPopupMediaAccessErrorKey(new PopupMediaAccessError('camera', 'no-device'))).toBe(
+    'popup.video.noWebcamsError'
+  );
+  expect(getPopupMediaAccessErrorKey(new PopupMediaAccessError('microphone', 'no-device'))).toBe(
+    'popup.video.noMicrophonesError'
+  );
+  expect(getPopupMediaAccessErrorKey(new PopupMediaAccessError('camera', 'unavailable'))).toBe(
+    'popup.video.mediaAccessUnavailable'
+  );
+  expect(getPopupMediaAccessErrorKey(new PopupMediaAccessError('camera', 'unknown'))).toBe(
+    'popup.video.mediaAccessUnconfirmed'
+  );
+});
+
+it.each(['camera', 'microphone'] as const)(
+  'keeps a dismissed %s request distinct from blocked access',
+  async (permissionName) => {
+    installPermissionsMock(vi.fn().mockResolvedValue({ state: 'prompt' }));
+    installMediaDevicesMock({
+      getUserMedia: vi
+        .fn()
+        .mockRejectedValue(new DOMException('private detail', 'NotAllowedError')),
+    });
+    await expect(
+      requestPopupMediaDevicePermission({ ...cameraConfig, permissionName })
+    ).rejects.toMatchObject({ state: 'prompt' });
+  }
+);
+
+it('shares overlapping permission requests and releases their temporary stream once', async () => {
+  let finish!: (stream: MediaStream) => void;
+  const getUserMedia = vi.fn().mockReturnValue(
+    new Promise<MediaStream>((resolve) => {
+      finish = resolve;
+    })
+  );
+  const stop = vi.fn();
+  installMediaDevicesMock({ getUserMedia });
+  const first = requestPopupMediaDevicePermission(cameraConfig, 'saved-camera');
+  const second = requestPopupMediaDevicePermission(cameraConfig, 'saved-camera');
+  expect(getUserMedia).toHaveBeenCalledOnce();
+  finish(createMockStream(stop));
+  await Promise.all([first, second]);
+  expect(stop).toHaveBeenCalledOnce();
+});
+
+it('checks a different selected device after the preceding request releases its stream', async () => {
+  let finish!: (stream: MediaStream) => void;
+  const firstStop = vi.fn();
+  const secondStop = vi.fn();
+  const getUserMedia = vi
+    .fn()
+    .mockReturnValueOnce(
+      new Promise<MediaStream>((resolve) => {
+        finish = resolve;
+      })
+    )
+    .mockImplementationOnce(() => {
+      expect(firstStop).toHaveBeenCalledOnce();
+      return Promise.resolve(createMockStream(secondStop));
+    });
+  installMediaDevicesMock({ getUserMedia });
+  const first = requestPopupMediaDevicePermission(cameraConfig, 'first-camera');
+  const second = requestPopupMediaDevicePermission(cameraConfig, 'second-camera');
+  expect(getUserMedia).toHaveBeenCalledOnce();
+  finish(createMockStream(firstStop));
+  await Promise.all([first, second]);
+  expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+    video: { deviceId: { exact: 'second-camera' } },
+    audio: false,
+  });
+  expect(secondStop).toHaveBeenCalledOnce();
+});
+
+it('reads and observes browser camera permission and disposes the observer', async () => {
+  const status = Object.assign(new EventTarget(), { state: 'prompt' });
+  Object.defineProperty(navigator, 'permissions', {
+    configurable: true,
+    value: { query: vi.fn().mockResolvedValue(status) },
+  });
+  await expect(readPopupMediaAccessState('camera')).resolves.toBe('prompt');
+  const listener = vi.fn();
+  const stop = await subscribeToPopupMediaAccessChanges('camera', listener);
+  status.state = 'denied';
+  status.dispatchEvent(new Event('change'));
+  expect(listener).toHaveBeenCalledWith('denied');
+  stop();
+  status.dispatchEvent(new Event('change'));
+  expect(listener).toHaveBeenCalledOnce();
+});
+
+it('treats missing or rejecting permission APIs as unknown without preventing capture', async () => {
+  Object.defineProperty(navigator, 'permissions', { configurable: true, value: undefined });
+  await expect(readPopupMediaAccessState('camera')).resolves.toBe('unknown');
+  const stopMissing = await subscribeToPopupMediaAccessChanges('camera', vi.fn());
+  expect(stopMissing).toBeTypeOf('function');
+  Object.defineProperty(navigator, 'permissions', {
+    configurable: true,
+    value: { query: vi.fn().mockRejectedValue(new Error('unsupported')) },
+  });
+  await expect(readPopupMediaAccessState('camera')).resolves.toBe('unknown');
+  const stopRejected = await subscribeToPopupMediaAccessChanges('camera', vi.fn());
+  expect(stopRejected).toBeTypeOf('function');
+  const stopTrack = vi.fn();
+  installMediaDevicesMock({ getUserMedia: vi.fn().mockResolvedValue(createMockStream(stopTrack)) });
+  await requestPopupMediaDevicePermission(cameraConfig);
+  expect(stopTrack).toHaveBeenCalledOnce();
+});
+
+it.each([
+  { deviceId: null, audio: true },
+  { deviceId: '', audio: true },
+  { deviceId: 'saved-mic', audio: { deviceId: { exact: 'saved-mic' } } },
+])(
+  'requests microphone ID $deviceId with compatible constraints and releases its stream',
+  async ({ deviceId, audio }) => {
+    const stop = vi.fn();
+    const getUserMedia = vi.fn().mockResolvedValue(createMockStream(stop));
+    installMediaDevicesMock({ getUserMedia });
+    await requestPopupMediaDevicePermission(
+      {
+        kind: 'audioinput',
+        permissionName: 'microphone',
+        fallbackLabelKey: 'popup.video.microphoneToggleLabel',
+        createConstraints: () => ({ audio: true }),
+      },
+      deviceId
+    );
+    expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({ audio });
+    expect(stop).toHaveBeenCalledOnce();
+  }
+);
 
 it('keeps current devices or falls back to the first available device', () => {
   expect(resolvePopupMediaDeviceId(null, [])).toBeNull();

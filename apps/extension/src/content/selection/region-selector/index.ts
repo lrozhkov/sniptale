@@ -54,6 +54,7 @@ function hideRegionSelector(args: {
   args.state.isDragging = false;
   args.state.isResizing = false;
   args.state.resizeCorner = '';
+  args.state.regionSelectorTooltip?.dispose();
   args.state.regionSelectorContainer?.remove();
   args.state.regionSelectorContainer = null;
   args.state.regionSelectorTooltip = null;
@@ -161,6 +162,15 @@ function createRegionSelectorPublicController(args: {
   surfaceActions: ReturnType<typeof createRegionSelectorSurfaceActions>;
 }): RegionSelectorController {
   return {
+    isRegionSelectorActive: (binding) => {
+      const active = args.state.activeRequestBinding;
+      return (
+        args.state.regionSelectorContainer?.isConnected === true &&
+        active?.regionSelectionCapabilityToken === binding.regionSelectionCapabilityToken &&
+        active.regionSelectionRequestGeneration === binding.regionSelectionRequestGeneration &&
+        active.regionSelectionRequestId === binding.regionSelectionRequestId
+      );
+    },
     clearSelectedRegion() {
       args.state.selectedRegion = null;
     },
@@ -176,7 +186,14 @@ function createRegionSelectorPublicController(args: {
     },
 
     hideRecordingOverlay: () => hideRecordingOverlay(args.state),
-    hideRegionSelector: args.hideSelector,
+    hideRegionSelector: (requestId) => {
+      if (
+        requestId !== undefined &&
+        args.state.activeRequestBinding?.regionSelectionRequestId !== requestId
+      )
+        return;
+      args.hideSelector();
+    },
     showRecordingOverlay: (region) => args.surfaceActions.showRecordingOverlay(region),
     showRegionSelector: (binding) => {
       args.state.activeRequestBinding = binding;

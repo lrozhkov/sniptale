@@ -1,4 +1,3 @@
-import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
 import {
   setContentSizeTooltipPosition,
   syncContentSizeTooltipValues,
@@ -7,9 +6,13 @@ import { showSelectionModeCancelButton } from '../cancel-button';
 import type { SelectionModeDom } from '../dom-types';
 import type { SelectionRect } from '../types';
 import { syncSelectionToolbarPaddingState } from '../final-elements/toolbar';
-import { closeSelectionCaptureActionMenu } from '../final-elements/capture-menu';
+import {
+  closeSelectionCaptureActionMenu,
+  syncSelectionCaptureMenuDirection,
+} from '../final-elements/capture-menu';
 import { paintSelectionModeDragMask } from '../final-elements/overlay';
 import { syncSelectionToolbarCompactControlsChrome } from '../final-elements/toolbar-chrome';
+import { calculateContentSizeTooltipPosition } from '@sniptale/ui/content-size-tooltip/core';
 
 function createDragFrameSizeLabel(): HTMLDivElement {
   const label = document.createElement('div');
@@ -129,7 +132,9 @@ function updateSizePanelPosition(sizePanel: HTMLElement, rect: SelectionRect): v
     calculateContentSizeTooltipPosition({
       anchorRect: rect,
       tooltipWidth: measured.width || sizePanel.offsetWidth || 430,
-      tooltipHeight: measured.height || sizePanel.offsetHeight || 44,
+      tooltipHeight: measured.height || sizePanel.offsetHeight || 50,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
     })
   );
 }
@@ -186,6 +191,7 @@ export function updateFinalFrame(dom: SelectionModeDom, rect: SelectionRect): vo
   updateOverlayShades(dom.finalOverlay, rect);
   syncSelectionToolbarPaddingState(dom.sizePanel, rect);
   updateSizePanelPosition(dom.sizePanel, rect);
+  syncSelectionCaptureMenuDirection(dom.sizePanel);
 }
 
 export function resetFinalElements(dom: SelectionModeDom): void {

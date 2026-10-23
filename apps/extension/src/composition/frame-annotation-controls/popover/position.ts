@@ -5,6 +5,23 @@ import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactio
 const MARGIN = 8;
 const GAP = 10;
 const INTERACTIVE_POPOVER_Z_INDEX = 2147483647;
+const measuredPopoverHeights = new WeakMap<HTMLElement, number>();
+
+export const FrameAnnotationPopoverMeasurementContext = React.createContext<(() => void) | null>(
+  null
+);
+
+export type FrameAnnotationMenuDirection = 'up' | 'down' | 'left' | 'right';
+
+/** Resolve the physical side of an anchored popover from its placed rectangle. */
+export function resolveFrameAnnotationPopoverDirection(
+  anchor: DOMRect,
+  popover: { left: number; top: number; width: number }
+): FrameAnnotationMenuDirection {
+  if (popover.left >= anchor.right) return 'right';
+  if (popover.left + popover.width <= anchor.left) return 'left';
+  return popover.top >= anchor.bottom ? 'down' : 'up';
+}
 
 const interactiveSurfaceStyle = {
   pointerEvents: 'auto',
@@ -18,7 +35,15 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
   popoverRef: React.RefObject<HTMLDivElement | null>;
   width: number;
 }): React.CSSProperties {
+  const onMeasured = React.useContext(FrameAnnotationPopoverMeasurementContext);
   const [, refresh] = React.useReducer((value) => value + 1, 0);
+  React.useLayoutEffect(() => {
+    const measuredHeight = args.popoverRef.current?.offsetHeight;
+    if (!onMeasured || !args.isOpen || !args.anchorEl || !measuredHeight) return;
+    if (measuredPopoverHeights.get(args.anchorEl) === measuredHeight) return;
+    measuredPopoverHeights.set(args.anchorEl, measuredHeight);
+    onMeasured?.();
+  });
   React.useLayoutEffect(() => {
     if (!args.isOpen) return;
     const update = () => refresh();
@@ -33,7 +58,25 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
       cleanup?.();
     };
   }, [args.anchorEl, args.isOpen, args.popoverRef]);
-  if (!args.isOpen || !args.anchorEl) {
+  if (!args.isOpen) {
+    return { position: 'fixed', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' };
+  }
+  return resolveFrameAnnotationSettingsPopoverPosition({
+    anchorEl: args.anchorEl,
+    height: args.height,
+    width: args.width,
+    measuredHeight: args.popoverRef.current?.offsetHeight,
+  });
+}
+
+/** Resolve current toolbar placement with the last measured height when the popover is closed. */
+function resolveFrameAnnotationSettingsPopoverPosition(args: {
+  anchorEl: HTMLElement | null;
+  height: number;
+  measuredHeight?: number | undefined;
+  width: number;
+}): React.CSSProperties {
+  if (!args.anchorEl) {
     return { position: 'fixed', left: 0, top: 0, visibility: 'hidden', pointerEvents: 'none' };
   }
   const anchor = args.anchorEl.getBoundingClientRect();
@@ -46,7 +89,7 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
   const hasToolbarGap = Number.isFinite(configuredGap) && configuredGap >= 0;
   const gap = (hasToolbarGap ? configuredGap : GAP) * uiScale;
   const width = Math.min(args.width * uiScale, window.innerWidth - margin * 2);
-  const measuredHeight = args.popoverRef.current?.offsetHeight;
+  const measuredHeight = args.measuredHeight || measuredPopoverHeights.get(args.anchorEl);
   const height = (measuredHeight && measuredHeight > 0 ? measuredHeight : args.height) * uiScale;
   const mainToolbar = args.anchorEl.closest<HTMLElement>(
     hasToolbarGap
@@ -128,6 +171,34 @@ function resolveMainToolbarPosition(input: {
         candidate.top + input.height <= window.innerHeight - input.margin
     ) ?? ordered[0]!;
   return { position: 'fixed', ...position, width: input.width, ...interactiveSurfaceStyle };
+}
+
+/** Predict a visible settings-popover side with the owner's current placement and measured size. */
+export function resolveFrameAnnotationSettingsPopoverDirection(args: {
+  anchorEl: HTMLElement | null;
+  height: number;
+  width: number;
+}) {
+  if (!args.anchorEl) return undefined;
+  const style = resolveFrameAnnotationSettingsPopoverPosition(args);
+  const height =
+    (measuredPopoverHeights.get(args.anchorEl) ?? args.height) *
+    readContentUiScaleCompensation(args.anchorEl);
+  if (
+    typeof style.left !== 'number' ||
+    typeof style.top !== 'number' ||
+    typeof style.width !== 'number' ||
+    style.left < 0 ||
+    style.top < 0 ||
+    style.left + style.width > window.innerWidth ||
+    style.top + height > window.innerHeight
+  )
+    return undefined;
+  return resolveFrameAnnotationPopoverDirection(args.anchorEl.getBoundingClientRect(), {
+    left: style.left,
+    top: style.top,
+    width: style.width,
+  });
 }
 
 function clamp(value: number, min: number, max: number): number {

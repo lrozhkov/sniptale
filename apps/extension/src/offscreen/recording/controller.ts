@@ -13,6 +13,7 @@ import { createRuntimeMessagingTransport } from '../../platform/runtime-messagin
 import { recordingContext, type RecordingStopOutcome } from './context';
 import { cleanupResources } from './start/cleanup';
 import { startRecording as startRecordingImpl } from './start/index';
+import { RecordingStartCleanupConfirmedError } from './start/error-reporting';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../platform/i18n';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -143,13 +144,18 @@ async function startRecordingAfterPendingPublication(
         await reconcilePendingPostRecordPublicationBeforeStart(previousBinding);
     }
     if ((params.settings?.sourceCount ?? 1) > 1) {
-      await startMultiSourceRecording({
-        recordingId: params.recordingId ?? `rec-${Date.now()}`,
-        settings: {
-          ...params.settings,
-          systemAudioEnabled: false,
+      await startMultiSourceRecording(
+        {
+          generation: params.generation,
+          recordingId: params.recordingId ?? `rec-${Date.now()}`,
+          streamInstanceId: params.streamInstanceId,
+          settings: {
+            ...params.settings,
+            systemAudioEnabled: false,
+          },
         },
-      });
+        runtimeMessaging
+      );
     } else {
       await startRecordingImpl(params, runtimeMessaging);
     }
@@ -163,6 +169,15 @@ async function startRecordingAfterPendingPublication(
   } catch (error) {
     if (prepareData) cancelRecordingBegin();
     if (!pendingRecordingStop && matchesActiveRecordingBinding(binding)) {
+      if (
+        error instanceof RecordingStartCleanupConfirmedError &&
+        matchesRecordingFrameClockBinding(error.binding, binding) &&
+        !hasActiveRecordingSession() &&
+        recordingContext.currentRecordingId === null &&
+        (!terminalRecording ||
+          !matchesRecordingFrameClockBinding(terminalRecording.binding, binding))
+      )
+        terminalRecording = { binding: { ...binding }, outcome: { result: 'stopped' } };
       activeRecordingBinding = previousBindingRetired ? null : previousBinding;
     }
     throw error;
@@ -191,16 +206,13 @@ async function prepareRecordingData(
     );
   });
   try {
-    if ((params.settings.sourceCount ?? 1) <= 1) {
-      // BEGIN arrives only after source admission and the background countdown.
-      const begin = reserveRecordingBegin(
-        binding,
-        RECORDING_SOURCE_PREPARATION_TIMEOUT_MS +
-          RECORDING_START_DELIVERY_TIMEOUT_MS +
-          Math.max(0, params.settings.countdownSeconds ?? 0) * 1000
-      );
-      void begin.catch((error) => preparation.abort.abort(error));
-    }
+    const begin = reserveRecordingBegin(
+      binding,
+      RECORDING_SOURCE_PREPARATION_TIMEOUT_MS +
+        RECORDING_START_DELIVERY_TIMEOUT_MS +
+        Math.max(0, params.settings.countdownSeconds ?? 0) * 1000
+    );
+    void begin.catch((error) => preparation.abort.abort(error));
     await Promise.race([prepareData(), aborted]);
     return !preparation.cancelled && matchesActiveRecordingBinding(binding);
   } catch (error) {
@@ -551,6 +563,7 @@ export function pauseRecording(binding: RecordingSourceBinding): void {
 
   logger.debug('Pausing recording');
   artifactSession.pause();
+  recordingContext.pauseMicrophoneObservation();
   pauseActiveSidecarRecorders();
   durationTracker.freeze();
   durationTracker.stopSegment();
@@ -584,6 +597,7 @@ export function resumeRecording(binding: RecordingSourceBinding): void {
 
   logger.debug('Resuming recording');
   artifactSession.resume();
+  recordingContext.resumeMicrophoneObservation();
   resumeActiveSidecarRecorders();
   durationTracker.startSegment();
 

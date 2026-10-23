@@ -8,13 +8,15 @@ import type { DrawSession } from '../../../core/types';
 import type { EditorControllerInstance } from '../../types';
 
 export function cancelTransientInteractionForController(
-  controller: EditorControllerInstance
+  controller: EditorControllerInstance,
+  reason?: 'window-blur'
 ): boolean {
   const nextState = cancelEditorTransientInteraction({
     canvas: controller.canvas,
     drawSession: controller.drawSession,
     cropGuide: controller.cropGuide,
     activeTool: controller.activeTool,
+    preserveActiveTool: reason === 'window-blur',
     clearCropSelection: () => controller.clearCropSelection(),
     switchToSelectTool: () => controller.switchToSelectTool(),
     syncRuntimeState: () => controller.syncRuntimeState(),

@@ -278,6 +278,18 @@ async function prepareNativeSpeech(browser: NativeSpeechBrowser, providerPort: n
   );
   await browser.wait(
     gallery,
+    () => !!document.querySelector('[data-ui="gallery.videoReview.modeChoice"]')
+  );
+  await browser.evaluate(
+    gallery,
+    () =>
+      document
+        .querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.modeChoice.basic"]')!
+        .click(),
+    undefined
+  );
+  await browser.wait(
+    gallery,
     () => !!document.querySelector('dialog [data-ui="gallery.videoReview.trackHeader"]')
   );
   await browser.click(gallery, label('gallery.videoReview.advancedEditing'), 'dialog button');

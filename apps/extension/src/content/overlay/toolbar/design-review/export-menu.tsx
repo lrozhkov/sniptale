@@ -1,5 +1,5 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Archive, Copy, Download, Settings2 } from 'lucide-react';
 import {
   ProductToolbarMenu,
@@ -18,6 +18,7 @@ import {
   ToolbarMenuDropdown,
 } from '../menu/dropdown';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import {
   executeToolbarAnnotationExportAction,
   type ToolbarAnnotationExportAction,
@@ -50,9 +51,28 @@ const ANNOTATION_EXPORT_OPTIONS: Array<{
   },
 ];
 
+function resolveAnnotationExportMenuLayout(props: {
+  displayMode: AnnotationExportMenuProps['displayMode'];
+  menuHeight: number;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const { menuPlacement, style } = resolveToolbarDropdownState({
+    anchorRef: props.triggerRef,
+    displayMode: props.displayMode,
+    getMenuPosition: (ref, height = 230) => getToolbarMenuPosition(ref.current, height),
+    menuHeight: props.menuHeight,
+    menuWidth: 240,
+  });
+  return {
+    placement: menuPlacement,
+    style: style ? { ...style, width: 240, minWidth: 0, maxWidth: 'calc(100vw - 16px)' } : null,
+  };
+}
+
 function AnnotationExportDropdown(
   props: AnnotationExportMenuProps & {
     busyAction: ToolbarAnnotationExportAction | null;
+    menuHeight: number;
     menuRef: React.RefObject<HTMLDivElement | null>;
     onSelect: (
       action: ToolbarAnnotationExportAction,
@@ -62,13 +82,7 @@ function AnnotationExportDropdown(
   }
 ) {
   const adopted = React.useContext(CommandPressScope);
-  const { menuPlacement, style } = resolveToolbarDropdownState({
-    anchorRef: props.triggerRef,
-    displayMode: props.displayMode,
-    getMenuPosition: (ref, height = 230) => getToolbarMenuPosition(ref.current, height),
-    menuHeight: 230,
-    menuWidth: 280,
-  });
+  const { placement: menuPlacement, style } = resolveAnnotationExportMenuLayout(props);
   if (!style) return null;
 
   return (
@@ -79,7 +93,6 @@ function AnnotationExportDropdown(
         placement={menuPlacement}
         style={style}
         title={translate('content.toolbar.annotationExportMenuTitle')}
-        variant="capture"
       >
         {ANNOTATION_EXPORT_OPTIONS.map((option) => {
           const Icon = option.icon;
@@ -113,19 +126,21 @@ function AnnotationExportDropdown(
               label={translate('content.toolbar.annotationExportOpenLabel')}
             />
           </ProductToolbarMenuItem>
-          <button
+          <ContentToolbarButton
             type="button"
-            className="sniptale-btn shrink-0"
-            data-ui="content.toolbar.annotation-export.configure-export"
+            className="shrink-0 self-center"
+            tone="utility"
+            size="compact"
+            style={{ maxWidth: 'var(--sniptale-size-icon-compact)' }}
+            dataUi="content.toolbar.annotation-export.configure-export"
             disabled={props.disabled || props.busyAction !== null}
             aria-label={translate('content.toolbar.annotationExportConfigureLabel')}
             title={translate('content.toolbar.annotationExportConfigureHint')}
-            style={{ alignSelf: 'stretch', height: 'auto', minWidth: 38, padding: 0 }}
             onClick={(event) => props.onSelect('configure-export', event)}
             onMouseDown={preventToolbarMenuClick}
           >
             <Settings2 aria-hidden="true" size={16} />
-          </button>
+          </ContentToolbarButton>
         </div>
       </ProductToolbarMenu>
     </ToolbarMenuDropdown>
@@ -148,10 +163,28 @@ function getErrorMessage(action: ToolbarAnnotationExportAction): string {
 
 export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuHeight, setMenuHeight] = useState(230);
+  const menuSide = useToolbarMenuDirection(() =>
+    resolveAnnotationExportMenuLayout({ displayMode: props.displayMode, menuHeight, triggerRef })
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
   const [busyAction, setBusyAction] = useState<ToolbarAnnotationExportAction | null>(null);
   const open = props.toolbarMenuState.activeMenuType === 'annotations-export';
+  useLayoutEffect(() => {
+    if (!open) return;
+    const surface = menuRef.current?.firstElementChild;
+    if (!(surface instanceof HTMLElement)) return;
+    const measure = () => {
+      const height = surface.offsetHeight;
+      if (height > 0) setMenuHeight(height);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [open, props.compactMenus]);
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
   }, [props.toolbarMenuState]);
@@ -206,9 +239,11 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
       <ContentToolbarButton
         ref={triggerRef}
         type="button"
+        tone="property"
         aria-expanded={open}
         aria-haspopup="menu"
         data-menu-open={open ? 'true' : 'false'}
+        data-menu-side={menuSide}
         dataUi="content.toolbar.annotation-export-button"
         disabled={props.disabled || busyAction !== null}
         aria-busy={busyAction !== null}
@@ -225,6 +260,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         <AnnotationExportDropdown
           {...props}
           busyAction={busyAction}
+          menuHeight={menuHeight}
           menuRef={menuRef}
           onSelect={handleSelect}
           triggerRef={triggerRef}

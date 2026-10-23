@@ -1,6 +1,6 @@
 import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { BrushCleaning, RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -22,6 +22,14 @@ const RESET_MESSAGES = {
   'design-review': 'content.toolbar.resetDesignReviewMessage',
 } as const;
 
+const RESET_LABELS = {
+  all: 'content.toolbar.clearPagePreparation',
+  drawing: 'content.toolbar.clearDrawings',
+  annotation: 'content.toolbar.clearAnnotations',
+  'content-editing': 'content.toolbar.restorePageContent',
+  'design-review': 'content.toolbar.clearReviewChanges',
+} as const;
+
 export function ToolbarResetConfirmControl(props: {
   available: boolean;
   scope?: PagePreparationResetScope;
@@ -37,6 +45,8 @@ export function ToolbarResetConfirmControl(props: {
   const [menuHeight, setMenuHeight] = useState(160);
   const titleId = useId();
   const messageId = useId();
+  const actionLabel = translate(RESET_LABELS[props.scope ?? 'all']);
+  const ResetIcon = (props.scope ?? 'all') === 'all' ? RotateCcw : BrushCleaning;
   const { closeMenu, toggleMenu, activeMenuType } = props.toolbarMenuState;
   const open = props.available && activeMenuType === 'reset-confirm';
   const close = useCallback(() => closeMenu('reset-confirm'), [closeMenu]);
@@ -82,8 +92,8 @@ export function ToolbarResetConfirmControl(props: {
         ref={triggerRef}
         type="button"
         dataUi="content.toolbar.reset-all-button"
-        title={translate('content.toolbar.clearPagePreparation')}
-        aria-label={translate('content.toolbar.clearPagePreparation')}
+        title={actionLabel}
+        aria-label={actionLabel}
         aria-expanded={open}
         aria-haspopup="dialog"
         disabled={!props.available}
@@ -94,7 +104,7 @@ export function ToolbarResetConfirmControl(props: {
           toggleMenu('reset-confirm');
         }}
       >
-        <RotateCcw size={18} strokeWidth={2} />
+        <ResetIcon size={18} strokeWidth={2} />
       </ContentToolbarButton>
       {open ? (
         <ProductToolbarMenu
@@ -129,7 +139,7 @@ export function ToolbarResetConfirmControl(props: {
               (event.shiftKey ? buttons[buttons.length - 1] : buttons[0])?.focus();
             }}
           >
-            <strong id={titleId}>{translate('content.toolbar.clearPagePreparation')}</strong>
+            <strong id={titleId}>{actionLabel}</strong>
             <p id={messageId}>{translate(RESET_MESSAGES[props.scope ?? 'all'])}</p>
             <div className="flex justify-end gap-2">
               <ProductActionButton
@@ -149,7 +159,7 @@ export function ToolbarResetConfirmControl(props: {
                   props.onConfirm?.();
                 }}
               >
-                {translate('content.toolbar.clearPagePreparation')}
+                {actionLabel}
               </ProductActionButton>
             </div>
           </div>

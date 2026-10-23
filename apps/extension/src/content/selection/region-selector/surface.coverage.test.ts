@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   }),
   calculateContentSizeTooltipPositionMock: vi.fn(() => ({ left: 12, top: 24 })),
   createRegionSelectorTooltipMock: vi.fn(() => ({
+    dismissMenu: vi.fn(),
+    dispose: vi.fn(),
     aspectRatioButton: document.createElement('button'),
     root: document.createElement('div'),
   })),
@@ -161,6 +163,10 @@ it('shows region selectors once and renders the surface with tooltip wiring', ()
   }
   const boundHandlers = firstBindCall[0];
   boundHandlers.onDragStart({ clientX: 12, clientY: 18, preventDefault: vi.fn() });
+  expect(state.isDragging).toBe(true);
+  boundHandlers.onResizeStart({ clientX: 30, clientY: 40, preventDefault: vi.fn() }, 'se');
+  expect(state.isResizing).toBe(false);
+  state.isDragging = false;
   boundHandlers.onResizeStart({ clientX: 30, clientY: 40, preventDefault: vi.fn() }, 'se');
 
   expect(state.regionSelectorContainer?.id).toBe('sniptale-region-selector-root');
@@ -168,13 +174,14 @@ it('shows region selectors once and renders the surface with tooltip wiring', ()
     expect.any(HTMLDivElement),
     'selector-style'
   );
-  expect(state.isDragging).toBe(true);
+  expect(state.isDragging).toBe(false);
   expect(state.isResizing).toBe(true);
   expect(state.resizeCorner).toBe('se');
+  expect(state.regionSelectorTooltip?.dismissMenu).toHaveBeenCalledTimes(2);
   expect(mocks.applyRegionSelectorThemeMock).toHaveBeenCalledOnce();
   expect(mocks.createRegionSelectorTooltipMock).toHaveBeenCalledOnce();
   expect(mocks.bindRegionSelectorRootEventsMock).toHaveBeenCalledOnce();
-  expect(mocks.updateOverlayMaskMock).toHaveBeenCalledOnce();
-  expect(mocks.syncContentSizeTooltipValuesMock).toHaveBeenCalledOnce();
+  expect(mocks.updateOverlayMaskMock).toHaveBeenCalledTimes(3);
+  expect(mocks.syncContentSizeTooltipValuesMock).toHaveBeenCalledTimes(3);
   expect(bindDocumentEvents).toHaveBeenCalledOnce();
 });

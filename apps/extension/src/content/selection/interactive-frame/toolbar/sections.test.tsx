@@ -36,6 +36,31 @@ afterEach(() => {
 });
 
 describe('InteractiveFrameToolbarEffectButtons', () => {
+  it('changes the effect without opening properties and keeps the arrow separate', () => {
+    const select = vi.fn();
+    const open = vi.fn();
+    act(() =>
+      root?.render(
+        <InteractiveFrameToolbarEffectButtons
+          effectMode="border"
+          popoverAnchorRef={React.createRef<HTMLButtonElement>()}
+          handleButtonMouseDown={vi.fn()}
+          handleEffectClick={() => open}
+          onEffectModeSelect={select}
+          effectButtons={[]}
+        />
+      )
+    );
+    act(() => container?.querySelector<HTMLButtonElement>('[data-frame-effect="blur"]')?.click());
+    expect(select).toHaveBeenCalledWith('blur');
+    expect(open).not.toHaveBeenCalled();
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>('.sniptale-annotation-effect-switch > button')
+        ?.click()
+    );
+    expect(open).toHaveBeenCalledOnce();
+  });
   it('passes React keys directly instead of spreading them through button props', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 

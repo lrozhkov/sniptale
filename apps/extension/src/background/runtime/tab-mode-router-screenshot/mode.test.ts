@@ -3,6 +3,8 @@ import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/r
 
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
+  assertBorrowed: vi.fn(),
+  releaseQuickAction: vi.fn(),
   browserTabsGet: vi.fn(),
   browserTabsGetZoom: vi.fn(),
   getApplied: vi.fn(),
@@ -29,6 +31,12 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
 
 vi.mock('@sniptale/platform/browser/runtime', () => ({
   runtimeInfo: { getURL: (path: string) => `chrome-extension://test/${path}` },
+}));
+
+vi.mock('../../capture/quick-actions/flow/surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture/quick-actions/flow/surface')>()),
+  assertBorrowedQuickActionSurfaceTransaction: mocks.assertBorrowed,
+  releaseQuickActionSurface: mocks.releaseQuickAction,
 }));
 
 import {
@@ -94,6 +102,118 @@ beforeEach(() => {
   mocks.release.mockResolvedValue(undefined);
   mocks.releaseTabOwners.mockResolvedValue(undefined);
   mocks.sendTabMessage.mockResolvedValue(undefined);
+  mocks.assertBorrowed.mockReset().mockReturnValue(true);
+  mocks.releaseQuickAction.mockReset().mockResolvedValue(undefined);
+});
+
+describe('borrowed quick-action cleanup', () => {
+  async function prepare() {
+    const current = state();
+    await enableScreenshotMode(5, current.screenshot, current.viewport, current.owner, new Map(), {
+      surfaceDocumentId: 'document-a',
+    });
+    const session = getScreenshotSurfaceSession(5)!;
+    mocks.sendTabMessage.mockClear();
+    const request = {
+      quickActionTransactionId: 'transaction-a',
+      leaseGeneration: session.activeLeaseGeneration,
+      operationGeneration: session.lastOperationGeneration + 1,
+      screenshotModeState: current.screenshot,
+      senderDocumentId: 'document-a',
+      surfaceCapabilityToken: session.capabilityToken,
+      tabId: 5,
+      viewportOwnerState: current.owner,
+      viewportState: current.viewport,
+      webSnapshotViewerPorts: new Map(),
+    };
+    return { current, request, session };
+  }
+
+  it('releases only the exact borrowed transaction and leaves preparation alive', async () => {
+    const { current, request, session } = await prepare();
+    await disableScreenshotModeForContent(request);
+    expect(mocks.assertBorrowed).toHaveBeenCalledWith(5, 'transaction-a');
+    expect(mocks.releaseQuickAction).toHaveBeenCalledWith(5, current.viewport, 'transaction-a');
+    expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+    expect(mocks.releaseTabOwners).not.toHaveBeenCalled();
+    expect(current.screenshot.get(5)).toBe(true);
+    expect(getScreenshotSurfaceSession(5)).toBe(session);
+  });
+
+  it('acknowledges finalized preset cleanup before claiming its old lease or operation', async () => {
+    const { current, request, session } = await prepare();
+    mocks.assertBorrowed.mockReturnValueOnce(false);
+    await disableScreenshotModeForContent({
+      ...request,
+      leaseGeneration: 19,
+      operationGeneration: 0,
+    });
+    expect(mocks.releaseQuickAction).not.toHaveBeenCalled();
+    expect(session.lastOperationGeneration).toBe(0);
+    expect(current.screenshot.get(5)).toBe(true);
+    expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+  });
+
+  it('binds an unbound content document through authorized finalized cleanup', async () => {
+    const { request, session } = await prepare();
+    session.documentId = null;
+    mocks.assertBorrowed.mockReturnValueOnce(false);
+    await disableScreenshotModeForContent(request);
+    expect(session.documentId).toBe('document-a');
+    expect(session.lastOperationGeneration).toBe(0);
+    expect(mocks.releaseQuickAction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { surfaceCapabilityToken: 'other-token' },
+    { senderDocumentId: 'document-b' },
+    { tabId: 6 },
+  ])('rejects unauthorized scoped cleanup %o', async (override) => {
+    const { request } = await prepare();
+    await expect(disableScreenshotModeForContent({ ...request, ...override })).rejects.toThrow(
+      'authorization-expired'
+    );
+    expect(mocks.assertBorrowed).not.toHaveBeenCalled();
+    expect(mocks.releaseQuickAction).not.toHaveBeenCalled();
+    expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([{ operationGeneration: 0 }, { leaseGeneration: 99 }])(
+    'rejects stale scoped cleanup %o',
+    async (override) => {
+      const { request } = await prepare();
+      await expect(disableScreenshotModeForContent({ ...request, ...override })).rejects.toThrow(
+        'stale-generation'
+      );
+      expect(mocks.releaseQuickAction).not.toHaveBeenCalled();
+      expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['stale-transaction', 'owned-transaction'])(
+    'does not claim an operation for %s',
+    async (reason) => {
+      const { request, session } = await prepare();
+      mocks.assertBorrowed.mockImplementationOnce(() => {
+        throw new Error(reason);
+      });
+      await expect(disableScreenshotModeForContent(request)).rejects.toThrow(reason);
+      expect(session.lastOperationGeneration).toBe(0);
+      expect(mocks.releaseQuickAction).not.toHaveBeenCalled();
+      expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it('retains preparation after release failure and permits a newer retry', async () => {
+    const { current, request, session } = await prepare();
+    mocks.releaseQuickAction.mockRejectedValueOnce(new Error('restore failed'));
+    await expect(disableScreenshotModeForContent(request)).rejects.toThrow('restore failed');
+    expect(current.screenshot.get(5)).toBe(true);
+    expect(getScreenshotSurfaceSession(5)).toBe(session);
+    await disableScreenshotModeForContent({ ...request, operationGeneration: 2 });
+    expect(mocks.releaseQuickAction).toHaveBeenCalledTimes(2);
+    expect(mocks.sendTabMessage).not.toHaveBeenCalled();
+  });
 });
 
 describe('screenshot mode initial surface setup', () => {

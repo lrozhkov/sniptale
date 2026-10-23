@@ -161,7 +161,7 @@ function runSettingsPanelControlsSuite() {
     const row = container?.querySelector('[data-ui="settings.control-row"]');
     expect(row?.textContent).toContain('Language');
     expect(row?.textContent).toContain('Used throughout the application');
-    expect(row?.className).toContain('max-w-[720px]');
+    expect(row?.className).toContain('max-w-[560px]');
     expect(row?.querySelector('.sniptale-parameter-name')?.textContent).toBe('Language');
     expect(row?.querySelector('.sniptale-parameter-value button')?.textContent).toBe('Choose');
   });

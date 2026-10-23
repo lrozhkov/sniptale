@@ -137,7 +137,7 @@ export interface EditorControllerInstanceObjectCapabilities {
   buildViewportState(): EditorViewportState;
   syncViewportState(): void;
   scheduleViewportStateSync(): void;
-  cancelTransientInteraction(): boolean;
+  cancelTransientInteraction(reason?: 'window-blur'): boolean;
   startDrawSession(
     tool: DrawSession['tool'],
     start: Point,

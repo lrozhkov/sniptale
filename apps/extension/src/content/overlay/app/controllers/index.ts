@@ -113,6 +113,7 @@ function useContentScreenshotController(
       },
       highlighterMode: modeState.highlighterMode,
       quickEditMode: modeState.quickEditMode,
+      quickEditDocumentMode: modeState.quickEditDocumentMode,
       restoreEditingMode,
       setAiPickMode: modeState.setAiPickMode,
       setDesignReviewMode: modeState.setDesignReviewMode,
@@ -125,6 +126,7 @@ function useContentScreenshotController(
     navigationLockEnabled: modeState.navigationLockEnabled,
     quickActionOverlayRef,
     timerDelay: modeState.timerDelay,
+    setCurrentViewport: modeState.setCurrentViewport,
     capturePersistence: {
       sessionActivePresetId: modeState.sessionActivePresetId,
       setSaveDialogState: modeState.setSaveDialogState,
@@ -238,6 +240,10 @@ export function useContentAppControllers(
         },
         highlighter: () => modeController.handleToggleHighlighterMode(true),
         'quick-edit': () => modeController.handleToggleQuickEditMode(true),
+        'quick-edit-document': () => {
+          modeController.handleToggleQuickEditMode(true);
+          modeController.handleToggleQuickEditDocumentMode(true);
+        },
       })
   );
   const videoRecordingController = useVideoRecordingSurfaceController({

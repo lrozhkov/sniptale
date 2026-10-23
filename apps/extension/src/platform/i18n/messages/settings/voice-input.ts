@@ -61,8 +61,8 @@ export const settingsVoiceInputMessages = defineMessageSource({
   phaseIdle: { ru: 'Готов', en: 'Ready' },
   phaseChecking: { ru: 'Проверка', en: 'Checking' },
   phaseInstalling: { ru: 'Установка', en: 'Installing' },
-  phaseStarting: { ru: 'Запуск', en: 'Starting' },
-  phaseListening: { ru: 'Слушаю', en: 'Listening' },
+  phaseStarting: { ru: 'Ожидание аудио', en: 'Waiting for audio' },
+  phaseListening: { ru: 'Аудио поступает', en: 'Receiving audio' },
   phaseStopping: { ru: 'Остановка', en: 'Stopping' },
   phaseEnded: { ru: 'Завершено', en: 'Finished' },
   phaseError: { ru: 'Ошибка', en: 'Error' },
@@ -79,12 +79,12 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'Chrome is installing the language package',
   },
   phaseStartingDescription: {
-    ru: 'Offscreen получает микрофон и ожидает audiostart',
-    en: 'Offscreen is acquiring the microphone and waiting for audiostart',
+    ru: 'Браузер ещё не подтвердил получение аудио для распознавания.',
+    en: 'The browser has not confirmed audio input for recognition yet.',
   },
   phaseListeningDescription: {
-    ru: 'Chrome подтвердил захват аудио',
-    en: 'Chrome confirmed audio capture',
+    ru: 'Браузер подтвердил получение аудио. Это ещё не означает, что речь распознана.',
+    en: 'The browser confirmed audio input. This does not yet mean that speech was recognized.',
   },
   phaseStoppingDescription: {
     ru: 'Ожидается end; затем принудительный abort',
@@ -183,8 +183,20 @@ export const settingsVoiceInputMessages = defineMessageSource({
     en: 'The selected language is unsupported by the current Chrome service.',
   },
   errorNetwork: {
-    ru: 'Сервис Chrome недоступен по сети. Повторите попытку позже.',
-    en: 'The Chrome service is unavailable over the network. Try again later.',
+    ru: 'Нет связи с сервисом распознавания. Проверьте подключение и доступность сервиса в этом браузере.',
+    en: 'Cannot reach the recognition service. Check your connection and service availability in this browser.',
+  },
+  errorServiceNotAllowed: {
+    ru: 'Браузер не разрешил использовать сервис распознавания. Разрешение на микрофон не даёт доступ к этому сервису.',
+    en: 'The browser blocked the recognition service. Microphone permission does not enable this service.',
+  },
+  localPackageUnavailable: {
+    ru: 'Для этого языка недоступен',
+    en: 'Unavailable for this language',
+  },
+  localPackageUnavailableDescription: {
+    ru: 'Локальная диктовка для выбранного языка недоступна в этом браузере. Пакет нельзя установить.',
+    en: 'Local dictation for the selected language is unavailable in this browser. The package cannot be installed.',
   },
   errorTimeout: {
     ru: 'Время ожидания истекло. Запустите ввод снова.',

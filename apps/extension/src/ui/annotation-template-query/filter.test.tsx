@@ -44,6 +44,9 @@ async function verifyTagMenuInteractions(host: Element | DocumentFragment) {
   expect(trigger.getAttribute('data-active')).toBe('true');
   expect(trigger.getAttribute('aria-pressed')).toBe('true');
   expect(option.getAttribute('data-active')).toBe('true');
+  expect(trigger.className).not.toContain('color-accent');
+  expect(trigger.className).not.toContain('border-accent');
+  expect(option.className).not.toContain('color-accent');
   act(() => {
     option.click();
   });

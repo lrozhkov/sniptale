@@ -30,7 +30,8 @@ export function isQuickActionOverlay(
     isString(value['imageFormat']) &&
     isNumber(value['imageQuality']) &&
     isBoolean(value['exitAfterCapture']) &&
-    hasOptionalField(value, 'delaySeconds', isNumber)
+    hasOptionalField(value, 'delaySeconds', isNumber) &&
+    hasOptionalField(value, 'transactionId', isString)
   );
 }
 

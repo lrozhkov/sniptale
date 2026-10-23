@@ -4,19 +4,28 @@ import { PermissionsSection } from './permissions';
 import { PrivacySection } from './privacy';
 
 export function AccessDataSection(props: { onViewChange?: (view: string) => void; view?: string }) {
-  const view = props.view === 'privacy' ? 'privacy' : 'permissions';
+  const view =
+    props.view === 'privacy' || props.view === 'required-permissions' ? props.view : 'permissions';
   return (
     <div className="space-y-5">
       <SettingsSubpageTabs
         activeId={view}
         ariaLabel={translate('settings.navigation.accessData')}
         items={[
-          { id: 'permissions', label: translate('settings.navigation.views.permissions') },
+          { id: 'permissions', label: translate('settings.permissions.statusChecksTitle') },
+          {
+            id: 'required-permissions',
+            label: translate('settings.permissions.requiredGrantsTitle'),
+          },
           { id: 'privacy', label: translate('settings.navigation.views.privacy') },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'privacy' ? <PrivacySection /> : <PermissionsSection />}
+      {view === 'privacy' ? (
+        <PrivacySection />
+      ) : (
+        <PermissionsSection view={view === 'required-permissions' ? 'required' : 'optional'} />
+      )}
     </div>
   );
 }

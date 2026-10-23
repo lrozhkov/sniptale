@@ -257,6 +257,24 @@ it('marks recording-state reads as degraded when the runtime state already carri
   });
 });
 
+it('returns the current microphone advisory when the popup reopens', async () => {
+  const microphoneActivity = { status: 'ready' as const, level: 0, warning: true };
+  getVideoRecordingRuntimeStateMock.mockReturnValue({
+    duration: 32,
+    status: VideoRecordingStatus.RECORDING,
+    microphoneActivity,
+  });
+  const sendResponse = createSendResponse();
+  handleRecordingState(sendResponse);
+  await flushAsyncRoute();
+  expect(sendResponse).toHaveBeenCalledWith(
+    expect.objectContaining({
+      recordingHealth: 'healthy',
+      state: expect.objectContaining({ microphoneActivity }),
+    })
+  );
+});
+
 it('returns camera recorder control capability to an authorized camera document', async () => {
   const sendResponse = createSendResponse();
   const sender = {
@@ -588,12 +606,14 @@ it('handles recording pause and resume lifecycle mutations through the recording
   await flushAsyncRoute();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
     status: VideoRecordingStatus.PAUSED,
+    microphoneActivity: null,
   });
   expectAcceptedLifecycleResponse(sendResponse);
   expectAsyncRoute(handleOffscreenRecordingResumed({ recordingId: 'rec-1' }, sendResponse));
   await flushAsyncRoute();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenLastCalledWith({
     status: VideoRecordingStatus.RECORDING,
+    microphoneActivity: null,
   });
   expectAcceptedLifecycleResponse(sendResponse);
 });
@@ -614,6 +634,7 @@ it('restores the active recording lease before accepting post-restart lifecycle 
   expect(ensureActiveVideoRecordingLeaseHydratedMock).toHaveBeenCalled();
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenCalledWith({
     status: VideoRecordingStatus.PAUSED,
+    microphoneActivity: null,
   });
   expectAcceptedLifecycleResponse(sendResponse);
 });

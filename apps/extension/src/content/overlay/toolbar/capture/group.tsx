@@ -12,6 +12,10 @@ import { ToolbarCaptureButtons } from './options';
 import { ToolbarSettingsMenu } from './settings';
 import { ToolbarCaptureMenuGroup } from './menu-group';
 import type { useToolbarCaptureMenus } from './use-menus';
+import { useContext } from 'react';
+import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageToolbarCustomizationDone } from './page-control-settings';
+import { PageProtectedControls } from '../controls/control-visibility';
 
 function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
   const pinned = props.pinToTab || props.pinToTabLocked;
@@ -50,7 +54,7 @@ function NavigationToolbarActions(props: ToolbarCaptureActionsProps) {
         title={translate('content.toolbar.hideToolbar')}
         onClick={(event) => {
           event.stopPropagation();
-          props.onClose();
+          props.onClose(event.detail === 0);
         }}
       >
         <PanelBottomClose size={18} strokeWidth={2} />
@@ -66,6 +70,13 @@ export function ToolbarCaptureActionGroup(
   }
 ) {
   const { menus, onSelectCaptureAction, ...captureProps } = props;
+  const visibility = useContext(PageToolbarControlsContext);
+  const capturesVisible =
+    !visibility ||
+    (['capture-visible', 'capture-selection', 'capture-full'] as const).some(visibility.isVisible);
+  const optionsVisible =
+    !visibility ||
+    (['after-capture', 'capture-delay', 'capture-size'] as const).some(visibility.isVisible);
 
   return (
     <>
@@ -73,24 +84,28 @@ export function ToolbarCaptureActionGroup(
         className="sniptale-capture-leading-divider"
         dataUi="content.toolbar.capture-leading-divider"
       />
-      <ContentToolbarGroup>
-        <ToolbarCaptureButtons
-          compactMenus={captureProps.compactMenus}
-          currentViewport={captureProps.currentViewport}
-          displayMode={captureProps.displayMode}
-          isLoading={captureProps.isLoading}
-          onTakeScreenshot={captureProps.onTakeScreenshot}
-          toolbarMenuState={captureProps.toolbarMenuState}
-        />
-      </ContentToolbarGroup>
-      <ContentToolbarDivider />
-      <ContentToolbarGroup>
-        <ToolbarCaptureMenuGroup
-          {...captureProps}
-          menus={menus}
-          onSelectCaptureAction={onSelectCaptureAction}
-        />
-      </ContentToolbarGroup>
+      {capturesVisible ? (
+        <ContentToolbarGroup>
+          <ToolbarCaptureButtons
+            compactMenus={captureProps.compactMenus}
+            currentViewport={captureProps.currentViewport}
+            displayMode={captureProps.displayMode}
+            isLoading={captureProps.isLoading}
+            onTakeScreenshot={captureProps.onTakeScreenshot}
+            toolbarMenuState={captureProps.toolbarMenuState}
+          />
+        </ContentToolbarGroup>
+      ) : null}
+      {capturesVisible && optionsVisible ? <ContentToolbarDivider /> : null}
+      {optionsVisible ? (
+        <ContentToolbarGroup>
+          <ToolbarCaptureMenuGroup
+            {...captureProps}
+            menus={menus}
+            onSelectCaptureAction={onSelectCaptureAction}
+          />
+        </ContentToolbarGroup>
+      ) : null}
       {!captureProps.videoRecordingMode &&
       (captureProps.screenshotMode ||
         captureProps.canClearPagePreparation ||
@@ -114,7 +129,11 @@ export function ToolbarCaptureActionGroup(
         </>
       ) : null}
       <ContentToolbarGroup dataUi="content.toolbar.settings-group">
-        {captureProps.isNavigationMode ? <NavigationToolbarActions {...captureProps} /> : null}
+        {captureProps.isNavigationMode ? (
+          <PageProtectedControls>
+            <NavigationToolbarActions {...captureProps} />
+          </PageProtectedControls>
+        ) : null}
         <ToolbarSettingsMenu
           compactMenus={captureProps.compactMenus}
           pinToTab={captureProps.pinToTab}
@@ -135,6 +154,7 @@ export function ToolbarCaptureActionGroup(
           onFreePlacementChange={captureProps.onFreePlacementChange}
           onPinToTabChange={captureProps.onPinToTabChange}
         />
+        <PageToolbarCustomizationDone onCloseMenus={menus.closeMenus} />
       </ContentToolbarGroup>
     </>
   );

@@ -96,7 +96,17 @@ export type RuntimeContentActionRequestByType = {
 
 export type RuntimeContentActionResponseByType = {
   [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: RuntimeMessageResponse<
-    VideoRecordingSurfaceActivation & { failureCode?: VideoRecordingStartFailureCode }
+    | (VideoRecordingSurfaceActivation & {
+        confirmationRequired?: never;
+        failureCode?: VideoRecordingStartFailureCode;
+      })
+    | {
+        confirmationRequired: true;
+        surfaceSessionId?: never;
+        surfaceToken?: never;
+        snapshot?: never;
+        failureCode?: never;
+      }
   >;
   [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<VideoRecordingSurfaceActivation>;
   [MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY]: RuntimeMessageResponse<{

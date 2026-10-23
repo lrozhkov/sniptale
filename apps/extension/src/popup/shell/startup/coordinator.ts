@@ -6,6 +6,7 @@ import {
 } from '../../../composition/persistence/capture-settings/popup-startup';
 import { consumePopupExportLaunchIntentForActiveTab } from '../export/runtime/tab-message-routing';
 import { popupBootstrapTransport } from '../bootstrap/runtime';
+import { clearPopupVideoLaunchUrlParams } from '../../platform/browser-driver';
 import {
   loadRecordingStateResponseWithFallback,
   resolvePopupBootstrapRecordingState,
@@ -28,7 +29,48 @@ const screenshotModes = {
   'screenshots:desktop': 'desktop',
 } as const;
 
-export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor> {
+function consumeVideoLaunchRoute(href: string | undefined): {
+  videoMode: CaptureMode;
+  videoLaunch: { tabId: number; viewportPresetId: string | null };
+} | null {
+  if (!href) return null;
+  const url = new URL(href);
+  const keys = ['videoLaunchMode', 'videoLaunchTabId', 'videoLaunchPresetId'];
+  if (keys.some((key) => url.searchParams.getAll(key).length > 1)) return null;
+  const mode = url.searchParams.get('videoLaunchMode');
+  if (mode !== CaptureMode.TAB && mode !== CaptureMode.TAB_CROP && mode !== CaptureMode.SCREEN)
+    return null;
+  const rawTabId = url.searchParams.get('videoLaunchTabId');
+  if (!rawTabId || !/^[1-9][0-9]*$/.test(rawTabId)) return null;
+  const tabId = Number(rawTabId);
+  if (!Number.isSafeInteger(tabId)) return null;
+  const viewportPresetId = url.searchParams.get('videoLaunchPresetId');
+  if (
+    viewportPresetId !== null &&
+    (!viewportPresetId || viewportPresetId.trim() !== viewportPresetId)
+  )
+    return null;
+  if (typeof window !== 'undefined' && window.location.href === href) {
+    clearPopupVideoLaunchUrlParams(href);
+  }
+  return { videoMode: mode, videoLaunch: { tabId, viewportPresetId } };
+}
+
+function consumeRecordingSetupRoute(href: string | undefined): boolean {
+  if (!href) return false;
+  const values = new URL(href).searchParams.getAll('recordingSetup');
+  if (values.length !== 1 || values[0] !== '1') return false;
+  if (typeof window !== 'undefined' && window.location.href === href) {
+    clearPopupVideoLaunchUrlParams(href);
+  }
+  return true;
+}
+
+export async function resolvePopupStartupRoute(
+  href = typeof window === 'undefined' ? undefined : window.location.href
+): Promise<PopupStartupDescriptor> {
+  const videoLaunch = consumeVideoLaunchRoute(href);
+  const recordingSetup = consumeRecordingSetupRoute(href);
   const [startup, recordingResponse, exportIntent] = await Promise.all([
     loadPopupStartupState().catch(() => DEFAULT_POPUP_STARTUP_STATE),
     loadRecordingStateResponseWithFallback(popupBootstrapTransport, () => undefined),
@@ -61,6 +103,8 @@ export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor
       postRecordSnapshot,
     };
   }
+  if (videoLaunch) return { page: 'video', ...videoLaunch, recordingSnapshot, postRecordSnapshot };
+  if (recordingSetup) return { page: 'video', recordingSnapshot, postRecordSnapshot };
   if (exportIntent) return { page: 'export', destination: 'export', launch: exportIntent };
   if (startup.selection === 'remember-last') {
     return startup.lastPage === 'video'

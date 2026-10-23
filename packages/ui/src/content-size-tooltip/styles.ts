@@ -60,16 +60,28 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
     .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME} {
     border-color: transparent;
     background: transparent;
-    color: var(--sniptale-color-text-primary);
+    color: var(--sniptale-color-text-secondary);
     box-shadow: none;
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']
-    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:hover:not(:disabled) {
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:hover:not(:disabled),
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:focus-visible:not(:disabled) {
     border-color: transparent;
     background: transparent;
     color: var(--sniptale-color-text-primary-strong);
     box-shadow: none;
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME} svg {
+    stroke-width: var(--sniptale-control-icon-stroke);
+  }
+
+  .sniptale-content-size-tooltip[data-variant='frame-edit']
+    .${CONTENT_SIZE_TOOLTIP_PRIMARY_ACTION_CLASS_NAME}:is(:hover, :focus-visible):not(:disabled) svg {
+    stroke-width: var(--sniptale-control-icon-stroke-hover);
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']

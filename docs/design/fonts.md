@@ -20,6 +20,16 @@ Replace backing assets in this face owner to change the bundled family. Keep com
 
 Content UI explicitly registers both stable aliases from trusted bundled font declarations. Reuse each runtime's installation owner and retain descriptors with bundled declarations. After replacement, check registered faces and painted Russian/English glyphs, narrow controls, and expanded text. Check detached layers, embedded UI, inherited status/duration, and controls. CSS declarations, asset requests, or child overrides alone do not prove font use. Load failure preserves usable fallback text and interactions.
 
+## Interface label rendering
+
+`--sniptale-interface-label-ink-strength` controls the optical strength of explicit interface labels. Its default is 100 percent. Windows dark themes use 82 percent to compensate for heavier grayscale font rendering. The shared theme DOM owner supplies the platform hint. Theme tokens also cover nested themes and content ShadowRoots.
+
+Apply this role to menu labels, select captions, parameter names, and action captions. Use `sniptale-interface-label` for other explicit captions. Preserve the inherited semantic foreground. Do not apply this role to headings, input values, document text, or whole containers. Do not use element opacity, which can change compositing and font rendering. Forced colors retain the system foreground.
+
+Destructive commands retain 100 percent strength to preserve their status contrast. Neutral parameter captions retain at least 4.5:1 contrast after correction.
+
+Check native Windows rendering and both primary viewports after changes. Keep light-theme pixels and non-label text unchanged. Linux screenshots and computed font weight alone do not prove Windows appearance.
+
 ## Documents and exports
 
 `--sniptale-font-document-sans` selects the default sans-serif family for new documents. It uses `Sniptale Text`. Standalone text exports embed Golos Text for content and Golos UI for interface controls, with both licenses. Ordinary text input uses the document family. Numbers, structured codes, and explicit monospace editors retain their declared roles.

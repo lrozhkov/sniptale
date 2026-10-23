@@ -27,6 +27,7 @@ interface BrowserAnnotationRuntimeState {
   knownTargets: Map<number, Element>;
   listeners: Set<BrowserAnnotationListener>;
   liveAnnotationIds: WeakMap<Element, number>;
+  markerNumbers: Map<Element, number>;
   nextAnnotationId: number;
   nextCreationOrder: number;
   nextMarkerNumber: number;
@@ -40,6 +41,7 @@ function createEmptyRuntimeState(): BrowserAnnotationRuntimeState {
     knownTargets: new Map(),
     listeners: new Set(),
     liveAnnotationIds: new WeakMap(),
+    markerNumbers: new Map(),
     nextAnnotationId: 1,
     nextCreationOrder: 1,
     nextMarkerNumber: 1,
@@ -168,8 +170,11 @@ function syncDesignReviewMarker(
 ): void {
   if (hasDesignReviewEvidence(record)) {
     if (record.markerNumber === undefined) {
-      record.markerNumber = state.nextMarkerNumber;
-      state.nextMarkerNumber += 1;
+      const target = state.knownTargets.get(record.annotationId);
+      const reserved = target ? state.markerNumbers.get(target) : undefined;
+      record.markerNumber = reserved ?? state.nextMarkerNumber;
+      if (reserved === undefined) state.nextMarkerNumber += 1;
+      if (target) state.markerNumbers.set(target, record.markerNumber);
     }
     return;
   }
@@ -432,6 +437,11 @@ function applySnapshot(
   const nextAnnotationId = resolveAllocator(state.nextAnnotationId, snapshot.nextAnnotationId);
   const nextCreationOrder = resolveAllocator(state.nextCreationOrder, snapshot.nextCreationOrder);
   const nextMarkerNumber = resolveAllocator(state.nextMarkerNumber, snapshot.nextMarkerNumber);
+  if (allocatorMode === 'exact') {
+    for (const [target, marker] of state.markerNumbers) {
+      if (marker >= nextMarkerNumber) state.markerNumbers.delete(target);
+    }
+  }
   const nextRecords = new Map(
     snapshot.domRecords.map((record) => [record.annotationId, cloneDomRecord(record)])
   );
@@ -441,6 +451,7 @@ function applySnapshot(
     const target = state.knownTargets.get(record.annotationId);
     if (target) {
       nextLiveAnnotationIds.set(target, record.annotationId);
+      if (record.markerNumber !== undefined) state.markerNumbers.set(target, record.markerNumber);
     }
   });
 

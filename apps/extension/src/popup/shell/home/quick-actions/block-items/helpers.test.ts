@@ -6,6 +6,8 @@ vi.mock('../meta', (_importOriginal) => ({
 }));
 
 import {
+  disabledQuickActionListItemClassName,
+  enabledQuickActionListItemClassName,
   getQuickActionItemState,
   getQuickActionListButtonClassName,
   getQuickActionListIconClassName,
@@ -13,11 +15,23 @@ import {
 } from './helpers';
 
 describe('popup quick action block helper styling', () => {
+  it('keeps enabled and disabled quick actions transparent until pointer hover', () => {
+    expect(enabledQuickActionListItemClassName.split(' ')).toContain('bg-transparent');
+    expect(disabledQuickActionListItemClassName.split(' ')).toContain('bg-transparent');
+    expect(enabledQuickActionListItemClassName).toContain(
+      'hover:bg-[var(--sniptale-color-surface-hover)]'
+    );
+    expect(disabledQuickActionListItemClassName).not.toContain('hover:bg-');
+  });
+
   it('maps every density to explicit button, icon, and meta visibility states', () => {
     expect(getQuickActionListButtonClassName('regular')).toContain('min-h-[58px]');
     expect(getQuickActionListButtonClassName('compact')).toContain('min-h-[48px]');
     expect(getQuickActionListButtonClassName('dense')).toContain('min-h-[40px]');
     expect(getQuickActionListButtonClassName('tight')).toContain('min-h-[28px]');
+    for (const density of ['regular', 'compact', 'dense', 'tight'] as const) {
+      expect(getQuickActionListButtonClassName(density)).toContain('rounded-[6px]');
+    }
 
     expect(getQuickActionListIconClassName('regular')).toContain('h-9');
     expect(getQuickActionListIconClassName('compact')).toContain('h-9');

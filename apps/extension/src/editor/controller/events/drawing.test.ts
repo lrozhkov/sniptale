@@ -96,6 +96,7 @@ function createCanvas() {
     discardActiveObject: vi.fn(),
     defaultCursor: 'tool-cursor',
     endCurrentTransform: vi.fn(),
+    getActiveObject: vi.fn(() => undefined),
     getActiveObjects: vi.fn<() => unknown[]>(() => []),
     getScenePoint: vi.fn(
       (event: { point?: { x: number; y: number } }) => event.point ?? { x: 10, y: 20 }
@@ -671,6 +672,24 @@ describe('drawing pointer continuity', () => {
 
 describe('drawing selection interactions', () => {
   beforeEach(resetDrawingMocks);
+
+  it.each([true, false])(
+    'does not activate text from a rotation control with target=%s',
+    (hasTarget) => {
+      const target = new FabricObject();
+      target.__corner = 'mtr';
+      mocks.isTextTarget.mockReturnValue(true);
+      const text = createBindings('text');
+      text.handlers.handleMouseDown({
+        e: new MouseEvent('mousedown', { button: 0 }),
+        ...(hasTarget ? { target } : {}),
+        transform: { target },
+      });
+      text.handlers.handleMouseUp();
+      expect(mocks.activateTextTarget).not.toHaveBeenCalled();
+      expect(text.bindings.startDrawSession).not.toHaveBeenCalled();
+    }
+  );
 
   it('edits an existing text on click, but completes drawing after a drag or ordinary mouse-up', () => {
     const target = { isEditing: false };

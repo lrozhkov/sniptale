@@ -8,7 +8,7 @@ import type {
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { ModeIconButton } from '../primitives';
 
-const CAPTURE_MODE_GRID_CLASS_NAME = 'mr-1 flex gap-1.5';
+const CAPTURE_MODE_GRID_CLASS_NAME = 'mr-1 flex gap-1.5 [container-type:inline-size]';
 type VisibleCaptureMode =
   | typeof CaptureMode.TAB
   | typeof CaptureMode.CAMERA

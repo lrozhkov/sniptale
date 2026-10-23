@@ -1,3 +1,8 @@
+import type { ReviewOriginalSpeech } from '../../review/original-speech';
+import type { SourceAudioGainRange } from '../../audio/source-envelope';
+import type { QuickEditAudioClip } from '../../review/advanced/types';
+import type { ReviewTimeSegment } from '../../review/time-segment';
+import type { VideoProjectTextBinding } from '../text/types';
 import type { ReviewSpeechTranscript } from '../../review/speech-transcript';
 import type { CameraHiddenRange } from '../camera/visibility';
 import type { CameraAppearance, CameraCrop } from '../camera/appearance';
@@ -31,6 +36,29 @@ import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
+
+/** Source content survives cuts and missing placements without extending the composition. */
+export interface VideoProjectSourceAudioDocument {
+  id: string;
+  binding: { kind: 'source'; assetId: string; sourceInstanceId: string };
+  ranges: SourceAudioGainRange[];
+  mutes: SourceAudioGainRange[];
+  /** Retained recognition metadata never schedules replacement audio or implicit gain. */
+  speech?: ReviewOriginalSpeech;
+}
+
+/** Whole accepted samples and capture clock survive all current montage placements. */
+export interface VideoProjectSourceVoiceoverDocument {
+  id: string;
+  binding: Extract<VideoProjectTextBinding, { kind: 'source' }>;
+  trackId: string;
+  reference: ReviewTimeSegment[];
+  take: QuickEditAudioClip;
+  enabled: boolean;
+  originalAudioMuteVolume?: number;
+  /** Original sound may occupy a separate instance of this same media asset. */
+  originalAudioSourceInstanceId?: string;
+}
 
 interface CameraPosition {
   /** An absent destination crop inherits the clip-wide source framing. */
@@ -377,8 +405,8 @@ export interface VideoProject {
     | 42
     | 43
     | 44;
-  sourceVoiceoverDocuments?: import('../source-voiceover').VideoProjectSourceVoiceoverDocument[];
-  sourceAudioDocuments?: import('../source-audio').VideoProjectSourceAudioDocument[];
+  sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
+  sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];
   textDocuments?: import('../text/types').VideoProjectTextDocument[];
   cameraFollowDefaults?: import('../camera/cursor-policy').CameraFollowSettings;

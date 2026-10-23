@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { translate } from '../../../../platform/i18n/popup';
 
 const mocks = vi.hoisted(() => ({ loadSettings: vi.fn(), patchSettings: vi.fn() }));
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
@@ -219,10 +220,16 @@ it('keeps capture and resource selects compact inside the settings curtain', asy
   const floatingSelect = container.querySelector(
     '[data-ui="popup.export.capture-floating-elements-select"]'
   );
+  expect(container.textContent).not.toContain(translate('popup.export.captureBehaviorHelp'));
+  expect(container.textContent).not.toContain(translate('popup.export.resourceLimitsDescription'));
+  expect(container.textContent).toContain(translate('popup.export.resourceLimitsHelp'));
   const resourceSelects = container.querySelectorAll(
     '[data-ui="popup.export.resource-limit-select"]'
   );
   expect(floatingSelect?.className).toContain('!w-[112px]');
+  expect(
+    container.querySelector('[data-ui="popup.export.capture-floating-elements-row"]')?.className
+  ).toContain('items-center');
   expect(floatingSelect?.className).toContain('!max-w-[112px]');
   expect(resourceSelects).toHaveLength(3);
   for (const select of resourceSelects) {

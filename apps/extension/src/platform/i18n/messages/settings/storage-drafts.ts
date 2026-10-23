@@ -8,15 +8,15 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   },
   newItemsTitle: { ru: 'Рабочие материалы', en: 'Working materials' },
   newItemsDescription: {
-    ru: 'Sniptale сохраняет внутреннюю рабочую копию захватов, записей и проектов для редакторов, истории и восстановления. Скачивание файла в папку Downloads выполняется отдельно.',
-    en: 'Sniptale keeps an internal working copy of captures, recordings, and projects for editors, history, and recovery. Downloading a file to Downloads happens separately.',
+    ru: 'Рабочие копии нужны для редактирования, истории и восстановления. Скачивание файла выполняется отдельно.',
+    en: 'Working copies support editing, history, and recovery. File downloads are separate.',
   },
   destinationLabel: { ru: 'Снимки и изображения', en: 'Screenshots and images' },
   recordingDestination: { ru: 'Видеозаписи', en: 'Video recordings' },
   webSnapshotDestination: { ru: 'Веб-архивы', en: 'Web archives' },
   destinationDescription: {
-    ru: 'Правила категорий применяются только к новым материалам. Создание проекта и явный импорт сохраняют материалы постоянно. Действие «Сохранить в библиотеку» всегда имеет приоритет.',
-    en: 'Category rules apply only to new materials. Creating a project and explicit import keep materials permanently. The “Save to library” action always takes priority.',
+    ru: 'Правила действуют для новых материалов. Проекты и импорт сохраняются постоянно. Действие «Сохранить в библиотеку» имеет приоритет.',
+    en: 'Rules apply to new items. Projects and imports are retained permanently. “Save to library” takes priority.',
   },
   destinationTemporary: { ru: 'В черновики', en: 'Drafts' },
   destinationLibrary: { ru: 'Сразу в библиотеку', en: 'Library immediately' },
@@ -38,14 +38,8 @@ export const settingsStorageDraftsMessages = defineMessageSource({
       '“Move expired drafts to Trash” is unavailable while automatic cleanup is off.',
   },
   retentionConsequence: {
-    ru:
-      'Сокращение срока может сделать уже сохранённые черновики просроченными. ' +
-      'Они переместятся в корзину при следующей штатной очистке или после подтверждённого действия ' +
-      '«Переместить просроченные в корзину». Увеличение срока не восстановит безвозвратно удалённое.',
-    en:
-      'Shortening a period can make existing drafts expired. ' +
-      'They move to Trash at the next regular cleanup or after you confirm “Move expired drafts to Trash”. ' +
-      'A longer period cannot restore permanently deleted drafts.',
+    ru: 'Новый срок действует и на сохранённые черновики. Просроченные материалы перемещаются в корзину при очистке.',
+    en: 'The new period also applies to existing drafts. Cleanup moves expired items to Trash.',
   },
   ordinaryRetention: { ru: 'Изображения и веб-архивы', en: 'Images and web archives' },
   videoRetention: { ru: 'Исходные видеозаписи', en: 'Source video recordings' },
@@ -64,14 +58,8 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   },
   trashRetention: { ru: 'Срок хранения в корзине', en: 'Trash retention period' },
   trashRetentionConsequence: {
-    ru:
-      'Срок отсчитывается с перемещения в корзину. При включённой автоочистке сокращение срока ' +
-      'может безвозвратно удалить уже просроченные материалы при следующем открытии или ' +
-      'обновлении библиотеки. Увеличение срока не восстановит безвозвратно удалённое.',
-    en:
-      'The period starts when an item moves to Trash. With automatic cleanup on, shortening it ' +
-      'may permanently remove already expired items at the next Library opening or refresh. ' +
-      'A longer period cannot restore deleted items.',
+    ru: 'Срок отсчитывается с перемещения в корзину. Автоочистка безвозвратно удаляет просроченное при открытии или обновлении библиотеки, включая уже сохранённые материалы. Медиа в проектах сохраняются.',
+    en: 'The period starts when items move to Trash. Automatic cleanup permanently deletes expired items when Library opens or refreshes, including existing items. Project media is retained.',
   },
   trashSaving: { ru: 'Сохраняем настройку корзины…', en: 'Saving Trash setting…' },
   trashSaved: { ru: 'Настройка корзины сохранена', en: 'Trash setting saved' },

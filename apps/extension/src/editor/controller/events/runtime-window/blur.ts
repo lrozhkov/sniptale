@@ -11,7 +11,7 @@ export function createRuntimeWindowBlurHandler(
 ) {
   return () => {
     handleEditorWindowBlur({
-      cancelTransientInteraction: bindings.cancelTransientInteraction,
+      cancelTransientInteraction: () => bindings.cancelTransientInteraction('window-blur'),
       endCurrentTransform: () => endEditorCanvasTransform(bindings.getCanvas()),
       finalizeSelectionNudge: () => bindings.finalizeSelectionNudge?.(),
     });

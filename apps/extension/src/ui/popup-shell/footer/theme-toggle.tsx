@@ -20,7 +20,7 @@ function resolveFooterTheme(): AppTheme {
 
 function getFooterThemeButtonClassName() {
   return [
-    'inline-flex h-7 w-7 items-center justify-center rounded-full border-none transition-colors',
+    'inline-flex h-8 w-8 items-center justify-center rounded-[6px] border-none transition-colors',
     'bg-transparent text-[var(--sniptale-color-text-secondary)]',
     'hover:bg-[var(--sniptale-color-surface-hover)]',
     'hover:text-[var(--sniptale-color-text-primary)]',
@@ -115,13 +115,13 @@ export function PopupFooterThemeToggle() {
       role="group"
       aria-label={translate('popup.common.footerThemeToggleAria')}
       className={[
-        ['inline-flex h-8 items-center rounded-full', 'bg-transparent'].join(' '),
-        'p-0.5 shadow-none',
+        ['inline-flex h-8 items-center rounded-[6px]', 'bg-transparent'].join(' '),
+        'shadow-none',
       ].join(' ')}
     >
       <button
         type="button"
-        title={getThemeToggleTitle(preference)}
+        data-popup-hint={getThemeToggleTitle(preference)}
         aria-label={translate('popup.common.footerThemeToggleAria')}
         data-theme-preference={preference}
         data-resolved-theme={theme}

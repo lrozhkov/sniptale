@@ -29,6 +29,16 @@ const viewportPresets = [
 const leaf = { type: 'command' as const, command: 'sniptale.video.tab', enabled: true };
 
 describe('v2 command tree', () => {
+  it('restores enabled window presets in the recommended window section', () => {
+    const tree = createRecommendedContextMenuTree(quickActions, viewportPresets);
+    expect(
+      tree.nodes.find((node) => node.type === 'section' && node.id === 'recommended-window')
+    ).toMatchObject({
+      enabled: true,
+      children: [{ command: 'sniptale.window-resize.preset.system%3Awindow-hd', enabled: true }],
+    });
+    expect(createRecommendedContextMenuSettings().showWindowResize).toBe(true);
+  });
   it('accepts deeply nested sections and rejects duplicate identities anywhere', () => {
     const nested = {
       version: 2 as const,
@@ -190,6 +200,34 @@ describe('v2 command tree', () => {
     expect(isContextMenuCommandAvailable(command, [], preset)).toBe(true);
   });
 
+  it('preserves explicitly disabled window commands in an existing v2 layout', () => {
+    const layout = {
+      version: 2 as const,
+      nodes: [
+        {
+          type: 'section' as const,
+          id: 'window',
+          title: 'Window size',
+          enabled: true,
+          children: [
+            {
+              type: 'command' as const,
+              command: 'sniptale.window-resize.preset.system%3Awindow-hd',
+              enabled: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      resolveContextMenuTree(
+        { ...createRecommendedContextMenuSettings(), layout },
+        [],
+        viewportPresets
+      )
+    ).toEqual(layout);
+  });
+
   it('rejects unknown commands, duplicate identities, excessive depth and unsafe titles', () => {
     const section = {
       type: 'section',
@@ -214,6 +252,29 @@ describe('v2 command tree', () => {
 });
 
 describe('legacy context menu migration', () => {
+  it('keeps grouped commands enabled beneath a hidden legacy block without changing standalone visibility', () => {
+    for (const layout of [undefined, createContextMenuLayout()]) {
+      const settings = {
+        ...createRecommendedContextMenuSettings(),
+        showWindowResize: false,
+        ...(layout ? { layout } : {}),
+      };
+      const tree = resolveContextMenuTree(settings, quickActions, viewportPresets);
+      const windowSection = tree.nodes.find(
+        (node) => node.type === 'section' && node.id.endsWith('-window')
+      );
+      expect(windowSection).toMatchObject({
+        enabled: false,
+        children: [{ command: 'sniptale.window-resize.preset.system%3Awindow-hd', enabled: true }],
+      });
+      expect(tree.nodes).toContainEqual({
+        type: 'command',
+        command: 'sniptale.image-editor',
+        enabled: false,
+      });
+    }
+  });
+
   it('projects missing and v1 layouts without writing or losing explicit legacy visibility', () => {
     const settings = {
       ...createRecommendedContextMenuSettings(),
@@ -221,7 +282,10 @@ describe('legacy context menu migration', () => {
       showWindowResize: true,
     };
     const missing = resolveContextMenuTree(settings, quickActions, viewportPresets);
-    expect(allCommands(missing.nodes)).toContainEqual({ command: leaf.command, enabled: false });
+    expect(missing.nodes).toContainEqual(
+      expect.objectContaining({ id: 'recommended-video', enabled: false })
+    );
+    expect(allCommands(missing.nodes)).toContainEqual({ command: leaf.command, enabled: true });
     expect(allCommands(missing.nodes)).toContainEqual({
       command: 'sniptale.screenshots.quick-action.capture-1',
       enabled: true,
@@ -247,7 +311,7 @@ describe('legacy context menu migration', () => {
     expect(video).toMatchObject({ type: 'section', id: 'block-video', enabled: false });
     expect(video?.type === 'section' ? video.children[0] : null).toEqual({
       ...leaf,
-      enabled: false,
+      enabled: true,
     });
   });
   it('nests legacy command blocks inside their existing custom section', () => {

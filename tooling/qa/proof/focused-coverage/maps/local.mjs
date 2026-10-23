@@ -1036,6 +1036,18 @@ export const LOCAL_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/toolbar/state/view-model.test.tsx'],
   },
   {
+    owner: 'content-toolbar-page-control-visibility',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/controls/control-visibility.tsx',
+    reason: 'The page-controls suite operates real customization choices and protected controls.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/state/page-controls.test.tsx'],
+  },
+  {
+    owner: 'content-toolbar-page-control-settings',
+    productionFile: 'apps/extension/src/content/overlay/toolbar/capture/page-control-settings.tsx',
+    reason: 'The page-controls suite operates customization, reveal, Done, and retry menu actions.',
+    testFiles: ['apps/extension/src/content/overlay/toolbar/state/page-controls.test.tsx'],
+  },
+  {
     owner: 'content-overlay-scenario-controller',
     productionFile: 'apps/extension/src/content/overlay/scenario/controller.ts',
     exclusive: true,
@@ -1049,6 +1061,17 @@ export const LOCAL_OWNER_MAPPINGS = [
     reason:
       'Toolbar capture menu visibility and exact dropdown/viewport composition execute through its direct owner suite.',
     testFiles: ['apps/extension/src/content/overlay/toolbar/capture/menus.test.tsx'],
+  },
+  {
+    owner: 'content-screenshot-surface-binding',
+    productionFile: 'apps/extension/src/content/overlay/viewport-selector/capability.ts',
+    reason:
+      'Toolbar status and session tests cover binding replacement, delayed responses, cancellation, and operation generations.',
+    testFiles: [
+      'apps/extension/src/content/overlay/toolbar/shell/viewport-status.test.tsx',
+      'apps/extension/src/content/overlay/toolbar/shell/surface-session.test.ts',
+      'apps/extension/src/content/overlay/toolbar/shell/viewport-change.test.ts',
+    ],
   },
   {
     owner: 'content-overlay-toolbar-viewport-mutation',

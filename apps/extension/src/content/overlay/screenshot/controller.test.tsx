@@ -170,6 +170,26 @@ async function expectInvalidationReturnsActiveRunBaselineAndCleansSelection() {
 }
 
 describe('useScreenshotController', () => {
+  it('retains the original queued preparation baseline until explicit Close invalidates it', async () => {
+    await renderHarness(false);
+    const preparationBaseline = {
+      captureAction: 'edit' as const,
+      timerDelay: 7,
+      isToolbarVisible: true,
+      navigationLockEnabled: false,
+      editingMode: 'drawing' as const,
+    };
+    const original = latestControllerResult!.invalidateScreenshotRuns({ preparationBaseline });
+    expect(original?.preparationBaseline).toBe(preparationBaseline);
+    expect(original?.runGeneration).toBe(1);
+    expect(latestActionArgs!.session.runActive).toBe(false);
+    const replacement = latestControllerResult!.invalidateScreenshotRuns({});
+    expect(replacement?.preparationBaseline).toBe(preparationBaseline);
+    expect(replacement?.runGeneration).toBe(2);
+    latestControllerResult!.invalidateScreenshotRuns();
+    expect(latestActionArgs!.session.preparationBaseline).toBeNull();
+    expect(latestControllerResult!.invalidateScreenshotRuns({})).toBeUndefined();
+  });
   it('cancels the countdown on unmount when a countdown lock session is still active', async () => {
     await renderHarness(true);
 

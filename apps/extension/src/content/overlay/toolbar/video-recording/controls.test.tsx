@@ -11,6 +11,11 @@ import {
   type VideoRecordingToolbarState,
 } from '../../video-recording/session/state';
 import type { ToolbarVideoRecordingProps } from '../types';
+import { RECORDING_TOOLBAR_CONTROLS } from '../../../../contracts/settings';
+import {
+  RecordingToolbarControlsContext,
+  type useRecordingToolbarControls,
+} from '../state/recording-controls';
 
 const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
 
@@ -49,7 +54,8 @@ afterEach(() => {
 function renderPhase(
   phase: VideoRecordingToolbarState['phase'],
   displayMode: 'horizontal' | 'vertical' = 'horizontal',
-  error: string | null = null
+  error: string | null = null,
+  visibility: ReturnType<typeof useRecordingToolbarControls> | null = null
 ) {
   const toolbarMenuState = {
     activeMenuType: null,
@@ -74,6 +80,7 @@ function renderPhase(
     onDeactivate: vi.fn(() => true),
     onInteractionChange: vi.fn(),
     onMicrophoneEnabledChange: vi.fn(),
+    onMicrophoneGainChange: vi.fn(),
     onPause: vi.fn(),
     onResume: vi.fn(),
     onSpotlightEnabledChange: vi.fn(),
@@ -90,16 +97,18 @@ function renderPhase(
   const recording = { drawingOwner, state, ...actions } satisfies ToolbarVideoRecordingProps;
   act(() =>
     root.render(
-      <CommandPressScope value={true}>
-        <ToolbarVideoRecordingControls
-          displayMode={displayMode}
-          onCollapse={vi.fn()}
-          onCompactMenusChange={vi.fn()}
-          onDisplayModeChange={vi.fn()}
-          recording={recording}
-          toolbarMenuState={toolbarMenuState}
-        />
-      </CommandPressScope>
+      <RecordingToolbarControlsContext.Provider value={visibility}>
+        <CommandPressScope value={true}>
+          <ToolbarVideoRecordingControls
+            displayMode={displayMode}
+            onCollapse={vi.fn()}
+            onCompactMenusChange={vi.fn()}
+            onDisplayModeChange={vi.fn()}
+            recording={recording}
+            toolbarMenuState={toolbarMenuState}
+          />
+        </CommandPressScope>
+      </RecordingToolbarControlsContext.Provider>
     )
   );
   return actions;
@@ -108,6 +117,177 @@ function renderPhase(
 function queryButton(dataUi: string): HTMLButtonElement | null {
   return host.querySelector(`[data-ui="${dataUi}"]`);
 }
+
+function visibilityState(
+  overrides: Partial<ReturnType<typeof useRecordingToolbarControls>> = {}
+): ReturnType<typeof useRecordingToolbarControls> {
+  return {
+    active: false,
+    controls: {},
+    hasHidden: false,
+    revealed: false,
+    toggleRevealed: vi.fn(),
+    editing: false,
+    error: null,
+    pending: false,
+    ready: true,
+    reload: vi.fn(async () => undefined),
+    setVisible: vi.fn(async () => undefined),
+    fadeDuringRecording: true,
+    setFadeDuringRecording: vi.fn(async () => undefined),
+    toggleEditing: vi.fn(),
+    ...overrides,
+  };
+}
+
+for (const preset of [
+  { name: 'default', controls: {} },
+  { name: 'partial', controls: { pencil: false, camera: false } },
+  {
+    name: 'compact',
+    controls: Object.fromEntries(RECORDING_TOOLBAR_CONTROLS.map((control) => [control, false])),
+  },
+]) {
+  it.each(['idle', 'starting', 'recording', 'paused', 'stopping', 'error'] as const)(
+    `keeps the lifecycle slot trailing in both orientations with ${preset.name} controls during %s`,
+    (phase) => {
+      const visibility = visibilityState({
+        active: phase !== 'idle' && phase !== 'error',
+        controls: preset.controls,
+      });
+      renderPhase(phase, 'horizontal', null, visibility);
+      const horizontal = [...host.querySelectorAll('button[data-ui]')].map((button) =>
+        button.getAttribute('data-ui')
+      );
+      renderPhase(phase, 'vertical', null, visibility);
+      const vertical = [...host.querySelectorAll('button[data-ui]')].map((button) =>
+        button.getAttribute('data-ui')
+      );
+      expect(vertical).toEqual(horizontal);
+      expect(
+        host.querySelector('[data-ui="content.toolbar.video-recording.lifecycle"]')
+          ?.nextElementSibling
+      ).toBeNull();
+    }
+  );
+}
+
+it('retains the focused lifecycle button when orientation changes', () => {
+  const visibility = visibilityState({ active: true });
+  renderPhase('recording', 'horizontal', null, visibility);
+  const pause = queryButton('content.toolbar.video-recording.pause');
+  act(() => pause?.focus());
+  renderPhase('recording', 'vertical', null, visibility);
+  expect(queryButton('content.toolbar.video-recording.pause')).toBe(pause);
+  expect(document.activeElement).toBe(pause);
+});
+
+it.each(['horizontal', 'vertical'] as const)(
+  'reveals optional controls through a leading narrow action in %s orientation',
+  (orientation) => {
+    const visibility = visibilityState({ active: true, hasHidden: true, revealed: true });
+    const actions = renderPhase('recording', orientation, null, visibility);
+    const reveal = queryButton('content.toolbar.video-recording.reveal-controls')!;
+    expect(host.querySelector('button')).toBe(reveal);
+    expect(reveal.classList.contains('sniptale-btn-narrow')).toBe(true);
+    expect(reveal.getAttribute('aria-expanded')).toBe('true');
+    expect(reveal.title).toBe('content.toolbar.recordingHideHiddenControls');
+    expect(
+      reveal.querySelector(
+        orientation === 'vertical' ? '.lucide-chevrons-up' : '.lucide-chevrons-left'
+      )
+    ).not.toBeNull();
+    expect(queryButton('content.toolbar.drawing.pencil')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.microphone.toggle')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.camera.toggle')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.auto-hide')).toBeNull();
+    expect(queryButton('content.toolbar.settings-button')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.customize')).toBeNull();
+    act(() => reveal.click());
+    expect(visibility.toggleRevealed).toHaveBeenCalledOnce();
+    expect(visibility.setVisible).not.toHaveBeenCalled();
+    expect(actions.onStart).not.toHaveBeenCalled();
+    expect(actions.onCameraEnabledChange).not.toHaveBeenCalled();
+  }
+);
+
+it('omits the disclosure without hidden controls and outside recording', () => {
+  renderPhase('recording', 'horizontal', null, visibilityState({ active: true }));
+  expect(queryButton('content.toolbar.video-recording.reveal-controls')).toBeNull();
+  renderPhase('idle', 'horizontal', null, visibilityState({ hasHidden: true }));
+  expect(queryButton('content.toolbar.video-recording.reveal-controls')).toBeNull();
+});
+
+it('customizes icons without activating their tools or media controls', () => {
+  const visibility = visibilityState({ editing: true, controls: { pencil: false } });
+  const actions = renderPhase('idle', 'horizontal', null, visibility);
+  expect(
+    queryButton('content.toolbar.video-recording.customize')?.querySelector('.lucide-check')
+  ).not.toBeNull();
+  const previousTool = drawingOwner.controller.session.getSnapshot().activeTool;
+  const pencil = queryButton('content.toolbar.video-recording.visibility.pencil')!;
+  expect(pencil.getAttribute('aria-pressed')).toBe('false');
+  expect(pencil.querySelector('.lucide-eye-off')).not.toBeNull();
+  const indicator = pencil.querySelector('.lucide-eye-off')!;
+  expect(indicator.parentElement?.style.position).toBe('relative');
+  expect(indicator.parentElement?.contains(pencil.querySelector('svg'))).toBe(true);
+  act(() => pencil.click());
+  act(() => queryButton('content.toolbar.video-recording.visibility.microphone')?.click());
+  act(() => queryButton('content.toolbar.video-recording.visibility.camera')?.click());
+  expect(visibility.setVisible).toHaveBeenNthCalledWith(1, 'pencil', true);
+  expect(visibility.setVisible).toHaveBeenNthCalledWith(2, 'microphone', false);
+  expect(visibility.setVisible).toHaveBeenNthCalledWith(3, 'camera', false);
+  expect(actions.onMicrophoneEnabledChange).not.toHaveBeenCalled();
+  expect(actions.onCameraEnabledChange).not.toHaveBeenCalled();
+  expect(drawingOwner.controller.session.getSnapshot().activeTool).toBe(previousTool);
+  expect(queryButton('content.toolbar.video-recording.start')?.disabled).toBe(true);
+  expect(
+    queryButton('content.toolbar.video-recording.auto-hide')?.closest('fieldset')?.disabled
+  ).toBe(true);
+});
+
+it.each(['starting', 'recording', 'paused', 'stopping'] as const)(
+  'keeps required controls and hides configured tools during %s',
+  (phase) => {
+    const visibility = visibilityState({
+      active: true,
+      controls: {
+        pencil: false,
+        eraser: false,
+        clear: false,
+        cursor: false,
+        camera: false,
+        microphone: false,
+      },
+    });
+    renderPhase(phase, 'horizontal', null, visibility);
+    expect(queryButton('content.toolbar.settings-button')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.customize')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.auto-hide')).toBeNull();
+    expect(queryButton('content.toolbar.drawing.pencil')).toBeNull();
+    expect(queryButton('content.toolbar.drawing.text')).not.toBeNull();
+    expect(queryButton('content.toolbar.video-recording.camera.toggle')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.microphone.toggle')).toBeNull();
+    expect(queryButton('content.toolbar.video-recording.navigation')).not.toBeNull();
+    expect(host.querySelector('[data-ui="content.toolbar.drawing-actions-group"]')).toBeNull();
+    expect(
+      host.querySelector('[data-ui="content.toolbar.video-recording.lifecycle"] button')
+    ).not.toBeNull();
+  }
+);
+
+it('restores hidden tools outside recording without changing their saved visibility', () => {
+  const visibility = visibilityState({ controls: { pencil: false, camera: false } });
+  renderPhase('idle', 'horizontal', null, visibility);
+  expect(queryButton('content.toolbar.drawing.pencil')).not.toBeNull();
+  expect(
+    queryButton('content.toolbar.video-recording.customize')?.querySelector('.tabler-eye-cog')
+  ).not.toBeNull();
+  expect(queryButton('content.toolbar.video-recording.camera.toggle')).not.toBeNull();
+  act(() => queryButton('content.toolbar.video-recording.customize')?.click());
+  expect(visibility.toggleEditing).toHaveBeenCalledOnce();
+  expect(visibility.setVisible).not.toHaveBeenCalled();
+});
 
 it.each([
   ['idle', 'start', false],
@@ -120,7 +300,11 @@ it.each([
   renderPhase(phase);
 
   expect(queryButton(`content.toolbar.video-recording.${action}`)).not.toBeNull();
-  expect(host.querySelector('fieldset')?.hasAttribute('disabled')).toBe(busy);
+  expect(
+    queryButton('content.toolbar.video-recording.navigation')
+      ?.closest('fieldset')
+      ?.hasAttribute('disabled')
+  ).toBe(busy);
   expect(queryButton('content.toolbar.video-recording.microphone.toggle')?.disabled).toBe(busy);
   expect(queryButton('content.toolbar.video-recording.camera.toggle')?.disabled).toBe(busy);
   expect(queryButton('content.toolbar.video-recording.stop') !== null).toBe(
@@ -161,12 +345,58 @@ it('explains that Start uses the saved popup Video settings without adding new U
   expect(start?.textContent).toBe('');
 });
 
+it('uses the shared outlined REC marker and standard action hover presentation', () => {
+  renderPhase('idle');
+  const start = queryButton('content.toolbar.video-recording.start')!;
+  expect(start.classList.contains('sniptale-btn-danger')).toBe(false);
+  expect(start.querySelector('svg')?.getAttribute('data-icon')).toBe('recording');
+  expect([...start.querySelectorAll('circle')].map((circle) => circle.getAttribute('r'))).toEqual([
+    '10',
+    '7',
+  ]);
+});
+
 it('preserves the original Start event through the adopted command owner', () => {
   const actions = renderPhase('idle');
   const start = queryButton('content.toolbar.video-recording.start')!;
   const nativeEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
   act(() => start.dispatchEvent(nativeEvent));
   expect(actions.onStart).toHaveBeenCalledExactlyOnceWith(nativeEvent);
+});
+
+it('offers Cancel before any confirmed start and restores focus', async () => {
+  const actions = renderPhase('idle');
+  actions.onStart.mockResolvedValueOnce('confirmation-required');
+  const start = queryButton('content.toolbar.video-recording.start')!;
+  await act(async () => start.click());
+  const dialog = host.querySelector('[role="alertdialog"]')!;
+  expect(dialog).not.toBeNull();
+  const cancel = Array.from(dialog.querySelectorAll('button')).find(
+    (button) => button.textContent === 'common.actions.cancel'
+  )!;
+  act(() => cancel.click());
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(actions.onStart).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(start);
+});
+
+it('uses the actual Continue event and remembered choice without repeating activation', async () => {
+  const actions = renderPhase('idle');
+  actions.onStart.mockResolvedValueOnce('confirmation-required').mockResolvedValueOnce('started');
+  await act(async () => queryButton('content.toolbar.video-recording.start')!.click());
+  const dialog = host.querySelector('[role="alertdialog"]')!;
+  act(() => dialog.querySelector<HTMLInputElement>('input')!.click());
+  const continueButton = Array.from(dialog.querySelectorAll('button')).find(
+    (button) => button.textContent === 'content.toolbar.videoRecordingWithoutMicrophoneContinue'
+  )!;
+  const continueEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+  await act(async () => continueButton.dispatchEvent(continueEvent));
+  expect(actions.onStart).toHaveBeenNthCalledWith(2, continueEvent, {
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: true,
+  });
+  expect(actions.onStart).toHaveBeenCalledTimes(2);
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
 it('keeps a paused lifecycle command distinct from persistent tools and properties', () => {
@@ -215,5 +445,6 @@ it('groups auto-hide, eraser, clear, and cursor spotlight in that order', () => 
     'content.toolbar.video-recording.eraser',
     'content.toolbar.video-recording.clear',
     'content.toolbar.video-recording.spotlight',
+    'content.toolbar.video-recording.cursor-settings',
   ]);
 });

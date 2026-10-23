@@ -40,7 +40,8 @@ export function ContextMenuControls({
           </p>
         </div>
         <SettingsSwitch
-          disabled={!visible || status === 'saving'}
+          disabled={!visible}
+          aria-busy={status === 'saving'}
           checked={state.contextMenu.enabled}
           size="sm"
           aria-label={enabledLabel}
@@ -48,14 +49,9 @@ export function ContextMenuControls({
           onClick={() => void updateEnabled()}
         />
       </div>
-      {status !== 'idle' ? (
-        <p role={status === 'failed' ? 'alert' : 'status'} className="text-sm">
-          {translate(
-            status === 'failed'
-              ? 'settings.appearance.contextMenuSaveFailed'
-              : 'settings.appearance.contextMenuSaving',
-            state.locale
-          )}
+      {status === 'failed' ? (
+        <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
+          {translate('settings.appearance.contextMenuSaveFailed', state.locale)}
         </p>
       ) : null}
       <ContextMenuEditor state={state} visible={visible} />

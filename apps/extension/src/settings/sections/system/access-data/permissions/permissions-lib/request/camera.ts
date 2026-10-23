@@ -6,6 +6,12 @@ export async function requestCameraPermission(): Promise<PermissionState> {
     stream.getTracks().forEach((track) => track.stop());
     return 'granted';
   } catch (error) {
-    return (error as DOMException).name === 'NotAllowedError' ? 'denied' : 'prompt';
+    if (!(error instanceof DOMException) || error.name !== 'NotAllowedError') return 'prompt';
+    try {
+      const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
+      return status.state === 'denied' ? 'denied' : 'prompt';
+    } catch {
+      return 'prompt';
+    }
   }
 }

@@ -18,7 +18,7 @@ it('requires recording ids on offscreen lifecycle and duration requests', () => 
     RuntimeVideoSessionRequestByType[typeof VideoMessageType.RECORDING_DURATION_UPDATED]
   >().toMatchTypeOf<{
     type: typeof VideoMessageType.RECORDING_DURATION_UPDATED;
-    duration: number;
+    duration?: number;
     recordingId: string;
   }>();
   expectTypeOf<

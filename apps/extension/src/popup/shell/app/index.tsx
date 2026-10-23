@@ -1,5 +1,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
+import { GalleryThumbnails, TvMinimalPlay } from 'lucide-react';
+import { Icon } from '@iconify/react';
+import toolsIcon from '@iconify-icons/tabler/tools';
+import worldDownIcon from '@iconify-icons/tabler/world-down';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
 import type { AppLocale } from '../../../platform/i18n/types';
@@ -7,6 +10,7 @@ import type { PopupPage } from '../navigation/actions';
 import { preloadPopupPage } from '../startup/resource';
 import { usePopupRouteController } from '../startup/use-route-controller';
 import { usePopupStartupReconciliation } from './use-startup-reconciliation';
+import { NativeHints } from '../../../ui/native-hints';
 
 const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'screenshots', icon: <GalleryThumbnails aria-hidden="true" /> },
@@ -14,9 +18,12 @@ const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'menu', icon: <ShellIcon path="M5 7h14M5 12h14M5 17h14" /> },
   {
     page: 'tools',
-    icon: <Paintbrush aria-hidden="true" />,
+    icon: <Icon icon={toolsIcon} className="tabler-tools" aria-hidden="true" />,
   },
-  { page: 'export', icon: <Upload aria-hidden="true" /> },
+  {
+    page: 'export',
+    icon: <Icon icon={worldDownIcon} className="tabler-world-down" aria-hidden="true" />,
+  },
 ];
 
 function ShellIcon({ path }: { path: string }) {
@@ -55,6 +62,7 @@ export function PopupApp() {
 
   return (
     <div className="popup-react-shell sniptale-extension-surface" data-ui="popup.app.root">
+      <NativeHints />
       <PopupNavigation locale={locale} route={route} />
       <PopupRouteError
         locale={locale}
@@ -136,7 +144,7 @@ function PopupNavigation({
           onPointerEnter={() => preload(candidate)}
           onPointerDown={() => preload(candidate)}
           onClick={() => void route.navigate(candidate)}
-          title={popupTabsMessages[candidate][locale]}
+          data-popup-hint={popupTabsMessages[candidate][locale]}
           aria-label={popupTabsMessages[candidate][locale]}
         >
           {candidate === 'menu' ? (
@@ -165,7 +173,7 @@ function PopupRouteError({
   if (!error) return null;
   return (
     <section
-      className="popup-react-shell__route-error"
+      className="popup-react-shell__route-error popup-error-message"
       data-ui="popup.app.route-error"
       role="alert"
     >

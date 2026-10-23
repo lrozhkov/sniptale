@@ -56,8 +56,8 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Frames and annotations',
   },
   editorResources: {
-    ru: 'Инструменты и палитры',
-    en: 'Tools and palettes',
+    ru: 'Палитры и стили',
+    en: 'Palettes and styles',
   },
   aiConnections: {
     ru: 'Подключения и модели',
@@ -121,8 +121,8 @@ export const settingsNavigationMessages = defineMessageSource({
       en: 'Configure frames, callouts, numbering, and annotation tags.',
     },
     editorResources: {
-      ru: 'Управляйте наборами инструментов и цветовыми палитрами редактора.',
-      en: 'Manage editor tool presets and color palettes.',
+      ru: 'Управляйте палитрами, стилями, градиентами и фонами редактора.',
+      en: 'Manage editor palettes, styles, gradients, and backgrounds.',
     },
     aiConnections: {
       ru: 'Подключите AI-провайдеров и выберите доступные модели.',

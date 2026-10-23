@@ -1,10 +1,15 @@
 import type { ContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 import { isContentPrivilegedActionCapability } from '../../protocol/content-privileged-action';
 import { VideoMessageType } from '../messages';
+import { MICROPHONE_GAIN_MIN, MICROPHONE_GAIN_MAX } from './microphone-processing';
 import {
   VideoRecordingStatus,
+  WebcamPresentationMode,
   WebcamPresentationShape,
   VIDEO_AUTO_FADE_DELAYS,
+  isVideoCursorEffectSettings,
+  isWebcamDockPosition,
+  type VideoCursorEffectSettings,
   type VideoAutoFadeDelay,
   type WebcamPresentationSettings,
 } from './types';
@@ -53,10 +58,12 @@ export interface VideoRecordingSurfaceSnapshot {
   cursorSpotlightEnabled: boolean;
   cursorDimmingEnabled?: boolean;
   cursorClickAnimationEnabled?: boolean;
+  cursorEffects?: VideoCursorEffectSettings;
   peerGeneration: number;
   status: VideoRecordingStatus;
   duration: number;
   microphoneEnabled: boolean;
+  microphoneGain?: number;
   microphoneDeviceId: string | null;
   webcamEnabled: boolean;
   webcamDeviceId: string | null;
@@ -79,6 +86,8 @@ export interface VideoRecordingSurfaceActivation {
 export interface StartSavedTabVideoRecordingMessage {
   type: typeof VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING;
   contentIntent: ContentPrivilegedActionCapability;
+  confirmedWithoutMicrophone?: boolean;
+  rememberWithoutMicrophone?: boolean;
 }
 
 export interface ActivateVideoRecordingSurfaceMessage {
@@ -100,22 +109,35 @@ export interface VideoRecordingSurfaceSnapshotMessage {
 
 export type VideoRecordingSurfaceCommand =
   | { kind: 'cancel-start' | 'pause' | 'resume' | 'stop' }
-  | { kind: 'list-media-devices'; deviceKind: 'audioinput' | 'videoinput' }
+  | {
+      kind: 'list-media-devices';
+      deviceKind: 'audioinput' | 'videoinput';
+      requestPermission?: boolean;
+    }
   | { kind: 'set-toolbar-requested'; enabled: boolean }
   | { kind: 'set-auto-fade-delay'; delay: VideoAutoFadeDelay }
   | {
       kind: 'set-spotlight-settings';
+      cursorEffects?: VideoCursorEffectSettings;
       cursorHaloEnabled: boolean;
       cursorDimmingEnabled: boolean;
       clickAnimationEnabled: boolean;
     }
   | { kind: 'set-microphone-enabled' | 'set-webcam-enabled'; enabled: boolean }
+  | { kind: 'set-microphone-gain'; gain: number }
   | { kind: 'select-microphone-device' | 'select-webcam-device'; deviceId: string | null }
+  | { kind: 'set-webcam-presentation-mode'; mode: WebcamPresentationMode }
   | {
       kind: 'update-embedded-camera';
       appearance: Pick<
         WebcamPresentationSettings,
-        'shape' | 'center' | 'sizeFraction' | 'cropOffset'
+        | 'shape'
+        | 'center'
+        | 'sizeFraction'
+        | 'cropOffset'
+        | 'freePlacement'
+        | 'dockPosition'
+        | 'appearance'
       >;
     };
 
@@ -127,6 +149,67 @@ export interface VideoRecordingSurfaceCommandMessage {
   documentGeneration: number;
   recordingId: string | null;
   command: VideoRecordingSurfaceCommand;
+}
+
+export interface RecordingMediaPermissionBootstrap {
+  type: 'recording-media-permission';
+  request: VideoRecordingSurfaceCommandMessage & {
+    command: {
+      kind: 'list-media-devices';
+      deviceKind: 'audioinput' | 'videoinput';
+      requestPermission: false;
+    };
+  };
+  locale: 'ru' | 'en';
+  theme: 'light' | 'dark';
+}
+
+export type RecordingMediaPermissionResult =
+  | { status: 'ready' | 'granted' | 'cancelled' }
+  | { status: 'failed'; reason: 'denied' | 'unavailable' | 'policy' | 'unauthorized' };
+
+export function isRecordingMediaPermissionBootstrap(
+  value: unknown
+): value is RecordingMediaPermissionBootstrap {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['type', 'request', 'locale', 'theme']) &&
+    value['type'] === 'recording-media-permission' &&
+    (value['locale'] === 'ru' || value['locale'] === 'en') &&
+    (value['theme'] === 'light' || value['theme'] === 'dark') &&
+    isVideoRecordingSurfaceCommandMessage(value['request']) &&
+    value['request'].surfaceToken.length > 0 &&
+    value['request'].surfaceSessionId.length > 0 &&
+    value['request'].command.kind === 'list-media-devices' &&
+    value['request'].command.requestPermission === false
+  );
+}
+
+export function isRecordingMediaPermissionResult(
+  value: unknown
+): value is RecordingMediaPermissionResult {
+  if (!isRecord(value)) return false;
+  if (
+    value['status'] === 'ready' ||
+    value['status'] === 'granted' ||
+    value['status'] === 'cancelled'
+  ) {
+    return hasExactKeys(value, ['status']);
+  }
+  return (
+    value['status'] === 'failed' &&
+    hasExactKeys(value, ['status', 'reason']) &&
+    (value['reason'] === 'denied' ||
+      value['reason'] === 'unavailable' ||
+      value['reason'] === 'policy' ||
+      value['reason'] === 'unauthorized')
+  );
+}
+
+export function isRecordingMediaPermissionCancellation(
+  value: unknown
+): value is { type: 'cancel' } {
+  return isRecord(value) && hasExactKeys(value, ['type']) && value['type'] === 'cancel';
 }
 
 interface VideoRecordingCameraPeerIdentity {
@@ -167,13 +250,45 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
-function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
+function isWebcamAppearance(value: unknown): boolean {
+  if (value === undefined) return true;
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['mode', 'shape', 'center', 'sizeFraction', 'cropOffset']) &&
+    hasExactKeys(value, ['roundness', 'zoom', 'mirror', 'shadow', 'shadowColor']) &&
+    typeof value['roundness'] === 'number' &&
+    Number.isFinite(value['roundness']) &&
+    value['roundness'] >= 0 &&
+    value['roundness'] <= 100 &&
+    typeof value['zoom'] === 'number' &&
+    Number.isFinite(value['zoom']) &&
+    value['zoom'] >= 1 &&
+    value['zoom'] <= 4 &&
+    typeof value['mirror'] === 'boolean' &&
+    typeof value['shadow'] === 'boolean' &&
+    typeof value['shadowColor'] === 'string' &&
+    /^#[0-9a-f]{6}$/i.test(value['shadowColor'])
+  );
+}
+
+/** Validates the complete recording camera presentation at runtime and storage boundaries. */
+export function isWebcamPresentationSettings(value: unknown): value is WebcamPresentationSettings {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'mode',
+      'shape',
+      'center',
+      'sizeFraction',
+      'cropOffset',
+      ...('freePlacement' in value ? ['freePlacement'] : []),
+      ...('dockPosition' in value ? ['dockPosition'] : []),
+      ...('appearance' in value ? ['appearance'] : []),
+    ]) &&
+    (value['freePlacement'] === undefined || typeof value['freePlacement'] === 'boolean') &&
+    (value['dockPosition'] === undefined || isWebcamDockPosition(value['dockPosition'])) &&
     (value['mode'] === 'embedded' || value['mode'] === 'separate-track') &&
-    (value['shape'] === WebcamPresentationShape.CIRCLE ||
-      value['shape'] === WebcamPresentationShape.RECTANGLE) &&
+    Object.values(WebcamPresentationShape).some((shape) => shape === value['shape']) &&
+    isWebcamAppearance(value['appearance']) &&
     isNormalizedPoint(value['center'], 0, 1) &&
     typeof value['sizeFraction'] === 'number' &&
     Number.isFinite(value['sizeFraction']) &&
@@ -216,6 +331,7 @@ export function isVideoRecordingSurfaceSnapshot(
         'status',
         'duration',
         'microphoneEnabled',
+        'microphoneGain',
         'microphoneDeviceId',
         'webcamEnabled',
         'webcamDeviceId',
@@ -223,6 +339,7 @@ export function isVideoRecordingSurfaceSnapshot(
         'errorCode',
         'cursorDimmingEnabled',
         'cursorClickAnimationEnabled',
+        'cursorEffects',
       ].includes(key)
     )
   ) {
@@ -239,6 +356,7 @@ export function isVideoRecordingSurfaceSnapshot(
     typeof value['toolbarRequested'] === 'boolean' &&
     isFiniteNonNegativeNumber(value['capabilityEpoch']) &&
     typeof value['cursorSpotlightEnabled'] === 'boolean' &&
+    (value['cursorEffects'] === undefined || isVideoCursorEffectSettings(value['cursorEffects'])) &&
     (value['cursorDimmingEnabled'] === undefined ||
       typeof value['cursorDimmingEnabled'] === 'boolean') &&
     (value['cursorClickAnimationEnabled'] === undefined ||
@@ -247,6 +365,7 @@ export function isVideoRecordingSurfaceSnapshot(
     isRecordingStatus(value['status']) &&
     isFiniteNonNegativeNumber(value['duration']) &&
     typeof value['microphoneEnabled'] === 'boolean' &&
+    (value['microphoneGain'] === undefined || isMicrophoneGain(value['microphoneGain'])) &&
     isNullableString(value['microphoneDeviceId']) &&
     typeof value['webcamEnabled'] === 'boolean' &&
     isNullableString(value['webcamDeviceId']) &&
@@ -273,8 +392,16 @@ export function isStartSavedTabVideoRecordingMessage(
 ): value is StartSavedTabVideoRecordingMessage {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['type', 'contentIntent']) &&
+    Object.keys(value).every((key) =>
+      ['type', 'contentIntent', 'confirmedWithoutMicrophone', 'rememberWithoutMicrophone'].includes(
+        key
+      )
+    ) &&
     value['type'] === VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING &&
+    (value['confirmedWithoutMicrophone'] === undefined ||
+      typeof value['confirmedWithoutMicrophone'] === 'boolean') &&
+    (value['rememberWithoutMicrophone'] === undefined ||
+      typeof value['rememberWithoutMicrophone'] === 'boolean') &&
     isContentPrivilegedActionCapability(value['contentIntent'])
   );
 }
@@ -338,9 +465,15 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   if (['cancel-start', 'pause', 'resume', 'stop'].includes(value['kind'])) {
     return hasExactKeys(value, ['kind']);
   }
+  if (value['kind'] === 'set-microphone-gain') {
+    return hasExactKeys(value, ['kind', 'gain']) && isMicrophoneGain(value['gain']);
+  }
   if (value['kind'] === 'list-media-devices') {
     return (
-      hasExactKeys(value, ['kind', 'deviceKind']) &&
+      (hasExactKeys(value, ['kind', 'deviceKind']) ||
+        hasExactKeys(value, ['kind', 'deviceKind', 'requestPermission'])) &&
+      (value['requestPermission'] === undefined ||
+        typeof value['requestPermission'] === 'boolean') &&
       (value['deviceKind'] === 'audioinput' || value['deviceKind'] === 'videoinput')
     );
   }
@@ -360,10 +493,12 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
         'cursorHaloEnabled',
         'cursorDimmingEnabled',
         'clickAnimationEnabled',
+        ...(value['cursorEffects'] === undefined ? [] : ['cursorEffects']),
       ]) &&
       typeof value['cursorHaloEnabled'] === 'boolean' &&
       typeof value['cursorDimmingEnabled'] === 'boolean' &&
-      typeof value['clickAnimationEnabled'] === 'boolean'
+      typeof value['clickAnimationEnabled'] === 'boolean' &&
+      (value['cursorEffects'] === undefined || isVideoCursorEffectSettings(value['cursorEffects']))
     );
   }
   if (value['kind'] === 'set-microphone-enabled' || value['kind'] === 'set-webcam-enabled') {
@@ -372,25 +507,31 @@ function isVideoRecordingSurfaceCommand(value: unknown): value is VideoRecording
   if (value['kind'] === 'select-microphone-device' || value['kind'] === 'select-webcam-device') {
     return hasExactKeys(value, ['kind', 'deviceId']) && isNullableString(value['deviceId']);
   }
+  if (value['kind'] === 'set-webcam-presentation-mode') {
+    return (
+      hasExactKeys(value, ['kind', 'mode']) &&
+      (value['mode'] === WebcamPresentationMode.EMBEDDED ||
+        value['mode'] === WebcamPresentationMode.SEPARATE_TRACK)
+    );
+  }
   if (
     value['kind'] !== 'update-embedded-camera' ||
     !hasExactKeys(value, ['kind', 'appearance']) ||
     !isRecord(value['appearance']) ||
-    !hasExactKeys(value['appearance'], ['shape', 'center', 'sizeFraction', 'cropOffset'])
+    Object.hasOwn(value['appearance'], 'mode')
   ) {
     return false;
   }
 
-  const appearance = value['appearance'];
+  return isWebcamPresentationSettings({ ...value['appearance'], mode: 'embedded' });
+}
+
+function isMicrophoneGain(value: unknown): value is number {
   return (
-    (appearance['shape'] === WebcamPresentationShape.CIRCLE ||
-      appearance['shape'] === WebcamPresentationShape.RECTANGLE) &&
-    isNormalizedPoint(appearance['center'], 0, 1) &&
-    typeof appearance['sizeFraction'] === 'number' &&
-    Number.isFinite(appearance['sizeFraction']) &&
-    appearance['sizeFraction'] > 0 &&
-    appearance['sizeFraction'] <= 1 &&
-    isNormalizedPoint(appearance['cropOffset'], -1, 1)
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MICROPHONE_GAIN_MIN &&
+    value <= MICROPHONE_GAIN_MAX
   );
 }
 

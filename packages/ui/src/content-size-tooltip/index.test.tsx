@@ -148,6 +148,11 @@ describe('ContentSizeTooltip', () => {
       '.sniptale-selection-size-cancel-button:focus-visible svg'
     );
     expect(style?.textContent).toContain('var(--sniptale-color-text-primary-strong)');
+    expect(style?.textContent).toContain('color: var(--sniptale-color-text-secondary)');
+    expect(style?.textContent).toContain('stroke-width: var(--sniptale-control-icon-stroke-hover)');
+    expect(style?.textContent).toContain(
+      '.sniptale-content-size-tooltip-primary-action:focus-visible:not(:disabled)'
+    );
     expect(style?.textContent).not.toContain(
       'background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent);'
     );

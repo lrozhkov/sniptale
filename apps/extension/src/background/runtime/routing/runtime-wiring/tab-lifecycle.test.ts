@@ -38,6 +38,7 @@ import {
   cleanupScreenshotModeAfterTabClose,
   flushMicrotasks,
   handleTabClose,
+  handleRegionSelectionNavigationStart,
   removedListenerRef,
 } from '../../../../../../../tooling/test/support/background-runtime-wiring.test-support';
 import { registerTabLifecycleListeners } from './tab-lifecycle';
@@ -54,6 +55,7 @@ it('restores screenshot ownership before clearing mode state on tab removal', as
 
   registerTabLifecycleListeners(state, logger);
   removedListenerRef.current?.(7);
+  expect(handleRegionSelectionNavigationStart).toHaveBeenCalledWith(7);
   await flushMicrotasks();
 
   expect(cleanupScreenshotModeAfterTabClose).toHaveBeenCalledWith(

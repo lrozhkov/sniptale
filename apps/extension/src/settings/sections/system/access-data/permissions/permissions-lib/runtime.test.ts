@@ -198,6 +198,7 @@ describe('settings microphone permission flows', () => {
   });
 
   it('maps microphone request failures to denied or prompt states', async () => {
+    defineNavigatorValue('permissions', { query: vi.fn().mockResolvedValue({ state: 'denied' }) });
     const deniedError = new DOMException('denied', 'NotAllowedError');
     const getUserMedia = vi
       .fn<Navigator['mediaDevices']['getUserMedia']>()

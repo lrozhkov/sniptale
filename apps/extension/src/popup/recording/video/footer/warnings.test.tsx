@@ -42,4 +42,5 @@ it('shows the warning banner only for non-null start errors', () => {
   );
 
   expect(container?.textContent).toContain('Cannot start');
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe('Cannot start');
 });

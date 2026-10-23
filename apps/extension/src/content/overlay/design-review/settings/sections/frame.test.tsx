@@ -15,7 +15,9 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -26,12 +28,14 @@ const actions: DesignReviewActions = {
 
 it('gives long width values the whole available field row', () => {
   const state: DesignReviewViewState = {
+    treeNavigation: { parent: null, child: null },
     action: 'refine',
     anchor: null,
     comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: { width: '100px', height: '50px' },
     draftPatch: { declarations: [] },
     modifiedProperties: [],
+    text: { editable: true, modified: false, preview: 'Heading', resettable: false },
     selection: null,
     settingsOpen: true,
     values: { width: '1234567px', height: '12345px' },

@@ -290,11 +290,11 @@ it.each([
   }
 );
 
-it('uses an independent 1–10 slider and previews before one keyboard commit', async () => {
+it('uses an independent 0.1–10 slider and previews before one keyboard commit', async () => {
   retained();
   await render();
   const range = field('Duration range');
-  expect(range.min).toBe('1');
+  expect(range.min).toBe('0.1');
   expect(range.max).toBe('10');
   act(() =>
     range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))

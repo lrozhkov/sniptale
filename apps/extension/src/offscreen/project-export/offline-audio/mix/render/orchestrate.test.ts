@@ -157,7 +157,7 @@ it('renders an offline mix and returns buffer settings', async () => {
   expect(offlineContext.startRendering).toHaveBeenCalledTimes(1);
 });
 
-it('applies fade ramps for audible clips and skips them for muted clips', async () => {
+it('applies separate fade ramps while keeping muted clips silent', async () => {
   const { offlineContext, renderOfflineAudioMix, renderedBuffer } =
     await createRampCoverageRuntime();
 
@@ -174,12 +174,26 @@ it('applies fade ramps for audible clips and skips them for muted clips', async 
     settings: { numberOfChannels: 2, sampleRate: 48_000 },
   });
 
-  const firstGain = offlineContext.createGain.mock.results[0]?.value?.gain;
-  const secondGain = offlineContext.createGain.mock.results[1]?.value?.gain;
-
-  expect(firstGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0.75, 1.3);
-  expect(firstGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, 3);
-  expect(secondGain?.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(offlineContext.createGain).toHaveBeenCalledTimes(4);
+  const [manual, fade, mutedManual, mutedFade] = offlineContext.createGain.mock.results.map(
+    (result) => result.value
+  );
+  expect(manual?.connect).toHaveBeenCalledWith(fade);
+  expect(fade?.connect).toHaveBeenCalledWith(offlineContext.destination);
+  expect(manual?.gain.setValueAtTime).toHaveBeenCalledWith(0.75, 1);
+  expect(manual?.gain.linearRampToValueAtTime).toHaveBeenCalledExactlyOnceWith(0.75, 3);
+  expect(fade?.gain.setValueAtTime).toHaveBeenCalledWith(0, 1);
+  expect(fade?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(1, 1.3);
+  expect(fade?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(expect.closeTo(1, 12), 2.6);
+  expect(fade?.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 3);
+  expect(mutedManual?.connect).toHaveBeenCalledWith(mutedFade);
+  expect(mutedFade?.connect).toHaveBeenCalledWith(offlineContext.destination);
+  expect(mutedManual?.gain.setValueAtTime.mock.calls).toEqual([
+    [0, 0],
+    [0, 0],
+  ]);
+  expect(mutedManual?.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(mutedFade?.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 1);
 });
 
 it('aborts an offline mix when the signal is already aborted and ignores close errors', async () => {

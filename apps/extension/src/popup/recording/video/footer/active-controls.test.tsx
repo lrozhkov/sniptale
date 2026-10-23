@@ -117,6 +117,20 @@ it('renders shared popup action controls and asks before discarding', () => {
 
   expect(container?.textContent).toContain('t:popup.video.cancelContinueRecording');
   expect(container?.textContent).toContain('t:popup.video.cancelDeleteRecording');
+  expect(mocks.actionButtonMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      label: 't:popup.video.cancelContinueRecording',
+      tone: 'primary',
+      centered: true,
+    })
+  );
+  expect(mocks.actionButtonMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      label: 't:popup.video.cancelDeleteRecording',
+      tone: 'secondary',
+      centered: true,
+    })
+  );
   expect(onPauseResume).toHaveBeenCalledTimes(2);
   expect(onStop).toHaveBeenCalledTimes(1);
   expect(onCancel).not.toHaveBeenCalled();

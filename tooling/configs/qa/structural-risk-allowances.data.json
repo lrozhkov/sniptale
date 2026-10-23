@@ -61,11 +61,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, resource, persistence, capture, or recovery authority. Remove when the analyzer models this cohesive UI receiver. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "57581854484820d39813f4d9305955c0c417758b041a7cff69f2fe2551165457",
-      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e",
-      "reason": "tool-noise: The existing editor composes preview, inspector, and timeline in one grid. This candidate moves the existing recorder into an inspector slot and restricts inert to unrelated controls. The176-line JSX body has14 statements and score3 delta0. Capture, playback, persistence, and recovery remain in their existing owners. A forwarding-only JSX adapter would distribute the same composition. Main inspected the exact body and native mounted-identity/save proof. Fresh complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-17"
+      "reason": "tool-noise: This editor composes existing preview, inspector and timeline owners. Initial mode selection reads the existing advanced UI state and calls the existing setMode command. Readiness enables existing panel and color DOM owners. All hooks retain their order. The merged inspector retains the recorder binding and inert controls. This function has no direct persistence or transport effect. A JSX forwarding component would distribute the same composition. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-23",
+      "astHash": "480e44f7addc45222c9cd501c252e60aa85a08d3d98e2fc22c909ee531aa598b",
+      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e"
     },
     {
       "rule": "structural-file-risk",
@@ -94,10 +94,10 @@
       "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:platform",
-      "reason": "tool-noise: One typed RU/EN track-order label extends the existing static message catalog. The catalog has no runtime authority, effects, or state; score2 delta0 and cohesion1. Splitting a label would fragment its existing semantic catalog. Main inspected the exact changed body. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-17",
-      "astHash": "5488899ed9193c7f18dec85cf063665df86504ab590b41e8cb2b26357aa8d894",
+      "reason": "tool-noise: The candidate adds typed RU/EN initial-mode titles, descriptions and a later-switch hint to the existing video-review message catalog. The file remains static locale data with no state, effects, external dependency edges or runtime authority and cohesion1. Splitting these messages only to satisfy the file cap would fragment their existing semantic catalog. Independent mode_structural_prewrite inspection supports Keep. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable behavior, mutable state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Fresh complete-candidate architecture review must validate this classification.",
+      "reviewDate": "2026-10-19",
+      "astHash": "84fdbb648be512db29387a8d5b8c9c9222b7fcd95d3f6c9fe07e0afd08601403",
       "signatureHash": "401666a2c5baa7b93761dc388924bab5516dc4c098271f424f4811eccf1344ef"
     },
     {
@@ -512,10 +512,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:composition:persistence:review-workspaces",
-      "reason": "tool-noise: This existing store owns one workspace transaction protocol. The candidate adds a read assertion in the consuming transaction. It reuses canonical snapshot and physical source admission. It creates no writer, transaction, state authority, or recovery path. Before and after metrics retain two owner groups, one effect family, two state signals, and zero effect clusters. The added export is the caller transaction assertion. Independent architecture review must assess this exact body.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess a new state authority, runtime, independent transaction or recovery policy. Remove when structural analysis models this cohesive transaction owner.",
-      "reviewDate": "2026-10-21",
-      "astHash": "466c6e6e47f8f7965fb8a675f36c4b0c1677ff0e38d36e7c4277bde633d9440b",
+      "reason": "tool-noise: This store owns one workspace transaction protocol: source admission, revision checks, history publication, retention and rollback. The merged code retains the consuming-transaction read assertion and initializes modeSelectionPending only in the existing new-workspace branch. It adds no writer, resource lifetime or recovery authority. The structural score remains two with two owner groups, one effect family and no effect cluster. Splitting would distribute this transaction protocol. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-23",
+      "astHash": "8eed7b959e51dc95863a66023cc3a6144a6f42f11597ac570c7975cc044049a8",
       "signatureHash": "f94b148614a83a2e7581a3bb44111aba8600dc78c5eabec39ecd663f1a740528"
     },
     {
@@ -523,11 +523,11 @@
       "file": "apps/extension/src/offscreen/recording/controller.start-stop.test.ts",
       "symbol": "<file>",
       "owner": "extension:offscreen:recording",
-      "reason": "tool-noise: This fixture tests one recording controller lifecycle. Each test now imports a fresh worker to isolate retained terminal outcomes. The added assertions use the existing recorder, staging, identity and publication fixtures. The file exceeds the line limit with unchanged structural score and full cohesion. An independent reader confirmed that a split would duplicate mocks or add a fixture-only boundary. Final architecture review must confirm this classification.",
+      "reason": "tool-noise: This fixture tests one recording controller lifecycle. The candidate adds exact-source startup-cleanup receipts and rejects a receipt for another source. These assertions use the existing fresh controller, start mock and source-binding fixture. No independent fixture or effect lifetime is added. The structural score remains two and cohesion remains one. A split would duplicate the lifecycle fixture. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent fixture, state receiver, effect lifetime or owner boundary. Remove when the analyzer models this cohesive test fixture.",
-      "reviewDate": "2026-10-14",
-      "astHash": "1c732babe2cef22dde6f31ff3cfb77c31d01dc5591660cad5e5fa00f3bc9c316",
-      "signatureHash": "a284d9bc5865640ee67c5b7e5bd1a2a64a6d3fd56ea21767753951d9c612e42b"
+      "reviewDate": "2026-10-22",
+      "astHash": "4c722b4a2c6a9ccbf31b056596f4a476c987483712821e6d5b5adda94b4c29e1",
+      "signatureHash": "1a9083a5a593151bd37798d0233e3f2d9d4eb7769510c709bf92cf51a6331355"
     },
     {
       "rule": "structural-file-risk",
@@ -545,10 +545,10 @@
       "file": "apps/extension/src/background/media/video/runtime/recording-completion.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file owns one recording completion operation. It decides Stop admission, outcomes, retry, startup cancellation and IDLE. Its new read-only projection derives from the same lease and Stop admission. It grants no new authority and introduces no state owner. The score remains ten and cohesion increases to 0.97. Existing architecture review checked the boundary. Final review must check this projection.",
+      "reason": "tool-noise: This file owns one recording completion operation. The candidate prevents a startup-error notification from declaring pending Stop cleanup failed. The existing Stop acknowledgement still decides the outcome. The guard uses the existing lease and Stop state without adding a writer, state owner or effect. The score remains ten and cohesion remains 0.97. Moving this guard would distribute the same transition authority. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-14",
-      "astHash": "b0336c47ef6b6b8979842027acd061c8086454a6b59d0a38f163966d80c53c9f",
+      "reviewDate": "2026-10-22",
+      "astHash": "0cab017f2f9bb35de68dc5b1b0864423ab9871468e2ab10e6970ab024bd59ac7",
       "signatureHash": "e60420bdb9852442df8c6e72c3543983d04808fa3e4ec324db2dde8a932041f6"
     },
     {
@@ -556,10 +556,10 @@
       "file": "apps/extension/src/background/media/video/runtime/handlers/state/recording-state.terminal-recovery.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:media",
-      "reason": "tool-noise: This file uses one storage fixture to test recording authority across completion, lease, runtime and lifecycle consumers. Added cases restore the same terminal outcomes into the runtime projection after worker memory loss. The score remains two and cohesion remains one. The line limit causes this finding. Existing architecture review checked this fixture boundary. Final review must check the added cases.",
+      "reason": "tool-noise: This file tests one recording completion lease with one reset fixture. The candidate adds controlled-order startup-error delivery during Stop dispatch and intent persistence. It uses the existing in-memory storage, requestStop and deferred fixtures. No independent fixture or authority is added. The score remains two and cohesion remains one. A split would duplicate the same terminal-recovery fixture. Final architecture review must confirm this classification.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent operation, fixture lifetime, transition authority or effect owner. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-14",
-      "astHash": "027483aa394dded96010f899829a0efecc3748824a1cc46de34eb2c338e276c0",
+      "reviewDate": "2026-10-22",
+      "astHash": "62997a7ec4382a450ffd2ac33380919e1ea5ffa2d5a9e1bf49dbe7920e9ad312",
       "signatureHash": "d20553052c92f825c5d86b199747dc39e36550dd32e40a3cdcd57efa7ec23938"
     },
     {
@@ -1491,10 +1491,10 @@
       "file": "apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts",
       "symbol": "useGuidePageState",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: One mounted page coordinates its existing history, autosave and mutation admission. The current and loadContext refs alias the same project/status receiver. narrationAdapter retains current save and commit callbacks, not another document authority. The new callbacks use that existing receiver for source save and serial Apply. Controlled no-render batch, save refusal and disposal tests prove ordering. The 227-line function has cyclomatic7 and cognitive6. A forwarding adapter with these same refs would distribute one mutation owner.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
-      "reviewDate": "2026-10-19",
-      "astHash": "17a53e424220aeb7e6e3c7ed1bbab5cb36ce6c813fd1d6ee9a01bd5665234055",
+      "reason": "tool-noise: One mounted page coordinates its existing history, autosave and shared mutation admission. Current and loadContext refs project the same project/status receiver. narrationAdapter retains callbacks. The release reducer carries no document or admission state. The existing mutation runner clears the shared busy ref before dispatching this render notification, so completed copy recovery enables controls. The insertion-control regression test checks this result and then edits the copied project. The function remains score 4, delta 0, with cyclomatic 7, cognitive 6 and no nested recovery. Splitting the notification would distribute the same admission lifecycle. Independent diagnosis supports Keep. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent admission gate, document receiver, effect lifetime, durable writer or recovery domain. Remove when the analyzer models this cohesive receiver.",
+      "reviewDate": "2026-10-23",
+      "astHash": "865cc009e89685753af1e13467578a7e26c1ff52a8557a5eddc7301c79236d4a",
       "signatureHash": "b154fc198334b22f879635c665ab02574d0a4aed9829e50317af1b0a00a9f7bf"
     },
     {
@@ -2365,6 +2365,39 @@
       "reviewDate": "2026-10-23",
       "astHash": "426143f07cd42135c5c66d313ed758da3cfd91bbafa08bc3fb8ba2d70eb2af13",
       "signatureHash": "b32d4c6f581059596a52b337e9fda04ab971db209dbdfac0f52002bbf9d071d7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/selection/selection-mode/ui/drawing-view.tsx",
+      "symbol": "DrawingToolbar",
+      "owner": "extension:content:selection",
+      "reason": "tool-noise: This function projects one crop drawing session into two existing toolbar slots. History and pending-text subscriptions observe the same controller and share cleanup. Undo and redo call the crop history owner. Mode selection calls the parent. Existing drawing controls own tool actions. Imported UI primitives increase owner counts but add no separate state authority. Splitting the JSX would add forwarding components. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-23",
+      "astHash": "0bc22e5c18ad9695dff27b80d847403ad8b0705022479097dddd4351541d760e",
+      "signatureHash": "faa07adbcd2d368463362b29e9607a0c7f1a786d42291493b94a9f9c9e3b9649"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/selection/selection-mode/ui/drawing.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:content:selection",
+      "reason": "tool-noise: This integration fixture tests one crop runtime: mode changes, surface identity, drawing history, pending text, toolbar attachment and disposal. Cross-owner imports exercise those existing seams. Mutable values belong to fixture setup and individual runtime instances. Length and imported-owner counts cause the score; the test has one fixture responsibility. Splitting would duplicate setup or introduce a fixture-only boundary. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-23",
+      "astHash": "b21294ec7e0bb05b27acd4ccff0fd745c2db45592682ebac4fff89e79178f68a",
+      "signatureHash": "3d2b64b629285accba3cb3afb884f088615dc5b028355670103c81e4b97075df"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/media-permission/index.ts",
+      "symbol": "mountPermissionSession",
+      "owner": "extension:media-permission",
+      "reason": "tool-noise: This entrypoint binds one document, one private message port and one permission session. session.ts owns acquisition, cancellation and retained-stream cleanup. Injected callbacks provide authorization, native acquisition and reporting. DOM nodes and the disposed flag share one document lifetime. Permission-settings recovery updates that same view and uses the same disposal guard. Existing entrypoint tests cover denial, malformed bootstrap, policy refusal, retained tracks, cancellation and stale recovery responses. Extracting callbacks would distribute the same lifecycle. Independent diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource lifetime, transport or recovery policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-23",
+      "astHash": "a77b59a1600c7db0eeb290828eba3596bba2b798e5c137325595e64b6a36ec81",
+      "signatureHash": "b59ea619d04c191a40d798478559f34e6bfd23dd905786a97e49ba589f47da6f"
     }
   ]
 }

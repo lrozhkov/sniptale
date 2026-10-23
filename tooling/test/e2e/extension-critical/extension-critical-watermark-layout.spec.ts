@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { translate, type TranslationKey } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
+import { installReviewModeChoice } from '../support/quick-editor-media-fixture';
 
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 test.use({ actionTimeout: 10_000 });
@@ -177,6 +178,7 @@ for (const locale of ['ru', 'en'] as const) {
           .click();
         await expect(ui(page, 'gallery.import-progress')).toHaveCount(0);
         await material.click();
+        await installReviewModeChoice(page);
         await ui(page, 'gallery.videoReview.enter').click();
         await page
           .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })

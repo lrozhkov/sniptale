@@ -11,12 +11,14 @@ const fieldKey = marginProperties.join('|');
 
 function createState(values: DesignReviewViewState['values']): DesignReviewViewState {
   return {
+    treeNavigation: { parent: null, child: null },
     action: 'refine',
     anchor: null,
     comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: { ...values },
     draftPatch: { declarations: [] },
     modifiedProperties: [],
+    text: { editable: true, modified: false, preview: 'Heading', resettable: false },
     selection: null,
     settingsOpen: true,
     values,

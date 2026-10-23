@@ -88,6 +88,7 @@ type RuntimeCoreBaseRequestByType = RuntimeActionSaveRequestByType &
     } & ContentPrivilegedActionGrantPayload;
     [MessageType.DISABLE_SCREENSHOT_MODE]: {
       type: typeof MessageType.DISABLE_SCREENSHOT_MODE;
+      quickActionTransactionId?: string;
       leaseGeneration?: number;
       operationGeneration?: number;
       surfaceCapabilityToken?: string;

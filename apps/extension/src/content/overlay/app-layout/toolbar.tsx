@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
+import { queryContentUiElement } from '../../platform/dom-host';
 import {
   exitScreenshotModeFromUserAction,
   finishScenarioRecorder,
@@ -186,6 +187,7 @@ function createVideoRecordingModeToggleHandler(toolbar: ContentAppLayoutToolbarP
 }
 
 function renderToolbarShell(args: {
+  onHide: (restoreFocus?: boolean) => void;
   canClearPagePreparation: boolean;
   designReview: ContentToolbarShellProps['designReview'];
   handleToggleScreenshotMode: (enabled: boolean) => void;
@@ -197,10 +199,6 @@ function renderToolbarShell(args: {
     args.toolbar.autoBlurController,
     args.toolbar.pinToTabAvailable
   );
-  const handleHideToolbar = () => {
-    useFrameUIStore.getState().dismissFrameUi();
-    args.toolbar.setPinnedToolbarVisible(false);
-  };
   const handleToggleVideoRecordingMode = createVideoRecordingModeToggleHandler(args.toolbar);
 
   return (
@@ -240,7 +238,7 @@ function renderToolbarShell(args: {
         onToggleDesignReviewPanel={args.designReview.panel.toggle}
         onPinToTabChange={args.toolbar.setPinToTab}
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
-        onHide={handleHideToolbar}
+        onHide={args.onHide}
         onClearHighlights={modeController.handleClearHighlights}
         onClearPagePreparation={() => clearPagePreparation(args.toolbar)}
         canClearPagePreparation={args.canClearPagePreparation}
@@ -273,6 +271,21 @@ function renderToolbarShell(args: {
 }
 
 export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
+  const focusRestorePending = useRef(false);
+  useEffect(() => {
+    if (toolbar.isToolbarVisible || !focusRestorePending.current) return;
+    focusRestorePending.current = false;
+    if (!toolbar.isCompletelyHidden) {
+      queryContentUiElement<HTMLButtonElement>(
+        '[data-ui="content.collapsed-panels.restore-toolbar"]'
+      )?.focus();
+    }
+  }, [toolbar.isToolbarVisible, toolbar.isCompletelyHidden]);
+  const handleHideToolbar = (restoreFocus = false) => {
+    focusRestorePending.current = restoreFocus;
+    useFrameUIStore.getState().dismissFrameUi();
+    toolbar.setPinnedToolbarVisible(false);
+  };
   const subscribeAvailability = useCallback(
     (listener: () => void) => subscribeResetAvailability(listener, toolbar.drawingController),
     [toolbar.drawingController]
@@ -323,6 +336,7 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
   });
 
   return renderToolbarShell({
+    onHide: handleHideToolbar,
     canClearPagePreparation,
     designReview,
     handleToggleScreenshotMode,

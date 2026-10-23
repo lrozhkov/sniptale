@@ -7,6 +7,10 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { TabOutputGeometry } from '../stream/tab-output';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import type { LiveRecordingArtifactSession } from '../encoding/live-artifact-session';
+import {
+  createMicrophoneActivityObserver,
+  type MicrophoneActivityObserver,
+} from '../stream/microphone-activity';
 
 const logger = createLogger({ namespace: 'OffscreenRecordingContext' });
 
@@ -29,6 +33,53 @@ interface StopRequestHandlers {
 }
 
 class OffscreenRecordingContext {
+  #microphoneObservation: MicrophoneActivityObserver | null = null;
+
+  configureMicrophoneObservation(enabled: boolean): void {
+    this.#microphoneObservation?.dispose();
+    const recordingId = this.currentRecordingId;
+    if (!recordingId) return;
+    this.#microphoneObservation = createMicrophoneActivityObserver((microphoneActivity) => {
+      if (this.currentRecordingId !== recordingId || this.lifecycleState === 'stopping') return;
+      sendRuntimeMessageBestEffort({
+        context: { recordingId },
+        logger,
+        logMessage: 'Failed to publish microphone activity',
+        payload: {
+          type: VideoMessageType.RECORDING_DURATION_UPDATED,
+          recordingId,
+          microphoneActivity,
+        },
+      });
+    });
+    this.#microphoneObservation.setEnabled(enabled);
+  }
+
+  observeMicrophone(stream: MediaStream | null, gain = 1): void {
+    this.#microphoneObservation?.setSource(stream, gain);
+  }
+
+  createMicrophoneObservationCallback(): (stream: MediaStream | null, gain: number) => void {
+    const observation = this.#microphoneObservation;
+    return (stream, gain) => observation?.setSource(stream, gain);
+  }
+
+  setMicrophoneObservationEnabled(enabled: boolean): void {
+    this.#microphoneObservation?.setEnabled(enabled);
+  }
+
+  pauseMicrophoneObservation(): void {
+    this.#microphoneObservation?.setPhase('paused');
+  }
+
+  resumeMicrophoneObservation(): void {
+    this.#microphoneObservation?.setPhase('recording');
+  }
+
+  #disposeMicrophoneObservation(): void {
+    this.#microphoneObservation?.dispose();
+    this.#microphoneObservation = null;
+  }
   videoStream: MediaStream | null = null;
   sourceStream: MediaStream | null = null;
   audioMixer: AudioMixer | null = null;
@@ -64,6 +115,9 @@ class OffscreenRecordingContext {
         type: VideoMessageType.RECORDING_DURATION_UPDATED,
         duration,
         recordingId,
+        ...(this.#microphoneObservation
+          ? { microphoneActivity: this.#microphoneObservation.current }
+          : {}),
       },
     });
   });
@@ -82,6 +136,7 @@ class OffscreenRecordingContext {
   }
 
   beginRecordingSession(recordingId: string, generation = 0): void {
+    this.#disposeMicrophoneObservation();
     this.#setLifecycleState('starting', 'beginRecordingSession');
     this.currentRecordingId = recordingId;
     this.generation = generation;
@@ -176,6 +231,7 @@ class OffscreenRecordingContext {
       return false;
     }
     this.#setLifecycleState('stopping', 'cancelStartingRecorder');
+    this.#disposeMicrophoneObservation();
     const cancel = this.#startingRecorderCancellation;
     this.#startingRecorderCancellation = null;
     cancel?.();
@@ -187,11 +243,13 @@ class OffscreenRecordingContext {
       throw new Error('Recording session cannot activate an unbound recorder');
     }
     this.#setLifecycleState('recording', 'activateRecorder');
+    this.#microphoneObservation?.setPhase('recording');
     this.#startingRecorderCancellation = null;
   }
 
   beginStopRequest(handlers: StopRequestHandlers): void {
     this.#setLifecycleState('stopping', 'beginStopRequest');
+    this.#disposeMicrophoneObservation();
     this.stopRecordingResolve = handlers.resolve;
     this.stopRecordingReject = handlers.reject;
     this.discardOnStop = handlers.discard ?? false;
@@ -234,6 +292,7 @@ class OffscreenRecordingContext {
   }
 
   resetRecordingSession(): void {
+    this.#disposeMicrophoneObservation();
     this.currentRecordingId = null;
     this.generation = null;
     this.streamInstanceId = null;

@@ -1,4 +1,6 @@
 import type { EditableElement } from '../../../features/highlighter/contracts';
+export { canEditQuickEditTarget, createQuickEditTargetSession } from './target-session';
+export { canResetQuickEditText, resetQuickEditText } from './text-reset';
 import { createQuickEditOverlayState } from './overlay.state';
 import { createQuickEditModeToggles } from './controller';
 import { createQuickEditDocumentMode } from './document-mode';

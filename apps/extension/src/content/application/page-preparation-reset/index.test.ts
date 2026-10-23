@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 
-import { clearAllPagePreparationChanges } from './index';
+import { clearAllPagePreparationChanges, restorePagePreparationHistory } from './index';
 
 function createDependencies(revisions: number[]) {
   let index = 0;
@@ -32,6 +32,15 @@ it('undoes every page preparation change before clearing residual owners', () =>
   expect(dependencies.clearHighlights).toHaveBeenCalledOnce();
   expect(dependencies.resetAnnotations).toHaveBeenCalledOnce();
   expect(dependencies.history.clear).toHaveBeenCalledOnce();
+});
+
+it('restores recorded changes without clearing history or residual evidence', () => {
+  const dependencies = createDependencies([3, 4, 5]);
+  expect(restorePagePreparationHistory(dependencies.history)).toBe(true);
+  expect(dependencies.history.undo).toHaveBeenCalledTimes(2);
+  expect(dependencies.history.clear).not.toHaveBeenCalled();
+  expect(dependencies.resetAnnotations).not.toHaveBeenCalled();
+  expect(dependencies.clearHighlights).not.toHaveBeenCalled();
 });
 
 it('preserves recovery history and residual owners when an undo cannot make progress', () => {

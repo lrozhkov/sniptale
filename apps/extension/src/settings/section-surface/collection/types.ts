@@ -58,6 +58,7 @@ export type SettingsCollectionGroup = {
 };
 
 export type SettingsCollectionProps = {
+  layout?: 'rows' | 'tiles';
   ariaLabel: string;
   title?: ReactNode;
   description?: ReactNode;
@@ -69,7 +70,8 @@ export type SettingsCollectionProps = {
   emptyState?: ReactNode;
   errorState?: ReactNode;
   onAction(action: SettingsCollectionAction): void;
-  onMove?(intent: SettingsCollectionMoveIntent): void;
+  /** Return the owner's completion promise to retain pointer placement until the move settles. */
+  onMove?(intent: SettingsCollectionMoveIntent): void | Promise<unknown>;
 };
 
 export type SettingsCollectionResolvedGroup = {

@@ -125,6 +125,7 @@ export const runtimeModeMessageContracts = {
       createMessageGuard({
         type: MessageType.DISABLE_SCREENSHOT_MODE,
         optional: {
+          quickActionTransactionId: isString,
           leaseGeneration: isNumber,
           operationGeneration: isNumber,
           surfaceCapabilityToken: isString,

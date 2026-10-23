@@ -1,9 +1,10 @@
+import { Download } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useState } from 'react';
 import { SegmentedRow } from '../../../../ui/compact-inspector-controls';
 import type { SettingsTransferTreeNode } from '../../../../contracts/settings-transfer';
 import { translate } from '../../../../platform/i18n';
-import { settingsAddButtonClassName, settingsPanelClassName } from '../../../section-surface';
+import { settingsPanelClassName } from '../../../section-surface';
 import { sendSettingsTransferOperation } from './client';
 import { SettingsTransferTree } from './tree';
 import {
@@ -89,11 +90,13 @@ export function SettingsTransferExportFlow() {
         </p>
       ) : null}
       <ProductActionButton
-        tone="secondary"
-        className={settingsAddButtonClassName}
+        compact
+        tone="primary"
+        className="mt-4 mb-2 w-fit"
         disabled={busy || (kind === 'selective' && selected.size === 0)}
         onClick={() => void exportSettings()}
       >
+        <Download size={16} aria-hidden="true" />
         {busy
           ? translate('settings.settingsTransfer.working')
           : translate('settings.settingsTransfer.download')}

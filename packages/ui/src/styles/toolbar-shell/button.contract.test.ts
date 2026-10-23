@@ -9,6 +9,38 @@ const toolbarLegacyActionsStylesheet = readFileSync(
 );
 
 describe('toolbar-shell button contract', () => {
+  it('keeps inactive editor effects transparent and annotation toggles neutral', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      ".sniptale-annotation-effect-switch:not(:has([aria-pressed='true']))"
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      "[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control::after {"
+    );
+  });
+  it('keeps annotation compound hover neutral and selected-frame arrows narrow', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      '> button.sniptale-annotation-properties-arrow.sniptale-glass-toolbar-button {'
+    );
+    expect(toolbarShellButtonStylesheet).toContain('flex: 0 0 14px;');
+    expect(toolbarShellButtonStylesheet).toContain(
+      '.sniptale-annotation-menu-control > button[aria-pressed] {'
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      "> .sniptale-annotation-properties-arrow:enabled:is(:hover, :focus-visible, [aria-expanded='true'])"
+    );
+  });
+  it('shares annotation effect accents and compound menu geometry without changing recording selectors', () => {
+    expect(toolbarShellButtonStylesheet).toContain(
+      ".sniptale-annotation-effect-options > button[aria-pressed='true']"
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      'border-color: var(--sniptale-color-accent) !important;'
+    );
+    expect(toolbarShellButtonStylesheet).toContain(
+      ':is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)'
+    );
+    expect(toolbarShellButtonStylesheet).toContain('.sniptale-annotation-properties-arrow');
+  });
   it('keeps toolbar button chrome on the button owner', () => {
     expect(toolbarShellButtonStylesheet).toContain('.sniptale-btn {');
     expect(toolbarShellButtonStylesheet).toContain(".sniptale-toggle[data-active='true']");

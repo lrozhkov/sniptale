@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   activate: vi.fn(),
   closePeer: vi.fn(),
   command: vi.fn(),
+  permissionRequest: vi.fn(),
+  permissionRelease: vi.fn(),
   disposeDrawing: vi.fn(),
   drawingClear: vi.fn(),
   getAutoHideDelay: vi.fn(() => 0),
@@ -63,7 +65,16 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: mocks.loggerWarn }),
 }));
 
+vi.mock('./permission-frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./permission-frame')>()),
+  createRecordingPermissionFrameOwner: () => ({
+    request: mocks.permissionRequest,
+    release: mocks.permissionRelease,
+  }),
+}));
+
 import { useVideoRecordingSurfaceController } from './controller';
+import { RecordingPermissionFrameError } from './permission-frame';
 
 type Controller = ReturnType<typeof useVideoRecordingSurfaceController>;
 const snapshot: VideoRecordingSurfaceSnapshot = {
@@ -108,11 +119,16 @@ function Probe() {
   return null;
 }
 
+function emitSurfaceSnapshot(changes: Partial<VideoRecordingSurfaceSnapshot>) {
+  act(() => mocks.surfaceListener?.({ ...snapshot, ...changes }, 'token-1'));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.surfaceListener = null;
   mocks.runtimeListener = null;
   mocks.command.mockResolvedValue({ snapshot });
+  mocks.permissionRequest.mockResolvedValue(undefined);
   mocks.requestAnswer.mockResolvedValue('answer-sdp');
   onModeRequested = vi.fn<(enabled: boolean) => void>();
   onToolbarRequested = vi.fn<() => void>();
@@ -122,6 +138,156 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount());
+});
+
+it.each(['camera', 'microphone'] as const)(
+  'requests %s permission before retrying an explicit enable',
+  async (kind) => {
+    const disabled = { ...snapshot, microphoneEnabled: false, webcamEnabled: false };
+    act(() => mocks.surfaceListener?.(disabled, 'token-1'));
+    const grant = createDeferred<void>();
+    mocks.permissionRequest.mockReturnValueOnce(grant.promise);
+    mocks.command
+      .mockResolvedValueOnce({ snapshot: disabled, result: { permissionRequired: true } })
+      .mockResolvedValueOnce({ snapshot });
+    let operation!: Promise<void>;
+    await act(async () => {
+      operation =
+        kind === 'camera'
+          ? controller.onCameraEnabledChange(true)
+          : controller.onMicrophoneEnabledChange(true);
+    });
+    expect(mocks.permissionRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ surfaceToken: 'token-1' }),
+      kind === 'camera' ? 'videoinput' : 'audioinput'
+    );
+    expect(controller.state.cameraEnabled).toBe(false);
+    expect(controller.state.microphoneEnabled).toBe(false);
+    await act(async () => {
+      grant.resolve();
+      await operation;
+    });
+    expect(mocks.command).toHaveBeenCalledTimes(2);
+    expect(controller.state[kind === 'camera' ? 'cameraEnabled' : 'microphoneEnabled']).toBe(true);
+    expect(mocks.start).not.toHaveBeenCalled();
+  }
+);
+
+it('opens permission for an explicit device menu, but not for a silent refresh', async () => {
+  act(() => mocks.surfaceListener?.(snapshot, 'token-1'));
+  mocks.command.mockResolvedValue({
+    snapshot,
+    result: { mediaDevices: [], permissionRequired: true },
+  });
+  await act(async () =>
+    expect(await controller.onLoadMediaDevices('audioinput', false)).toEqual([])
+  );
+  expect(mocks.permissionRequest).not.toHaveBeenCalled();
+  mocks.command
+    .mockResolvedValueOnce({ snapshot, result: { mediaDevices: [], permissionRequired: true } })
+    .mockResolvedValueOnce({
+      snapshot,
+      result: {
+        mediaDevices: [{ deviceId: 'real', kind: 'audioinput', label: 'Actual microphone' }],
+      },
+    });
+  await act(async () => expect(await controller.onLoadMediaDevices('audioinput')).toHaveLength(1));
+  expect(mocks.permissionRequest).toHaveBeenCalledOnce();
+});
+
+it('does not duplicate a permission failure that the frame already presents', async () => {
+  const disabled = { ...snapshot, microphoneEnabled: false, webcamEnabled: false };
+  act(() => mocks.surfaceListener?.(disabled, 'token-1'));
+  mocks.command.mockResolvedValue({ snapshot: disabled, result: { permissionRequired: true } });
+  mocks.permissionRequest.mockRejectedValue(
+    new RecordingPermissionFrameError('Device access denied', true)
+  );
+  await act(async () => {
+    await controller.onMicrophoneEnabledChange(true);
+  });
+  expect(controller.state.microphoneEnabled).toBe(false);
+  expect(controller.state.error).toBeNull();
+  await act(async () => expect(await controller.onLoadMediaDevices('audioinput')).toEqual([]));
+  expect(mocks.start).not.toHaveBeenCalled();
+});
+
+it('releases the acquired device if catalog preparation fails after permission succeeds', async () => {
+  act(() => mocks.surfaceListener?.(snapshot, 'token-1'));
+  mocks.permissionRelease.mockClear();
+  mocks.command
+    .mockResolvedValueOnce({ snapshot, result: { permissionRequired: true } })
+    .mockRejectedValueOnce(new Error('Catalog unavailable'));
+  await act(async () =>
+    expect(controller.onLoadMediaDevices('audioinput')).rejects.toThrow('Catalog unavailable')
+  );
+  expect(mocks.permissionRelease).toHaveBeenCalledExactlyOnceWith('audioinput');
+});
+
+it.each([
+  { kind: 'microphone', status: VideoRecordingStatus.RECORDING },
+  { kind: 'camera', status: VideoRecordingStatus.PAUSED },
+] as const)(
+  'releases the permission probe after live $kind ownership succeeds',
+  async ({ kind, status }) => {
+    const active = {
+      ...snapshot,
+      recordingId: 'recording-1',
+      status,
+      microphoneEnabled: false,
+      webcamEnabled: false,
+    };
+    emitSurfaceSnapshot(active);
+    mocks.permissionRelease.mockClear();
+    mocks.command
+      .mockResolvedValueOnce({ snapshot: active, result: { permissionRequired: true } })
+      .mockResolvedValueOnce({
+        snapshot: { ...active, microphoneEnabled: true, webcamEnabled: true },
+        result: { result: 'accepted' },
+      });
+    await act(async () => {
+      await (kind === 'microphone'
+        ? controller.onMicrophoneEnabledChange(true)
+        : controller.onCameraEnabledChange(true));
+    });
+    expect(mocks.permissionRelease).toHaveBeenCalledExactlyOnceWith(
+      kind === 'microphone' ? 'audioinput' : 'videoinput'
+    );
+  }
+);
+
+it.each([VideoRecordingStatus.STOPPING, VideoRecordingStatus.IDLE])(
+  'retires recording-associated catalog leases on %s without clearing idle preparation leases',
+  async (status) => {
+    const active = {
+      ...snapshot,
+      recordingId: 'recording-1',
+      status: VideoRecordingStatus.RECORDING,
+    };
+    emitSurfaceSnapshot(active);
+    mocks.permissionRelease.mockClear();
+    mocks.command
+      .mockResolvedValueOnce({ snapshot: active, result: { permissionRequired: true } })
+      .mockResolvedValueOnce({ snapshot: active, result: { mediaDevices: [] } });
+    await act(async () => {
+      await controller.onLoadMediaDevices('audioinput');
+    });
+    expect(mocks.permissionRelease).not.toHaveBeenCalled();
+    emitSurfaceSnapshot({
+      ...active,
+      status,
+      recordingId: status === VideoRecordingStatus.IDLE ? null : 'recording-1',
+    });
+    expect(mocks.permissionRelease).toHaveBeenCalledOnce();
+  }
+);
+
+it('retains the permission stream during countdown and releases it once recording owns devices', () => {
+  act(() => mocks.surfaceListener?.(snapshot, 'token-1'));
+  mocks.permissionRelease.mockClear();
+  emitSurfaceSnapshot({ recordingId: 'recording', status: VideoRecordingStatus.COUNTDOWN });
+  expect(mocks.permissionRelease).not.toHaveBeenCalled();
+  emitSurfaceSnapshot({ recordingId: 'recording', status: VideoRecordingStatus.RECORDING });
+  expect(mocks.permissionRelease).toHaveBeenCalledOnce();
 });
 
 it('projects surface snapshots and lifecycle clock ownership', () => {
@@ -138,6 +304,47 @@ it('projects surface snapshots and lifecycle clock ownership', () => {
   expect(mocks.setClockRunning).toHaveBeenLastCalledWith(false);
   expect(mocks.subscribeRuntime).toHaveBeenCalledOnce();
   expect(mocks.subscribeSurface).toHaveBeenCalledOnce();
+});
+
+it('silently refreshes media state when the originating tab becomes visible again', async () => {
+  emitSurfaceSnapshot({ recordingId: null, status: VideoRecordingStatus.IDLE });
+  const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(mocks.command).not.toHaveBeenCalled();
+  visibility.mockReturnValue('visible');
+  await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+  expect(mocks.command).toHaveBeenCalledWith(expect.anything(), {
+    kind: 'list-media-devices',
+    deviceKind: 'audioinput',
+    requestPermission: false,
+  });
+  visibility.mockRestore();
+});
+
+it('returns authoritative confirmation without reporting a recording failure', async () => {
+  mocks.start.mockResolvedValueOnce({ success: true, confirmationRequired: true });
+  const startEvent = new Event('click');
+  await act(async () => expect(await controller.onStart(startEvent)).toBe('confirmation-required'));
+  expect(controller.state.phase).toBe('idle');
+  expect(controller.state.error).toBeNull();
+  expect(mocks.start).toHaveBeenCalledWith(startEvent, {});
+});
+
+it('uses the new Continue activation and explicit remembered choice on retry', async () => {
+  mocks.start.mockResolvedValueOnce({ success: true, snapshot, surfaceToken: 'token-1' });
+  const continueEvent = new Event('click');
+  await act(async () =>
+    expect(
+      await controller.onStart(continueEvent, {
+        confirmedWithoutMicrophone: true,
+        rememberWithoutMicrophone: true,
+      })
+    ).toBe('started')
+  );
+  expect(mocks.start).toHaveBeenCalledWith(continueEvent, {
+    confirmedWithoutMicrophone: true,
+    rememberWithoutMicrophone: true,
+  });
 });
 
 it('activates, releases, and starts through trusted content transport', async () => {
@@ -336,7 +543,7 @@ it('keeps a successful countdown cancellation idle when the original start settl
   }>();
   mocks.start.mockReturnValueOnce(pendingStart.promise);
 
-  let startPromise!: Promise<void>;
+  let startPromise!: ReturnType<Controller['onStart']>;
   act(() => {
     startPromise = controller.onStart(new Event('click'));
   });
@@ -358,7 +565,7 @@ it('accepts the successful start when cancel loses the activation race', async (
   mocks.start.mockReturnValueOnce(pendingStart.promise);
   mocks.command.mockRejectedValueOnce(new Error('no active countdown'));
 
-  let startPromise!: Promise<void>;
+  let startPromise!: ReturnType<Controller['onStart']>;
   act(() => {
     startPromise = controller.onStart(new Event('click'));
   });

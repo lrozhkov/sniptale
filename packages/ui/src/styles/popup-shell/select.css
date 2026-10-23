@@ -9,7 +9,7 @@
   --sniptale-field-padding-inline-start: 10px;
   --sniptale-field-padding-inline-end: 30px;
   --sniptale-field-gap: 8px;
-  --sniptale-field-radius: 10px;
+  --sniptale-field-radius: 6px;
   --sniptale-field-font-size: 12px;
   --sniptale-field-bg-idle: transparent;
   --sniptale-field-border-idle: transparent;
@@ -31,14 +31,8 @@
     var(--sniptale-color-surface-panel) 98%,
     var(--sniptale-color-surface-canvas) 2%
   );
-  --sniptale-field-border-active: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 20%,
-    var(--sniptale-color-border-soft) 80%
-  );
-  --sniptale-field-shadow-active:
-    inset 0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 8%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--sniptale-color-accent) 6%, transparent);
+  --sniptale-field-border-active: var(--sniptale-color-border-soft);
+  --sniptale-field-shadow-active: none;
   line-height: 1.25;
 }
 
@@ -77,14 +71,20 @@
 .sniptale-popup-select-menu {
   max-height: min(11rem, calc(100vh - 168px));
   padding: 4px;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .sniptale-popup-select-menu .sniptale-select-option {
   min-height: 30px;
   gap: 8px;
   padding: 7px 8px;
-  border-radius: 8px;
+  border-radius: 6px;
+}
+
+.sniptale-popup-select-menu .sniptale-select-option-selected {
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
 }
 
 .sniptale-popup-select-menu .sniptale-select-option-copy {
@@ -114,4 +114,5 @@
 .sniptale-popup-select-menu .sniptale-select-option-check {
   width: 14px;
   height: 14px;
+  color: var(--sniptale-color-text-primary);
 }

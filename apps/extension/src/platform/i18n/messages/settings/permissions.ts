@@ -74,14 +74,8 @@ export const settingsPermissionsMessages = defineMessageSource({
     en: 'Required permissions',
   },
   requiredGrantsDescription: {
-    ru: sentence(
-      'Эти разрешения включены при установке, потому что без них основные функции Sniptale не смогут работать.',
-      'Доступ к сайтам и приложению Sniptale остаётся отдельным опциональным разрешением.'
-    ),
-    en: sentence(
-      'These permissions are enabled at install time because core Sniptale features need them to work.',
-      'Site access and the Sniptale app remain separate optional permissions.'
-    ),
+    ru: 'Эти разрешения включены при установке, потому что без них основные функции Sniptale не смогут работать.',
+    en: 'These permissions are enabled at install time because core Sniptale features need them to work.',
   },
   requiredGrantPermission: {
     ru: 'Manifest permission',
@@ -330,5 +324,25 @@ export const settingsPermissionsMessages = defineMessageSource({
   refreshButton: {
     ru: 'Обновить статусы',
     en: 'Refresh statuses',
+  },
+  openBrowserSettingsButton: {
+    ru: 'Настройки браузера',
+    en: 'Open browser settings',
+  },
+  openBrowserSettingsFailed: {
+    ru: 'Не удалось открыть настройки браузера. Откройте настройки камеры или микрофона в браузере и разрешите доступ для Sniptale.',
+    en: 'Could not open browser settings. Open the camera or microphone settings in your browser and allow access for Sniptale.',
+  },
+  enableRecordingDeviceFailed: {
+    ru: 'Не удалось включить устройство для записи. Откройте панель записи и включите микрофон или камеру ещё раз.',
+    en: 'Could not enable the recording device. Open the recording panel and turn on the microphone or camera again.',
+  },
+  recordingDeviceReady: {
+    ru: 'Вернитесь к записи через значок расширения. Для разового доступа оставьте эту вкладку открытой до завершения записи.',
+    en: 'Return to recording through the extension icon. For one-time access, keep this tab open until recording ends.',
+  },
+  recordingAccessSessionFailed: {
+    ru: 'Не удалось поддержать доступ к устройству для записи. Проверьте разрешения перед продолжением записи.',
+    en: 'Could not maintain device access for recording. Check device permissions before continuing.',
   },
 });

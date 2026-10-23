@@ -131,6 +131,7 @@ vi.mock('mediabunny', () => ({
   },
 }));
 import { remuxRecoveryRecording } from './recording-recovery-remux';
+import type { RecordingRecoveryProgress } from './recording-recovery-progress';
 function track(kind: Track['kind']): Track {
   return {
     kind,
@@ -180,7 +181,36 @@ beforeEach(() => {
     finalize: mocks.finalize,
   });
 });
-afterEach(() => installPersistenceLockManagerForTests(null));
+afterEach(() => {
+  installPersistenceLockManagerForTests(null);
+  vi.restoreAllMocks();
+});
+
+it('reports measured packet and decoded sample counts including a broken suffix', async () => {
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  mocks.sourceAudio = track('audio');
+  mocks.resultAudio = track('audio');
+  mocks.truncated = true;
+  const events: RecordingRecoveryProgress[] = [];
+  await remuxRecoveryRecording(source(), undefined, (event) => events.push(event));
+  expect(events).toEqual([
+    { stage: 'remuxing', completed: 0 },
+    { stage: 'remuxing', completed: 4 },
+    { stage: 'validatingVideo', completed: 0 },
+    { stage: 'validatingVideo', completed: 2 },
+    { stage: 'validatingAudio', completed: 0 },
+    { stage: 'validatingAudio', completed: 2 },
+  ]);
+});
+
+it('does not add audio progress for video-only recovery and ignores observer errors', async () => {
+  const observer = vi.fn((_event: RecordingRecoveryProgress) => {
+    throw new Error('observer unavailable');
+  });
+  await expect(remuxRecoveryRecording(source(), undefined, observer)).resolves.toBeDefined();
+  expect(observer.mock.calls.some(([event]) => event.stage === 'validatingAudio')).toBe(false);
+  expect(mocks.abort).not.toHaveBeenCalled();
+});
 
 it.each(['video/webm', 'video/mp4'])(
   'retains readable packets from %s and returns a validated prepared asset',

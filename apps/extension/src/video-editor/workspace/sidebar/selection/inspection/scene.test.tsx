@@ -204,7 +204,14 @@ function verifiesSceneBackgroundSelectLabels() {
   const backgroundType = container?.querySelector(
     '[role="group"][aria-label="videoEditor.sidebar.sceneBackgroundTypeLabel"]'
   );
-  expect(backgroundType?.querySelectorAll('button')).toHaveLength(3);
+  expect(
+    Array.from(backgroundType?.querySelectorAll('button') ?? [], (button) => button.textContent)
+  ).toEqual([
+    'gallery.videoReview.backgroundNone',
+    'videoEditor.sidebar.sceneBackgroundSolid',
+    'videoEditor.sidebar.sceneBackgroundGradient',
+    'videoEditor.sidebar.sceneBackgroundImage',
+  ]);
   expect(backgroundType?.querySelector('[aria-pressed="true"]')?.textContent).toBe(
     'videoEditor.sidebar.sceneBackgroundImage'
   );

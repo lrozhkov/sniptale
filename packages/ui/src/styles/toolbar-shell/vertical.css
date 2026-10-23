@@ -7,6 +7,21 @@
   flex-direction: column;
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-switch,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-options {
+  flex-direction: column;
+}
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-switch {
+  width: 100%;
+}
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-annotation-effect-switch
+  > .sniptale-annotation-properties-arrow {
+  width: var(--sniptale-toolbar-button-size);
+  height: 14px;
+  min-height: 14px;
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-drag-handle {
   width: var(--sniptale-toolbar-button-size);
   height: 24px;
@@ -38,6 +53,10 @@
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-capture-leading-divider {
   margin: 2px 0;
+}
+
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-btn-narrow {
+  width: calc(var(--sniptale-toolbar-button-size) / 2);
 }
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn,
@@ -80,16 +99,40 @@
   border-radius: 0 0 var(--sniptale-radius-md) var(--sniptale-radius-md);
 }
 
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-toolbar-split-control {
+  display: grid;
+  grid-template-columns: 10px var(--sniptale-toolbar-button-size) 10px;
+  width: calc(var(--sniptale-toolbar-button-size) + 20px);
+  height: var(--sniptale-toolbar-button-size);
+  gap: 0;
+}
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-toolbar-split-control
+  > .sniptale-full-page-primary {
+  grid-column: 2;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-toolbar-split-control
+  > .sniptale-full-page-chevron {
+  grid-column: 3;
+  width: 10px;
+  min-width: 10px;
+  max-width: 10px;
+  height: var(--sniptale-toolbar-button-size);
+  min-height: var(--sniptale-toolbar-button-size);
+}
+
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-full-page-chevron svg {
   width: 12px;
   height: 12px;
-  transform: rotate(-90deg);
+  transform: rotate(var(--sniptale-toolbar-chevron-rotation, -90deg));
 }
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-glass-toolbar-divider {
   width: 100%;
   height: 1px;
-  margin: 2px 0;
+  margin: min(2px, var(--sniptale-toolbar-gap)) 0;
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--sniptale-color-border-soft) 28%, transparent),
@@ -140,41 +183,6 @@
   height: 24px;
 }
 
-/* Device toggle and menu retain separate targets in one compact media row. */
-.sniptale-content-toolbar-adopted[data-display-mode='vertical'][data-video-recording='true'] {
-  --sniptale-toolbar-vertical-inline-size: calc(var(--sniptale-toolbar-button-size) + 28px);
-  padding-inline: 4px;
-}
-
-.sniptale-content-toolbar-adopted[data-display-mode='vertical'] .sniptale-recording-media-control {
-  width: calc(var(--sniptale-toolbar-button-size) + 18px);
-  height: var(--sniptale-toolbar-button-size);
-  flex-direction: row;
-}
-
-.sniptale-content-toolbar-adopted[data-display-mode='vertical']
-  .sniptale-recording-media-control
-  .sniptale-full-page-primary {
-  border-inline-end-width: 0;
-  border-block-end-width: 1px;
-  border-radius: 4px 0 0 4px;
-}
-
-.sniptale-content-toolbar-adopted[data-display-mode='vertical']
-  .sniptale-recording-media-control
-  .sniptale-full-page-chevron {
-  flex: 0 0 18px;
-  min-width: 18px;
-  width: 18px;
-  max-width: 18px;
-  min-height: var(--sniptale-toolbar-button-size);
-  height: var(--sniptale-toolbar-button-size);
-  max-height: var(--sniptale-toolbar-button-size);
-  border-inline-start-width: 0;
-  border-block-start-width: 1px;
-  border-radius: 0 4px 4px 0;
-}
-
 .sniptale-content-toolbar-adopted[data-display-mode='vertical']
   .sniptale-content-menu-adopted
   .sniptale-toolbar-menu-item
@@ -204,4 +212,24 @@
   )::before {
   border-top-color: transparent;
   border-left-color: var(--sniptale-color-accent);
+}
+
+.sniptale-content-toolbar-adopted[data-menu-side='left'],
+.sniptale-content-toolbar-adopted [data-menu-side='left'] {
+  --sniptale-toolbar-indicator-top: auto;
+  --sniptale-toolbar-indicator-bottom: 2px;
+  --sniptale-toolbar-indicator-left: 2px;
+  --sniptale-toolbar-indicator-right: auto;
+  --sniptale-toolbar-indicator-rotation: 180deg;
+  --sniptale-toolbar-chevron-rotation: 90deg;
+}
+
+.sniptale-content-toolbar-adopted[data-menu-side='right'],
+.sniptale-content-toolbar-adopted [data-menu-side='right'] {
+  --sniptale-toolbar-indicator-top: auto;
+  --sniptale-toolbar-indicator-bottom: 2px;
+  --sniptale-toolbar-indicator-left: auto;
+  --sniptale-toolbar-indicator-right: 2px;
+  --sniptale-toolbar-indicator-rotation: 0deg;
+  --sniptale-toolbar-chevron-rotation: -90deg;
 }

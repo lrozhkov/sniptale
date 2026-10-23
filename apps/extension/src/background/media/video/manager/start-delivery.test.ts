@@ -118,7 +118,7 @@ it('leaves identity-bound cleanup to the start owner when activation persistence
   expect(mocks.scheduleWatchdog).not.toHaveBeenCalled();
 });
 
-it('activates a prepared multi-source recording without a redundant begin command', async () => {
+it('activates a prepared multi-source recording through its bound begin command', async () => {
   await expect(
     finalizeAcceptedRecordingStart(
       'recording-1',
@@ -132,7 +132,11 @@ it('activates a prepared multi-source recording without a redundant begin comman
     )
   ).resolves.toMatchObject({ controlToken: 'active-token', result: 'accepted' });
 
-  expect(mocks.beginPreparedRecording).not.toHaveBeenCalled();
+  expect(mocks.beginPreparedRecording).toHaveBeenCalledWith({
+    generation: 3,
+    recordingId: 'recording-1',
+    streamInstanceId: 'stream-1',
+  });
   expect(mocks.activateLease).toHaveBeenCalledWith({
     generation: 3,
     recordingId: 'recording-1',

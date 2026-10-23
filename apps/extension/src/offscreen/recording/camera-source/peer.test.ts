@@ -19,6 +19,38 @@ class TestPeerConnection extends EventTarget {
   setRemoteDescription = vi.fn().mockResolvedValue(undefined);
 }
 
+it.each(['close', 'closeAll'] as const)(
+  'does not publish a late peer after %s during source acquisition',
+  async (operation) => {
+    const acquisition = Promise.withResolvers<CameraSourceLease>();
+    const release = vi.fn();
+    const connection = new TestPeerConnection();
+    const createConnection = vi.fn(() => connection);
+    const owner = createCameraSourcePeerOwner({
+      acquireSource: () => acquisition.promise,
+      createConnection,
+    });
+    const pending = owner.answerOffer({
+      peerId: 'pending',
+      offer: { type: 'offer', sdp: 'offer' },
+      settings: DEFAULT_VIDEO_SETTINGS,
+    });
+    const observed = expect(pending).rejects.toThrow('closed during source acquisition');
+    if (operation === 'close') owner.close('pending');
+    else owner.closeAll();
+    acquisition.resolve({
+      release,
+      stream: createTrackedStream(),
+      sourceLabel: null,
+      trackSettings: {},
+    });
+    await observed;
+    expect(release).toHaveBeenCalledOnce();
+    expect(createConnection).not.toHaveBeenCalled();
+    expect(owner.has('pending')).toBe(false);
+  }
+);
+
 it('self-retires a peer that never establishes a connection', async () => {
   vi.useFakeTimers();
   const release = vi.fn();

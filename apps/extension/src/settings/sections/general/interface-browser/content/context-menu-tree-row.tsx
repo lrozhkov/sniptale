@@ -39,7 +39,7 @@ type RowActions = {
   remove(key: string): void;
 };
 
-export const treeIconButton = [
+const treeIconButton = [
   'inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[4px]',
   'text-[var(--sniptale-color-text-muted)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',

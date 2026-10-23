@@ -104,8 +104,17 @@ function applyElementAttributes(
   attributes: Record<string, string>
 ): void {
   const nextAttributes = normalizeHistoryAttributes(target, attributes);
+  const liveStyle = target.getAttribute('style');
+  const liveStyleProjection = normalizeHistoryAttributes(
+    target,
+    liveStyle === null ? {} : { style: liveStyle }
+  )['style'];
+  const preserveLiveStyle =
+    attributes['style'] === nextAttributes['style'] &&
+    liveStyleProjection === nextAttributes['style'];
 
   Array.from(target.attributes).forEach((attribute) => {
+    if (attribute.name === 'style' && preserveLiveStyle) return;
     if (!isManagedHistoryAttribute(target, attribute)) {
       return;
     }
@@ -122,6 +131,7 @@ function applyElementAttributes(
   });
 
   Object.entries(nextAttributes).forEach(([name, value]) => {
+    if (name === 'style' && preserveLiveStyle) return;
     if (target.getAttribute(name) !== value) {
       target.setAttribute(name, value);
     }

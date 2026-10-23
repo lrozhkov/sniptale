@@ -11,6 +11,7 @@ import {
 } from './types';
 
 type RegionOverlayBridgeDeps = {
+  isRegionSelectorActive: RegionSelectorController['isRegionSelectorActive'];
   hideRecordingOverlay: RegionSelectorController['hideRecordingOverlay'];
   hideRegionSelector: RegionSelectorController['hideRegionSelector'];
   logger: Pick<Logger, 'debug'>;
@@ -41,6 +42,9 @@ function handleKnownRegionOverlayMessage(
   deps: RegionOverlayBridgeDeps
 ): ContentRuntimeHandlerResult {
   switch (message.type) {
+    case VideoMessageType.GET_REGION_SELECTOR_STATE:
+      sendResponse({ success: true, active: deps.isRegionSelectorActive(message) });
+      return true;
     case VideoMessageType.SHOW_REGION_SELECTOR:
       deps.logger.debug('[ContentRegionOverlay] show selector');
       deps.showRegionSelector({
@@ -51,7 +55,7 @@ function handleKnownRegionOverlayMessage(
       return acknowledgeOverlayRequest(sendResponse);
     case VideoMessageType.HIDE_REGION_SELECTOR:
       deps.logger.debug('[ContentRegionOverlay] hide selector');
-      deps.hideRegionSelector();
+      deps.hideRegionSelector(message.regionSelectionRequestId);
       return acknowledgeOverlayRequest(sendResponse);
     case VideoMessageType.REGION_SELECTED:
       deps.logger.debug('[ContentRegionOverlay] region selected');
@@ -76,7 +80,11 @@ function handleKnownRegionOverlayMessage(
 export function createRegionOverlayBridgeDeps(
   controller: Pick<
     RegionSelectorController,
-    'hideRecordingOverlay' | 'hideRegionSelector' | 'showRecordingOverlay' | 'showRegionSelector'
+    | 'hideRecordingOverlay'
+    | 'hideRegionSelector'
+    | 'showRecordingOverlay'
+    | 'showRegionSelector'
+    | 'isRegionSelectorActive'
   >
 ): RegionOverlayBridgeDeps {
   return {

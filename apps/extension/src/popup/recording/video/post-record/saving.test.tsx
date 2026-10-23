@@ -35,4 +35,7 @@ it('shows a saving loader with user-facing wait copy', () => {
   expect(container?.textContent).toContain('popup.video.savingTitle');
   expect(container?.textContent).toContain('popup.video.savingDescription');
   expect(container?.querySelector('.animate-spin')).not.toBeNull();
+  expect(container?.firstElementChild?.className).toContain('rounded-[6px]');
+  expect(container?.querySelector('svg')?.getAttribute('class')).not.toContain('color-accent');
+  expect(container?.querySelector('.font-semibold')).toBeNull();
 });

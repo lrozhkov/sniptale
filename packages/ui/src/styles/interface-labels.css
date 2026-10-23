@@ -1,0 +1,24 @@
+.sniptale-dropdown-item.danger,
+.sniptale-btn-danger {
+  --sniptale-interface-label-ink-strength: 100%;
+}
+
+.sniptale-interface-label,
+.sniptale-toolbar-menu-item-label,
+.sniptale-select-value-label,
+.sniptale-parameter-name {
+  -webkit-text-fill-color: color-mix(
+    in srgb,
+    currentColor var(--sniptale-interface-label-ink-strength),
+    transparent
+  );
+}
+
+@media (forced-colors: active) {
+  .sniptale-interface-label,
+  .sniptale-toolbar-menu-item-label,
+  .sniptale-select-value-label,
+  .sniptale-parameter-name {
+    -webkit-text-fill-color: currentColor;
+  }
+}

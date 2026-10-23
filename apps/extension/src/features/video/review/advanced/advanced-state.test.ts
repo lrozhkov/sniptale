@@ -17,6 +17,27 @@ const gradient: Gradient = {
   ],
 };
 
+it.each([undefined, true, false])(
+  'retains the optional initial-mode choice value %s',
+  (pending) => {
+    const advanced = createQuickEditAdvancedState();
+    if (pending !== undefined) advanced.ui.modeSelectionPending = pending;
+    const loaded = loadQuickEditAdvancedState(advanced);
+    expect(loaded?.ui.modeSelectionPending).toBe(pending);
+    expect(loadQuickEditAdvancedState(loaded)).toEqual(loaded);
+  }
+);
+
+it('rejects malformed initial-mode choice values', () => {
+  const advanced = createQuickEditAdvancedState();
+  expect(
+    loadQuickEditAdvancedState({
+      ...advanced,
+      ui: { ...advanced.ui, modeSelectionPending: 'true' },
+    })
+  ).toBeNull();
+});
+
 const zoomRegion = (id: string, start: number, end: number) => ({
   id,
   start,

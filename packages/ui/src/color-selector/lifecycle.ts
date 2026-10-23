@@ -65,8 +65,8 @@ function useEscapeDismiss(args: {
     const trigger = pickerOpen
       ? rootRef.current?.querySelector<HTMLButtonElement>('button')
       : rootRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded]');
-    const handleDocumentKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+    const handleDocumentKeyDown = (event: Event) => {
+      if ('key' in event && event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();
         if (pickerOpen) onPickerOutsideDismiss();
@@ -75,9 +75,14 @@ function useEscapeDismiss(args: {
       }
     };
 
-    document.addEventListener('keydown', handleDocumentKeyDown, true);
+    const ownerDocument = rootRef.current?.ownerDocument ?? document;
+    const root = rootRef.current?.getRootNode();
+    const shadowRoot = root instanceof ShadowRoot ? root : null;
+    ownerDocument.addEventListener('keydown', handleDocumentKeyDown, true);
+    shadowRoot?.addEventListener('keydown', handleDocumentKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleDocumentKeyDown, true);
+      ownerDocument.removeEventListener('keydown', handleDocumentKeyDown, true);
+      shadowRoot?.removeEventListener('keydown', handleDocumentKeyDown, true);
     };
   }, [expanded, onPickerOutsideDismiss, pickerOpen, rootRef, setExpanded]);
 }

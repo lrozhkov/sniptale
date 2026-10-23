@@ -43,6 +43,7 @@ const topLevelContentRuntimeMessageTypes = new Set<TabMessageType>([
   VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
   VideoMessageType.RECORDING_STATE_SYNC,
   VideoMessageType.SHOW_REGION_SELECTOR,
+  VideoMessageType.GET_REGION_SELECTOR_STATE,
   VideoMessageType.HIDE_REGION_SELECTOR,
   VideoMessageType.REGION_SELECTED,
   VideoMessageType.SHOW_RECORDING_OVERLAY,

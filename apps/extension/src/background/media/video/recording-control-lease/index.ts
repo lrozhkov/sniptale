@@ -243,6 +243,21 @@ export function validateRecordingControlCapability(args: {
   return true;
 }
 
+/** Prepared authority permits start cancellation with the exact owner-bound capability. */
+export function validatePreparedRecordingCancellationCapability(args: {
+  controlToken: string;
+  ownerSenderUrl: string | null;
+  recordingId: string;
+}): boolean {
+  const lease = getUnexpiredActiveLease();
+  return (
+    lease?.phase === 'prepared' &&
+    lease.recordingId === args.recordingId &&
+    lease.controlToken === args.controlToken &&
+    lease.ownerSenderUrl === args.ownerSenderUrl
+  );
+}
+
 export function getActiveVideoRecordingLeaseSnapshot(): VideoRecordingControlLease | null {
   return getUnexpiredActiveLease();
 }

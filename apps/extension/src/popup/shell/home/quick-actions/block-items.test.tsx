@@ -79,11 +79,16 @@ it('renders enabled items across supported density variants and triggers the act
     await renderDensityVariant(density, onTriggerAction);
 
     const button = getContainer()?.querySelector('button');
-    expect(button?.title).toBe('display:' + density + ' • Visible page • Ctrl+Shift+K');
+    expect(button?.getAttribute('data-popup-hint')).toBe(
+      'display:' + density + ' • Visible page • Ctrl+Shift+K'
+    );
     expect(button?.className).toContain('group');
     expect(
       button?.querySelector('[data-testid="dynamic-icon"]')?.parentElement?.className
     ).toContain('group-hover:scale-110');
+    expect(
+      button?.querySelector('[data-testid="dynamic-icon"]')?.parentElement?.className
+    ).not.toContain('color-accent');
     expectDensityMeta(density);
 
     act(() => {
@@ -114,7 +119,7 @@ it('renders disabled items with the disabled title and blocks triggering', async
   const button = getContainer()?.querySelector('button');
 
   expect(button?.disabled).toBe(true);
-  expect(button?.title).toBe(
+  expect(button?.getAttribute('data-popup-hint')).toBe(
     'display:disabled-action • Visible page • Ctrl+Shift+K • Quick actions unavailable'
   );
 

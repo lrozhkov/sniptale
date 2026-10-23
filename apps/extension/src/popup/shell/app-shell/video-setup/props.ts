@@ -5,6 +5,11 @@ import {
   type VideoRecordingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { createPopupVideoSetupHandlers } from './handlers';
+import {
+  createTranslator,
+  SUPPORTED_LOCALES,
+  type TranslationKey,
+} from '../../../../platform/i18n/popup';
 
 export function getPopupVideoSetupProps(runtime: PopupVideoSetupRuntime) {
   const handlers = createPopupVideoSetupHandlers(runtime);
@@ -28,14 +33,44 @@ function createVideoSetupStateProps(runtime: PopupVideoSetupRuntime) {
     activeTabCapabilities: runtime.environment.activeTabCapabilities,
     microphoneDevices: recording.microphoneDevices,
     isLoadingMicrophones: recording.isLoadingMicrophones,
+    onRefreshMicrophones: createMediaAccessRecovery(
+      runtime,
+      'microphone',
+      runtime.actions?.refreshMicrophones
+    ),
     webcamDevices: recording.webcamDevices,
     isLoadingWebcams: recording.isLoadingWebcams,
+    onRefreshWebcams: createMediaAccessRecovery(runtime, 'camera', runtime.actions?.refreshWebcams),
     startError: recording.startError,
     isStartPending: recording.isStartPending,
     pageAccessDisabledReason: runtime.environment.pageAccess?.disabledReason ?? null,
     activeRecordingId: recording.recordingControlCapability?.recordingId ?? null,
     recordingState: recording.recordingState,
     galleryStatus: runtime.environment.galleryStatus,
+  };
+}
+
+function createMediaAccessRecovery(
+  runtime: PopupVideoSetupRuntime,
+  permissionName: 'microphone' | 'camera',
+  refresh: (() => Promise<unknown>) | undefined
+) {
+  if (!refresh) return undefined;
+  const recoveredKeys: TranslationKey[] =
+    permissionName === 'microphone'
+      ? ['popup.video.microphonePermissionRequired', 'popup.video.microphonePermissionDenied']
+      : ['popup.video.cameraPermissionRequired', 'popup.video.cameraPermissionDenied'];
+  const recoveredMessages = new Set(
+    SUPPORTED_LOCALES.flatMap((locale) => {
+      const translator = createTranslator(locale);
+      return recoveredKeys.map((key) => translator(key));
+    })
+  );
+  return async () => {
+    runtime.recording.setStartError((current) =>
+      current && recoveredMessages.has(current) ? null : current
+    );
+    return refresh();
   };
 }
 

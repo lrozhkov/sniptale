@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVideoClicksController, disableVideoClicks, enableVideoClicks } from '.';
+import { initializeContentUiRoots } from '../../platform/dom-host';
 
 function appendOverlayNode<T extends Node>(node: T): T {
   document.body.appendChild(node);
@@ -45,6 +46,33 @@ describe('video clicks controller lifecycle', () => {
 describe('video clicks controller ripple behavior', () => {
   beforeEach(() => {
     resetVideoClicksDom();
+  });
+
+  it('excludes registered content chrome while preserving page clicks and event propagation', () => {
+    const showRipple = vi.fn();
+    const controller = createVideoClicksController({ createDomDriver: () => ({ showRipple }) });
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const { appContainer, overlayRoot } = initializeContentUiRoots(shadow);
+    controller.enable();
+    try {
+      for (const container of [appContainer, overlayRoot]) {
+        const button = document.createElement('button');
+        container.append(button);
+        const observer = vi.fn();
+        button.addEventListener('click', observer);
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+        expect(showRipple).not.toHaveBeenCalled();
+        expect(observer).toHaveBeenCalledOnce();
+      }
+      document.body.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, clientX: 12, clientY: 24 })
+      );
+      expect(showRipple).toHaveBeenCalledExactlyOnceWith(12, 24);
+    } finally {
+      controller.disable();
+    }
   });
 
   it('creates a ripple element on click and removes it after the animation timeout', () => {

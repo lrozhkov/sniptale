@@ -7,7 +7,7 @@ import {
   Type,
   ArrowUpRight,
 } from 'lucide-react';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useId, useRef, useState, type ReactNode } from 'react';
 import {
   ContentToolbarButton,
   ContentToolbarDivider,
@@ -18,6 +18,9 @@ import { useDrawingSessionSnapshot } from '../../../drawing/controller';
 import type { DrawingSessionSnapshot, DrawingTool } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
 import { resolveDrawingQuickOptionsTool, ToolbarDrawingOptions } from './drawing-options';
+import { useDrawingOptionsLayout, type DrawingMenuLayoutResolver } from './drawing-options-layout';
+import { useToolbarMenuDirection } from '../menu/direction';
+import { PageControlVisibility, PageProtectedControls } from './control-visibility';
 
 type DrawingToolDescriptor = {
   tool: DrawingTool;
@@ -68,17 +71,27 @@ const tools: readonly DrawingToolDescriptor[] = [
 
 /** Narrow presentation seam used by toolbar modes that share drawing tools but own interaction. */
 export interface ToolbarDrawingControlsOwner {
+  readonly resolveMenuLayout?: DrawingMenuLayoutResolver;
+  readonly preferredMenuPlacement?: 'up' | 'down';
   readonly activeTool: DrawingTool | null;
   readonly showActions?: boolean;
   readonly persistOptionsDisclosure?: boolean;
   readonly tools?: readonly DrawingTool[];
   onToolActivated(tool: DrawingTool): void;
+  renderToolControl?(params: {
+    tool: DrawingTool;
+    control: ReactNode;
+    icon: typeof PenLine;
+    label: string;
+  }): ReactNode;
   renderLeadingControls?(snapshot: DrawingSessionSnapshot): ReactNode;
   renderTrailingControls?(snapshot: DrawingSessionSnapshot): ReactNode;
   renderActions?(snapshot: DrawingSessionSnapshot): ReactNode;
 }
 
 function DrawingToolControl(props: {
+  resolveMenuLayout?: DrawingMenuLayoutResolver;
+  preferredMenuPlacement?: 'up' | 'down';
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
   icon: typeof PenLine;
@@ -94,6 +107,18 @@ function DrawingToolControl(props: {
   onActivated?: (tool: DrawingTool) => void;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const layout = useDrawingOptionsLayout({
+    displayMode: props.displayMode,
+    hasSelection: props.snapshot.selectedObjectIds.length > 0,
+    panelRef,
+    tool: props.optionsTool ?? 'pencil',
+    triggerRef,
+    open: props.showOptions,
+    ...(props.resolveMenuLayout ? { resolveMenuLayout: props.resolveMenuLayout } : {}),
+    ...(props.preferredMenuPlacement ? { preferredPlacement: props.preferredMenuPlacement } : {}),
+  });
+  const menuSide = useToolbarMenuDirection(layout.resolveLayout);
   const modifierHintId = useId();
   const Icon = props.icon;
   const label = translate(props.label);
@@ -113,6 +138,7 @@ function DrawingToolControl(props: {
         aria-describedby={modifierHint ? modifierHintId : undefined}
         title={title}
         menuIndicator={disclosureAvailable}
+        data-menu-side={menuSide}
         data-menu-open={disclosureAvailable ? String(props.showOptions) : undefined}
         dataUi={`content.toolbar.drawing.${props.tool}`}
         onClick={() => {
@@ -142,6 +168,8 @@ function DrawingToolControl(props: {
           snapshot={props.snapshot}
           tool={props.optionsTool}
           triggerRef={triggerRef}
+          panelRef={panelRef}
+          layout={layout}
         />
       ) : null}
     </div>
@@ -175,36 +203,58 @@ export function ToolbarDrawingControls(props: {
         dataUi="content.toolbar.drawing-tools-group"
       >
         {props.owner?.renderLeadingControls?.(snapshot)}
-        {visibleTools.map(({ tool, icon, label, modifierHint }) => (
-          <DrawingToolControl
-            key={tool}
-            controller={controller}
-            displayMode={props.displayMode}
-            icon={icon}
-            label={label}
-            modifierHint={modifierHint}
-            optionsTool={optionsTool}
-            showOptions={
-              optionsAnchorTool === tool &&
-              collapsedOptionsTool !== tool &&
-              !(props.owner?.persistOptionsDisclosure && optionsSuppressed)
-            }
-            snapshot={snapshot}
-            tool={tool}
-            active={activeTool === tool}
-            {...(props.owner?.onToolActivated ? { onActivated: props.owner.onToolActivated } : {})}
-            onActivateTool={() => {
-              if (!props.owner?.persistOptionsDisclosure) setCollapsedOptionsTool(null);
-            }}
-            onToggleOptions={() => {
-              if (props.owner?.persistOptionsDisclosure) {
-                setOptionsSuppressed((current) => !current);
-              } else {
-                setCollapsedOptionsTool((current) => (current === tool ? null : tool));
+        {visibleTools.map(({ tool, icon, label, modifierHint }) => {
+          const control = (
+            <DrawingToolControl
+              {...(props.owner?.resolveMenuLayout
+                ? { resolveMenuLayout: props.owner.resolveMenuLayout }
+                : {})}
+              {...(props.owner?.preferredMenuPlacement
+                ? { preferredMenuPlacement: props.owner.preferredMenuPlacement }
+                : {})}
+              controller={controller}
+              displayMode={props.displayMode}
+              icon={icon}
+              label={label}
+              modifierHint={modifierHint}
+              optionsTool={optionsTool}
+              showOptions={
+                optionsAnchorTool === tool &&
+                collapsedOptionsTool !== tool &&
+                !(props.owner?.persistOptionsDisclosure && optionsSuppressed)
               }
-            }}
-          />
-        ))}
+              snapshot={snapshot}
+              tool={tool}
+              active={activeTool === tool}
+              {...(props.owner?.onToolActivated
+                ? { onActivated: props.owner.onToolActivated }
+                : {})}
+              onActivateTool={() => {
+                if (!props.owner?.persistOptionsDisclosure) setCollapsedOptionsTool(null);
+              }}
+              onToggleOptions={() => {
+                if (props.owner?.persistOptionsDisclosure) {
+                  setOptionsSuppressed((current) => !current);
+                } else {
+                  setCollapsedOptionsTool((current) => (current === tool ? null : tool));
+                }
+              }}
+            />
+          );
+          return (
+            <Fragment key={tool}>
+              {props.owner?.renderToolControl ? (
+                props.owner.renderToolControl({ tool, control, icon, label: translate(label) })
+              ) : tool === 'select' || tool === 'pencil' ? (
+                <PageProtectedControls>{control}</PageProtectedControls>
+              ) : (
+                <PageControlVisibility control={`drawing-${tool}`} label={translate(label)}>
+                  {control}
+                </PageControlVisibility>
+              )}
+            </Fragment>
+          );
+        })}
         {props.owner?.renderTrailingControls?.(snapshot)}
       </ContentToolbarGroup>
       {props.owner?.showActions === false || !props.owner?.renderActions ? null : (
@@ -214,7 +264,7 @@ export function ToolbarDrawingControls(props: {
             aria-label={translate('content.toolbar.drawingActions')}
             dataUi="content.toolbar.drawing-actions-group"
           >
-            {props.owner.renderActions(snapshot)}
+            <PageProtectedControls>{props.owner.renderActions(snapshot)}</PageProtectedControls>
           </ContentToolbarGroup>
         </>
       )}

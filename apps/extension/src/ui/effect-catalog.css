@@ -38,14 +38,14 @@
 }
 .effect-catalog-category[aria-pressed='true'] {
   background: var(--sniptale-color-surface-hover);
-  color: var(--sniptale-color-accent);
+  color: var(--sniptale-color-text-primary);
 }
 .effect-catalog-category:disabled {
   opacity: 0.5;
   cursor: default;
 }
 .effect-catalog-category:focus-visible {
-  outline: 2px solid var(--sniptale-color-accent);
+  outline: 2px solid var(--sniptale-color-focus-ring);
   outline-offset: -2px;
 }
 @container (min-width: 230px) {

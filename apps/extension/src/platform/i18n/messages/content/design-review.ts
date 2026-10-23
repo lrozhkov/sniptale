@@ -291,6 +291,18 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Переместить окно замечания',
     en: 'Move the feedback window',
   },
+  selectParentElement: {
+    ru: 'Выбрать родительский элемент',
+    en: 'Select parent element',
+  },
+  selectChildElement: {
+    ru: 'Выбрать дочерний элемент',
+    en: 'Select child element',
+  },
+  navigateElementFailed: {
+    ru: 'Не удалось выбрать элемент. Текущий выбор сохранён.',
+    en: 'Could not select the element. The current selection is unchanged.',
+  },
   elementHeading: {
     ru: 'заголовок',
     en: 'heading',
@@ -366,6 +378,26 @@ export const contentDesignReviewMessages = defineMessageSource({
   editProperties: {
     ru: 'Изменить свойства элемента',
     en: 'Edit element properties',
+  },
+  editText: {
+    ru: 'Изменить текст элемента',
+    en: 'Edit element text',
+  },
+  textModified: {
+    ru: 'Текст изменён',
+    en: 'Text edited',
+  },
+  resetText: {
+    ru: 'Восстановить исходный текст',
+    en: 'Restore original text',
+  },
+  textEditFailed: {
+    ru: 'Не удалось сохранить текст. Предыдущие изменения сохранены.',
+    en: 'Could not save the text. Previous changes are retained.',
+  },
+  textResetFailed: {
+    ru: 'Не удалось восстановить исходный текст. Текущее содержимое сохранено.',
+    en: 'Could not restore the original text. Current content is retained.',
   },
   deleteFeedback: {
     ru: 'Удалить замечание',

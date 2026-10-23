@@ -7,11 +7,10 @@ import {
   addContextMenuCommand,
   addContextMenuSection,
   contextMenuNodePosition,
-  hasDisabledContextMenuSection,
   moveContextMenuNode,
   removeContextMenuNode,
   reactivateContextMenuCommand,
-  restoreContextMenuSections,
+  restoreContextMenuSectionCommands,
   updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
@@ -34,8 +33,26 @@ const tree: ContextMenuTree = {
   ],
 };
 
+it('restores section commands without stealing active commands or changing the source tree', () => {
+  const before = structuredClone(tree);
+  const restored = restoreContextMenuSectionCommands(tree, 'tools', [
+    'sniptale.settings',
+    'sniptale.image-editor',
+  ]);
+  expect(restored.nodes[0]).toEqual(tree.nodes[0]);
+  expect(restored.nodes[1]).toMatchObject({
+    children: [
+      { command: 'sniptale.video.tab' },
+      { command: 'sniptale.video.area' },
+      { command: 'sniptale.image-editor' },
+    ],
+  });
+  expect(tree).toEqual(before);
+  expect(restoreContextMenuSectionCommands(tree, 'missing', ['sniptale.gallery'])).toBe(tree);
+});
+
 describe('context menu tree mutations', () => {
-  it('restores disabled empty sections without enabling their disabled commands', () => {
+  it('omits legacy disabled sections without modifying their stored commands', () => {
     const hidden: ContextMenuTree = {
       version: 2,
       nodes: [
@@ -49,13 +66,10 @@ describe('context menu tree mutations', () => {
         },
       ],
     };
-    expect(hasDisabledContextMenuSection(hidden.nodes)).toBe(true);
-    const restored = restoreContextMenuSections(hidden);
-    expect(restored.nodes).toMatchObject([
-      { id: 'empty', enabled: true, children: [] },
-      { id: 'tools', enabled: true, children: [{ enabled: false }] },
-    ]);
-    expect(parseContextMenuTree(restored)).not.toBeNull();
+    const before = structuredClone(hidden);
+    expect(visibleContextMenuNodes(hidden, new Set(['empty', 'tools']))).toEqual([]);
+    expect(hidden).toEqual(before);
+    expect(parseContextMenuTree(hidden)).not.toBeNull();
   });
   it('reactivates a retained command with its disabled ancestor chain and placement', () => {
     const disabled: ContextMenuTree = {

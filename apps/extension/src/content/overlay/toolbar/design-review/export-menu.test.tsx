@@ -130,10 +130,19 @@ it('uses the canonical toolbar trigger and horizontally aligns the menu with its
     'calc(100% + 10px)'
   );
   expect(trigger?.className).toContain('sniptale-glass-toolbar-button');
-  expect(trigger?.className).toContain('sniptale-toggle');
+  expect(trigger?.className).not.toContain('sniptale-toggle');
   expect(trigger?.dataset['active']).toBeUndefined();
   expect(trigger?.dataset['menuIndicator']).toBe('true');
   expect(trigger?.querySelector('.lucide-archive')).not.toBeNull();
+  const menu = view.querySelector<HTMLElement>('.sniptale-popover-menu')!;
+  expect(menu.style.width).toBe('240px');
+  const configure = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export.configure-export"]'
+  )!;
+  expect(configure.className).toContain('sniptale-btn-utility');
+  expect(configure.className).toContain('sniptale-btn-compact');
+  expect(configure.style.minWidth).toBe('');
+  expect(configure.style.maxWidth).toBe('var(--sniptale-size-icon-compact)');
 });
 
 it('exports the complete page directly and reserves the settings button for popup configuration', async () => {
@@ -159,6 +168,38 @@ it('exports the complete page directly and reserves the settings button for popu
   expect(mocks.executeAction).toHaveBeenLastCalledWith('configure-export', {
     kind: 'trusted-content-event',
   });
+});
+
+it('uses the measured menu height for placement and disconnects its observer on close', () => {
+  let height = 140;
+  let resize = () => {};
+  const disconnect = vi.fn();
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.classList.contains('sniptale-toolbar-menu') ? height : 0;
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe = vi.fn();
+      disconnect = disconnect;
+    }
+  );
+  const view = renderMenu({ rect: { top: 700, bottom: 736, y: 700 } });
+  expect(view.querySelector('.sniptale-popover-up')).toBeNull();
+  height = 200;
+  act(() => resize());
+  expect(view.querySelector('.sniptale-popover-up')).not.toBeNull();
+  act(() =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.annotation-export-button"]')!
+      .click()
+  );
+  expect(disconnect).toHaveBeenCalledOnce();
 });
 
 it('places the menu beside a vertical toolbar and clears the trigger highlight when closed', () => {

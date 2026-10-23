@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react';
 import { translate } from '../../../platform/i18n';
+import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import { InlineCurtainNotice, InlineCurtainOptionList, type InlineCurtainOption } from './options';
 import { renderSecondaryCurtainPanel } from './secondary-panel';
 import {
@@ -17,7 +18,7 @@ import {
   type InlineCurtainSecondaryAction,
 } from './trigger';
 
-const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[14px]';
+const INLINE_CURTAIN_ROW_CLASS_NAME = 'mt-2 mr-1 min-w-0 rounded-[6px]';
 type InlineCurtainSelectProps = {
   ariaLabel: string;
   description: string;
@@ -63,7 +64,23 @@ export function InlineCurtainSelect({
   useInlineCurtainLifecycle({ openPanel, panelId, rootRef, setOpenPanel, triggerRef });
   useLayoutEffect(() => onOpenChange?.(openPanel === 'options'), [onOpenChange, openPanel]);
   return (
-    <div ref={rootRef} className={INLINE_CURTAIN_ROW_CLASS_NAME} data-open={openPanel !== null}>
+    <div
+      ref={rootRef}
+      className={INLINE_CURTAIN_ROW_CLASS_NAME}
+      data-open={openPanel !== null}
+      onPointerDownCapture={(event) => {
+        const active = document.activeElement;
+        if (
+          event.target instanceof Element &&
+          event.target.closest('button') &&
+          active instanceof HTMLButtonElement &&
+          rootRef.current?.contains(active) &&
+          active.matches(':focus-visible')
+        ) {
+          active.blur();
+        }
+      }}
+    >
       <InlineCurtainSelectTrigger
         ariaLabel={ariaLabel}
         label={label}
@@ -291,18 +308,18 @@ function useInlineCurtainLifecycle({
     }
     wasOpenRef.current = true;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (rootRef.current?.querySelector('[aria-haspopup="listbox"][aria-expanded="true"]')) return;
       event.preventDefault();
       event.stopPropagation();
       setOpenPanel(null);
     };
-    document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keydown', handleKeyDown);
     queueMicrotask(() => {
       const panel = rootRef.current?.querySelector<HTMLElement>(`[id="${panelId}"]`);
       panel?.querySelector<HTMLElement>('button:not([disabled]), [tabindex="0"]')?.focus();
     });
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [openPanel, panelId, rootRef, setOpenPanel, triggerRef]);
 }
 
@@ -330,7 +347,15 @@ function useDismissCurtainOnOutsidePointer({
     }
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const root = rootRef.current;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        !root ||
+        ![root, ...getOwnedFloatingInteractionLayers(root, root.ownerDocument)].some((layer) =>
+          layer.contains(target)
+        )
+      ) {
         setOpen(false);
       }
     };

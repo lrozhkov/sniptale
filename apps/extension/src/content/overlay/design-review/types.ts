@@ -15,6 +15,8 @@ export interface DesignReviewViewState {
   modifiedProperties: PageStyleProperty[];
   selection: PageStyleSelectionSnapshot | null;
   settingsOpen: boolean;
+  text: DesignReviewTextViewState;
+  treeNavigation: { parent: Element | null; child: Element | null };
   sideFieldLinks?: Record<string, boolean>;
   values: PageStyleDeclarationValueMap;
   voice: DesignReviewCommentVoiceViewState;
@@ -31,14 +33,23 @@ export interface DesignReviewActions {
   comment: DesignReviewCommentActions;
   copyElement: () => Promise<boolean>;
   copyPath: () => Promise<void>;
+  navigateElement: (target: Element) => void;
   delete: () => void;
   resetValue: (property: PageStyleProperty) => void;
   selectAction: (action: BrowserDesignReviewAction) => void;
   setSideFieldLinked?: (fieldKey: string, linked: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  text: { edit: () => void; reset: () => void };
   updateValue: (property: PageStyleProperty, value: string) => void;
   updateValues: (updates: Array<{ property: PageStyleProperty; value: string }>) => void;
   voice: DesignReviewCommentVoiceActions;
+}
+
+export interface DesignReviewTextViewState {
+  editable: boolean;
+  modified: boolean;
+  preview: string;
+  resettable: boolean;
 }
 
 interface DesignReviewCommentActions {

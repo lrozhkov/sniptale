@@ -84,6 +84,35 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it('suspends page picking, Escape and inspection cursor without consuming text input', () => {
+  const selected = makeVisible(document.createElement('p'));
+  const outside = makeVisible(document.createElement('button'));
+  document.body.append(selected, outside);
+  const onSelection = vi.fn();
+  const onDisableRequested = vi.fn();
+  const onInspectorDismissRequested = vi.fn(() => true);
+  const picker = startPicker({ onSelection, onDisableRequested, onInspectorDismissRequested });
+  picker.selectElement(selected);
+  picker.setTextEditing(true);
+  expect(document.getElementById('sniptale-design-review-cursor-style')).toBeNull();
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  outside.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  outside.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  outside.dispatchEvent(click);
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  selected.dispatchEvent(escape);
+  inaccessibleIframeMocks.onSelect?.(document.createElement('iframe'));
+  expect(click.defaultPrevented).toBe(false);
+  expect(escape.defaultPrevented).toBe(false);
+  expect(onSelection).toHaveBeenCalledOnce();
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(onDisableRequested).not.toHaveBeenCalled();
+  picker.setTextEditing(false);
+  expect(document.getElementById('sniptale-design-review-cursor-style')).not.toBeNull();
+  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  expect(onInspectorDismissRequested).toHaveBeenCalledOnce();
+});
+
 it('selects the exact rendered open-shadow DOM element and claims its click', () => {
   const host = makeVisible(document.createElement('article'));
   const root = host.attachShadow({ mode: 'open' });

@@ -58,8 +58,12 @@ function CaptureActionDropdownItems(props: {
   });
 }
 
-export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
-  const adopted = React.useContext(CommandPressScope);
+export function resolveCaptureActionMenuLayout(
+  props: Pick<
+    CaptureActionDropdownProps,
+    'captureButtonRef' | 'displayMode' | 'getMenuPosition' | 'viewportRightInset'
+  >
+) {
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: props.captureButtonRef,
     displayMode: props.displayMode,
@@ -70,6 +74,13 @@ export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
       ? {}
       : { viewportRightInset: props.viewportRightInset }),
   });
+
+  return { placement: menuPlacement, style };
+}
+
+export function CaptureActionDropdown(props: CaptureActionDropdownProps) {
+  const adopted = React.useContext(CommandPressScope);
+  const { placement: menuPlacement, style } = resolveCaptureActionMenuLayout(props);
 
   if (!style) {
     return null;

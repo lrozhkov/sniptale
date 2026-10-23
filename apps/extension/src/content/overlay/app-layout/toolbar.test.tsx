@@ -29,6 +29,11 @@ vi.mock('../toolbar/view', () => ({
   Toolbar: (props: Record<string, unknown>) => toolbarMock(props),
 }));
 
+vi.mock('../../platform/dom-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/dom-host')>()),
+  queryContentUiElement: (selector: string) => document.querySelector(selector),
+}));
+
 vi.mock('./sidebar-lazy', () => ({
   preloadContentScenarioRecorderSidebar: preloadContentScenarioRecorderSidebarMock,
 }));
@@ -137,6 +142,25 @@ async function verifiesHidePersistsCollapsedPinnedToolbarState() {
   expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
   expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
   expect(useFrameUIStore.getState().activePopover).toBeNull();
+}
+
+async function verifiesCollapseFocus(keyboard: boolean) {
+  const props = createProps();
+  await renderShell(props);
+  const restore = document.createElement('button');
+  restore.dataset['ui'] = 'content.collapsed-panels.restore-toolbar';
+  document.body.append(restore);
+  try {
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      onHide: (restoreFocus?: boolean) => void;
+    };
+    lastToolbarProps.onHide(keyboard);
+    props.toolbar.isToolbarVisible = false;
+    await renderShell(props);
+    expect(document.activeElement === restore).toBe(keyboard);
+  } finally {
+    restore.remove();
+  }
 }
 
 async function verifiesToolbarForwardsQuickEditDocumentMode() {
@@ -280,6 +304,10 @@ async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
 
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
+  it.each([true, false])(
+    'restores collapsed toolbar focus only for keyboard activation: %s',
+    verifiesCollapseFocus
+  );
   it.each([false, true])(
     'keeps scenario pin state explicit when all-sites availability is %s',
     async (available) => {

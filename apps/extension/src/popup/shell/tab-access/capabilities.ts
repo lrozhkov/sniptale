@@ -3,24 +3,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
 
-export function useActiveTabCapabilities() {
+export function useActiveTabCapabilities(targetTabId?: number) {
   const [capabilities, setCapabilities] = useState(() => getTabCapabilities(null));
   const refresh = useCallback(async () => {
     try {
-      const [tab] = await browserTabs.query({ active: true, currentWindow: true });
+      const tab =
+        targetTabId === undefined
+          ? (await browserTabs.query({ active: true, currentWindow: true }))[0]
+          : await browserTabs.get(targetTabId);
       setCapabilities(getTabCapabilities(tab));
     } catch {
       setCapabilities(getTabCapabilities(null));
     }
-  }, []);
+  }, [targetTabId]);
 
   useEffect(() => {
     void refresh();
     const onFocus = () => void refresh();
     window.addEventListener('focus', onFocus);
     const disposeActivated = browserTabs.subscribeToActivated(onFocus);
-    const disposeUpdated = browserTabs.subscribeToUpdated((_tabId, change, tab) => {
-      if (tab.active && (change.status === 'complete' || typeof change.url === 'string')) {
+    const disposeUpdated = browserTabs.subscribeToUpdated((tabId, change, tab) => {
+      if (
+        (targetTabId === undefined ? tab.active : targetTabId === tabId) &&
+        (change.status === 'complete' || typeof change.url === 'string')
+      ) {
         void refresh();
       }
     });
@@ -29,7 +35,7 @@ export function useActiveTabCapabilities() {
       disposeActivated();
       disposeUpdated();
     };
-  }, [refresh]);
+  }, [refresh, targetTabId]);
 
   return capabilities;
 }

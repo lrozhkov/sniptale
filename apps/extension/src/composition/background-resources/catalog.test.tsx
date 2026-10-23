@@ -115,3 +115,53 @@ it('unsubscribes and ignores a read finishing after disposal', async () => {
   expect(io.mediaOff).toHaveBeenCalled();
   root = createRoot(host);
 });
+
+it('uses the supplied background name in the original add transaction', async () => {
+  await act(async () => root.render(<Harness />));
+  await act(async () => value.add({ file: new File(['x'], 'Mine.png') }, '  My background  '));
+  expect(io.edit).toHaveBeenLastCalledWith({ type: 'add', mediaId: 'a', name: 'My background' });
+});
+
+it('keeps each supplied name attached to its media when parallel acquisitions finish out of order', async () => {
+  await act(async () => root.render(<Harness />));
+  let finishFirst!: (id: string) => void;
+  let finishSecond!: (id: string) => void;
+  io.retain.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        finishFirst = resolve;
+      })
+  );
+  io.retain.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        finishSecond = resolve;
+      })
+  );
+  const first = value.add({ file: new File(['a'], 'one.png') }, 'First name');
+  const second = value.add({ file: new File(['b'], 'two.png') }, 'Second name');
+  await act(async () => {
+    finishSecond('second-media');
+    await second;
+  });
+  await act(async () => {
+    finishFirst('first-media');
+    await first;
+  });
+  expect(io.edit.mock.calls.map(([edit]) => edit)).toEqual([
+    { type: 'add', mediaId: 'second-media', name: 'Second name' },
+    { type: 'add', mediaId: 'first-media', name: 'First name' },
+  ]);
+});
+
+it('retains the catalog and supplied name when an add is refused and the user retries', async () => {
+  await act(async () => root.render(<Harness />));
+  const original = value.presets;
+  io.edit.mockRejectedValueOnce(new Error('refused'));
+  const image = { file: new File(['x'], 'source.png') };
+  await expect(value.add(image, 'Chosen name')).rejects.toThrow('refused');
+  expect(value.presets).toBe(original);
+  await act(async () => value.add(image, 'Chosen name'));
+  expect(io.edit).toHaveBeenNthCalledWith(1, { type: 'add', mediaId: 'a', name: 'Chosen name' });
+  expect(io.edit).toHaveBeenNthCalledWith(2, { type: 'add', mediaId: 'a', name: 'Chosen name' });
+});

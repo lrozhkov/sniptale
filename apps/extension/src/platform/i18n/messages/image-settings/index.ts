@@ -44,16 +44,16 @@ export const imageSettingsMessages = defineMessageSource({
     fullPageProfileMaximum: { ru: 'Максимальное', en: 'Maximum' },
     fullPageProfileCustom: { ru: 'Пользовательский', en: 'Custom' },
     fullPageMaxSize: {
-      ru: 'Максимальный размер полноразмерного снимка, Мп',
-      en: 'Maximum full-page screenshot size, MP',
+      ru: 'Макс. размер снимка, Мп',
+      en: 'Max. screenshot size, MP',
     },
     fullPageMinScale: {
-      ru: 'Минимальный масштаб длинной страницы',
-      en: 'Minimum long-page scale',
+      ru: 'Мин. масштаб страницы',
+      en: 'Min. page scale',
     },
     fullPageMaxFileSize: {
-      ru: 'Максимальный размер файла, МиБ',
-      en: 'Maximum file size, MiB',
+      ru: 'Макс. размер файла, МиБ',
+      en: 'Max. file size, MiB',
     },
     fullPageInvalidValue: {
       ru: 'Введите значение в указанном безопасном диапазоне.',

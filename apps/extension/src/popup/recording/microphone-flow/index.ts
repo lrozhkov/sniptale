@@ -5,6 +5,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { refreshPopupMediaDevices, togglePopupMediaDevice } from '../media-device-flow/index';
 import {
   resolveMicrophoneDeviceId,
+  requestMicrophonePermission,
   loadMicrophoneDevices,
   type LoadMicrophoneDevicesOptions,
 } from '../microphone/index';
@@ -54,6 +55,7 @@ export async function toggleMicrophone(params: ToggleMicrophoneParams): Promise<
     videoSettings,
     setVideoSettings,
     setStartError,
+    requestPermission: requestMicrophonePermission,
     refreshDevices: () =>
       refreshMicrophones({
         hydrateLabels: 'always',

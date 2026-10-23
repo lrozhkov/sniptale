@@ -16,6 +16,22 @@ import { waitForRecordingBegin, allowRecordingBegin } from '../start/gate';
 beforeEach(resetLiveSessionFixture);
 
 describe('source-driven live recording flow', () => {
+  it.each([
+    { container: 'mp4', videoCodec: 'avc' },
+    { container: 'webm', videoCodec: 'vp9' },
+  ] as const)(
+    'contains resized source frames within the original $container output',
+    async (encoding) => {
+      const { session } = await createSession(encoding);
+      try {
+        expect(mediabunny.Output.instances[0]?.videoSource?.config).toMatchObject({
+          sizeChangeBehavior: 'contain',
+        });
+      } finally {
+        await session.abort();
+      }
+    }
+  );
   it('installs an independent timestamp-only transform for each audio session', async () => {
     const { AudioSample } = await vi.importActual<typeof import('mediabunny')>('mediabunny');
     const first = await createSession({ audio: true });

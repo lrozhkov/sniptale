@@ -3,6 +3,7 @@ import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { authorizeContentSender } from '../../../routing-contracts/capabilities/content-action/sender-binding';
 import { isPopupTabRouteSenderUrl } from '../capabilities/popup-tab/route-capabilities';
+import { isVideoRecordingSurfaceCommandMessage } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 type CaptureRouteSenderPolicyArgs = {
   message: { type: string; desktopSelection?: unknown };
@@ -129,6 +130,13 @@ function canRoutePrivilegedTabMessageFromSender(args: PrivilegedTabRouteSenderPo
     );
   }
 
+  if (
+    args.family === 'video-recording-surface' &&
+    isRecordingPermissionFrameUrl(args.sender?.url)
+  ) {
+    return canValidateRecordingPermissionFrame(args);
+  }
+
   const policy = privilegedTabRouteAuthorizationMatrix[args.family];
   if (policy.senderOwnedTab && authorizeContentSender(args.sender, args.resolvedTabId).allowed) {
     return true;
@@ -141,6 +149,40 @@ function canRoutePrivilegedTabMessageFromSender(args: PrivilegedTabRouteSenderPo
   }
 
   return false;
+}
+
+function isRecordingPermissionFrameUrl(senderUrl: string | undefined): boolean {
+  if (!senderUrl) return false;
+  try {
+    const expectedUrl = new URL(
+      'apps/extension/src/media-permission/index.html',
+      runtimeInfo.getURL('')
+    );
+    const actualUrl = new URL(senderUrl);
+    return (
+      actualUrl.protocol === expectedUrl.protocol &&
+      actualUrl.host === expectedUrl.host &&
+      actualUrl.pathname === expectedUrl.pathname
+    );
+  } catch {
+    return false;
+  }
+}
+
+function canValidateRecordingPermissionFrame(args: PrivilegedTabRouteSenderPolicyArgs): boolean {
+  const { sender, message } = args;
+  return (
+    sender?.id === chrome.runtime.id &&
+    sender.tab?.id === args.resolvedTabId &&
+    typeof sender.frameId === 'number' &&
+    Number.isInteger(sender.frameId) &&
+    sender.frameId > 0 &&
+    typeof sender.documentId === 'string' &&
+    sender.documentId.length > 0 &&
+    isVideoRecordingSurfaceCommandMessage(message) &&
+    message.command.kind === 'list-media-devices' &&
+    message.command.requestPermission === false
+  );
 }
 
 export function getUnauthorizedPrivilegedTabRouteSenderReason(

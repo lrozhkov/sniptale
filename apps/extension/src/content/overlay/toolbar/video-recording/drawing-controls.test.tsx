@@ -97,6 +97,9 @@ it('reuses the complete drawing catalog while recording owns navigation, eraser,
   );
   expect(owner.getAutoHideDelay()).toBe(0);
   expect(onAutoHideDelayChange).toHaveBeenCalledWith(5);
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.auto-hide-value"]')
+  ).toBeNull();
 
   act(() =>
     host
@@ -122,6 +125,71 @@ it('keeps the page-preparation drawing toolbar free of separate clear actions', 
     'content.toolbar.drawing-tools-group',
   ]);
   expect(host.querySelector('[data-ui="content.toolbar.video-recording.navigation"]')).toBeNull();
+  act(() => root.unmount());
+  owner.dispose();
+});
+
+it('marks only the selected drawing auto-hide delay including off', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const owner = createRecordingDrawingOwner();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  for (const delay of [0, 3, 5, 10, 30, 0] as const) {
+    owner.setAutoHideDelay(delay);
+    act(() =>
+      root.render(
+        <RecordingDrawingControls
+          compactMenus={false}
+          displayMode="horizontal"
+          interactionMode="navigation"
+          owner={owner}
+          onInteractionModeChange={vi.fn()}
+        />
+      )
+    );
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.video-recording.auto-hide"]'
+    )!;
+    const icon = trigger.querySelector<SVGElement>('svg.lucide-broom-sparkles');
+    const value = trigger.querySelector<HTMLElement>(
+      '[data-ui="content.toolbar.video-recording.auto-hide-value"]'
+    );
+    if (delay > 0) {
+      expect(icon).not.toBeNull();
+      expect(value?.parentElement?.classList.contains('sniptale-toolbar-delay')).toBe(true);
+      expect(trigger.getAttribute('data-menu-indicator')).toBeNull();
+      expect(value?.textContent).toBe(String(delay));
+      expect(value?.closest('[aria-hidden="true"]')).not.toBeNull();
+      expect(value?.style.position).toBe('');
+      expect(trigger.getAttribute('aria-label')).toContain(
+        `${delay} content.toolbar.recordingDrawingAutoHideSeconds`
+      );
+    } else {
+      expect(icon).not.toBeNull();
+      expect(value).toBeNull();
+      expect(trigger.getAttribute('data-menu-indicator')).toBe('true');
+    }
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!
+        .click()
+    );
+    const selected = host.querySelector(
+      `[data-ui="content.toolbar.video-recording.auto-hide-${delay}"]`
+    )!;
+    expect(selected.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(
+      host.querySelectorAll(
+        '[data-ui="content.toolbar.video-recording.auto-hide-menu"] svg.lucide-check'
+      )
+    ).toHaveLength(1);
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.video-recording.auto-hide"]')!
+        .click()
+    );
+  }
   act(() => root.unmount());
   owner.dispose();
 });
@@ -166,6 +234,7 @@ it('keeps recording tool options collapsed across tool switches until explicitly
 it('does not let the recording eraser capture toolbar or popover pointer gestures', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const owner = createRecordingDrawingOwner();
+  const erasePath = vi.spyOn(owner, 'erasePath');
   const host = document.createElement('div');
   host.className = 'sniptale-app';
   document.body.append(host);
@@ -185,6 +254,9 @@ it('does not let the recording eraser capture toolbar or popover pointer gesture
   const toolbarButton = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.video-recording.auto-hide"]'
   )!;
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')?.textContent
+  ).toContain('.sniptale-drawing-canvas[tabindex="0"]');
   const toolbarPointerDown = new MouseEvent('pointerdown', {
     bubbles: true,
     cancelable: true,
@@ -206,6 +278,41 @@ it('does not let the recording eraser capture toolbar or popover pointer gesture
   });
   Object.defineProperty(pagePointerDown, 'pointerId', { value: 2 });
   expect(pageTarget.dispatchEvent(pagePointerDown)).toBe(false);
+
+  act(() =>
+    root.render(
+      <RecordingDrawingControls
+        compactMenus={false}
+        displayMode="horizontal"
+        interactionMode="navigation"
+        owner={owner}
+        onInteractionModeChange={vi.fn()}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')
+  ).toBeNull();
+  const lateUp = new MouseEvent('pointerup', { bubbles: true, cancelable: true, composed: true });
+  Object.defineProperty(lateUp, 'pointerId', { value: 2 });
+  expect(pageTarget.dispatchEvent(lateUp)).toBe(true);
+  expect(erasePath).not.toHaveBeenCalled();
+
+  act(() =>
+    root.render(
+      <RecordingDrawingControls
+        compactMenus={false}
+        disabled
+        displayMode="horizontal"
+        interactionMode="eraser"
+        owner={owner}
+        onInteractionModeChange={vi.fn()}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="content.toolbar.video-recording.eraser-cursor"]')
+  ).toBeNull();
 
   act(() => root.unmount());
   owner.dispose();

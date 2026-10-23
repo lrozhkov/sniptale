@@ -27,6 +27,7 @@ import { ReviewTimelineBinding } from './timeline-binding';
 import { useLoadedReview, type LoadedReview } from './use-session';
 import { ReviewVoiceoverLayer } from './voiceover-panel';
 import { useReviewEditorState } from './use-editor-state';
+import { ReviewModeChoice } from './mode-choice';
 
 /** Audio lane wiring: import and the recorder reuse the state-owned audio selection. */
 function ReviewHistoryControlBinding({
@@ -110,17 +111,19 @@ function useEditorPresentationPreview(
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
 function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
+  const editorReady = !state.advanced.ui.modeSelectionPending;
   const previewPreferences = useReviewPreviewPreferences();
   const [previewRaster, setPreviewRaster] = useState<{ width: number; height: number } | null>(
     null
   );
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
-  const panels = useReviewPanelLayout(panelsEnabled);
+  const panels = useReviewPanelLayout(panelsEnabled, editorReady);
   const workspaceColor = useReviewWorkspaceColor(
     panels.container,
     state.advanced.ui.workspaceColors,
-    state.setWorkspaceColor
+    state.setWorkspaceColor,
+    editorReady
   );
   const { navigation, requestExport, historyCommands } = useReviewEditorNavigation(state);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
@@ -136,6 +139,11 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
     features.mode === 'advanced' || !!editing.exporter.index?.audioCodec,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
+  if (!editorReady) {
+    return (
+      <ReviewModeChoice filename={resource.filename} onSelect={state.setMode} onBack={onBack} />
+    );
+  }
   return (
     <>
       <ReviewEditorPresentationDialog preview={joinPreview} />

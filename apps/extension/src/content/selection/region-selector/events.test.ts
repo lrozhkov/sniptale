@@ -24,7 +24,40 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+it('leaves Escape from a nested floating menu to its keyboard owner', () => {
+  const state = createDefaultRegionSelectorState();
+  const menu = document.createElement('div');
+  menu.dataset['floatingUiRoot'] = 'true';
+  const handleRegionCancelled = vi.fn();
+  const handlers = createRegionSelectorDocumentHandlers({
+    state,
+    handleRegionCancelled,
+    updateUi: vi.fn(),
+  });
+  const event = new KeyboardEvent('keydown', { key: 'Escape' });
+  vi.spyOn(event, 'composedPath').mockReturnValue([menu]);
+  handlers.handleKeyDown(event);
+  expect(handleRegionCancelled).not.toHaveBeenCalled();
+  handlers.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+  expect(handleRegionCancelled).toHaveBeenCalledOnce();
+});
+
 describe('region-selector root events', () => {
+  it('repaints controls on pointer release and ignores an unrelated release', () => {
+    const state = createDefaultRegionSelectorState();
+    const updateUi = vi.fn();
+    const handlers = createRegionSelectorDocumentHandlers({
+      state,
+      updateUi,
+      handleRegionCancelled: vi.fn(),
+    });
+    handlers.handlePointerUp();
+    expect(updateUi).not.toHaveBeenCalled();
+    state.isResizing = true;
+    handlers.handlePointerUp();
+    expect(state.isResizing).toBe(false);
+    expect(updateUi).toHaveBeenCalledOnce();
+  });
   function createCancelFixture() {
     const overlay = document.createElement('div');
     const region = document.createElement('div');
@@ -211,7 +244,8 @@ describe('region-selector document events', () => {
       expect.any(Object),
       state.dragStart,
       'se',
-      expect.any(MouseEvent)
+      expect.any(MouseEvent),
+      null
     );
     expect(state.currentRegion).toBe(nextRegion);
     expect(updateUi).toHaveBeenCalledOnce();

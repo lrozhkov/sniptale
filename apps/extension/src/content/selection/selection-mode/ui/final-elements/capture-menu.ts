@@ -1,5 +1,9 @@
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
-import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
+import {
+  bindFloatingInteractionPositionListeners,
+  resolveToolbarSurfacePlacement,
+  TOOLBAR_SURFACE_GAP_PX as MENU_GAP,
+} from '@sniptale/ui/floating-interactions/placement';
 import {
   createProductToolbarMenuDom,
   createProductToolbarMenuItemCopyDom,
@@ -15,7 +19,6 @@ import {
 } from './capture-controls';
 import { createSelectionCaptureActionIcon } from './icons';
 
-const MENU_GAP = 8;
 const VIEWPORT_MARGIN = 8;
 
 interface CaptureMenuLifecycleState {
@@ -27,23 +30,65 @@ interface CaptureMenuLifecycleState {
 type CaptureActionDescriptor = ReturnType<typeof getCaptureActionDescriptors>[number];
 
 const captureMenuStates = new WeakMap<HTMLElement, CaptureMenuLifecycleState>();
+const captureMenuHeights = new WeakMap<HTMLElement, number>();
+
+function canOpenCaptureMenuBelow(anchorRect: DOMRect, height: number): boolean {
+  const below = window.innerHeight - VIEWPORT_MARGIN - anchorRect.bottom - MENU_GAP;
+  const above = anchorRect.top - MENU_GAP - VIEWPORT_MARGIN;
+  return below >= height || (above < height && below >= above);
+}
+
+function getCaptureMenuShellRect(trigger: HTMLElement): DOMRect {
+  return (trigger.closest('.sniptale-selection-toolbar') ?? trigger).getBoundingClientRect();
+}
+
+function applyCaptureMenuDirection(trigger: HTMLElement, below: boolean): void {
+  trigger.dataset['menuSide'] = below ? 'down' : 'up';
+  const icon = trigger.querySelector('svg');
+  if (icon) icon.style.transform = below ? 'none' : 'rotate(180deg)';
+}
+
+export function syncSelectionCaptureMenuDirection(root: ParentNode): void {
+  const trigger = root.querySelector<HTMLButtonElement>('.sniptale-selection-capture-menu-trigger');
+  if (!trigger) return;
+  const below = canOpenCaptureMenuBelow(
+    getCaptureMenuShellRect(trigger),
+    captureMenuHeights.get(trigger) ?? 284
+  );
+  applyCaptureMenuDirection(trigger, below);
+}
 
 function positionCaptureMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const anchorRect = anchor.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
+  const shellRect = getCaptureMenuShellRect(anchor);
+  menu.style.maxHeight = '';
+  menu.classList.remove('sniptale-toolbar-menu--compact');
+  let menuRect = menu.getBoundingClientRect();
+  let height = menuRect.height || 284;
+  const availableAbove = shellRect.top - MENU_GAP - VIEWPORT_MARGIN;
+  const availableBelow = window.innerHeight - VIEWPORT_MARGIN - shellRect.bottom - MENU_GAP;
+  if (height > Math.max(availableAbove, availableBelow)) {
+    menu.classList.add('sniptale-toolbar-menu--compact');
+    menuRect = menu.getBoundingClientRect();
+    height = menuRect.height || 284;
+  }
   const width = menuRect.width || 280;
-  const height = menuRect.height || 284;
-  const left = Math.min(
-    Math.max(anchorRect.left + anchorRect.width / 2 - width / 2, VIEWPORT_MARGIN),
-    Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
-  );
-  const canOpenBelow =
-    anchorRect.bottom + MENU_GAP + height <= window.innerHeight - VIEWPORT_MARGIN;
-  const top = canOpenBelow
-    ? anchorRect.bottom + MENU_GAP
-    : Math.max(VIEWPORT_MARGIN, anchorRect.top - MENU_GAP - height);
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  captureMenuHeights.set(anchor, height);
+  const canOpenBelow = canOpenCaptureMenuBelow(shellRect, height);
+  applyCaptureMenuDirection(anchor, canOpenBelow);
+  const position = resolveToolbarSurfacePlacement({
+    anchor: anchorRect,
+    toolbar: shellRect,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    width,
+    height,
+    placement: canOpenBelow ? 'down' : 'up',
+    align: 'center',
+  });
+  menu.style.maxHeight = `${position.maxHeight}px`;
+  menu.style.overflowY = 'auto';
+  menu.style.left = `${position.left}px`;
+  menu.style.top = `${position.top}px`;
 }
 
 function createCaptureMenuSurface(): {
@@ -55,7 +100,7 @@ function createCaptureMenuSurface(): {
     variant: 'capture',
   });
   menu.id = SELECTION_CAPTURE_MENU_ID;
-  menu.classList.add('sniptale-selection-capture-menu');
+  menu.classList.add('sniptale-selection-capture-menu', 'sniptale-content-menu-adopted');
   menu.dataset['ui'] = 'content.selection.capture-action-menu';
   menu.setAttribute('role', 'menu');
   Object.assign(menu.style, {
@@ -106,6 +151,12 @@ function installCaptureMenuKeyboardNavigation(
   overlayContainer: HTMLElement
 ): void {
   menu.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeSelectionCaptureActionMenu(overlayContainer, true);
+      return;
+    }
     const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
     const currentIndex = items.findIndex((item) => item === event.target);
     if (currentIndex < 0) return;

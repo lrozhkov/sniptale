@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { registerFrameCallbacks } from '../../../selection/highlighter';
 import { disableNavigationLock } from '../../../selection/locker';
@@ -8,19 +8,13 @@ import {
   subscribeToBrowserAnnotationDocumentNavigation,
 } from '../../../parser/page-preparation/annotations';
 import type { InteractiveFrameComponent } from '../../../selection/frame-runtime/roots/component';
-import type {
-  ContentAppModeControls,
-  ContentAppModeFlags,
-  ContentAppVisibilityState,
-} from '../mode';
+import type { ContentAppModeControls, ContentAppModeFlags } from '../mode';
 import { useFrameManager } from '../../../selection/frame-runtime/react/useFrameManager';
 import { useFrameUIController } from '../../../selection/frame-runtime/ui-controller';
 import { useModeDisabledListener } from '../../../application/mode-session/disabled-listener';
 import { useQuickActionHotkeys } from '../../toolbar/quick-action-hotkeys';
-import { useShowToolbarButton } from '../../toolbar/show-button';
 
 interface ContentAppBindingsParams {
-  countdownActive: boolean;
   InteractiveFrameComponent: InteractiveFrameComponent;
   modeControls: Pick<
     ContentAppModeControls,
@@ -29,13 +23,8 @@ interface ContentAppBindingsParams {
     | 'setHighlighterMode'
     | 'setQuickEditDocumentMode'
     | 'setQuickEditMode'
-  > &
-    Pick<ContentAppVisibilityState, 'setIsToolbarVisible'>;
-  modeFlags: ContentAppModeFlags;
-  visibilityState: Pick<
-    ContentAppVisibilityState,
-    'isCompletelyHidden' | 'isToolbarVisible' | 'setPinnedToolbarVisible'
   >;
+  modeFlags: ContentAppModeFlags;
 }
 
 function useNavigationLockCleanup(modeFlags: ContentAppModeFlags) {
@@ -107,7 +96,6 @@ function useFrameCallbackRegistration(args: {
 
 export function useContentAppBindings(params: ContentAppBindingsParams) {
   const { modeControls } = params;
-  const { setPinnedToolbarVisible } = params.visibilityState;
   const {
     setAiPickMode,
     setDesignReviewMode,
@@ -118,9 +106,6 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
   const frameManager = useFrameManager({
     InteractiveFrameComponent: params.InteractiveFrameComponent,
   });
-  const handleShowToolbar = useCallback(() => {
-    setPinnedToolbarVisible(true);
-  }, [setPinnedToolbarVisible]);
 
   useFrameUIController({ frames: frameManager.frames });
   useBrowserAnnotationDocumentReset(frameManager.clearFrames);
@@ -132,16 +117,6 @@ export function useContentAppBindings(params: ContentAppBindingsParams) {
     clearFrames: frameManager.clearFrames,
     hasFrameForElement: frameManager.hasFrameForElement,
     removeFrame: frameManager.removeFrame,
-  });
-  useShowToolbarButton({
-    countdownActive: params.countdownActive,
-    screenshotMode: params.modeFlags.screenshotMode,
-    ...(params.modeFlags.videoRecordingMode === undefined
-      ? {}
-      : { videoRecordingMode: params.modeFlags.videoRecordingMode }),
-    isToolbarVisible: params.visibilityState.isToolbarVisible,
-    isCompletelyHidden: params.visibilityState.isCompletelyHidden,
-    onShowToolbar: handleShowToolbar,
   });
   useModeDisabledListener({
     aiPickMode: params.modeFlags.aiPickMode,

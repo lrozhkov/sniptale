@@ -16,20 +16,19 @@ type PagePreparationResetDependencies = {
   resetAnnotations: () => void;
 };
 
-export function clearAllPagePreparationChanges(
-  dependencies: PagePreparationResetDependencies
-): boolean {
-  if (dependencies.history.hasOpenTransactions()) {
+/** Reverts recorded changes without discarding redo or residual owner evidence. */
+export function restorePagePreparationHistory(history: PagePreparationResetHistory): boolean {
+  if (history.hasOpenTransactions()) {
     logger.warn('Stopped page preparation reset while an editor transaction is open');
     return false;
   }
   let undoSteps = 0;
-  let previousState = dependencies.history.getState();
+  let previousState = history.getState();
 
   while (previousState.canUndo && undoSteps < MAX_UNDO_STEPS) {
-    dependencies.history.undo();
+    history.undo();
     undoSteps += 1;
-    const nextState = dependencies.history.getState();
+    const nextState = history.getState();
     if (nextState.canUndo && nextState.revision === previousState.revision) {
       logger.warn('Stopped page preparation reset because history made no progress');
       break;
@@ -37,12 +36,18 @@ export function clearAllPagePreparationChanges(
     previousState = nextState;
   }
 
-  const fullyReverted =
-    !dependencies.history.getState().canUndo && !dependencies.history.hasOpenTransactions();
+  const fullyReverted = !history.getState().canUndo && !history.hasOpenTransactions();
   if (!fullyReverted) {
     logger.warn('Page preparation reset could not finish undoing changes', { undoSteps });
     return false;
   }
+  return true;
+}
+
+export function clearAllPagePreparationChanges(
+  dependencies: PagePreparationResetDependencies
+): boolean {
+  if (!restorePagePreparationHistory(dependencies.history)) return false;
   dependencies.clearHighlights();
   dependencies.resetAnnotations();
   dependencies.history.clear();

@@ -70,9 +70,10 @@ function requireAnswer(description: RTCSessionDescription | null): CameraSourceP
 
 export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) {
   const peers = new Map<string, PeerRecord>();
-  const pendingPeerIds = new Set<string>();
+  const pendingPeerIds = new Map<string, symbol>();
 
   const close = (peerId: string): void => {
+    pendingPeerIds.delete(peerId);
     const record = peers.get(peerId);
     if (!record) return;
     peers.delete(peerId);
@@ -122,18 +123,28 @@ export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) 
     async answerOffer(params: {
       offer: RTCSessionDescriptionInit;
       peerId: string;
-      settings: VideoRecordingSettings;
+      settings?: VideoRecordingSettings;
+      source?: () => Promise<CameraSourceLease>;
     }): Promise<CameraSourcePeerAnswer> {
       if (peers.has(params.peerId)) {
         close(params.peerId);
       }
-      pendingPeerIds.add(params.peerId);
+      const token = Symbol();
+      pendingPeerIds.set(params.peerId, token);
       let lease: CameraSourceLease;
       try {
-        lease = await deps.acquireSource(params.settings);
-      } finally {
-        pendingPeerIds.delete(params.peerId);
+        if (params.source) lease = await params.source();
+        else if (params.settings) lease = await deps.acquireSource(params.settings);
+        else throw new Error('Camera peer source is missing.');
+      } catch (error) {
+        if (pendingPeerIds.get(params.peerId) === token) pendingPeerIds.delete(params.peerId);
+        throw error;
       }
+      if (pendingPeerIds.get(params.peerId) !== token) {
+        lease.release();
+        throw new Error('Camera peer was closed during source acquisition.');
+      }
+      pendingPeerIds.delete(params.peerId);
       let connection: CameraPeerConnection;
       try {
         connection = deps.createConnection();
@@ -170,6 +181,7 @@ export function createCameraSourcePeerOwner(deps: CameraSourcePeerDependencies) 
     close,
 
     closeAll(): void {
+      pendingPeerIds.clear();
       [...peers.keys()].forEach(close);
     },
 

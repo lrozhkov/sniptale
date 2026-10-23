@@ -5,6 +5,15 @@ import { describe, expect, it } from 'vitest';
 const foundationStylesheet = readFileSync(new URL('./foundation.css', import.meta.url), 'utf8');
 
 describe('styles.foundation contract', () => {
+  it('restricts optical correction to explicit interface label roles', () => {
+    const labels = readFileSync(new URL('./interface-labels.css', import.meta.url), 'utf8');
+    expect(labels).toContain('.sniptale-interface-label,');
+    expect(labels).toContain('currentColor var(--sniptale-interface-label-ink-strength)');
+    expect(labels).toContain('@media (forced-colors: active)');
+    expect(labels).not.toMatch(/\b(?:input|textarea|h1|h2|contenteditable)\b/u);
+    expect(labels).not.toMatch(/(?:^|\s)opacity:/u);
+  });
+
   it('keeps extension surfaces non-selectable while preserving editable descendants', () => {
     expect(foundationStylesheet).toContain('.sniptale-extension-surface,');
     expect(foundationStylesheet).toContain('.sniptale-extension-surface * {');

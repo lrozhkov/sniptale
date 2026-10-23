@@ -5,6 +5,7 @@ import {
   prepareOriginalRecordingDownload,
   recoverRecording,
   type RecoveryRecording,
+  type RecordingRecoveryProgress,
 } from '../../workflows/video/recording-recovery';
 import { downloadGalleryBlob } from '../shared/download';
 
@@ -15,10 +16,12 @@ interface RecoveryState {
   loading: boolean;
   busy: boolean;
   message: RecoveryMessage;
+  progress: { id: string; incarnation: string; value: RecordingRecoveryProgress } | null;
 }
 interface ActionFeedback {
   isMounted(): boolean;
   report(message: RecoveryMessage): void;
+  onProgress(progress: RecordingRecoveryProgress): void;
 }
 
 async function downloadOriginal(entry: RecoveryRecording, feedback: ActionFeedback) {
@@ -45,7 +48,7 @@ async function performRecoveryAction(
   feedback: ActionFeedback
 ) {
   if (action === 'download') return downloadOriginal(entry, feedback);
-  if (action === 'recover') await recoverRecording(entry);
+  if (action === 'recover') await recoverRecording(entry, feedback.onProgress);
   else await deleteRecoveryRecording(entry.id, entry.incarnation);
   return true;
 }
@@ -62,6 +65,7 @@ function completedRecoveryAction(
       (item) => item.id !== entry.id || item.incarnation !== entry.incarnation
     ),
     message: null,
+    progress: null,
   };
 }
 
@@ -71,6 +75,7 @@ export function useRecordingRecovery(disabled: boolean) {
     loading: true,
     busy: false,
     message: null,
+    progress: null,
   });
   const alive = useRef(false);
   const pending = useRef(false);
@@ -111,12 +116,25 @@ export function useRecordingRecovery(disabled: boolean) {
   const run = async (entry: RecoveryRecording, action: RecoveryAction) => {
     if (pending.current || disabled) return false;
     pending.current = true;
-    revision.current++;
-    setState((current) => ({ ...current, loading: false, busy: true, message: null }));
+    const actionRevision = ++revision.current;
+    setState((current) => ({
+      ...current,
+      loading: false,
+      busy: true,
+      message: null,
+      progress: null,
+    }));
     try {
       const completed = await performRecoveryAction(entry, action, {
         isMounted: () => alive.current,
         report,
+        onProgress: (value) => {
+          if (!alive.current || !pending.current || revision.current !== actionRevision) return;
+          setState((current) => ({
+            ...current,
+            progress: { id: entry.id, incarnation: entry.incarnation, value },
+          }));
+        },
       });
       if (completed && alive.current)
         setState((current) => completedRecoveryAction(current, entry, action));
@@ -126,7 +144,7 @@ export function useRecordingRecovery(disabled: boolean) {
       return false;
     } finally {
       pending.current = false;
-      if (alive.current) setState((current) => ({ ...current, busy: false }));
+      if (alive.current) setState((current) => ({ ...current, busy: false, progress: null }));
     }
   };
   return { ...state, refresh, run };

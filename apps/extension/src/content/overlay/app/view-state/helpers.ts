@@ -25,7 +25,9 @@ export type ContentRuntimeBridgeParams = {
     contentIntentSource?: ContentPrivilegedActionIntentSource,
     startContext?: ScreenshotStartContext
   ) => Promise<void>;
-  invalidateScreenshotRuns: () => ScreenshotStartContext | undefined;
+  invalidateScreenshotRuns: (
+    startContext?: ScreenshotStartContext
+  ) => ScreenshotStartContext | undefined;
   modeControls: ReturnType<typeof buildContentModeControls>;
   modeController: UseToolbarModeControllerResult;
   modeFlags: ContentAppModeFlags;
@@ -162,6 +164,8 @@ export function buildRuntimeMessageBridgeParams(
         : { drawingMode: params.modeFlags.drawingMode }),
       highlighterMode: params.modeFlags.highlighterMode,
       isToolbarVisible: params.visibilityState.isToolbarVisible,
+      navigationLockEnabled: params.visibilityState.navigationLockEnabled,
+      quickEditDocumentMode: params.modeFlags.quickEditDocumentMode,
       quickEditMode: params.modeFlags.quickEditMode,
       screenshotMode: params.modeFlags.screenshotMode,
     },
@@ -173,6 +177,7 @@ export function buildRuntimeMessageBridgeParams(
       setQuickActionOverlay: params.quickActionState.setQuickActionOverlay,
       setQuickActionToastCountdown: params.quickActionState.setQuickActionToastCountdown,
       setTimerDelay: params.quickActionState.setTimerDelay,
+      timerDelay: params.quickActionState.timerDelay,
     },
     viewport: {
       clearPendingAutoStartCapture: params.visibilityState.clearPendingAutoStartCapture,

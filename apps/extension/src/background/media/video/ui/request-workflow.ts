@@ -4,7 +4,10 @@ type RuntimeListener = Parameters<typeof browserRuntime.subscribeToMessages>[0];
 type MessageSubscription = typeof browserRuntime.subscribeToMessages;
 
 export function runRequestWorkflow<TResult>(props: {
-  createListener: (finish: (result: TResult) => void) => RuntimeListener;
+  createListener: (
+    finish: (result: TResult) => void,
+    renewTimeout: (timeoutMs?: number) => void
+  ) => RuntimeListener;
   onRequestError: (error: unknown, finish: (result: TResult) => void) => void;
   onTimeout: (finish: (result: TResult) => void) => void;
   request: () => Promise<unknown>;
@@ -29,11 +32,16 @@ export function runRequestWorkflow<TResult>(props: {
       resolve(result);
     };
 
-    timeoutId = setTimeout(() => {
-      props.onTimeout(finish);
-    }, props.timeoutMs);
+    const renewTimeout = (timeoutMs = props.timeoutMs) => {
+      if (settled) return;
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        props.onTimeout(finish);
+      }, timeoutMs);
+    };
+    renewTimeout();
 
-    unsubscribe = props.subscribeToMessages(props.createListener(finish));
+    unsubscribe = props.subscribeToMessages(props.createListener(finish, renewTimeout));
 
     if (settled) {
       unsubscribe();

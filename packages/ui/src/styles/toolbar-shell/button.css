@@ -1,3 +1,103 @@
+.sniptale-annotation-effect-switch,
+.sniptale-annotation-effect-options,
+.sniptale-annotation-menu-control {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.sniptale-annotation-effect-options {
+  padding: 2px;
+  border-radius: var(--sniptale-radius-md, 4px);
+  background: var(--sniptale-color-surface-input);
+}
+[data-ui='editor.floating.tool-rail']
+  .sniptale-annotation-effect-switch:not(:has([aria-pressed='true'])),
+[data-ui='editor.floating.tool-rail']
+  .sniptale-annotation-effect-switch:not(:has([aria-pressed='true']))
+  > .sniptale-annotation-effect-options {
+  background: transparent !important;
+}
+[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control::after {
+  display: none;
+}
+[data-ui='editor.floating.tool-rail'] .sniptale-toolbar-split-control > button {
+  color: var(--sniptale-color-text-secondary);
+}
+.sniptale-annotation-effect-switch,
+.sniptale-annotation-menu-control {
+  border-radius: var(--sniptale-radius-md, 4px);
+}
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control):has(
+  > .sniptale-annotation-properties-arrow:enabled:is(:hover, :focus-visible, [aria-expanded='true'])
+) {
+  background: var(--sniptale-color-surface-hover);
+}
+.sniptale-annotation-effect-switch:has(
+    > .sniptale-annotation-properties-arrow:enabled:is(
+        :hover,
+        :focus-visible,
+        [aria-expanded='true']
+      )
+  )
+  > .sniptale-annotation-effect-options {
+  background: transparent;
+}
+.sniptale-annotation-effect-options > button {
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-annotation-effect-options > button[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent) !important;
+  background: var(--sniptale-color-surface-panel) !important;
+  box-shadow: none !important;
+}
+.sniptale-annotation-effect-switch > button.sniptale-annotation-properties-arrow,
+.sniptale-annotation-menu-control > button.sniptale-annotation-properties-arrow {
+  width: 14px;
+  min-width: 14px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control)
+  > button.sniptale-annotation-properties-arrow:is(:hover, :active, [aria-expanded='true']) {
+  background: transparent !important;
+  border-color: transparent !important;
+  transform: none;
+}
+:is(.sniptale-annotation-effect-switch, .sniptale-annotation-menu-control)
+  > button.sniptale-annotation-properties-arrow.sniptale-glass-toolbar-button {
+  flex: 0 0 14px;
+  width: 14px;
+  min-width: 14px;
+  max-width: 14px;
+}
+.sniptale-annotation-menu-control > button:not(.sniptale-annotation-properties-arrow) {
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm, 4px);
+}
+.sniptale-annotation-menu-control > button[aria-pressed] {
+  border-color: transparent !important;
+  color: var(--sniptale-color-text-secondary) !important;
+}
+.sniptale-annotation-menu-control > button[aria-pressed]:is(:hover, [aria-pressed='true']) {
+  background: var(--sniptale-color-surface-hover) !important;
+  color: var(--sniptale-color-text-primary) !important;
+}
+.sniptale-annotation-menu-control:has(
+    > .sniptale-annotation-properties-arrow:enabled:is(
+        :hover,
+        :focus-visible,
+        [aria-expanded='true']
+      )
+  )
+  > button[aria-pressed] {
+  background: transparent !important;
+}
+
 .sniptale-btn {
   position: relative;
   display: inline-flex;
@@ -62,8 +162,11 @@
 .sniptale-btn[data-menu-indicator='true']::before {
   content: '';
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  top: var(--sniptale-toolbar-indicator-top, auto);
+  right: var(--sniptale-toolbar-indicator-right, 2px);
+  bottom: var(--sniptale-toolbar-indicator-bottom, 2px);
+  left: var(--sniptale-toolbar-indicator-left, auto);
+  transform: rotate(var(--sniptale-toolbar-indicator-rotation, 0deg));
   width: 0;
   height: 0;
   border-inline: clamp(1px, calc(var(--sniptale-toolbar-button-size) / 8 - 2px), 2px) solid
@@ -78,6 +181,30 @@
 .sniptale-btn[data-menu-indicator='true'][data-menu-open='true']::before {
   border-top-color: var(--sniptale-color-accent);
   opacity: 1;
+}
+
+.sniptale-content-toolbar-adopted[data-menu-side='up'],
+.sniptale-content-toolbar-adopted [data-menu-side='up'] {
+  --sniptale-toolbar-indicator-top: 2px;
+  --sniptale-toolbar-indicator-bottom: auto;
+  --sniptale-toolbar-indicator-left: auto;
+  --sniptale-toolbar-indicator-right: 2px;
+  --sniptale-toolbar-indicator-rotation: 180deg;
+  --sniptale-toolbar-chevron-rotation: 180deg;
+}
+
+.sniptale-content-toolbar-adopted[data-menu-side='down'],
+.sniptale-content-toolbar-adopted [data-menu-side='down'] {
+  --sniptale-toolbar-indicator-top: auto;
+  --sniptale-toolbar-indicator-bottom: 2px;
+  --sniptale-toolbar-indicator-left: auto;
+  --sniptale-toolbar-indicator-right: 2px;
+  --sniptale-toolbar-indicator-rotation: 0deg;
+  --sniptale-toolbar-chevron-rotation: 0deg;
+}
+
+.sniptale-content-toolbar-adopted .sniptale-btn.sniptale-full-page-chevron svg {
+  transform: rotate(var(--sniptale-toolbar-chevron-rotation, 0deg));
 }
 
 .sniptale-toolbar-menu-item > svg,
@@ -181,6 +308,16 @@
   opacity: 0.4;
   cursor: default;
 }
+.sniptale-btn.sniptale-btn-narrow {
+  width: calc(var(--sniptale-toolbar-button-size) / 2);
+  min-width: calc(var(--sniptale-toolbar-button-size) / 2);
+  padding: 0;
+  flex-shrink: 0;
+}
+.sniptale-btn.sniptale-btn-narrow svg {
+  width: 14px;
+  height: 14px;
+}
 .sniptale-btn.sniptale-btn-compact {
   width: var(--sniptale-size-icon-compact);
   height: var(--sniptale-size-icon-compact);
@@ -243,6 +380,7 @@
     .sniptale-full-page-chevron,
     .sniptale-btn-outline,
     .sniptale-btn-compact,
+    .sniptale-btn-narrow,
     .sniptale-drawing-options-popover *
   ) {
   width: var(--sniptale-toolbar-button-size);
@@ -349,17 +487,46 @@
 }
 
 @layer utilities {
-  /* Split media controls share one silhouette while retaining separate targets. */
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control
-    .sniptale-split-action-start[data-command-press] {
-    border-radius: 4px 0 0 4px !important;
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)
+    > .sniptale-btn[data-command-press] {
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
   }
 
   .sniptale-content-toolbar-adopted
-    .sniptale-recording-media-control
-    .sniptale-split-action-end[data-command-press] {
-    border-radius: 0 4px 4px 0 !important;
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control)::after {
+    display: none;
+  }
+
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control) {
+    border-radius: var(--sniptale-radius-sm, 4px) !important;
+    background: transparent;
+  }
+
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):has(
+      > .sniptale-split-action-start[data-active='true']
+    )
+    > .sniptale-btn[data-command-press] {
+    transition-property: border-color, color, box-shadow, transform !important;
+  }
+
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):is(
+      :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
+      :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
+    ) {
+    background: var(--sniptale-color-surface-hover);
+  }
+
+  .sniptale-content-toolbar-adopted
+    :is(.sniptale-recording-media-control, .sniptale-toolbar-split-control):is(
+      :has(> .sniptale-split-action-start:not([data-active='true']):enabled):hover,
+      :has(> .sniptale-split-action-end:enabled:is(:hover, :focus-visible, [aria-expanded='true']))
+    )
+    > .sniptale-btn[data-command-press] {
+    background: transparent !important;
   }
 
   .sniptale-content-toolbar-adopted

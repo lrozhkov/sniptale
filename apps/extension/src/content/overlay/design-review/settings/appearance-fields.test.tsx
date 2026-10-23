@@ -19,7 +19,9 @@ const actions: DesignReviewActions = {
   },
   copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
+  navigateElement: vi.fn(),
   delete: vi.fn(),
+  text: { edit: vi.fn(), reset: vi.fn() },
   resetValue: vi.fn(),
   selectAction: vi.fn(),
   setSettingsOpen: vi.fn(),
@@ -38,12 +40,14 @@ afterEach(() => {
 
 it('keeps direct appearance controls and omits background asset and gradient inputs', () => {
   const state: DesignReviewViewState = {
+    treeNavigation: { parent: null, child: null },
     action: 'refine',
     anchor: null,
     comment: { commitFailed: false, draft: '', marker: null },
     defaultValues: { 'background-color': '#ffffff', 'box-shadow': 'none' },
     draftPatch: { declarations: [] },
     modifiedProperties: [],
+    text: { editable: true, modified: false, preview: 'Heading', resettable: false },
     selection: null,
     settingsOpen: true,
     values: { 'background-color': '#ffffff', 'box-shadow': 'none' },
@@ -79,6 +83,7 @@ it('applies a selected background color from the picker', () => {
         actions={{ ...actions, updateValue: onChange }}
         disabled={false}
         state={{
+          treeNavigation: { parent: null, child: null },
           action: 'refine',
           anchor: null,
           comment: { commitFailed: false, draft: '', marker: null },
@@ -87,6 +92,7 @@ it('applies a selected background color from the picker', () => {
           modifiedProperties: [],
           selection: null,
           settingsOpen: true,
+          text: { editable: false, modified: false, preview: '', resettable: false },
           values: { 'background-color': '#ffffff' },
           voice: {
             active: false,

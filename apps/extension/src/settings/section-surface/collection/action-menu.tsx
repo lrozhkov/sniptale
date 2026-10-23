@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronUp, MoreHorizontal, RotateCcw, Trash2 } from
 import { useId } from 'react';
 
 import { translate } from '../../../platform/i18n';
+import { settingsPendingControlClassName } from '../classes';
 import { useSettingsCollectionActionMenuInteraction } from './action-menu-interaction';
 import type {
   SettingsCollectionAction,
@@ -45,17 +46,21 @@ function SettingsCollectionInlineActionButton(props: {
         props.action.id === 'delete'
           ? 'text-[var(--sniptale-color-text-danger)]'
           : 'text-[var(--sniptale-color-text-muted)]',
-        isDisabled
+        props.action.disabledReason !== undefined
           ? 'cursor-not-allowed opacity-45'
           : 'hover:bg-[var(--sniptale-color-surface-hover)]',
         props.revealOnRowInteraction
           ? [
-              'pointer-events-none opacity-0 transition-opacity',
-              'group-hover:pointer-events-auto group-hover:opacity-100',
-              'group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-              'focus-visible:pointer-events-auto focus-visible:opacity-100',
+              'pointer-events-none !opacity-0 transition-opacity',
+              'group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
+              'focus-visible:pointer-events-auto',
+              props.action.disabledReason !== undefined
+                ? 'group-hover:!opacity-45 group-focus-within:!opacity-45 focus-visible:!opacity-45'
+                : 'group-hover:!opacity-100 group-focus-within:!opacity-100 focus-visible:!opacity-100',
             ].join(' ')
-          : '',
+          : props.busy && props.action.disabledReason === undefined
+            ? settingsPendingControlClassName
+            : '',
       ].join(' ')}
       onClick={props.onInvoke}
     >

@@ -62,6 +62,8 @@ export interface RuntimeMessageBridgeModeState {
   drawingMode?: boolean;
   highlighterMode: boolean;
   isToolbarVisible: boolean;
+  navigationLockEnabled?: boolean;
+  quickEditDocumentMode?: boolean;
   quickEditMode: boolean;
   screenshotMode: boolean;
 }
@@ -73,7 +75,7 @@ export type RuntimeMessageBridgeModeControls = ContentAppRuntimeModeControls & {
   disableQuickEditMode: () => void;
 };
 
-export type RuntimeMessageBridgeQuickActionControls = Pick<
+export type RuntimeMessageBridgeQuickActionControls = { timerDelay?: number } & Pick<
   ContentAppQuickActionState,
   | 'captureAction'
   | 'captureActionRef'
@@ -87,7 +89,9 @@ export type RuntimeMessageBridgeQuickActionControls = Pick<
 export interface RuntimeMessageBridgeViewportControls {
   clearPendingAutoStartCapture: () => void;
   handleTakeScreenshotRef: ScreenshotHandlerRef;
-  invalidateScreenshotRuns: () => ScreenshotStartContext | undefined;
+  invalidateScreenshotRuns: (
+    startContext?: ScreenshotStartContext
+  ) => ScreenshotStartContext | undefined;
   queueAutoStartCapture: QueueAutoStartCapture;
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void;
 }

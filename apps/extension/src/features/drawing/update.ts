@@ -12,11 +12,10 @@ export function resolveDrawingLinearPoint(args: {
   const deltaX = args.point.x - args.start.x;
   const deltaY = args.point.y - args.start.y;
   const distance = Math.hypot(deltaX, deltaY);
-  if (distance < 0.001 || (args.modifiers.ctrlKey && !args.modifiers.shiftKey)) return args.point;
+  if (distance < 0.001 || !args.modifiers.shiftKey) return args.point;
   const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
-  const step = args.modifiers.shiftKey ? 15 : 45;
+  const step = 15;
   const snapped = Math.round(angle / step) * step;
-  if (!args.modifiers.shiftKey && Math.abs(snapped - angle) > 5) return args.point;
   const radians = (snapped * Math.PI) / 180;
   return {
     x: args.start.x + Math.cos(radians) * distance,

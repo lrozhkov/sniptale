@@ -1,23 +1,18 @@
-import { parseReviewOriginalSpeech, type ReviewOriginalSpeech } from '../review/original-speech';
+import { parseReviewOriginalSpeech } from '../review/original-speech';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   parseSourceAudioGainRanges,
   parseSourceAudioAttenuationRanges,
-  type SourceAudioGainRange,
 } from '../audio/source-envelope';
 import type { AudioGainRange } from '../audio/source-attenuation';
-import type { VideoProject, VideoProjectClip } from './types/model';
+import type {
+  VideoProject,
+  VideoProjectClip,
+  VideoProjectSourceAudioDocument,
+} from './types/model';
 import { normalizeClipPlaybackRate, getSourceTimedClipProjectOffset } from './timeline/rate';
 
-/** Source content survives cuts and missing placements without extending the composition. */
-export interface VideoProjectSourceAudioDocument {
-  id: string;
-  binding: { kind: 'source'; assetId: string; sourceInstanceId: string };
-  ranges: SourceAudioGainRange[];
-  mutes: SourceAudioGainRange[];
-  /** Retained recognition metadata never schedules replacement audio or implicit gain. */
-  speech?: ReviewOriginalSpeech;
-}
+export type { VideoProjectSourceAudioDocument } from './types/model';
 
 function identity(value: unknown): value is string {
   return typeof value === 'string' && !!value && value.trim() === value && value.length <= 256;

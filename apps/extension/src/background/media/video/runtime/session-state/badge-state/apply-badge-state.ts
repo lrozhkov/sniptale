@@ -23,8 +23,12 @@ export function applyBadgeState(state: VideoRecordingRuntimeState): void {
     case VideoRecordingStatus.RECORDING:
       applyDurationBadgeState(
         state,
-        DEFAULT_COLOR_RECORDING,
-        translate('background.runtime.actionRecordingPrefix')
+        state.microphoneActivity?.warning ? DEFAULT_COLOR_WARNING_STRONG : DEFAULT_COLOR_RECORDING,
+        translate(
+          state.microphoneActivity?.warning
+            ? 'background.runtime.actionMicrophoneQuiet'
+            : 'background.runtime.actionRecordingPrefix'
+        )
       );
       return;
 

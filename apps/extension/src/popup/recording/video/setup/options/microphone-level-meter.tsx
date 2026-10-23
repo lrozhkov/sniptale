@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n/popup';
-
-const METER_CLASS_NAME = 'h-2 overflow-hidden rounded-full bg-[var(--sniptale-color-border-soft)]';
+import { MicrophoneMeter } from '../../microphone-meter';
 
 function calculateRms(samples: Float32Array): number {
   if (samples.length === 0) {
@@ -12,7 +11,7 @@ function calculateRms(samples: Float32Array): number {
   for (const sample of samples) {
     sum += sample * sample;
   }
-  return Math.min(1, Math.sqrt(sum / samples.length) * 3);
+  return Math.min(1, Math.sqrt(sum / samples.length));
 }
 
 function startLevelMeter({
@@ -28,18 +27,15 @@ function startLevelMeter({
   const audioContext = new AudioContextCtor();
   const source = audioContext.createMediaStreamSource(stream);
   const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
+  analyser.fftSize = 1024;
   source.connect(analyser);
   const samples = new Float32Array(analyser.fftSize);
   let frame = 0;
-  let smoothedLevel = 0;
 
   const tick = () => {
     analyser.getFloatTimeDomainData(samples);
     const measuredLevel = Math.min(1, calculateRms(samples) * getGain());
-    const smoothing = measuredLevel > smoothedLevel ? 0.42 : 0.16;
-    smoothedLevel += (measuredLevel - smoothedLevel) * smoothing;
-    onLevel(smoothedLevel);
+    onLevel(measuredLevel);
     frame = requestAnimationFrame(tick);
   };
 
@@ -77,25 +73,7 @@ export function MicrophoneLevelMeter({
       <div className="text-[10px] text-[var(--sniptale-color-text-muted-strong)]">
         {translate('popup.video.microphoneLevelLabel')}
       </div>
-      <div className={METER_CLASS_NAME}>
-        <div
-          className={[
-            'h-full transition-[width,background-color] duration-100 ease-out',
-            resolveLevelColor(level),
-          ].join(' ')}
-          style={{ width: `${Math.round(level * 100)}%` }}
-        />
-      </div>
+      <MicrophoneMeter label={translate('popup.video.microphoneLevelLabel')} level={level} />
     </div>
   );
-}
-
-function resolveLevelColor(level: number): string {
-  if (level > 0.72) {
-    return 'bg-[var(--sniptale-color-danger)]';
-  }
-  if (level > 0.42) {
-    return 'bg-[var(--sniptale-color-warning)]';
-  }
-  return 'bg-[var(--sniptale-color-success)]';
 }

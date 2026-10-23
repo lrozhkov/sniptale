@@ -6,6 +6,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
+  get: vi.fn(),
   activated: vi.fn(),
   updated: vi.fn(),
   getCapabilities: vi.fn((tab: { id?: number } | null) => {
@@ -32,6 +33,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: {
     query: mocks.query,
+    get: mocks.get,
     subscribeToActivated: (listener: () => void) => {
       mocks.activated(listener);
       return vi.fn();
@@ -48,6 +50,30 @@ vi.mock('../../../features/tab-capabilities/capabilities', async (importOriginal
 }));
 
 beforeEach(() => vi.clearAllMocks());
+
+it('keeps launch capabilities bound to the selected source when another tab is active', async () => {
+  mocks.query.mockResolvedValue([{ id: 99 }]);
+  mocks.get.mockResolvedValue({ id: 21 });
+  const { useActiveTabCapabilities } = await import('./capabilities');
+  function Harness() {
+    const capabilities = useActiveTabCapabilities(21);
+    return <div>{capabilities.tabId}</div>;
+  }
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() => root.render(<Harness />));
+  await vi.waitFor(() => expect(container.textContent).toBe('21'));
+  expect(mocks.get).toHaveBeenCalledWith(21);
+  expect(mocks.query).not.toHaveBeenCalled();
+  const listener = mocks.updated.mock.calls[0]?.[0];
+  mocks.get.mockClear();
+  await act(async () => listener(21, { url: 'chrome://settings' }, { active: false }));
+  expect(mocks.get).toHaveBeenCalledExactlyOnceWith(21);
+  mocks.get.mockClear();
+  await act(async () => listener(99, { url: 'https://decoy.test' }, { active: true }));
+  expect(mocks.get).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
 
 it('loads capabilities only for a mounted route and refreshes on active-tab changes', async () => {
   mocks.query.mockResolvedValue([{ id: 3 }]);

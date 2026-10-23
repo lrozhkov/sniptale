@@ -4,6 +4,7 @@ import type { VideoControlMessage } from '../../../../../contracts/video/types/m
 import { createRouteErrorResponse } from '../../../../routing-contracts/response';
 import {
   getActiveVideoRecordingLeaseSnapshot,
+  validatePreparedRecordingCancellationCapability,
   validateRecordingControlCapability,
   validateTerminalRecordingStopCapability,
 } from '../../recording-control-lease';
@@ -34,6 +35,16 @@ export async function isAuthorizedRecordingControl(args: {
     args.sender,
     args.message.recordingId
   );
+  if (
+    args.message.type === VideoMessageType.CANCEL_RECORDING_START &&
+    resolveTrustedPopupRuntimeSenderUrl(args.sender) !== null &&
+    validatePreparedRecordingCancellationCapability({
+      controlToken: args.message.controlToken,
+      ownerSenderUrl,
+      recordingId: args.message.recordingId,
+    })
+  )
+    return true;
   if (
     args.message.type === VideoMessageType.STOP_RECORDING &&
     resolveTrustedPopupRuntimeSenderUrl(args.sender) !== null &&

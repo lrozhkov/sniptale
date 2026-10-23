@@ -25,6 +25,11 @@ vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) =
   openCameraRecorderPage,
 }));
 
+vi.mock('../../recording/media-devices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../recording/media-devices')>()),
+  readPopupMediaAccessState: vi.fn().mockResolvedValue('granted'),
+}));
+
 const defaultSettings = {
   ...DEFAULT_VIDEO_SETTINGS,
   autoFadeDelay: 3,

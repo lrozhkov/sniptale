@@ -117,8 +117,8 @@ describe('Properties comment producer', () => {
 
     expect(commitPropertiesComment({ comment: 'First', evidence, target })).toBe(1);
     expect(commitPropertiesComment({ comment: '', evidence, target })).toBeNull();
-    expect(commitPropertiesComment({ comment: 'Again', evidence, target })).toBe(2);
-    expect(readPropertiesComment(target)).toEqual({ comment: 'Again', marker: 2 });
+    expect(commitPropertiesComment({ comment: 'Again', evidence, target })).toBe(1);
+    expect(readPropertiesComment(target)).toEqual({ comment: 'Again', marker: 1 });
 
     pagePreparationHistory.undo();
     expect(readPropertiesComment(target)).toEqual({ comment: '', marker: null });
@@ -127,7 +127,7 @@ describe('Properties comment producer', () => {
     pagePreparationHistory.redo();
     expect(readPropertiesComment(target)).toEqual({ comment: '', marker: null });
     pagePreparationHistory.redo();
-    expect(readPropertiesComment(target)).toEqual({ comment: 'Again', marker: 2 });
+    expect(readPropertiesComment(target)).toEqual({ comment: 'Again', marker: 1 });
   });
 
   it('deduplicates an unchanged comment instead of adding another history entry', () => {

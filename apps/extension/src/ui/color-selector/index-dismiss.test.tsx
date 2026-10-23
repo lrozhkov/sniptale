@@ -130,36 +130,46 @@ it('hides the picker and rolls back on outside click without committing the draf
   expect(document.body.textContent).toContain('#123456'.toUpperCase());
 });
 
-it('restores focus to the trigger after Escape inside a Shadow DOM picker', async () => {
-  act(() => root?.unmount());
-  const host = document.createElement('div');
-  document.body.append(host);
-  const shadowRoot = host.attachShadow({ mode: 'open' });
-  root = createRoot(shadowRoot);
-  const onChange = vi.fn();
-  renderSelector({ onChange });
-  const trigger = shadowRoot.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.color-selector.picker-trigger"]'
-  );
-  await act(async () => trigger?.click());
-  const hex = shadowRoot.querySelector<HTMLInputElement>(
-    'input[aria-label="shared.ui.colorSelectorHex"]'
-  );
-  hex?.focus();
-  expect(shadowRoot.activeElement).toBe(hex);
-
-  await act(async () => {
-    hex?.dispatchEvent(
-      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
+it.each(['composed', 'local-keyboard', 'local-bridge'])(
+  'restores focus after Shadow DOM Escape (%s)',
+  async (source) => {
+    act(() => root?.unmount());
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    root = createRoot(shadowRoot);
+    const onChange = vi.fn();
+    renderSelector({ onChange });
+    const trigger = shadowRoot.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.picker-trigger"]'
     );
-  });
+    await act(async () => trigger?.click());
+    const hex = shadowRoot.querySelector<HTMLInputElement>(
+      'input[aria-label="shared.ui.colorSelectorHex"]'
+    );
+    hex?.focus();
+    expect(shadowRoot.activeElement).toBe(hex);
 
-  expect(shadowRoot.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
-  expect(shadowRoot.activeElement).toBe(trigger);
-  expect(onChange).not.toHaveBeenCalled();
+    await act(async () => {
+      const event =
+        source === 'local-bridge'
+          ? new Event('keydown', { bubbles: true, cancelable: true, composed: false })
+          : new KeyboardEvent('keydown', {
+              bubbles: true,
+              composed: source === 'composed',
+              key: 'Escape',
+            });
+      if (source === 'local-bridge') Object.defineProperty(event, 'key', { value: 'Escape' });
+      hex?.dispatchEvent(event);
+    });
 
-  expect(
-    shadowRoot.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
-  ).toBeNull();
-  host.remove();
-});
+    expect(shadowRoot.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+    expect(shadowRoot.activeElement).toBe(trigger);
+    expect(onChange).not.toHaveBeenCalled();
+
+    expect(
+      shadowRoot.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+    ).toBeNull();
+    host.remove();
+  }
+);

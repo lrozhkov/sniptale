@@ -166,6 +166,34 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('offscreen voice input service', () => {
+  it('waits for audiostart even when the service starts and the microphone has a signal', async () => {
+    const harness = createHarness('unavailable');
+    start(harness.service);
+    await flushStart();
+    harness.recognitions[0]?.callbacks.onStart();
+    harness.emitLevel(0.8);
+    expect(harness.service.getSnapshot()).toMatchObject({
+      phase: 'starting',
+      effectiveMode: 'browser-managed',
+    });
+    harness.recognitions[0]?.callbacks.onAudioStart();
+    expect(harness.service.getSnapshot().phase).toBe('listening');
+  });
+
+  it('ends browser-managed startup without claiming to listen when audiostart never arrives', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness('unavailable');
+    start(harness.service);
+    await flushStart();
+    harness.recognitions[0]?.callbacks.onStart();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(harness.service.getSnapshot()).toMatchObject({ phase: 'error', errorCode: 'timeout' });
+    expect(harness.events).not.toContainEqual(
+      expect.objectContaining({ snapshot: expect.objectContaining({ phase: 'listening' }) })
+    );
+    expect(harness.releaseMicrophone).toHaveBeenCalledOnce();
+  });
+
   it('uses processLocally=true only when the dictation package is available', async () => {
     const harness = createHarness('available');
     start(harness.service);

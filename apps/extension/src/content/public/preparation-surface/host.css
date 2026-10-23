@@ -3,6 +3,7 @@
   --sniptale-content-ui-viewport-height: 100vh;
   --sniptale-content-ui-viewport-width: 100vw;
   all: initial;
+  -webkit-text-stroke: 0 !important;
   display: block;
   box-sizing: border-box;
   margin: 0;
@@ -31,61 +32,54 @@
   z-index: 2147483647;
 }
 
-.sniptale-show-toolbar-button {
+.sniptale-collapsed-panels {
   position: fixed;
-  bottom: calc(20px * var(--sniptale-content-ui-scale));
-  right: calc(20px * var(--sniptale-content-ui-scale));
-  width: 44px;
-  height: 44px;
-  background: var(--sniptale-color-surface-panel);
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 10px;
-  color: var(--sniptale-color-accent);
-  box-shadow:
-    0 8px 18px color-mix(in srgb, var(--sniptale-color-shadow-strong) 18%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 12%, transparent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px;
+  gap: 2px;
+  border-radius: var(--sniptale-radius-md);
   pointer-events: auto;
   z-index: 2147483646;
-  animation: sniptale-bounceIn 0.3s ease-out;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.sniptale-show-toolbar-button:hover {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-surface-canvas) 8%,
-    var(--sniptale-color-surface-panel) 92%
-  );
-  border-color: var(--sniptale-color-border-accent-strong);
-  color: var(--sniptale-color-accent-emphasis);
-  transform: translateY(-1px);
-  box-shadow:
-    0 10px 20px color-mix(in srgb, var(--sniptale-color-shadow-strong) 20%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 14%, transparent);
-}
-
-.sniptale-show-toolbar-button:active {
-  transform: translateY(0);
-}
-
-.sniptale-show-toolbar-button svg {
+.sniptale-collapsed-panels .sniptale-drag-handle {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
   width: 20px;
-  height: 20px;
-  stroke-width: 2;
+  height: auto;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 120ms ease-out;
 }
 
-@keyframes sniptale-bounceIn {
-  0% {
-    transform: translateY(8px) scale(0.94);
-    opacity: 0;
-  }
+.sniptale-collapsed-panels[data-corner$='right'] .sniptale-drag-handle {
+  right: 100%;
+}
 
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
+.sniptale-collapsed-panels[data-corner$='left'] .sniptale-drag-handle {
+  left: 100%;
+}
+
+.sniptale-collapsed-panels:is(:hover, :focus-within, [data-dragging='true']) .sniptale-drag-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sniptale-collapsed-panels[data-dragging='true'] .sniptale-drag-handle {
+  cursor: grabbing;
+}
+
+.sniptale-collapsed-panels .sniptale-drag-handle:focus-visible {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: 0;
+  border-radius: var(--sniptale-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sniptale-collapsed-panels .sniptale-drag-handle {
+    transition: none;
   }
 }

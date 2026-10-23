@@ -57,6 +57,8 @@ export const settingsQuickActionsMessages = defineMessageSource({
     ru: 'Например: Полный скриншот',
     en: 'Example: Full screenshot',
   },
+  moreIcons: { ru: 'Все иконки', en: 'All icons' },
+  fewerIcons: { ru: 'Меньше иконок', en: 'Fewer icons' },
   iconLabel: {
     ru: 'Иконка',
     en: 'Icon',

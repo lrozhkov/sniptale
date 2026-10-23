@@ -18,19 +18,29 @@ import {
   updateVideoRecordingSurface,
   validateVideoRecordingSurfaceCapability,
 } from './surface-lease';
-import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  VideoRecordingStatus,
+  type VideoRecordingSettings,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import { getVideoRecordingRuntimeState } from '../runtime/session-state';
 import {
   closeVideoRecordingCameraPeerForLease,
   listVideoRecordingMediaDevices,
   switchVideoRecordingCameraPeerInput,
 } from './camera-peer';
 import { runSerializedVideoRecordingMediaMutation } from './mutation-queue';
+import { cancelSavedTabVideoRecordingStart, isSavedTabVideoRecordingStartPending } from './start';
+import { hasRecordingMediaAccess, resolveRecordingMediaAccess } from './media-access';
+import { resolveMicrophoneGain } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 
 const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
   'select-microphone-device',
   'select-webcam-device',
+  'set-webcam-presentation-mode',
   'update-embedded-camera',
   'set-toolbar-requested',
   'set-auto-fade-delay',
@@ -39,11 +49,22 @@ const IDLE_SETTINGS_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['comm
 ]);
 
 const SERIALIZED_MEDIA_COMMANDS = new Set<VideoRecordingSurfaceCommandMessage['command']['kind']>([
+  'set-microphone-gain',
   'set-microphone-enabled',
   'set-webcam-enabled',
   'select-microphone-device',
   'select-webcam-device',
+  'set-webcam-presentation-mode',
 ]);
+
+function requireIdleCameraPlacement(tabId: number, recordingId: string | null): void {
+  if (
+    recordingId ||
+    isSavedTabVideoRecordingStartPending(tabId) ||
+    getVideoRecordingRuntimeState().status !== VideoRecordingStatus.IDLE
+  )
+    throw new Error('Camera placement cannot change during recording');
+}
 
 async function requireAuthorizedSurfaceCommand(
   tabId: number,
@@ -88,7 +109,10 @@ export async function runVideoRecordingSurfaceCommand(
     return {
       success: true,
       result,
-      snapshot: createVideoRecordingSurfaceSnapshot(currentLease ?? authorizedLease, settings),
+      snapshot: createVideoRecordingSurfaceSnapshot(
+        currentLease ?? authorizedLease,
+        message.recordingId ? settings : await resolveRecordingMediaAccess(settings)
+      ),
     };
   };
 
@@ -107,8 +131,12 @@ async function applySurfaceCommand(
   message: VideoRecordingSurfaceCommandMessage
 ): Promise<unknown> {
   switch (message.command.kind) {
-    case 'list-media-devices':
+    case 'list-media-devices': {
+      if (!(await hasRecordingMediaAccess(message.command.deviceKind))) {
+        return { mediaDevices: [], permissionRequired: true };
+      }
       return { mediaDevices: await listVideoRecordingMediaDevices(message.command.deviceKind) };
+    }
     case 'set-toolbar-requested':
       await updateVideoRecordingSurface(message.surfaceSessionId, {
         toolbarRequested: message.command.enabled,
@@ -118,7 +146,8 @@ async function applySurfaceCommand(
       await patchVideoSettings({ autoFadeDelay: message.command.delay });
       return { result: 'updated' };
     case 'set-spotlight-settings': {
-      const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled } = message.command;
+      const { clickAnimationEnabled, cursorDimmingEnabled, cursorHaloEnabled, cursorEffects } =
+        message.command;
       await mutateVideoSettings((current) => ({
         ...current,
         recordingSurface: {
@@ -127,11 +156,13 @@ async function applySurfaceCommand(
           cursorSpotlightEnabled: cursorHaloEnabled,
           cursorDimmingEnabled,
           cursorClickAnimationEnabled: clickAnimationEnabled,
+          ...(cursorEffects ? { cursorEffects } : {}),
         },
       }));
       return { result: 'updated' };
     }
     case 'cancel-start':
+      cancelSavedTabVideoRecordingStart(tabId);
       return requireAcceptedResult(await cancelRecordingStart(), [
         'accepted',
         'cancelled-before-active',
@@ -143,12 +174,24 @@ async function applySurfaceCommand(
     case 'stop':
       return requireAcceptedResult(await stopRecording(false), ['accepted', 'already-stopping']);
     case 'set-microphone-enabled':
+      if (message.command.enabled && !(await hasRecordingMediaAccess('audioinput'))) {
+        return { result: 'permission-required', permissionRequired: true };
+      }
       return applyLiveSettingsWithDurableCommit(
         message,
         { microphoneEnabled: message.command.enabled },
         buildMicrophoneLivePatch
       );
+    case 'set-microphone-gain':
+      return applyLiveSettingsWithDurableCommit(
+        message,
+        { microphoneGain: message.command.gain },
+        (settings) => ({ microphoneGain: resolveMicrophoneGain(settings) })
+      );
     case 'set-webcam-enabled':
+      if (message.command.enabled && !(await hasRecordingMediaAccess('videoinput'))) {
+        return { result: 'permission-required', permissionRequired: true };
+      }
       await applyLiveSettingsWithDurableCommit(
         message,
         { webcamEnabled: message.command.enabled },
@@ -174,6 +217,23 @@ async function applySurfaceCommand(
         (settings) => ({ webcamDeviceId: settings.webcamDeviceId ?? null })
       );
       return { result: 'accepted' };
+    case 'set-webcam-presentation-mode': {
+      requireIdleCameraPlacement(tabId, message.recordingId);
+      const mode = message.command.mode;
+      const settings = await mutateVideoSettings((current) => {
+        requireIdleCameraPlacement(tabId, message.recordingId);
+        return {
+          ...current,
+          webcamPresentation: {
+            ...(current.webcamPresentation ?? DEFAULT_VIDEO_SETTINGS.webcamPresentation!),
+            mode,
+          },
+        };
+      });
+      if (settings.webcamEnabled === true && (await hasRecordingMediaAccess('videoinput')))
+        await advanceCameraPreviewPeer(message.surfaceSessionId);
+      return { result: 'updated' };
+    }
     case 'update-embedded-camera': {
       const webcamPresentation = { mode: 'embedded' as const, ...message.command.appearance };
       await patchVideoSettings({ webcamPresentation });
@@ -188,6 +248,11 @@ async function switchIdleCameraWithDurableCommit(
   deviceId: string | null
 ) {
   const previous = await loadVideoSettings();
+  if (previous.webcamEnabled !== true) {
+    await requireAuthorizedSurfaceCommand(tabId, message);
+    await patchVideoSettings({ webcamDeviceId: deviceId });
+    return { result: 'accepted' };
+  }
   const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
   if (!lease || lease.surfaceSessionId !== message.surfaceSessionId) {
     throw new Error('Camera preview surface is unavailable');

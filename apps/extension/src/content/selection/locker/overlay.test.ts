@@ -3,8 +3,13 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const targetResolver = vi.hoisted(() => ({ resolveShieldedPageElement: vi.fn() }));
+const routing = vi.hoisted(() => ({
+  isPageElementPickerActive: vi.fn(() => false),
+  isSelectionDelegatedMode: vi.fn(() => false),
+}));
 
 vi.mock('../page-element-target', () => targetResolver);
+vi.mock('./routing', () => routing);
 
 import { handleOverlayWheel, syncNavigationLockOverlay } from './overlay';
 import { getContentUiElementById } from '../../platform/dom-host';
@@ -13,6 +18,8 @@ import { FRAME_ANNOTATION_Z_INDEX } from '../../../features/highlighter/frame-an
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
+  routing.isPageElementPickerActive.mockReturnValue(false);
+  routing.isSelectionDelegatedMode.mockReturnValue(false);
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });
@@ -141,4 +148,20 @@ it('blocks page pointer input below editable frames and above passive frames', (
   expect(pointer.defaultPrevented).toBe(true);
   syncNavigationLockOverlay(false);
   expect(overlay?.style.display).toBe('none');
+});
+
+it('restores a native arrow after delegated selection exits', () => {
+  routing.isSelectionDelegatedMode.mockReturnValue(true);
+  syncNavigationLockOverlay(true);
+  const overlay = getContentUiElementById('sniptale-navigation-lock-overlay');
+  expect(overlay?.style.cursor).toBe('inherit');
+
+  routing.isSelectionDelegatedMode.mockReturnValue(false);
+  syncNavigationLockOverlay(true);
+
+  expect(overlay?.style.cursor).toBe('default');
+  expect(overlay?.style.display).toBe('block');
+  routing.isPageElementPickerActive.mockReturnValue(true);
+  syncNavigationLockOverlay(true);
+  expect(overlay?.style.cursor).toBe('inherit');
 });

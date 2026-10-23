@@ -59,7 +59,7 @@ describe('SettingsPopoverHeader', () => {
     expect(markup).toContain('aria-label="Close"');
   });
 
-  it('renders a compact destructive action before mode and close actions', () => {
+  it('places back navigation before the title and keeps trash and close at the trailing edge', () => {
     const markup = renderToStaticMarkup(
       <SettingsPopoverHeader
         action={{ label: 'Customize', onClick: vi.fn() }}
@@ -72,7 +72,17 @@ describe('SettingsPopoverHeader', () => {
     );
 
     expect(markup).toContain('sniptale-settings-popover-destructive-action');
-    expect(markup.indexOf('Disable')).toBeLessThan(markup.indexOf('Customize'));
-    expect(markup.indexOf('Customize')).toBeLessThan(markup.indexOf('aria-label="Close"'));
+    expect(markup.indexOf('data-settings-action="back-to-templates"')).toBeLessThan(
+      markup.indexOf('Comment')
+    );
+    expect(markup.indexOf('data-settings-action="disable"')).toBeGreaterThan(
+      markup.indexOf('Comment')
+    );
+    expect(markup.indexOf('data-settings-action="disable"')).toBeLessThan(
+      markup.indexOf('data-settings-action="close"')
+    );
+    expect(markup).toContain('aria-label="Disable"');
+    expect(markup).toContain('lucide-trash-2');
+    expect(markup).toContain('lucide-arrow-left');
   });
 });

@@ -125,6 +125,7 @@ it('routes screenshot mode messages through async success and delegated status h
     routeScreenshotModeMessage(
       {
         type: MessageType.DISABLE_SCREENSHOT_MODE,
+        quickActionTransactionId: 'transaction-1',
         leaseGeneration: 3,
         operationGeneration: 4,
         surfaceCapabilityToken: 'surface-token',
@@ -134,6 +135,7 @@ it('routes screenshot mode messages through async success and delegated status h
   ).toBe(true);
   await flushPromises();
   expect(disableScreenshotModeMock).toHaveBeenCalledWith({
+    quickActionTransactionId: 'transaction-1',
     leaseGeneration: 3,
     operationGeneration: 4,
     screenshotModeState: disableContext.screenshotModeState,

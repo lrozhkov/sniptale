@@ -243,6 +243,7 @@ it('shows HTML composition and resource settings without ZIP component controls'
   renderReady(createProps({ destination: 'html' }));
   expect(container?.textContent).toContain('packageDestinationHtmlDescription');
   expect(container?.querySelector('[data-ui="html-composition"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="html-composition"]')?.className).toContain('px-3');
   expect(container?.querySelector('[data-ui="pages"]')).not.toBeNull();
   act(() =>
     container

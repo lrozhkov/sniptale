@@ -33,7 +33,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
-  'access-data': ['permissions', 'privacy'],
+  'access-data': ['permissions', 'required-permissions', 'privacy'],
   'settings-transfer': [],
   'events-logs': [],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
@@ -63,7 +63,7 @@ export type SettingsRoute =
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
   | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }
-  | { section: 'access-data'; view?: 'permissions' | 'privacy' };
+  | { section: 'access-data'; view?: 'permissions' | 'required-permissions' | 'privacy' };
 
 type SettingsRouteResolution = {
   normalizedUrl: URL;

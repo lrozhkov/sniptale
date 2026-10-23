@@ -5,7 +5,18 @@ import { pauseSessionRecorders, resumeSessionRecorders, setSessionMediaEnabled }
 import { consumeDesktopStreams, disposeMultiSourceDesktopMedia } from '../setup/desktop-media';
 import { initializeDurationPublishing } from './duration';
 import { finalizeSession } from './finalize';
-import { notifyMultiSourceRuntimeFailure, notifyMultiSourceStarted } from './messages';
+import {
+  notifyMultiSourceRuntimeFailure,
+  notifyMultiSourceSourceReady,
+  notifyMultiSourceStarted,
+} from './messages';
+import { cancelRecordingBegin, waitForRecordingBegin } from '../start/gate';
+import {
+  prepareCountdownCameraPreview,
+  retireCountdownCameraPeers,
+  cleanupCountdownCameraPreview,
+} from '../countdown-preview';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { createMicrophoneRecorder, createSourceRecorders, stopRecorderStreams } from './recorders';
 import {
   createMultiSourceLifecycle,
@@ -20,6 +31,7 @@ import { createRecordingStagingCoordinator } from '../../../composition/persiste
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { assertRecordingResourceBudget } from '../encoding/resource-budget';
 import { requireRecordingDimensions } from './dimensions';
+import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
 
 let startSequence = 0;
 
@@ -66,17 +78,27 @@ function assertMultiSourceResourceBudget(
   });
 }
 
-export async function startMultiSourceRecording(params: {
-  recordingId: string;
-  settings: VideoRecordingSettings;
-}): Promise<void> {
-  await orchestrateMultiSourceRecordingStart(params);
+export async function startMultiSourceRecording(
+  params: {
+    generation: number;
+    recordingId: string;
+    streamInstanceId: string;
+    settings: VideoRecordingSettings;
+  },
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
+): Promise<void> {
+  await orchestrateMultiSourceRecordingStart(params, messaging);
 }
 
-async function orchestrateMultiSourceRecordingStart(params: {
-  recordingId: string;
-  settings: VideoRecordingSettings;
-}): Promise<void> {
+async function orchestrateMultiSourceRecordingStart(
+  params: {
+    generation: number;
+    recordingId: string;
+    streamInstanceId: string;
+    settings: VideoRecordingSettings;
+  },
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
+): Promise<void> {
   if (getActiveMultiSourceSession()) {
     throw new Error('A multi-source recording is already active.');
   }
@@ -94,6 +116,7 @@ async function orchestrateMultiSourceRecordingStart(params: {
   try {
     prepared = await prepareMultiSourceRecorders({
       filenameSession,
+      messaging,
       baseRecordingId: params.recordingId,
       coordinator,
       sequence,
@@ -110,9 +133,43 @@ async function orchestrateMultiSourceRecordingStart(params: {
   }
   try {
     assertMultiSourceResourceBudget(prepared, params.settings);
+    const binding = {
+      generation: params.generation,
+      recordingId: params.recordingId,
+      streamInstanceId: params.streamInstanceId,
+    };
+    const begin = waitForRecordingBegin(
+      binding,
+      Math.max(0, params.settings.countdownSeconds ?? 0) * 1000
+    );
+    await Promise.all([
+      begin,
+      prepareCountdownCameraPreview({
+        binding,
+        captureMode: CaptureMode.SCREEN,
+        settings: params.settings,
+        stream: prepared.webcamRecorder?.stream ?? null,
+      }).then(() => {
+        if (sequence !== startSequence) throw new Error('Recording preparation was cancelled');
+        return notifyMultiSourceSourceReady(
+          binding,
+          sources[0]!.stream.getVideoTracks()[0]!.getSettings(),
+          messaging
+        );
+      }),
+    ]);
+    retireCountdownCameraPeers(binding);
+    if (sequence !== startSequence || getActiveMultiSourceSession()) {
+      disposePreparedMultiSourceRecorders({ ...prepared, sources });
+      await coordinator.abort();
+      return;
+    }
   } catch (error) {
+    cancelRecordingBegin();
+    cleanupCountdownCameraPreview();
     disposePreparedMultiSourceRecorders({ ...prepared, sources });
     await coordinator.abort();
+    if (sequence !== startSequence) return;
     throw error;
   }
   const session = createMultiSourceSession({
@@ -128,6 +185,7 @@ async function orchestrateMultiSourceRecordingStart(params: {
 
 async function prepareMultiSourceRecorders(params: {
   filenameSession: FilenameSession;
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   sequence: number;
@@ -149,6 +207,7 @@ async function prepareMultiSourceRecorders(params: {
       params.baseRecordingId,
       params.settings,
       params.coordinator,
+      params.messaging,
       params.filenameSession
     );
     webcamRecorder = await createMultiSourceWebcamRecorder({
@@ -192,6 +251,8 @@ function disposePreparedMultiSourceRecorders(params: {
 
 export function cancelPendingMultiSourceRecordingStart(): void {
   startSequence += 1;
+  cleanupCountdownCameraPreview();
+  cancelRecordingBegin();
 }
 
 function createMultiSourceSession(
@@ -275,12 +336,14 @@ export function resumeMultiSourceRecording(): void {
 
 export function updateMultiSourceRecordingSettings(patch: {
   microphoneEnabled?: boolean;
+  microphoneGain?: number;
   webcamEnabled?: boolean;
 }): void {
   setSessionMediaEnabled(getActiveMultiSourceSession(), patch);
 }
 
 export function stopMultiSourceRecording(discard = false): Promise<void> {
+  cancelPendingMultiSourceRecordingStart();
   const session = getActiveMultiSourceSession();
   if (!session) {
     return Promise.resolve();

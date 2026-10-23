@@ -21,8 +21,8 @@ import {
 import { ImageEditorControllerSceneHelperActions } from './controller-scene-helper-actions';
 
 export abstract class ImageEditorControllerInteractionHelperActions extends ImageEditorControllerSceneHelperActions {
-  cancelTransientInteraction() {
-    return cancelTransientInteractionForController(this.instance);
+  cancelTransientInteraction(reason?: 'window-blur') {
+    return cancelTransientInteractionForController(this.instance, reason);
   }
 
   startDrawSession(

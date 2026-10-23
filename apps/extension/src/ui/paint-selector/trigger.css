@@ -1,5 +1,13 @@
 @layer theme, base, components, utilities;
 
+.paint-selector-modes button.sniptale-glass-icon-button--active,
+.paint-selector-modes button.sniptale-glass-icon-button--active:is(:hover, :focus) {
+  border-color: var(--sniptale-color-border-strong);
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+
 [data-ui='shared.ui.paint-selector'][data-trigger-variant='swatch'] {
   container: paint-inspector / inline-size;
 }

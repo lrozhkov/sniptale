@@ -1,25 +1,15 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseReviewAudioClip } from '../review/audio-clip-validation';
 import { parseVoiceoverSegments } from '../review/voiceover-validation';
-import type { QuickEditAudioClip } from '../review/advanced/types';
-import type { ReviewTimeSegment } from '../review/time-segment';
 import { parseVideoProjectTextBinding } from './text/validation';
-import type { VideoProjectTextBinding } from './text/types';
-import type { VideoProject, VideoProjectClip } from './types/model';
+import type {
+  VideoProject,
+  VideoProjectClip,
+  VideoProjectSourceVoiceoverDocument,
+} from './types/model';
 import { applyVideoProjectMutationPatch } from './mutation';
 
-/** Whole accepted samples and capture clock survive all current montage placements. */
-export interface VideoProjectSourceVoiceoverDocument {
-  id: string;
-  binding: Extract<VideoProjectTextBinding, { kind: 'source' }>;
-  trackId: string;
-  reference: ReviewTimeSegment[];
-  take: QuickEditAudioClip;
-  enabled: boolean;
-  originalAudioMuteVolume?: number;
-  /** Original sound may occupy a separate instance of this same media asset. */
-  originalAudioSourceInstanceId?: string;
-}
+export type { VideoProjectSourceVoiceoverDocument } from './types/model';
 
 const identity = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0 && value.length <= 256 && value.trim() === value;

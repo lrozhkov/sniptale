@@ -57,5 +57,5 @@ it('disables tab independently from desktop capture', async () => {
   );
   expect(tab?.textContent).toContain('popup.home.captureTabHint');
   expect(tab?.textContent).not.toContain('blocked');
-  expect(tab?.title).toContain('blocked');
+  expect(tab?.getAttribute('data-popup-hint')).toContain('blocked');
 });

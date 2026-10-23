@@ -67,10 +67,10 @@ export const popupHomeMessages = defineMessageSource({
     ru: 'Открыть инструменты подготовки страницы',
     en: 'Open page preparation tools',
   },
-  toolsOpenLabel: { ru: 'Редактировать страницу', en: 'Edit page' },
+  toolsOpenLabel: { ru: 'Навигация', en: 'Navigation' },
   toolsOpenHint: {
-    ru: 'Разметка, режимы снимка и инструменты работы со страницей',
-    en: 'Markup, capture modes, and page editing tools',
+    ru: 'Пользуйтесь страницей как обычно: переходите по ссылкам, нажимайте кнопки и прокручивайте',
+    en: 'Use the page normally: follow links, click buttons, and scroll',
   },
   toolsIntroDescription: {
     ru: 'Выберите режим — панель откроется сразу с нужным инструментом.',

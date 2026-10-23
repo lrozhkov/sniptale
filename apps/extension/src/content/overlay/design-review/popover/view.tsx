@@ -10,6 +10,7 @@ import { DesignReviewActionMenu } from './action-menu';
 import { PageStyleCommentField } from './comment';
 import { useDesignReviewPopoverDrag } from './drag';
 import { DesignReviewElementBar } from './element-bar';
+import { describeDesignReviewElement } from './element-label';
 import {
   DESIGN_REVIEW_POPOVER_VIEWPORT_GAP,
   readDesignReviewPopoverTargetRect,
@@ -126,6 +127,41 @@ function useDesignReviewPopoverViewModel(props: { open: boolean; state: DesignRe
   };
 }
 
+function ElementIdentity(props: {
+  selection: NonNullable<DesignReviewViewState['selection']>;
+  text: DesignReviewViewState['text'];
+}) {
+  const elementText = props.selection.element.textContent?.trim() || props.text.preview;
+  return (
+    <>
+      <span
+        className={[
+          'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
+          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        ].join(' ')}
+        data-ui="content.design-review.element-tag"
+        tabIndex={0}
+        title={describeDesignReviewElement(props.selection.tagName)}
+      >
+        {props.selection.tagName.toUpperCase()}
+      </span>
+      {elementText ? (
+        <strong
+          className="min-w-0 max-w-[50%] truncate text-xs font-medium"
+          data-ui="content.design-review.element-text"
+          title={
+            props.text.modified
+              ? `${elementText}\n${translate('content.designReview.textModified')}`
+              : elementText
+          }
+        >
+          {elementText}
+        </strong>
+      ) : null}
+    </>
+  );
+}
+
 export function DesignReviewPopover(props: {
   actions: DesignReviewActions;
   open: boolean;
@@ -158,47 +194,41 @@ export function DesignReviewPopover(props: {
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <span
-        data-ui="content.design-review.close-backing"
-        className="pointer-events-none absolute -right-3 -top-3 z-50 inline-flex h-6 w-6 items-center justify-center"
-        style={{
-          backgroundColor: 'rgb(from var(--sniptale-color-surface-panel) r g b / 1)',
-          border: '1px solid var(--sniptale-color-border-strong)',
-          borderRadius: '50%',
-          boxSizing: 'border-box',
-        }}
+      <ContentToolbarButton
+        tone="close"
+        type="button"
+        className={[
+          'sniptale-dismiss-button',
+          'pointer-events-auto absolute right-1 top-1 z-50 inline-flex !h-6 !min-h-6 !w-6 !min-w-6 !p-0',
+          'cursor-pointer items-center justify-center !rounded-[4px] [&_svg]:!size-3.5',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
+        ].join(' ')}
+        aria-label={translate('content.designReview.close')}
+        title={translate('content.designReview.close')}
+        onClick={props.actions.close}
       >
-        <ContentToolbarButton
-          tone="close"
-          type="button"
-          className={[
-            'sniptale-dismiss-button',
-            'pointer-events-auto relative z-50 inline-flex !h-6 !min-h-6 !w-6 !min-w-6 !p-0',
-            'cursor-pointer items-center justify-center !rounded-full',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
-          ].join(' ')}
-          aria-label={translate('content.designReview.close')}
-          title={translate('content.designReview.close')}
-          onClick={props.actions.close}
-        >
-          <X size={16} />
-        </ContentToolbarButton>
-      </span>
+        <X size={14} />
+      </ContentToolbarButton>
       <div
         className="grid grid-rows-[auto_minmax(0,1fr)] overflow-visible"
         data-ui="content.design-review.popover-layout"
         style={{ maxHeight: view.basePosition.maxHeight }}
       >
-        <div className="relative z-20 p-3 pb-2 pt-4" data-ui="content.design-review.comment-layer">
+        <div className="relative z-20 p-3 pb-2 pt-8" data-ui="content.design-review.comment-layer">
           <div
-            className="absolute inset-x-0 top-0 z-10 h-4 touch-none cursor-grab active:cursor-grabbing"
+            className={[
+              'absolute inset-x-0 top-0 z-10 flex h-8 touch-none items-center gap-2 pl-3 pr-9',
+              'cursor-grab active:cursor-grabbing',
+            ].join(' ')}
             data-ui="content.design-review.popover-drag-handle"
             title={translate('content.designReview.movePopover')}
             onPointerDown={view.drag.onPointerDown}
             onPointerMove={view.drag.onPointerMove}
             onPointerUp={view.drag.onPointerUp}
             onPointerCancel={view.drag.onPointerUp}
-          />
+          >
+            <ElementIdentity selection={props.state.selection} text={props.state.text} />
+          </div>
           <PageStyleCommentField
             actions={{
               ...props.actions.comment,
@@ -222,6 +252,10 @@ export function DesignReviewPopover(props: {
             hasFeedback={props.state.comment.marker !== null}
             onCopyElement={props.actions.copyElement}
             onCopyPath={() => void props.actions.copyPath()}
+            onNavigateElement={props.actions.navigateElement}
+            onEditText={props.actions.text.edit}
+            onResetText={props.actions.text.reset}
+            text={props.state.text}
             onDeleteRequest={() => {
               props.actions.setSettingsOpen(false);
               view.setDeleteRequested((requested) => !requested);
@@ -231,6 +265,7 @@ export function DesignReviewPopover(props: {
               props.actions.setSettingsOpen(open);
             }}
             selection={props.state.selection}
+            navigation={props.state.treeNavigation}
             settingsOpen={props.state.settingsOpen}
           />
           {view.deleteRequested && !props.state.settingsOpen ? (

@@ -8,16 +8,20 @@ import {
   attachContentActionIntent,
   type ContentPrivilegedActionIntentSource,
 } from '../../../application/privileged-action-intent';
-import { setScreenshotSurfaceBinding } from '../../viewport-selector/capability';
+import {
+  createScreenshotSurfaceStatusBindingUpdater,
+  setScreenshotSurfaceBinding,
+} from '../../viewport-selector/capability';
 import type { ScreenshotSurfaceBindingSnapshot } from '../../viewport-selector/capability';
 
 export async function refreshToolbarSurfaceSession() {
+  const updateBinding = createScreenshotSurfaceStatusBindingUpdater();
   const status = await getContentRuntimeServices().messaging.sendRuntimeMessage({
     type: MessageType.SCREENSHOT_MODE_STATUS,
   });
   if (status?.success) {
-    setScreenshotSurfaceBinding({
-      token: status.enabled ? (status.surfaceCapabilityToken ?? null) : null,
+    const applied = updateBinding({
+      token: status.enabled ? status.surfaceCapabilityToken : null,
       ...(status.surfaceLeaseGeneration === undefined
         ? {}
         : { leaseGeneration: status.surfaceLeaseGeneration }),
@@ -25,6 +29,7 @@ export async function refreshToolbarSurfaceSession() {
         ? {}
         : { operationGeneration: status.surfaceOperationGeneration }),
     });
+    if (!applied) return undefined;
   }
   return status;
 }

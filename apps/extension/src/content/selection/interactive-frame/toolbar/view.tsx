@@ -30,8 +30,11 @@ export function InteractiveFrameToolbarContent({
         handleButtonMouseDown={toolbarActions.handleButtonMouseDown}
         handleEffectClick={toolbarActions.handleEffectClick}
         effectButtons={effectButtons}
+        onEffectModeSelect={toolbarProps.handleEffectModeSelect}
       />
       <InteractiveFrameToolbarMiddleSection
+        handleToggleStepBadgeClick={toolbarActions.handleToggleStepBadgeClick}
+        handleToggleCalloutClick={toolbarActions.handleToggleCalloutClick}
         frame={toolbarProps.frame}
         stepBadgePopoverAnchorRef={toolbarProps.stepBadgePopoverAnchorRef}
         calloutPopoverAnchorRef={toolbarProps.calloutPopoverAnchorRef}

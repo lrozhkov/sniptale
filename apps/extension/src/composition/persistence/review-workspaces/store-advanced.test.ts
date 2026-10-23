@@ -59,6 +59,47 @@ beforeEach(() => {
   harness.database.mockResolvedValue(fixture.database);
 });
 
+it.each(['basic', 'advanced'] as const)(
+  'retains a new project choice until %s is accepted and rejects a stale choice',
+  async (mode) => {
+    const initial = await openVideoWorkspace(id, source);
+    expect(initial.workspace.advanced.ui.modeSelectionPending).toBe(true);
+    expect((await openVideoWorkspace(id, source)).workspace.advanced.ui.modeSelectionPending).toBe(
+      true
+    );
+    const advanced = structuredClone(initial.workspace.advanced);
+    advanced.ui.mode = mode;
+    advanced.ui.modeSelectionPending = false;
+    const request = {
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: initial.workspace.revision,
+      advanced,
+    };
+    await saveVideoWorkspaceAdvanced(request);
+    await expect(
+      saveVideoWorkspaceAdvanced({ ...request, advanced: initial.workspace.advanced })
+    ).rejects.toMatchObject({ code: 'conflict' });
+    const reopened = await openVideoWorkspace(id, source);
+    expect(reopened.workspace.advanced.ui).toMatchObject({ mode, modeSelectionPending: false });
+    expect(reopened.workspace.history).toEqual([]);
+  }
+);
+
+it('does not request an initial mode choice for an existing project without the flag', async () => {
+  const initial = await openVideoWorkspace(id, source);
+  delete initial.workspace.advanced.ui.modeSelectionPending;
+  await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: initial.workspace.revision,
+    advanced: initial.workspace.advanced,
+  });
+  expect(
+    (await openVideoWorkspace(id, source)).workspace.advanced.ui.modeSelectionPending
+  ).toBeUndefined();
+});
+
 it('opens legacy workspaces with advanced defaults and persists explicit replacement', async () => {
   const opened = await openVideoWorkspace(id, source);
   expect(parseVideoWorkspace({ ...opened.workspace, advanced: undefined })?.advanced).toEqual(

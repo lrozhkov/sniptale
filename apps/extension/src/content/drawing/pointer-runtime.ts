@@ -1,12 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { DrawingPoint } from '../../features/drawing/public';
+import {
+  resolveDrawingArrowBendTarget,
+  type DrawingPoint,
+  type DrawingSessionSnapshot,
+} from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import {
   beginDrawingPointer,
   commitDrawingPointerDraft,
   toDrawingScenePoint,
   type PointerDraft,
+  type DrawingArrowHover,
 } from './interaction';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { DrawingTextDraft } from './text-editor';
@@ -23,6 +28,8 @@ export function useDrawingPointerRuntime(args: {
 }) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
+  const hoverBendRef = useRef<DrawingArrowHover | null>(null);
+  const activePointerRef = useRef<number | null>(null);
   const touchPointsRef = useRef(new Map<number, DrawingPoint>());
   const touchCentroidRef = useRef<DrawingPoint | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
@@ -31,9 +38,19 @@ export function useDrawingPointerRuntime(args: {
     const draft = draftRef.current;
     if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
+    hoverBendRef.current = null;
+    activePointerRef.current = null;
     onCancelText();
     changed();
   }, [changed, controller, onCancelText]);
+
+  useEffect(() => {
+    const cancelBend = () => {
+      if (draftRef.current?.kind === 'bend') cancelDraft();
+    };
+    window.addEventListener('blur', cancelBend);
+    return () => window.removeEventListener('blur', cancelBend);
+  }, [cancelDraft]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -50,12 +67,14 @@ export function useDrawingPointerRuntime(args: {
         }
       }
       const start = beginDrawingPointer({
-        modifiers: { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
+        modifiers: { altKey: event.altKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
         point,
         snapshot: controller.session.getSnapshot(),
         timestamp: event.timeStamp,
       });
       draftRef.current = start.draft;
+      activePointerRef.current = event.pointerId;
+      hoverBendRef.current = null;
       if (start.selection) controller.session.setSelection(start.selection);
       if (start.text) onText(start.text);
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -68,8 +87,16 @@ export function useDrawingPointerRuntime(args: {
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
       if (moveTouchViewport({ controller, event, touchCentroidRef, touchPointsRef })) return;
       const draft = draftRef.current;
-      if (!draft) return;
       const point = toDrawingScenePoint(event, root);
+      if (!draft) {
+        const previous = hoverBendRef.current;
+        hoverBendRef.current = active
+          ? resolveArrowHover(controller.session.getSnapshot(), point, event)
+          : null;
+        if (hoverBendRef.current || previous) changed();
+        return;
+      }
+      if (draft.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
       const isTextTransform =
         (draft.kind === 'move' || draft.kind === 'resize') && draft.original.kind === 'text';
       if (isTextTransform) {
@@ -87,17 +114,19 @@ export function useDrawingPointerRuntime(args: {
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [changed, controller, root]
+    [active, changed, controller, root]
   );
 
   const finishPointer = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
       if (event.pointerType === 'touch') {
         touchPointsRef.current.delete(event.pointerId);
         if (touchPointsRef.current.size < 2) touchCentroidRef.current = null;
       }
       commitDrawingPointerDraft(controller.session, draftRef.current);
       draftRef.current = null;
+      activePointerRef.current = null;
       changed();
     },
     [changed, controller]
@@ -106,11 +135,14 @@ export function useDrawingPointerRuntime(args: {
   const finalizeDraft = useCallback(() => {
     commitDrawingPointerDraft(controller.session, draftRef.current);
     draftRef.current = null;
+    hoverBendRef.current = null;
+    activePointerRef.current = null;
     changed();
   }, [changed, controller]);
 
   const cancelPointer = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
       touchPointsRef.current.delete(event.pointerId);
       touchCentroidRef.current = null;
       cancelDraft();
@@ -123,12 +155,33 @@ export function useDrawingPointerRuntime(args: {
     cancelPointer,
     changed,
     draftRef,
+    hoverBendRef,
     draftRevision,
     finalizeDraft,
     finishPointer,
     onPointerDown,
     onPointerMove,
   };
+}
+
+function resolveArrowHover(
+  snapshot: DrawingSessionSnapshot,
+  point: DrawingPoint,
+  modifiers: { altKey: boolean; ctrlKey: boolean; shiftKey: boolean }
+): DrawingArrowHover | null {
+  if (
+    snapshot.selectedObjectIds.length !== 1 ||
+    modifiers.altKey ||
+    modifiers.ctrlKey ||
+    modifiers.shiftKey
+  )
+    return null;
+  const selected = snapshot.document.objects.find(
+    (object) => object.id === snapshot.selectedObjectIds[0]
+  );
+  if (selected?.kind !== 'arrow') return null;
+  const target = resolveDrawingArrowBendTarget(selected, point);
+  return target ? { object: selected, target } : null;
 }
 
 function averagePoints(points: DrawingPoint[]): DrawingPoint {

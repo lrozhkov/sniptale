@@ -70,10 +70,6 @@ function VideoProfileFormatFields(props: {
           }))}
           onChange={(quality) => props.onChange({ ...props.configuration, quality })}
         />
-        <div className="flex justify-between text-xs text-[var(--sniptale-color-text-muted)]">
-          <span>{translate('settings.videoQuality.smallerFile')}</span>
-          <span>{translate('settings.videoQuality.moreDetail')}</span>
-        </div>
       </fieldset>
       <fieldset className="mt-4 min-w-0">
         <legend className="mb-2 text-sm font-medium">
@@ -113,41 +109,23 @@ function VideoProfileFormatFields(props: {
                 <span className="block text-[13px] font-medium">
                   {container === VideoOutputContainer.MP4 ? 'MP4' : 'WebM'}
                 </span>
-                <span className="mt-1 block text-xs text-[var(--sniptale-color-text-muted)]">
-                  {translate(
-                    container === VideoOutputContainer.MP4
-                      ? 'settings.videoQuality.mp4Purpose'
-                      : 'settings.videoQuality.webmPurpose'
-                  )}
-                </span>
               </span>
             </label>
           ))}
         </div>
       </fieldset>
-      <details className="mt-2 border-t border-[var(--sniptale-color-border-subtle)] pt-3">
-        <summary className="cursor-pointer text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.videoQuality.advanced')}
-        </summary>
-        <div className="pt-3">
-          <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
-            <ProductSelect
-              aria-label={translate('settings.videoQuality.codecLabel')}
-              menuPlacement="auto"
-              menuScrollable={false}
-              value={props.configuration.codec}
-              options={codecOptions}
-              onChange={(codec) => props.onChange({ ...props.configuration, codec })}
-            />
-          </SettingsControlRow>
-          <p className="mt-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {translate('settings.videoQuality.geometryHelp')}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {translate('settings.videoQuality.compressionHelp')}
-          </p>
-        </div>
-      </details>
+      <div className="mt-2">
+        <SettingsControlRow label={translate('settings.videoQuality.codecLabel')}>
+          <ProductSelect
+            aria-label={translate('settings.videoQuality.codecLabel')}
+            menuPlacement="auto"
+            menuScrollable={false}
+            value={props.configuration.codec}
+            options={codecOptions}
+            onChange={(codec) => props.onChange({ ...props.configuration, codec })}
+          />
+        </SettingsControlRow>
+      </div>
     </>
   );
 }
@@ -292,14 +270,12 @@ export function VideoQualityProfileEditor(props: {
             role="status"
             className="min-h-8 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]"
           >
-            {codecSupport === 'available'
+            {codecSupport === 'available' || codecSupport === 'checking'
               ? ''
               : translate(
-                  codecSupport === 'checking'
-                    ? 'settings.videoQuality.codecChecking'
-                    : codecSupport === 'unavailable'
-                      ? 'settings.videoQuality.codecUnavailable'
-                      : 'settings.videoQuality.codecUnknown'
+                  codecSupport === 'unavailable'
+                    ? 'settings.videoQuality.codecUnavailable'
+                    : 'settings.videoQuality.codecUnknown'
                 )}
           </p>
         </div>

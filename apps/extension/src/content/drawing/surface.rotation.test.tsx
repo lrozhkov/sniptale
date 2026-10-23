@@ -2,23 +2,28 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createDrawingSession } from '../../features/drawing/public';
+import { createDrawingSession, getDrawingObjectRotation } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { getDrawingRotationHandlePoint } from './interaction';
 import { DrawingSurface } from './surface';
+import { renderDrawingObject } from './render';
 
 function createCanvasContextFixture(): CanvasRenderingContext2D {
   const fixture: Partial<CanvasRenderingContext2D> = {
     arc: vi.fn(),
+    arcTo: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
     closePath: vi.fn(),
     fill: vi.fn(),
+    fillText: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 10 }) as TextMetrics),
     lineTo: vi.fn(),
     moveTo: vi.fn(),
     rect: vi.fn(),
     restore: vi.fn(),
     rotate: vi.fn(),
+    roundRect: vi.fn(),
     scale: vi.fn(),
     save: vi.fn(),
     setLineDash: vi.fn(),
@@ -51,6 +56,28 @@ beforeEach(() => {
     innerHeight: { configurable: true, value: 600 },
     devicePixelRatio: { configurable: true, value: 2 },
   });
+});
+
+it('keeps canvas text backgrounds joined in local coordinates after rotation', () => {
+  renderDrawingObject(
+    context,
+    {
+      backgroundColor: '#fef08a',
+      bounds: { x: 100, y: 100, width: 180, height: 60 },
+      color: '#111827',
+      fontSize: 20,
+      id: 'canvas-text',
+      kind: 'text',
+      rotation: 45,
+      text: 'Longer\nTiny',
+    },
+    { x: 0, y: 0 }
+  );
+  expect(context.rotate).toHaveBeenCalledWith(Math.PI / 4);
+  expect(context.moveTo).toHaveBeenCalledWith(169, 102);
+  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 102, 172, 127, 3);
+  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 127, 152, 127, 3);
+  expect(context.roundRect).not.toHaveBeenCalled();
 });
 
 it('shows the standard rotation control without skewing handles and commits live rotation', () => {
@@ -110,5 +137,59 @@ it('shows the standard rotation control without skewing handles and commits live
   act(() => canvas.dispatchEvent(pointerEvent('pointerup', rotated, true)));
 
   expect(session.getSnapshot().document.objects[0]).toMatchObject({ rotation: 30 });
+  act(() => root.unmount());
+});
+
+it('consumes the rotation release click with Text selected and accepts the next text click', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const text = {
+    backgroundColor: '#fef08a',
+    bounds: { x: 100, y: 100, width: 180, height: 60 },
+    color: '#111827',
+    fontSize: 20,
+    id: 'rotated-text',
+    kind: 'text' as const,
+    text: 'First line\nSecond',
+  };
+  session.commitObject(text);
+  session.setActiveTool('text');
+  session.select(text.id);
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => [],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const canvas = host.querySelector('canvas')!;
+  const handle = getDrawingRotationHandlePoint(text, 'rotate-ne')!;
+  const release = { x: handle.x + 30, y: handle.y + 90 };
+  const dispatch = (type: string, point: { x: number; y: number }) => {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      button: 0,
+      clientX: point.x,
+      clientY: point.y,
+    });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    act(() => canvas.dispatchEvent(event));
+  };
+  dispatch('pointerdown', handle);
+  dispatch('pointermove', release);
+  dispatch('pointerup', release);
+  dispatch('click', release);
+  expect(host.querySelector('[data-ui="content.drawing.text-input"]')).toBeNull();
+  expect(session.getSnapshot().document.objects).toHaveLength(1);
+  expect(getDrawingObjectRotation(session.getSnapshot().document.objects[0]!)).not.toBe(0);
+  dispatch('pointerdown', { x: 500, y: 400 });
+  dispatch('pointerup', { x: 500, y: 400 });
+  dispatch('click', { x: 500, y: 400 });
+  expect(host.querySelector('[data-ui="content.drawing.text-input"]')).not.toBeNull();
   act(() => root.unmount());
 });

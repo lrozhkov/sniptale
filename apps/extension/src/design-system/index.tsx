@@ -7,10 +7,12 @@ import '@sniptale/ui/styles/overlays';
 import './previews/layout.css';
 import { DesignSystemPage } from './shell/page';
 import { DesignSystemThemeSurface } from './theme';
+import { NativeHints } from '../ui/native-hints';
 
 renderPageShell({
   element: (
     <DesignSystemThemeSurface>
+      <NativeHints />
       <DesignSystemPage />
     </DesignSystemThemeSurface>
   ),

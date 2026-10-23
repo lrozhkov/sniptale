@@ -340,6 +340,8 @@ export const backgroundIngressTabRouteGroups = [
     messageTypes: [
       'START_RECORDING',
       'CANCEL_RECORDING_START',
+      'COUNTDOWN_CAMERA_OFFER',
+      'COUNTDOWN_CAMERA_CLOSE',
       'STOP_RECORDING',
       'PAUSE_RECORDING',
       'RESUME_RECORDING',
@@ -347,7 +349,8 @@ export const backgroundIngressTabRouteGroups = [
     ],
   },
   {
-    acceptedSenderClass: 'owned top-frame content document bound to its tab',
+    acceptedSenderClass:
+      'owned top-frame content document bound to its tab, or exact owned permission child frame for read-only device access validation',
     actionKind: 'tab',
     alternateAuthorizationPolicyIds: [],
     alternateAuthorityFamilies: [],

@@ -170,7 +170,7 @@ describe('effect-panels', () => {
         selectedActionOccurrence={resolveVideoProjectActionOccurrences(props.project)[0]!}
       />
     );
-    changeSelect('videoEditor.sidebar.historyEventMode', 'on');
+    chooseEventMode('videoEditor.sidebar.historyForceOn');
     expect(props.onUpdateActionEventDetails).toHaveBeenLastCalledWith(event.id, {
       clipId: null,
       presentation: { offset: -0.2, enabled: true },
@@ -200,7 +200,7 @@ describe('effect-panels', () => {
         selectedActionOccurrence={resolveVideoProjectActionOccurrences(props.project)[0]!}
       />
     );
-    changeSelect('videoEditor.sidebar.historyEventMode', 'inherit');
+    chooseEventMode('videoEditor.sidebar.historyInherit');
     expect(props.onUpdateActionEventDetails).toHaveBeenLastCalledWith(event.id, {
       clipId: null,
       presentation: { offset: -0.2 },
@@ -277,13 +277,15 @@ function clickGroup(title: string) {
   });
 }
 
-function changeSelect(label: string, value: string) {
-  const select = container?.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
-  if (!select) throw new Error(`Missing select: ${label}`);
-  act(() => {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+function chooseEventMode(label: string) {
+  const group = container?.querySelector(
+    '[role="group"][aria-label="videoEditor.sidebar.historyEventMode"]'
+  );
+  const button = Array.from(group?.querySelectorAll('button') ?? []).find(
+    (candidate) => candidate.textContent === label
+  );
+  if (!button) throw new Error(`Missing event mode: ${label}`);
+  act(() => button.click());
 }
 
 it('explains shared fact settings and authorizes the selected repeated occurrence', () => {
@@ -318,7 +320,7 @@ it('explains shared fact settings and authorizes the selected repeated occurrenc
     <InspectActionPanel {...props} currentTime={11} selectedActionOccurrence={occurrence} />
   );
   expect(container?.textContent).toContain('videoEditor.sidebar.actionSharedOccurrencesHint');
-  changeSelect('videoEditor.sidebar.historyEventMode', 'on');
+  chooseEventMode('videoEditor.sidebar.historyForceOn');
   expect(props.onUpdateActionEventDetails).toHaveBeenLastCalledWith('shared', {
     clipId: 'repeat',
     presentation: { enabled: true },

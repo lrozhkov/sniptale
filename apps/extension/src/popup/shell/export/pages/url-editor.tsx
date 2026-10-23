@@ -8,6 +8,7 @@ export function ExportPageSourceSwitch(props: {
   return (
     <div className="pb-2">
       <SegmentedSwitch
+        appearance="neutral"
         activeId={props.mode}
         ariaLabel={translate('popup.export.pageSourceModeLabel')}
         density="compact"
@@ -34,9 +35,9 @@ export function ExportUrlsEditor(props: {
         aria-label={translate('popup.export.urlInputLabel')}
         autoFocus
         className={[
-          'min-h-0 flex-1 resize-none rounded-[9px] border bg-transparent p-2.5 text-[11px] leading-5',
+          'min-h-0 flex-1 resize-none rounded-[6px] border bg-transparent p-2.5 text-[11px] leading-5',
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_92%,transparent)]',
-          'text-[var(--sniptale-color-text-primary)] outline-none focus:border-[var(--sniptale-color-accent)]',
+          'text-[var(--sniptale-color-text-primary)] outline-none focus:border-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
         placeholder={translate('popup.export.urlInputPlaceholder')}
         value={props.text}

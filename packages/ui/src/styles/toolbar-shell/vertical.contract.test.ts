@@ -32,10 +32,17 @@ describe('toolbar-shell vertical contract', () => {
       ".sniptale-toolbar[data-display-mode='vertical'] .sniptale-btn.sniptale-full-page-chevron svg {"
     );
     expect(toolbarShellVerticalStylesheet).toMatch(
-      /\.sniptale-btn\.sniptale-full-page-chevron svg \{[^}]*width: 12px;[^}]*height: 12px;[^}]*transform: rotate\(-90deg\);/su
+      /\.sniptale-btn\.sniptale-full-page-chevron svg \{[^}]*width: 12px;[^}]*height: 12px;[^}]*transform: rotate\(var\(--sniptale-toolbar-chevron-rotation, -90deg\)\);/su
     );
     expect(toolbarShellVerticalStylesheet).toMatch(
       /\.sniptale-full-page-chevron \{[^}]*flex: 0 0 18px;[^}]*min-height: 18px;[^}]*height: 18px;[^}]*max-height: 18px;[^}]*border-inline-start-width: 1px;[^}]*border-block-start-width: 0;/su
+    );
+    expect(toolbarShellVerticalStylesheet).not.toContain('.sniptale-recording-media-control');
+    expect(toolbarShellVerticalStylesheet).toMatch(
+      /\.sniptale-glass-toolbar-divider \{[^}]*margin: min\(2px, var\(--sniptale-toolbar-gap\)\) 0;/su
+    );
+    expect(toolbarShellVerticalStylesheet).not.toContain(
+      '--sniptale-toolbar-vertical-inline-size: calc(var(--sniptale-toolbar-button-size) + 28px)'
     );
   });
 });

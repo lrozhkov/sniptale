@@ -44,7 +44,7 @@ Keep its target at least 24px. Keep focus on the command after copying. Report s
 
 Related-project rows navigate without selecting projects or changing properties. URLs use real links, preserving modified-click, new-tab, keyboard, and browser behavior. Extension-API navigation retains the existing command owner. Related-object lists use one consistent navigation icon, without checkboxes or dropdown chevrons.
 
-A neutral row can brighten its text on hover. Keep adjacent rows visually separate with 4px spacing. User-authored object names in compact navigation buttons occupy one line. Truncate excess text at the trailing edge with an ellipsis. Keep the full stored and accessible name. Use the native browser title to expose the complete name on hover. Plain informational names can wrap. Loading, failure, empty results, and unavailable references have distinct readable states. An unavailable reference displays its name and reason as plain content. Do not display a working-looking navigation target.
+A neutral row can brighten its text on hover. Keep adjacent rows visually separate with 4px spacing. User-authored object names in compact navigation buttons occupy one line. Truncate excess text at the trailing edge with an ellipsis. Keep the full stored and accessible name. Follow [full-text access](localization.md#full-text-access) for hover and keyboard access. Plain informational names can wrap. Loading, failure, empty results, and unavailable references have distinct readable states. An unavailable reference displays its name and reason as plain content. Do not display a working-looking navigation target.
 
 ## Existing consumers
 

@@ -579,6 +579,21 @@ async function voiceTestField(page: Page, locale: Locale, info: TestInfo) {
     .filter({ hasText: t('settings.voiceInput.diagnosticsTitle') });
   await diagnostics.click();
   await expect(page.getByText(t('settings.voiceInput.apiStatus'), { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailable'), { exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+  ).toBeVisible();
+  await page
+    .getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    page.getByText(t('settings.voiceInput.localPackageUnavailableDescription'), { exact: true })
+  ).toBeInViewport({ ratio: 1 });
+  await expect(
+    page.getByRole('button', { name: t('settings.voiceInput.install'), exact: true })
+  ).toHaveCount(0);
   await expect(field).toHaveValue('Текст проверки микрофона');
   await screenshot(page, info, 'voice-diagnostics');
   await diagnostics.click();
@@ -595,6 +610,16 @@ for (const theme of ['light', 'dark'] as const)
   ]) {
     test(`native voice test field ${theme} ${size.width}`, async ({ page, extensionId }, info) => {
       await page.setViewportSize(size);
+      await page.addInitScript(() => {
+        Object.defineProperty(window, 'SpeechRecognition', {
+          configurable: true,
+          value: class {
+            static async available() {
+              return 'unavailable';
+            }
+          },
+        });
+      });
       await configure(page, extensionId, 'ru', theme);
       await route(page, extensionId, 'voice-input');
       await voiceTestField(page, 'ru', info);
@@ -922,7 +947,7 @@ test('native settings preset drafts clear names and cancel without changing thei
       rows.evaluateAll((nodes) =>
         nodes.map((node) => ({
           id: node.getAttribute('data-settings-collection-item'),
-          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+          title: node.querySelector('.truncate')?.textContent?.trim(),
         }))
       );
     const before = await catalog();
@@ -1012,7 +1037,7 @@ test('native settings resource create forms clear names and cancel without catal
       page.locator('[data-settings-collection-item]').evaluateAll((nodes) =>
         nodes.map((node) => ({
           id: node.getAttribute('data-settings-collection-item'),
-          title: node.querySelector('.truncate[title]')?.getAttribute('title'),
+          title: node.querySelector('.truncate')?.textContent?.trim(),
         }))
       );
     await settle(page);
@@ -1062,7 +1087,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect.soft(active).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)', { timeout: 500 });
     await route(page, extensionId, 'screen-sizes');
     const row = page.locator('[data-settings-collection-item]').first();
-    const title = row.locator('div[title]').first();
+    const title = row.locator(':scope > div.min-w-0 > div').first();
     const metadata = row.locator(':scope > div.min-w-0 > div').nth(1);
     await expect(metadata).toBeVisible();
     await expect.soft(title).toHaveCSS('font-weight', '400', { timeout: 500 });

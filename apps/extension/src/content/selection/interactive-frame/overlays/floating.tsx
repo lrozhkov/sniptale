@@ -43,6 +43,7 @@ export interface InteractiveFrameFloatingUiProps {
   selectFrame: (frameId: string, anchorOffset?: { x: number; y: number }) => void;
   clearSelection: () => void;
   handleEffectButtonClick: (mode: EffectMode) => void;
+  handleEffectModeSelect?: (mode: EffectMode) => void;
   handleStartEditing: () => void;
   handleSave: () => void;
   handleCancel: () => void;
@@ -91,6 +92,9 @@ function getToolbarProps(
     ...(props.setActiveCalloutIndex ? { setActiveCalloutIndex: props.setActiveCalloutIndex } : {}),
     setState: props.setState,
     handleEffectButtonClick: props.handleEffectButtonClick,
+    ...(props.handleEffectModeSelect
+      ? { handleEffectModeSelect: props.handleEffectModeSelect }
+      : {}),
     handleStartEditing: props.handleStartEditing,
     handleDelete: props.handleDelete,
     onUpdate: props.onUpdate,

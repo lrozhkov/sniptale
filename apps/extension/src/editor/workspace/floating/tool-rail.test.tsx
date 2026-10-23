@@ -122,6 +122,8 @@ it('renders the exact centered tool order with two vertical dividers', () => {
   expect(actionIds).toEqual([
     'editor.floating.tool-rail.select',
     'content.toolbar.future-frame-style',
+    'shared.ui.content-toolbar-button',
+    'shared.ui.content-toolbar-button',
     'content.toolbar.future-frame-style.menu',
     'editor.floating.tool-rail.pencil',
     'editor.floating.tool-rail.marker',

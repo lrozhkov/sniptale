@@ -130,6 +130,7 @@ it('clears the previous error and delegates an idle recording start', async () =
 
   expect(state.recording.clearStartError).toHaveBeenCalledOnce();
   expect(startRecordingHandlerMock).toHaveBeenCalledWith({
+    targetTabId: 1,
     captureMode: CaptureMode.TAB,
     microphoneDevices: [],
     setIsStartPending: state.recording.setIsStartPending,

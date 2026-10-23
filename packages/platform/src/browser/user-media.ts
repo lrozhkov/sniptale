@@ -43,6 +43,7 @@ function mapMicrophoneAccessError(error: unknown): MicrophoneAccessState {
     case 'NotAllowedError':
       return 'denied';
     case 'NotFoundError':
+    case 'OverconstrainedError':
       return 'no-device';
     case 'NotReadableError':
     case 'AbortError':

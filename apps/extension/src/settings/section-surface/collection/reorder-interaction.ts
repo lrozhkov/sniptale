@@ -14,7 +14,7 @@ import type { SettingsCollectionMoveIntent, SettingsCollectionResolvedGroup } fr
 
 export function useSettingsCollectionReorder(
   groups: readonly SettingsCollectionResolvedGroup[],
-  onMove: ((intent: SettingsCollectionMoveIntent) => void) | undefined
+  onMove: ((intent: SettingsCollectionMoveIntent) => void | Promise<unknown>) | undefined
 ) {
   const [keyboardPreview, setKeyboardPreview] = useState<SettingsCollectionKeyboardPreview | null>(
     null
@@ -36,7 +36,7 @@ export function useSettingsCollectionReorder(
   const emitMove = useCallback(
     (intent: SettingsCollectionMoveIntent | null) => {
       if (!intent || !onMove) return false;
-      onMove(intent);
+      void onMove(intent);
       setKeyboardPreview(null);
       announce(translate('settings.collection.announcements.moved'));
       return true;
@@ -59,7 +59,10 @@ export function useSettingsCollectionReorder(
   return {
     a11y: { announcement, dragInstructionsId, keyboardItemId: keyboardPreview?.itemId ?? null },
     draggingItemId: pointer.preview?.itemId ?? null,
-    groups: resolveKeyboardPreviewGroups(groups, pointerPreview ?? keyboardPreview),
+    groups: resolveKeyboardPreviewGroups(
+      groups,
+      pointerPreview ?? pointer.committedPreview ?? keyboardPreview
+    ),
     row: {
       onPointerStart(
         itemId: string,
@@ -71,6 +74,7 @@ export function useSettingsCollectionReorder(
         pointer.start(itemId, pointerId, clientX, clientY, root);
       },
       onKeyboardToggle(itemId: string) {
+        if (pointer.committedPreview) return;
         if (keyboardPreview?.itemId === itemId) {
           const intent = getKeyboardPreviewIntent(groups, keyboardPreview);
           setKeyboardPreview(null);
@@ -84,6 +88,7 @@ export function useSettingsCollectionReorder(
         announce(translate('settings.collection.announcements.pickedUp'));
       },
       onKeyboardMove(itemId: string, direction: -1 | 1) {
+        if (pointer.committedPreview) return;
         if (keyboardPreview?.itemId !== itemId) return;
         const next = moveKeyboardPreview(keyboardPreview, direction);
         if (next === keyboardPreview) return;
@@ -95,7 +100,10 @@ export function useSettingsCollectionReorder(
         setKeyboardPreview(null);
         announce(translate('settings.collection.announcements.cancelled'));
       },
-      onMove: emitMove,
+      onMove(intent: SettingsCollectionMoveIntent) {
+        if (pointer.committedPreview) return false;
+        return emitMove(intent);
+      },
     },
   };
 }

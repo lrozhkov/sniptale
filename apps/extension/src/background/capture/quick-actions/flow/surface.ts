@@ -12,6 +12,7 @@ import {
 import type { QuickActionFlowArgs } from './shared';
 
 type QuickActionSurfaceTransaction = {
+  transactionId: string;
   appliedLeaseId: string | null;
   ownsSession: boolean;
   priorViewport: ReturnType<QuickActionFlowArgs['viewportState']['get']>;
@@ -23,11 +24,12 @@ const transactions = new Map<number, QuickActionSurfaceTransaction>();
 
 export async function applyQuickActionSurface(
   args: QuickActionFlowArgs
-): Promise<{ surfaceCapabilityToken: string | null }> {
+): Promise<{ surfaceCapabilityToken: string | null; transactionId: string }> {
   if (transactions.has(args.tabId)) throw new Error('surface-busy');
   const existingSession = getScreenshotSurfaceSession(args.tabId);
   const session = beginScreenshotSurfaceSession(args.tabId);
   const transaction: QuickActionSurfaceTransaction = {
+    transactionId: crypto.randomUUID(),
     appliedLeaseId: null,
     ownsSession: existingSession === null,
     priorViewport: args.viewportState.get(args.tabId),
@@ -62,10 +64,13 @@ export async function releaseQuickActionSurfaceAfterFailure(
 async function applyQuickActionSurfaceTransaction(
   args: QuickActionFlowArgs,
   transaction: QuickActionSurfaceTransaction
-): Promise<{ surfaceCapabilityToken: string | null }> {
+): Promise<{ surfaceCapabilityToken: string | null; transactionId: string }> {
   if (!args.viewportPresetId) {
     if (transaction.ownsSession) args.viewportState.set(args.tabId, null);
-    return { surfaceCapabilityToken: transaction.surfaceCapabilityToken };
+    return {
+      surfaceCapabilityToken: transaction.surfaceCapabilityToken,
+      transactionId: transaction.transactionId,
+    };
   }
   const settings = await loadSettings();
   const preset = settings.viewportPresets.find(
@@ -96,13 +101,30 @@ async function applyQuickActionSurfaceTransaction(
     width: applied.width,
     height: applied.height,
   });
-  return { surfaceCapabilityToken: transaction.surfaceCapabilityToken };
+  return {
+    surfaceCapabilityToken: transaction.surfaceCapabilityToken,
+    transactionId: transaction.transactionId,
+  };
+}
+
+export function assertBorrowedQuickActionSurfaceTransaction(
+  tabId: number,
+  transactionId: string
+): boolean {
+  const transaction = transactions.get(tabId);
+  if (!transaction) return false;
+  if (transaction.transactionId !== transactionId) throw new Error('stale-transaction');
+  if (transaction.ownsSession) throw new Error('owned-transaction');
+  return true;
 }
 
 export async function releaseQuickActionSurface(
   tabId: number,
-  viewportState?: QuickActionFlowArgs['viewportState']
+  viewportState?: QuickActionFlowArgs['viewportState'],
+  transactionId?: string
 ): Promise<void> {
+  if (transactionId !== undefined)
+    assertBorrowedQuickActionSurfaceTransaction(tabId, transactionId);
   const transaction = transactions.get(tabId);
   if (!transaction) return;
   const state = viewportState ?? transaction.viewportState;

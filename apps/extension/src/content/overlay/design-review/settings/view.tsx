@@ -78,7 +78,7 @@ export function DesignReviewSettings(props: {
         >
           <nav
             className={[
-              'grid content-start gap-1 border-r border-solid p-1',
+              'grid content-start justify-items-center gap-1 border-r border-solid p-1',
               'border-[color:var(--sniptale-color-border-soft)]',
             ].join(' ')}
             aria-label={translate('content.designReview.settingsNavigation')}

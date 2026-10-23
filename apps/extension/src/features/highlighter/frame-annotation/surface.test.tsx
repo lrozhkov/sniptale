@@ -8,6 +8,7 @@ import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contract
 import { DEFAULT_BORDER_PRESET } from '../style/defaults';
 import { FrameCalloutBadge, resolveFrameCalloutBadgeText } from './callout-badge';
 import { getFrameAnnotationCommandSchema } from './commands';
+import { translate } from '../../../platform/i18n';
 import { createDefaultFrameCallout, createDefaultFrameStepBadge } from './defaults';
 import { FrameAnnotationEffectIcon } from './effect-icon';
 import { getFrameAnnotationBlurBackdropStyle } from './effect-style';
@@ -65,14 +66,7 @@ it('normalizes canonical geometry and provides complete shared commands/defaults
     normalizeFrameAnnotationSnapshot({ ...frame(), x: Number.NaN, width: -5, ordering: -2 })
   ).toMatchObject({ x: 0, width: 0, ordering: 0 });
   expect(getFrameAnnotationCommandSchema().map((command) => command.id)).toEqual(
-    expect.arrayContaining([
-      'effect-border',
-      'effect-blur',
-      'effect-focus',
-      'step-badge',
-      'callout',
-      'delete',
-    ])
+    expect.arrayContaining(['effect-blur', 'effect-focus', 'step-badge', 'callout', 'delete'])
   );
   expect(createDefaultFrameStepBadge()).toMatchObject({ enabled: true });
   expect(createDefaultFrameCallout()).toMatchObject({
@@ -382,12 +376,7 @@ it('dispatches shared floating-toolbar commands without leaking pointer events',
   await act(async () =>
     root.render(<FrameAnnotationFloatingToolbar effectMode="border" onCommand={onCommand} />)
   );
-  const buttons = [...host.querySelectorAll('button')];
-  await act(async () =>
-    buttons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-  );
-  expect(host.querySelectorAll('button').length).toBeGreaterThan(buttons.length);
-  const focus = [...host.querySelectorAll('button')].at(-1);
+  const focus = host.querySelector<HTMLButtonElement>('[data-frame-effect="focus"]');
   await act(async () =>
     focus?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   );
@@ -431,6 +420,8 @@ it('preserves every floating-toolbar command and optional action branch', async 
   const root = createRoot(host);
   const onCommand = vi.fn();
   const labels = new Map(getFrameAnnotationCommandSchema().map((item) => [item.id, item.label]));
+  labels.set('step-badge', translate('content.stepBadge.settingsTitle'));
+  labels.set('callout', translate('content.callout.settingsTitle'));
   const button = (command: Parameters<typeof labels.get>[0]) => {
     const title = labels.get(command);
     const match = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -473,7 +464,7 @@ it('preserves every floating-toolbar command and optional action branch', async 
     ...host.querySelectorAll<HTMLButtonElement>('.sniptale-action-toolbar button'),
   ];
   const calloutIndex = toolbarButtons.findIndex((item) => item.title === labels.get('callout'));
-  expect(toolbarButtons[calloutIndex + 1]?.title).toBe('Add another comment');
+  expect(toolbarButtons[calloutIndex + 2]?.title).toBe('Add another comment');
   const deleteIndex = toolbarButtons.findIndex((item) => item.title === labels.get('delete'));
   expect(toolbarButtons[deleteIndex + 1]?.title).toBe(labels.get('close'));
   host
@@ -502,7 +493,6 @@ it('preserves every floating-toolbar command and optional action branch', async 
       'edit',
       'delete',
       'close',
-      'effect-border',
       'effect-blur',
       'effect-focus',
     ])
@@ -526,10 +516,22 @@ it('preserves every floating-toolbar command and optional action branch', async 
       />
     )
   );
+  await click(button('effect-border'));
+  expect(onCommand).toHaveBeenCalledWith('effect-border');
   const commandCount = onCommand.mock.calls.length;
-  await click(button('effect-focus'));
-  await click(button('step-badge'));
-  await click(button('callout'));
+  await click(
+    host.querySelector<HTMLButtonElement>('.sniptale-annotation-effect-switch > button')!
+  );
+  await click(
+    host.querySelector<HTMLButtonElement>(
+      `button[title="${translate('content.interactiveFrame.stepBadgeSettings')}"]`
+    )!
+  );
+  await click(
+    host.querySelector<HTMLButtonElement>(
+      `button[title="${translate('content.interactiveFrame.calloutSettings')}"]`
+    )!
+  );
   expect(effectSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
   expect(stepSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
   expect(calloutSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));

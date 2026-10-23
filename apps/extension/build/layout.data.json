@@ -87,6 +87,12 @@
       "mode": "always"
     },
     {
+      "outputPath": "apps/extension/src/media-permission/index.html",
+      "sourcePath": "apps/extension/src/media-permission/index.html",
+      "rollupName": "mediaPermission",
+      "mode": "always"
+    },
+    {
       "outputPath": "apps/extension/src/web-snapshot-viewer/index.html",
       "sourcePath": "apps/extension/src/web-snapshot-viewer/index.html",
       "rollupName": "webSnapshotViewer",
@@ -197,6 +203,7 @@
     "apps/extension/src/settings/index.html",
     "apps/extension/src/gallery/index.html",
     "apps/extension/src/camera-recorder/index.html",
+    "apps/extension/src/media-permission/index.html",
     "apps/extension/src/web-snapshot-viewer/index.html",
     "apps/extension/src/offscreen/offscreen.html",
     "apps/extension/src/effect-runtime-sandbox/index.html",
@@ -251,6 +258,7 @@
     "@tailwindcss/postcss",
     "@tailwindcss/vite",
     "@vitejs/plugin-react",
+    "canvas",
     "esbuild",
     "postcss",
     "tailwindcss",

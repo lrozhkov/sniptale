@@ -1,6 +1,13 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../ui/compact-inspector-controls/layout';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import {
   FrameAnnotationCreationControls,
   type FrameAnnotationCreationMenu,
@@ -33,9 +40,49 @@ import {
   selectAnnotationForkDrafts,
 } from './annotation-fork-session';
 import { setHighlighterCreationEnabled } from '../../../selection/highlighter';
+import { resolveFrameAnnotationSettingsPopoverDirection } from '../../../../composition/frame-annotation-controls/popover/position';
+import {
+  SETTINGS_POPOVER_HEIGHT,
+  SETTINGS_POPOVER_WIDTH,
+} from '../../../../composition/frame-annotation-controls/popover/surface';
+import { resolveMainToolbarFramePopoverDirection } from '../../../selection/interactive-frame/layout/popover-position';
+import { PageToolbarControlsContext } from '../state/page-controls';
+import { PageControlVisibility } from './control-visibility';
+import { translate } from '../../../../platform/i18n';
 
 const FUTURE_FRAME_ID = 'future-frame-style';
 const EMPTY_FRAME_RECT = { x: 0, y: 0, width: 0, height: 0 };
+
+function renderAnnotationVisibility(menu: 'callout' | 'step-badge', control: ReactNode) {
+  return (
+    <PageControlVisibility
+      control={menu === 'callout' ? 'annotation-callout' : 'annotation-step-badge'}
+      label={translate(
+        menu === 'callout' ? 'content.callout.settingsTitle' : 'content.stepBadge.settingsTitle'
+      )}
+    >
+      {control}
+    </PageControlVisibility>
+  );
+}
+
+function resolveCreationMenuDirection(
+  menu: FrameAnnotationCreationMenu,
+  anchorEl: HTMLElement | null
+) {
+  if (!anchorEl) return undefined;
+  if (menu === 'frame') {
+    return resolveMainToolbarFramePopoverDirection(anchorEl, {
+      width: SETTINGS_POPOVER_WIDTH,
+      height: SETTINGS_POPOVER_HEIGHT,
+    });
+  }
+  return resolveFrameAnnotationSettingsPopoverDirection({
+    anchorEl,
+    width: SETTINGS_POPOVER_WIDTH,
+    height: SETTINGS_POPOVER_HEIGHT,
+  });
+}
 
 export function FutureFrameStyleControls(props: {
   compactMenus?: boolean;
@@ -45,6 +92,7 @@ export function FutureFrameStyleControls(props: {
   futureFrameStepBadgeActions?: ToolbarFutureFrameStepBadgeActions;
   toolbarMenuState: ToolbarMenuState;
 }) {
+  const visibility = useContext(PageToolbarControlsContext);
   const [style, setStyle] = useState(props.futureFrameStyle);
   const [frameActive, setFrameActive] = useState(true);
   const [forkDraftsHydrated, setForkDraftsHydrated] = useState(false);
@@ -114,8 +162,11 @@ export function FutureFrameStyleControls(props: {
     <CommandPressScope value={true}>
       <InspectorLayout>
         <FrameAnnotationCreationControls
+          disabled={visibility?.editing ?? false}
+          renderAnnotationControl={renderAnnotationVisibility}
           activeMenu={toCreationMenu(props.toolbarMenuState.activeMenuType)}
           context="content"
+          resolveMenuDirection={resolveCreationMenuDirection}
           frameActive={frameActive}
           calloutTemplateSourceControl={{
             onChange: (source) => setAnnotationTemplateSource('callout', source),

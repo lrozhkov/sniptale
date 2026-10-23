@@ -9,6 +9,7 @@ import { translate } from '../../platform/i18n';
 import { InspectorParameterRow, useInspectorLayout } from './layout';
 
 const TEXT_FIELD_LABEL_CLASS_NAME = [
+  'sniptale-interface-label',
   'select-none break-words',
   'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',

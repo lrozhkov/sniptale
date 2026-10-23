@@ -13,6 +13,7 @@ import {
 export function ToolbarDockingGuides(props: {
   activeEdge: ContentToolbarDockEdge | null;
   uiScale: number;
+  cornersOnly?: boolean;
 }) {
   const viewport = resolveToolbarDockViewport(props.uiScale);
   const rightGutter = window.innerWidth - viewport.width * props.uiScale;
@@ -34,9 +35,10 @@ export function ToolbarDockingGuides(props: {
     <div
       aria-hidden
       data-ui="content.toolbar.dock-guides"
-      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2147483645 }}
+      data-floating-ui-capture-transient="true"
+      style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2147483645, scale: 1 }}
     >
-      {[...TOOLBAR_DOCK_EDGES, ...corners].map((edge) => {
+      {(props.cornersOnly ? corners : [...TOOLBAR_DOCK_EDGES, ...corners]).map((edge) => {
         const horizontal = edge === 'top' || edge === 'bottom';
         const corner = edge.includes('-');
         const active = zone === edge;

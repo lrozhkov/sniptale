@@ -7,6 +7,7 @@ import {
   VideoFrameRate,
   VideoQuality,
   VideoResolutionPreset,
+  WEBCAM_DOCK_POSITIONS,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { parseStoredVideoSettings, parseStoredVideoUiState } from './guards';
 
@@ -24,6 +25,129 @@ function parseCurrentVideoSettings(value: Record<string, unknown>) {
 }
 
 describe('video guards roots', () => {
+  it.each(['circle', 'rectangle', 'soft', 'ellipse', 'square'])(
+    'round-trips %s page camera appearance',
+    (shape) => {
+      const webcamPresentation = {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+        shape,
+        appearance: { roundness: 35, zoom: 2, mirror: true, shadow: false, shadowColor: '#123abc' },
+      };
+      expect(parseCurrentVideoSettings({ webcamPresentation }).value.webcamPresentation).toEqual(
+        webcamPresentation
+      );
+      for (const invalid of [
+        { zoom: 5 },
+        { mirror: 1 },
+        { shadowColor: 'url(x)' },
+        { roundness: -1 },
+        { extra: true },
+      ]) {
+        const result = parseCurrentVideoSettings({
+          webcamPresentation: {
+            ...webcamPresentation,
+            appearance: { ...webcamPresentation.appearance, ...invalid },
+          },
+        });
+        expect(result.value.webcamPresentation).toBeUndefined();
+        expect(result.invalidFieldCount).toBe(1);
+      }
+    }
+  );
+  it('keeps old camera settings and admits only boolean free-placement preferences', () => {
+    const presentation = DEFAULT_VIDEO_SETTINGS.webcamPresentation!;
+    for (const freePlacement of [undefined, false, true]) {
+      const webcamPresentation = {
+        ...presentation,
+        ...(freePlacement === undefined ? {} : { freePlacement }),
+      };
+      expect(parseCurrentVideoSettings({ webcamPresentation }).value.webcamPresentation).toEqual(
+        webcamPresentation
+      );
+    }
+    for (const freePlacement of ['true', null, 1]) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, freePlacement } }).value
+          .webcamPresentation
+      ).toBeUndefined();
+    }
+    for (const dockPosition of WEBCAM_DOCK_POSITIONS) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, dockPosition } }).value
+          .webcamPresentation?.dockPosition
+      ).toBe(dockPosition);
+    }
+    for (const dockPosition of ['center', null, 1]) {
+      expect(
+        parseCurrentVideoSettings({ webcamPresentation: { ...presentation, dockPosition } }).value
+          .webcamPresentation
+      ).toBeUndefined();
+    }
+  });
+  it('preserves bounded cursor effects and refuses malformed appearance objects', () => {
+    const cursorEffects = {
+      haloSize: 48,
+      haloOpacity: 70,
+      dimmingRadius: 90,
+      dimmingOpacity: 45,
+      clickSize: 60,
+      clickDuration: 650,
+      haloColor: '#2563eb',
+      dimmingColor: '#112233',
+      clickColor: '#ef4444',
+    };
+    const recordingSurface = {
+      toolbarEnabled: true,
+      cursorSpotlightEnabled: true,
+      cursorEffects,
+    };
+    expect(parseCurrentVideoSettings({ recordingSurface }).value).toMatchObject({
+      recordingSurface: { cursorEffects },
+    });
+    const rgbaEffects = { ...cursorEffects, haloColor: '#2563eb80', clickColor: '#ff000000' };
+    expect(
+      parseCurrentVideoSettings({
+        recordingSurface: { ...recordingSurface, cursorEffects: rgbaEffects },
+      }).value
+    ).toMatchObject({ recordingSurface: { cursorEffects: rgbaEffects } });
+    for (const invalid of [
+      null,
+      [],
+      {},
+      { ...cursorEffects, extra: true },
+      { ...cursorEffects, haloSize: 121 },
+      { ...cursorEffects, haloOpacity: 0 },
+      { ...cursorEffects, dimmingRadius: 29 },
+      { ...cursorEffects, dimmingOpacity: 81 },
+      { ...cursorEffects, clickSize: '60' },
+      { ...cursorEffects, clickDuration: Infinity },
+      { ...cursorEffects, clickDuration: 149 },
+      { ...cursorEffects, haloColor: 'url(https://example.com/cursor.svg)' },
+      { ...cursorEffects, dimmingColor: '#12345g' },
+      { ...cursorEffects, clickColor: '#ff0000800' },
+    ]) {
+      expect(
+        parseCurrentVideoSettings({
+          recordingSurface: { ...recordingSurface, cursorEffects: invalid },
+        }).invalidFieldCount
+      ).toBe(1);
+    }
+  });
+
+  it('preserves optional microphone warning booleans and rejects malformed preferences', () => {
+    for (const warnWithoutMicrophone of [true, false]) {
+      expect(parseCurrentVideoSettings({ warnWithoutMicrophone }).value).toMatchObject({
+        warnWithoutMicrophone,
+      });
+    }
+    expect(parseCurrentVideoSettings({}).value).not.toHaveProperty('warnWithoutMicrophone');
+    for (const warnWithoutMicrophone of [null, 'false', 0, {}]) {
+      const parsed = parseCurrentVideoSettings({ warnWithoutMicrophone, microphoneEnabled: true });
+      expect(parsed.invalidFieldCount).toBe(1);
+      expect(parsed.value).not.toHaveProperty('warnWithoutMicrophone');
+      expect(parsed.value.microphoneEnabled).toBe(true);
+    }
+  });
   it('returns empty values for undefined and marks invalid non-record roots', () => {
     expect(parseStoredVideoSettings(undefined)).toEqual({
       hasInvalidRoot: false,

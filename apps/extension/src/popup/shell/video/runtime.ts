@@ -17,6 +17,8 @@ import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
 export function useVideoRouteRuntime(options: {
   capabilities: ActiveTabCapabilities;
   initialMode?: CaptureMode;
+  initialPresetId?: string | null;
+  persistUiSelection?: boolean;
 }): PopupVideoRuntimeStateSlice & {
   isReady: boolean;
   setIsReady(ready: boolean): void;
@@ -25,7 +27,9 @@ export function useVideoRouteRuntime(options: {
   const [isReady, setIsReady] = useState(false);
   const [viewportPresets, setViewportPresets] = useState<ViewportPreset[]>([]);
   const [videoCaptureMode, setVideoCaptureMode] = useState(options.initialMode ?? CaptureMode.TAB);
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(
+    options.initialPresetId ?? null
+  );
   const [videoSettings, setVideoSettings] = useState(DEFAULT_VIDEO_SETTINGS);
   const [recordingControlCapability, updateRecordingControlCapability] =
     useState<RecordingControlCapability | null>(null);
@@ -122,6 +126,9 @@ export function useVideoRouteRuntime(options: {
     videoSettings,
   });
   usePopupVideoPersistenceEffects({
+    ...(options.persistUiSelection === undefined
+      ? {}
+      : { persistUiSelection: options.persistUiSelection }),
     isReady,
     selectedPresetId,
     setSelectedPresetId,

@@ -217,6 +217,39 @@ beforeEach(() => {
 });
 
 describe('handleScreenshotModeMessage auto-start captures', () => {
+  it('snapshots existing preparation settings before applying popup capture settings', () => {
+    const params = createBridgeParams();
+    params.modeState.screenshotMode = true;
+    params.modeState.isToolbarVisible = true;
+    Object.assign(params.modeState, { drawingMode: true, navigationLockEnabled: false });
+    Object.assign(params.quickAction, { timerDelay: 7 });
+    handleScreenshotModeMessage(
+      {
+        type: MessageType.ENABLE_SCREENSHOT_MODE,
+        autoStartCaptureType: 'visible',
+        quickActionOverlay: {
+          afterCapture: 'copy',
+          imageFormat: 'png',
+          imageQuality: 100,
+          exitAfterCapture: true,
+        },
+      },
+      params,
+      vi.fn()
+    );
+    expect(params.viewport.queueAutoStartCapture).toHaveBeenCalledWith(
+      'visible',
+      undefined,
+      expect.objectContaining({
+        preparationBaseline: expect.objectContaining({
+          captureAction: 'download_default',
+          timerDelay: 7,
+          editingMode: 'drawing',
+          isToolbarVisible: true,
+        }),
+      })
+    );
+  });
   it(
     'queues auto-start captures through the viewport readiness seam',
     expectAutoStartCaptureQueueing

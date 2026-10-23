@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, CSSProperties } from 'react';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -6,7 +6,7 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 
 const BUTTON_BASE_CLASS_NAME = [
   'group relative h-[58px] min-h-[58px] min-w-0 basis-0 overflow-hidden',
-  'rounded-[12px] border',
+  'rounded-[6px] border',
 ].join(' ');
 const BUTTON_ACTIVE_CLASS_NAME = [
   'grow-[1.9] border-[var(--sniptale-color-border-soft)]',
@@ -26,7 +26,8 @@ const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 tex
   ' '
 );
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
-  'pointer-events-none absolute inset-y-0 left-[38px] right-2 flex min-w-0 items-center text-left',
+  'pointer-events-none absolute inset-y-0 left-[38px] flex min-w-0 items-center text-left',
+  'w-[calc((100cqw-12px)*var(--popup-mode-expanded-grow)/(var(--popup-mode-expanded-grow)+2)-48px)]',
 ].join(' ');
 const MODE_ICON_CLASS_NAME = [
   'absolute h-[19px] w-[19px]',
@@ -95,15 +96,19 @@ export function PopupExpandingModeButton({
   compact = false,
   onClick,
 }: PopupExpandingModeButtonProps) {
+  const textLayoutStyle: CSSProperties & { '--popup-mode-expanded-grow': number } = {
+    '--popup-mode-expanded-grow': compact ? 2.2 : 1.9,
+  };
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={active}
       className={getButtonClassName(active, animate, disabled, compact)}
+      style={textLayoutStyle}
       disabled={disabled}
       onClick={onClick}
-      title={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
+      data-popup-hint={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
     >
       <Icon
         className={cx(
@@ -116,15 +121,20 @@ export function PopupExpandingModeButton({
         )}
       />
       <span aria-hidden="true" className={getCompactLayerClassName(active, animate)}>
-        <span className="absolute inset-x-1 bottom-[8px] block truncate text-[9px] font-medium leading-tight">
+        <span
+          className={[
+            'absolute bottom-[6px] left-1/2 -translate-x-1/2 line-clamp-2 text-[10px] font-normal leading-tight',
+            'w-[calc((100cqw-12px)/(var(--popup-mode-expanded-grow)+2)-8px)]',
+          ].join(' ')}
+        >
           {label}
         </span>
       </span>
 
       <span aria-hidden="true" className={getExpandedLayerClassName(active, animate)}>
-        <span className="w-[108px] shrink-0">
-          <span className="block truncate text-[11px] font-semibold leading-tight">{label}</span>
-          <span className="mt-0.5 block text-[8px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 text-xs font-medium leading-tight">{label}</span>
+          <span className="mt-0.5 line-clamp-2 text-[9px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
             {description}
           </span>
         </span>

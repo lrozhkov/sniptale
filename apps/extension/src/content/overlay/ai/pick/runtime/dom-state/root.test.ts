@@ -119,6 +119,8 @@ function expectAiPickDomSetup(state: ReturnType<typeof createAiPickDomState>): v
   expect(buildElementMapsMock).toHaveBeenCalledWith(state.elementIndex, expect.any(Object));
   expect(document.body.classList.contains('sniptale-ai-pick-mode')).toBe(true);
   expect(state.cursorStyleElement?.id).toBe('sniptale-ai-pick-cursor-style');
+  expect(state.cursorStyleElement?.textContent).toContain('cursor: default !important');
+  expect(state.cursorStyleElement?.textContent).not.toContain('data:image');
   expect(addEventListenerToAllWindowsDynamicMock.mock.calls.map(([type]) => type)).toEqual([
     'mousemove',
     'pointerdown',

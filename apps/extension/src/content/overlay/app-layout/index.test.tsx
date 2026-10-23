@@ -330,6 +330,33 @@ async function verifiesSidebarOwnerSurvivesToolbarCollapse() {
 describe('ContentAppLayout', () => {
   useContentAppLayoutTestScope();
 
+  it('temporarily hides scenario chrome in video mode without changing the scenario owner', async () => {
+    const props = createProps();
+    props.scenario.state.captureAction = 'scenario';
+    props.scenario.state.scenarioEnabled = true;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: false, scenario: props.scenario })
+    );
+    props.toolbar.modes.videoRecordingMode = true;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: true, scenario: props.scenario })
+    );
+    props.toolbar.modes.videoRecordingMode = false;
+    await renderLayout(props);
+    expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isCompletelyHidden: false, scenario: props.scenario })
+    );
+    expect(props.scenario.actions.setSidebarVisible).not.toHaveBeenCalled();
+    props.scenario.state.scenarioEnabled = false;
+    for (const videoMode of [true, false]) {
+      props.toolbar.modes.videoRecordingMode = videoMode;
+      await renderLayout(props);
+      expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).toBeNull();
+    }
+  });
+
   it(
     'composes the split toolbar, sidebar, and dialog stacks with the grouped layout props',
     verifiesLayoutComposition
@@ -342,47 +369,50 @@ describe('ContentAppLayout', () => {
     'retains the sidebar position owner while the toolbar is collapsed',
     verifiesSidebarOwnerSurvivesToolbarCollapse
   );
-  it('keeps the embedded camera visible while the video toolbar is collapsed', async () => {
-    const props = createProps();
-    const drawingOwner = createRecordingDrawingOwner();
-    props.toolbar.isToolbarVisible = false;
-    props.toolbar.modes.videoRecordingMode = true;
-    props.toolbar.videoRecording = {
-      drawingOwner,
-      state: {
-        ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
-        cameraEnabled: true,
-        peerGeneration: 1,
-        surfaceSessionId: 'surface-1',
-        webcamPresentation: {
-          ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE.webcamPresentation,
-          mode: 'embedded',
+  it.each([true, false])(
+    'keeps the embedded camera visible with video toolbar mode %s',
+    async (videoMode) => {
+      const props = createProps();
+      const drawingOwner = createRecordingDrawingOwner();
+      props.toolbar.isToolbarVisible = false;
+      props.toolbar.modes.videoRecordingMode = videoMode;
+      props.toolbar.videoRecording = {
+        drawingOwner,
+        state: {
+          ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE,
+          cameraEnabled: true,
+          peerGeneration: 1,
+          surfaceSessionId: 'surface-1',
+          webcamPresentation: {
+            ...INITIAL_VIDEO_RECORDING_TOOLBAR_STATE.webcamPresentation,
+            mode: 'embedded',
+          },
         },
-      },
-      onActivate: vi.fn(() => true),
-      onCancelStart: vi.fn(),
-      onCameraEnabledChange: vi.fn(),
-      onCameraGeometryChange: vi.fn(),
-      onCameraOffer: vi.fn(async () => 'answer'),
-      onCameraPeerClose: vi.fn(),
-      onDeactivate: vi.fn(() => true),
-      onInteractionChange: vi.fn(),
-      onMicrophoneEnabledChange: vi.fn(),
-      onPause: vi.fn(),
-      onResume: vi.fn(),
-      onSpotlightEnabledChange: vi.fn(),
-      onStart: vi.fn(),
-      onStop: vi.fn(),
-    };
+        onActivate: vi.fn(() => true),
+        onCancelStart: vi.fn(),
+        onCameraEnabledChange: vi.fn(),
+        onCameraGeometryChange: vi.fn(),
+        onCameraOffer: vi.fn(async () => 'answer'),
+        onCameraPeerClose: vi.fn(),
+        onDeactivate: vi.fn(() => true),
+        onInteractionChange: vi.fn(),
+        onMicrophoneEnabledChange: vi.fn(),
+        onPause: vi.fn(),
+        onResume: vi.fn(),
+        onSpotlightEnabledChange: vi.fn(),
+        onStart: vi.fn(),
+        onStop: vi.fn(),
+      };
 
-    await renderLayout(props);
+      await renderLayout(props);
 
-    expect(embeddedRecordingCameraMock).toHaveBeenCalledWith(
-      expect.objectContaining({ enabled: true })
-    );
-    expect(contentToolbarShellMock).toHaveBeenCalledWith(
-      expect.objectContaining({ toolbar: expect.objectContaining({ isToolbarVisible: false }) })
-    );
-    drawingOwner.dispose();
-  });
+      expect(embeddedRecordingCameraMock).toHaveBeenCalledWith(
+        expect.objectContaining({ enabled: true })
+      );
+      expect(contentToolbarShellMock).toHaveBeenCalledWith(
+        expect.objectContaining({ toolbar: expect.objectContaining({ isToolbarVisible: false }) })
+      );
+      drawingOwner.dispose();
+    }
+  );
 });

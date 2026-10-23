@@ -8,6 +8,7 @@ import {
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { getVideoRecordingRuntimeState } from '../runtime/session-state';
 import type { VideoRecordingSurfaceLease } from './surface-lease';
+import { resolveMicrophoneGain } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 
 export function createVideoRecordingSurfaceSnapshot(
   lease: VideoRecordingSurfaceLease,
@@ -24,12 +25,16 @@ export function createVideoRecordingSurfaceSnapshot(
     cursorSpotlightEnabled: settings.recordingSurface?.cursorSpotlightEnabled ?? false,
     cursorDimmingEnabled: settings.recordingSurface?.cursorDimmingEnabled ?? false,
     cursorClickAnimationEnabled: settings.recordingSurface?.cursorClickAnimationEnabled ?? false,
+    ...(settings.recordingSurface?.cursorEffects
+      ? { cursorEffects: settings.recordingSurface.cursorEffects }
+      : {}),
     documentGeneration: lease.documentGeneration,
     duration: ownsRecording ? state.duration : 0,
     entry: lease.entry,
     errorCode: ownsRecording ? state.error : null,
     lifecycle: lease.lifecycle,
     microphoneEnabled: liveMedia?.microphoneEnabled ?? settings.microphoneEnabled,
+    microphoneGain: resolveMicrophoneGain(settings),
     microphoneDeviceId: liveMedia?.microphoneDeviceId ?? settings.microphoneDeviceId,
     peerGeneration: lease.peerGeneration,
     recordingId: lease.recordingId,

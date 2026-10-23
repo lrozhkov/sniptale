@@ -23,6 +23,7 @@ export type PopupStartupDescriptor =
   | {
       page: 'video';
       videoMode?: CaptureMode;
+      videoLaunch?: { tabId: number; viewportPresetId: string | null };
       recordingSnapshot?: PopupRecordingSnapshot;
       postRecordSnapshot?: PopupPostRecordSnapshot;
       recordingSeed?: VideoRecordingRuntimeState;

@@ -80,21 +80,23 @@ function performPointerClick(element: HTMLElement) {
   element.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
 }
 
-function openManualCalloutSettings(source: 'quick' | 'selected') {
+async function openManualCalloutSettings(source: 'quick' | 'selected') {
   if (source === 'selected') {
-    act(() => useFrameUIStore.getState().selectFrame('frame-1'));
-    act(() => performPointerClick(findButton(translate('content.interactiveFrame.calloutEdit'))));
+    await act(async () => useFrameUIStore.getState().selectFrame('frame-1'));
+    await act(async () =>
+      performPointerClick(findButton(translate('content.interactiveFrame.calloutSettings')))
+    );
   } else {
     const quickSettings = queryAllContentUiElements('.sniptale-callout-settings-handle')[0];
     expect(quickSettings).toBeInstanceOf(HTMLElement);
-    act(() => performPointerClick(quickSettings as HTMLElement));
+    await act(async () => performPointerClick(quickSettings as HTMLElement));
   }
   const modeButtons = queryAllContentUiElements('button');
   const forkButton = modeButtons.find(
     (button) => button.title === translate('content.templateFork.fork')
   );
   if (forkButton) {
-    act(() => performPointerClick(forkButton));
+    await act(async () => performPointerClick(forkButton));
     return;
   }
   expect(
@@ -130,16 +132,28 @@ afterEach(() => {
 describe('callout settings lifecycle', () => {
   it.each(['selected', 'quick'] as const)(
     'keeps the %s settings lifecycle open after dropdown and color updates',
-    (source) => {
-      openManualCalloutSettings(source);
+    async (source) => {
+      await openManualCalloutSettings(source);
 
-      const fontSelect = queryAllContentUiElements('[aria-label="Шрифт"]')[0];
-      act(() => performPointerClick(fontSelect as HTMLButtonElement));
-      const monoOption = queryAllContentUiElements('[role="option"]').find(
-        (option): option is HTMLButtonElement =>
-          option instanceof HTMLButtonElement && option.textContent === 'Mono'
+      await act(async () =>
+        performPointerClick(findButton(translate('content.callout.manualConnector')))
       );
-      act(() => performPointerClick(monoOption as HTMLButtonElement));
+      const lineConnector = queryAllContentUiElements('button').find(
+        (button) => button.textContent === translate('content.callout.connector.line')
+      );
+      expect(lineConnector).toBeInstanceOf(HTMLButtonElement);
+      await act(async () => performPointerClick(lineConnector as HTMLButtonElement));
+      const markerSelect = queryAllContentUiElements(
+        `button[aria-label="${translate('content.callout.blockMarker')}"]`
+      )[0];
+      expect(markerSelect).toBeInstanceOf(HTMLButtonElement);
+      await act(async () => performPointerClick(markerSelect as HTMLButtonElement));
+      const markerOption = queryAllContentUiElements('[role="option"]').find(
+        (option) => option.textContent === translate('content.callout.marker.arrow')
+      );
+      expect(markerOption).toBeInstanceOf(HTMLElement);
+      await act(async () => performPointerClick(markerOption as HTMLElement));
+      expect(markerSelect?.textContent).toContain(translate('content.callout.marker.arrow'));
 
       expect(useFrameUIStore.getState().activePopover).toEqual({
         frameId: 'frame-1',
@@ -148,14 +162,17 @@ describe('callout settings lifecycle', () => {
       });
       expect(queryAllContentUiElements('.sniptale-callout-settings-popover')).toHaveLength(1);
 
+      await act(async () =>
+        performPointerClick(findButton(translate('content.callout.manualText')))
+      );
       const pickerTrigger = queryAllContentUiElements(
         '[data-ui="shared.ui.color-selector.picker-trigger"]'
       )[0];
-      act(() => performPointerClick(pickerTrigger as HTMLButtonElement));
+      await act(async () => performPointerClick(pickerTrigger as HTMLButtonElement));
       const applyButton = queryAllContentUiElements('button').find(
         (button) => button.textContent === 'Применить'
       );
-      act(() => performPointerClick(applyButton as HTMLButtonElement));
+      await act(async () => performPointerClick(applyButton as HTMLButtonElement));
 
       expect(useFrameUIStore.getState().activePopover).toEqual({
         frameId: 'frame-1',

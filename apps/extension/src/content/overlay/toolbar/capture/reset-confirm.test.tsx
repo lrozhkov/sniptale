@@ -181,15 +181,25 @@ it('places the vertical popup using layout height unaffected by entrance animati
 });
 
 it.each([
-  ['all', 'resetPagePreparationMessage'],
-  ['drawing', 'resetDrawingMessage'],
-  ['annotation', 'resetAnnotationMessage'],
-  ['content-editing', 'resetContentEditingMessage'],
-  ['design-review', 'resetDesignReviewMessage'],
-] as const)('confirms only the advertised %s scope', (resetScope, message) => {
+  ['all', 'resetPagePreparationMessage', 'clearPagePreparation'],
+  ['drawing', 'resetDrawingMessage', 'clearDrawings'],
+  ['annotation', 'resetAnnotationMessage', 'clearAnnotations'],
+  ['content-editing', 'resetContentEditingMessage', 'restorePageContent'],
+  ['design-review', 'resetDesignReviewMessage', 'clearReviewChanges'],
+] as const)('confirms only the advertised %s scope', (resetScope, message, label) => {
   render();
   act(() => root?.render(<Harness resetScope={resetScope} />));
+  const icon = resetScope === 'all' ? 'rotate-ccw' : 'brush-cleaning';
+  expect(trigger().querySelector(`svg.lucide-${icon}`)).not.toBeNull();
+  expect(trigger().querySelectorAll('svg')).toHaveLength(1);
+  expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('18');
+  expect(trigger().getAttribute('aria-label')).toBe(`content.toolbar.${label}`);
+  expect(trigger().title).toBe(`content.toolbar.${label}`);
   click(trigger());
+  expect(scope.querySelector('[role="alertdialog"] strong')?.textContent).toBe(
+    `content.toolbar.${label}`
+  );
+  expect(actions()[1]?.textContent).toBe(`content.toolbar.${label}`);
   expect(scope.querySelector('[role="alertdialog"]')?.textContent).toContain(
     `content.toolbar.${message}`
   );

@@ -1,5 +1,7 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useRef } from 'react';
+import { Icon } from '@iconify/react';
+import cursorTextIcon from '@iconify-icons/tabler/cursor-text';
 import {
   Bot,
   Check,
@@ -7,7 +9,6 @@ import {
   MousePointerClick,
   Pencil,
   SwatchBook,
-  TextCursor,
   TextCursorInput,
   Touchpad,
   Video,
@@ -31,8 +32,10 @@ import {
   useToolbarFloatingMenuDismissal,
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
+import { useToolbarMenuDirection } from '../menu/direction';
 import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
+import { PageControlVisibility, PageProtectedControls } from './control-visibility';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
@@ -219,13 +222,10 @@ function ModeMenuItem(props: {
   );
 }
 
-function ToolbarModeMenu(props: {
-  menuRef: React.RefObject<HTMLDivElement | null>;
-  onClose: () => void;
+function resolveModeMenuLayout(props: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   triggerProps: ToolbarModeButtonsProps;
 }) {
-  const adopted = React.useContext(CommandPressScope);
   const placement = getToolbarMenuPosition(props.triggerRef.current, 320);
   const menuPlacement = resolveToolbarMenuPlacement(
     props.triggerProps.displayMode ?? 'horizontal',
@@ -239,6 +239,20 @@ function ToolbarModeMenu(props: {
     placement,
     viewportRightInset: props.triggerProps.sidebarVisible ? TOOLBAR_SIDEBAR_RIGHT_INSET_PX : 0,
   });
+  return {
+    placement: menuPlacement,
+    style: menuStyle ? { ...menuStyle, zIndex: TOOLBAR_PRIMARY_MENU_Z_INDEX } : null,
+  };
+}
+
+function ToolbarModeMenu(props: {
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  triggerProps: ToolbarModeButtonsProps;
+}) {
+  const adopted = React.useContext(CommandPressScope);
+  const { placement: menuPlacement, style: menuStyle } = resolveModeMenuLayout(props);
   const selectedMode = getSelectedMode(props.triggerProps);
 
   if (!menuStyle) {
@@ -253,7 +267,7 @@ function ToolbarModeMenu(props: {
         title={translate('content.toolbar.modeMenuTitle')}
         variant="capture"
         placement={menuPlacement}
-        style={{ ...menuStyle, zIndex: TOOLBAR_PRIMARY_MENU_Z_INDEX }}
+        style={menuStyle}
       >
         {TOOLBAR_INTERACTION_MODES.map((mode) => {
           const selected = selectedMode === mode;
@@ -303,7 +317,15 @@ function getPageEditingModeCopy(mode: ToolbarPageEditingMode) {
 function getPageEditingModeIcon(mode: ToolbarPageEditingMode) {
   switch (mode) {
     case 'direct-text':
-      return <TextCursor size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
+      return (
+        <Icon
+          icon={cursorTextIcon}
+          width={18}
+          height={18}
+          className={`${MODE_ICON_CLASS_NAME} tabler-cursor-text`}
+          aria-hidden="true"
+        />
+      );
     case 'ai':
       return <Bot size={18} strokeWidth={2} className={MODE_ICON_CLASS_NAME} />;
     case 'block-selection':
@@ -320,7 +342,7 @@ function PageEditingModeButton(props: {
 }) {
   const copy = getPageEditingModeCopy(props.mode);
 
-  return (
+  const control = (
     <ContentToolbarButton
       type="button"
       active={props.active}
@@ -338,6 +360,16 @@ function PageEditingModeButton(props: {
     >
       {getPageEditingModeIcon(props.mode)}
     </ContentToolbarButton>
+  );
+  return props.mode === 'block-selection' ? (
+    <PageProtectedControls>{control}</PageProtectedControls>
+  ) : (
+    <PageControlVisibility
+      control={props.mode === 'ai' ? 'editing-ai' : 'editing-direct-text'}
+      label={copy.label}
+    >
+      {control}
+    </PageControlVisibility>
   );
 }
 
@@ -370,6 +402,9 @@ function ToolbarQuickEditModeButtons(props: ToolbarModeButtonsProps) {
 
 export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuSide = useToolbarMenuDirection(() =>
+    resolveModeMenuLayout({ triggerProps: props, triggerRef })
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedMode = getSelectedMode(props);
   const buttonCopy = getModeCopy(selectedMode);
@@ -386,7 +421,7 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   return (
     <>
       <ContentToolbarGroup className="sniptale-mode-selector-group">
-        <div className="sniptale-mode-wrapper">
+        <div className="sniptale-mode-wrapper" data-menu-side={menuSide}>
           <ModeSelectorButton
             label={buttonCopy.label}
             title={

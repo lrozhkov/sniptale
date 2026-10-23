@@ -7,6 +7,18 @@ it('accepts only supported capture action values', () => {
   expect(isCaptureActionType('download')).toBe(false);
 });
 
+it('accepts only string quick-action transaction identities', () => {
+  const overlay = {
+    afterCapture: 'copy',
+    exitAfterCapture: false,
+    imageFormat: 'png',
+    imageQuality: 90,
+  };
+  expect(isQuickActionOverlay({ ...overlay, transactionId: 'transaction-1' })).toBe(true);
+  expect(isQuickActionOverlay({ ...overlay, transactionId: 1 })).toBe(false);
+  expect(isQuickActionOverlay({ ...overlay, transactionId: null })).toBe(false);
+});
+
 it('validates quick-action overlays and toast payloads with optional fields', () => {
   expect(
     isQuickActionOverlay({

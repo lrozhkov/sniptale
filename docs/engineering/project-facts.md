@@ -163,6 +163,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/media-library-header.test.tsx`
 - `apps/extension/src/ui/media-library-header.tsx`
 - `apps/extension/src/ui/media-library-list.tsx`
+- `apps/extension/src/ui/native-hints`
 - `apps/extension/src/ui/page-bootstrap`
 - `apps/extension/src/ui/paint-selector`
 - `apps/extension/src/ui/pointer-feedback`
@@ -173,6 +174,10 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/presentation-join-fields.tsx`
 - `apps/extension/src/ui/presentation-media-fields.test.tsx`
 - `apps/extension/src/ui/presentation-media-fields.tsx`
+- `apps/extension/src/ui/recording-camera-controls.test.tsx`
+- `apps/extension/src/ui/recording-camera-controls.tsx`
+- `apps/extension/src/ui/recording-icon.test.tsx`
+- `apps/extension/src/ui/recording-icon.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/theme`
 - `apps/extension/src/ui/video-export`
@@ -234,6 +239,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `content` → `apps/extension/src/content`
 - `camera-recorder` → `apps/extension/src/camera-recorder`
 - `popup` → `apps/extension/src/popup`
+- `media-permission` → `apps/extension/src/media-permission`
 - `settings` → `apps/extension/src/settings`
 - `gallery` → `apps/extension/src/gallery`
 - `design-system` → `apps/extension/src/design-system`

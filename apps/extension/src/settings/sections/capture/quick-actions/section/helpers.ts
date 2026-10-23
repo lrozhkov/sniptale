@@ -45,7 +45,7 @@ export function createDefaultQuickAction(): QuickAction {
     hotkey: null,
     screenshotMode: 'visible',
     viewportPresetId: null,
-    delay: null,
+    delay: 0,
     afterCapture: 'download_default',
     imageFormat: null,
     imageQuality: null,

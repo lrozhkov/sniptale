@@ -29,6 +29,7 @@ export function beginVideoRecordingPreparation(
     cropRegion: null,
     viewportPresetId,
     liveMedia: createVideoRecordingLiveMediaState(settings),
+    outputProfile: { ...settings.outputProfile },
     error: null,
   });
 }

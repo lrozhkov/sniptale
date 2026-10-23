@@ -64,6 +64,8 @@ it('keeps an open settings dropdown transient instead of marking its trigger act
   );
   expect(trigger?.getAttribute('aria-expanded')).toBe('true');
   expect(trigger?.getAttribute('data-active')).toBeNull();
+  expect(trigger?.classList.contains('sniptale-toggle')).toBe(false);
+  expect(trigger?.getAttribute('data-menu-indicator')).toBe('true');
 
   act(() => root.unmount());
 });

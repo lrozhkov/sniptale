@@ -6,7 +6,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
 
 const controllerMocks = vi.hoisted(() => ({
+  openTarget: vi.fn(() => true),
+  flushHistory: vi.fn(),
+  showToast: vi.fn(),
   closeComment: vi.fn(() => true),
+  canEditText: vi.fn(() => true),
+  canResetText: vi.fn(() => false),
+  editText: vi.fn(() => true),
+  resetText: vi.fn(() => true),
   dismissSelection: vi.fn(),
   dismissRequestHandler: null as (() => boolean) | null,
   registerDismissRequestHandler: vi.fn((handler: () => boolean) => {
@@ -33,16 +40,21 @@ const selection: PageStyleSelectionSnapshot = {
 };
 const designReviewModeState = {
   enabled: true,
+  editingText: false,
   selection: { anchor: { x: 20, y: 30 }, snapshot: selection },
 };
 
 vi.mock('../../../selection/design-review', () => ({
+  canEditDesignReviewText: controllerMocks.canEditText,
+  canResetDesignReviewText: controllerMocks.canResetText,
+  startDesignReviewTextEditing: controllerMocks.editText,
+  resetDesignReviewText: controllerMocks.resetText,
   DesignReviewModeState: undefined,
   disableDesignReviewMode: vi.fn(),
   dismissDesignReviewSelection: controllerMocks.dismissSelection,
   enableDesignReviewMode: vi.fn(),
   getDesignReviewModeState: () => designReviewModeState,
-  openDesignReviewTarget: vi.fn(() => true),
+  openDesignReviewTarget: controllerMocks.openTarget,
   registerDesignReviewInspectorDismissRequestHandler: controllerMocks.registerDismissRequestHandler,
   subscribeToDesignReviewMode: () => () => undefined,
 }));
@@ -105,6 +117,12 @@ vi.mock('../runtime/record', () => ({
 vi.mock('./clipboard', () => ({
   copyDesignReviewText: vi.fn(async () => true),
 }));
+vi.mock('../runtime/actions', () => ({
+  flushPendingPageStyleHistory: controllerMocks.flushHistory,
+}));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  showToast: controllerMocks.showToast,
+}));
 
 import { useDesignReviewController } from './controller';
 
@@ -118,9 +136,17 @@ function Harness() {
 }
 
 beforeEach(async () => {
+  Object.defineProperty(document.body, 'getClientRects', {
+    configurable: true,
+    value: () => [new DOMRect(0, 0, 1280, 560)],
+  });
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   controllerMocks.closeComment.mockReturnValue(true);
+  controllerMocks.openTarget.mockReturnValue(true);
+  controllerMocks.flushHistory.mockReset();
   controllerMocks.voiceActive = false;
+  designReviewModeState.editingText = false;
+  target.textContent = 'Save';
   host = document.createElement('div');
   document.body.append(host, target);
   root = createRoot(host);
@@ -128,6 +154,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  Reflect.deleteProperty(document.body, 'getClientRects');
   act(() => root?.unmount());
   root = null;
   latest = null;
@@ -146,6 +173,69 @@ it('autosaves and closes the inspector through the picker outside-dismiss reques
   expect(controllerMocks.stopVoiceInput).toHaveBeenCalledTimes(2);
   expect(controllerMocks.dismissSelection).toHaveBeenCalledOnce();
   expect(latest?.inspectorOpen).toBe(false);
+});
+
+it('finishes the comment before text editing and hides only the inspector during input', async () => {
+  act(() => latest?.actions.text.edit());
+  expect(controllerMocks.editText).toHaveBeenCalledOnce();
+  expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
+  designReviewModeState.editingText = true;
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(false);
+  expect(latest?.enabled).toBe(true);
+  target.textContent = 'Changed';
+  designReviewModeState.editingText = false;
+  await act(async () => root?.render(<Harness />));
+  expect(latest?.inspectorOpen).toBe(true);
+  expect(latest?.viewState.text.preview).toBe('Changed');
+});
+
+it('saves the comment and flushes properties before selecting another tree element', () => {
+  act(() => latest?.actions.navigateElement(document.body));
+  expect(controllerMocks.openTarget).toHaveBeenCalledWith(document.body);
+  expect(controllerMocks.closeComment.mock.invocationCallOrder[0]).toBeLessThan(
+    controllerMocks.flushHistory.mock.invocationCallOrder[0]!
+  );
+  expect(controllerMocks.flushHistory.mock.invocationCallOrder[0]).toBeLessThan(
+    controllerMocks.openTarget.mock.invocationCallOrder[0]!
+  );
+  expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
+});
+
+it('retains the current element when its comment cannot be saved or the target is detached', () => {
+  controllerMocks.closeComment.mockReturnValue(false);
+  act(() => latest?.actions.navigateElement(document.body));
+  controllerMocks.closeComment.mockReturnValue(true);
+  act(() => latest?.actions.navigateElement(document.createElement('div')));
+  expect(controllerMocks.openTarget).not.toHaveBeenCalled();
+  expect(controllerMocks.flushHistory).not.toHaveBeenCalled();
+  expect(latest?.inspectorOpen).toBe(true);
+});
+
+it.each(['refused', 'history failure'] as const)(
+  'keeps selection and reports %s during tree navigation',
+  (failure) => {
+    if (failure === 'refused') controllerMocks.openTarget.mockReturnValue(false);
+    else
+      controllerMocks.flushHistory.mockImplementationOnce(() => {
+        throw new Error('Cannot flush');
+      });
+    act(() => latest?.actions.navigateElement(document.body));
+    expect(controllerMocks.showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(controllerMocks.dismissSelection).not.toHaveBeenCalled();
+    expect(latest?.inspectorOpen).toBe(true);
+  }
+);
+
+it('preserves a failed comment draft before either text action', () => {
+  controllerMocks.closeComment.mockReturnValue(false);
+  act(() => {
+    latest?.actions.text.edit();
+    latest?.actions.text.reset();
+  });
+  expect(controllerMocks.editText).not.toHaveBeenCalled();
+  expect(controllerMocks.resetText).not.toHaveBeenCalled();
+  expect(latest?.inspectorOpen).toBe(true);
 });
 
 it('keeps the inspector open and selected when automatic save fails', () => {

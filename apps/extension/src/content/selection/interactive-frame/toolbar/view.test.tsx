@@ -10,6 +10,7 @@ import {
 import { InteractiveFrameToolbarContent } from './view';
 import type { InteractiveFrameToolbarProps } from './types';
 import { translate } from '../../../../platform/i18n';
+import * as frameEvents from '../../../platform/page-context/frame-events';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -22,6 +23,12 @@ it('delegates selected-frame capture visibility to the shared floating state', (
   document.body.append(container);
   const root = createRoot(container);
   const onUpdate = vi.fn();
+  const stepChange = vi
+    .spyOn(frameEvents, 'dispatchFrameStepBadgeChanged')
+    .mockImplementation(() => undefined);
+  const calloutChange = vi
+    .spyOn(frameEvents, 'dispatchFrameCalloutChanged')
+    .mockImplementation(() => undefined);
   const frame = createFrameDataFixture('frame-1');
   const props = {
     calloutPopoverAnchorRef: { current: null },
@@ -68,17 +75,29 @@ it('delegates selected-frame capture visibility to the shared floating state', (
   act(() => button?.click());
   expect(props.captureVisibility.toggle).toHaveBeenCalledOnce();
   expect(onUpdate).not.toHaveBeenCalled();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('content.stepBadge.settingsTitle')}"]`
+      )
+      ?.click()
+  );
+  expect(stepChange).toHaveBeenCalledWith({ frameId: 'frame-1', settings: { enabled: true } });
+  expect(onUpdate).not.toHaveBeenCalled();
+  expect(props.togglePopover).not.toHaveBeenCalled();
+  onUpdate.mockClear();
   expect(
     container.querySelectorAll('[data-ui="content.interactive-frame.add-callout"]')
   ).toHaveLength(0);
 
+  const calloutSettings = createCalloutSettingsFixture();
   act(() =>
     root.render(
       <InteractiveFrameToolbarContent
         toolbarProps={{
           ...props,
           frame: createFrameDataFixture('frame-1', {
-            callout: createCalloutSettingsFixture(),
+            callout: calloutSettings,
           }),
         }}
       />
@@ -88,10 +107,23 @@ it('delegates selected-frame capture visibility to the shared floating state', (
     '[data-ui="content.interactive-frame.add-callout"]'
   );
   expect(addCalloutButton).not.toBeNull();
-  expect(addCalloutButton?.getAttribute('data-sniptale-activation-bridge')).toBe('defer');
-  expect(addCalloutButton?.previousElementSibling?.getAttribute('title')).toBe(
-    translate('content.interactiveFrame.calloutEdit')
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('content.callout.settingsTitle')}"]`
+      )
+      ?.click()
   );
+  expect(calloutChange).toHaveBeenCalledWith({
+    frameId: 'frame-1',
+    settings: { enabled: !calloutSettings.enabled },
+  });
+  expect(onUpdate).not.toHaveBeenCalled();
+  expect(props.togglePopover).not.toHaveBeenCalled();
+  expect(addCalloutButton?.getAttribute('data-sniptale-activation-bridge')).toBe('defer');
+  expect(
+    addCalloutButton?.previousElementSibling?.querySelector('button')?.getAttribute('title')
+  ).toBe(translate('content.callout.settingsTitle'));
   expect(
     container.querySelector<HTMLButtonElement>(
       `button[title="${translate('content.interactiveFrame.editButton')}"]`

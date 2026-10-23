@@ -89,6 +89,8 @@ beforeEach(() => {
   calculateContentSizeTooltipPositionMock.mockReturnValue({ left: 12, top: 24 });
   buildRegionSelectorMarkupMock.mockImplementation(() => createMarkup());
   createRegionSelectorTooltipMock.mockReturnValue({
+    dismissMenu: vi.fn(),
+    dispose: vi.fn(),
     aspectRatioButton: document.createElement('button'),
     root: document.createElement('div'),
   });

@@ -65,6 +65,14 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
   vi.clearAllMocks();
   mocks.activeTab.url = null;
   mocks.activeTab.videoByMode.TAB.supported = true;
@@ -193,11 +201,11 @@ it('keeps current content until a cold navigation commits and only then persists
     'lucide-tv-minimal-play'
   );
   expect(container.querySelector('button[data-page="tools"] svg')?.getAttribute('class')).toContain(
-    'lucide-paintbrush'
+    'tabler-tools'
   );
   expect(
     container.querySelector('button[data-page="export"] svg')?.getAttribute('class')
-  ).toContain('lucide-upload');
+  ).toContain('tabler-world-down');
   expect(
     [...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.app.tabs"] button')].every(
       (button) => button.textContent === '' && Boolean(button.getAttribute('aria-label'))

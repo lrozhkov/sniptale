@@ -55,6 +55,7 @@ export interface DrawingObjectProjection {
 }
 
 type DrawingSessionOptions = {
+  autoSelectCreatedObjects?: boolean;
   objectProjection?: DrawingObjectProjection;
   initialDocument?: DrawingDocumentV1;
   defaults?: DrawingToolDefaults;
@@ -232,7 +233,9 @@ class DrawingSessionOwner implements DrawingSession {
   commitObject(object: DrawingObject, commitOptions?: { select?: boolean }) {
     this.commitDocument(
       { version: 1, objects: [...this.document.objects, object] },
-      commitOptions?.select === false ? [] : [object.id]
+      this.options.autoSelectCreatedObjects === false || commitOptions?.select === false
+        ? []
+        : [object.id]
     );
   }
 

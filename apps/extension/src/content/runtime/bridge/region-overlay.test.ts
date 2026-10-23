@@ -31,6 +31,7 @@ function createRegionSelectionBinding() {
 
 function createOverlayDeps() {
   return {
+    isRegionSelectorActive: vi.fn().mockReturnValue(true),
     hideRecordingOverlay: vi.fn(),
     hideRegionSelector: vi.fn(),
     logger: { debug: vi.fn() },
@@ -57,7 +58,15 @@ function expectSelectorVisibilityRouting() {
     handleRegionOverlayMessage({ type: VideoMessageType.HIDE_REGION_SELECTOR }, sendResponse, deps)
   ).toBe(true);
   expect(deps.hideRegionSelector).toHaveBeenCalledOnce();
+  expect(deps.hideRegionSelector).toHaveBeenLastCalledWith(undefined);
   expect(sendResponse).toHaveBeenLastCalledWith({ success: true });
+
+  handleRegionOverlayMessage(
+    { type: VideoMessageType.HIDE_REGION_SELECTOR, regionSelectionRequestId: 'request-1' },
+    sendResponse,
+    deps
+  );
+  expect(deps.hideRegionSelector).toHaveBeenLastCalledWith('request-1');
 }
 
 function expectOverlayVisibilityRouting() {
@@ -157,6 +166,7 @@ function expectBridgeDepsFactory() {
   const logger = { debug: vi.fn() };
   createLogger.mockReturnValue(logger);
   const controller = {
+    isRegionSelectorActive: vi.fn(),
     hideRecordingOverlay: vi.fn(),
     hideRegionSelector: vi.fn(),
     showRecordingOverlay: vi.fn(),
@@ -173,6 +183,22 @@ function expectBridgeDepsFactory() {
 }
 
 describe('handleRegionOverlayMessage', () => {
+  it('probes only the current selector without recreating or modifying it', () => {
+    const deps = createOverlayDeps();
+    const sendResponse = vi.fn();
+    const message = {
+      type: VideoMessageType.GET_REGION_SELECTOR_STATE,
+      ...createRegionSelectionBinding(),
+    };
+    expect(handleRegionOverlayMessage(message, sendResponse, deps)).toBe(true);
+    expect(sendResponse).toHaveBeenLastCalledWith({ success: true, active: true });
+    deps.isRegionSelectorActive.mockReturnValue(false);
+    handleRegionOverlayMessage(message, sendResponse, deps);
+    expect(sendResponse).toHaveBeenLastCalledWith({ success: true, active: false });
+    expect(deps.showRegionSelector).not.toHaveBeenCalled();
+    expect(deps.hideRegionSelector).not.toHaveBeenCalled();
+  });
+
   it(
     'shows and hides the region selector through injected overlay deps',
     expectSelectorVisibilityRouting

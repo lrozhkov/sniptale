@@ -9,10 +9,8 @@ import { act, useContext, useState } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  setImmediate as settleHostTurn,
-  setTimeout as settleTimerTurn,
-} from 'node:timers/promises';
+import { createRequire } from 'node:module';
+import { setImmediate as settleHostTurn } from 'node:timers/promises';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
 import { ReviewZoomInspector } from './zoom-inspector';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -28,6 +26,40 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 let root: Root;
 let host: HTMLDivElement;
 
+const requireFromTest = createRequire(import.meta.url);
+const requireFromReact = createRequire(requireFromTest.resolve('react-dom'));
+const scheduler: unknown = requireFromReact('scheduler');
+
+function schedulerApi() {
+  if (
+    typeof scheduler !== 'object' ||
+    scheduler === null ||
+    !('unstable_scheduleCallback' in scheduler) ||
+    typeof scheduler.unstable_scheduleCallback !== 'function' ||
+    !('unstable_IdlePriority' in scheduler) ||
+    typeof scheduler.unstable_IdlePriority !== 'number' ||
+    !('unstable_NormalPriority' in scheduler) ||
+    typeof scheduler.unstable_NormalPriority !== 'number'
+  ) {
+    throw new Error('React scheduler does not provide the required cleanup API');
+  }
+  return {
+    schedule: scheduler.unstable_scheduleCallback,
+    idle: scheduler.unstable_IdlePriority,
+    normal: scheduler.unstable_NormalPriority,
+  };
+}
+
+function settleReactCallbacks() {
+  const { schedule, idle } = schedulerApi();
+  return new Promise<void>((resolve) => {
+    schedule(idle, () => {
+      resolve();
+      return null;
+    });
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
@@ -37,12 +69,24 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => root.unmount());
-  // act can schedule a passive host callback as it finishes. Drain after it returns.
-  await settleTimerTurn(0);
+  // Native details toggles use a DOM task; React passive work can span host turns.
   await settleHostTurn();
+  await settleReactCallbacks();
   host.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it('settles React callbacks that yield across host turns before cleanup completes', async () => {
+  const { schedule, normal } = schedulerApi();
+  let completed = 0;
+  function continuation(): typeof continuation | null {
+    completed += 1;
+    return completed < 100 ? continuation : null;
+  }
+  schedule(normal, continuation);
+  await settleReactCallbacks();
+  expect(completed).toBe(100);
 });
 
 function setInputValue(input: HTMLInputElement, value: string) {

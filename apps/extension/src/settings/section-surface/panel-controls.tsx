@@ -1,3 +1,4 @@
+import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { GripVertical } from 'lucide-react';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
@@ -34,14 +35,16 @@ export function SettingsSwitch({
   size?: 'sm' | 'md';
 }) {
   return (
-    <ProductGlassSwitch
-      {...props}
-      role="switch"
-      aria-checked={checked}
-      on={checked}
-      className={className}
-      data-density={size}
-    />
+    <CommandPressScope value={false}>
+      <ProductGlassSwitch
+        {...props}
+        role="switch"
+        aria-checked={checked}
+        on={checked}
+        className={className}
+        data-density={size}
+      />
+    </CommandPressScope>
   );
 }
 
@@ -69,7 +72,7 @@ export function SettingsControlRow(props: {
   return (
     <div
       data-ui="settings.control-row"
-      className={['w-full max-w-[720px]', props.className ?? ''].join(' ')}
+      className={['w-full max-w-[560px]', props.className ?? ''].join(' ')}
     >
       {typeof props.label === 'string' ? (
         <InspectorParameterRow

@@ -10,14 +10,14 @@ const INLINE_CURTAIN_BUTTON_CLASS_NAME = [
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const INLINE_CURTAIN_LABEL_CLASS_NAME = [
-  'w-[88px] shrink-0 truncate text-[11px] font-medium',
+  'w-[88px] shrink-0 truncate text-[11px] font-normal',
   'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 export const INLINE_CURTAIN_PANEL_CLASS_NAME = [
   'absolute inset-y-0 right-0 z-20 w-[78%] min-w-[248px] max-w-[calc(100%-76px)]',
   'overflow-y-auto border-l border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] px-2 py-3',
+  'bg-[var(--sniptale-color-surface-panel)] px-2 py-2',
 ].join(' ');
 
 export type InlineCurtainSecondaryAction = {
@@ -51,7 +51,7 @@ function InlineCurtainPanelCloseButton({
       aria-label={ariaLabel}
       className={[
         'sniptale-dismiss-button',
-        'absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-[7px]',
+        'absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-[6px]',
         'transition-colors',
       ].join(' ')}
       onClick={onClick}
@@ -84,7 +84,7 @@ export function InlineCurtainPanelHeader({
           type="button"
           aria-label={actionAriaLabel}
           className={[
-            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px]',
+            'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px]',
             'text-[var(--sniptale-color-text-secondary)] transition-colors',
             'hover:bg-[var(--sniptale-color-surface-hover)]',
             'hover:text-[var(--sniptale-color-text-primary)]',
@@ -98,10 +98,10 @@ export function InlineCurtainPanelHeader({
         <InlineCurtainPanelCloseButton ariaLabel={actionAriaLabel} onClick={onAction} />
       )}
       <div className="min-w-0 pt-0.5">
-        <h2 className="text-xs font-semibold leading-tight text-[var(--sniptale-color-text-primary)]">
+        <h2 className="text-[13px] font-medium leading-tight text-[var(--sniptale-color-text-primary)]">
           {title}
         </h2>
-        <p className="mt-1 line-clamp-2 text-[10px] leading-[1.35] text-[var(--sniptale-color-text-muted)]">
+        <p className="mt-1 text-[11px] leading-[1.35] text-[var(--sniptale-color-text-muted)]">
           {description}
         </p>
       </div>
@@ -177,17 +177,20 @@ function InlineCurtainPrimaryButton({
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel}
       className={[
-        'group flex h-8 min-w-0 flex-1 items-center gap-2 rounded-[8px] px-2 text-left',
+        'group flex h-8 min-w-0 flex-1 items-center gap-2 rounded-[6px] px-1.5 text-left',
         'transition-colors',
         'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_68%,transparent)]',
-        'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+        'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       onClick={onClick}
     >
-      <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} title={label}>
+      <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} data-popup-hint={label}>
         {label}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={valueLabel}>
+      <span
+        className="min-w-0 flex-1 truncate text-[13px] font-normal"
+        data-popup-hint={valueLabel}
+      >
         {valueLabel}
       </span>
       <InlineCurtainChevron expanded={ariaExpanded} />
@@ -223,7 +226,7 @@ function InlineCurtainSecondaryButton({
       aria-controls={ariaControls}
       aria-label={secondaryAction.ariaLabel}
       className={[
-        'shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-medium',
+        'shrink-0 rounded-[6px] px-2 py-1 text-[11px] font-medium',
         'text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_70%,transparent)]',
         'hover:text-[var(--sniptale-color-text-primary)]',
@@ -231,7 +234,7 @@ function InlineCurtainSecondaryButton({
       ].join(' ')}
       disabled={secondaryAction.disabled}
       onClick={onClick}
-      title={secondaryAction.title ?? secondaryAction.label}
+      data-popup-hint={secondaryAction.title ?? secondaryAction.label}
     >
       {secondaryAction.label}
     </button>

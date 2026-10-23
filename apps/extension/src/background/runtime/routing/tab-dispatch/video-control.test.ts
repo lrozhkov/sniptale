@@ -57,6 +57,19 @@ vi.mock('../../../storage/video/camera-recorder-grant', async (importOriginal) =
 
 const POPUP_ACTIVE_RECORDING_CONTROLS = [
   {
+    type: VideoMessageType.COUNTDOWN_CAMERA_OFFER,
+    controlToken: 'token-1',
+    recordingId: 'rec-1',
+    peerGeneration: 0,
+    sdp: 'offer',
+  },
+  {
+    type: VideoMessageType.COUNTDOWN_CAMERA_CLOSE,
+    controlToken: 'token-1',
+    recordingId: 'rec-1',
+    peerGeneration: 0,
+  },
+  {
     type: VideoMessageType.CANCEL_RECORDING_START,
     controlToken: 'token-1',
     recordingId: 'rec-1',

@@ -5,6 +5,7 @@ import {
   type TranslationKey,
 } from '../../../../apps/extension/src/platform/i18n';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
+import { installReviewModeChoice } from '../support/quick-editor-media-fixture';
 
 type Composition = { locale: AppLocale; theme: 'light' | 'dark' };
 const sizes = [
@@ -35,6 +36,7 @@ async function capture(page: Page, info: TestInfo, name: string) {
 }
 
 async function open(page: Page, extensionId: string, c: Composition) {
+  await installReviewModeChoice(page);
   await page.setViewportSize(sizes[0]!);
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
   await expect(ui(page, 'gallery.page.root')).toBeVisible();

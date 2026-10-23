@@ -44,9 +44,10 @@ export const SCENARIO_STAGE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts',
     exclusive: true,
     reason:
-      'Hook fixtures exercise mounted edit admission, image publication, narration, templates and refusal paths that the page suite substitutes.',
+      'Hook fixtures exercise edit admission, publication, narration, templates and refusal. Mounted history proof verifies controls unlock after asynchronous copy recovery.',
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage-history.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/runtime/use-state.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/runtime/image-edits.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/runtime/narration.test.tsx',

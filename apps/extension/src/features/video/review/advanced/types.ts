@@ -49,6 +49,7 @@ export interface QuickEditUiState {
   /** Project workspace appearance, independent of authored scene and history. */
   workspaceColors?: Partial<Record<'light' | 'dark', string>>;
   mode: 'basic' | 'advanced';
+  modeSelectionPending?: boolean;
   /** First entry reveals editing lanes; later mode switches preserve their settings. */
   advancedTracksInitialized?: boolean;
   tracks: QuickEditTrackVisibility;

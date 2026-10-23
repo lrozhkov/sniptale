@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { createRoot } from 'react-dom/client';
@@ -9,6 +9,31 @@ import { ToolbarShellContent } from './view';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { useContext } from 'react';
 import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
+import type { VideoRecordingToolbarState } from '../../video-recording/session/state';
+
+const recordingPreferences = vi.hoisted(() => ({ ready: true, fadeDuringRecording: true }));
+
+vi.mock('../state/recording-controls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../state/recording-controls')>()),
+  useRecordingToolbarControls: (_enabled: boolean, active: boolean) => ({
+    active,
+    controls: {},
+    editing: false,
+    error: null,
+    pending: false,
+    ready: recordingPreferences.ready,
+    fadeDuringRecording: recordingPreferences.fadeDuringRecording,
+    reload: vi.fn(),
+    setVisible: vi.fn(),
+    setFadeDuringRecording: vi.fn(),
+    toggleEditing: vi.fn(),
+  }),
+}));
+
+afterEach(() => {
+  recordingPreferences.ready = true;
+  recordingPreferences.fadeDuringRecording = true;
+});
 
 vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/trusted-events')>()),
@@ -62,12 +87,13 @@ function renderToolbarShell(
     freePlacement: boolean;
     dockPreview: 'top' | 'bottom' | 'left' | 'right' | null;
   },
-  videoRecordingMode = false
+  videoRecordingMode = false,
+  phase: VideoRecordingToolbarState['phase'] = 'idle'
 ) {
   useContentUiScaleMock.mockReturnValue(uiScale);
   return renderToStaticMarkup(
     <ToolbarShellContent
-      toolbarProps={{ videoRecordingMode } as never}
+      toolbarProps={{ videoRecordingMode, videoRecording: { state: { phase } } } as never}
       viewModel={
         {
           derivedState: {
@@ -90,6 +116,28 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
+  it.each(['idle', 'starting', 'recording', 'paused', 'stopping', 'error'] as const)(
+    'admits automatic fading only in the recording phase, phase=%s',
+    (phase) => {
+      const markup = renderToolbarShell(true, null, 1, undefined, true, phase);
+      expect(markup.includes('data-recording-fade="true"')).toBe(phase === 'recording');
+    }
+  );
+
+  it.each([
+    { mode: false, ready: true, enabled: true },
+    { mode: true, ready: false, enabled: true },
+    { mode: true, ready: true, enabled: false },
+  ])(
+    'keeps non-recording, unavailable and disabled preferences visible: $mode/$ready/$enabled',
+    (state) => {
+      recordingPreferences.ready = state.ready;
+      recordingPreferences.fadeDuringRecording = state.enabled;
+      expect(renderToolbarShell(true, null, 1, undefined, state.mode, 'recording')).not.toContain(
+        'data-recording-fade="true"'
+      );
+    }
+  );
   it.each([false, true])('adopts ordinary chrome in recording mode=%s', (recording) => {
     const container = document.createElement('div');
     container.innerHTML = renderToolbarShell(true, null, 1, undefined, recording);

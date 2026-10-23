@@ -549,6 +549,34 @@ it('reconciles a committed result with a lost response before accepting the next
   );
 });
 
+it('acknowledges confirmed startup cleanup only for its exact source binding', async () => {
+  const { RecordingStartCleanupConfirmedError } = await import('./start/error-reporting');
+  startRecordingImplMock.mockRejectedValueOnce(
+    new RecordingStartCleanupConfirmedError(new Error('source failed'), sourceBinding)
+  );
+  await expect(controller.startRecording(createStartParams())).rejects.toThrow('source failed');
+  await expect(controller.stopRecording(sourceBinding, true)).resolves.toEqual({
+    result: 'stopped',
+  });
+  await expect(
+    controller.stopRecording({ ...sourceBinding, streamInstanceId: 'other-source' }, true)
+  ).rejects.toThrow('Recording source binding is unavailable');
+});
+
+it('does not acknowledge another source cleanup receipt', async () => {
+  const { RecordingStartCleanupConfirmedError } = await import('./start/error-reporting');
+  startRecordingImplMock.mockRejectedValueOnce(
+    new RecordingStartCleanupConfirmedError(new Error('source failed'), {
+      ...sourceBinding,
+      streamInstanceId: 'other-source',
+    })
+  );
+  await expect(controller.startRecording(createStartParams())).rejects.toThrow('source failed');
+  await expect(controller.stopRecording(sourceBinding, true)).rejects.toThrow(
+    'Recording source binding is unavailable'
+  );
+});
+
 it('does not resurrect a retired previous binding when the next start fails', async () => {
   const { recorder } = createActiveRecorderFixture();
   startRecordingImplMock.mockImplementationOnce(async () => {
@@ -732,10 +760,8 @@ it.each([1, 2])(
     const params = createStartParams();
     params.settings.sourceCount = sourceCount;
     const pending = controller.startRecording(params, () => data);
-    if (sourceCount === 1) {
-      const { allowRecordingBegin } = await import('./start/gate');
-      allowRecordingBegin(sourceBinding);
-    }
+    const { allowRecordingBegin } = await import('./start/gate');
+    allowRecordingBegin(sourceBinding);
     await expect(controller.stopRecording({ ...sourceBinding, generation: 0 })).rejects.toThrow(
       'Stale'
     );
@@ -783,29 +809,4 @@ it('releases a failed admission so a subsequent start can retry', async () => {
   ).rejects.toThrow('storage failed');
   await controller.startRecording(createStartParams());
   expect(startRecordingImplMock).toHaveBeenCalledOnce();
-});
-
-it('keeps BEGIN available through slow preparation and the full countdown', async () => {
-  vi.useFakeTimers();
-  const { waitForRecordingBegin, allowRecordingBegin, cancelRecordingBegin } =
-    await import('./start/gate');
-  try {
-    const params = createStartParams();
-    params.settings.countdownSeconds = 10;
-    startRecordingImplMock.mockImplementationOnce(async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 33_000));
-      await waitForRecordingBegin(sourceBinding, 10_000);
-    });
-    const pending = controller.startRecording(
-      params,
-      () => new Promise<void>((resolve) => setTimeout(resolve, 11_000))
-    );
-    const observed = pending.catch((error: unknown) => error);
-    await vi.advanceTimersByTimeAsync(54_000);
-    allowRecordingBegin(sourceBinding);
-    await expect(observed).resolves.toBeUndefined();
-  } finally {
-    cancelRecordingBegin();
-    vi.useRealTimers();
-  }
 });

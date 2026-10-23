@@ -5,20 +5,15 @@ import { RotateCcw, Trash2 } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 import type { LocalExtensionDataErasureOptions } from '../../../../../composition/persistence/privacy-erasure';
-import {
-  getControlSecondaryButtonClassName,
-  getFormActionRowClassName,
-} from '@sniptale/ui/control-language';
 import { requestLocalExtensionDataErasure } from '../../../../runtime/privacy-erasure-client';
 import { settingsPanelClassName, settingsSectionClassName } from '../../../../section-surface';
+import { settingsCompactWorkbenchClassName } from '../../../../section-surface/classes';
 
 type PrivacyAction = 'delete-local-data' | 'factory-reset';
 type PrivacyStatus = { kind: 'error' | 'success'; message: string } | null;
 
-const privacyActionRowClassName = [
-  getFormActionRowClassName({ emphasis: 'primary' }),
-  'items-start',
-].join(' ');
+const privacyActionRowClassName =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-t border-[var(--sniptale-color-border-subtle)] py-3';
 
 function getActionOptions(action: PrivacyAction): LocalExtensionDataErasureOptions {
   return action === 'delete-local-data'
@@ -59,22 +54,22 @@ function PrivacyActionRow(props: {
 
   return (
     <div className={privacyActionRowClassName}>
-      <div className="flex min-w-0 gap-3">
-        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sniptale-color-danger)]" />
+      <div className="flex min-w-0 gap-2">
+        <Icon className="mt-0.5 size-4 shrink-0 text-[var(--sniptale-color-text-secondary)]" />
         <div className="min-w-0 space-y-1">
-          <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary-strong)]">
+          <h2 className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
             {labels.title}
           </h2>
-          <p className="max-w-2xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
+          <p className="text-[12px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
             {labels.description}
           </p>
         </div>
       </div>
       <ProductActionButton
         tone="danger"
+        compact
         type="button"
         disabled={props.disabled}
-        className={getControlSecondaryButtonClassName({ tone: 'danger' })}
         onClick={() => props.onRun(props.action)}
       >
         {props.disabled ? translate('settings.privacy.working') : labels.button}
@@ -137,11 +132,11 @@ function usePrivacyErasureActions() {
 
 function PrivacyDataClasses() {
   return (
-    <div className="space-y-2">
-      <h2 className="text-sm font-semibold text-[var(--sniptale-color-text-primary-strong)]">
+    <div className="space-y-1 pb-3">
+      <h2 className="text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-primary)]">
         {translate('settings.privacy.dataClassesTitle')}
       </h2>
-      <p className="max-w-3xl text-sm leading-6 text-[var(--sniptale-color-text-secondary)]">
+      <p className="text-[12px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
         {translate('settings.privacy.dataClasses')}
       </p>
     </div>
@@ -153,7 +148,7 @@ export function PrivacySection() {
 
   return (
     <section className={settingsSectionClassName}>
-      <div className={[settingsPanelClassName, 'space-y-5'].join(' ')}>
+      <div className={[settingsPanelClassName, settingsCompactWorkbenchClassName].join(' ')}>
         <PrivacyDataClasses />
         <PrivacyActionRow
           action="delete-local-data"

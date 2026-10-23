@@ -87,7 +87,7 @@ export interface EditorControllerEventObjectBindings {
 }
 
 export interface EditorControllerEventCommandBindings {
-  cancelTransientInteraction: () => boolean;
+  cancelTransientInteraction: (reason?: 'window-blur') => boolean;
   undo: () => void;
   redo: () => void;
   duplicateSelection: () => void;

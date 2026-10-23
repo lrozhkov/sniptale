@@ -6,7 +6,7 @@ import {
   type ScenarioNarrationText,
 } from '../../../features/scenario/project/public';
 import type { ScenarioNarrationPreview } from '../../../workflows/scenario-narration/generation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   readScenarioEditorProjectId,
@@ -98,6 +98,7 @@ export function useGuidePageState() {
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<ScenarioProjectSnapshot | null>(null);
   const busy = useRef(false);
+  const [, publishMutationRelease] = useReducer((revision: number) => revision + 1, 0);
   const autosaving = useRef(false);
   const { project, reset, commit, publish, actionId, closedCaptures, ...editing } = useGuideHistory(
     {
@@ -157,7 +158,13 @@ export function useGuidePageState() {
       generation.current += 1;
     };
   }, [load]);
-  const mutate = createGuideMutationRunner({ busy, generation, setStatus, setActionError });
+  const mutate = createGuideMutationRunner({
+    busy,
+    generation,
+    setStatus,
+    setActionError,
+    publishMutationRelease,
+  });
   const acceptProject = (committed: ScenarioProjectSnapshot, reversible = false) => {
     saved.current = committed;
     current.current = { ...current.current, project: committed.project, status: 'saved' };
@@ -501,11 +508,13 @@ function createGuideMutationRunner({
   generation,
   setStatus,
   setActionError,
+  publishMutationRelease,
 }: {
   busy: { current: boolean };
   generation: { current: number };
   setStatus: (status: GuidePageStatus) => void;
   setActionError: (error: GuideActionError | null) => void;
+  publishMutationRelease: () => void;
 }) {
   return async <T>(
     operation: () => Promise<T>,
@@ -527,6 +536,7 @@ function createGuideMutationRunner({
       return false;
     } finally {
       busy.current = false;
+      publishMutationRelease();
     }
   };
 }

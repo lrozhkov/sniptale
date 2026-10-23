@@ -20,14 +20,15 @@ it('renders the initial active mode at its final fixed-height layout without ani
 
   expect(markup).toContain('grow-[1.9]');
   expect(markup).toContain('h-[58px] min-h-[58px]');
+  expect(markup).toContain('rounded-[6px]');
   expect(markup).toContain('opacity-100');
   expect(markup).not.toContain('transition-[flex-grow');
   expect(markup).not.toContain('transition-opacity');
   expect(markup).toContain('Capture the current tab');
-  expect(markup).toContain('w-[108px] shrink-0');
-  expect(markup).toContain('block text-[8px]');
-  expect(markup).not.toContain('block truncate text-[8px]');
-  expect(markup).not.toContain('line-clamp-2');
+  expect(markup).toContain('min-w-0 flex-1');
+  expect(markup).toContain('line-clamp-2 text-[9px]');
+  expect(markup).toContain('line-clamp-2 text-xs');
+  expect(markup).not.toContain('w-[108px]');
   expect(markup).toContain('aria-pressed="true"');
 });
 
@@ -47,9 +48,9 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).toContain('opacity-0');
   expect(markup).toContain('group-hover:scale-110');
   expect(markup).not.toContain('group-hover:-translate-y-px');
-  expect(markup).toContain('absolute inset-y-0 left-[38px] right-2 flex');
+  expect(markup).toContain('absolute inset-y-0 left-[38px] flex');
   expect(markup).toContain('Choose an area');
-  expect(markup).toContain('title="Area. Choose an area"');
+  expect(markup).toContain('data-popup-hint="Area. Choose an area"');
 });
 
 it('keeps the normal description visible while an unavailable reason stays in the title', () => {
@@ -67,11 +68,11 @@ it('keeps the normal description visible while an unavailable reason stays in th
   );
 
   expect(markup).toContain('>Capture the current tab</span>');
-  expect(markup).toContain('title="Tab. Unavailable on extension pages"');
+  expect(markup).toContain('data-popup-hint="Tab. Unavailable on extension pages"');
   expect(markup).toContain('disabled=""');
 });
 
-it('animates width while crossfading static compact and expanded layouts', () => {
+it('crossfades stable text layouts at the same time as width without a delayed reveal', () => {
   const markup = renderToStaticMarkup(
     <PopupExpandingModeButton
       accentClassName="text-accent"
@@ -85,6 +86,10 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   );
 
   expect(markup).toContain('transition-[flex-grow,background-color,border-color,color]');
+  expect(markup).toContain('transition-opacity duration-150');
+  expect(markup).not.toContain('delay-300');
+  expect(markup).toContain('100cqw');
+  expect(markup).toContain('--popup-mode-expanded-grow:1.9');
   expect(markup).toContain('transition-[left,top,translate,color,filter,scale]');
   expect(markup).toContain('top-1/2');
   expect(markup).toContain('left-2.5');

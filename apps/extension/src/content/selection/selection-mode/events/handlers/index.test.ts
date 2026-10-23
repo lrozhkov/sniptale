@@ -74,6 +74,8 @@ function createHandlersFixture() {
     updateFinalFrame: vi.fn(),
   };
   const state = {
+    isDragging: false,
+    isResizing: false,
     currentState: 'hover',
     hoveredElement: document.createElement('div'),
     mouseDownPoint: null as { x: number; y: number } | null,
@@ -92,6 +94,32 @@ function createHandlersFixture() {
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+it('does not repaint a confirmed selection while clicking a numeric draft', () => {
+  const { handlers, state, selectionModeEvents } = createHandlersFixture();
+  state.currentState = 'confirmed';
+  handlers.handleMouseDown(new MouseEvent('mousedown'));
+  handlers.handleMouseUp(new MouseEvent('mouseup'));
+  expect(selectionModeEvents.updateFinalFrame).not.toHaveBeenCalled();
+});
+
+it.each(['isDragging', 'isResizing'] as const)(
+  'repaints at %s start and release without changing ordinary click behavior',
+  (gesture) => {
+    const { handlers, state, selectionModeEvents } = createHandlersFixture();
+    state.currentState = 'confirmed';
+    handleSelectionModeMouseDownMock.mockImplementationOnce(() => {
+      state[gesture] = true;
+    });
+    handleSelectionModeMouseUpMock.mockImplementationOnce(() => {
+      state[gesture] = false;
+    });
+    handlers.handleMouseDown(new MouseEvent('mousedown'));
+    expect(selectionModeEvents.updateFinalFrame).toHaveBeenCalledOnce();
+    handlers.handleMouseUp(new MouseEvent('mouseup'));
+    expect(selectionModeEvents.updateFinalFrame).toHaveBeenCalledTimes(2);
+  }
+);
 
 function expectActivationHandlerLifecycle() {
   const { handlers, selectionModeEvents, state } = createHandlersFixture();

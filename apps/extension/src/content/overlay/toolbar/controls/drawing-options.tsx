@@ -1,6 +1,6 @@
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
-import { useContext, useRef, type RefObject, type ReactNode } from 'react';
+import { useContext, type RefObject, type ReactNode } from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
   DRAWING_ARROW_WIDTHS,
@@ -42,7 +42,7 @@ import {
   updateQuickToolOption,
   type ConfigurableDrawingQuickOptionsTool,
 } from './drawing-options-updates';
-import { useDrawingOptionsLayout, type DrawingQuickOptionsTool } from './drawing-options-layout';
+import type { useDrawingOptionsLayout, DrawingQuickOptionsTool } from './drawing-options-layout';
 
 type DrawingOptionsBodyProps = {
   children: ReactNode;
@@ -573,16 +573,11 @@ export function ToolbarDrawingOptions(props: {
   snapshot: DrawingSessionSnapshot;
   tool: DrawingQuickOptionsTool;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  panelRef: RefObject<HTMLDivElement | null>;
+  layout: ReturnType<typeof useDrawingOptionsLayout>;
 }) {
   const { controller, displayMode, snapshot, tool } = props;
-  const panelRef = useRef<HTMLDivElement>(null);
-  const layout = useDrawingOptionsLayout({
-    displayMode,
-    hasSelection: snapshot.selectedObjectIds.length > 0,
-    panelRef,
-    tool,
-    triggerRef: props.triggerRef,
-  });
+  const { panelRef, layout } = props;
   const selectedObject = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );

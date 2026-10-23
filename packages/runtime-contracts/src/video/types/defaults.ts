@@ -10,6 +10,7 @@ import { DEFAULT_VIDEO_RECORDING_QUALITY_PROFILE_ID } from './quality-profiles';
 
 export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
   microphoneEnabled: false,
+  warnWithoutMicrophone: true,
   microphoneDeviceId: null,
   echoCancellation: true,
   noiseSuppression: true,

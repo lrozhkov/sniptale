@@ -12,6 +12,26 @@ import {
 } from './index';
 
 describe('i18n runtime contract', () => {
+  it.each([
+    ['clearPagePreparation', 'Сбросить всё', 'Reset all'],
+    ['clearDrawings', 'Очистить рисунки', 'Clear drawings'],
+    ['clearAnnotations', 'Очистить аннотации', 'Clear annotations'],
+    ['restorePageContent', 'Восстановить содержимое', 'Restore page content'],
+    ['clearReviewChanges', 'Сбросить правки и замечания', 'Clear edits and feedback'],
+  ] as const)('names the reset action in both languages: %s', (key, ru, en) => {
+    expect(translate(`content.toolbar.${key}`, 'ru')).toBe(ru);
+    expect(translate(`content.toolbar.${key}`, 'en')).toBe(en);
+  });
+  it.each([
+    'resetDrawingMessage',
+    'resetAnnotationMessage',
+    'resetContentEditingMessage',
+    'resetDesignReviewMessage',
+  ] as const)('localizes the complete Russian confirmation for %s', (message) => {
+    const copy = translate(`content.toolbar.${message}`, 'ru');
+    expect(copy).not.toMatch(/[A-Za-z]/u);
+    expect(copy).toContain('Изменения в других режимах останутся.');
+  });
   it('resolves derived dictionaries and keys without changing public lookup APIs', () => {
     const knownKeys: TranslationKey[] = [
       'common.actions.save',

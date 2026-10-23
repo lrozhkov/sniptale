@@ -38,10 +38,12 @@ export function VideoMediaDeviceSelector({
   };
   selectAriaLabel: string;
 }) {
-  const options = devices.map((device) => ({
-    value: device.deviceId,
-    label: device.label,
-  }));
+  const options = devices
+    .filter((device) => device.deviceId !== '')
+    .map((device) => ({
+      value: device.deviceId,
+      label: device.label,
+    }));
   const fallbackText = isLoading ? loadingText : options.length > 0 ? placeholder : emptyText;
 
   return (

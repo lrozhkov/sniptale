@@ -2,19 +2,59 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
-import { translate, useAppLocale, formatDateTime } from '../../platform/i18n';
+import { translate, useAppLocale, formatDateTime, formatNumber } from '../../platform/i18n';
 import { formatBytes } from '../../platform/i18n/format-bytes';
-import type { RecoveryRecording } from '../../workflows/video/recording-recovery';
+import type {
+  RecoveryRecording,
+  RecordingRecoveryProgress,
+} from '../../workflows/video/recording-recovery';
 import { useRecordingRecovery } from './use-recording-recovery';
 
 interface RecoveryRowProps {
   entry: RecoveryRecording;
+  progress: ReturnType<typeof useRecordingRecovery>['progress'];
   locked: boolean;
   onAction(entry: RecoveryRecording, action: 'recover' | 'download'): Promise<boolean>;
   onDelete(entry: RecoveryRecording): void;
 }
 
-function RecoveryRow({ entry, locked, onAction, onDelete }: RecoveryRowProps) {
+function RecoveryProgress({ progress }: { progress: RecordingRecoveryProgress }) {
+  const locale = useAppLocale();
+  const labels = {
+    preparing: 'gallery.recordingRecovery.preparing',
+    remuxing: 'gallery.recordingRecovery.remuxing',
+    validatingVideo: 'gallery.recordingRecovery.validatingVideo',
+    validatingAudio: 'gallery.recordingRecovery.validatingAudio',
+    publishing: 'gallery.recordingRecovery.publishing',
+  } as const;
+  const label = translate(labels[progress.stage]);
+  const measuredStage =
+    progress.stage === 'preparing' || progress.stage === 'publishing' ? null : progress.stage;
+  return (
+    <div data-ui="gallery.recovery-progress" className="mt-2 space-y-2">
+      <p role="status" className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
+        {label}
+      </p>
+      <div
+        role="progressbar"
+        aria-label={label}
+        className="h-1 overflow-hidden rounded-full bg-[var(--sniptale-color-surface-canvas)]"
+      >
+        <div className="h-full w-1/3 bg-[var(--sniptale-color-accent)] motion-safe:animate-pulse" />
+      </div>
+      {measuredStage ? (
+        <p className="text-xs leading-4 tabular-nums text-[var(--sniptale-color-text-secondary)]">
+          {translate(`gallery.recordingRecovery.${measuredStage}Count`).replace(
+            '{count}',
+            formatNumber(progress.completed, undefined, locale)
+          )}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function RecoveryRow({ entry, progress, locked, onAction, onDelete }: RecoveryRowProps) {
   const locale = useAppLocale();
   return (
     <li
@@ -31,6 +71,9 @@ function RecoveryRow({ entry, locked, onAction, onDelete }: RecoveryRowProps) {
           {formatDateTime(entry.createdAt, { dateStyle: 'short', timeStyle: 'short' }, locale)} ·{' '}
           {formatBytes(entry.size)}
         </div>
+        {progress?.id === entry.id && progress.incarnation === entry.incarnation ? (
+          <RecoveryProgress progress={progress.value} />
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <ProductActionButton
@@ -87,7 +130,7 @@ function RecoveryStatus({ state }: { state: ReturnType<typeof useRecordingRecove
           {translate(`gallery.recordingRecovery.${state.message}`)}
         </p>
       ) : null}
-      {state.busy ? (
+      {state.busy && !state.progress ? (
         <p role="status" className="mt-2 text-sm">
           {translate('gallery.recordingRecovery.busy')}
         </p>
@@ -105,7 +148,7 @@ function RecoveryContents({
   locked: boolean;
   onDelete(entry: RecoveryRecording): void;
 }) {
-  const actions = { locked, onAction: state.run, onDelete };
+  const actions = { locked, progress: state.progress, onAction: state.run, onDelete };
   return (
     <>
       <p className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">

@@ -8,6 +8,7 @@ import type { ContentAppLayoutProps } from './types';
 import { DrawingSurface } from '../../drawing/surface';
 import { VideoRecordingSpotlight } from '../video-recording/spotlight/view';
 import { EmbeddedRecordingCamera } from '../video-recording/camera/view';
+import { CollapsedPanels } from './collapsed-panels';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
@@ -55,7 +56,6 @@ function VideoRecordingSurfaceSlot(props: {
           chromeHidden={props.chromeHidden}
           controller={recording.drawingOwner.controller}
           escapeImmediately
-          showSelectionChrome={false}
           onExit={() => recording.onInteractionChange('navigation')}
           visualEffects={{
             getOpacity: recording.drawingOwner.getVisualOpacity,
@@ -65,6 +65,9 @@ function VideoRecordingSurfaceSlot(props: {
         />
       ) : null}
       <VideoRecordingSpotlight
+        {...(recording?.state.cursorEffects
+          ? { cursorEffects: recording.state.cursorEffects }
+          : {})}
         cursorHaloEnabled={Boolean(
           videoMode &&
           recording?.state.interaction === 'navigation' &&
@@ -83,7 +86,6 @@ function VideoRecordingSurfaceSlot(props: {
       />
       <EmbeddedRecordingCamera
         enabled={Boolean(
-          videoMode &&
           recording?.state.surfaceSessionId &&
           recording.state.cameraEnabled &&
           !recording.state.cameraPreviewSuppressed &&
@@ -132,7 +134,9 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         <DesignReviewSurface controller={designReview} showChrome={!isCaptureUiHidden} />
       ) : null}
       <ContentScenarioRecorderSidebarSlot
-        isCompletelyHidden={props.toolbar.isCompletelyHidden}
+        isCompletelyHidden={
+          props.toolbar.isCompletelyHidden || props.toolbar.modes.videoRecordingMode === true
+        }
         isToolbarVisible={props.toolbar.isToolbarVisible}
         byClickDisabled={isScenarioByClickBlocked(props.toolbar.modes)}
         handleTakeScreenshot={props.toolbar.handleTakeScreenshot}
@@ -144,6 +148,11 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
           props.toolbar.autoBlurController.autoApplyEnabled &&
           props.toolbar.autoBlurController.autoApplyAllowed
         }
+      />
+      <CollapsedPanels
+        toolbar={props.toolbar}
+        scenario={props.scenario}
+        countdownActive={props.dialogs.countdown !== null}
       />
       {isCaptureUiHidden ? null : <ContentDialogStack dialogs={props.dialogs} />}
     </>

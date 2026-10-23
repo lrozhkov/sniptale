@@ -15,25 +15,10 @@ type VideoSetupViewModelArgs = Pick<
   | 'activeTabCapabilities'
   | 'pageAccessDisabledReason'
   | 'isStartPending'
-  | 'galleryStatus'
   | 'webcamDevices'
   | 'isLoadingWebcams'
   | 'settings'
 >;
-
-export function getGalleryTitle(galleryStatus: VideoSetupPageProps['galleryStatus']): string {
-  const galleryStatusText =
-    galleryStatus &&
-    typeof galleryStatus === 'object' &&
-    'text' in galleryStatus &&
-    typeof galleryStatus.text === 'string'
-      ? galleryStatus.text
-      : null;
-
-  return galleryStatusText
-    ? `${translate('popup.video.galleryTitle')}. ${galleryStatusText}`
-    : translate('popup.video.galleryTitle');
-}
 
 function getStartDisabledReason(params: {
   currentModeCapability: VideoSetupViewModel['currentModeCapability'];
@@ -111,7 +96,6 @@ export function getVideoSetupViewModel({
   activeTabCapabilities,
   pageAccessDisabledReason,
   isStartPending,
-  galleryStatus,
   webcamDevices,
   isLoadingWebcams,
   settings,
@@ -150,7 +134,6 @@ export function getVideoSetupViewModel({
     controlledCursorDisabled,
     controlledCursorDisabledReason,
     startButtonLabel: getStartButtonLabel({ canStart, isStartPending, startDisabledReason }),
-    galleryTitle: getGalleryTitle(galleryStatus),
   };
 }
 
