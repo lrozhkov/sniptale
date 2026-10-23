@@ -11,9 +11,12 @@ describe('toolbar-shell layout contract', () => {
     expect(toolbarShellLayoutStylesheet).toContain(
       'transition: opacity var(--sniptale-duration-normal) ease-out;'
     );
-    expect(toolbarShellLayoutStylesheet).toContain(':focus-within');
+    expect(toolbarShellLayoutStylesheet).not.toContain(':focus-within');
     expect(toolbarShellLayoutStylesheet).toContain(
-      ":has([aria-expanded='true']:not([data-content-tool='true']))"
+      ":has(:focus-visible:not([data-focus-restoration='pointer']))"
+    );
+    expect(toolbarShellLayoutStylesheet).toContain(
+      ":has([aria-haspopup][aria-expanded='true']:not([data-content-tool='true']))"
     );
     expect(toolbarShellLayoutStylesheet).toContain('@media (prefers-reduced-motion: reduce)');
   });

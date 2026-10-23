@@ -42,10 +42,10 @@
 
 .sniptale-toolbar[data-video-recording='true'][data-recording-fade='true']:is(
     :hover,
-    :focus-within,
+    :has(:focus-visible:not([data-focus-restoration='pointer'])),
     [data-menu-open='true'],
     .sniptale-toolbar-dragging,
-    :has([aria-expanded='true']:not([data-content-tool='true']))
+    :has([aria-haspopup][aria-expanded='true']:not([data-content-tool='true']))
   ) {
   opacity: 1;
 }
