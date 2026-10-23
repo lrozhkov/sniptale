@@ -2338,10 +2338,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This suite proves one resource transfer and montage journey. Private helpers use the same saved root and browser lifetime. Speech creation extends two existing cases. Remote response fixtures preserve actual extraction, staging, acceptance and encoding. No new product owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves resource transfer through one montage journey. Private helpers extend two existing cases with actual backup, duplicate restore and encoding. Browser and project owners remain the same. No new product authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "fa860543b5256e97246d91b8fc3483fcc2460237f55927c47f7b875dced526b9",
+      "astHash": "f30111fb5394e1cf3204429e5192bac4d944f9a368c334d87b0c84419ce8fa45",
       "signatureHash": "9955b32c07fed0d6507abd495b601d9d5045a110c96bfd40e63e3c5721fb73dd"
     },
     {
@@ -2349,10 +2349,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This callback keeps one imported root through speech creation, resource transfer, Native editing, montage, reopening and export. The existing variants share browser setup and cleanup. Private helpers preserve ordering. No generic framework or product coordinator applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This callback follows the same imported root through creation, editing, backup, restored copy and export. Private helpers preserve ordering and browser cleanup. No new runtime owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "357ea361935b7e6eaa6ebe1ce3e1d47be8347d260cc788e2b238c509fc636a4a",
+      "astHash": "c543d776aaffa04a1c866a5c9a96f2ec105a1af681f4f94eafe2e9f838c00172",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {

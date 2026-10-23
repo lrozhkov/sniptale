@@ -25,7 +25,7 @@ export function createObjectCollector(rootLabel: string, paths: ArchivePathAlloc
       blob,
       ref: {
         filename,
-        mimeType,
+        mimeType: mimeType.split(';', 1)[0]!.trim().toLowerCase(),
         objectId,
         path: paths.reserve(
           directory ? [...directory, filename] : createInternalObjectSegments(objectId, filename)
@@ -62,7 +62,7 @@ export function createReadableAssetFilename(index: number, mimeType: string): st
         'video/mp4': '.mp4',
         'video/webm': '.webm',
       } as Record<string, string>
-    )[mimeType.toLocaleLowerCase('en-US')] ?? '';
+    )[mimeType.split(';', 1)[0]!.trim().toLowerCase()] ?? '';
   return `Asset ${String(index + 1).padStart(3, '0')}${extension}`;
 }
 

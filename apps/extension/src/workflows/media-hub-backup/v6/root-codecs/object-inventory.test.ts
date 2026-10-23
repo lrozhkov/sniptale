@@ -38,20 +38,20 @@ function envelope(
     objects: [object],
   };
 }
-const media = () =>
+const media = (mimeType = 'image/png') =>
   envelope('media', {
-    entry: { id: 'root', tags: [], source: { kind: 'screenshot' }, mimeType: 'image/png', size: 3 },
+    entry: { id: 'root', tags: [], source: { kind: 'screenshot' }, mimeType, size: 3 },
     originalObjectId: 'body',
   });
-const scenario = () =>
+const scenario = (mimeType = 'image/png') =>
   envelope('scenario-project', {
     entry: { id: 'root', project: {} },
-    assets: [{ entry: { id: 'asset', mimeType: 'image/png', size: 3 }, objectId: 'body' }],
+    assets: [{ entry: { id: 'asset', mimeType, size: 3 }, objectId: 'body' }],
     exports: [],
     exportThumbnails: [],
     stepDocuments: [],
   });
-const video = () =>
+const video = (mimeType = 'image/png') =>
   envelope('video-project', {
     entry: {
       id: 'root',
@@ -59,7 +59,7 @@ const video = () =>
     },
     projectAssets: [
       {
-        entry: { id: 'asset', mimeType: 'image/png', size: 3 },
+        entry: { id: 'asset', mimeType, size: 3 },
         filename: 'one.png',
         objectId: 'body',
       },
@@ -262,10 +262,12 @@ it.each([1, [{}], [{ assets: ['bad'] }], [{ assets: [{ objectId: 'body', sha256:
 it.each([media, scenario, video])(
   'admits each typed body role without changing authored metadata %#',
   async (fixture) => {
-    const root = fixture();
-    const before = structuredClone(root);
-    await assertArchiveRootObjectInventory(root, reader, []);
-    expect(root).toEqual(before);
+    for (const mimeType of ['image/png', 'image/png; name="source.png"']) {
+      const root = fixture(mimeType);
+      const before = structuredClone(root);
+      await assertArchiveRootObjectInventory(root, reader, []);
+      expect(root).toEqual(before);
+    }
   }
 );
 

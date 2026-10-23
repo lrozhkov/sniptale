@@ -1086,6 +1086,312 @@ async function checkTransferredRotatedArea(args: {
   );
 }
 
+async function restorePortableNative(args: {
+  page: Page;
+  origin: string;
+  theme: string;
+  project: NativeProject;
+  label: InspectorLabel;
+  outputPath: (name: string) => string;
+}) {
+  const { page, project, label, outputPath } = args;
+  await page.goto(`${args.origin}${GALLERY_HARNESS_PATH}?theme=${args.theme}`);
+  await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  await page.locator('[data-gallery-folder="video-project"]').getByRole('button').first().click();
+  const projects = page.locator('[data-gallery-keyboard-id^="video-project:"]');
+  const identities = () =>
+    projects.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-gallery-keyboard-id')!)
+    );
+  const before = await identities();
+  const source = page.locator(`[data-gallery-keyboard-id="video-project:${project.id}"]`);
+  await source.getByRole('button', { name: label('gallery.app.selectItem'), exact: true }).click();
+  const saved = () =>
+    page.evaluate(
+      () =>
+        window.__sniptaleHarness
+          ?.getSavedFiles()
+          .filter((file) => file.filename.endsWith('.zip')) ?? []
+    );
+  const count = (await saved()).length;
+  const backup = page.getByRole('button', {
+    name: label('gallery.app.selectionBackup'),
+    exact: true,
+  });
+  await checkInspectorPaintedFont(
+    page,
+    source.getByText((await source.getAttribute('aria-label'))!, { exact: true }),
+    'native-portable-backup-name'
+  );
+  await page.screenshot({ path: outputPath('native-portable-backup.png'), fullPage: false });
+  await backup.click();
+  await expect.poll(async () => (await saved()).length, { timeout: 60_000 }).toBe(count + 1);
+  const file = (await saved())[count]!;
+  expect(file.bytes.length).toBeGreaterThan(1_000);
+  await writeFile(outputPath('native-portable-backup.zip'), Buffer.from(file.bytes));
+  expect(await readNativeVideoProject(page, project.id)).toEqual(project);
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page
+    .getByRole('menuitem', { name: label('gallery.app.importBackup'), exact: true })
+    .click();
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles({
+    name: file.filename,
+    mimeType: 'application/zip',
+    buffer: Buffer.from(file.bytes),
+  });
+  await page
+    .getByRole('button', { name: label('gallery.importModal.conflictActionLabel'), exact: true })
+    .click();
+  await page
+    .getByRole('option', { name: label('gallery.importModal.duplicateTitle'), exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: label('gallery.importModal.restore'), exact: true })
+    .click();
+  const added = async () => (await identities()).filter((id) => !before.includes(id));
+  await expect.poll(added, { timeout: 60_000 }).toHaveLength(1);
+  const id = (await added())[0]!.slice('video-project:'.length);
+  const restoredThumbnail = page
+    .locator(`[data-gallery-keyboard-id="video-project:${id}"] img`)
+    .first();
+  await expect(restoredThumbnail).toBeVisible();
+  await expect
+    .poll(() =>
+      restoredThumbnail.evaluate(
+        (node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0
+      )
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: outputPath('native-portable-restored-gallery.png'),
+    fullPage: false,
+  });
+  const restored = (await readNativeVideoProject(page, id))!;
+  expect(restored.id).not.toBe(project.id);
+  expect(restored.assets).toHaveLength(project.assets.length);
+  for (const [index, asset] of restored.assets.entries()) {
+    const original = project.assets[index]!;
+    if (asset.recordingPart && asset.source.kind === 'recording')
+      expect(asset.recordingPart.recordingId).toBe(asset.source.recordingId);
+    expect({
+      ...asset,
+      source: original.source,
+      ...(original.recordingPart
+        ? {
+            recordingPart: {
+              ...asset.recordingPart,
+              recordingId: original.recordingPart.recordingId,
+            },
+          }
+        : {}),
+    }).toEqual(original);
+  }
+  expect(restored.clips).toEqual(project.clips);
+  expect(restored.tracks).toEqual(project.tracks);
+  expect(restored.textDocuments).toEqual(project.textDocuments);
+  expect(restored.sourceAudioDocuments).toEqual(project.sourceAudioDocuments);
+  expect(restored.transitions).toEqual(project.transitions);
+  expect(restored.effectInstances).toEqual(project.effectInstances);
+  expect(restored.duration).toBe(project.duration);
+  expect(restored.sourceVoiceoverDocuments).toHaveLength(project.sourceVoiceoverDocuments!.length);
+  for (const [index, voice] of restored.sourceVoiceoverDocuments!.entries()) {
+    const original = project.sourceVoiceoverDocuments![index]!;
+    expect(voice.take).toMatchObject({ ...original.take, assetId: expect.any(String) });
+    expect(voice.reference).toEqual(original.reference);
+    expect(
+      restored.assets.some((asset) => asset.id === voice.take.assetId && asset.type === 'AUDIO')
+    ).toBe(true);
+  }
+  const hashes = async (value: NativeProject) =>
+    Promise.all(
+      (value.effectSnapshots ?? [])
+        .flatMap((snapshot) => snapshot.assets)
+        .map(async (asset) => {
+          const hash = createHash('sha256')
+            .update(new Uint8Array(await asset.blob.arrayBuffer()))
+            .digest('hex');
+          expect(hash).toBe(asset.sha256);
+          return hash;
+        })
+    );
+  expect((await hashes(restored)).sort()).toEqual((await hashes(project)).sort());
+  expect(await readNativeVideoProject(page, project.id)).toEqual(project);
+  await writeFile(
+    outputPath('native-portable-restored.json'),
+    JSON.stringify({ original: project, restored, archiveBytes: file.bytes.length })
+  );
+  return restored;
+}
+
+async function checkRestoredNativeExport(args: {
+  page: Page;
+  origin: string;
+  theme: string;
+  project: NativeProject;
+  format: 'WEBM' | 'MP4';
+  label: InspectorLabel;
+  outputPath: (name: string) => string;
+}) {
+  const { page, project, label, outputPath } = args;
+  const restored = await restorePortableNative(args);
+  const nativeUrl = `${args.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(restored.id)}&theme=${args.theme}`;
+  await page.goto(nativeUrl);
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  await page
+    .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
+    .click();
+  const fragment = restored.textDocuments![0]!.document.fragments[0]!;
+  const phrase = page.locator(`[data-text-id="${fragment.id}"]`);
+  const editor = phrase.getByRole('textbox', {
+    name: label('gallery.videoReview.speechText'),
+    exact: true,
+  });
+  if (!(await editor.isVisible())) await phrase.locator('button[aria-expanded]').click();
+  await editor.fill('The restored copy remains editable independently of its accepted voice.');
+  await editor.press('Tab');
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page, restored.id))?.textDocuments?.[0]?.document.fragments[0]
+          ?.text
+    )
+    .toBe('The restored copy remains editable independently of its accepted voice.');
+  await checkInspectorPaintedFont(page, editor, 'input');
+  await page.screenshot({ path: outputPath('native-portable-restored-edit.png'), fullPage: false });
+  const accepted = (await readNativeVideoProject(page, restored.id))!;
+  expect(accepted.sourceVoiceoverDocuments).toEqual(restored.sourceVoiceoverDocuments);
+  expect(await readNativeVideoProject(page, project.id)).toEqual(project);
+  await page.reload();
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  expect(await readNativeVideoProject(page, restored.id)).toEqual(accepted);
+  await page.evaluate(
+    ({ capabilitiesType, startType }) => {
+      window.__sniptaleHarness?.setRuntimeResponse(capabilitiesType, {
+        success: true,
+        capabilities: {
+          formats: [
+            { format: 'WEBM', available: true },
+            { format: 'MP4', available: true },
+          ],
+          mp4Codecs: [
+            { codec: 'AVC', available: true },
+            { codec: 'HEVC', available: false, reason: 'CODEC_UNSUPPORTED' },
+            { codec: 'VP9', available: true },
+          ],
+          defaultMp4VideoCodec: 'AVC',
+        },
+        capabilityToken: 'restored-export-start',
+        cancelCapabilityToken: 'restored-export-cancel',
+        ownerDocumentId: 'restored-editor',
+      });
+      window.__sniptaleHarness?.setRuntimeResponse(startType, {
+        success: true,
+        capabilityToken: 'restored-export-cancel',
+        ownerDocumentId: 'restored-editor',
+      });
+    },
+    {
+      capabilitiesType: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES,
+      startType: VideoMessageType.START_PROJECT_EXPORT,
+    }
+  );
+  await page.locator('[data-ui="video-editor.timeline.toolbar.project-menu"]').click();
+  await page
+    .getByRole('button', { name: label('videoEditor.app.exportButton'), exact: true })
+    .click();
+  const inspector = page.locator('[data-ui="video-editor.export.inspector"]');
+  await chooseInspectorValue(
+    page,
+    inspector,
+    label('videoEditor.exportDialog.formatLabel'),
+    label(
+      args.format === 'WEBM'
+        ? 'videoEditor.exportDialog.formatWebmLabel'
+        : 'videoEditor.exportDialog.formatMp4Label'
+    )
+  );
+  if (args.format === 'MP4')
+    await inspector
+      .getByRole('button', { name: label('videoEditor.exportDialog.codecVp9Label'), exact: true })
+      .click();
+  await chooseInspectorValue(
+    page,
+    inspector,
+    label('videoEditor.exportDialog.resolutionLabel'),
+    label('videoEditor.exportDialog.resolutionSource')
+  );
+  const fps = inspector.getByRole('textbox', {
+    name: label('videoEditor.exportDialog.fpsLabel'),
+    exact: true,
+  });
+  await fps.fill('40');
+  await fps.press('Tab');
+  const submit = inspector.getByRole('button', {
+    name: label('videoEditor.exportDialog.submit'),
+    exact: true,
+  });
+  await submit.scrollIntoViewIfNeeded();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect
+    .poll(
+      async () =>
+        (await getRuntimeMessagesByType(page, VideoMessageType.START_PROJECT_EXPORT)).length
+    )
+    .toBe(1);
+  const start = (await getRuntimeMessagesByType(page, VideoMessageType.START_PROJECT_EXPORT))[0]!;
+  if (
+    !isProjectExportInputReference(start.input) ||
+    !isBoundedVideoProjectExportSettings(start.settings)
+  )
+    throw new Error('Missing restored project UI export admission');
+  expect(start.input.projectId).toBe(restored.id);
+  const host = accepted.clips.find(
+    (clip) =>
+      clip.type === 'EFFECT' && clip.attachment?.kind === 'source' && !clip.sourceRange?.dormant
+  )!;
+  const camera = resolveVideoCompositionFrame(accepted, 2).camera;
+  const projection = resolveEffectSourceProjection(accepted, host, camera, 2);
+  if (!projection) throw new Error('Missing restored resource source projection');
+  const projected = projectQuickEditPoint(projection, {
+    x: host.transform.x + host.transform.width / 2,
+    y: host.transform.y + host.transform.height / 2,
+  });
+  const point = projected && mapCompositionPointThroughCamera(projected, camera);
+  if (!point) throw new Error('Missing restored resource draw point');
+  const output = await encodedNativeVideoSamples(
+    page,
+    args.origin,
+    accepted,
+    args.format,
+    [{ time: 2, x: Math.round(point.x), y: Math.round(point.y), expected: [224, 32, 176] }],
+    undefined,
+    start.input,
+    start.settings
+  );
+  expect(output.samples[0]!.error).toBeLessThanOrEqual(12);
+  expect(Math.abs(output.duration - accepted.duration)).toBeLessThanOrEqual(0.1);
+  const audible = planProjectSourceVoiceoverPlayback(accepted).find(
+    ({ entry }) => entry.duration > 0.1
+  );
+  if (!audible) throw new Error('Missing restored accepted voice placement');
+  const audio = await readEncodedAudioWindows(
+    page,
+    [audible.entry.timelineStart + audible.entry.duration / 2],
+    0.05
+  );
+  expect(audio[0]).toBeGreaterThan(0.02);
+  expect(await readNativeVideoProject(page, restored.id)).toEqual(accepted);
+  expect(await readNativeVideoProject(page, project.id)).toEqual(project);
+  await writeFile(
+    outputPath('native-portable-restored-encoded.json'),
+    JSON.stringify({ output, audio, accepted })
+  );
+}
+
 const baseCase = {
   viewport: PRIMARY_BROWSER_VIEWPORTS[0]!,
   format: 'WEBM',
@@ -4514,6 +4820,18 @@ for (const {
         expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(
           spotlight || createdSpeech ? null : gallery
         );
+        if (createdSpeech) {
+          const project = (await readNativeVideoProject(page, final.id))!;
+          await checkRestoredNativeExport({
+            page,
+            origin: host.origin,
+            theme,
+            project,
+            format,
+            label,
+            outputPath: (name) => info.outputPath(name),
+          });
+        }
       }
       expect(errors).toEqual([]);
     } finally {

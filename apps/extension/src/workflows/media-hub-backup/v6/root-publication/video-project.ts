@@ -1,3 +1,5 @@
+import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
@@ -137,21 +139,25 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       (metadata.entry.project.effectSnapshots ?? []).map(async (snapshot) => ({
         ...snapshot,
         assets: await Promise.all(
-          snapshot.assets.map(async ({ objectId, ...asset }) => ({
-            ...asset,
-            blob: await readAssetFile(required(objects, objectId).ref, asset.id),
-          }))
+          snapshot.assets.map(async ({ objectId, ...asset }) => {
+            const file = await readAssetFile(required(objects, objectId).ref, asset.id);
+            return {
+              ...asset,
+              // Restore cleanup removes the staging file after publication.
+              blob: new Blob([await file.arrayBuffer()], { type: file.type }),
+            };
+          })
         ),
       }))
     );
+    const decodedProject = decodePortableVideoProjectAssetRefs(metadata.entry.project);
+    if (!isRecord(decodedProject)) throw new Error('Restored video project metadata is invalid.');
     const portableEntry = parseVideoProjectEntry({
       ...metadata.entry,
-      project: decodePortableVideoProjectAssetRefs({
-        ...metadata.entry.project,
-        effectSnapshots: snapshots,
-      }),
+      project: { ...decodedProject, effectSnapshots: snapshots },
     });
     if (!portableEntry) throw new Error('Restored video project metadata is invalid.');
+    await verifyVideoProjectEffectSnapshotIntegrity(portableEntry.project);
     const transformedProject = transformPortableVideoProjectReferences(
       portableEntry.project,
       assetIdMap,

@@ -19,7 +19,7 @@ import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
-import { assertPortableJson } from '../codec';
+import { assertPortableJson, parseRootEnvelope } from '../codec';
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import { createMediaHubBackupExportOptions } from '../options';
 import { buildVideoProjectRootInventory } from './video-projects';
@@ -168,36 +168,62 @@ describe('video project backup inventory', () => {
     ).rejects.toThrow('Stored video project is invalid');
   });
 
-  it('archives review-referenced external audio assets with portable-safe metadata', async () => {
-    const entry = createVideoProjectEntryWithMediaClip();
-    const db = database(
-      [
-        assetEntry('project-asset-1', 'local-video', 'video/webm', 10),
-        assetEntry('music', 'local-music', 'audio/mpeg', 8),
-      ],
-      new Map([['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })]]),
-      [entry],
-      [workspaceRow]
-    );
-    const roots = await buildVideoProjectRootInventory({
-      db,
-      options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
-      paths,
-    });
-    expect(roots).toHaveLength(1);
-    const payload = await roots[0]!.load();
-    expect(() => assertPortableJson(payload.metadata)).not.toThrow();
-    const metadata = parsePortableVideoProjectMetadata(payload.metadata);
-    const assets = metadata.projectAssets.map((asset) => ({
-      id: asset.entry.id,
-      filename: asset.filename,
-    }));
-    expect(assets).toEqual([
-      { id: 'project-asset-1', filename: 'Asset 001.webm' },
-      { id: 'music', filename: 'theme.mp3' },
-    ]);
-    expect(roots[0]!.descriptor.objectCount).toBe(2);
-  });
+  it.each(['video/webm', 'video/webm; codecs="vp8, opus"'])(
+    'archives review-referenced external audio assets with portable-safe metadata: %s',
+    async (mimeType) => {
+      const entry = createVideoProjectEntryWithMediaClip();
+      entry.project.assets[0]!.metadata.mimeType = mimeType;
+      const sourceFile = new Blob([new Uint8Array(10)], { type: mimeType });
+      mocks.readInventoryAssetFile.mockResolvedValueOnce(sourceFile);
+      const db = database(
+        [
+          assetEntry('project-asset-1', 'local-video', mimeType, 10),
+          assetEntry('music', 'local-music', 'audio/mpeg', 8),
+        ],
+        new Map([['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })]]),
+        [entry],
+        [workspaceRow]
+      );
+      const roots = await buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
+        paths,
+      });
+      expect(roots).toHaveLength(1);
+      const payload = await roots[0]!.load();
+      expect(() => assertPortableJson(payload.metadata)).not.toThrow();
+      expect(() =>
+        parseRootEnvelope({
+          descriptor: roots[0]!.descriptor,
+          metadata: payload.metadata,
+          objects: payload.objects.map((object) => object.ref),
+        })
+      ).not.toThrow();
+      expect(payload.objects[0]!.ref.mimeType).toBe('video/webm');
+      if (mimeType.includes(';')) {
+        expect(() =>
+          parseRootEnvelope({
+            descriptor: roots[0]!.descriptor,
+            metadata: payload.metadata,
+            objects: payload.objects.map((object) => ({ ...object.ref, mimeType })),
+          })
+        ).toThrow('Media backup object MIME type is invalid.');
+      }
+      expect(payload.objects[0]!.blob).toBe(sourceFile);
+      expect(sourceFile.type).toBe(mimeType);
+      const metadata = parsePortableVideoProjectMetadata(payload.metadata);
+      expect(metadata.projectAssets[0]!.entry.mimeType).toBe(mimeType);
+      const assets = metadata.projectAssets.map((asset) => ({
+        id: asset.entry.id,
+        filename: asset.filename,
+      }));
+      expect(assets).toEqual([
+        { id: 'project-asset-1', filename: 'Asset 001.webm' },
+        { id: 'music', filename: 'theme.mp3' },
+      ]);
+      expect(roots[0]!.descriptor.objectCount).toBe(2);
+    }
+  );
 
   it('rejects a project backup when a review-referenced asset is missing', async () => {
     const entry = createVideoProjectEntryWithMediaClip();

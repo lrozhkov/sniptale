@@ -47,10 +47,7 @@ export function parseEffectBundleMetadata(value: unknown): PortableEffectBundleM
   if (!Array.isArray(rawEntry['assets'])) {
     throw new Error('Effect bundle portable asset metadata is invalid.');
   }
-  if (
-    rawEntry['assets'].length === 0 ||
-    rawEntry['assets'].length > EFFECT_BUNDLE_LIMITS.maxAssets
-  ) {
+  if (rawEntry['assets'].length > EFFECT_BUNDLE_LIMITS.maxAssets) {
     throw new Error('Effect bundle portable asset count is invalid.');
   }
   const assets: PortableEffectBundleAsset[] = rawEntry['assets'].map((asset) => {

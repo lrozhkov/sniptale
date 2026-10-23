@@ -1,5 +1,5 @@
 import { putRecordingBackupRestore } from '../../../../composition/persistence/recordings/backup-restore';
-import { assertPortableJson } from '../codec';
+import { assertPortableJson, parseRootEnvelope } from '../codec';
 import { parsePortableMediaMetadata } from '../root-codecs/media';
 import { expect, it, vi } from 'vitest';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
@@ -246,103 +246,121 @@ it.each<MediaLibraryEntry['source']>([
   }
 );
 
-it('exports recording bytes through OPFS File and telemetry only when requested', async () => {
-  const entry = mediaEntry({
-    duration: 3,
-    filename: 'recording.webm',
-    height: 720,
-    id: 'recording:recording-one',
-    kind: 'video',
-    mimeType: 'video/webm',
-    size: 5,
-    source: { kind: 'recording', recordingId: 'recording-one' },
-    width: 1280,
-  });
-  const actions: RecordingTelemetryEntry['actionEvents'] = [
-    {
-      id: 'captured-click',
-      kind: 'CLICK',
-      time: 1,
-      duration: 0.4,
-      preset: 'CLICK_RIPPLE',
-      label: 'Click',
-      point: { x: 0.5, y: 0.5 },
-      data: { targetKind: 'button', targetSource: 'html', targetTag: 'button', targetName: 'Save' },
-    },
-  ];
-  const db = {
-    transaction: emptyReviewTransaction,
-    get: vi.fn(async (store: string) => {
-      if (store === 'media_library') return entry;
-      if (store === 'recordings') {
-        return {
-          assetId: 'recording-asset',
-          createdAt: 1,
-          filename: 'recording.webm',
-          id: 'recording-one',
-          mimeType: 'video/webm',
-          size: 5,
-        };
-      }
-      if (store === 'asset_refs')
-        return { ...ref('recording-asset'), mimeType: 'video/webm', size: 5 };
-      if (store === 'recording_telemetry') {
-        return {
-          actionEvents: actions,
-          captureMode: null,
-          createdAt: 1,
-          cursorTrack: null,
-          recordingId: 'recording-one',
-          signals: [],
-          updatedAt: 1,
-          viewport: null,
-        } satisfies RecordingTelemetryEntry;
-      }
-      return undefined;
-    }),
-  };
-  mocks.readFile.mockResolvedValue(new File(['media'], 'recording.webm', { type: 'video/webm' }));
-  const [root] = await buildMediaRootInventory({
-    db,
-    items: [item(entry)],
-    options: createMediaHubBackupExportOptions({ includeTelemetry: true }),
-    paths: createArchivePathAllocator(),
-  });
-  const payload = await root!.load();
-  expect(payload.objects[0]?.ref.path).toBe('Recordings/recording.webm');
-  expect(payload.metadata).toMatchObject({
-    recording: {
-      entry: { id: 'recording-one' },
-      telemetry: { recordingId: 'recording-one' },
-    },
-  });
-  expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
-  const restored = parsePortableMediaMetadata(JSON.parse(JSON.stringify(payload.metadata)));
-  expect(restored.recording?.telemetry?.actionEvents).toEqual(actions);
-  const recording = restored.recording!;
-  const telemetryStore = { put: vi.fn(async () => undefined) };
-  const discard = { put: async () => undefined };
-  await putRecordingBackupRestore({
-    entry: { ...recording.entry, assetId: 'restored-asset' },
-    ref: {
-      ...ref('restored-asset'),
-      location: { kind: 'opfs', objectKey: 'objects/restored-asset' },
-      mimeType: 'video/webm',
+it.each(['video/webm', 'video/webm; codecs="vp8, opus"'])(
+  'exports recording bytes through OPFS File and telemetry only when requested: %s',
+  async (mimeType) => {
+    const entry = mediaEntry({
+      duration: 3,
+      filename: 'recording.webm',
+      height: 720,
+      id: 'recording:recording-one',
+      kind: 'video',
+      mimeType,
       size: 5,
-    },
-    refStore: discard,
-    ownerStore: discard,
-    recordingStore: discard,
-    telemetry: recording.telemetry!,
-    telemetryStore,
-  });
-  expect(telemetryStore.put).toHaveBeenCalledWith(
-    expect.objectContaining({
-      recordingId: 'recording-one',
-      actionEvents: actions,
-    })
-  );
-});
+      source: { kind: 'recording', recordingId: 'recording-one' },
+      width: 1280,
+    });
+    const actions: RecordingTelemetryEntry['actionEvents'] = [
+      {
+        id: 'captured-click',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0.4,
+        preset: 'CLICK_RIPPLE',
+        label: 'Click',
+        point: { x: 0.5, y: 0.5 },
+        data: {
+          targetKind: 'button',
+          targetSource: 'html',
+          targetTag: 'button',
+          targetName: 'Save',
+        },
+      },
+    ];
+    const db = {
+      transaction: emptyReviewTransaction,
+      get: vi.fn(async (store: string) => {
+        if (store === 'media_library') return entry;
+        if (store === 'recordings') {
+          return {
+            assetId: 'recording-asset',
+            createdAt: 1,
+            filename: 'recording.webm',
+            id: 'recording-one',
+            mimeType,
+            size: 5,
+          };
+        }
+        if (store === 'asset_refs') return { ...ref('recording-asset'), mimeType, size: 5 };
+        if (store === 'recording_telemetry') {
+          return {
+            actionEvents: actions,
+            captureMode: null,
+            createdAt: 1,
+            cursorTrack: null,
+            recordingId: 'recording-one',
+            signals: [],
+            updatedAt: 1,
+            viewport: null,
+          } satisfies RecordingTelemetryEntry;
+        }
+        return undefined;
+      }),
+    };
+    const file = new File(['media'], 'recording.webm', { type: mimeType });
+    mocks.readFile.mockResolvedValue(file);
+    const [root] = await buildMediaRootInventory({
+      db,
+      items: [item(entry)],
+      options: createMediaHubBackupExportOptions({ includeTelemetry: true }),
+      paths: createArchivePathAllocator(),
+    });
+    const payload = await root!.load();
+    expect(payload.objects[0]?.ref.path).toBe('Recordings/recording.webm');
+    expect(() =>
+      parseRootEnvelope({
+        descriptor: root!.descriptor,
+        metadata: payload.metadata,
+        objects: payload.objects.map((object) => object.ref),
+      })
+    ).not.toThrow();
+    expect(payload.objects[0]!.ref.mimeType).toBe('video/webm');
+    expect(payload.objects[0]!.blob).toBe(file);
+    expect(file.type).toBe(mimeType);
+    expect(payload.metadata).toMatchObject({
+      recording: {
+        entry: { id: 'recording-one' },
+        telemetry: { recordingId: 'recording-one' },
+      },
+    });
+    expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
+    const restored = parsePortableMediaMetadata(JSON.parse(JSON.stringify(payload.metadata)));
+    expect(restored.recording?.telemetry?.actionEvents).toEqual(actions);
+    const recording = restored.recording!;
+    const telemetryStore = { put: vi.fn(async () => undefined) };
+    const discard = { put: async () => undefined };
+    await putRecordingBackupRestore({
+      entry: { ...recording.entry, assetId: 'restored-asset' },
+      ref: {
+        ...ref('restored-asset'),
+        location: { kind: 'opfs', objectKey: 'objects/restored-asset' },
+        mimeType,
+        size: 5,
+      },
+      refStore: discard,
+      ownerStore: discard,
+      recordingStore: discard,
+      telemetry: recording.telemetry!,
+      telemetryStore,
+    });
+    expect(telemetryStore.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordingId: 'recording-one',
+        actionEvents: actions,
+      })
+    );
+  }
+);
 
 it('places durable audio in the readable Audio directory', async () => {
   const entry = mediaEntry({
