@@ -1,5 +1,15 @@
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
-import { syntheticSpeechWav } from '../support/voiceover-speech-fixture';
+import {
+  syntheticSpeechWav,
+  installSpeechPortFixture,
+  persistedReviewContent,
+} from '../support/voiceover-speech-fixture';
+import {
+  installTextPortFixture,
+  textModelResponse,
+  textRewriteRequests,
+} from '../support/text-rewrite-fixture';
+import { planProjectSourceVoiceoverPlayback } from '../../../../apps/extension/src/features/video/project/source-voiceover-playback';
 import { reviewSpeechTextSignature } from '../../../../apps/extension/src/features/video/review/speech-transcript';
 import { inspectVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
@@ -450,6 +460,202 @@ async function checkTransferredResultVoiceEditing(
     path: outputPath('result-voice-current-text-deleted.png'),
     fullPage: false,
   });
+}
+
+async function createGallerySpeechForTransfer(
+  page: Page,
+  dialog: Locator,
+  label: InspectorLabel,
+  outputPath: (name: string) => string
+) {
+  await installSpeechPortFixture(page, 1);
+  await installTextPortFixture(page);
+  const command = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: label(key), exact: true });
+  const original = dialog
+    .locator('[data-ui="gallery.videoReview.trackHeader"]')
+    .filter({ hasText: label('gallery.videoReview.audioOriginal') });
+  await original
+    .getByRole('button', { name: label('gallery.videoReview.speechTitle'), exact: true })
+    .click();
+  const speech = dialog.locator('[data-ui="gallery.videoReview.speechPanel"]');
+  const volume = speech.getByRole('textbox', {
+    name: label('gallery.videoReview.volume'),
+    exact: true,
+  });
+  await volume.fill('0');
+  await volume.press('Tab');
+  await expect
+    .poll(async () => (await persistedReviewContent(page))?.audio.original.volume)
+    .toBe(0);
+  await speech
+    .getByRole('button', { name: label('gallery.videoReview.recognitionStart'), exact: true })
+    .click();
+  await speech
+    .getByRole('button', { name: label('gallery.videoReview.speechConsentContinue'), exact: true })
+    .click();
+  const result = speech.locator('[data-ui="gallery.videoReview.recognitionResult"]');
+  await expect(result.locator('[data-ui="gallery.videoReview.textPhrase"]')).toHaveCount(1);
+  expect((await persistedReviewContent(page))?.text?.fragments.length ?? 0).toBe(0);
+  const applyRecognition = result.getByRole('button', {
+    name: label('gallery.videoReview.recognitionApply'),
+    exact: true,
+  });
+  await applyRecognition.scrollIntoViewIfNeeded();
+  await applyRecognition.click();
+  await expect
+    .poll(async () => (await persistedReviewContent(page))?.text?.fragments.length)
+    .toBe(1);
+  await command('gallery.videoReview.textTrackOpen').click();
+  const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+  const phrase = document.locator('[data-ui="gallery.videoReview.textPhrase"]');
+  const text = phrase.getByRole('textbox', {
+    name: label('gallery.videoReview.speechText'),
+    exact: true,
+  });
+  if (!(await text.isVisible())) await phrase.locator('button[aria-expanded]').click();
+  await text.fill('Corrected recognition for the shared editor journey.');
+  await text.press('Tab');
+  await expect
+    .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.text)
+    .toBe('Corrected recognition for the shared editor journey.');
+  const shown = phrase.getByRole('switch', {
+    name: label('gallery.videoReview.textFragmentShown'),
+    exact: true,
+  });
+  if ((await shown.getAttribute('aria-checked')) === 'true') await shown.click();
+  await expect
+    .poll(async () => (await persistedReviewContent(page))?.text?.fragments[0]?.showInVideo)
+    .toBe(false);
+  const corrected = (await persistedReviewContent(page))!;
+  expect(corrected.text!.fragments[0]!.text).toBe(
+    'Corrected recognition for the shared editor journey.'
+  );
+  await command('gallery.videoReview.textRewriteTitle').click();
+  const rewrite = dialog.locator('[data-ui="gallery.videoReview.textRewrite"]');
+  await rewrite
+    .getByRole('textbox', { name: label('gallery.videoReview.textRewritePrompt'), exact: true })
+    .fill('Keep the meaning and simplify the wording.');
+  await rewrite
+    .getByRole('button', { name: label('gallery.videoReview.textRewriteStart'), exact: true })
+    .click();
+  const proposed = rewrite.getByRole('textbox', {
+    name: label('gallery.videoReview.textRewriteResult').replace('{index}', '1'),
+    exact: true,
+  });
+  await expect(proposed).toHaveValue(`AI: ${corrected.text!.fragments[0]!.text}`);
+  expect((await persistedReviewContent(page))!.text).toEqual(corrected.text);
+  const replace = rewrite.getByRole('button', {
+    name: label('gallery.videoReview.textRewriteReplace'),
+    exact: true,
+  });
+  await replace.scrollIntoViewIfNeeded();
+  await checkInspectorPaintedFont(page, proposed, 'input');
+  await page.screenshot({
+    path: outputPath('gallery-created-speech-rewrite.png'),
+    fullPage: false,
+  });
+  await replace.click();
+  await expect(rewrite).toContainText(label('gallery.videoReview.textRewriteApplied'));
+  await command('gallery.videoReview.textVoiceBack').click();
+  await command('gallery.videoReview.speechGenerate').click();
+  const voice = dialog.locator('[data-ui="gallery.videoReview.textVoice"]');
+  await chooseInspectorValue(page, voice, label('gallery.videoReview.speechFormat'), 'WAV');
+  await voice
+    .getByRole('button', { name: label('gallery.videoReview.speechGenerate'), exact: true })
+    .click();
+  await voice
+    .getByRole('button', { name: label('gallery.videoReview.speechConsentContinue'), exact: true })
+    .click();
+  const preview = voice.locator('audio');
+  await expect(preview).toHaveCount(1);
+  await expect.poll(() => preview.evaluate((element) => element.duration)).toBe(1);
+  expect((await persistedReviewContent(page))!.audio.voiceover).toHaveLength(0);
+  await preview.evaluate((element) => element.play());
+  await expect.poll(() => preview.evaluate((element) => element.currentTime)).toBeGreaterThan(0);
+  await preview.evaluate((element) => element.pause());
+  const applyVoice = voice.getByRole('button', {
+    name: label('gallery.videoReview.speechApply'),
+    exact: true,
+  });
+  await applyVoice.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: outputPath('gallery-created-speech-apply.png'), fullPage: false });
+  await applyVoice.click();
+  await expect
+    .poll(async () => (await persistedReviewContent(page))?.audio.voiceover.length)
+    .toBe(1);
+  const accepted = (await persistedReviewContent(page))!;
+  const take = accepted.audio.voiceover[0]!;
+  expect(take.textSnapshot?.text).toBe(`AI: ${corrected.text!.fragments[0]!.text}`);
+  expect(take.sourceAnchor?.length).toBeGreaterThan(0);
+  expect(accepted.text!.fragments[0]!.showInVideo).toBe(false);
+  const requests: unknown = await page.evaluate(() => Reflect.get(window, 'speechFixtureRequests'));
+  expect(requests).toEqual([
+    { operation: 'transcription' },
+    { operation: 'input', inputBytes: expect.any(Number), wav: true },
+    { operation: 'speech', text: take.textSnapshot!.text },
+  ]);
+  const rewrites = await textRewriteRequests(page);
+  expect(rewrites).toHaveLength(1);
+  expect(rewrites[0]!.context.fragments[0]!.text).toBe(corrected.text!.fragments[0]!.text);
+  await writeFile(
+    outputPath('gallery-created-speech.json'),
+    JSON.stringify({ accepted, requests, rewrites })
+  );
+  await command('gallery.videoReview.textVoiceBack').click();
+  return { take, fragment: accepted.text!.fragments[0]! };
+}
+
+async function checkCreatedSpeechTransfer(
+  page: Page,
+  native: NativeProject,
+  created: Awaited<ReturnType<typeof createGallerySpeechForTransfer>>,
+  label: InspectorLabel,
+  outputPath: (name: string) => string
+) {
+  expect(native.sourceVoiceoverDocuments).toHaveLength(1);
+  const retained = native.sourceVoiceoverDocuments![0]!;
+  expect(retained.take.textSnapshot).toEqual(created.take.textSnapshot);
+  expect(retained.take.duration).toBe(created.take.duration);
+  const asset = native.assets.find((entry) => entry.id === retained.take.assetId)!;
+  expect(asset.name).toBe(created.take.textSnapshot!.text.trim());
+  const material = page.locator(`[data-material-id="${asset.id}"]`);
+  await expect(material).toContainText(asset.name);
+  await material.scrollIntoViewIfNeeded();
+  await expect(material).toBeInViewport();
+  await page
+    .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: label('videoEditor.sidebar.textDocuments'), exact: true })
+    .click();
+  const phrase = page
+    .locator('[data-ui="video-editor.text.panel"]')
+    .locator(`[data-text-id="${created.fragment.id}"]`);
+  const editor = phrase.getByRole('textbox', {
+    name: label('gallery.videoReview.speechText'),
+    exact: true,
+  });
+  if (!(await editor.isVisible())) await phrase.locator('button[aria-expanded]').click();
+  await expect(editor).toHaveValue(created.fragment.text);
+  await editor.fill('Current Native text changes independently of the accepted voice.');
+  await editor.press('Tab');
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page))?.textDocuments
+          ?.flatMap((entry) => entry.document.fragments)
+          .find((fragment) => fragment.id === created.fragment.id)?.text
+    )
+    .toBe('Current Native text changes independently of the accepted voice.');
+  expect((await readNativeVideoProject(page))?.sourceVoiceoverDocuments).toEqual(
+    native.sourceVoiceoverDocuments
+  );
+  expect(
+    (await readNativeVideoProject(page))?.assets.find((entry) => entry.id === asset.id)?.name
+  ).toBe(asset.name);
+  await checkInspectorPaintedFont(page, editor, 'input');
+  await page.screenshot({ path: outputPath('native-created-speech-text.png'), fullPage: false });
 }
 
 async function configureGallerySpatialDetails(page: Page, dialog: Locator, label: InspectorLabel) {
@@ -1112,7 +1318,7 @@ for (const {
     galleryCut: 'fade-black',
   },
 ] as const) {
-  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}${resultVoice ? ' result-voice' : ''}${spatialDetails ? ' spatial-details' : ''}`, async ({
+  test(`resource-bearing Gallery annotations remain editable through Native montage reopen and real export ${viewport.name} ${format}${crop ? ' crop-header' : ''}${spatial ? ' 3D' : ''}${selectedOnly ? ' selected-only' : ''}${nativeFx ? ' native-FX' : ''}${groupFx ? ' group-FX' : ''}${spotlight ? ` spotlight-${spotlightEffect}` : ''}${galleryCut === 'none' ? '' : ` gallery-cut-${galleryCut}`}${bookends ? ' gallery-bookends' : ''}${activeIntro ? ' active-intro' : ''}${fractionalVideo ? ' fractional-video' : ''}${fractionalMain ? ' fractional-main' : ''}${heldExposure ? ' held-exposure' : ''}${lateExposureEnd ? ' late-end' : ''}${emptyMedia ? ' empty-media' : ''}${resultVoice ? ' result-voice' : ''}${spatialDetails ? ' spatial-details speech-created' : ''}`, async ({
     page,
   }, info) => {
     test.setTimeout(240000);
@@ -1134,6 +1340,14 @@ for (const {
           'sniptale-locale-preference': locale,
           'sniptale-theme-preference': theme,
         },
+        ...(spatialDetails
+          ? {
+              runtimeResponses: {
+                AI_SETTINGS_QUERY: textModelResponse,
+                REQUEST_LLM_SESSION: { success: true, token: 'fixture-review-text-token' },
+              },
+            }
+          : {}),
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -1269,6 +1483,9 @@ for (const {
       await page.getByRole('option', { name: title, exact: true }).click();
       await drawAnnotation(page, 0.1, 0.6);
       await expect(dialog.locator('[data-annotation-effect-id]')).toHaveCount(3);
+      const createdSpeech = spatialDetails
+        ? await createGallerySpeechForTransfer(page, dialog, label, (name) => info.outputPath(name))
+        : undefined;
       await button('gallery.videoReview.cutMode').click();
       const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
       const cutLane = plane.locator(
@@ -2209,6 +2426,10 @@ for (const {
         .toBe(3);
       const native = (await readNativeVideoProject(page))!;
       expect(native.id).not.toBe(aggregate);
+      if (createdSpeech)
+        await checkCreatedSpeechTransfer(page, native, createdSpeech, label, (name) =>
+          info.outputPath(name)
+        );
       const spatialDetailIds = spatialDetails
         ? await checkTransferredSpatialDetails(page, native, label, (name) => info.outputPath(name))
         : undefined;
@@ -3462,7 +3683,7 @@ for (const {
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       expect(await readNativeVideoProject(page, final.id)).toEqual(final);
       expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(gallery);
-      if (spotlight) {
+      if (spotlight || createdSpeech) {
         await page.goto(
           `${host.origin}${SETTINGS_HARNESS_PATH}?section=video-effects&theme=${theme}`
         );
@@ -3945,6 +4166,25 @@ for (const {
         start.input,
         selectedOnly || activeIntro ? start.settings : undefined
       );
+      if (createdSpeech) {
+        expect(final.sourceVoiceoverDocuments).toEqual(native.sourceVoiceoverDocuments);
+        const schedule = planProjectSourceVoiceoverPlayback(final);
+        const active = schedule.find(({ entry }) => entry.duration > 0.1);
+        if (!active) throw new Error('Missing audible accepted speech placement after montage');
+        const time = active.entry.timelineStart + active.entry.duration / 2;
+        const audio = await readEncodedAudioWindows(page, [time], 0.05);
+        expect(audio[0]).toBeGreaterThan(0.02);
+        await writeFile(
+          info.outputPath('created-speech-real-encode.json'),
+          JSON.stringify({
+            format,
+            schedule,
+            time,
+            audio,
+            sourceVoiceoverDocuments: final.sourceVoiceoverDocuments,
+          })
+        );
+      }
       if (resultVoice) {
         const audio = await readEncodedAudioWindows(page, [2.2, 4.2], 0.1);
         await writeFile(
@@ -4271,7 +4511,9 @@ for (const {
           label,
           outputPath: (name) => info.outputPath(name),
         });
-        expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(gallery);
+        expect(await readNativeReviewWorkspace(page, aggregate)).toEqual(
+          spotlight || createdSpeech ? null : gallery
+        );
       }
       expect(errors).toEqual([]);
     } finally {

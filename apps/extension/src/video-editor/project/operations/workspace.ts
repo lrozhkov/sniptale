@@ -367,8 +367,16 @@ async function prepareReviewResources(
       if (bookendIds.has(id)) bookends.push(resource);
     } else {
       const metadata = await loadAudioMetadata(result.entry.file);
+      const snapshotName = audio.voiceover
+        .find((take) => take.assetId === id && take.textSnapshot?.text.trim())
+        ?.textSnapshot?.text.trim();
+      const filename = result.entry.file.name;
+      const name =
+        snapshotName && (!filename || [id, projectAssetId, result.entry.assetId].includes(filename))
+          ? snapshotName
+          : filename || id;
       const asset = createVideoProjectAsset(
-        result.entry.file.name || id,
+        name,
         'AUDIO',
         { kind: 'project-asset', projectAssetId },
         { ...metadata, width: 0, height: 0 }

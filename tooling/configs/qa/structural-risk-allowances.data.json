@@ -1854,10 +1854,10 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
       "symbol": "prepareReviewResources",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This workflow prepares one captured immutable resource bundle. Existing adapters admit the bytes and detect conflicting roles. Historical snapshot hashing uses that same capture before the final stale-snapshot barrier. No writer or second resource lifetime applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: One captured immutable resource bundle feeds conversion. The added name uses an already retained speech snapshot. A blank file name or known backing identity uses retained speech text. Explicit file names remain. No new reader, writer, lifetime or coordinator applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "1d788fa55ced45eac1d62baee32653ee24bf4f227deb90f479c38812f61534d5",
+      "astHash": "75675c83bfaa6e00244cec3da48670bb03ff2b873dd2e002b149c4e637ea1bfb",
       "signatureHash": "61d42269b9a47647c3d55d69c5f2ee4589db4306015f090645afaf7e51c79c33"
     },
     {
@@ -1920,10 +1920,10 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This suite proves one Gallery opening and publication workflow. Mock dependencies serve its existing source and storage fixtures. The added snapshot assertions use the same missing-resource retry. Fixture state grants no product authority. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves one project opening and publication operation. Two audio rows cover physical and explicit names under the same resource refusal and retry. Fixtures grant no product authority. No runtime state or ownership change applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "a67a21ee86c403654fbac15ad4cd62fa22dfcb0288726d69c4d8d6341741d72b",
+      "astHash": "f05007f296bd65bec8bb9df08048bb84018b4e35fa2e2d0ff2a4fb6844fa2180",
       "signatureHash": "3945c9c609bb72de6c6661c873250ad62b091a9b5afd6e0ef927f1b774b2c43a"
     },
     {
@@ -2338,21 +2338,21 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This suite proves one resource transfer and montage journey. Private helpers use the same saved root and browser lifetime. Spatial resource checks extend two existing cases. No new product owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This suite proves one resource transfer and montage journey. Private helpers use the same saved root and browser lifetime. Speech creation extends two existing cases. Remote response fixtures preserve actual extraction, staging, acceptance and encoding. No new product owner or state authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "4db46764ff4a2ce80b681a3eb163bef572bfc48d8f825bcba1715bece9040e39",
-      "signatureHash": "814214b05a8d9ccfd5edc438c1558aa80bc04cf60ccd07c337a508441014ead3"
+      "astHash": "fa860543b5256e97246d91b8fc3483fcc2460237f55927c47f7b875dced526b9",
+      "signatureHash": "9955b32c07fed0d6507abd495b601d9d5045a110c96bfd40e63e3c5721fb73dd"
     },
     {
       "rule": "structural-function-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-annotation-transfer.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: This callback owns one Gallery transfer, Native edit, reload and export journey. Existing cases share browser setup and cleanup. Private spatial helpers preserve this ordering. No generic phase framework or new runtime state applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This callback keeps one imported root through speech creation, resource transfer, Native editing, montage, reopening and export. The existing variants share browser setup and cleanup. Private helpers preserve ordering. No generic framework or product coordinator applies. Main inspected this exact body. Independent architecture review must assess this classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
       "reviewDate": "2026-10-23",
-      "astHash": "b3d00cb27dd2987444373fa8069ec714bf5794ce3fce626face264a7f608d743",
+      "astHash": "357ea361935b7e6eaa6ebe1ce3e1d47be8347d260cc788e2b238c509fc636a4a",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {

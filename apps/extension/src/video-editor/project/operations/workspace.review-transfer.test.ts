@@ -422,82 +422,91 @@ it('transfers captured cursor facts without changing Gallery or painting a new p
   expect(snapshot).toEqual(before);
 });
 
-it('claims existing accepted audio resources without copying bytes and retries a missing resource', async () => {
-  const snapshot = await transferFixture();
-  snapshot.workspace.advanced.audio.voiceover = [
-    {
-      id: 'voice',
-      assetId: 'project-asset:voice-bytes',
-      timelineStart: 0,
-      sourceOffset: 0,
-      duration: 1,
-      volume: 1,
-      muted: false,
-      fadeIn: 0,
-      fadeOut: 0,
-      transcript: { version: 1, phrases: [], replacements: [] },
-      textSnapshot: {
-        kind: 'microphone',
-        textId: 'deleted-script',
-        revision: 2,
-        timingRevision: 3,
-        text: 'Accepted historical script',
-        start: 0,
-        end: 1,
-        timeDomain: 'result',
+it.each([
+  { fileName: 'voice-object', expectedName: 'Accepted historical script' },
+  { fileName: 'Voice.wav', expectedName: 'Voice.wav' },
+])(
+  'claims accepted audio named $fileName without copying bytes and retries a missing resource',
+  async ({ fileName, expectedName }) => {
+    const snapshot = await transferFixture();
+    snapshot.workspace.advanced.audio.voiceover = [
+      {
+        id: 'voice',
+        assetId: 'project-asset:voice-bytes',
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 1,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+        transcript: { version: 1, phrases: [], replacements: [] },
+        textSnapshot: {
+          kind: 'microphone',
+          textId: 'deleted-script',
+          revision: 2,
+          timingRevision: 3,
+          text: 'Accepted historical script',
+          start: 0,
+          end: 1,
+          timeDomain: 'result',
+        },
       },
-    },
-  ];
-  getProjectAsset.mockResolvedValue({ status: 'not-found' });
-  await expect(loadInitialProjectFromLocation()).rejects.toThrow(
-    'Review audio resource is unavailable.'
-  );
-  expect(saveVideoProject).not.toHaveBeenCalled();
-  getProjectAsset.mockResolvedValue({
-    status: 'ready',
-    entry: {
-      id: 'voice-bytes',
-      assetId: 'voice-object',
+    ];
+    getProjectAsset.mockResolvedValue({ status: 'not-found' });
+    await expect(loadInitialProjectFromLocation()).rejects.toThrow(
+      'Review audio resource is unavailable.'
+    );
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    getProjectAsset.mockResolvedValue({
+      status: 'ready',
+      entry: {
+        id: 'voice-bytes',
+        assetId: 'voice-object',
+        mimeType: 'audio/wav',
+        size: 4,
+        createdAt: 1,
+        file: new File(['wave'], fileName, { type: 'audio/wav' }),
+      },
+    });
+    const { loadAudioMetadata } = await import('../media-metadata');
+    vi.mocked(loadAudioMetadata).mockResolvedValue({
+      duration: 2,
       mimeType: 'audio/wav',
       size: 4,
-      createdAt: 1,
-      file: new File(['wave'], 'Voice.wav', { type: 'audio/wav' }),
-    },
-  });
-  const { loadAudioMetadata } = await import('../media-metadata');
-  vi.mocked(loadAudioMetadata).mockResolvedValue({
-    duration: 2,
-    mimeType: 'audio/wav',
-    size: 4,
-    hasAudio: true,
-    audioPeaks: null,
-  });
-  const result = await loadInitialProjectFromLocation();
-  expect(
-    result.project!.assets.find((asset) => asset.id === 'project-asset:voice-bytes')
-  ).toMatchObject({ source: { kind: 'project-asset', projectAssetId: 'voice-bytes' } });
-  expect(
-    result.project!.clips.some(
+      hasAudio: true,
+      audioPeaks: null,
+    });
+    const result = await loadInitialProjectFromLocation();
+    expect(
+      result.project!.assets.find((asset) => asset.id === 'project-asset:voice-bytes')
+    ).toMatchObject({
+      name: expectedName,
+      source: { kind: 'project-asset', projectAssetId: 'voice-bytes' },
+    });
+    expect(
+      result.project!.clips.some(
+        (clip) => clip.type === 'AUDIO' && clip.assetId === 'project-asset:voice-bytes'
+      )
+    ).toBe(true);
+    const take = result.project!.clips.find(
       (clip) => clip.type === 'AUDIO' && clip.assetId === 'project-asset:voice-bytes'
-    )
-  ).toBe(true);
-  const take = result.project!.clips.find(
-    (clip) => clip.type === 'AUDIO' && clip.assetId === 'project-asset:voice-bytes'
-  );
-  expect(result.project!.version).toBe(44);
-  expect(take).toMatchObject({
-    linkMode: 'DETACHED',
-    transcript: { version: 1, phrases: [], replacements: [] },
-    textSnapshot: {
-      binding: { kind: 'project' },
-      basisHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
-      text: snapshot.workspace.advanced.audio.voiceover[0]!.textSnapshot,
-    },
-  });
-  expect(snapshot.workspace.advanced.audio.voiceover[0]!.sourceAnchor).toBeUndefined();
-  expect(saveVideoProject).toHaveBeenCalledTimes(1);
-  expect(deleteProjectAsset).not.toHaveBeenCalled();
-});
+    );
+    expect(result.project!.version).toBe(44);
+    expect(take).toMatchObject({
+      linkMode: 'DETACHED',
+      transcript: { version: 1, phrases: [], replacements: [] },
+      textSnapshot: {
+        binding: { kind: 'project' },
+        basisHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+        text: snapshot.workspace.advanced.audio.voiceover[0]!.textSnapshot,
+      },
+    });
+    expect(snapshot.workspace.advanced.audio.voiceover[0]!.sourceAnchor).toBeUndefined();
+    expect(saveVideoProject).toHaveBeenCalledTimes(1);
+    expect(deleteProjectAsset).not.toHaveBeenCalled();
+  }
+);
 
 it('converts a non-recording Library video through the existing material placement owner', async () => {
   const snapshot = await transferFixture();
