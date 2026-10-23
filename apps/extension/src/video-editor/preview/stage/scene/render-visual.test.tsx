@@ -149,7 +149,7 @@ function stubOffscreenCanvas(context: ReturnType<typeof createCanvasContext>) {
   return OffscreenCanvasMock;
 }
 
-function renderPreviewPasses(canvas: HTMLCanvasElement) {
+async function renderPreviewPasses(canvas: HTMLCanvasElement) {
   const firstPass = createPass(1.4, 1.2, 10, 5);
   firstPass.transitionOverlays = [
     {
@@ -164,7 +164,7 @@ function renderPreviewPasses(canvas: HTMLCanvasElement) {
     },
   ];
 
-  drawPreviewVisualPasses({
+  await drawPreviewVisualPasses({
     canvas,
     clipMediaElements: new Map(),
     imageBank: {},
@@ -186,7 +186,7 @@ function renderPreviewPasses(canvas: HTMLCanvasElement) {
   });
 }
 
-it('uses a weighted pass buffer for multi-pass preview rendering', () => {
+it('uses a weighted pass buffer for multi-pass preview rendering', async () => {
   const canvasContext = createCanvasContext();
   const bufferContext = {
     ...createCanvasContext(),
@@ -195,7 +195,7 @@ it('uses a weighted pass buffer for multi-pass preview rendering', () => {
   const canvas = createPreviewCanvas(canvasContext);
   const offscreenCanvasClass = stubOffscreenCanvas(bufferContext);
 
-  renderPreviewPasses(canvas);
+  await renderPreviewPasses(canvas);
 
   expect(bufferContext.globalCompositeOperation).toBe('lighter');
   expect(canvasContext.drawImage).toHaveBeenCalledWith(
@@ -209,7 +209,7 @@ it('uses a weighted pass buffer for multi-pass preview rendering', () => {
   expect(drawEffectRuntimeVisualLayerMock).toHaveBeenCalledBefore(drawTransitionOverlayMock);
 });
 
-it('dispatches a spatial preview pass at the real viewport raster without applying the affine camera again', () => {
+it('draws spatial preview at viewport resolution without applying the affine camera twice', async () => {
   vi.mocked(drawSpatialCompositionGroup).mockClear();
   drawEffectRuntimeVisualLayerMock.mockClear();
   const context = createCanvasContext();
@@ -241,7 +241,7 @@ it('dispatches a spatial preview pass at the real viewport raster without applyi
     stage: null,
     spatialRenderer,
   };
-  drawPreviewVisualPasses(args);
+  await drawPreviewVisualPasses(args);
   expect(spatialRenderer).toHaveBeenCalledOnce();
   expect(drawSpatialCompositionGroup).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -255,10 +255,10 @@ it('dispatches a spatial preview pass at the real viewport raster without applyi
   expect(context.scale).not.toHaveBeenCalled();
   expect(drawEffectRuntimeVisualLayerMock).not.toHaveBeenCalled();
   const { spatialRenderer: _factory, ...withoutRenderer } = args;
-  expect(() => drawPreviewVisualPasses(withoutRenderer)).toThrow('Perspective renderer');
+  await expect(drawPreviewVisualPasses(withoutRenderer)).rejects.toThrow('Perspective renderer');
 });
 
-it('refuses spatial multi-pass rendering when an exposure buffer cannot be acquired', () => {
+it('refuses spatial multi-pass rendering when an exposure buffer cannot be acquired', async () => {
   vi.stubGlobal(
     'OffscreenCanvas',
     class {
@@ -293,7 +293,7 @@ it('refuses spatial multi-pass rendering when an exposure buffer cannot be acqui
     },
   };
   vi.mocked(drawSpatialCompositionGroup).mockClear();
-  expect(() =>
+  await expect(
     drawPreviewVisualPasses({
       canvas,
       clipMediaElements: new Map(),
@@ -303,6 +303,6 @@ it('refuses spatial multi-pass rendering when an exposure buffer cannot be acqui
       project: createEmptyVideoProject('No exposure', 200, 100),
       stage: null,
     })
-  ).toThrow('Motion blur buffer');
+  ).rejects.toThrow('Motion blur buffer');
   expect(drawSpatialCompositionGroup).not.toHaveBeenCalled();
 });

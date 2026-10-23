@@ -51,7 +51,7 @@ it('forwards precomputed composition and effect state to the export owners', asy
   const frame = createFrame();
   mocks.resolveRenderPasses.mockReturnValue({ overlayFrame: frame, visualPasses: [] });
 
-  drawProjectFrame(createContext(), project, createSettings(), 3, {}, new Map(), {
+  await drawProjectFrame(createContext(), project, createSettings(), 3, {}, new Map(), {
     backgroundCache,
     compositionIndex,
     effectRuntimeFrames,

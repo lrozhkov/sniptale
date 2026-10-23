@@ -598,6 +598,7 @@ it.each(['clip', 'track', 'video-group', 'stacked'] as const)(
     );
     const rendered = await renderEffectRuntimeComposition({
       project,
+      streamVisualPasses: true,
       executor,
       imageBank: {},
       clipMediaElements: new Map(),
@@ -608,16 +609,147 @@ it.each(['clip', 'track', 'video-group', 'stacked'] as const)(
           ? []
           : [0.98, 0.99, 1, 1.01, 1.02].map((time) => createPass(time, frame)),
     });
-    for (const frames of rendered.framesByTime.values()) {
+    const checkFrames = (frames: EffectRuntimeRenderedFrameMap) => {
       expect(frames.has('reader')).toBe(true);
       expect(frames.has('source')).toBe(false);
       expect(frames.has('viewport')).toBe(kind === 'clip' && frames === rendered.overlayFrames);
       if (kind === 'stacked') {
         expect([...frames.keys()]).toEqual(['transition', 'reader']);
       }
-    }
+    };
+    checkFrames(rendered.overlayFrames);
+    if (kind !== 'stacked')
+      for (const time of [0.98, 0.99, 1, 1.01, 1.02]) {
+        await rendered.prepareVisualPass!(time);
+        checkFrames(rendered.framesByTime.get(time)!);
+      }
     expect(peak).toBeLessThanOrEqual(EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases);
     disposeEffectRuntimeComposition(rendered);
     for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('streams two source annotations through five exposures without retaining every output', async () => {
+  const { project, frame } = createAnnotationComposition();
+  const source = project.clips.find((clip) => clip.id === 'source');
+  const layer = frame.visualLayers.find((layer) => layer.clipId === 'source');
+  if (!source || source.type !== 'EFFECT' || !layer) throw new Error('Missing source annotation');
+  project.clips.push({ ...source, id: 'source-two', effectInstanceId: 'source-two' });
+  frame.visualLayers.push({ ...layer, clipId: 'source-two' });
+  frame.effectRuntimePlans!.push({
+    ...createPlan('source-two'),
+    target: { kind: 'scene', clipId: 'source-two' },
+  });
+  const bitmaps: ImageBitmap[] = [];
+  let peak = 0;
+  renderPlans.mockImplementation(
+    async ({
+      plans,
+      resourceScope,
+    }: {
+      plans: readonly EffectRuntimeFramePlan[];
+      resourceScope: EffectRuntimeFrameResourceScope;
+    }) => {
+      const frames = new Map<string, EffectRuntimeRenderedFrame>();
+      for (const plan of plans) {
+        const output = createFrames(plan.effectInstanceId).get(plan.effectInstanceId)!;
+        resourceScope.retainBitmap(output.bitmap);
+        bitmaps.push(output.bitmap);
+        peak = Math.max(peak, resourceScope.snapshot().liveRasterResources);
+        frames.set(plan.effectInstanceId, { ...output, target: plan.target });
+      }
+      return frames;
+    }
+  );
+  const rendered = await renderEffectRuntimeComposition({
+    project,
+    executor,
+    imageBank: {},
+    clipMediaElements: new Map(),
+    overlayFrame: frame,
+    overlayTime: 1,
+    visualPasses: [0.98, 0.99, 1, 1.01, 1.02].map((time) => createPass(time, frame)),
+    streamVisualPasses: true,
+  });
+  expect(rendered.overlayFrames.size).toBe(3);
+  expect(rendered.framesByTime.size).toBe(1);
+  expect(rendered.prepareVisualPass).toBeTypeOf('function');
+  let previous: EffectRuntimeRenderedFrameMap | undefined;
+  for (const time of [0.98, 0.99, 1, 1.01, 1.02, 0.98]) {
+    await rendered.prepareVisualPass?.(time);
+    if (previous && previous !== rendered.overlayFrames)
+      for (const output of previous.values()) expect(output.bitmap.close).toHaveBeenCalledOnce();
+    const current = rendered.framesByTime.get(time)!;
+    expect(current.size).toBe(time === 1 ? 3 : 2);
+    for (const output of current.values()) expect(output.bitmap.close).not.toHaveBeenCalled();
+    expect(rendered.framesByTime.size).toBeLessThanOrEqual(2);
+    previous = current;
+  }
+  expect(peak).toBeLessThanOrEqual(EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases);
+  disposeEffectRuntimeComposition(rendered);
+  disposeEffectRuntimeComposition(rendered);
+  for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+it.each(['dispose', 'failure'] as const)(
+  'closes streamed rasters when a pending exposure ends with %s',
+  async (mode) => {
+    const { project, frame } = createAnnotationComposition();
+    const bitmaps: ImageBitmap[] = [];
+    const scopes: EffectRuntimeFrameResourceScope[] = [];
+    let complete: () => void = () => {
+      throw new Error('Missing controlled exposure');
+    };
+    const produce = ({
+      plans,
+      resourceScope,
+    }: {
+      plans: readonly EffectRuntimeFramePlan[];
+      resourceScope: EffectRuntimeFrameResourceScope;
+    }) => {
+      scopes.push(resourceScope);
+      const frames = new Map<string, EffectRuntimeRenderedFrame>();
+      for (const plan of plans) {
+        const output = createFrames(plan.effectInstanceId).get(plan.effectInstanceId)!;
+        resourceScope.retainBitmap(output.bitmap);
+        bitmaps.push(output.bitmap);
+        frames.set(plan.effectInstanceId, { ...output, target: plan.target });
+      }
+      return frames;
+    };
+    renderPlans.mockImplementationOnce(produce);
+    const rendered = await renderEffectRuntimeComposition({
+      project,
+      executor,
+      imageBank: {},
+      clipMediaElements: new Map(),
+      overlayFrame: frame,
+      overlayTime: 1,
+      visualPasses: [createPass(0.99, frame)],
+      streamVisualPasses: true,
+    });
+    renderPlans.mockImplementationOnce(
+      (args) =>
+        new Promise<EffectRuntimeRenderedFrameMap>((resolve, reject) => {
+          complete = () => {
+            if (mode === 'failure') reject(new Error('Exposure refused'));
+            else resolve(produce(args));
+          };
+        })
+    );
+    const pending = rendered.prepareVisualPass!(0.99);
+    await vi.waitFor(() => expect(renderPlans).toHaveBeenCalledTimes(2));
+    if (mode === 'dispose') disposeEffectRuntimeComposition(rendered);
+    complete();
+    await expect(pending).rejects.toThrow(
+      mode === 'dispose' ? 'EFFECT_RUNTIME_COMPOSITION_DISPOSED' : 'Exposure refused'
+    );
+    expect(rendered.framesByTime.size).toBe(0);
+    await expect(rendered.prepareVisualPass!(0.99)).rejects.toThrow(
+      'EFFECT_RUNTIME_COMPOSITION_DISPOSED'
+    );
+    disposeEffectRuntimeComposition(rendered);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+    for (const scope of scopes) expect(scope.snapshot().liveRasterResources).toBe(0);
   }
 );

@@ -129,6 +129,9 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/preview/stage/scene/overlay-scale.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/render-visual.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/locked-overlays-motion-blur.test.tsx',
     ],
   },
   {

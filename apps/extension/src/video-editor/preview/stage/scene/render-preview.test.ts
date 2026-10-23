@@ -118,10 +118,10 @@ it('draws prepared captions after the scene in final viewport coordinates regard
   const fillText = vi.spyOn(context, 'fillText');
   const translate = vi.spyOn(context, 'translate');
   const scale = vi.spyOn(context, 'scale');
-  vi.mocked(drawPreviewVisualPasses).mockReturnValueOnce({
+  vi.mocked(drawPreviewVisualPasses).mockResolvedValueOnce({
     context,
     viewport: { offsetX: 12, offsetY: 18, scale: 0.5, width: 960, height: 540 },
-  } as ReturnType<typeof drawPreviewVisualPasses>);
+  } as Awaited<ReturnType<typeof drawPreviewVisualPasses>>);
   const draw = vi.fn((target: CanvasRenderingContext2D, time: number) => {
     target.fillText(`Caption ${time}`, 100, 200);
   });
@@ -195,7 +195,7 @@ it('preserves the last complete spatial frame through paint failure cancellation
       viewport: { width, height, offsetX: 0, offsetY: 0, scale: 0.5 },
     };
   };
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) => {
     paint(canvas);
     throw new Error('projection failed');
   });
@@ -204,7 +204,7 @@ it('preserves the last complete spatial frame through paint failure cancellation
   expect(job.canvas.height).toBe(180);
   expect(publish).not.toHaveBeenCalled();
   const controller = new AbortController();
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) => {
     const result = paint(canvas);
     controller.abort();
     return result;
@@ -212,7 +212,7 @@ it('preserves the last complete spatial frame through paint failure cancellation
   expect(await renderPreviewScene({ ...input, signal: controller.signal })).toBe(false);
   expect(publish).not.toHaveBeenCalled();
   expect(job.canvas.width).toBe(320);
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas, viewportCanvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas, viewportCanvas }) => {
     expect(canvas).toBe(staging);
     expect(viewportCanvas).toBe(job.canvas);
     return paint(canvas);
@@ -222,7 +222,7 @@ it('preserves the last complete spatial frame through paint failure cancellation
   expect(job.canvas.height).toBe(360);
   expect(publish).toHaveBeenCalledOnce();
   expect(publish).toHaveBeenCalledWith(staging, 0, 0);
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) => {
     paint(canvas, 1920, 1080);
     throw new Error('resized GPU failed');
   });
@@ -230,7 +230,7 @@ it('preserves the last complete spatial frame through paint failure cancellation
   expect(job.canvas.width).toBe(640);
   expect(job.canvas.height).toBe(360);
   expect(publish).toHaveBeenCalledOnce();
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) =>
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) =>
     paint(canvas, 1920, 1080)
   );
   await renderPreviewScene(input);
@@ -258,7 +258,7 @@ it('avoids staging for plain frames and releases temporary spatial canvas after 
     },
   };
   const observed: HTMLCanvasElement[] = [];
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) => {
     observed.push(canvas);
     canvas.width = 960;
     canvas.height = 540;
@@ -304,7 +304,7 @@ it('retains the complete live frame when sharp overlays fail after successful sp
   presented.fillStyle = '#22d3ee';
   presented.fillRect(0, 0, 320, 180);
   const publish = vi.spyOn(presented, 'drawImage');
-  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ canvas }) => {
     canvas.width = 640;
     canvas.height = 360;
     const context = canvas.getContext('2d')!;
@@ -337,7 +337,7 @@ it('paints watermark without captions and publishes only a completed overlay fra
   const prepare = vi.fn(async () => ({ bounds: { x: 0, y: 0, width: 20, height: 10 }, draw }));
   const watermarkRenderer = { prepare, clear: vi.fn() };
   const observed: HTMLCanvasElement[] = [];
-  vi.mocked(drawPreviewVisualPasses).mockImplementation(({ canvas }) => {
+  vi.mocked(drawPreviewVisualPasses).mockImplementation(async ({ canvas }) => {
     observed.push(canvas);
     canvas.width = 640;
     canvas.height = 360;
@@ -417,7 +417,7 @@ it.each([24, 60])(
       intro: { enabled: false, duration: 0.4 },
       outro: { enabled: true, duration: 0.4, color: '#000000' },
     };
-    vi.mocked(drawPreviewVisualPasses).mockImplementation(({ canvas }) => {
+    vi.mocked(drawPreviewVisualPasses).mockImplementation(async ({ canvas }) => {
       canvas.width = 8;
       canvas.height = 4;
       const context = canvas.getContext('2d')!;
@@ -447,5 +447,61 @@ it.each([24, 60])(
     expect(Array.from(job.canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data)).toEqual([
       0, 0, 0, 255,
     ]);
+  }
+);
+
+it.each(['seek', 'abort'] as const)(
+  'retains the last complete preview when %s occurs during asynchronous painting',
+  async (mode) => {
+    const { video, job } = setup();
+    const { createDefaultCameraState } =
+      await import('../../../../features/video/composition/motion/defaults');
+    const controller = new AbortController();
+    const staging = document.createElement('canvas');
+    job.canvas.width = 320;
+    job.canvas.height = 180;
+    const publish = vi.spyOn(job.canvas.getContext('2d')!, 'drawImage');
+    const cameraOverride = {
+      ...createDefaultCameraState(job.project),
+      spatial: {
+        rotation: [0, 0, 0, 1] as const,
+        perspective: 0,
+        windowMotion: 0,
+        lockBackground: false,
+        focus: [],
+        reference: { x: 0, y: 0, width: 1280, height: 720 },
+      },
+    };
+    let finish: () => void = () => {
+      throw new Error('Missing controlled paint');
+    };
+    vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(
+      ({ canvas }) =>
+        new Promise((resolve) => {
+          canvas.width = 640;
+          canvas.height = 360;
+          finish = () =>
+            resolve({
+              context: canvas.getContext('2d')!,
+              bounds: { width: 640, height: 360 },
+              dpr: 1,
+              viewport: { width: 640, height: 360, offsetX: 0, offsetY: 0, scale: 0.5 },
+            });
+        })
+    );
+    const pending = renderPreviewScene({
+      ...job,
+      cameraOverride,
+      stagingCanvas: () => staging,
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(drawPreviewVisualPasses).toHaveBeenCalledOnce());
+    if (mode === 'seek') video.dispatchEvent(new Event('seeking'));
+    else controller.abort();
+    finish();
+    expect(await pending).toBe(false);
+    expect(publish).not.toHaveBeenCalled();
+    expect(job.canvas.width).toBe(320);
+    expect(job.canvas.height).toBe(180);
   }
 );

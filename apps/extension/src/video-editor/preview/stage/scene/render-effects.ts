@@ -25,12 +25,12 @@ export function resolvePreviewEffectDrawState(
   return created;
 }
 
-export function drawPreviewTransitionOverlays(params: {
+export async function drawPreviewTransitionOverlays(params: {
   canvas: HTMLCanvasElement;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   passes: VisualPasses;
   prepared: PreparedPreviewSceneCanvas;
-}): void {
+}): Promise<void> {
   const passTarget = resolvePreviewPassTarget({
     canvas: params.canvas,
     passCount: params.passes.length,
@@ -38,6 +38,8 @@ export function drawPreviewTransitionOverlays(params: {
   });
   try {
     for (const pass of params.passes) {
+      if (!pass.transitionOverlays?.length) continue;
+      await params.effectRuntimeFrames?.prepareVisualPass?.(pass.time);
       for (const overlay of pass.transitionOverlays ?? []) {
         const frames = getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time);
         if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;

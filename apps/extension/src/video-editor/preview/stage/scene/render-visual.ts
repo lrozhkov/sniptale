@@ -147,7 +147,7 @@ function drawPreparedPreviewVisualPass(params: {
   params.prepared.context.restore();
 }
 
-export function drawPreviewVisualPasses(params: {
+export async function drawPreviewVisualPasses(params: {
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
@@ -178,7 +178,7 @@ export function drawPreviewVisualPasses(params: {
     return null;
   }
 
-  drawPreviewOrderedVisualLayers({
+  await drawPreviewOrderedVisualLayers({
     project: params.project,
     canvas: params.canvas,
     clipMediaElements: params.clipMediaElements,
@@ -189,7 +189,7 @@ export function drawPreviewVisualPasses(params: {
     effectRuntimeFrames: params.effectRuntimeFrames,
     spatialRenderer: params.spatialRenderer,
   });
-  drawPreviewTransitionOverlays({
+  await drawPreviewTransitionOverlays({
     canvas: params.canvas,
     passes: params.passes,
     prepared,
@@ -198,7 +198,7 @@ export function drawPreviewVisualPasses(params: {
   return prepared;
 }
 
-function drawPreviewOrderedVisualLayers(params: {
+async function drawPreviewOrderedVisualLayers(params: {
   project: VideoProject;
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
@@ -238,7 +238,7 @@ function drawPreviewOrderedVisualLayers(params: {
             }
           );
       } else
-        drawPreviewUnlockedLayerGroup({
+        await drawPreviewUnlockedLayerGroup({
           canvas: params.canvas,
           clipMediaElements: params.clipMediaElements,
           effectRuntimeFrames: params.effectRuntimeFrames,
@@ -272,7 +272,7 @@ function drawPreviewOrderedVisualLayers(params: {
   }
 }
 
-function drawPreviewUnlockedLayerGroup(params: {
+async function drawPreviewUnlockedLayerGroup(params: {
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;
@@ -301,6 +301,7 @@ function drawPreviewUnlockedLayerGroup(params: {
     )
       throw new Error('Motion blur buffer is unavailable.');
     for (const pass of params.passes) {
+      await params.effectRuntimeFrames?.prepareVisualPass?.(pass.time);
       const paint = (context: CanvasRenderingContext2D) =>
         drawPreparedPreviewVisualPass({
           clipMediaElements: params.clipMediaElements,

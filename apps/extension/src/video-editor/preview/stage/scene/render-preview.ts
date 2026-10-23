@@ -198,9 +198,8 @@ async function renderPreparedPreviewScene(
   };
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
-  let captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   try {
-    captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
+    const captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
       params.project,
       params.project,
       params.signal
@@ -210,32 +209,20 @@ async function renderPreparedPreviewScene(
       renderPasses,
       clipMediaElements
     );
-  } finally {
-    for (const video of videos) video.removeEventListener('seeking', invalidate);
-  }
-  if (mediaChanged) {
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
-    return false;
-  }
-  if (params.signal?.aborted) {
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
-    return;
-  }
-  try {
+    if (mediaChanged || !arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
     if (params.signal?.aborted) return;
-    // Media seeking can invalidate readiness after the React render was queued.
-    // Keep the last complete frame until the decoder supplies a replacement.
-    if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
-    const drawn = drawResolvedPreviewScene({
+    const drawn = await drawResolvedPreviewScene({
       clipMediaElements,
       captions,
       watermark,
       effectRuntimeFrames,
       params,
       renderPasses,
+      isInvalidated: () => mediaChanged,
     });
     if (!drawn) return false;
   } finally {
+    for (const video of videos) video.removeEventListener('seeking', invalidate);
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }
 }
@@ -267,25 +254,27 @@ type ResolvedPreviewSceneArgs = {
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
+  isInvalidated(): boolean;
 };
 
-function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): boolean {
+async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise<boolean> {
   const spatial = [
     args.renderPasses.overlayFrame,
     ...args.renderPasses.visualPasses.map((pass) => pass.frame),
   ].some((frame) => frame.camera.spatial !== undefined);
-  if (!spatial && !args.watermark) return drawResolvedPreviewSceneContent(args);
+  if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass)
+    return drawResolvedPreviewSceneContent(args);
   const presented = args.params.canvas;
   const owned = !args.params.stagingCanvas;
   const staging = args.params.stagingCanvas?.() ?? presented.ownerDocument.createElement('canvas');
   if (staging === presented || staging.ownerDocument !== presented.ownerDocument)
     throw new Error('Preview frame canvas is unavailable.');
   try {
-    const drawn = drawResolvedPreviewSceneContent(
+    const drawn = await drawResolvedPreviewSceneContent(
       { ...args, params: { ...args.params, canvas: staging } },
       presented
     );
-    if (!drawn || args.params.signal?.aborted) return false;
+    if (!drawn || args.params.signal?.aborted || args.isInvalidated()) return false;
     publishCompletedPreviewFrame(presented, staging);
     return true;
   } finally {
@@ -296,10 +285,10 @@ function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): boolean {
   }
 }
 
-function drawResolvedPreviewSceneContent(
+async function drawResolvedPreviewSceneContent(
   args: ResolvedPreviewSceneArgs,
   viewportCanvas?: HTMLCanvasElement
-): boolean {
+): Promise<boolean> {
   const visualPassArgs = {
     canvas: args.params.canvas,
     ...(args.params.spatialRenderer ? { spatialRenderer: args.params.spatialRenderer } : {}),
@@ -314,7 +303,7 @@ function drawResolvedPreviewSceneContent(
     project: args.params.project,
     stage: args.params.stage,
   };
-  const overlayPrepared = drawPreviewVisualPasses(visualPassArgs);
+  const overlayPrepared = await drawPreviewVisualPasses(visualPassArgs);
 
   if (!overlayPrepared || args.params.signal?.aborted) return false;
 
@@ -399,6 +388,7 @@ async function resolvePreviewEffectRuntimeFrames(
   if (!executor) throw new Error('EFFECT_RUNTIME_PREVIEW_EXECUTOR_MISSING');
   return renderEffectRuntimeComposition({
     project: params.project,
+    streamVisualPasses: true,
     clipMediaElements,
     executor,
     imageBank: params.imageBank,

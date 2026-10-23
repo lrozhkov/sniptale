@@ -15,6 +15,10 @@ export function disposeEffectRuntimeComposition(
   rendered: EffectRuntimeRenderedComposition | undefined
 ): void {
   if (!rendered) return;
+  if (rendered.dispose) {
+    rendered.dispose();
+    return;
+  }
   const disposed = new Set<EffectRuntimeRenderedFrameMap>();
   for (const frames of rendered.framesByTime.values()) {
     if (disposed.has(frames)) continue;

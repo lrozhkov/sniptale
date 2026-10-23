@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { disposeEffectRuntimeComposition } from '../../../features/video/composition/effect-runtime';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
@@ -71,12 +72,14 @@ describe('offscreen EffectV1 runtime lifecycle', () => {
     expect(mocks.dispose).toHaveBeenCalledOnce();
   });
 
-  it('recognizes visual-pass plans and always disposes the one-shot runtime', async () => {
+  it('keeps the one-shot executor alive until its streamed composition is disposed', async () => {
     mocks.resolveRenderPasses.mockReturnValue(createRenderPasses(false, true));
 
-    await expect(
-      renderOffscreenProjectEffectFrames(createRenderArgs(createProject(true)))
-    ).resolves.toEqual(expect.objectContaining({ framesByTime: expect.any(Map) }));
+    const frames = await renderOffscreenProjectEffectFrames(createRenderArgs(createProject(true)));
+    expect(frames).toEqual(expect.objectContaining({ framesByTime: expect.any(Map) }));
+    expect(mocks.dispose).not.toHaveBeenCalled();
+    disposeEffectRuntimeComposition(frames);
+    disposeEffectRuntimeComposition(frames);
     expect(mocks.dispose).toHaveBeenCalledOnce();
   });
 });
@@ -160,3 +163,23 @@ function createRenderPasses(overlayPlan: boolean, visualPlan: boolean) {
     ],
   };
 }
+
+it.each(['empty', 'refused'] as const)(
+  'cleans up one-shot preparation when frames are %s',
+  async (mode) => {
+    mocks.resolveRenderPasses.mockReturnValue(createRenderPasses(mode === 'refused', false));
+    if (mode === 'refused') {
+      mocks.renderComposition.mockRejectedValueOnce(new Error('Raster preparation refused'));
+      await expect(
+        renderOffscreenProjectEffectFrames(createRenderArgs(createProject(true)))
+      ).rejects.toThrow('Raster preparation refused');
+      expect(mocks.dispose).toHaveBeenCalledOnce();
+    } else {
+      await expect(
+        renderOffscreenProjectEffectFrames(createRenderArgs(createProject(true)))
+      ).resolves.toBeUndefined();
+      expect(mocks.createExecutor).not.toHaveBeenCalled();
+      expect(mocks.dispose).not.toHaveBeenCalled();
+    }
+  }
+);

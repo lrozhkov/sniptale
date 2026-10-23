@@ -72,3 +72,47 @@ it('omits offscreen and invalid annotations without crashing the editor', () => 
   p.effectSnapshots![0]!.source = '{}';
   expect(buildEffectThumbnailPlans(p, null)).toEqual([]);
 });
+
+it('retains the video owner when preparing a source-bound annotation thumbnail', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../features/video/project/factories/creation');
+  const p = project();
+  const recording = createVideoProjectFromRecording({
+    recordingId: 'source',
+    filename: 'source.webm',
+    width: p.width,
+    height: p.height,
+    duration: 5,
+    size: 1,
+    mimeType: 'video/webm',
+  });
+  const video = recording.clips.find((clip) => clip.type === 'VIDEO');
+  const host = p.clips[0];
+  if (!video || video.type !== 'VIDEO' || !host || host.type !== 'EFFECT')
+    throw new Error('Missing annotation source');
+  p.assets = recording.assets;
+  p.tracks.push(...recording.tracks);
+  p.clips.push(video);
+  host.attachment = {
+    kind: 'source',
+    assetId: video.assetId,
+    sourceInstanceId: video.sourceInstanceId ?? video.id,
+  };
+  host.sourceRange = {
+    assetId: video.assetId,
+    sourceInstanceId: video.sourceInstanceId ?? video.id,
+    start: 0,
+    end: 3,
+  };
+  p.version = 44;
+  p.duration = 5;
+  const before = structuredClone(p);
+  const plans = buildEffectThumbnailPlans(p, null);
+  expect(plans).toHaveLength(1);
+  expect(plans[0]?.clipId).toBe(host.id);
+  expect(plans[0]?.plan.time).toBe(1.5);
+  expect(p).toEqual(before);
+  for (const track of p.tracks) track.visible = false;
+  p.effectInstances![0]!.enabled = false;
+  expect(buildEffectThumbnailPlans(p, null)).toHaveLength(1);
+});

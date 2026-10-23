@@ -35,13 +35,62 @@ export async function renderEffectRuntimeComposition(args: {
   spatialRenderer?: () => ReviewSpatialRenderer;
   rasterScale?: number;
   signal?: AbortSignal;
+  streamVisualPasses?: boolean;
   visualPasses: readonly VideoCompositionVisualPass[];
 }): Promise<EffectRuntimeRenderedComposition> {
   const renderedByTime = new Map<number, EffectRuntimeRenderedFrameMap>();
   const resourceLedger = createEffectRuntimeCompositionResourceLedger();
+  let disposed = false;
+  let preparing = false;
+  let sampledTime: number | undefined;
+  const releaseSampled = () => {
+    if (sampledTime === undefined) return;
+    const frames = renderedByTime.get(sampledTime);
+    if (frames) for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
+    renderedByTime.delete(sampledTime);
+    sampledTime = undefined;
+  };
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    disposeEffectRuntimeComposition({
+      framesByTime: renderedByTime,
+      overlayFrames: EMPTY_EFFECT_RUNTIME_FRAMES,
+    });
+    renderedByTime.clear();
+  };
+  const prepareVisualPass = async (time: number) => {
+    if (disposed) throw new Error('EFFECT_RUNTIME_COMPOSITION_DISPOSED');
+    if (preparing) throw new Error('EFFECT_RUNTIME_COMPOSITION_BUSY');
+    if (time === args.overlayTime) {
+      releaseSampled();
+      return;
+    }
+    if (time === sampledTime) return;
+    const pass = args.visualPasses.find((pass) => pass.time === time);
+    if (!pass) throw new Error('EFFECT_RUNTIME_VISUAL_PASS_MISSING');
+    releaseSampled();
+    preparing = true;
+    try {
+      const frames = await renderFrame(pass.frame, time, true);
+      if (disposed) {
+        for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
+        throw new Error('EFFECT_RUNTIME_COMPOSITION_DISPOSED');
+      }
+      renderedByTime.set(time, frames);
+      sampledTime = time;
+    } catch (error) {
+      dispose();
+      throw error;
+    } finally {
+      preparing = false;
+    }
+  };
   try {
     const overlayFrames = await renderFrame(args.overlayFrame, args.overlayTime);
     renderedByTime.set(args.overlayTime, overlayFrames);
+    if (args.streamVisualPasses)
+      return { framesByTime: renderedByTime, overlayFrames, prepareVisualPass, dispose };
     for (const pass of args.visualPasses) {
       if (renderedByTime.has(pass.time)) continue;
       renderedByTime.set(pass.time, await renderFrame(pass.frame, pass.time, true));

@@ -61,7 +61,7 @@ function beginExportCameraPass(
   );
 }
 
-function drawVisualPasses(params: {
+async function drawVisualPasses(params: {
   clipMediaElements: ClipMediaSources;
   context: CanvasRenderingContext2D;
   effectRuntimeFrames?: EffectRuntimeRenderedComposition;
@@ -100,7 +100,7 @@ function drawVisualPasses(params: {
           params.effectRuntimeFrames?.overlayFrames,
           overlayEffectState
         );
-      } else drawUnlockedOverlayGroup(part.layers, params, passEffectStates);
+      } else await drawUnlockedOverlayGroup(part.layers, params, passEffectStates);
       if (part.afterClipId)
         drawCompositionSceneSpotlights({
           context: params.context,
@@ -189,7 +189,7 @@ function drawLockedOverlayLayers(
   context.restore();
 }
 
-function drawUnlockedOverlayGroup(
+async function drawUnlockedOverlayGroup(
   layers: VisualLayer[],
   params: DrawParams,
   effectRuntimeStates: Map<number, EffectRuntimeDrawState>
@@ -219,6 +219,7 @@ function drawUnlockedOverlayGroup(
     )
       throw new Error('Motion blur buffer is unavailable.');
     for (const pass of params.renderPasses.visualPasses) {
+      await params.effectRuntimeFrames?.prepareVisualPass?.(pass.time);
       const paint = (drawContext: CanvasRenderingContext2D) => {
         if (pass.frame.camera.spatial) {
           if (!params.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
@@ -280,7 +281,7 @@ function drawUnlockedOverlayGroup(
   }
 }
 
-export function drawProjectFrame(
+export async function drawProjectFrame(
   context: CanvasRenderingContext2D,
   project: VideoProject,
   settings: VideoProjectExportSettings,
@@ -293,7 +294,7 @@ export function drawProjectFrame(
     compositionIndex?: VideoCompositionTimelineIndex;
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
   } = {}
-): void {
+): Promise<void> {
   const { offsetX, offsetY, scale } = resolveProjectOutputTransform(project, settings);
   const renderPasses = resolveVideoCompositionRenderPasses(project, currentTime, {
     includeSubtitles: settings.burnInSubtitles === true,
@@ -306,63 +307,65 @@ export function drawProjectFrame(
   });
 
   context.save();
-  context.clearRect(0, 0, settings.width, settings.height);
-  drawExportSceneBackground({
-    ...(renderPasses.overlayFrame.camera.backgroundCamera
-      ? { backgroundCamera: renderPasses.overlayFrame.camera.backgroundCamera }
-      : {}),
-    ...(options.backgroundCache ? { cache: options.backgroundCache } : {}),
-    context,
-    currentTime,
-    height: settings.height,
-    loadedImages,
-    project,
-    width: settings.width,
-  });
-  drawVisualPasses({
-    clipMediaElements,
-    context,
-    ...(options.effectRuntimeFrames ? { effectRuntimeFrames: options.effectRuntimeFrames } : {}),
-    loadedImages,
-    offsetX,
-    offsetY,
-    renderPasses,
-    project,
-    logicalSize: { width: project.width, height: project.height },
-    ...(options.spatialRenderer ? { spatialRenderer: options.spatialRenderer } : {}),
-    scaleX: scale,
-    scaleY: scale,
-    settings,
-  });
-  drawExportTransitionOverlayPasses(
-    context,
-    renderPasses.visualPasses,
-    settings,
-    options.effectRuntimeFrames
-  );
-  drawCompositionSceneSpotlights({
-    context,
-    frame: renderPasses.overlayFrame,
-    project,
-    images: loadedImages,
-    viewport: { x: 0, y: 0, width: settings.width, height: settings.height },
-    composition: { x: offsetX, y: offsetY, scale },
-  });
-  drawCompositionBorders(
-    context,
-    renderPasses.overlayFrame.viewportBorders,
-    { x: 0, y: 0, width: settings.width, height: settings.height },
-    scale
-  );
-  context.save();
-  if (offsetX !== 0 || offsetY !== 0) {
-    context.translate(offsetX, offsetY);
+  try {
+    context.clearRect(0, 0, settings.width, settings.height);
+    drawExportSceneBackground({
+      ...(renderPasses.overlayFrame.camera.backgroundCamera
+        ? { backgroundCamera: renderPasses.overlayFrame.camera.backgroundCamera }
+        : {}),
+      ...(options.backgroundCache ? { cache: options.backgroundCache } : {}),
+      context,
+      currentTime,
+      height: settings.height,
+      loadedImages,
+      project,
+      width: settings.width,
+    });
+    await drawVisualPasses({
+      clipMediaElements,
+      context,
+      ...(options.effectRuntimeFrames ? { effectRuntimeFrames: options.effectRuntimeFrames } : {}),
+      loadedImages,
+      offsetX,
+      offsetY,
+      renderPasses,
+      project,
+      logicalSize: { width: project.width, height: project.height },
+      ...(options.spatialRenderer ? { spatialRenderer: options.spatialRenderer } : {}),
+      scaleX: scale,
+      scaleY: scale,
+      settings,
+    });
+    await drawExportTransitionOverlayPasses(
+      context,
+      renderPasses.visualPasses,
+      settings,
+      options.effectRuntimeFrames
+    );
+    drawCompositionSceneSpotlights({
+      context,
+      frame: renderPasses.overlayFrame,
+      project,
+      images: loadedImages,
+      viewport: { x: 0, y: 0, width: settings.width, height: settings.height },
+      composition: { x: offsetX, y: offsetY, scale },
+    });
+    drawCompositionBorders(
+      context,
+      renderPasses.overlayFrame.viewportBorders,
+      { x: 0, y: 0, width: settings.width, height: settings.height },
+      scale
+    );
+    context.save();
+    if (offsetX !== 0 || offsetY !== 0) {
+      context.translate(offsetX, offsetY);
+    }
+    drawExportOverlayPass(context, renderPasses.overlayFrame, scale, scale, {
+      logicalSize: { width: project.width, height: project.height },
+      spatialRenderer: options.spatialRenderer,
+    });
+    context.restore();
+  } finally {
+    context.restore();
   }
-  drawExportOverlayPass(context, renderPasses.overlayFrame, scale, scale, {
-    logicalSize: { width: project.width, height: project.height },
-    spatialRenderer: options.spatialRenderer,
-  });
-  context.restore();
-
-  context.restore();
 }

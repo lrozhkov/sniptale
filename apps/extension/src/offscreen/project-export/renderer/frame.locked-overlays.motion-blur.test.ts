@@ -247,7 +247,7 @@ it('draws locked text once while export media stays multi-pass during zoom blur'
   configurePartitionMocks();
   configureMultiPassRenderPass(visualLayers);
 
-  drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
+  await drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
 
   expectLockedOverlayMotionBlurDraws({ bufferContext, context });
 });

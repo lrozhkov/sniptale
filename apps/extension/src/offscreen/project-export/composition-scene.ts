@@ -66,6 +66,7 @@ export async function renderProjectCompositionScene(
     loadedImages: args.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
     project,
+    ...(signal ? { signal } : {}),
     spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
   };
   const frames = await (args.effectRuntime
@@ -73,7 +74,7 @@ export async function renderProjectCompositionScene(
     : renderOffscreenProjectEffectFrames(frameArgs));
   try {
     assertLive();
-    drawProjectFrame(
+    await drawProjectFrame(
       context,
       project,
       settings,
@@ -87,6 +88,7 @@ export async function renderProjectCompositionScene(
         ...(args.backgroundCache ? { backgroundCache: args.backgroundCache } : {}),
       }
     );
+    assertLive();
     captions.draw(context, currentTime);
     watermark?.draw(context);
   } finally {

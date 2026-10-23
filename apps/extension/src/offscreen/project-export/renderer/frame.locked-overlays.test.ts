@@ -214,7 +214,7 @@ it('draws locked overlay layers outside the camera scale path while keeping medi
   const { project, settings } = createFrameFixture();
 
   configureLockedOverlayRenderPass(camera);
-  drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
+  await drawProjectFrame(context, project, settings, 1.5, { asset: 'image' } as never, new Map());
   expectLockedOverlayFrameDraw(context);
 });
 
@@ -237,7 +237,7 @@ it('projects native media once while keeping the locked foreground outside the s
   configureLockedOverlayRenderPass(camera);
   const renderer = { validateSizes: vi.fn(), surface: vi.fn(), draw: vi.fn(), dispose: vi.fn() };
   const spatialRenderer = vi.fn(() => renderer);
-  drawProjectFrame(context, project, settings, 1.5, {}, new Map(), { spatialRenderer });
+  await drawProjectFrame(context, project, settings, 1.5, {}, new Map(), { spatialRenderer });
   expect(spatialRenderer).toHaveBeenCalledOnce();
   expect(drawSpatialCompositionGroup).toHaveBeenCalledWith(
     expect.objectContaining({
