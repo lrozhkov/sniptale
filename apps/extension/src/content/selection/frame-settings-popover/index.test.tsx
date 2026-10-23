@@ -472,7 +472,7 @@ describe('FrameSettingsPopover preset selection', () => {
   });
 
   it.each(['blur', 'focus'] as const)(
-    'keeps the selected template visible for %s despite a legacy hidden-decoration value',
+    'restores the selected template when %s decoration is enabled again',
     (effectMode) => {
       const presetName = getBorderPresetDisplayName(DEFAULT_BORDER_PRESET);
       storageMocks.loadHighlighterSettings.mockReturnValue(
@@ -487,10 +487,13 @@ describe('FrameSettingsPopover preset selection', () => {
           : { focusSettings: { ...DEFAULT_FOCUS_SETTINGS, showBorder: false } }),
       });
 
-      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
-      const decorationSwitch = document.querySelector('.sniptale-glass-switch');
+      expect(document.querySelector('.sniptale-frame-style-section')).toBeNull();
+      const decorationSwitch = document.querySelector<HTMLElement>('.sniptale-glass-switch');
       expect(decorationSwitch).not.toBeNull();
       expect(decorationSwitch?.classList).not.toContain('sniptale-glass-switch--on');
+      if (!decorationSwitch) throw new Error('Expected decoration switch');
+      clickTrusted(decorationSwitch);
+      expect(getPresetButton(presetName).classList).toContain('sniptale-glass-preset-item--active');
     }
   );
 

@@ -114,6 +114,11 @@ function FrameEffectParameterGroup(props: { children: ReactNode }) {
 
 export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentProps) {
   const inspector = useInspectorLayout();
+  const showDecoration =
+    props.effectMode === 'border' ||
+    (props.effectMode === 'blur'
+      ? props.localBlurSettings.showBorder === true
+      : props.localFocusSettings.showBorder === true);
   const workflow = useTemplateForkWorkflow({
     ...(props.selectedPresetId ? { activeTemplateId: props.selectedPresetId } : {}),
     onFork: props.handleForkPreset ?? props.handleSelectPreset,
@@ -191,39 +196,43 @@ export function FrameSettingsPopoverContent(props: FrameSettingsPopoverContentPr
             </FrameEffectParameterGroup>
           ) : null}
 
-          <FrameBorderSection
-            borderPresets={props.globalSettings.borderPresets}
-            {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
-            handleManualBorderChange={props.handleManualBorderChange}
-            handleSelectPreset={props.handleSelectPreset}
-            handleTogglePresetEnabled={props.handleTogglePresetEnabled}
-            pendingPresetIds={props.pendingPresetIds}
-            localBorderSettings={props.localBorderSettings}
-            linkedTemplateOptions={props.linkedTemplateOptions ?? { callouts: [], stepBadges: [] }}
-            manual={{
-              ...props.manual,
-              save: (input) =>
-                props.manual.save({
-                  ...input,
-                  tagIds: workflow.session.sourceTemplate?.tagIds ?? [],
-                }),
-            }}
-            {...(workflow.session.mode === 'temporary'
-              ? { manualStatus: translate('content.templateFork.temporaryStatus') }
-              : {})}
-            mode={workflow.session.mode === 'templates' ? 'preset' : 'manual'}
-            onForkPreset={workflow.fork}
-            onCreated={workflow.completeSave}
-            {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
-            {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
-            onClose={props.onClose}
-            {...(props.onFloatingInteractionChange
-              ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
-              : {})}
-            {...(props.selectedPresetId === undefined
-              ? {}
-              : { selectedPresetId: props.selectedPresetId })}
-          />
+          {showDecoration ? (
+            <FrameBorderSection
+              borderPresets={props.globalSettings.borderPresets}
+              {...(props.acceptAction ? { acceptAction: props.acceptAction } : {})}
+              handleManualBorderChange={props.handleManualBorderChange}
+              handleSelectPreset={props.handleSelectPreset}
+              handleTogglePresetEnabled={props.handleTogglePresetEnabled}
+              pendingPresetIds={props.pendingPresetIds}
+              localBorderSettings={props.localBorderSettings}
+              linkedTemplateOptions={
+                props.linkedTemplateOptions ?? { callouts: [], stepBadges: [] }
+              }
+              manual={{
+                ...props.manual,
+                save: (input) =>
+                  props.manual.save({
+                    ...input,
+                    tagIds: workflow.session.sourceTemplate?.tagIds ?? [],
+                  }),
+              }}
+              {...(workflow.session.mode === 'temporary'
+                ? { manualStatus: translate('content.templateFork.temporaryStatus') }
+                : {})}
+              mode={workflow.session.mode === 'templates' ? 'preset' : 'manual'}
+              onForkPreset={workflow.fork}
+              onCreated={workflow.completeSave}
+              {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
+              {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
+              onClose={props.onClose}
+              {...(props.onFloatingInteractionChange
+                ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+                : {})}
+              {...(props.selectedPresetId === undefined
+                ? {}
+                : { selectedPresetId: props.selectedPresetId })}
+            />
+          ) : null}
         </>
       )}
     </>

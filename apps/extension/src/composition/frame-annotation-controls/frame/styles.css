@@ -3,6 +3,10 @@
   cursor: default;
 }
 
+.sniptale-frame-settings-popover.sniptale-compact-workspace {
+  --sniptale-numeric-stepper-inset: -8px;
+}
+
 .sniptale-frame-settings-popover .sniptale-content-popover-section-label {
   justify-content: flex-start;
   padding-inline: 0;

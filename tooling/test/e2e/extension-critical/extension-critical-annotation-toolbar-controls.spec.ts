@@ -97,6 +97,80 @@ async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
     await effects.locator('button[aria-haspopup="dialog"]').click();
     await expect(panel(page)).toHaveCount(1);
     await expect(panel(page).locator('.sniptale-frame-effect-mode-section')).toHaveCount(0);
+    if (mode !== 'border') {
+      const surface = panel(page);
+      const readHorizontalOverflow = () =>
+        surface.evaluate((element) =>
+          Math.max(
+            element.scrollWidth - element.clientWidth,
+            ...[...element.querySelectorAll('*')]
+              .filter((child) => /^(auto|scroll)$/.test(getComputedStyle(child).overflowX))
+              .map((child) => child.scrollWidth - child.clientWidth)
+          )
+        );
+      const overflow = await surface.evaluate((element) => ({
+        width: element.scrollWidth - element.clientWidth,
+        owners: [element, ...element.querySelectorAll('*')]
+          .filter(
+            (child) =>
+              /^(auto|scroll)$/.test(getComputedStyle(child).overflowX) &&
+              child.scrollWidth > child.clientWidth + 1
+          )
+          .map((child) => ({
+            className: child.className,
+            width: child.scrollWidth - child.clientWidth,
+            bounds: child.getBoundingClientRect().width,
+            client: child.clientWidth,
+            children: [...child.children].map((nested) => ({
+              className: nested.className,
+              width: nested.getBoundingClientRect().width,
+              scroll: nested.scrollWidth,
+              client: nested.clientWidth,
+              padding: getComputedStyle(nested).padding,
+              boxSizing: getComputedStyle(nested).boxSizing,
+            })),
+          })),
+        children: [...element.querySelectorAll('*')]
+          .filter(
+            (child) =>
+              child.getBoundingClientRect().right > element.getBoundingClientRect().right + 1
+          )
+          .slice(0, 6)
+          .map((child) => ({
+            className: child.className,
+            width: child.getBoundingClientRect().width,
+          })),
+      }));
+      await info.attach(`effect-${mode}-overflow`, {
+        body: JSON.stringify(overflow),
+        contentType: 'application/json',
+      });
+      expect(overflow.width).toBeLessThanOrEqual(1);
+      expect(overflow.owners).toEqual([]);
+      const toggle = surface.getByLabel(
+        translate('content.overlayControls.showBorderTitle', 'en'),
+        { exact: true }
+      );
+      const isOn = () =>
+        toggle.evaluate(
+          (element) =>
+            element.getAttribute('aria-checked') === 'true' ||
+            element.classList.contains('sniptale-glass-switch--on')
+        );
+      if (!(await isOn())) await toggle.click();
+      await expect(surface.locator('.sniptale-frame-style-section')).toHaveCount(1);
+      const expandedHeight = (await surface.boundingBox())!.height;
+      await toggle.click();
+      await expect(surface.locator('.sniptale-frame-style-section')).toHaveCount(0);
+      await expect.poll(readHorizontalOverflow).toBeLessThanOrEqual(1);
+      await expect
+        .poll(async () => (await surface.boundingBox())!.height)
+        .toBeLessThan(expandedHeight);
+      await capture(page, info, `creation-${mode}-without-decoration.png`);
+      await toggle.click();
+      await expect(surface.locator('.sniptale-frame-style-section')).toHaveCount(1);
+      await expect.poll(readHorizontalOverflow).toBeLessThanOrEqual(1);
+    } else await expect(panel(page).locator('.sniptale-frame-style-section')).toHaveCount(1);
     if (mode === 'blur')
       await expect(
         panel(page).getByText(translate('content.overlayControls.blurTypeLabel', 'en'), {

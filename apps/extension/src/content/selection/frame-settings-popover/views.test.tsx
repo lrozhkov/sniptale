@@ -92,6 +92,12 @@ function expectNoFrameStyleSectionHeading(markup: string) {
 }
 
 describe('FrameSettingsPopoverContent', () => {
+  it('always shows templates for border even when effect decoration is disabled', () => {
+    const markup = renderContent('border', false);
+    expect(markup).toContain('sniptale-frame-style-section');
+    expect(markup).toContain('Default');
+    expect(markup).not.toContain(translate('content.overlayControls.showBorderTitle'));
+  });
   it('keeps one short canonical menu heading without duplicate section headings', () => {
     const markup = renderContent('border');
 
@@ -128,7 +134,7 @@ describe('FrameSettingsPopoverContent', () => {
   });
 
   it.each(['blur', 'focus'] as const)(
-    'shares the always-visible frame template section with %s',
+    'shows frame templates when %s decoration is enabled',
     (effectMode) => {
       const markup = renderContent(effectMode, true);
 
@@ -161,7 +167,7 @@ describe('FrameSettingsPopoverContent', () => {
   });
 
   it.each(['blur', 'focus'] as const)(
-    'keeps the %s effect controls and templates visible regardless of legacy decoration state',
+    'hides the template section and its divider when %s decoration is disabled',
     (effectMode) => {
       const markup = renderContent(effectMode, false);
 
@@ -169,8 +175,9 @@ describe('FrameSettingsPopoverContent', () => {
       expect(markup).toContain(translate('content.overlayControls.showBorderTitle'));
       expect(markup).toContain('sniptale-glass-switch');
       expect(markup).not.toContain('sniptale-glass-switch--on');
-      expect(markup).toContain('Default');
-      expect(markup).toContain('Secondary');
+      expect(markup).not.toContain('sniptale-frame-style-section');
+      expect(markup).not.toContain('Default');
+      expect(markup).not.toContain('Secondary');
       expect(markup).not.toContain('sniptale-frame-style-add');
       expect(markup).toContain('shared.ui.compact-inspector.numeric-row');
     }
