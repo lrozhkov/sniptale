@@ -1,12 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ integrity: vi.fn() }));
+const mocks = vi.hoisted(() => ({ integrity: vi.fn(), preferences: vi.fn() }));
 vi.mock('../../../../composition/persistence/effect-bundles/integrity', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../../composition/persistence/effect-bundles/integrity')
   >()),
   assertEffectBundleCatalogIntegrity: mocks.integrity,
 }));
+
+vi.mock(
+  '../../../../composition/persistence/effect-bundles/preferences',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/effect-bundles/preferences')
+    >()),
+    readEffectCatalogPreferences: mocks.preferences,
+  })
+);
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.preferences.mockResolvedValue([]);
+});
 
 import { buildEffectBundleRootInventory } from './effect-bundles';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
@@ -69,4 +83,28 @@ describe('effect bundle v6 inventory', () => {
       ],
     });
   });
+});
+
+it('exports the canonical user preset snapshot without changing source catalog rows', async () => {
+  const entry = bundle('resource-pack');
+  const original = structuredClone(entry);
+  const preferences = {
+    presets: [
+      { id: 'personal', name: 'Resource personal', values: { accent: '#e020b0', intensity: 0.5 } },
+    ],
+    defaultPreset: { kind: 'user', id: 'personal' },
+  };
+  mocks.preferences.mockResolvedValue([
+    { packId: entry.packId, documents: { effect: preferences } },
+  ]);
+  const [root] = await buildEffectBundleRootInventory(
+    { getAll: vi.fn().mockResolvedValue([entry]) },
+    createArchivePathAllocator()
+  );
+  const snapshot = await root!.load();
+  expect(snapshot.metadata).toMatchObject({
+    entry: { documents: [{ id: 'effect', presetPreferences: preferences }] },
+  });
+  expect(entry).toEqual(original);
+  expect(mocks.preferences).toHaveBeenCalledOnce();
 });

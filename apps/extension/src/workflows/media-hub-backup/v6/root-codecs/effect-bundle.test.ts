@@ -1,11 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { importRawEffectDocument } from '../../../../features/video/project/effect-bundle/import/zip';
 import { createEffectCatalogEntry } from '../../../../composition/persistence/effect-bundles/catalog-builder';
-import { putEffectBundleBackupRestore } from '../../../../composition/persistence/effect-bundles/backup-restore';
+import { prepareEffectBundleBackupRestore } from '../../../../composition/persistence/effect-bundles/backup-restore';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { buildEffectBundleRootInventory } from '../inventory/effect-bundles';
 import { encodeBackupMetadata } from '../metadata-transport';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock(
+  '../../../../composition/persistence/effect-bundles/preferences',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/effect-bundles/preferences')
+    >()),
+    readEffectCatalogPreferences: async () => [],
+  })
+);
 import { encodeEffectBundleMetadata, parseEffectBundleMetadata } from './effect-bundle';
 
 const entry = {
@@ -94,19 +103,19 @@ it('retains a valid catalog document without binary assets through backup and re
       rows.set(value.packId, value);
     },
   };
-  await expect(
-    putEffectBundleBackupRestore({ assets: [], entry: restoredEntry, store, strategy: 'replace' })
-  ).resolves.toMatchObject({ imported: true, packId: catalog.packId });
+  const publish = await prepareEffectBundleBackupRestore({ assets: [], entry: restoredEntry });
+  await expect(publish({ store, strategy: 'replace' })).resolves.toMatchObject({
+    imported: true,
+    packId: catalog.packId,
+  });
   expect(rows.get(catalog.packId)).toEqual(catalog);
   await expect(
-    putEffectBundleBackupRestore({
+    prepareEffectBundleBackupRestore({
       assets: [],
       entry: {
         ...restoredEntry,
         documents: restoredEntry.documents.map((document) => ({ ...document, source: '{}' })),
       },
-      store,
-      strategy: 'replace',
     })
   ).rejects.toMatchObject({ code: 'catalogIntegrityFailure' });
   expect(rows.get(catalog.packId)).toEqual(catalog);

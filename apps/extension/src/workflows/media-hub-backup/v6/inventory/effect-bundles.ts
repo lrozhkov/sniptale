@@ -2,6 +2,10 @@ import type { ArchivePathAllocator } from '../../../../composition/archive-trans
 import { VIDEO_EFFECT_BUNDLES_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { parseEffectBundleCatalogEntry } from '../../../../composition/persistence/effect-bundles/entry';
 import { assertEffectBundleCatalogIntegrity } from '../../../../composition/persistence/effect-bundles/integrity';
+import {
+  overlayEffectPreferences,
+  readEffectCatalogPreferences,
+} from '../../../../composition/persistence/effect-bundles/preferences';
 import { encodeEffectBundleMetadata } from '../root-codecs/effect-bundle';
 import type { MediaHubBackupRootInventoryItem } from '../export';
 import type { JsonValue } from '../contracts';
@@ -19,7 +23,10 @@ export async function buildEffectBundleRootInventory(
   db: EffectBundleInventoryDatabase,
   paths: ArchivePathAllocator
 ): Promise<MediaHubBackupRootInventoryItem[]> {
-  const values = await db.getAll(VIDEO_EFFECT_BUNDLES_STORE);
+  const [values, preferences] = await Promise.all([
+    db.getAll(VIDEO_EFFECT_BUNDLES_STORE),
+    readEffectCatalogPreferences(),
+  ]);
   if (!Array.isArray(values)) throw new Error('Effect bundle backup inventory is invalid.');
   const entries = values.map(parseEffectBundleCatalogEntry);
   if (entries.some((entry) => entry === null)) {
@@ -27,7 +34,7 @@ export async function buildEffectBundleRootInventory(
   }
   return Promise.all(
     entries
-      .map((entry) => entry!)
+      .map((entry) => overlayEffectPreferences(entry!, preferences))
       .sort((left, right) => left.packId.localeCompare(right.packId))
       .map(async (entry, rootIndex) => {
         await assertEffectBundleCatalogIntegrity(entry);
