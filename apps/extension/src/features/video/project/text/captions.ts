@@ -9,7 +9,8 @@ export function videoProjectCaptionInput(project: VideoProject) {
   const bindings = new Map(
     entries.flatMap((entry) =>
       entry.document.fragments.map(
-        (fragment) => [JSON.stringify([entry.id, fragment.id]), entry] as const
+        (fragment) =>
+          [JSON.stringify([entry.id, fragment.id]), { entry, fragmentId: fragment.id }] as const
       )
     )
   );
@@ -27,9 +28,12 @@ export function videoProjectCaptionInput(project: VideoProject) {
     settings: { ...createReviewCaptionSettings(), enabled: true },
     segments: [],
     project(fragment: ReviewTextFragment) {
-      const entry = bindings.get(fragment.id);
-      if (!entry) throw new Error('Caption document binding is unavailable.');
-      return projectVideoProjectTextFragment(project, entry, fragment);
+      const binding = bindings.get(fragment.id);
+      if (!binding) throw new Error('Caption document binding is unavailable.');
+      return projectVideoProjectTextFragment(project, binding.entry, {
+        ...fragment,
+        id: binding.fragmentId,
+      });
     },
   };
 }

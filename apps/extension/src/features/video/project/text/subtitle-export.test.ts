@@ -109,3 +109,43 @@ it('reports sub-millisecond omissions without discarding other authored cues', (
   expect(result).toMatchObject({ ok: true, count: 1, excluded: 1 });
   expect(project).toEqual(before);
 });
+
+it.each(['srt', 'vtt'] as const)(
+  'retains transferred caption limits in %s after reopen',
+  async (format) => {
+    const { parseHydratableVideoProject } = await import('../validation/root');
+    const { project } = fixture();
+    project.version = 45;
+    const entry = project.textDocuments![1]!;
+    const fragment = entry.document.fragments[0]!;
+    fragment.start = 6;
+    fragment.end = 8;
+    fragment.text = 'Partial tail';
+    entry.document.fragments.push({
+      ...fragment,
+      id: 'hidden',
+      start: 8,
+      end: 9,
+      text: 'Hidden tail',
+    });
+    entry.resultEndLimits = [
+      { fragmentId: fragment.id, end: 7 },
+      { fragmentId: 'hidden', end: 7 },
+    ];
+    const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(project)));
+    expect(reopened).not.toBeNull();
+    if (!reopened) throw new Error('Project was not admitted');
+    const before = structuredClone(reopened);
+    const result = exportVideoProjectSubtitles(reopened, { format });
+    expect(result).toMatchObject({ ok: true, count: 2, excluded: 2 });
+    if (!result.ok) throw new Error(result.reason);
+    const separator = format === 'srt' ? ',' : '.';
+    expect(result.text).toContain(
+      `00:00:06${separator}000 --> 00:00:07${separator}000\nPartial tail`
+    );
+    expect(result.text).not.toContain('Hidden tail');
+    expect(result.text).toContain('Привет');
+    expect(reopened).toEqual(before);
+    expect(reopened.textDocuments).toEqual(project.textDocuments);
+  }
+);

@@ -131,3 +131,26 @@ it('preserves explicit duration modes only on project-time documents', () => {
   };
   expect(parseVideoProjectTextDocuments([{ ...source, durationMode: 'project' }])).toBeNull();
 });
+
+it('validates display tail limits without changing retained text facts', () => {
+  const entry = document();
+  entry.resultEndLimits = [{ fragmentId: 'phrase', end: 0.5 }];
+  expect(parseVideoProjectTextDocuments(JSON.parse(JSON.stringify([entry])))).toEqual([entry]);
+  for (const resultEndLimits of [
+    null,
+    {},
+    [{ fragmentId: 'missing', end: 1 }],
+    [{ fragmentId: 'phrase', end: -1 }],
+    [{ fragmentId: 'phrase', end: Infinity }],
+    [{ fragmentId: 'phrase', end: 86_401 }],
+    [
+      { fragmentId: 'phrase', end: 1 },
+      { fragmentId: 'phrase', end: 2 },
+    ],
+    [{ fragmentId: 'phrase', end: 1, unknown: true }],
+  ])
+    expect(parseVideoProjectTextDocuments([{ ...entry, resultEndLimits }])).toBeNull();
+  entry.binding = { kind: 'source', assetId: 'asset', sourceInstanceId: 'instance' };
+  entry.document.fragments[0]!.timeDomain = 'source';
+  expect(parseVideoProjectTextDocuments([entry])).toBeNull();
+});

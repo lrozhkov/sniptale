@@ -6,6 +6,10 @@ import { loadAudioMetadata } from './index';
 const mocks = vi.hoisted(() => ({
   duration: vi.fn(),
   peaks: vi.fn(),
+  inspectAudio: vi.fn(),
+}));
+vi.mock('../../../workflows/video-review/audio-import', () => ({
+  inspectReviewAudio: mocks.inspectAudio,
 }));
 vi.mock('./helpers', () => ({
   resolveMediaDuration: mocks.duration,
@@ -37,6 +41,7 @@ beforeEach(() => {
   vi.stubGlobal('document', { createElement: () => ({ src: '', preload: '' }) });
   mocks.duration.mockResolvedValue({ duration: 3.539458, isAuthoritative: true });
   mocks.peaks.mockResolvedValue([0]);
+  mocks.inspectAudio.mockResolvedValue(44102 / 44100);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -71,4 +76,52 @@ it('does not replace browser duration with an empty WAV duration', async () => {
   const metadata = await loadAudioMetadata(wav(0, 48000));
   expect(metadata.duration).toBe(3.539458);
   expect(dispose).toHaveBeenCalledOnce();
+});
+
+it('reconciles a transferred MP3 end with the Gallery decoder without changing source bytes', async () => {
+  const source = new Blob(['MP3 fixture'], { type: 'audio/mpeg' });
+  const original = await source.arrayBuffer();
+  mocks.duration.mockResolvedValue({ duration: 1.000045, isAuthoritative: true });
+  const metadata = await loadAudioMetadata(source, { requiredSourceEnd: 44102 / 44100 });
+  expect(metadata.duration).toBe(44102 / 44100);
+  expect(await source.arrayBuffer()).toEqual(original);
+  expect(mocks.inspectAudio).toHaveBeenCalledWith(source, expect.any(AbortSignal));
+});
+
+it('retains sample-exact WAV duration when decoded sample-rate conversion is shorter', async () => {
+  const source = wav(48001, 48000);
+  mocks.inspectAudio.mockResolvedValue(1);
+  const metadata = await loadAudioMetadata(source, { requiredSourceEnd: 2 });
+  expect(metadata.duration).toBe(48001 / 48000);
+});
+
+it.each([undefined, { requiredSourceEnd: 1 }, { requiredSourceEnd: NaN }])(
+  'does not decode when reconciliation is unnecessary: %j',
+  async (options) => {
+    await loadAudioMetadata(wav(169894, 48000), options);
+    expect(mocks.inspectAudio).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps a decoded duration below an invalid requested end', async () => {
+  mocks.duration.mockResolvedValue({ duration: 1.000045, isAuthoritative: true });
+  const metadata = await loadAudioMetadata(new Blob(['MP3'], { type: 'audio/mpeg' }), {
+    requiredSourceEnd: 2,
+  });
+  expect(metadata.duration).toBe(44102 / 44100);
+  expect(metadata.duration).toBeLessThan(2);
+});
+
+it('keeps the conservative duration when Gallery admission refuses the source', async () => {
+  mocks.inspectAudio.mockRejectedValue(new Error('Unsupported audio size.'));
+  const metadata = await loadAudioMetadata(wav(48000, 48000), { requiredSourceEnd: 2 });
+  expect(metadata.duration).toBe(1);
+});
+
+it('does not decode timed-out metadata even when the transfer requests a longer end', async () => {
+  mocks.duration.mockResolvedValue({ duration: 1, isAuthoritative: false });
+  const metadata = await loadAudioMetadata(wav(48000, 48000), { requiredSourceEnd: 2 });
+  expect(metadata.duration).toBe(1);
+  expect(mocks.inspectAudio).not.toHaveBeenCalled();
+  expect(mocks.peaks).not.toHaveBeenCalled();
 });

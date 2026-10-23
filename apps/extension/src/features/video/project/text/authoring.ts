@@ -117,6 +117,21 @@ export function applyVideoProjectTextEdit(
 ): TextMutation {
   if (!project.textDocuments?.includes(basis)) return { ok: false, reason: 'stale' };
   const next = { ...basis, ...patch };
+  if (basis.resultEndLimits && patch.document) {
+    const previous = new Map(basis.document.fragments.map((fragment) => [fragment.id, fragment]));
+    next.resultEndLimits = basis.resultEndLimits.filter(({ fragmentId }) => {
+      const before = previous.get(fragmentId);
+      const after = patch.document!.fragments.find((fragment) => fragment.id === fragmentId);
+      return (
+        before &&
+        after &&
+        before.start === after.start &&
+        before.end === after.end &&
+        before.timingRevision === after.timingRevision
+      );
+    });
+    if (!next.resultEndLimits.length) delete next.resultEndLimits;
+  }
   const documents = project.textDocuments.map((entry) => (entry === basis ? next : entry));
   if (!parseVideoProjectTextDocuments(documents)) return { ok: false, reason: 'invalid' };
   return {

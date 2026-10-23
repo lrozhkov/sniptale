@@ -48,17 +48,20 @@ export function projectVideoProjectTextFragment(
   entry: VideoProjectTextDocument,
   fragment: ReviewTextFragment
 ): ReturnType<typeof projectReviewTextFragment> {
-  if (entry.binding.kind === 'project')
+  if (entry.binding.kind === 'project') {
+    const limit = entry.resultEndLimits?.find(({ fragmentId }) => fragmentId === fragment.id);
+    const duration = Math.min(project.duration, limit?.end ?? project.duration);
     return projectReviewTextFragment(fragment, [
       {
         kind: 'keep',
         rate: 1,
         sourceStart: 0,
-        sourceEnd: project.duration,
+        sourceEnd: duration,
         resultStart: 0,
-        resultEnd: project.duration,
+        resultEnd: duration,
       },
     ]);
+  }
   const spans = projectVideoProjectTextSourceSpans(project, entry, fragment);
   let covered = 0;
   let end = fragment.start;

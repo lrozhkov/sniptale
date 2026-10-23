@@ -18,7 +18,11 @@ export function exportVideoProjectSubtitles(
   const entries = new Map(
     (project.textDocuments ?? []).flatMap((entry) =>
       entry.document.fragments.map(
-        (fragment) => [JSON.stringify(['document', entry.id, fragment.id]), entry] as const
+        (fragment) =>
+          [
+            JSON.stringify(['document', entry.id, fragment.id]),
+            { entry, fragmentId: fragment.id },
+          ] as const
       )
     )
   );
@@ -70,9 +74,12 @@ export function exportVideoProjectSubtitles(
     mainOffset: 0,
     omitSubMillisecondRanges: true,
     project: (fragment) => {
-      const entry = entries.get(fragment.id);
-      const projected = entry
-        ? projectVideoProjectTextFragment(project, entry, fragment)
+      const binding = entries.get(fragment.id);
+      const projected = binding
+        ? projectVideoProjectTextFragment(project, binding.entry, {
+            ...fragment,
+            id: binding.fragmentId,
+          })
         : {
             excludedFromResult: false,
             partiallyExcluded: false,

@@ -489,6 +489,18 @@ export function planReviewProjectPresentation(args: {
   const requiredVersion: VideoProject['version'] = independent ? 41 : hasPresets ? 26 : 24;
   let project: VideoProject = {
     ...mainProject,
+    ...(active && mainPlacement && mainProject.textDocuments
+      ? {
+          textDocuments: mainProject.textDocuments.map((entry) => {
+            if (entry.binding.kind !== 'project') return entry;
+            const end = Math.min(args.project.duration, mainPlacement.duration);
+            const resultEndLimits = entry.document.fragments
+              .filter((fragment) => fragment.end > end)
+              .map((fragment) => ({ fragmentId: fragment.id, end }));
+            return resultEndLimits.length ? { ...entry, resultEndLimits } : entry;
+          }),
+        }
+      : {}),
     version: mainProject.version > requiredVersion ? mainProject.version : requiredVersion,
     assets: [
       ...args.project.assets,
@@ -523,5 +535,7 @@ export function planReviewProjectPresentation(args: {
   }
   if (active && !preservesJoinTiming(args.project, project, sequence.plan))
     return { status: 'blocked', field: 'presentation-joins' };
+  if (project.textDocuments?.some((entry) => entry.resultEndLimits !== undefined))
+    project.version = 45;
   return { status: 'prepared', project };
 }

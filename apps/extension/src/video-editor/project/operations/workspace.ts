@@ -1,3 +1,4 @@
+import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import {
   reviewProjectBookendReferences,
   type ReviewProjectBookendResource,
@@ -219,15 +220,24 @@ async function prepareReviewResources(
     });
   }
   const audio = document.advancedContent.audio;
-  const audioIds = new Set([
-    ...[...audio.voiceover, ...audio.music].flatMap((take) => [
+  const audioSourceEnds = new Map<string, number>();
+  const takes = [...audio.voiceover, ...audio.music];
+  for (const take of takes) {
+    audioSourceEnds.set(
       take.assetId,
-      ...(take.transcript?.replacements ?? []).map((replacement) => replacement.assetId),
-    ]),
-    ...(audio.originalSpeech?.transcript.replacements ?? []).map(
-      (replacement) => replacement.assetId
-    ),
-  ]);
+      Math.max(audioSourceEnds.get(take.assetId) ?? 0, take.sourceOffset + take.duration)
+    );
+  }
+  for (const replacement of [
+    ...takes.flatMap((take) => take.transcript?.replacements ?? []),
+    ...(audio.originalSpeech?.transcript.replacements ?? []),
+  ]) {
+    audioSourceEnds.set(
+      replacement.assetId,
+      Math.max(audioSourceEnds.get(replacement.assetId) ?? 0, replacement.duration)
+    );
+  }
+  const audioIds = new Set(audioSourceEnds.keys());
   const imageIds = new Set(reviewProjectSceneImageReferences(document.advancedContent));
   const bookendReferences = reviewProjectBookendReferences(document.advancedContent.presentation);
   const bookendIds = new Set([...bookendReferences.images, ...bookendReferences.videos]);
@@ -366,7 +376,9 @@ async function prepareReviewResources(
       if (imageIds.has(id)) images.push(resource);
       if (bookendIds.has(id)) bookends.push(resource);
     } else {
-      const metadata = await loadAudioMetadata(result.entry.file);
+      const metadata = await loadAudioMetadata(result.entry.file, {
+        requiredSourceEnd: audioSourceEnds.get(id) ?? 0,
+      });
       const snapshotName = audio.voiceover
         .find((take) => take.assetId === id && take.textSnapshot?.text.trim())
         ?.textSnapshot?.text.trim();
@@ -450,7 +462,8 @@ async function createProjectFromReview(
     snapshot.workspace.source.width,
     snapshot.workspace.source.height
   );
-  const assets = await ensureLibraryMediaAssets(empty, aggregateId);
+  const libraryBindings: LibraryProjectBinding[] = [];
+  const assets = await ensureLibraryMediaAssets(empty, aggregateId, libraryBindings);
   const primary = assets[0];
   if (!primary || (primary.type !== 'VIDEO' && primary.type !== 'RECORDING'))
     throw new Error('Review video source is unavailable.');
@@ -516,6 +529,7 @@ async function createProjectFromReview(
   return commitVideoProjectMutation(result.project, {
     baseRevision: null,
     expectedReviewWorkspace: snapshot.workspace,
+    ...(libraryBindings.length ? { libraryBindings } : {}),
   });
 }
 

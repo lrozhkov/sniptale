@@ -6,6 +6,7 @@ export interface CommitVideoProjectMutationOptions {
   baseRevision?: number | null;
   expectedWorkspaceRevision?: number | null;
   expectedReviewWorkspace?: SaveVideoProjectOptions['expectedReviewWorkspace'];
+  libraryBindings?: SaveVideoProjectOptions['libraryBindings'];
 }
 
 export interface VideoProjectWorkspaceCommit {
@@ -25,6 +26,7 @@ export async function commitVideoProjectMutation(
     ...(options.expectedReviewWorkspace === undefined
       ? {}
       : { expectedReviewWorkspace: options.expectedReviewWorkspace }),
+    ...(options.libraryBindings ? { libraryBindings: options.libraryBindings } : {}),
     storageClass: 'library',
   });
   return entry.project;

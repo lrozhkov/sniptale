@@ -255,7 +255,7 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
   };
 }
 
-/** Bounded parser for both source snapshots and authored feedback, without a persistence side effect. */
+/** Preserve source facts and bound authored feedback without a persistence side effect. */
 export function parseVideoProjectActionFeedback(
   raw: unknown
 ): VideoProjectActionFeedback[] | undefined | null {
@@ -264,7 +264,6 @@ export function parseVideoProjectActionFeedback(
   const groups: VideoProjectActionFeedback[] = [];
   const ids = new Set<string>();
   let settingsCount = 0,
-    signalCount = 0,
     styleCount = 0,
     keyStyleCount = 0;
   for (const item of raw) {
@@ -298,17 +297,14 @@ export function parseVideoProjectActionFeedback(
       styles === null ||
       keys === null ||
       !Array.isArray(signals) ||
-      signals.length > 10000 ||
       !signals.every(isRecordingTelemetrySignal)
     )
       return null;
     settingsCount += settings.length;
-    signalCount += signals.length;
     styleCount += styles?.length ?? 0;
     keyStyleCount += keys?.length ?? 0;
     if (
       settingsCount > 10000 ||
-      signalCount > 10000 ||
       styleCount > 10000 ||
       keyStyleCount > 10000 ||
       new Set(signals.map((signal) => signal.id)).size !== signals.length

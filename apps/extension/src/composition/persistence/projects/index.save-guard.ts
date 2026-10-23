@@ -1,3 +1,4 @@
+import type { LibraryProjectBinding } from './known-library-source';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
 import type { VideoProjectEntry } from './contracts';
@@ -10,6 +11,8 @@ export interface SaveVideoProjectOptions {
   expectedProject?: VideoProject | null;
   /** Exact selected Gallery predecessor; checked in the destination transaction. */
   expectedReviewWorkspace?: VideoWorkspace;
+  /** Private existing-source bindings committed atomically with a new review destination. */
+  libraryBindings?: readonly LibraryProjectBinding[];
   storageClass?: LibraryStorageClass;
 }
 

@@ -142,3 +142,23 @@ it('keeps a source caption in a held-only descendant after a split', () => {
   expect(fragment.start).toBe(1);
   expect(fragment.end).toBe(9);
 });
+
+it('clips only the retained result fragment tail after project expansion without changing word facts', () => {
+  const { project, entry, fragment } = fixture();
+  entry.binding = { kind: 'project' };
+  fragment.timeDomain = 'result';
+  entry.resultEndLimits = [{ fragmentId: fragment.id, end: 5 }];
+  const before = structuredClone(fragment);
+  expect(projectVideoProjectTextFragment(project, entry, fragment)).toEqual({
+    excludedFromResult: false,
+    partiallyExcluded: true,
+    ranges: [{ start: 1, end: 5 }],
+  });
+  expect(projectVideoProjectTextFragment(project, entry, { ...fragment, start: 6 }).ranges).toEqual(
+    []
+  );
+  expect(
+    projectVideoProjectTextFragment(project, entry, { ...fragment, id: 'new' }).ranges
+  ).toEqual([{ start: 1, end: 9 }]);
+  expect(fragment).toEqual(before);
+});

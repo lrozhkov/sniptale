@@ -246,7 +246,8 @@ it('creates a separate editable project from saved Gallery cuts instead of the r
   expect(deleteProjectAsset).not.toHaveBeenCalled();
   expect(ensureLibraryMediaAssetsMock).toHaveBeenCalledWith(
     expect.anything(),
-    'recording:recording-1'
+    'recording:recording-1',
+    []
   );
   const second = await loadInitialProjectFromLocation();
   expect(second.project!.id).not.toBe(result.project!.id);
@@ -434,7 +435,7 @@ it.each([
         id: 'voice',
         assetId: 'project-asset:voice-bytes',
         timelineStart: 0,
-        sourceOffset: 0,
+        sourceOffset: 0.25,
         duration: 1,
         volume: 1,
         muted: false,
@@ -451,6 +452,14 @@ it.each([
           end: 1,
           timeDomain: 'result',
         },
+      },
+    ];
+    snapshot.workspace.advanced.audio.music = [
+      {
+        ...snapshot.workspace.advanced.audio.voiceover[0]!,
+        id: 'music-shared',
+        sourceOffset: 1.5,
+        duration: 0.5,
       },
     ];
     getProjectAsset.mockResolvedValue({ status: 'not-found' });
@@ -478,6 +487,10 @@ it.each([
       audioPeaks: null,
     });
     const result = await loadInitialProjectFromLocation();
+    expect(loadAudioMetadata).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ name: fileName }),
+      { requiredSourceEnd: 2 }
+    );
     expect(
       result.project!.assets.find((asset) => asset.id === 'project-asset:voice-bytes')
     ).toMatchObject({
@@ -1267,4 +1280,34 @@ it('transfers fractional bookend timing without modifying Gallery or requiring a
   expect(saveVideoProject).toHaveBeenCalledOnce();
   expect(deleteProjectAsset).not.toHaveBeenCalled();
   expect(snapshot).toEqual(source);
+});
+
+it('hands unpublished private bindings to the destination transaction', async () => {
+  await transferFixture();
+  const asset = await importRecordingProjectAssetMock('recording-1');
+  const binding = {
+    claim: {
+      mediaId: 'recording:recording-1',
+      source: { kind: 'recording', recordingId: 'recording-1' },
+    },
+    entry: {
+      id: 'private-source',
+      assetId: 'recording-body',
+      createdAt: 1,
+      mimeType: 'video/webm',
+      size: 5,
+    },
+    ref: { assetId: 'recording-body' },
+  };
+  ensureLibraryMediaAssetsMock.mockImplementationOnce(async (_project, _mediaId, pending) => {
+    pending.push(binding);
+    return [asset];
+  });
+  await loadInitialProjectFromLocation();
+  expect(saveVideoProject).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      libraryBindings: [binding],
+    })
+  );
 });

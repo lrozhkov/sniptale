@@ -16,6 +16,8 @@ export interface VideoProjectTextDocument {
   binding: VideoProjectTextBinding;
   /** Project-time text can follow the montage without extending its duration. */
   durationMode?: VideoProjectDurationMode;
+  /** Display-only tails retained during composition transfer; explicit retiming releases them. */
+  resultEndLimits?: { fragmentId: string; end: number }[];
   document: ReviewTextDocument;
   captions?: ReviewCaptionSettings;
 }

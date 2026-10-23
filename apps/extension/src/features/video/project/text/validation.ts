@@ -1,3 +1,4 @@
+import { MAX_VIDEO_PROJECT_DURATION_SECONDS } from '../validation/primitives';
 import { isVideoProjectDurationMode } from '../types/layout';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseReviewCaptionSettings, parseReviewTextDocument } from '../../review/text-validation';
@@ -56,6 +57,28 @@ function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
     (binding.kind !== 'project' || !isVideoProjectDurationMode(durationMode))
   )
     return null;
+  const limits = value['resultEndLimits'];
+  const resultEndLimits: NonNullable<VideoProjectTextDocument['resultEndLimits']> = [];
+  if (limits !== undefined) {
+    if (binding.kind !== 'project' || !Array.isArray(limits) || limits.length > 2_000) return null;
+    const ids = new Set<string>();
+    for (const limit of limits) {
+      if (
+        !isRecord(limit) ||
+        Object.keys(limit).length !== 2 ||
+        !identity(limit['fragmentId']) ||
+        ids.has(limit['fragmentId']) ||
+        !document.fragments.some((fragment) => fragment.id === limit['fragmentId']) ||
+        typeof limit['end'] !== 'number' ||
+        !Number.isFinite(limit['end']) ||
+        limit['end'] < 0 ||
+        limit['end'] > MAX_VIDEO_PROJECT_DURATION_SECONDS
+      )
+        return null;
+      ids.add(limit['fragmentId']);
+      resultEndLimits.push({ fragmentId: limit['fragmentId'], end: limit['end'] });
+    }
+  }
   const domain = binding.kind === 'source' ? 'source' : 'result';
   if (document.fragments.some((fragment) => fragment.timeDomain !== domain)) return null;
   return {
@@ -63,6 +86,7 @@ function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
     binding,
     document,
     ...(durationMode === undefined ? {} : { durationMode }),
+    ...(limits === undefined ? {} : { resultEndLimits }),
     ...(captions ? { captions } : {}),
   };
 }

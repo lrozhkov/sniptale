@@ -115,6 +115,14 @@ function prefixTextDocuments(
     entry.binding.kind === 'project'
       ? {
           ...entry,
+          ...(entry.resultEndLimits === undefined
+            ? {}
+            : {
+                resultEndLimits: entry.resultEndLimits.map((limit) => ({
+                  ...limit,
+                  end: shift(limit.end),
+                })),
+              }),
           document: {
             ...entry.document,
             fragments: entry.document.fragments.map((fragment) => ({

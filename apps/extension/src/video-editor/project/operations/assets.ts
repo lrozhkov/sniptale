@@ -1,7 +1,9 @@
+import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import type { ProjectAssetPublicationOptions } from '../../../composition/persistence/projects/index';
 import {
   readLibraryProjectBindingSource,
   prepareLibraryProjectBinding,
+  prepareLibraryProjectBindingForCommit,
 } from '../../../composition/persistence/projects/library-project-binding';
 import { getRecording } from '../../../composition/persistence/recordings/index';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
@@ -127,7 +129,8 @@ export async function importRecordingProjectAsset(
 /** References Library media; freezes derived presentations as private project resources. */
 export async function ensureLibraryMediaAssets(
   project: VideoProject,
-  mediaId: string
+  mediaId: string,
+  pendingBindings?: LibraryProjectBinding[]
 ): Promise<VideoProjectAsset[]> {
   const existing = project.assets.find(
     (asset) =>
@@ -150,8 +153,12 @@ export async function ensureLibraryMediaAssets(
         ? { ...(await loadAudioMetadata(source.file)), width: 0, height: 0, hasAudio: true }
         : await loadVideoMetadata(source.file);
     const projectAssetId = crypto.randomUUID();
-    const prepared = await prepareLibraryProjectBinding(source, projectAssetId);
-    await prepared.publish();
+    if (pendingBindings) {
+      pendingBindings.push(prepareLibraryProjectBindingForCommit(source, projectAssetId));
+    } else {
+      const prepared = await prepareLibraryProjectBinding(source, projectAssetId);
+      await prepared.publish();
+    }
     return [
       createVideoProjectAsset(
         source.filename,

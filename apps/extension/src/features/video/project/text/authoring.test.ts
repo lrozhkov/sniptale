@@ -507,3 +507,66 @@ it('refuses invalid source-duration mode edits and allows a current-basis retry 
   });
   expect(sourceProject).toEqual(before);
 });
+
+it('releases transferred limits only for retimed or deleted fragments', async () => {
+  const { project, entry } = fixture();
+  const { projectVideoProjectTextFragment } = await import('./projection');
+  const { parseHydratableVideoProject } = await import('../validation/root');
+  project.duration = 12;
+  const fragment = entry.document.fragments[0]!;
+  entry.document.fragments = [fragment, { ...fragment, id: 'second' }];
+  entry.resultEndLimits = [
+    { fragmentId: fragment.id, end: 2 },
+    { fragmentId: 'second', end: 2 },
+  ];
+  const text = editReviewTextFragment(entry.document, fragment.id, { text: 'Edited text' });
+  if (!text.ok) throw new Error('Text edit failed');
+  const edited = applyVideoProjectTextEdit(project, entry, { document: text.document });
+  if (!edited.ok) throw new Error('Native edit failed');
+  expect(edited.project.version).toBe(45);
+  expect(edited.entry.resultEndLimits).toEqual(entry.resultEndLimits);
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(edited.project)));
+  expect(reopened?.textDocuments).toEqual(edited.project.textDocuments);
+  expect(
+    projectVideoProjectTextFragment(
+      edited.project,
+      edited.entry,
+      edited.entry.document.fragments[0]!
+    ).ranges
+  ).toEqual([{ start: 1, end: 2 }]);
+  const timing = editReviewTextFragment(edited.entry.document, fragment.id, { start: 8, end: 10 });
+  if (!timing.ok) throw new Error('Timing edit failed');
+  const retimed = applyVideoProjectTextEdit(edited.project, edited.entry, {
+    document: timing.document,
+  });
+  if (!retimed.ok) throw new Error('Native timing edit failed');
+  expect(retimed.entry.resultEndLimits).toEqual([{ fragmentId: 'second', end: 2 }]);
+  expect(
+    projectVideoProjectTextFragment(
+      retimed.project,
+      retimed.entry,
+      retimed.entry.document.fragments[0]!
+    ).ranges
+  ).toEqual([{ start: 8, end: 10 }]);
+  const added = addVideoProjectManualText(retimed.project, {
+    documentId: retimed.entry.id,
+    fragmentId: 'new',
+    start: 9,
+    target: retimed.entry,
+  });
+  if (!added.ok) throw new Error('Native addition failed');
+  expect(added.entry.resultEndLimits).toEqual(retimed.entry.resultEndLimits);
+  expect(
+    projectVideoProjectTextFragment(added.project, added.entry, added.entry.document.fragments[2]!)
+      .ranges
+  ).toEqual([{ start: 9, end: 12 }]);
+  const deleted = applyVideoProjectTextEdit(added.project, added.entry, {
+    document: {
+      ...added.entry.document,
+      fragments: added.entry.document.fragments.filter(({ id }) => id !== 'second'),
+    },
+  });
+  if (!deleted.ok) throw new Error('Native deletion failed');
+  expect(deleted.entry.resultEndLimits).toBeUndefined();
+  expect(parseHydratableVideoProject({ ...edited.project, version: 44 })).toBeNull();
+});

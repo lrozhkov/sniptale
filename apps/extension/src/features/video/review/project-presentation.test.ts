@@ -611,3 +611,65 @@ it.each([0.14, 0.15])(
     expect(input).toEqual(before);
   }
 );
+
+it.each(['intro', 'outro', 'both'] as const)(
+  'retains clipped result captions without reviving them across %s bookends',
+  async (side) => {
+    const { videoProjectCaptionInput } = await import('../project/text/captions');
+    const { planReviewCaptions } = await import('./caption-plan');
+    const { parseHydratableVideoProject } = await import('../project/validation/root');
+    const input = bookendFixture();
+    const settings = input.document.advancedContent.presentation!;
+    if (side === 'intro') settings.outroControl!.mode = 'none';
+    if (side === 'outro') settings.introControl!.mode = 'none';
+    const original = input.document.advancedContent.text!.fragments[0]!;
+    const fragments = [
+      { ...original, id: 'visible', timeDomain: 'result' as const },
+      {
+        ...original,
+        id: 'partial',
+        start: 6,
+        end: 8,
+        timeDomain: 'result' as const,
+        alignment: 'word' as const,
+        words: [{ text: 'Text', start: 6, end: 8 }],
+      },
+      { ...original, id: 'hidden', start: 7, end: 8, timeDomain: 'result' as const },
+    ];
+    input.document.advancedContent.text!.fragments = fragments;
+    const before = structuredClone(fragments);
+    const result = planReviewProjectConversion(input);
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    const project = parseHydratableVideoProject(JSON.parse(JSON.stringify(result.project)));
+    if (!project) throw new Error('Converted captions did not reopen');
+    const offset = side === 'outro' ? 0 : 1;
+    const entry = project.textDocuments!.find((value) => value.binding.kind === 'project')!;
+    expect(entry.document.fragments).toEqual(
+      before.map((fragment) => ({
+        ...fragment,
+        start: fragment.start + offset,
+        end: fragment.end + offset,
+        timingRevision: fragment.timingRevision + (offset ? 1 : 0),
+        ...(fragment.words
+          ? {
+              words: fragment.words.map((word) => ({
+                ...word,
+                start: word.start + offset,
+                end: word.end + offset,
+              })),
+            }
+          : {}),
+      }))
+    );
+    const plan = planReviewCaptions({
+      ...videoProjectCaptionInput(project),
+      output: { width: 640, height: 360 },
+      measure: () => 10,
+    });
+    expect(plan.cues.map(({ start, end }) => ({ start, end }))).toEqual([
+      { start: 1 + offset, end: 2 + offset },
+      { start: 6 + offset, end: 7 + offset },
+    ]);
+    expect(input.document.advancedContent.text!.fragments).toEqual(before);
+  }
+);

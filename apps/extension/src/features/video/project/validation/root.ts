@@ -57,6 +57,7 @@ import {
   MAX_VIDEO_PROJECT_DIMENSION,
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
   MAX_VIDEO_PROJECT_FPS,
+  MAX_VIDEO_PROJECT_ITEMS,
   isBoundedNumber,
   isBoundedArray,
   isColorString,
@@ -82,6 +83,18 @@ function isProjectSource(value: unknown): boolean {
     return isString(value['scenarioProjectId']);
   }
   return true;
+}
+
+function isActionEventCollection(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  let authoredCount = 0;
+  return value.every((event) => {
+    if (!isActionEvent(event) || !isRecord(event) || !isRecord(event['anchor'])) return false;
+    // Captured source facts retain the source telemetry collection admission.
+    if (event['anchor']['kind'] === 'recording-source') return true;
+    authoredCount += 1;
+    return authoredCount <= MAX_VIDEO_PROJECT_ITEMS;
+  });
 }
 
 function isTransition(value: unknown): boolean {
@@ -135,8 +148,13 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 44) &&
+    isBoundedNumber(version, 2, 45) &&
     Number.isInteger(version) &&
+    (version >= 45 ||
+      !Array.isArray(value['textDocuments']) ||
+      value['textDocuments'].every(
+        (entry: unknown) => !isRecord(entry) || entry['resultEndLimits'] === undefined
+      )) &&
     (version >= 42 || value['watermarkSource'] === undefined) &&
     (version >= 41 ||
       !isRecord(value['bookendPresets']) ||
@@ -304,7 +322,7 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     parseVideoProjectActionFeedback(value['actionFeedback']) !== null &&
     (value['cursorFocusPath'] === undefined ||
       parseCursorFocusPath(value['cursorFocusPath']) !== null) &&
-    isBoundedArray(value['actionEvents'], isActionEvent) &&
+    isActionEventCollection(value['actionEvents']) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['watermarkSource'] === undefined ||

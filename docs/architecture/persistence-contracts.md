@@ -646,3 +646,17 @@ Gallery conversion retains every observation, including observations inside cuts
 Recording observations can extend beyond the encoded media duration. Source groups retain these observations with their original times within the existing finite 0–86400 second limit. Projection limits timeline samples and source anchors to the owning clip. It can use a later observation to interpolate the final visible position. This corrects schema 33 admission without changing its stored fields or the original recording.
 
 The existing immutable project revision owns derived focus caches. Preview cache signatures include complete retained source observations. A source fact outside the visible clip can affect its inferred trajectory. This field adds no storage writer, resource store, or deletion authority. Existing guarded publication and source retention contracts remain authoritative.
+
+## Gallery transfer preservation
+
+Montage schema 45 admits optional `resultEndLimits` on project-bound text documents. Each entry identifies an existing fragment and its visible result-time end. Earlier schemas refuse this field. Mutation retains schema 45 after field removal.
+
+Gallery transfer records limits for result fragments that extend beyond the retained main composition. Caption projection applies these limits before bookends can extend visibility. Original fragments, words, and authored times remain stored. Intro insertion shifts limits with their fragments.
+
+Text and style edits retain the limits. An explicit timing edit releases only the affected fragment limit. Deletion removes its limit. New fragments have no inherited limit. Existing rewrite admission refuses excluded or partially excluded fragments before disclosure.
+
+Recording-source actions and signals retain all admitted source facts. Their counts do not use the authored-event limit. Authored events retain that limit. Shape, identity, and reference checks remain mandatory.
+
+Transfer preparation keeps new private Library bindings in memory. The destination transaction rechecks source authority and publishes the binding, byte ownership, and project together. Refusal or transaction failure publishes none of them. Retry creates a new candidate. No compensating deletion can remove another accepted destination or shared source bytes.
+
+Audio acquisition reconciles an insufficient metadata duration through the existing bounded Gallery decoder. It uses the retained take and replacement endpoints. It never extends duration to an unsupported requested endpoint. Source bytes and authored edits remain unchanged.

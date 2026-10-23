@@ -1854,10 +1854,10 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
       "symbol": "prepareReviewResources",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: One captured immutable resource bundle feeds conversion. The added name uses an already retained speech snapshot. A blank file name or known backing identity uses retained speech text. Explicit file names remain. No new reader, writer, lifetime or coordinator applies. Main inspected this exact body. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
+      "reason": "tool-noise: One immutable resource bundle feeds conversion. Local maps deduplicate identities and reject incompatible roles. Existing media owners admit the bytes. The new map derives maximum retained audio endpoints for metadata admission. This operation publishes no durable ownership and adds no independent state or recovery authority. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
       "reviewDate": "2026-10-23",
-      "astHash": "75675c83bfaa6e00244cec3da48670bb03ff2b873dd2e002b149c4e637ea1bfb",
+      "astHash": "278204fe43e4c7cbc1d7cdda674092dad5f5e464f2e50eb502cae93725fd2f6f",
       "signatureHash": "61d42269b9a47647c3d55d69c5f2ee4589db4306015f090645afaf7e51c79c33"
     },
     {
@@ -1920,10 +1920,10 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This suite proves one project opening and publication operation. Two audio rows cover physical and explicit names under the same resource refusal and retry. Fixtures grant no product authority. No runtime state or ownership change applies. Main inspected this exact body. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
+      "reason": "tool-noise: This suite proves one location-driven Gallery transfer with one source snapshot and destination publication observation. Reset mocks hold test observations, not product authority. Added cases prove shared audio endpoints and pending binding propagation. No new test runtime or independent lifetime exists. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
       "reviewDate": "2026-10-23",
-      "astHash": "f05007f296bd65bec8bb9df08048bb84018b4e35fa2e2d0ff2a4fb6844fa2180",
+      "astHash": "c95b54726f78905ce9d552bf1ca7c8dadc4b1ce3e60b6e1d4942391541353074",
       "signatureHash": "3945c9c609bb72de6c6661c873250ad62b091a9b5afd6e0ef927f1b774b2c43a"
     },
     {
@@ -2398,6 +2398,28 @@
       "reviewDate": "2026-10-23",
       "astHash": "a77b59a1600c7db0eeb290828eba3596bba2b798e5c137325595e64b6a36ec81",
       "signatureHash": "b59ea619d04c191a40d798478559f34e6bfd23dd905786a97e49ba589f47da6f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/projects/index.ts",
+      "symbol": "saveVideoProject",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One destination save transaction owns predecessor admission, binding publication, reference checks, root publication, and abort. Bindings are cloned before asynchronous preparation. The existing transaction publishes them atomically. Separate publication would break that invariant. Existing lifecycle and physical deletion remain under this owner. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
+      "reviewDate": "2026-10-23",
+      "astHash": "5e2797aa60339b926396933a6a3a3b2bb2d2fbf13958b95ae331a76f645fdf9c",
+      "signatureHash": "9c1a61ad3c8a2a28fe294876778e34eaab975da22af58ffeb31606d55d285db1"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/project/operations/assets.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:project",
+      "reason": "tool-noise: This suite proves one acquisition boundary through existing recording, Library, and import fixtures. Mock receivers are dependency observations, not product state authorities. The new case verifies pending transfer acquisition without publication. Splitting this case would duplicate the same acquisition fixture. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
+      "reviewDate": "2026-10-23",
+      "astHash": "514016bbd4bd152a0efa63a1e19773e60c96d400e69bd303d0bf0e1f2ea39955",
+      "signatureHash": "65db8947592046ea0204fa32f520b703b3644746aa27ccfcaf8aa14c040262e1"
     }
   ]
 }
